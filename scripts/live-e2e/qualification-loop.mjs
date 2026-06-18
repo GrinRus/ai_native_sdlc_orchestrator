@@ -174,14 +174,19 @@ function resolveSummaryRelativePath(summaryFile, fileRef) {
 /**
  * @param {Record<string, unknown>} summary
  * @param {Record<string, unknown>} observationReport
+ * @param {Record<string, unknown>} runHealthReport
  * @returns {"passed" | "needs_fix" | "blocked"}
  */
-function classifyQualification(summary, observationReport) {
+function classifyQualification(summary, observationReport, runHealthReport) {
   if (asNonEmptyString(observationReport.report_status) === "in_progress") {
     return "blocked";
   }
-  const canonical = asRecord(summary.canonical_status);
-  const qualityJudgement = asRecord(summary.quality_judgement);
+  const runHealthStatus =
+    asNonEmptyString(runHealthReport.overall_status) ||
+    asNonEmptyString(asRecord(summary.run_health).overall_status) ||
+    asNonEmptyString(summary.live_e2e_run_health_overall_status);
+  const failureSummary = asRecord(runHealthReport.failure_summary);
+  const failureOwner = asNonEmptyString(failureSummary.owner);
   const finalAnalysis = asRecord(observationReport.final_analysis);
   const stageResults = Array.isArray(summary.stage_results) ? summary.stage_results.map((entry) => asRecord(entry)) : [];
   const blockedStage = stageResults.find((entry) => {
@@ -194,14 +199,17 @@ function classifyQualification(summary, observationReport) {
         summaryText.includes("auth") ||
         summaryText.includes("permission") ||
         summaryText.includes("provider") ||
-        summaryText.includes("safety"))
+      summaryText.includes("safety"))
     );
   });
   if (blockedStage) return "blocked";
+  if (runHealthStatus === "blocked") return "blocked";
+  if (runHealthStatus !== "pass" && ["provider", "environment", "operator"].includes(failureOwner)) {
+    return "blocked";
+  }
   if (
     asNonEmptyString(summary.status) === "pass" &&
-    asNonEmptyString(canonical.acceptance_status) === "pass" &&
-    asNonEmptyString(qualityJudgement.overall_status) !== "fail" &&
+    runHealthStatus === "pass" &&
     asNonEmptyString(finalAnalysis.status) === "pass"
   ) {
     return "passed";
@@ -210,11 +218,58 @@ function classifyQualification(summary, observationReport) {
 }
 
 /**
- * @param {{ summary: Record<string, unknown>, observationReport: Record<string, unknown>, status: "passed" | "needs_fix" | "blocked" }}
+ * @param {Record<string, unknown>} runHealthReport
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectRunHealthGaps(runHealthReport) {
+  const gaps = [];
+  const sections = [
+    ["command_health", "failed_commands"],
+    ["controller_health", "gaps"],
+    ["provider_health", "findings"],
+    ["target_environment_health", "findings"],
+    ["evidence_health", "missing_evidence_refs"],
+    ["resume_interaction_health", "gaps"],
+  ];
+  for (const [sectionName, fieldName] of sections) {
+    const section = asRecord(runHealthReport[sectionName]);
+    for (const entry of asStringArray(section[fieldName])) {
+      gaps.push({
+        section: sectionName,
+        field: fieldName,
+        summary: entry,
+      });
+    }
+  }
+  const failureSummary = asRecord(runHealthReport.failure_summary);
+  if (asNonEmptyString(failureSummary.class)) {
+    gaps.push({
+      section: "failure_summary",
+      owner: asNonEmptyString(failureSummary.owner) || null,
+      phase: asNonEmptyString(failureSummary.phase) || null,
+      class: asNonEmptyString(failureSummary.class),
+      summary: asNonEmptyString(failureSummary.summary) || null,
+    });
+  }
+  const runFindings = Array.isArray(runHealthReport.run_findings)
+    ? runHealthReport.run_findings.map((entry) => asRecord(entry))
+    : [];
+  for (const finding of runFindings) {
+    gaps.push({
+      section: "run_findings",
+      category: asNonEmptyString(finding.category) || null,
+      severity: asNonEmptyString(finding.severity) || null,
+      summary: asNonEmptyString(finding.summary) || null,
+      evidence_refs: asStringArray(finding.evidence_refs),
+    });
+  }
+  return gaps;
+}
+
+/**
+ * @param {{ summary: Record<string, unknown>, observationReport: Record<string, unknown>, runHealthReport: Record<string, unknown>, status: "passed" | "needs_fix" | "blocked" }}
  */
 function buildAnalysis(options) {
-  const qualityJudgement = asRecord(options.summary.quality_judgement);
-  const runnerQualitySummary = asRecord(options.summary.runner_quality_summary);
   const stepJournal = Array.isArray(options.observationReport.step_journal)
     ? options.observationReport.step_journal.map((entry) => asRecord(entry))
     : [];
@@ -232,16 +287,7 @@ function buildAnalysis(options) {
       evidence_refs: asStringArray(entry.artifact_refs),
       observation_ref: asNonEmptyString(entry.observation_ref) || null,
     }));
-  const qualityDrops = [
-    ["target_baseline_status", qualityJudgement.target_baseline_status],
-    ["real_code_change_status", qualityJudgement.real_code_change_status],
-    ["post_run_verification_status", qualityJudgement.post_run_verification_status],
-    ["provider_execution_status", qualityJudgement.provider_execution_status],
-    ["quality_gate_decision", qualityJudgement.quality_gate_decision],
-    ["mission_satisfaction", runnerQualitySummary.mission_satisfaction],
-  ]
-    .filter(([, value]) => asNonEmptyString(value) && !["pass", "warn", "accept"].includes(asNonEmptyString(value)))
-    .map(([field, value]) => ({ field, value }));
+  const runHealthGaps = collectRunHealthGaps(options.runHealthReport);
   const failure_context = extractQualificationFailureContext({
     ...options.summary,
     status: options.status,
@@ -257,10 +303,15 @@ function buildAnalysis(options) {
     commit_sha: asNonEmptyString(options.summary.commit_sha) || null,
     branch_name: asNonEmptyString(options.summary.branch_name) || null,
     failing_steps: failingSteps,
-    quality_drops: qualityDrops,
+    run_health_status:
+      asNonEmptyString(options.runHealthReport.overall_status) ||
+      asNonEmptyString(asRecord(options.summary.run_health).overall_status) ||
+      null,
+    run_health_gaps: runHealthGaps,
     failure_context,
     evidence_refs: [
       asNonEmptyString(options.summary.live_e2e_observation_report_file),
+      asNonEmptyString(options.summary.live_e2e_run_health_report_file),
       asNonEmptyString(options.summary.review_report_file),
       asNonEmptyString(options.summary.latest_runtime_harness_report_file),
       asNonEmptyString(options.summary.post_run_verify_summary_file),
@@ -268,8 +319,8 @@ function buildAnalysis(options) {
     recommended_fix_scope:
       options.status === "passed"
         ? "none"
-        : qualityDrops.length > 0
-          ? "Inspect failing quality dimensions and patch AOR runtime or live E2E flow before rerunning from a fresh isolated workspace."
+        : runHealthGaps.length > 0
+          ? "Inspect run-health gaps and patch the first run, provider, environment, operator, or AOR-owner break before rerunning from a fresh isolated workspace."
           : "Inspect failing step evidence refs and patch the first public flow break before rerunning.",
     generated_at: nowIso(),
   };
@@ -294,6 +345,8 @@ function updateQualificationSet(options) {
     branch_name: asNonEmptyString(options.summary.branch_name) || null,
     summary_ref: asNonEmptyString(options.summary.summary_ref) || null,
     observation_report_ref: asNonEmptyString(options.summary.live_e2e_observation_report_file) || null,
+    run_health_report_ref: asNonEmptyString(options.summary.live_e2e_run_health_report_file) || null,
+    run_health_status: asNonEmptyString(options.analysis.run_health_status) || null,
     analysis_ref: asNonEmptyString(options.analysis.analysis_file) || null,
     failure_owner: asNonEmptyString(asRecord(options.analysis.failure_context).failure_owner) || null,
     failure_phase: asNonEmptyString(asRecord(options.analysis.failure_context).failure_phase) || null,
@@ -369,16 +422,21 @@ function recordQualificationResult(options) {
   }
   const observationFile = resolveSummaryRelativePath(summaryFile, observationFileRef);
   const observationReport = asRecord(readJson(observationFile));
+  const runHealthFileRef =
+    asNonEmptyString(summary.live_e2e_run_health_report_file) || asNonEmptyString(summary.run_health_report_file);
+  const runHealthFile = runHealthFileRef ? resolveSummaryRelativePath(summaryFile, runHealthFileRef) : null;
+  const runHealthReport = runHealthFile && fs.existsSync(runHealthFile) ? asRecord(readJson(runHealthFile)) : {};
   const featureSize = normalizeFeatureSize(summary.feature_size);
   if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
     throw new UsageError(
       `Qualification loop requires recorded summary feature_size medium or large; xlarge is manual-only. Received '${featureSize || "unknown"}'.`,
     );
   }
-  const status = classifyQualification(summary, observationReport);
+  const status = classifyQualification(summary, observationReport, runHealthReport);
   const analysis = buildAnalysis({
     summary,
     observationReport,
+    runHealthReport,
     status,
   });
   const analysisFile = path.join(
@@ -395,6 +453,7 @@ function recordQualificationResult(options) {
           ...summary,
           summary_ref: summaryFile,
           live_e2e_observation_report_file: observationFile,
+          live_e2e_run_health_report_file: runHealthFile,
         },
       })
     : null;
@@ -410,6 +469,7 @@ function recordQualificationResult(options) {
         qualification_set_status: asNonEmptyString(asRecord(qualificationSet).qualification_status) || null,
         live_e2e_run_summary_file: summaryFile,
         live_e2e_observation_report_file: observationFile,
+        live_e2e_run_health_report_file: runHealthFile,
       },
       null,
       2,
@@ -511,12 +571,15 @@ function runCli(rawArgs) {
   const output = asRecord(JSON.parse(child.stdout));
   const summaryFile = asNonEmptyString(output.live_e2e_run_summary_file);
   const observationFile = asNonEmptyString(output.live_e2e_observation_report_file);
+  const runHealthFile = asNonEmptyString(output.live_e2e_run_health_report_file);
   const summary = summaryFile ? asRecord(readJson(summaryFile)) : {};
   const observationReport = observationFile ? asRecord(readJson(observationFile)) : {};
-  const status = classifyQualification(summary, observationReport);
+  const runHealthReport = runHealthFile ? asRecord(readJson(runHealthFile)) : {};
+  const status = classifyQualification(summary, observationReport, runHealthReport);
   const analysis = buildAnalysis({
     summary,
     observationReport,
+    runHealthReport,
     status,
   });
   const analysisFile = path.join(
@@ -546,6 +609,7 @@ function runCli(rawArgs) {
         qualification_set_status: asNonEmptyString(asRecord(qualificationSet).qualification_status) || null,
         live_e2e_run_summary_file: summaryFile || null,
         live_e2e_observation_report_file: observationFile || null,
+        live_e2e_run_health_report_file: runHealthFile || null,
       },
       null,
       2,

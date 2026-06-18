@@ -1,4 +1,4 @@
-profile_id: live-e2e.installed-user.guided-journey.qwen
+profile_id: live-e2e.installed-user.guided-journey.anthropic
 version: 1
 journey_mode: full-journey
 flow_kind: guided-regress
@@ -30,7 +30,7 @@ implementation_loop:
 target_catalog_id: ky
 feature_mission_id: ky-header-regression
 scenario_family: regress
-provider_variant_id: qwen-primary
+provider_variant_id: anthropic-primary
 bootstrap_template: github-default
 guided_journey:
   enabled: true

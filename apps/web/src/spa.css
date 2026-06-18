@@ -2370,20 +2370,62 @@ code {
   .app-shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto auto auto auto auto auto;
+    max-width: 100vw;
+    overflow-x: clip;
   }
 
   .topbar {
     flex-wrap: wrap;
+    align-items: stretch;
     min-height: 44px;
+    max-width: 100vw;
+    overflow-x: clip;
   }
 
   .brand {
-    min-width: 180px;
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .brand > div {
+    white-space: normal;
+  }
+
+  .project-switcher {
+    grid-template-columns: 1fr;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .project-switcher-meta code,
+  .top-context code {
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .project-switcher .utility-button,
+  .topbar > .utility-button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .top-context {
+    flex: 1 1 100%;
+    width: 100%;
   }
 
   .flow-selector {
     grid-template-columns: 1fr;
-    flex-basis: 100%;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .new-flow-button {
@@ -2438,11 +2480,15 @@ code {
   .main {
     grid-column: 1;
     grid-row: 3;
+    max-width: 100vw;
+    padding: 14px;
   }
 
   .right-rail {
     grid-row: 4;
     grid-template-columns: 1fr;
+    max-width: 100vw;
+    padding: 0 14px 14px;
   }
 
   .bottom-bar {
@@ -2457,6 +2503,7 @@ code {
 
   .graph-trace-row {
     grid-row: 7;
+    grid-template-columns: 1fr;
   }
 
   .secondary-workbench-row {
@@ -2495,6 +2542,10 @@ code {
     grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
     gap: 8px;
     overflow-x: visible;
+  }
+
+  .graph-flow-node::after {
+    display: none;
   }
 
   .timeline-step {

@@ -23,6 +23,8 @@
 - `review-decision.md`
 - `runtime-harness-report.md`
 - `live-e2e-observation-report.md`
+- `live-e2e-run-health-report.md`
+- `live-e2e-quality-assessment-report.md`
 - `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`
 - `dataset.md`
@@ -30,6 +32,8 @@
 - `promotion-decision.md`
 - `compiled-context-artifact.md`
 - `operator-request.md`
+
+Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; outcome quality remains in `live-e2e-quality-assessment-report`. Strict local closure can additionally run the advisory all-pass quality gate, but that gate does not mutate run-health or provider qualification.
 
 ## Platform assets
 - `provider-route-profile.md`

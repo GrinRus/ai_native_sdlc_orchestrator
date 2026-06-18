@@ -148,9 +148,6 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
   }
 
   const externalRunnerMode = String(proof.proof_method?.external_runner_mode ?? "");
-  const targetVerdicts = Array.isArray(proof.targets)
-    ? proof.targets.map((target) => target.overall_status).filter(Boolean)
-    : [];
   const changedPaths = [
     ...(Array.isArray(proof.changed_paths) ? proof.changed_paths : []),
     ...(Array.isArray(proof.no_upstream_write_assertion?.changed_paths)
@@ -175,21 +172,6 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
   }
   if (proof.proof_method?.examples_root_override || proof.source_run?.examples_root_override) {
     findings.push(`${proofFixturePath} must not use examples_root_override.`);
-  }
-  if (targetVerdicts.length === 0 || targetVerdicts.some((verdict) => verdict !== "pass")) {
-    findings.push(`${proofFixturePath} must record pass target verdicts.`);
-  }
-  if (proof.quality_judgement?.overall_status !== "pass") {
-    findings.push(`${proofFixturePath} must record quality_judgement.overall_status=pass.`);
-  }
-
-  const requiredTargetVerdicts = Array.isArray(proof.production_proof?.required_target_verdicts)
-    ? proof.production_proof.required_target_verdicts
-    : [];
-  for (const field of requiredTargetVerdicts) {
-    if (proof.quality_judgement?.[field] !== "pass") {
-      findings.push(`${proofFixturePath} required target verdict '${field}' is not pass.`);
-    }
   }
 
   const noUpstreamWrite = proof.no_upstream_write_assertion ?? {};
@@ -312,7 +294,7 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
     const evidence = row.evidence;
     for (const requiredEvidence of [
       "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
-      "overall_status=pass",
+      "proof_scope=full_code_changing_runtime",
       "real_code_change_proof_complete=true",
       "external_runner_mode=real-external-process",
     ]) {

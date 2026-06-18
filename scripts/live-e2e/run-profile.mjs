@@ -35,7 +35,13 @@ import {
   resolveCatalogRoot,
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
-import { executeFullJourneyFlow, executeInstalledUserFlow, prepareAorInstallationProof } from "./lib/flows.mjs";
+import {
+  collectRuntimeHarnessChangedPaths,
+  executeFullJourneyFlow,
+  executeInstalledUserFlow,
+  prepareAorInstallationProof,
+  runtimeHarnessReportHasMissionRelevantChanges,
+} from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
 import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
 import {
@@ -62,6 +68,14 @@ const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
   "diagnose",
   "block",
 ]);
+const AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+]);
 
 /**
  * @param {string} cwd
@@ -82,26 +96,6 @@ function resolveHostSourceMetadata(hostRoot) {
     branch_name: gitOutputOrNull(hostRoot, ["branch", "--show-current"]),
   };
 }
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function asFindingStrings(value) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (typeof entry === "string") return entry.trim();
-      const record = asRecord(entry);
-      return (
-        asNonEmptyString(record.summary) ||
-        asNonEmptyString(record.message) ||
-        asNonEmptyString(record.code) ||
-        (Object.keys(record).length > 0 ? JSON.stringify(record) : "")
-      );
-    })
-    .filter((entry) => entry.length > 0);
-}
-
 /**
  * @param {string} status
  * @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"}
@@ -160,23 +154,224 @@ function getQualityRelevantStepJournal(stepJournal) {
 }
 
 /**
- * @param {unknown} value
- * @returns {"pass" | "warn" | "fail"}
- */
-function normalizeVerdictStatus(value) {
-  const status = asNonEmptyString(value).toLowerCase();
-  if (status === "pass" || status === "passed" || status === "success") return "pass";
-  if (status === "warn" || status === "warning" || status === "pass_with_findings") return "warn";
-  return "fail";
-}
-
-/**
  * @param {string | null} filePath
  * @returns {Record<string, unknown>}
  */
 function readJsonIfPresent(filePath) {
   const resolved = asNonEmptyString(filePath);
   return resolved && fileExists(resolved) ? asRecord(readJson(resolved)) : {};
+}
+
+/**
+ * @param {Record<string, unknown>} controllerState
+ * @param {string[]} includedSteps
+ * @returns {boolean}
+ */
+function isLiveE2eControllerStateInProgress(controllerState, includedSteps) {
+  const state = asRecord(controllerState);
+  if (Object.keys(state).length === 0) return false;
+
+  const completedSteps = new Set(asStringArray(state.completed_steps));
+  const allIncludedStepsCompleted =
+    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+  const hasCurrentStep = Boolean(asNonEmptyString(state.current_step));
+  const pendingDecision = asRecord(state.pending_decision);
+  const pendingAction = asNonEmptyString(pendingDecision.action);
+  const pendingNextStep = asNonEmptyString(pendingDecision.next_step);
+  const terminalPendingContinue =
+    pendingAction === "continue" && !pendingNextStep && !hasCurrentStep && allIncludedStepsCompleted;
+  const hasPendingDecision = Object.keys(pendingDecision).length > 0 && !terminalPendingContinue;
+  return hasCurrentStep || hasPendingDecision || !allIncludedStepsCompleted;
+}
+
+/**
+ * @param {string} reportsRoot
+ * @param {string} fileName
+ * @returns {string | null}
+ */
+function existingReportFile(reportsRoot, fileName) {
+  const file = path.join(reportsRoot, fileName);
+  return fileExists(file) ? file : null;
+}
+
+/**
+ * @param {{ layout: { reportsRoot: string }, runId: string, profile: Record<string, unknown> }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function loadExistingTerminalProofRunnerArtifacts(options) {
+  const normalizedRunId = normalizeId(options.runId);
+  const summaryFile = existingReportFile(options.layout.reportsRoot, `live-e2e-run-summary-${normalizedRunId}.json`);
+  if (!summaryFile) return null;
+  const summary = readJsonIfPresent(summaryFile);
+  if (asNonEmptyString(summary.status) !== "pass") return null;
+
+  const runHealthReportFile =
+    asNonEmptyString(summary.live_e2e_run_health_report_file) ||
+    existingReportFile(options.layout.reportsRoot, `live-e2e-run-health-report-${normalizedRunId}.json`);
+  const runHealthReport = readJsonIfPresent(runHealthReportFile);
+  if (asNonEmptyString(runHealthReport.overall_status) !== "pass") return null;
+
+  const observationReportFile =
+    asNonEmptyString(summary.live_e2e_observation_report_file) ||
+    existingReportFile(options.layout.reportsRoot, `live-e2e-observation-report-${normalizedRunId}.json`);
+  const observationReport = readJsonIfPresent(observationReportFile);
+  if (
+    asNonEmptyString(observationReport.report_status) !== "final" ||
+    toObservationStatus(asNonEmptyString(observationReport.overall_status)) !== "pass"
+  ) {
+    return null;
+  }
+
+  const controllerStateFile = asNonEmptyString(summary.live_e2e_controller_state_file);
+  const controllerState = readJsonIfPresent(controllerStateFile);
+  if (isLiveE2eControllerStateInProgress(controllerState, getIncludedStepsForProfile(options.profile))) return null;
+
+  return {
+    summary,
+    summaryFile,
+    runHealthReport,
+    runHealthReportFile,
+    observationReport,
+    observationReportFile,
+  };
+}
+
+/**
+ * @param {{ runId: string, existing: Record<string, unknown> }} options
+ */
+function writeExistingProofRunnerOutput(options) {
+  const summary = asRecord(options.existing.summary);
+  const runHealthReport = asRecord(options.existing.runHealthReport);
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        command: "scripts live-e2e run-profile",
+        status: "ok",
+        run_id: options.runId,
+        live_e2e_run_status: asNonEmptyString(summary.status) || null,
+        live_e2e_run_health_status: asNonEmptyString(runHealthReport.overall_status) || null,
+        live_e2e_run_summary_file: asNonEmptyString(options.existing.summaryFile) || null,
+        live_e2e_run_health_report_file: asNonEmptyString(options.existing.runHealthReportFile) || null,
+        live_e2e_observation_report_file:
+          asNonEmptyString(summary.live_e2e_observation_report_file) ||
+          asNonEmptyString(options.existing.observationReportFile) ||
+          null,
+        aor_installation_proof_file: asNonEmptyString(summary.aor_installation_proof_file) || null,
+        live_e2e_controller_state_file: asNonEmptyString(summary.live_e2e_controller_state_file) || null,
+        live_e2e_step_observation_files: asStringArray(summary.live_e2e_step_observation_files),
+        live_e2e_scorecard_files: asStringArray(summary.scorecard_files),
+        learning_loop_scorecard_file: asNonEmptyString(summary.learning_loop_scorecard_file) || null,
+        learning_loop_handoff_file: asNonEmptyString(summary.learning_loop_handoff_file) || null,
+        incident_report_file: asNonEmptyString(summary.incident_report_file) || null,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+/**
+ * Guided AOR UI smoke files are deterministic report artifacts. Manual resume
+ * can rebuild final reports from durable controller state after those transient
+ * artifact fields have been dropped, so hydrate them before observation and
+ * run-health reports are written.
+ *
+ * @param {Record<string, unknown>} artifacts
+ * @param {{ reportsRoot: string, runId: string }} options
+ */
+function hydrateGuidedUiArtifactsFromReports(artifacts, options) {
+  const normalizedRunId = normalizeId(options.runId);
+  const webSmokeSummaryFile =
+    asNonEmptyString(artifacts.guided_web_smoke_summary_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.json`);
+  const webSmoke =
+    Object.keys(asRecord(artifacts.guided_web_smoke)).length > 0
+      ? asRecord(artifacts.guided_web_smoke)
+      : readJsonIfPresent(webSmokeSummaryFile);
+  if (webSmokeSummaryFile) artifacts.guided_web_smoke_summary_file = webSmokeSummaryFile;
+  if (Object.keys(webSmoke).length > 0) {
+    artifacts.guided_web_smoke = webSmoke;
+  }
+  const htmlFile =
+    asNonEmptyString(artifacts.guided_web_smoke_html_file) ||
+    asNonEmptyString(webSmoke.rendered_html_file) ||
+    asNonEmptyString(webSmoke.html_ref) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`);
+  const domSnapshotFile =
+    asNonEmptyString(artifacts.guided_web_dom_snapshot_file) ||
+    asNonEmptyString(webSmoke.dom_snapshot_file) ||
+    asNonEmptyString(webSmoke.dom_snapshot_ref) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`);
+  const accessibilitySummaryFile =
+    asNonEmptyString(artifacts.guided_web_accessibility_summary_file) ||
+    asNonEmptyString(webSmoke.accessibility_summary_file) ||
+    asNonEmptyString(webSmoke.accessibility_summary_ref) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`);
+  const visualGuardrailFile =
+    asNonEmptyString(artifacts.guided_web_visual_guardrail_file) ||
+    asNonEmptyString(webSmoke.visual_guardrail_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`);
+  const browserTaskProofRequestFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`);
+  const browserTaskProofFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-browser-task-proof-${normalizedRunId}.json`);
+
+  if (htmlFile) artifacts.guided_web_smoke_html_file = htmlFile;
+  if (domSnapshotFile) artifacts.guided_web_dom_snapshot_file = domSnapshotFile;
+  if (accessibilitySummaryFile) artifacts.guided_web_accessibility_summary_file = accessibilitySummaryFile;
+  if (visualGuardrailFile) artifacts.guided_web_visual_guardrail_file = visualGuardrailFile;
+  if (browserTaskProofRequestFile) artifacts.guided_browser_task_proof_request_file = browserTaskProofRequestFile;
+  if (browserTaskProofFile) artifacts.guided_browser_task_proof_file = browserTaskProofFile;
+
+  const mergedWebSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
+  if (Object.keys(mergedWebSmoke).length > 0) {
+    artifacts.guided_web_smoke = mergedWebSmoke;
+    if (webSmokeSummaryFile) writeJson(webSmokeSummaryFile, mergedWebSmoke);
+  }
+}
+
+/**
+ * @param {number} pid
+ * @returns {boolean}
+ */
+function terminateDetachedProcessGroup(pid) {
+  if (process.platform === "win32" || !Number.isInteger(pid) || pid <= 0) return false;
+  for (const target of [-pid, pid]) {
+    try {
+      process.kill(target, "SIGTERM");
+      return true;
+    } catch {
+      // Try the direct child PID when process group termination is unavailable.
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} runHealthReport
+ * @returns {Record<string, unknown> | null}
+ */
+function cleanupGuidedBrowserTaskAppSurface(artifacts, runHealthReport) {
+  const lifecycle = asRecord(runHealthReport.lifecycle_completion);
+  if (asNonEmptyString(lifecycle.continuation_status) !== "complete") return null;
+  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const rawPid =
+    artifacts.guided_browser_task_app_server_pid ??
+    webSmoke.browser_task_app_server_pid ??
+    webSmoke.app_server_pid;
+  const pid = typeof rawPid === "number" ? rawPid : Number(rawPid);
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const terminated = terminateDetachedProcessGroup(pid);
+  return {
+    status: terminated ? "terminated" : "not_running",
+    pid,
+    terminated_at: nowIso(),
+  };
 }
 
 /**
@@ -198,6 +393,61 @@ function resolveBrowserTaskProofFile(artifacts, webSmoke) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const rawEntries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return rawEntries
+    .map((entry) => ({
+      check_id: asNonEmptyString(entry.check_id) || asNonEmptyString(entry.id) || asNonEmptyString(entry.key),
+      status: toObservationStatus(asNonEmptyString(entry.status) || "not_pass"),
+      evidence_refs: uniqueStrings([...asStringArray(entry.evidence_refs), asNonEmptyString(entry.evidence_ref)]),
+      findings: asStringArray(entry.findings),
+    }))
+    .filter((entry) => AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.includes(entry.check_id))
+    .map((entry) => ({
+      ...entry,
+      evidence_refs: entry.evidence_refs.length > 0 ? entry.evidence_refs : uniqueStrings(fallbackEvidenceRefs),
+    }));
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function buildAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const normalized = normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs);
+  const byId = new Map(normalized.map((entry) => [entry.check_id, entry]));
+  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.map((checkId) => {
+    const existing = byId.get(checkId);
+    if (existing) return existing;
+    return {
+      check_id: checkId,
+      status: "not_pass",
+      evidence_refs: [],
+      findings: [`AOR operator accessibility check '${checkId}' was not materialized in browser-task proof.`],
+    };
+  });
+}
+
+/**
+ * @param {Record<string, unknown>} proof
+ * @returns {string[]}
+ */
+function findAorOperatorAccessibilityCheckGaps(proof) {
+  const checks = normalizeAorOperatorAccessibilityChecks(proof.accessibility_checks);
+  const byId = new Map(checks.map((entry) => [entry.check_id, entry]));
+  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.flatMap((checkId) => {
+    const entry = byId.get(checkId);
+    if (!entry) return [`browser-task-proof.accessibility_checks.${checkId}`];
+    return entry.evidence_refs.length === 0 ? [`browser-task-proof.accessibility_checks.${checkId}.evidence_refs`] : [];
+  });
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @param {Record<string, unknown>} webSmoke
  * @returns {Record<string, unknown>}
@@ -216,6 +466,16 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
   const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const proofEvidenceRefs = uniqueStrings([
+    browserTaskProofFile,
+    asNonEmptyString(proof.accessibility_summary_file),
+    asNonEmptyString(proof.accessibility_summary_ref),
+    asNonEmptyString(webSmoke.accessibility_summary_file),
+    ...screenshotFiles,
+  ]);
+  const retainedWebSmokeUxFindings = asStringArray(webSmoke.ux_findings).filter(
+    (finding) => !/browser-task-proof requires skill-agent browser evidence/iu.test(finding),
+  );
   return {
     ...webSmoke,
     rendered_html_file:
@@ -248,6 +508,7 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
     browser_task_proof_file: browserTaskProofFile,
     screenshot_files: screenshotFiles,
     screenshot_refs: screenshotFiles,
+    accessibility_checks: buildAorOperatorAccessibilityChecks(proof.accessibility_checks, proofEvidenceRefs),
     task_outcome: {
       status: "pass",
       checked_tasks: uniqueStrings([
@@ -256,66 +517,11 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       ]),
       findings: asStringArray(proofOutcome.findings),
     },
-    ux_findings: uniqueStrings([...asStringArray(webSmoke.ux_findings), ...asStringArray(proof.ux_findings)]),
-    agent_verdict_ref:
-      asNonEmptyString(proof.agent_verdict_ref) ||
-      asNonEmptyString(webSmoke.agent_verdict_ref),
+    ux_findings: uniqueStrings([...retainedWebSmokeUxFindings, ...asStringArray(proof.ux_findings)]),
+    operator_decision_ref:
+      asNonEmptyString(proof.operator_decision_ref) ||
+      asNonEmptyString(webSmoke.operator_decision_ref),
   };
-}
-
-/**
- * @param {Record<string, unknown>} context
- * @returns {string[]}
- */
-function evidenceRootCandidates(context = {}) {
-  return uniqueStrings([
-    asNonEmptyString(context.reportsRoot),
-    asNonEmptyString(context.sourceRoot),
-    asNonEmptyString(context.targetCheckoutRoot),
-    ...asStringArray(context.extraRoots),
-  ]).filter((root) => root && path.isAbsolute(root) && fileExists(root));
-}
-
-/**
- * @param {string} ref
- * @returns {boolean}
- */
-function isMaterializedRelativeRef(ref) {
-  return (
-    ref.startsWith(".") ||
-    ref.startsWith("apps/") ||
-    ref.startsWith("docs/") ||
-    ref.startsWith("examples/") ||
-    ref.startsWith("packages/") ||
-    ref.startsWith("scripts/") ||
-    ref.includes("\\")
-  );
-}
-
-/**
- * @param {string} evidenceRef
- * @param {Record<string, unknown>} context
- * @returns {boolean}
- */
-function localEvidenceRefExists(evidenceRef, context = {}) {
-  const ref = asNonEmptyString(evidenceRef);
-  if (!ref) return true;
-  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
-    if (!ref.startsWith("evidence://")) return true;
-    const evidencePath = ref.slice("evidence://".length);
-    if (!evidencePath) return false;
-    if (path.isAbsolute(evidencePath)) return fileExists(evidencePath);
-    const roots = evidenceRootCandidates(context);
-    if (roots.some((root) => fileExists(path.resolve(root, evidencePath)))) return true;
-    return !isMaterializedRelativeRef(evidencePath);
-  }
-  if (path.isAbsolute(ref)) return fileExists(ref);
-  if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
-    const roots = evidenceRootCandidates(context);
-    if (roots.some((root) => fileExists(path.resolve(root, ref)))) return true;
-    return !isMaterializedRelativeRef(ref);
-  }
-  return true;
 }
 
 /**
@@ -396,202 +602,6 @@ function collectRuntimePermissionEvidence(reportFiles) {
 }
 
 /**
- * @param {Record<string, unknown>} artifacts
- * @returns {string[]}
- */
-function collectDeliveryChangedPaths(artifacts) {
-  const deliveryManifest = readJsonIfPresent(asNonEmptyString(artifacts.delivery_manifest_file));
-  const deliveryPaths = Array.isArray(deliveryManifest.repo_deliveries)
-    ? deliveryManifest.repo_deliveries.flatMap((entry) => asStringArray(asRecord(entry).changed_paths))
-    : [];
-  const reviewReport = readJsonIfPresent(asNonEmptyString(artifacts.review_report_file));
-  const reviewPaths = asStringArray(asRecord(reviewReport.code_quality).changed_paths);
-  return uniqueStrings([...deliveryPaths, ...reviewPaths]);
-}
-
-/**
- * @param {string | null | undefined} reportFile
- * @returns {string[]}
- */
-function collectRuntimeHarnessMeaningfulChangedPaths(reportFile) {
-  const report = readJsonIfPresent(asNonEmptyString(reportFile));
-  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
-  return uniqueStrings(
-    stepDecisions.flatMap((entry) => asStringArray(asRecord(asRecord(entry).mission_semantics).meaningful_changed_paths)),
-  );
-}
-
-/**
- * @param {string[]} expectedPaths
- * @param {string[]} actualPaths
- * @param {string} label
- * @returns {string[]}
- */
-function buildMissingDeliveryPathFindings(expectedPaths, actualPaths, label) {
-  const actualPathSet = new Set(actualPaths);
-  return expectedPaths
-    .filter((changedPath) => !actualPathSet.has(changedPath))
-    .map((changedPath) => `delivery manifest omits ${label} changed path: ${changedPath}`);
-}
-
-/**
- * @param {Record<string, unknown>} artifacts
- * @returns {{ status: "pass" | "warn" | "not_pass", delivery_manifest_ref: string | null, review_report_ref: string | null, post_delivery_check_refs: string[], changed_paths: string[], findings: string[] }}
- */
-function buildCodeQualityObservation(artifacts) {
-  const deliveryManifestRef = asNonEmptyString(artifacts.delivery_manifest_file) || null;
-  const reviewReportRef = asNonEmptyString(artifacts.review_report_file) || null;
-  const deliveryQualityGateStatus = asNonEmptyString(artifacts.delivery_quality_gate_status);
-  const deliveryBlocked = artifacts.delivery_blocking === true;
-  const postDeliveryCheckRefs = uniqueStrings([
-    asNonEmptyString(artifacts.post_run_verify_summary_file),
-    asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
-  ]);
-  const reviewReport = readJsonIfPresent(reviewReportRef);
-  const reviewCodeQuality = asRecord(reviewReport.code_quality);
-  const deliveryManifest = readJsonIfPresent(deliveryManifestRef);
-  const deliveryManifestPresent = Boolean(deliveryManifestRef && Object.keys(deliveryManifest).length > 0);
-  const deliveryPaths = Array.isArray(deliveryManifest.repo_deliveries)
-    ? uniqueStrings(deliveryManifest.repo_deliveries.flatMap((entry) => asStringArray(asRecord(entry).changed_paths)))
-    : [];
-  const reviewPaths = asStringArray(reviewCodeQuality.changed_paths);
-  const runtimeHarnessPaths = collectRuntimeHarnessMeaningfulChangedPaths(
-    asNonEmptyString(artifacts.latest_runtime_harness_report_file) ||
-      asNonEmptyString(artifacts.runtime_harness_report_file),
-  );
-  const findings = uniqueStrings([
-    ...asFindingStrings(reviewCodeQuality.findings),
-    ...(asNonEmptyString(artifacts.provider_execution_status) === "fail"
-      ? ["provider execution evidence was not materialized"]
-      : []),
-    ...(asNonEmptyString(artifacts.real_code_change_status) === "fail" ? ["no meaningful code change observed"] : []),
-    ...(asNonEmptyString(artifacts.post_run_verify_status) === "fail" ? ["post-delivery verification failed"] : []),
-    ...(asNonEmptyString(artifacts.quality_gate_decision) === "fail" ? ["quality gate decision failed"] : []),
-    ...(deliveryBlocked ? ["delivery prepare was blocked"] : []),
-    ...(["fail", "not_pass"].includes(deliveryQualityGateStatus)
-      ? ["delivery quality gate produced observed findings"]
-      : []),
-    ...asStringArray(artifacts.delivery_quality_gate_findings),
-    ...(deliveryManifestPresent
-      ? [
-          ...buildMissingDeliveryPathFindings(runtimeHarnessPaths, deliveryPaths, "Runtime Harness meaningful"),
-          ...buildMissingDeliveryPathFindings(reviewPaths, deliveryPaths, "review"),
-        ]
-      : []),
-  ]);
-  const reviewCodeStatus = normalizeVerdictStatus(reviewCodeQuality.status);
-  const status =
-    !deliveryManifestRef
-      ? "not_pass"
-      : asNonEmptyString(artifacts.provider_execution_status) === "fail" ||
-          asNonEmptyString(artifacts.real_code_change_status) === "fail" ||
-          asNonEmptyString(artifacts.post_run_verify_status) === "fail" ||
-          asNonEmptyString(artifacts.quality_gate_decision) === "fail" ||
-          deliveryBlocked ||
-          ["fail", "not_pass"].includes(deliveryQualityGateStatus) ||
-          reviewCodeStatus === "fail"
-        ? "not_pass"
-        : findings.length > 0 || reviewCodeStatus === "warn"
-          ? "warn"
-          : "pass";
-  return {
-    status,
-    delivery_manifest_ref: deliveryManifestRef,
-    review_report_ref: reviewReportRef,
-    post_delivery_check_refs: postDeliveryCheckRefs,
-    changed_paths: collectDeliveryChangedPaths(artifacts),
-    findings,
-  };
-}
-
-/**
- * @param {Record<string, unknown>} artifacts
- * @returns {string | null}
- */
-function inferRuntimeHarnessDecision(artifacts) {
-  const directDecision =
-    asNonEmptyString(artifacts.runtime_harness_decision) ||
-    asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
-    asNonEmptyString(artifacts.latest_runtime_harness_decision) ||
-    asNonEmptyString(artifacts.runtime_harness_overall_decision);
-  if (directDecision) return directDecision;
-  const reportFiles = uniqueStrings([
-    asNonEmptyString(artifacts.latest_runtime_harness_report_file),
-    asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
-    asNonEmptyString(artifacts.runtime_harness_report_file),
-    asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
-  ]);
-  for (const reportFile of reportFiles) {
-    const decision = asNonEmptyString(readJsonIfPresent(reportFile).overall_decision);
-    if (decision) return decision;
-  }
-  return null;
-}
-
-/**
- * @param {Record<string, unknown>} artifacts
- * @param {{ reportsRoot: string, sourceRoot: string, targetCheckoutRoot?: string }} context
- */
-function normalizePreVerdictQualityArtifacts(artifacts, context) {
-  const reviewReport = readJsonIfPresent(asNonEmptyString(artifacts.review_report_file));
-  const reviewCodeStatus = normalizeVerdictStatus(asRecord(reviewReport.code_quality).status);
-  const reviewArtifactQuality = asRecord(reviewReport.artifact_quality);
-  const reviewArtifactStatus =
-    Object.keys(reviewArtifactQuality).length > 0
-      ? normalizeVerdictStatus(reviewArtifactQuality.status)
-      : null;
-  const evaluationReport = readJsonIfPresent(asNonEmptyString(artifacts.evaluation_report_file));
-  const evaluationStatus =
-    Object.keys(evaluationReport).length > 0 ? normalizeVerdictStatus(evaluationReport.status) : null;
-  const changedPaths = collectDeliveryChangedPaths(artifacts);
-  const providerEvidenceMaterialized = localEvidenceRefExists(asNonEmptyString(artifacts.adapter_raw_evidence_ref), {
-    reportsRoot: context.reportsRoot,
-    sourceRoot: context.sourceRoot,
-    targetCheckoutRoot: asNonEmptyString(context.targetCheckoutRoot),
-  });
-  if (!asNonEmptyString(artifacts.provider_execution_status) && asNonEmptyString(artifacts.adapter_raw_evidence_ref)) {
-    artifacts.provider_execution_status = providerEvidenceMaterialized ? "pass" : "fail";
-  }
-  if (!asNonEmptyString(artifacts.real_code_change_status) && changedPaths.length > 0) {
-    artifacts.real_code_change_status = "pass";
-  }
-  if (!asNonEmptyString(artifacts.code_quality_status) && Object.keys(asRecord(reviewReport.code_quality)).length > 0) {
-    artifacts.code_quality_status = reviewCodeStatus;
-  }
-  const runtimeHarnessDecision = inferRuntimeHarnessDecision(artifacts);
-  if (!asNonEmptyString(artifacts.runtime_harness_decision) && runtimeHarnessDecision) {
-    artifacts.runtime_harness_decision = runtimeHarnessDecision;
-  }
-  if (!asNonEmptyString(artifacts.latest_runtime_harness_decision) && runtimeHarnessDecision) {
-    artifacts.latest_runtime_harness_decision = runtimeHarnessDecision;
-  }
-  if (!asNonEmptyString(artifacts.run_start_runtime_harness_decision) && runtimeHarnessDecision) {
-    artifacts.run_start_runtime_harness_decision = runtimeHarnessDecision;
-  }
-  const deliveryStatus = asNonEmptyString(artifacts.delivery_manifest_file) ? "materialized" : "not_materialized";
-  const releaseStatus = asNonEmptyString(artifacts.release_status) || (asNonEmptyString(artifacts.release_packet_file) ? "pass" : "");
-  const verificationPass = asNonEmptyString(artifacts.post_run_verify_status) === "pass";
-  const diagnosticPass = asNonEmptyString(artifacts.post_run_diagnostic_status) !== "fail";
-  const qualityInputsPass =
-    asNonEmptyString(artifacts.provider_execution_status) === "pass" &&
-    asNonEmptyString(artifacts.real_code_change_status) === "pass" &&
-    ["pass", "warn"].includes(asNonEmptyString(artifacts.code_quality_status)) &&
-    verificationPass &&
-    diagnosticPass &&
-    deliveryStatus === "materialized" &&
-    (releaseStatus === "pass" || !releaseStatus);
-  if (!asNonEmptyString(artifacts.quality_gate_decision) && qualityInputsPass) {
-    artifacts.quality_gate_decision = "pass";
-  }
-  if (!asNonEmptyString(artifacts.artifact_quality_status)) {
-    artifacts.artifact_quality_status =
-      reviewArtifactStatus ??
-      evaluationStatus ??
-      (qualityInputsPass ? "pass" : artifacts.artifact_quality_status);
-  }
-}
-
-/**
  * @param {{
  *   runId: string,
  *   profilePath: string,
@@ -609,11 +619,6 @@ function normalizePreVerdictQualityArtifacts(artifacts, context) {
  */
 function buildScorecard(options) {
   const targetRepo = asRecord(options.profile.target_repo);
-  const qualityJudgement =
-    typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
-      ? asRecord(options.flowResult.artifacts.quality_judgement)
-      : {};
-  const canonicalStatus = asRecord(options.flowResult.artifacts.canonical_status);
   return {
     scorecard_id: `${options.runId}.scorecard.${asNonEmptyString(targetRepo.repo_id) || "target"}`,
     run_id: options.runId,
@@ -625,7 +630,7 @@ function buildScorecard(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
-    run_tier: asNonEmptyString(canonicalStatus.run_tier) || asNonEmptyString(options.flowResult.artifacts.run_tier) || null,
+    run_tier: asNonEmptyString(options.flowResult.artifacts.run_tier) || resolveSummaryRunTier(options.profile),
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
     matrix_cell:
@@ -639,30 +644,15 @@ function buildScorecard(options) {
     },
     stage_counts: summarizeStageCounts(options.flowResult.stageResults),
     status: asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_overall_status) || options.flowResult.status,
-    canonical_status: Object.keys(canonicalStatus).length > 0 ? canonicalStatus : null,
-    command_status: asNonEmptyString(canonicalStatus.command_status) || null,
-    target_verification_status: asNonEmptyString(canonicalStatus.target_verification_status) || null,
-    artifact_quality_status: asNonEmptyString(canonicalStatus.artifact_quality_status) || null,
-    delivery_status: asNonEmptyString(canonicalStatus.delivery_status) || null,
-    coverage_status: asNonEmptyString(canonicalStatus.coverage_status) || null,
-    acceptance_status: asNonEmptyString(canonicalStatus.acceptance_status) || null,
-    release_status: asNonEmptyString(canonicalStatus.release_status) || null,
-    proof_eligible_tier:
-      typeof canonicalStatus.proof_eligible_tier === "boolean" ? canonicalStatus.proof_eligible_tier : null,
-    required_matrix_acceptance_closed:
-      typeof canonicalStatus.required_matrix_acceptance_closed === "boolean"
-        ? canonicalStatus.required_matrix_acceptance_closed
-        : null,
+    run_health_report_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_run_health_report_file) || null,
     live_e2e_observation_report_file:
       asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_report_file) || null,
-    scenario_coverage_status: qualityJudgement.scenario_coverage_status ?? null,
-    provider_execution_status: qualityJudgement.provider_execution_status ?? null,
+    provider_execution_status: asNonEmptyString(options.flowResult.artifacts.provider_execution_status) || null,
     provider_step_status:
       typeof options.flowResult.artifacts.provider_step_status === "object" && options.flowResult.artifacts.provider_step_status
         ? options.flowResult.artifacts.provider_step_status
         : null,
-    feature_size_fit_status: qualityJudgement.feature_size_fit_status ?? null,
-    target_baseline_status: qualityJudgement.target_baseline_status ?? null,
+    baseline_verify_status: asNonEmptyString(options.flowResult.artifacts.baseline_verify_status) || null,
     target_pre_execution_status:
       typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
       options.flowResult.artifacts.target_pre_execution_status
@@ -671,15 +661,8 @@ function buildScorecard(options) {
     failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
     failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
     failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
-    real_code_change_status: qualityJudgement.real_code_change_status ?? null,
-    post_run_verification_status: qualityJudgement.post_run_verification_status ?? null,
-    post_run_diagnostic_status: qualityJudgement.post_run_diagnostic_status ?? null,
-    runtime_harness_decision: qualityJudgement.runtime_harness_decision ?? null,
-    run_start_runtime_harness_decision:
-      qualityJudgement.run_start_runtime_harness_decision ?? qualityJudgement.runtime_harness_decision ?? null,
-    latest_runtime_harness_decision:
-      qualityJudgement.latest_runtime_harness_decision ?? qualityJudgement.runtime_harness_decision ?? null,
-    quality_gate_decision: qualityJudgement.quality_gate_decision ?? null,
+    post_run_verify_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || null,
+    post_run_diagnostic_status: asNonEmptyString(options.flowResult.artifacts.post_run_diagnostic_status) || null,
     summary_ref: options.summaryFile,
     command_count: options.flowResult.commandResults.length,
     generated_at: nowIso(),
@@ -887,6 +870,11 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
     ...asStringArray(webSmoke.screenshot_files),
     ...asStringArray(webSmoke.screenshot_refs),
   ]);
+  const accessibilityChecks = buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
+    accessibilitySummaryFile,
+    browserTaskProofFile,
+    ...screenshotRefs,
+  ]);
   if (
     !summaryFile &&
     !htmlFile &&
@@ -903,11 +891,11 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
       asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
   );
-  const agentVerdictRef =
-    asNonEmptyString(webSmoke.agent_verdict_ref) ||
+  const operatorDecisionRef =
+    asNonEmptyString(webSmoke.operator_decision_ref) ||
     asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) ||
     null;
-  const interactionStatus = agentVerdictRef ? status : "blocked";
+  const interactionStatus = operatorDecisionRef ? status : "blocked";
   return [
     {
       step_id: "learning",
@@ -929,17 +917,88 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       browser_task_proof_ref: browserTaskProofFile || null,
       dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
       accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
+      accessibility_checks: accessibilityChecks,
       task_outcome: {
         status,
         checked_tasks: asStringArray(taskOutcome.checked_tasks),
         findings: asStringArray(taskOutcome.findings),
       },
       ux_findings: asStringArray(webSmoke.ux_findings),
-      agent_verdict_ref: agentVerdictRef,
+      operator_decision_ref: operatorDecisionRef,
       status: interactionStatus,
-      summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
+      summary: "Guided AOR operator UI interaction completed through the installed-user web surface.",
     },
   ];
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} artifacts
+ * @returns {boolean}
+ */
+function expectsGuidedBrowserTaskProof(profile, artifacts) {
+  const liveE2e = asRecord(profile.live_e2e);
+  const guidedJourney = asRecord(profile.guided_journey);
+  const browserTaskProof = asRecord(guidedJourney.browser_task_proof);
+  return (
+    asNonEmptyString(liveE2e.frontend_capability) === "browser-task-proof" ||
+    asStringArray(guidedJourney.proof_requirements).includes("browser-task-proof") ||
+    browserTaskProof.required === true ||
+    Boolean(asNonEmptyString(artifacts.guided_browser_task_proof_request_file))
+  );
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   artifacts: Record<string, unknown>,
+ *   observationReport: Record<string, unknown>,
+ * }} options
+ * @returns {Array<string>}
+ */
+function buildGuidedUiEvidenceGaps(options) {
+  if (!expectsGuidedBrowserTaskProof(options.profile, options.artifacts)) return [];
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
+  const gaps = [];
+  const summaryFile =
+    asNonEmptyString(options.artifacts.guided_web_smoke_summary_file) ||
+    asNonEmptyString(webSmoke.summary_file);
+  const browserTaskProofRequestFile =
+    asNonEmptyString(options.artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const browserTaskProofFile =
+    asNonEmptyString(options.artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file);
+  const frontendInteractions = Array.isArray(options.observationReport.frontend_interactions)
+    ? options.observationReport.frontend_interactions.map((entry) => asRecord(entry))
+    : [];
+  if (!summaryFile || !fileExists(summaryFile)) {
+    gaps.push("guided-web-smoke-summary");
+  }
+  if (!browserTaskProofRequestFile || !fileExists(browserTaskProofRequestFile)) {
+    gaps.push("guided-browser-task-proof-request");
+  }
+  if (!browserTaskProofFile || !fileExists(browserTaskProofFile)) {
+    gaps.push("guided-browser-task-proof");
+  } else {
+    gaps.push(...findAorOperatorAccessibilityCheckGaps(readJsonIfPresent(browserTaskProofFile)));
+  }
+  const taskOutcome = asRecord(webSmoke.task_outcome);
+  if (asNonEmptyString(taskOutcome.status) && asNonEmptyString(taskOutcome.status) !== "pass") {
+    gaps.push("guided-web-smoke.task_outcome");
+  }
+  if (frontendInteractions.length === 0) {
+    gaps.push("frontend_interactions.guided-web-smoke");
+  }
+  for (const interaction of frontendInteractions) {
+    if (
+      asNonEmptyString(interaction.interaction_id) === "guided-web-smoke" &&
+      asNonEmptyString(interaction.status) !== "pass"
+    ) {
+      gaps.push("frontend_interactions.guided-web-smoke.status");
+    }
+  }
+  return uniqueStrings(gaps);
 }
 
 /**
@@ -1047,15 +1106,16 @@ function buildSetupJournal(artifacts) {
 }
 
 function latestProviderStepStatusFromArtifacts(artifacts) {
+  const candidates = [];
   const direct = asRecord(artifacts.provider_step_status);
-  if (Object.keys(direct).length > 0) return direct;
+  if (Object.keys(direct).length > 0) candidates.push(direct);
 
   const controllerEntries = Array.isArray(artifacts.live_e2e_step_journal_entries)
     ? artifacts.live_e2e_step_journal_entries.map((entry) => asRecord(entry))
     : [];
   for (let index = controllerEntries.length - 1; index >= 0; index -= 1) {
     const providerStepStatus = asRecord(controllerEntries[index].provider_step_status);
-    if (Object.keys(providerStepStatus).length > 0) return providerStepStatus;
+    if (Object.keys(providerStepStatus).length > 0) candidates.push(providerStepStatus);
   }
 
   const commandResults = Array.isArray(artifacts.command_results)
@@ -1063,10 +1123,34 @@ function latestProviderStepStatusFromArtifacts(artifacts) {
     : [];
   for (let index = commandResults.length - 1; index >= 0; index -= 1) {
     const providerStepStatus = asRecord(commandResults[index].provider_step_status);
-    if (Object.keys(providerStepStatus).length > 0) return providerStepStatus;
+    if (Object.keys(providerStepStatus).length > 0) candidates.push(providerStepStatus);
   }
 
-  return {};
+  candidates.sort((left, right) => providerStatusRank(right) - providerStatusRank(left));
+  return candidates[0] ?? {};
+}
+
+function providerStatusRank(providerStepStatus) {
+  const status = asNonEmptyString(asRecord(providerStepStatus).status);
+  if (["failed", "fail", "completed", "complete", "pass", "succeeded", "interrupted"].includes(status)) return 3;
+  if (["timeout", "timed-out", "timeout-risk"].includes(status)) return 2;
+  if (["running", "silent-running"].includes(status)) return 1;
+  return 0;
+}
+
+function isTransientProviderExecutionStatus(status) {
+  return ["running", "silent-running", "timeout-risk"].includes(asNonEmptyString(status));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function artifactValuePresent(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(asRecord(value)).length > 0;
+  return value !== null && value !== undefined;
 }
 
 function classifyProviderStepStatus(providerStepStatus) {
@@ -1128,19 +1212,7 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
   const copyIfMissing = (key) => {
     const current = artifacts[key];
     const candidate = snapshot[key];
-    const currentPresent =
-      typeof current === "string"
-        ? current.length > 0
-        : typeof current === "object" && current
-          ? Object.keys(asRecord(current)).length > 0
-          : current !== null && current !== undefined;
-    const candidatePresent =
-      typeof candidate === "string"
-        ? candidate.length > 0
-        : typeof candidate === "object" && candidate
-          ? Object.keys(asRecord(candidate)).length > 0
-          : candidate !== null && candidate !== undefined;
-    if (!currentPresent && candidatePresent) {
+    if (!artifactValuePresent(current) && artifactValuePresent(candidate)) {
       artifacts[key] = candidate;
     }
   };
@@ -1160,6 +1232,14 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "execution_readiness_file",
     "target_cleanliness_before_execution_file",
     "target_cleanliness_before_execution",
+    "feature_request_file",
+    "intake_artifact_packet_file",
+    "intake_artifact_packet_body_file",
+    "analysis_report_file",
+    "discovery_analysis_report_file",
+    "spec_step_result_file",
+    "handoff_packet_file",
+    "approved_handoff_packet_file",
     "routed_step_result_file",
     "runtime_harness_report_file",
     "latest_runtime_harness_report_file",
@@ -1169,18 +1249,39 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "latest_runtime_harness_decision",
     "run_start_runtime_harness_decision",
     "runtime_harness_overall_decision",
+    "meaningful_changed_paths",
     "adapter_raw_evidence_ref",
+    "request_artifact_ref",
+    "provider_work_packet_ref",
+    "context_budget_status",
+    "context_budget_failure_class",
+    "raw_provider_error_summary",
+    "top_context_size_sources",
     "provider_execution_status",
     "real_code_change_status",
     "code_quality_status",
-    "artifact_quality_status",
-    "quality_gate_decision",
     "review_report_file",
     "evaluation_report_file",
     "post_run_verify_summary_file",
     "post_run_verify_status",
     "post_run_diagnostic_verify_summary_file",
     "post_run_diagnostic_status",
+    "guided_journey_enabled",
+    "guided_web_smoke",
+    "guided_web_smoke_summary_file",
+    "guided_web_smoke_html_file",
+    "guided_web_dom_snapshot_file",
+    "guided_web_accessibility_summary_file",
+    "guided_web_visual_guardrail_file",
+    "guided_web_screenshot_files",
+    "guided_browser_task_proof_request_file",
+    "guided_browser_task_proof_file",
+    "guided_journey_proof_file",
+    "guided_journey_proof",
+    "new_flow_mission_artifact_packet_file",
+    "new_flow_mission_artifact_packet_body_file",
+    "new_flow_next_action_report_file",
+    "flow_targeted_operator_request_file",
     "delivery_plan_file",
     "delivery_manifest_file",
     "delivery_transcript_file",
@@ -1205,7 +1306,10 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
   if (Object.keys(latestProviderStepStatus).length > 0) {
     artifacts.provider_step_status = latestProviderStepStatus;
     const providerClassification = classifyProviderStepStatus(latestProviderStepStatus);
-    if (!asNonEmptyString(artifacts.provider_execution_status)) {
+    if (
+      !asNonEmptyString(artifacts.provider_execution_status) ||
+      isTransientProviderExecutionStatus(artifacts.provider_execution_status)
+    ) {
       artifacts.provider_execution_status = providerClassification.provider_execution_status;
     }
     if (!asNonEmptyString(artifacts.failure_owner) && providerClassification.failure_owner) {
@@ -1214,6 +1318,34 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
       artifacts.failure_class = providerClassification.failure_class;
     }
   }
+}
+
+function runtimeHarnessReportFilesForSummary(artifacts, productionProof = null) {
+  return uniqueStrings([
+    asNonEmptyString(asRecord(productionProof).evidence_refs?.runtime_harness_report_file),
+    asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+    asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
+    asNonEmptyString(artifacts.runtime_harness_report_file),
+    asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
+  ]);
+}
+
+function refreshRuntimeHarnessChangeEvidenceForSummary(artifacts, mission, productionProof = null) {
+  const runtimeHarnessReportFiles = runtimeHarnessReportFilesForSummary(artifacts, productionProof);
+  if (runtimeHarnessReportFiles.length === 0) {
+    return;
+  }
+  const meaningfulChangedPaths = uniqueStrings(
+    runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
+  );
+  if (meaningfulChangedPaths.length > 0) {
+    artifacts.meaningful_changed_paths = meaningfulChangedPaths;
+  }
+  artifacts.real_code_change_status = runtimeHarnessReportFiles.some((reportFile) =>
+    runtimeHarnessReportHasMissionRelevantChanges(reportFile, mission),
+  )
+    ? "pass"
+    : "fail";
 }
 
 function buildStepJournal(options) {
@@ -1375,15 +1507,14 @@ function buildStepJournal(options) {
  * @param {{ stepJournal: Array<Record<string, unknown>>, stageResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }}
  */
 function buildFinalAnalysis(options) {
-  const codeQuality = buildCodeQualityObservation(options.artifacts);
-  const qualityRelevantStepJournal = getQualityRelevantStepJournal(options.stepJournal);
-  const qualityRelevantStageIds = new Set(qualityRelevantStepJournal.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
+  const journalEntries = getQualityRelevantStepJournal(options.stepJournal);
+  const journalStageIds = new Set(journalEntries.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
   const failingStages = options.stageResults
     .filter((entry) => {
       const stage = asNonEmptyString(entry.stage);
       return (
         asNonEmptyString(entry.status) === "fail" &&
-        (qualityRelevantStageIds.has(stage) || ["bootstrap", "install", ...LIVE_E2E_OBSERVATION_PRELUDE_STEPS].includes(stage))
+        (journalStageIds.has(stage) || ["bootstrap", "install", ...LIVE_E2E_OBSERVATION_PRELUDE_STEPS].includes(stage))
       );
     })
     .map((entry) => ({
@@ -1407,16 +1538,15 @@ function buildFinalAnalysis(options) {
     asNonEmptyString(options.artifacts.learning_loop_scorecard_file) && asNonEmptyString(options.artifacts.learning_loop_handoff_file)
       ? "pass"
       : "not_pass";
-  let status = codeQuality.status;
-  for (const step of qualityRelevantStepJournal) {
+  let status = "pass";
+  for (const step of journalEntries) {
     status = worstObservationStatus(status, asNonEmptyString(step.final_step_verdict) || "not_pass");
   }
   if (failingStages.length > 0) {
     status = worstObservationStatus(status, "not_pass");
   }
   const findings = uniqueStrings([
-    ...asStringArray(codeQuality.findings),
-    ...qualityRelevantStepJournal.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
+    ...journalEntries.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
     ...failingStages.map((entry) => `Stage '${entry.stage}' failed: ${entry.summary}`),
   ]);
   return {
@@ -1428,15 +1558,6 @@ function buildFinalAnalysis(options) {
           ? "Live E2E step journal completed with findings."
           : "Live E2E step journal did not pass.",
     findings,
-    code_quality: {
-      status: codeQuality.status,
-      changed_paths: asStringArray(codeQuality.changed_paths),
-      evidence_refs: uniqueStrings([
-        asNonEmptyString(codeQuality.review_report_ref),
-        ...asStringArray(codeQuality.post_delivery_check_refs),
-      ]),
-      findings: asStringArray(codeQuality.findings),
-    },
     failed_stages: failingStages,
     delivery: {
       status: deliveryStatus,
@@ -1484,7 +1605,12 @@ function buildObservationReport(options) {
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
-  const reportStatus = isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ? "in_progress" : "final";
+  const controllerState = readJsonIfPresent(asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file));
+  const reportStatus =
+    isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ||
+    isLiveE2eControllerStateInProgress(controllerState, includedSteps)
+      ? "in_progress"
+      : "final";
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,
@@ -1589,228 +1715,6 @@ function buildLifecycleCompletenessSummary(observationReport) {
 }
 
 /**
- * @param {{
- *   runId: string,
- *   reportsRoot: string,
- *   sourceRoot?: string,
- *   targetCheckoutRoot?: string,
- *   observationReport: Record<string, unknown>,
- *   canonicalStatus?: Record<string, unknown>,
- *   runnerQualitySummary?: Record<string, unknown>,
- *   qualityJudgement?: Record<string, unknown>,
- *   flowResult?: Record<string, unknown>,
- * }}
- */
-function resolveFinalSkillAgentVerdict(options) {
-  const flowResult = asRecord(options.flowResult);
-  const artifacts = asRecord(flowResult.artifacts);
-  const canonicalStatus = asRecord(options.canonicalStatus);
-  const runnerQualitySummary = asRecord(options.runnerQualitySummary);
-  const qualityJudgement = asRecord(options.qualityJudgement);
-  const stepJournal = Array.isArray(options.observationReport.step_journal)
-    ? options.observationReport.step_journal.map((entry) => asRecord(entry))
-    : [];
-  const includedSteps = asStringArray(asRecord(options.observationReport.flow_range).included_steps);
-  const acceptedSkillAgentSteps = stepJournal.filter(
-    (entry) =>
-      asNonEmptyString(entry.operator_decision_status) === "accepted" &&
-      asNonEmptyString(asRecord(entry.semantic_analysis).judge_source) === "skill-agent",
-  );
-  const acceptedStepIds = new Set(acceptedSkillAgentSteps.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
-  const missingSteps = includedSteps.filter((step) => !acceptedStepIds.has(step));
-  const finalAnalysis = asRecord(options.observationReport.final_analysis);
-  const finalAnalysisStatus = toObservationStatus(asNonEmptyString(finalAnalysis.status) || "not_pass");
-  const frontendInteractions = Array.isArray(options.observationReport.frontend_interactions)
-    ? options.observationReport.frontend_interactions.map((entry) => asRecord(entry))
-    : [];
-  const missingFrontendVerdicts = frontendInteractions
-    .filter((entry) => {
-      const status = toObservationStatus(asNonEmptyString(entry.status) || "not_pass");
-      return status === "pass" && !asNonEmptyString(entry.agent_verdict_ref);
-    })
-    .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
-  const failedFrontendInteractions = frontendInteractions
-    .filter((entry) => !["pass", "warn"].includes(toObservationStatus(asNonEmptyString(entry.status) || "not_pass")))
-    .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
-  const expectedVerdictFile = path.join(
-    options.reportsRoot,
-    `live-e2e-final-skill-agent-verdict-${normalizeId(options.runId)}.json`,
-  );
-  const requestFile = path.join(
-    options.reportsRoot,
-    `live-e2e-final-skill-agent-verdict-request-${normalizeId(options.runId)}.json`,
-  );
-  const requiredEvidenceRefs = uniqueStrings([
-    asNonEmptyString(options.observationReport.controller_state_ref),
-    ...asStringArray(options.observationReport.evidence_refs),
-    ...stepJournal.flatMap((entry) => [
-      asNonEmptyString(entry.observation_ref),
-      asNonEmptyString(entry.operator_decision_ref),
-      ...asStringArray(entry.artifact_refs),
-    ]),
-    ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
-  ]);
-  const lifecycleCompleteness = buildLifecycleCompletenessSummary(options.observationReport);
-  const lifecyclePendingSteps = asStringArray(lifecycleCompleteness.pending_steps);
-  const lifecycleCompletenessStatus =
-    lifecyclePendingSteps.length === 0 && missingSteps.length === 0
-      ? "pass"
-      : "blocked";
-  const operatorDecisionStatus = missingSteps.length === 0 && acceptedSkillAgentSteps.length >= includedSteps.length
-    ? "accepted"
-    : "blocked";
-  const providerExecutionStatus =
-    asNonEmptyString(artifacts.provider_execution_status) ||
-    asNonEmptyString(qualityJudgement.provider_execution_status) ||
-    "not_attempted";
-  const deliveryStatus =
-    asNonEmptyString(canonicalStatus.delivery_status) ||
-    asNonEmptyString(artifacts.delivery_status) ||
-    "not_materialized";
-  const releaseStatus =
-    asNonEmptyString(canonicalStatus.release_status) || asNonEmptyString(artifacts.release_status) || "not_attempted";
-  const artifactQualityStatus =
-    asNonEmptyString(canonicalStatus.artifact_quality_status) ||
-    asNonEmptyString(artifacts.artifact_quality_status) ||
-    "not_attempted";
-  const baselineVerifyStatus =
-    asNonEmptyString(artifacts.baseline_verify_status) ||
-    asNonEmptyString(qualityJudgement.target_baseline_status) ||
-    "not_attempted";
-  const postRunVerificationStatus =
-    asNonEmptyString(artifacts.post_run_verify_status) ||
-    asNonEmptyString(qualityJudgement.post_run_verification_status) ||
-    "not_attempted";
-  const postRunDiagnosticStatus =
-    asNonEmptyString(artifacts.post_run_diagnostic_status) ||
-    asNonEmptyString(qualityJudgement.post_run_diagnostic_status) ||
-    "not_attempted";
-  const realCodeChangeStatus =
-    asNonEmptyString(artifacts.real_code_change_status) ||
-    asNonEmptyString(qualityJudgement.real_code_change_status) ||
-    "not_attempted";
-  const deterministicRequestStatus =
-    asNonEmptyString(canonicalStatus.acceptance_status) === "pass" &&
-    lifecycleCompletenessStatus === "pass" &&
-    operatorDecisionStatus === "accepted"
-      ? "pass"
-      : finalAnalysisStatus;
-  const request = {
-    request_id: `${options.runId}.final-skill-agent-verdict-request.v1`,
-    run_id: options.runId,
-    expected_verdict_file: expectedVerdictFile,
-    final_skill_agent_verdict_expected_ref: expectedVerdictFile,
-    required_judge_source: "skill-agent",
-    current_deterministic_status: finalAnalysisStatus,
-    deterministic_analysis: {
-      status: deterministicRequestStatus,
-      final_analysis_status: finalAnalysisStatus,
-      self_pending_final_verdict: !fileExists(expectedVerdictFile),
-    },
-    required_steps: includedSteps,
-    accepted_step_count: acceptedSkillAgentSteps.length,
-    missing_skill_agent_steps: missingSteps,
-    missing_frontend_agent_verdicts: missingFrontendVerdicts,
-    failed_frontend_interactions: failedFrontendInteractions,
-    lifecycle_completeness: lifecycleCompleteness,
-    completion_summary: {
-      lifecycle_completeness_status: lifecycleCompletenessStatus,
-      operator_decision_status: operatorDecisionStatus,
-      provider_execution_status: providerExecutionStatus,
-      delivery_status: deliveryStatus,
-      release_status: releaseStatus,
-      artifact_quality_status: artifactQualityStatus,
-      baseline_verify_status: baselineVerifyStatus,
-      post_run_verification_status: postRunVerificationStatus,
-      post_run_diagnostic_status: postRunDiagnosticStatus,
-      real_code_change_status: realCodeChangeStatus,
-      final_verdict_status: fileExists(expectedVerdictFile) ? "present" : "missing",
-    },
-    canonical_status: Object.keys(canonicalStatus).length > 0 ? canonicalStatus : {},
-    runner_quality_summary: Object.keys(runnerQualitySummary).length > 0 ? runnerQualitySummary : {},
-    quality_judgement: Object.keys(qualityJudgement).length > 0 ? qualityJudgement : {},
-    stage_results: Array.isArray(flowResult.stageResults) ? flowResult.stageResults : [],
-    adapter_raw_evidence_ref: asNonEmptyString(artifacts.adapter_raw_evidence_ref) || "not_attempted",
-    current_artifact_status: {
-      final_analysis_status: finalAnalysisStatus,
-      frontend_interaction_count: frontendInteractions.length,
-      accepted_step_count: acceptedSkillAgentSteps.length,
-      missing_step_count: missingSteps.length,
-      evidence_ref_count: requiredEvidenceRefs.length,
-      provider_execution_status: providerExecutionStatus,
-      delivery_status: deliveryStatus,
-      release_status: releaseStatus,
-      artifact_quality_status: artifactQualityStatus,
-      baseline_verify_status: baselineVerifyStatus,
-      post_run_verification_status: postRunVerificationStatus,
-      post_run_diagnostic_status: postRunDiagnosticStatus,
-      real_code_change_status: realCodeChangeStatus,
-    },
-    required_inspection: [
-      "review the full observation report and step observations",
-      "verify every included step has an accepted skill-agent decision",
-      "verify deterministic classifications and command transcripts",
-      "verify target diff, no-upstream-write evidence, and delivery artifacts",
-      "verify UI/UX evidence for frontend-capable profiles",
-      "emit a final verdict only from skill-agent judgement",
-    ],
-    required_evidence_refs: requiredEvidenceRefs,
-    expected_response_shape: {
-      verdict_id: `${options.runId}.final-skill-agent-verdict.v1`,
-      run_id: options.runId,
-      status: "pass|warn|not_pass|blocked",
-      judge_source: "skill-agent",
-      inspected_evidence_refs: requiredEvidenceRefs.slice(0, 8),
-      findings: [],
-      final_recommendation: "accept|accept_with_findings|reject",
-      created_at: nowIso(),
-    },
-    created_at: nowIso(),
-  };
-  writeJson(requestFile, request);
-  if (!fileExists(expectedVerdictFile)) {
-    return {
-      verdictFile: expectedVerdictFile,
-      verdict: null,
-      requestFile,
-      missingFindings: [
-        `Final skill-agent verdict is missing; write an accepted skill-agent verdict to ${expectedVerdictFile}.`,
-      ],
-    };
-  }
-  const verdict = asRecord(readJson(expectedVerdictFile));
-  const inspectedRefs = asStringArray(verdict.inspected_evidence_refs);
-  const evidenceRefs = uniqueStrings([...asStringArray(verdict.evidence_refs), ...inspectedRefs]);
-  const invalidReasons = [];
-  if (asNonEmptyString(verdict.judge_source) !== "skill-agent") {
-    invalidReasons.push("final verdict judge_source must be skill-agent.");
-  }
-  if (inspectedRefs.length === 0) {
-    invalidReasons.push("final verdict must include non-empty inspected_evidence_refs.");
-  }
-  if (evidenceRefs.length === 0) {
-    invalidReasons.push("final verdict must reference inspected evidence.");
-  }
-  const missingMaterializedRefs = inspectedRefs.filter(
-    (ref) =>
-      !localEvidenceRefExists(ref, {
-        reportsRoot: options.reportsRoot,
-        sourceRoot: options.sourceRoot,
-        targetCheckoutRoot: options.targetCheckoutRoot,
-      }),
-  );
-  if (missingMaterializedRefs.length > 0) {
-    invalidReasons.push(`final verdict cites missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`);
-  }
-  return {
-    verdictFile: expectedVerdictFile,
-    verdict,
-    requestFile,
-    missingFindings: invalidReasons,
-  };
-}
-
-/**
  * @param {Record<string, unknown>} profile
  * @returns {string}
  */
@@ -1828,356 +1732,689 @@ function resolveSummaryRunTier(profile) {
  * @param {Record<string, unknown>} diagnostic
  * @returns {boolean}
  */
-function commandCompletedForCanonicalStatus(diagnostic) {
-  return asNonEmptyString(diagnostic.status) === "pass" || diagnostic.accepted_nonzero_payload === true;
+function commandCompletedForRunHealth(diagnostic) {
+  return ["pass", "warn", "interaction_required", "resumed"].includes(asNonEmptyString(diagnostic.status)) ||
+    diagnostic.accepted_nonzero_payload === true;
 }
 
 /**
- * @param {{
- *   profile: Record<string, unknown>,
- *   flowResult: {
- *     status: string,
- *     commandResults: Array<Record<string, unknown>>,
- *     artifacts: Record<string, unknown>,
- *   },
- *   observationStatus: string,
- * }}
+ * @param {{ flowResult: { commandResults: Array<Record<string, unknown>> }, observationReport?: Record<string, unknown> }} options
+ * @returns {Record<string, unknown>}
  */
-function resolveSummaryCanonicalStatus(options) {
-  const qualityJudgement = asRecord(options.flowResult.artifacts.quality_judgement);
-  const commandStatus =
-    options.flowResult.commandResults.length > 0 &&
-    options.flowResult.commandResults.every((entry) => commandCompletedForCanonicalStatus(entry))
-      ? "pass"
-      : "fail";
-  const deliveryStatus = asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file)
-    ? options.flowResult.artifacts.delivery_blocking === true
-      ? "blocked"
-      : asNonEmptyString(options.flowResult.artifacts.delivery_quality_gate_status) === "not_pass"
-        ? "degraded"
-      : "materialized"
-    : "not_materialized";
-  const releaseRequired =
-    asNonEmptyString(options.profile.scenario_family) === "release" && asStringArray(options.profile.stages).includes("release");
-  const releaseStatus = releaseRequired
-    ? asNonEmptyString(options.flowResult.artifacts.release_status) || "fail"
-    : asNonEmptyString(options.flowResult.artifacts.release_status) || "not_attempted";
-  const releaseMissing = releaseRequired && releaseStatus !== "pass";
-  const allStageResultsPass =
-    options.flowResult.stageResults.length > 0 &&
-    options.flowResult.stageResults.every((entry) => asNonEmptyString(entry.status) === "pass");
-  const blockedOnlyByFinalVerdict = options.observationStatus === "blocked" && allStageResultsPass;
-  const effectiveObservationStatus = blockedOnlyByFinalVerdict ? "pass" : options.observationStatus;
-  const acceptanceStatus =
-    releaseMissing
-      ? "fail"
-      : deliveryStatus === "degraded" || deliveryStatus === "blocked"
-        ? "fail"
-      : effectiveObservationStatus === "pass"
-      ? "pass"
-      : effectiveObservationStatus === "warn" && deliveryStatus !== "not_materialized"
-        ? "warn"
-        : "fail";
-  const runTier = resolveSummaryRunTier(options.profile);
-  const proofEligibleTier = runTier === "acceptance" || runTier === "production-proof";
-  const hasMatrixCell = Object.keys(asRecord(options.flowResult.artifacts.matrix_cell)).length > 0;
-  const coverageStatus = !hasMatrixCell
-    ? "not_attempted"
-    : acceptanceStatus === "pass" && proofEligibleTier
-      ? "covered_pass"
-    : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
-      ? "covered_with_findings"
-      : "attempted_failed";
-  const blockedContinuation = effectiveObservationStatus === "blocked";
-  const findings = uniqueStrings([
-    ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
-    ...(blockedContinuation ? ["Live E2E controller stopped before full lifecycle completion."] : []),
-  ]);
+function buildCommandHealth(options) {
+  const commandResults =
+    options.flowResult.commandResults.length > 0
+      ? options.flowResult.commandResults
+      : Array.isArray(options.observationReport?.step_journal)
+        ? options.observationReport.step_journal
+            .map((entry) => asRecord(entry))
+            .filter((entry) => asNonEmptyString(entry.transcript_ref))
+            .map((entry) => ({
+              command_surface: asNonEmptyString(entry.public_surface) || asNonEmptyString(entry.step_id) || "unknown",
+              status: ["pass", "warn", "interaction_required", "resumed"].includes(
+                asNonEmptyString(asRecord(entry.deterministic_analysis).status),
+              )
+                ? asNonEmptyString(asRecord(entry.deterministic_analysis).status)
+                : "fail",
+              exit_code:
+                typeof asRecord(entry.deterministic_analysis).exit_code === "number"
+                  ? asRecord(entry.deterministic_analysis).exit_code
+                  : null,
+              transcript_ref: asNonEmptyString(entry.transcript_ref),
+              summary: asNonEmptyString(asRecord(entry.stage_result).summary) || asNonEmptyString(entry.step_id) || null,
+            }))
+        : [];
+  const failedCommands = commandResults
+    .filter((entry) => !commandCompletedForRunHealth(entry))
+    .map((entry) => ({
+      command_surface: asNonEmptyString(entry.command_surface) || asNonEmptyString(entry.command) || "unknown",
+      status: asNonEmptyString(entry.status) || "unknown",
+      exit_code: typeof entry.exit_code === "number" ? entry.exit_code : null,
+      transcript_ref: asNonEmptyString(entry.transcript_ref) || null,
+      summary: asNonEmptyString(entry.summary) || asNonEmptyString(entry.stderr) || "Public command did not complete.",
+    }));
   return {
-    command_status: commandStatus,
-    target_verification_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || "not_attempted",
-    artifact_quality_status:
-      asNonEmptyString(qualityJudgement.artifact_quality) ||
-      asNonEmptyString(options.flowResult.artifacts.artifact_quality_status) ||
-      "not_attempted",
-    delivery_status: deliveryStatus,
-    coverage_status: coverageStatus,
-    acceptance_status: acceptanceStatus,
-    run_tier: runTier,
-    release_status: releaseStatus,
-    proof_eligible_tier: proofEligibleTier,
-    required_matrix_acceptance_closed: coverageStatus === "covered_pass" && proofEligibleTier,
-    findings,
-    summary:
-      blockedContinuation
-        ? "Live E2E continuation is blocked and acceptance is incomplete."
-        : acceptanceStatus === "pass"
-        ? "Live E2E acceptance evidence passed."
-        : acceptanceStatus === "warn"
-          ? "Live E2E completed with findings; required matrix acceptance is not closed."
-          : "Live E2E did not meet acceptance requirements.",
+    status: failedCommands.length === 0 ? "pass" : "fail",
+    command_count: commandResults.length,
+    failed_command_count: failedCommands.length,
+    failed_commands: failedCommands,
   };
 }
 
 /**
- * @param {{
- *   canonicalStatus: Record<string, unknown>,
- *   observationReport: Record<string, unknown>,
- *   flowResult: { artifacts: Record<string, unknown> },
- *   finalSkillAgentVerdict: Record<string, unknown>,
- * }}
+ * @param {{ observationReport: Record<string, unknown> }} options
  * @returns {Record<string, unknown>}
  */
-function buildPartialRunnerQualitySummary(options) {
-  const artifacts = options.flowResult.artifacts;
+function buildControllerHealth(options) {
   const completeness = buildLifecycleCompletenessSummary(options.observationReport);
-  const completionComplete = asNonEmptyString(completeness.continuation_status) === "complete";
-  const acceptancePass = asNonEmptyString(options.canonicalStatus.acceptance_status) === "pass";
-  return {
-    summary_type: "partial",
-    completion_status: asNonEmptyString(completeness.continuation_status),
-    mission_satisfaction: acceptancePass ? "pass" : "not_pass",
-    implementation_relevance: asNonEmptyString(artifacts.real_code_change_status) || "not_attempted",
-    diff_quality: asNonEmptyString(artifacts.code_quality_status) || "not_attempted",
-    verification_interpretation:
-      asNonEmptyString(options.canonicalStatus.target_verification_status) ||
-      asNonEmptyString(artifacts.post_run_verify_status) ||
-      "not_attempted",
-    artifact_consistency: asNonEmptyString(options.canonicalStatus.artifact_quality_status) || "not_attempted",
-    provider_execution_status: asNonEmptyString(artifacts.provider_execution_status) || "not_attempted",
-    delivery_status: asNonEmptyString(options.canonicalStatus.delivery_status) || "not_attempted",
-    release_status: asNonEmptyString(options.canonicalStatus.release_status) || "not_attempted",
-    lifecycle_completeness: completeness,
-    risk_findings: uniqueStrings([
-      ...asStringArray(options.canonicalStatus.findings),
-      ...asStringArray(asRecord(options.observationReport.final_analysis).findings),
-      ...asStringArray(options.finalSkillAgentVerdict.missingFindings),
-    ]),
-    final_recommendation: acceptancePass && completionComplete ? "accept" : "reject",
-  };
-}
-
-/**
- * @param {{
- *   base: Record<string, unknown>,
- *   canonicalStatus: Record<string, unknown>,
- *   observationReport: Record<string, unknown>,
- *   finalSkillAgentVerdict: Record<string, unknown>,
- * }}
- * @returns {Record<string, unknown>}
- */
-function applyFinalSkillAgentVerdictToRunnerQualitySummary(options) {
-  const verdict = asRecord(options.finalSkillAgentVerdict.verdict);
-  if (Object.keys(verdict).length === 0) return options.base;
-  const verdictStatus = toObservationStatus(asNonEmptyString(verdict.status) || "not_pass");
-  const verdictFindings = uniqueStrings([
-    ...asStringArray(verdict.findings),
-    ...asStringArray(options.finalSkillAgentVerdict.missingFindings),
-  ]);
-  const baseRiskFindings = asStringArray(options.base.risk_findings);
-  const acceptancePass = asNonEmptyString(options.canonicalStatus.acceptance_status) === "pass";
-  const completeness = buildLifecycleCompletenessSummary(options.observationReport);
-  const completionComplete = asNonEmptyString(completeness.continuation_status) === "complete";
-  const finalRecommendation =
-    verdictStatus === "pass" && acceptancePass && completionComplete
-      ? "accept"
-      : verdictStatus === "warn" && completionComplete
-        ? "accept_with_findings"
-        : "reject";
-  return {
-    ...options.base,
-    completion_status: asNonEmptyString(options.base.completion_status) || asNonEmptyString(completeness.continuation_status),
-    lifecycle_completeness:
-      typeof options.base.lifecycle_completeness === "object" && options.base.lifecycle_completeness
-        ? options.base.lifecycle_completeness
-        : completeness,
-    mission_satisfaction: verdictStatus === "pass" || verdictStatus === "warn" ? "pass" : "not_pass",
-    risk_findings: uniqueStrings([
-      ...baseRiskFindings,
-      ...verdictFindings,
-      ...asStringArray(options.canonicalStatus.findings),
-    ]),
-    final_recommendation: finalRecommendation,
-    final_skill_agent_verdict_status: verdictStatus,
-  };
-}
-
-/**
- * @param {{
- *   base: Record<string, unknown>,
- *   runnerQualitySummary: Record<string, unknown>,
- *   finalSkillAgentVerdict: Record<string, unknown>,
- * }}
- * @returns {Record<string, unknown>}
- */
-function applyFinalSkillAgentVerdictToQualityJudgement(options) {
-  const verdict = asRecord(options.finalSkillAgentVerdict.verdict);
-  if (Object.keys(verdict).length === 0) return options.base;
-  const verdictStatus = toObservationStatus(asNonEmptyString(verdict.status) || "not_pass");
-  return {
-    ...options.base,
-    runner_quality_summary: options.runnerQualitySummary,
-    quality_gate_decision:
-      verdictStatus === "pass" || verdictStatus === "warn"
-        ? asNonEmptyString(options.base.quality_gate_decision) || "pass"
-        : "fail",
-    overall_status:
-      verdictStatus === "pass"
-        ? asNonEmptyString(options.base.overall_status) || "pass"
-        : verdictStatus === "warn"
-          ? "pass_with_findings"
-          : "fail",
-    final_skill_agent_verdict_status: verdictStatus,
-  };
-}
-
-/**
- * @param {{
- *   profile: Record<string, unknown>,
- *   canonicalStatus: Record<string, unknown>,
- *   runnerQualitySummary: Record<string, unknown>,
- *   flowResult: { artifacts: Record<string, unknown> },
- *   observationReport: Record<string, unknown>,
- * }}
- * @returns {Record<string, unknown>}
- */
-function buildPartialQualityJudgement(options) {
-  const artifacts = options.flowResult.artifacts;
   const stepJournal = Array.isArray(options.observationReport.step_journal)
     ? options.observationReport.step_journal.map((entry) => asRecord(entry))
     : [];
-  const discoveryAccepted = stepJournal.some(
-    (entry) =>
-      asNonEmptyString(entry.step_id) === "discovery" &&
-      asNonEmptyString(entry.operator_decision_status) === "accepted" &&
-      ["pass", "warn", "resumed"].includes(toObservationStatus(asNonEmptyString(asRecord(entry.semantic_analysis).status))),
-  );
-  const deliveryStatus = asNonEmptyString(options.canonicalStatus.delivery_status);
-  const releaseStatus = asNonEmptyString(options.canonicalStatus.release_status);
-  const completionComplete = asNonEmptyString(options.runnerQualitySummary.completion_status) === "complete";
-  const acceptancePass = asNonEmptyString(options.canonicalStatus.acceptance_status) === "pass";
+  const missingPhaseEvidence = stepJournal.flatMap((entry) => {
+    const stepId = asNonEmptyString(entry.step_id) || "step";
+    return ["plan_ref", "execution_ref", "inspection_ref", "classification_ref"]
+      .filter((field) => !asNonEmptyString(entry[field]))
+      .map((field) => `${stepId}.${field}`);
+  });
+  const rejectedDecisionSteps = stepJournal
+    .filter((entry) => asNonEmptyString(entry.operator_decision_status) === "rejected")
+    .map((entry) => asNonEmptyString(entry.step_id))
+    .filter(Boolean);
+  const missingDecisionSteps = asStringArray(completeness.missing_operator_decision_steps);
   return {
-    judgement_type: "partial",
-    scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
-    provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
-    feature_size: artifacts.feature_size ?? null,
-    target_selection: asNonEmptyString(artifacts.target_checkout_root) ? "pass" : "not_attempted",
-    feature_request_quality:
-      asNonEmptyString(artifacts.feature_request_file) || asNonEmptyString(artifacts.intake_artifact_packet_file)
+    status:
+      missingPhaseEvidence.length === 0 &&
+      missingDecisionSteps.length === 0 &&
+      rejectedDecisionSteps.length === 0
         ? "pass"
-        : "not_attempted",
-    scenario_coverage_status: asNonEmptyString(options.canonicalStatus.coverage_status) || "not_attempted",
-    provider_execution_status: asNonEmptyString(artifacts.provider_execution_status) || "not_attempted",
-    target_baseline_status:
-      asNonEmptyString(artifacts.baseline_verify_status) ||
-      asNonEmptyString(artifacts.target_baseline_status) ||
-      "not_attempted",
-    real_code_change_status: asNonEmptyString(artifacts.real_code_change_status) || "not_attempted",
-    runner_quality_summary: options.runnerQualitySummary,
-    post_run_verification_status:
-      asNonEmptyString(artifacts.post_run_verify_status) ||
-      asNonEmptyString(options.canonicalStatus.target_verification_status) ||
-      "not_attempted",
-    post_run_diagnostic_status: asNonEmptyString(artifacts.post_run_diagnostic_status) || "not_attempted",
-    discovery_quality: discoveryAccepted ? "pass" : "not_attempted",
-    runtime_success:
-      asNonEmptyString(artifacts.routed_step_result_file) &&
-      asNonEmptyString(artifacts.runtime_harness_report_file) &&
-      asNonEmptyString(artifacts.provider_execution_status) === "pass"
-        ? "pass"
-        : "not_attempted",
-    runtime_harness_decision: asNonEmptyString(artifacts.runtime_harness_decision) || "not_attempted",
-    run_start_runtime_harness_decision: asNonEmptyString(artifacts.run_start_runtime_harness_decision) || "not_attempted",
-    latest_runtime_harness_decision: asNonEmptyString(artifacts.latest_runtime_harness_decision) || "not_attempted",
-    artifact_quality: asNonEmptyString(options.canonicalStatus.artifact_quality_status) || "not_attempted",
-    code_quality: asNonEmptyString(artifacts.code_quality_status) || "not_attempted",
-    feature_size_fit_status: asNonEmptyString(artifacts.feature_size_fit_status) || "not_attempted",
-    delivery_release_quality:
-      deliveryStatus === "materialized" && (releaseStatus === "pass" || releaseStatus === "not_attempted")
-        ? "pass"
-        : "not_attempted",
-    learning_loop_closure:
-      asNonEmptyString(artifacts.learning_loop_scorecard_file) && asNonEmptyString(artifacts.learning_loop_handoff_file)
-        ? "pass"
-        : "not_attempted",
-    quality_gate_decision: asNonEmptyString(artifacts.quality_gate_decision) || "not_attempted",
-    overall_status: acceptancePass && completionComplete ? "pass" : "fail",
-    summary: asNonEmptyString(options.canonicalStatus.summary) || "Partial quality judgement generated for an incomplete run.",
+        : "blocked",
+    controller_state_ref: asNonEmptyString(options.observationReport.controller_state_ref) || null,
+    missing_phase_evidence: missingPhaseEvidence,
+    missing_operator_decision_steps: missingDecisionSteps,
+    rejected_operator_decision_steps: rejectedDecisionSteps,
   };
 }
 
 /**
- * @param {{ runId: string, reportsRoot: string, stepJournal: Array<Record<string, unknown>> }}
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
  */
-function writeAgentArtifactReviewRequest(options) {
-  const requestFile = path.join(
-    options.reportsRoot,
-    `live-e2e-agent-artifact-review-request-${normalizeId(options.runId)}.json`,
+function buildProviderHealth(artifacts) {
+  const providerStepStatus = asRecord(artifacts.provider_step_status);
+  const contextBudgetStatus = asNonEmptyString(artifacts.context_budget_status);
+  const contextBudgetFailureClass = asNonEmptyString(artifacts.context_budget_failure_class);
+  const hasContextBudgetBlock =
+    ["compiled_context_budget_exceeded", "provider_context_window_exceeded"].includes(contextBudgetFailureClass) ||
+    contextBudgetStatus === "fail";
+  const providerExecutionStatus =
+    asNonEmptyString(artifacts.provider_execution_status) ||
+    asNonEmptyString(providerStepStatus.status) ||
+    (hasContextBudgetBlock ? "blocked" : null) ||
+    "not_attempted";
+  const hasProviderBlock = ["interrupted", "blocked", "provider_blocked", "permission-mode-blocked", "edit-denied"].includes(
+    providerExecutionStatus,
   );
-  const missingDecisionSteps = options.stepJournal
-    .filter((entry) => asNonEmptyString(entry.operator_decision_status) !== "accepted")
+  const hasProviderPass = ["pass", "completed", "not_attempted"].includes(providerExecutionStatus);
+  const status = hasContextBudgetBlock || hasProviderBlock ? "blocked" : hasProviderPass ? "pass" : "fail";
+  return {
+    status,
+    provider_execution_status: providerExecutionStatus,
+    provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
+    adapter_raw_evidence_ref: asNonEmptyString(artifacts.adapter_raw_evidence_ref) || null,
+    request_artifact_ref: asNonEmptyString(artifacts.request_artifact_ref) || null,
+    provider_work_packet_ref: asNonEmptyString(artifacts.provider_work_packet_ref) || null,
+    context_budget_status: contextBudgetStatus || null,
+    context_budget_failure_class: contextBudgetFailureClass || null,
+    top_context_size_sources: Array.isArray(artifacts.top_context_size_sources)
+      ? artifacts.top_context_size_sources
+      : [],
+    raw_provider_error_summary: asNonEmptyString(artifacts.raw_provider_error_summary) || null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
+ */
+function buildTargetEnvironmentHealth(artifacts) {
+  const targetSetupStatus = asRecord(artifacts.target_setup_status);
+  const targetVerificationStatus = asRecord(artifacts.target_verification_status_detail);
+  const setupStatus = asNonEmptyString(targetSetupStatus.status) || "not_attempted";
+  const postRunVerificationStatus = asNonEmptyString(artifacts.post_run_verify_status);
+  const verificationStatus =
+    postRunVerificationStatus ||
+    asNonEmptyString(targetVerificationStatus.status) ||
+    "not_attempted";
+  const status = [setupStatus, verificationStatus].includes("fail")
+    ? "fail"
+    : [setupStatus, verificationStatus].includes("blocked")
+      ? "blocked"
+      : "pass";
+  const inferredFailurePhase =
+    status === "pass" ? null : setupStatus === "fail" || setupStatus === "blocked" ? "target_setup" : "target_verification";
+  const inferredFailureClass =
+    status === "pass"
+      ? null
+      : inferredFailurePhase === "target_setup"
+        ? "target_setup_failed"
+        : "target_verification_failed";
+  const blockingTargetStatus =
+    setupStatus === "fail" || setupStatus === "blocked"
+      ? targetSetupStatus
+      : verificationStatus === "fail" || verificationStatus === "blocked"
+        ? targetVerificationStatus
+        : {};
+  return {
+    status,
+    target_setup_status: setupStatus,
+    target_verification_status: verificationStatus,
+    failure_owner:
+      asNonEmptyString(artifacts.failure_owner) || asNonEmptyString(blockingTargetStatus.failure_owner) || null,
+    failure_phase:
+      asNonEmptyString(artifacts.failure_phase) ||
+      asNonEmptyString(blockingTargetStatus.failure_phase) ||
+      inferredFailurePhase,
+    failure_class:
+      asNonEmptyString(artifacts.failure_class) ||
+      asNonEmptyString(blockingTargetStatus.failure_class) ||
+      inferredFailureClass,
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {"pass" | "warn" | "fail" | "blocked" | null}
+ */
+function toRunHealthStatusOrNull(value) {
+  const normalized = asNonEmptyString(value).toLowerCase();
+  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
+  if (normalized === "warn" || normalized === "warning") return "warn";
+  if (normalized === "fail" || normalized === "failed" || normalized === "not_pass") return "fail";
+  if (normalized === "blocked" || normalized === "block") return "blocked";
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @param {string | null} stepResultRef
+ * @returns {Record<string, unknown>}
+ */
+function summarizeDiagnosticCommand(stepResult, stepResultRef) {
+  return {
+    repo_scope: asNonEmptyString(stepResult.repo_scope) || null,
+    command: asNonEmptyString(stepResult.command) || null,
+    status: asNonEmptyString(stepResult.status) || "unknown",
+    timed_out: stepResult.timed_out === true,
+    step_result_ref: stepResultRef,
+    summary: asNonEmptyString(stepResult.summary) || null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @returns {Record<string, unknown>}
+ */
+function summarizeDiagnosticSummaryCommand(entry) {
+  return {
+    repo_scope: asNonEmptyString(entry.repo_scope) || null,
+    command: asNonEmptyString(entry.command) || null,
+    status: asNonEmptyString(entry.status) || "failed",
+    timed_out: entry.timed_out === true,
+    step_result_ref: asNonEmptyString(entry.step_result_ref) || null,
+    summary: asNonEmptyString(entry.summary) || null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
+ */
+function buildDiagnosticHealth(artifacts) {
+  const policy = asRecord(artifacts.post_run_quality_policy);
+  const diagnosticFailureMode =
+    asNonEmptyString(policy.diagnosticFailureMode) ||
+    asNonEmptyString(policy.diagnostic_failure_mode) ||
+    null;
+  const summaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+  const summary = readJsonIfPresent(summaryFile);
+  const summaryStatus = toRunHealthStatusOrNull(summary.status);
+  const artifactStatus = toRunHealthStatusOrNull(artifacts.post_run_diagnostic_status);
+  const inferredStatus =
+    artifactStatus ||
+    (summaryStatus === "pass"
+      ? "pass"
+      : summaryStatus
+        ? diagnosticFailureMode === "fail"
+          ? "fail"
+          : "warn"
+        : "pass");
+  const status = inferredStatus === "fail" && diagnosticFailureMode !== "fail" ? "warn" : inferredStatus;
+  const stepResultRefs = uniqueStrings([
+    ...asStringArray(summary.step_result_refs),
+    ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+  ]);
+  const stepResultEntries = stepResultRefs.map((ref) => ({
+    ref,
+    stepResult: readJsonIfPresent(ref),
+  }));
+  const failedCommandsFromStepResults = stepResultEntries
+    .filter(({ stepResult }) => asNonEmptyString(stepResult.status) === "failed")
+    .map(({ ref, stepResult }) => summarizeDiagnosticCommand(stepResult, ref));
+  const timedOutCommands = Array.isArray(summary.timed_out_commands)
+    ? summary.timed_out_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
+    : failedCommandsFromStepResults.filter((entry) => entry.timed_out === true);
+  const outputQualityFailedCommands = Array.isArray(summary.output_quality_failed_commands)
+    ? summary.output_quality_failed_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
+    : [];
+  const failedCommands = uniqueDiagnosticCommands([
+    ...failedCommandsFromStepResults,
+    ...outputQualityFailedCommands,
+    ...timedOutCommands,
+  ]);
+  const evidenceRefs = uniqueStrings([
+    summaryFile,
+    ...stepResultRefs,
+    ...timedOutCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
+    ...failedCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
+    ...asStringArray(artifacts.post_run_diagnostic_verify_preserved_files),
+  ]);
+  return {
+    status,
+    diagnostic_failure_mode: diagnosticFailureMode === "warn" || diagnosticFailureMode === "fail" ? diagnosticFailureMode : null,
+    post_run_diagnostic_status: artifactStatus || (summaryStatus ? status : null),
+    post_run_diagnostic_verify_summary_file: summaryFile || null,
+    timed_out_command_count: timedOutCommands.length,
+    failed_command_count: failedCommands.length,
+    timed_out_commands: timedOutCommands,
+    failed_commands: failedCommands,
+    evidence_refs: evidenceRefs,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>[]} entries
+ * @returns {Record<string, unknown>[]}
+ */
+function uniqueDiagnosticCommands(entries) {
+  const seen = new Set();
+  const result = [];
+  for (const entry of entries) {
+    const key = [
+      asNonEmptyString(entry.repo_scope),
+      asNonEmptyString(entry.command),
+      asNonEmptyString(entry.step_result_ref),
+      asNonEmptyString(entry.status),
+    ].join("::");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(entry);
+  }
+  return result;
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   artifacts: Record<string, unknown>,
+ *   observationReport: Record<string, unknown>,
+ *   stepObservationFiles: string[],
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildEvidenceHealth(options) {
+  const stepJournal = Array.isArray(options.observationReport.step_journal)
+    ? options.observationReport.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const rawRefs = [
+    options.observationReport.controller_state_ref,
+    ...asStringArray(options.observationReport.evidence_refs),
+    ...options.stepObservationFiles,
+    ...stepJournal.flatMap((entry) => [
+      entry.plan_ref,
+      entry.execution_ref,
+      entry.inspection_ref,
+      entry.classification_ref,
+      entry.agent_decision_request_ref,
+      entry.operator_decision_ref,
+      ...asStringArray(entry.artifact_refs),
+      ...asStringArray(entry.inspected_evidence_refs),
+    ]),
+  ];
+  const missingEvidenceRefs = rawRefs
+    .map((ref, index) => ({ ref: asNonEmptyString(ref), index }))
+    .filter((entry) => !entry.ref)
+    .map((entry) => `missing-ref-${entry.index}`);
+  const guidedUiEvidenceGaps = buildGuidedUiEvidenceGaps({
+    profile: options.profile,
+    artifacts: options.artifacts,
+    observationReport: options.observationReport,
+  });
+  const status =
+    guidedUiEvidenceGaps.length > 0
+      ? "blocked"
+      : missingEvidenceRefs.length === 0
+        ? "pass"
+        : "warn";
+  return {
+    status,
+    missing_evidence_refs: missingEvidenceRefs,
+    weak_evidence_refs: guidedUiEvidenceGaps,
+    evidence_ref_count: uniqueStrings(rawRefs.map((ref) => asNonEmptyString(ref))).length,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} observationReport
+ * @returns {Record<string, unknown>}
+ */
+function buildResumeInteractionHealth(observationReport) {
+  const stepJournal = Array.isArray(observationReport.step_journal)
+    ? observationReport.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const pendingInteractions = stepJournal.filter(
+    (entry) => asNonEmptyString(asRecord(entry.requested_interaction).interaction_status) === "requested",
+  );
+  const pendingDecisions = stepJournal.filter((entry) => asNonEmptyString(entry.operator_decision_status) === "missing");
+  const resumeIssues = stepJournal
+    .filter((entry) => ["resume_failed", "blocked"].includes(asNonEmptyString(asRecord(entry.resume_result).status)))
     .map((entry) => asNonEmptyString(entry.step_id))
     .filter(Boolean);
-  const requiredArtifactRefs = uniqueStrings(options.stepJournal.flatMap((entry) => asStringArray(entry.artifact_refs)));
-  const missingArtifactSteps = options.stepJournal
-    .filter((entry) => asStringArray(entry.artifact_refs).length === 0)
-    .map((entry) => asNonEmptyString(entry.step_id))
-    .filter(Boolean);
-  const request = {
-    request_id: `${options.runId}.agent-artifact-review.v1`,
+  return {
+    status: pendingInteractions.length === 0 && pendingDecisions.length === 0 && resumeIssues.length === 0 ? "pass" : "blocked",
+    pending_interaction_count: pendingInteractions.length,
+    pending_decision_count: pendingDecisions.length,
+    resume_issues: resumeIssues,
+  };
+}
+
+/**
+ * @param {{
+ *   observationReport: Record<string, unknown>,
+ *   commandHealth: Record<string, unknown>,
+ *   controllerHealth: Record<string, unknown>,
+ *   providerHealth: Record<string, unknown>,
+ *   targetEnvironmentHealth: Record<string, unknown>,
+ *   diagnosticHealth: Record<string, unknown>,
+ *   evidenceHealth: Record<string, unknown>,
+ *   resumeInteractionHealth: Record<string, unknown>,
+ *   lifecycleCompletion: Record<string, unknown>,
+ *   artifacts: Record<string, unknown>,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function resolveRunHealthFailure(options) {
+  const rawDeclaredClass = asNonEmptyString(options.artifacts.failure_class);
+  const declaredClassIsNonFailure = ["none", "pass", "passed", "completed", "succeeded"].includes(rawDeclaredClass);
+  const declaredOwner = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_owner);
+  const declaredPhase = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_phase);
+  const declaredClass = declaredClassIsNonFailure ? "" : rawDeclaredClass;
+  if (declaredOwner || declaredPhase || declaredClass) {
+    if (["compiled_context_budget_exceeded", "provider_context_window_exceeded"].includes(declaredClass)) {
+      return {
+        owner: declaredOwner || (declaredClass === "provider_context_window_exceeded" ? "provider" : "aor"),
+        phase: declaredPhase || "provider_execution",
+        class: declaredClass,
+        summary:
+          asNonEmptyString(options.artifacts.raw_provider_error_summary) ||
+          (declaredClass === "provider_context_window_exceeded"
+            ? "External runtime exhausted its provider conversation context during execution."
+            : "Provider work packet exceeded the configured context budget before provider execution."),
+      };
+    }
+    if (["provider_work_packet_not_executed", "no-op"].includes(declaredClass)) {
+      return {
+        owner: declaredOwner || "provider",
+        phase: declaredPhase || "provider_execution",
+        class: declaredClass,
+        summary:
+          declaredClass === "provider_work_packet_not_executed"
+            ? "External runtime summarized the provider work packet instead of executing the implementation."
+            : "Runtime Harness detected a strict code-changing no-op during provider execution.",
+      };
+    }
+    return {
+      owner: declaredOwner || "unknown",
+      phase: declaredPhase || "unknown",
+      class: declaredClass || "declared_failure",
+      summary: "Run artifacts declared a primary failure owner, phase, or class.",
+    };
+  }
+  const liveAdapterPreflight = asRecord(options.artifacts.live_adapter_preflight);
+  const liveAdapterPreflightStatus = asNonEmptyString(liveAdapterPreflight.status);
+  if (liveAdapterPreflightStatus && liveAdapterPreflightStatus !== "pass") {
+    const failureKind = asNonEmptyString(liveAdapterPreflight.failure_kind) || "live_adapter_preflight_failed";
+    return {
+      owner: ["missing-command", "missing-live-runtime"].includes(failureKind) ? "environment" : "provider",
+      phase: "readiness",
+      class: failureKind,
+      summary: asNonEmptyString(liveAdapterPreflight.summary) || "Live adapter preflight did not pass.",
+    };
+  }
+  if (asNonEmptyString(options.observationReport.report_status) === "in_progress") {
+    return {
+      owner: "operator",
+      phase: "controller_decision",
+      class: "controller_incomplete",
+      summary: "Live E2E observation is still in progress and requires a terminal controller decision.",
+    };
+  }
+  if (asNonEmptyString(options.controllerHealth.status) !== "pass") {
+    return {
+      owner: "operator",
+      phase: "controller_decision",
+      class: "controller_incomplete",
+      summary: "Live E2E controller did not complete every required continuation decision.",
+    };
+  }
+  if (asNonEmptyString(options.resumeInteractionHealth.status) !== "pass") {
+    return {
+      owner: "operator",
+      phase: "controller_decision",
+      class: "resume_or_interaction_blocked",
+      summary: "Run has pending or failed interaction/resume evidence.",
+    };
+  }
+  if (asNonEmptyString(options.providerHealth.status) !== "pass") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: asNonEmptyString(options.providerHealth.provider_execution_status) || "provider_execution_failed",
+      summary: "Provider execution did not complete cleanly.",
+    };
+  }
+  if (asNonEmptyString(options.targetEnvironmentHealth.status) !== "pass") {
+    const targetOwner = asNonEmptyString(options.targetEnvironmentHealth.failure_owner);
+    const targetPhase = asNonEmptyString(options.targetEnvironmentHealth.failure_phase);
+    const targetClass = asNonEmptyString(options.targetEnvironmentHealth.failure_class);
+    return {
+      owner: targetOwner || "target_repository",
+      phase:
+        targetPhase ||
+        (asNonEmptyString(options.targetEnvironmentHealth.target_setup_status) === "fail"
+          ? "target_setup"
+          : "target_verification"),
+      class: targetClass || "target_environment_failed",
+      summary: "Target setup or target verification failed during the run.",
+    };
+  }
+  if (asNonEmptyString(options.diagnosticHealth.status) === "fail") {
+    return {
+      owner: "target_repository",
+      phase: "target_verification",
+      class: "post_run_diagnostic_failed",
+      summary: "Post-run diagnostic verification failed under diagnostic_failure_mode=fail.",
+    };
+  }
+  if (asNonEmptyString(options.commandHealth.status) === "fail") {
+    return {
+      owner: "aor",
+      phase: "unknown",
+      class: "public_command_failed",
+      summary: "One or more public live E2E commands failed.",
+    };
+  }
+  if (
+    asStringArray(options.evidenceHealth.weak_evidence_refs).some((ref) =>
+      ref === "guided-browser-task-proof" || ref.startsWith("frontend_interactions.guided-web-smoke"),
+    )
+  ) {
+    return {
+      owner: "operator",
+      phase: "ui_validation",
+      class: "guided_browser_task_proof_missing",
+      summary: "Guided AOR operator UI proof was required but browser-task evidence was missing or did not pass.",
+    };
+  }
+  if (asNonEmptyString(options.evidenceHealth.status) !== "pass") {
+    return {
+      owner: "aor",
+      phase: "summary_write",
+      class: "missing_evidence",
+      summary: "Run completed with missing factual evidence refs.",
+    };
+  }
+  if (toObservationStatus(asNonEmptyString(options.observationReport.overall_status)) === "warn") {
+    return {
+      owner: "unknown",
+      phase: "unknown",
+      class: "run_completed_with_findings",
+      summary: "Run completed with factual findings.",
+    };
+  }
+  if (asNonEmptyString(options.diagnosticHealth.status) === "warn") {
+    return {
+      owner: "target_repository",
+      phase: "target_verification",
+      class: "post_run_diagnostic_warning",
+      summary: "Post-run diagnostic verification recorded a non-blocking factual warning.",
+    };
+  }
+  if (
+    toObservationStatus(asNonEmptyString(options.observationReport.overall_status)) === "blocked" ||
+    asNonEmptyString(options.lifecycleCompletion.continuation_status) !== "complete"
+  ) {
+    return {
+      owner: "unknown",
+      phase: "unknown",
+      class: "lifecycle_incomplete",
+      summary: "Run stopped before completing the declared lifecycle without a more specific owner classification.",
+    };
+  }
+  return {
+    owner: "aor",
+    phase: "summary_write",
+    class: "unclassified_run_health_failure",
+    summary: "Run-health was non-passing without a more specific factual failure classification.",
+  };
+}
+
+/**
+ * @param {{
+ *   runId: string,
+ *   profile: Record<string, unknown>,
+ *   summaryFile: string,
+ *   observationReportFile: string,
+ *   observationReport: Record<string, unknown>,
+ *   flowResult: {
+ *     commandResults: Array<Record<string, unknown>>,
+ *     artifacts: Record<string, unknown>,
+ *   },
+ *   stepObservationFiles: string[],
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildRunHealthReport(options) {
+  const lifecycleCompletion = buildLifecycleCompletenessSummary(options.observationReport);
+  const commandHealth = buildCommandHealth({
+    flowResult: options.flowResult,
+    observationReport: options.observationReport,
+  });
+  const controllerHealth = buildControllerHealth({ observationReport: options.observationReport });
+  const providerHealth = buildProviderHealth(options.flowResult.artifacts);
+  const targetEnvironmentHealth = buildTargetEnvironmentHealth(options.flowResult.artifacts);
+  const diagnosticHealth = buildDiagnosticHealth(options.flowResult.artifacts);
+  const evidenceHealth = buildEvidenceHealth({
+    profile: options.profile,
+    artifacts: options.flowResult.artifacts,
+    observationReport: options.observationReport,
+    stepObservationFiles: options.stepObservationFiles,
+  });
+  const resumeInteractionHealth = buildResumeInteractionHealth(options.observationReport);
+  const observationStatus = toObservationStatus(asNonEmptyString(options.observationReport.overall_status) || "not_pass");
+  const hasBlockingRunControl =
+    asNonEmptyString(options.observationReport.report_status) === "in_progress" ||
+    observationStatus === "blocked" ||
+    observationStatus === "interaction_required" ||
+    asNonEmptyString(controllerHealth.status) === "blocked" ||
+    asNonEmptyString(providerHealth.status) === "blocked" ||
+    asNonEmptyString(targetEnvironmentHealth.status) === "blocked" ||
+    asNonEmptyString(diagnosticHealth.status) === "blocked" ||
+    asNonEmptyString(evidenceHealth.status) === "blocked" ||
+    asNonEmptyString(resumeInteractionHealth.status) === "blocked";
+  const hasFailedRun =
+    observationStatus === "not_pass" ||
+    asNonEmptyString(commandHealth.status) === "fail" ||
+    asNonEmptyString(providerHealth.status) === "fail" ||
+    asNonEmptyString(targetEnvironmentHealth.status) === "fail" ||
+    asNonEmptyString(diagnosticHealth.status) === "fail";
+  const overallStatus = hasBlockingRunControl
+    ? "blocked"
+    : hasFailedRun
+      ? "fail"
+      : asNonEmptyString(lifecycleCompletion.continuation_status) !== "complete"
+        ? "blocked"
+        : observationStatus === "warn" ||
+            asNonEmptyString(evidenceHealth.status) === "warn" ||
+            asNonEmptyString(diagnosticHealth.status) === "warn"
+          ? "warn"
+          : "pass";
+  const failureSummary =
+    overallStatus === "pass"
+      ? { owner: null, phase: null, class: null, summary: null }
+      : resolveRunHealthFailure({
+          observationReport: options.observationReport,
+          commandHealth,
+          controllerHealth,
+          providerHealth,
+          targetEnvironmentHealth,
+          diagnosticHealth,
+          evidenceHealth,
+          resumeInteractionHealth,
+          lifecycleCompletion,
+          artifacts: options.flowResult.artifacts,
+        });
+  const failedCommandFindings = Array.isArray(commandHealth.failed_commands)
+    ? commandHealth.failed_commands.map((entry) => asNonEmptyString(asRecord(entry).summary)).filter(Boolean)
+    : [];
+  const runFindingSummaries = uniqueStrings([
+    ...asStringArray(asRecord(options.observationReport.final_analysis).findings),
+    ...failedCommandFindings,
+    ...(Array.isArray(diagnosticHealth.failed_commands) ? diagnosticHealth.failed_commands : []).map(
+      (entry) =>
+        `Post-run diagnostic command '${asNonEmptyString(asRecord(entry).command) || "unknown"}' did not pass.`,
+    ),
+    ...(Array.isArray(diagnosticHealth.timed_out_commands) ? diagnosticHealth.timed_out_commands : []).map(
+      (entry) =>
+        `Post-run diagnostic command '${asNonEmptyString(asRecord(entry).command) || "unknown"}' timed out.`,
+    ),
+    ...asStringArray(controllerHealth.missing_operator_decision_steps).map((step) => `Missing operator decision for ${step}.`),
+    ...asStringArray(evidenceHealth.missing_evidence_refs).map((ref) => `Missing evidence ref: ${ref}.`),
+    ...asStringArray(evidenceHealth.weak_evidence_refs).map((ref) => `Weak or missing required evidence: ${ref}.`),
+  ]);
+  return {
+    report_id: `${options.runId}.live-e2e-run-health.v1`,
     run_id: options.runId,
-    required_review: {
-      step_count: options.stepJournal.length,
-      accepted_operator_decision_count: options.stepJournal.length - missingDecisionSteps.length,
-      missing_operator_decision_steps: missingDecisionSteps,
-      artifact_ref_count: requiredArtifactRefs.length,
-      missing_artifact_steps: missingArtifactSteps,
-    },
-    required_artifacts: requiredArtifactRefs,
-    missing_artifacts: missingArtifactSteps,
-    rubric: {
-      statuses: ["pass", "warn", "not_pass", "blocked", "interaction_required", "resumed"],
-      criteria: [
-        "traceability to feature request, mission, and previous step",
-        "completeness for the step",
-        "actionability for the next step",
-        "consistency with neighboring artifacts",
-        "absence of synthetic or no-op explanations that hide failure",
-      ],
-    },
-    expected_response_shape: {
-      step_journal: [
-        {
-          step_id: "discovery",
-          semantic_analysis: {
-            status: "pass|warn|not_pass|blocked|interaction_required|resumed",
-            judge_source: "skill-agent",
-            findings: [],
-          },
-          judge_source: "skill-agent",
-          artifact_refs: [],
-          findings: [],
-        },
-      ],
-    },
-    steps: options.stepJournal.map((entry) => ({
-      step_id: asNonEmptyString(entry.step_id),
-      step_instance_id: asNonEmptyString(entry.step_instance_id),
-      flow_stage: asNonEmptyString(entry.flow_stage),
-      artifact_refs: asStringArray(entry.artifact_refs),
-      operator_decision_status: asNonEmptyString(entry.operator_decision_status),
-      inspected_evidence_refs_count: asStringArray(entry.inspected_evidence_refs).length,
-      semantic_status: asNonEmptyString(asRecord(entry.semantic_analysis).status),
-      semantic_judge_source: asNonEmptyString(asRecord(entry.semantic_analysis).judge_source),
-      observed_status: asNonEmptyString(entry.final_step_verdict),
-      findings: uniqueStrings([
-        ...asStringArray(asRecord(entry.deterministic_analysis).findings),
-        ...asStringArray(asRecord(entry.semantic_analysis).findings),
+    profile_id: asNonEmptyString(options.profile.profile_id) || "unknown-profile",
+    generated_at: nowIso(),
+    source_run_summary_file: options.summaryFile,
+    source_observation_report_file: options.observationReportFile,
+    overall_status: overallStatus,
+    lifecycle_completion: lifecycleCompletion,
+    command_health: commandHealth,
+    controller_health: controllerHealth,
+    provider_health: providerHealth,
+    target_environment_health: targetEnvironmentHealth,
+    diagnostic_health: diagnosticHealth,
+    evidence_health: evidenceHealth,
+    failure_summary: failureSummary,
+    resume_interaction_health: resumeInteractionHealth,
+    run_findings: runFindingSummaries.map((summary) => ({
+      category: "run-health",
+      severity: overallStatus === "pass" ? "info" : overallStatus === "warn" ? "medium" : "high",
+      summary,
+      evidence_refs: uniqueStrings([
+        asNonEmptyString(options.observationReportFile),
+        asNonEmptyString(options.observationReport.controller_state_ref),
       ]),
     })),
+    evidence_refs: uniqueStrings([
+      options.summaryFile,
+      options.observationReportFile,
+      asNonEmptyString(options.observationReport.controller_state_ref),
+      ...options.stepObservationFiles,
+      ...asStringArray(diagnosticHealth.evidence_refs),
+    ]),
   };
-  writeJson(requestFile, request);
-  return requestFile;
 }
 
 /**
@@ -2233,10 +2470,9 @@ export function writeProofRunnerArtifacts(options) {
   );
   const productionProofPolicy = buildProductionProofSummary(options.profile);
   hydrateFlowArtifactsFromControllerState(options.flowResult.artifacts);
-  normalizePreVerdictQualityArtifacts(options.flowResult.artifacts, {
+  hydrateGuidedUiArtifactsFromReports(options.flowResult.artifacts, {
     reportsRoot: options.layout.reportsRoot,
-    sourceRoot: options.hostRoot,
-    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
+    runId: options.runId,
   });
   const observationReport = buildObservationReport({
     runId: options.runId,
@@ -2254,72 +2490,10 @@ export function writeProofRunnerArtifacts(options) {
     options.layout.reportsRoot,
     `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
   );
-  const preFinalCanonicalStatus = resolveSummaryCanonicalStatus({
-    profile: options.profile,
-    flowResult: options.flowResult,
-    observationStatus: observationReport.overall_status,
-  });
-  const preFinalRunnerQualitySummary =
-    typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
-    options.flowResult.artifacts.runner_quality_summary
-      ? asRecord(options.flowResult.artifacts.runner_quality_summary)
-      : buildPartialRunnerQualitySummary({
-          canonicalStatus: preFinalCanonicalStatus,
-          observationReport,
-          flowResult: options.flowResult,
-          finalSkillAgentVerdict: { missingFindings: [] },
-        });
-  const preFinalQualityJudgement =
-    typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
-      ? asRecord(options.flowResult.artifacts.quality_judgement)
-      : buildPartialQualityJudgement({
-          profile: options.profile,
-          canonicalStatus: preFinalCanonicalStatus,
-          runnerQualitySummary: preFinalRunnerQualitySummary,
-          flowResult: options.flowResult,
-          observationReport,
-        });
-  const finalSkillAgentVerdict = resolveFinalSkillAgentVerdict({
-    runId: options.runId,
-    reportsRoot: options.layout.reportsRoot,
-    sourceRoot: options.hostRoot,
-    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
-    observationReport,
-    canonicalStatus: preFinalCanonicalStatus,
-    runnerQualitySummary: preFinalRunnerQualitySummary,
-    qualityJudgement: preFinalQualityJudgement,
-    flowResult: options.flowResult,
-  });
-  observationReport.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
-  if (finalSkillAgentVerdict.verdict) {
-    observationReport.report_status = "final";
-    observationReport.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
-    observationReport.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
-  } else {
-    observationReport.report_status = "in_progress";
-  }
   observationReport.evidence_refs = uniqueStrings([
     ...asStringArray(observationReport.evidence_refs),
     ...stepObservationFiles,
-    finalSkillAgentVerdict.requestFile,
-    finalSkillAgentVerdict.verdict ? finalSkillAgentVerdict.verdictFile : null,
   ]);
-  const finalVerdictStatus =
-    asStringArray(finalSkillAgentVerdict.missingFindings).length > 0
-      ? "blocked"
-      : finalSkillAgentVerdict.verdict
-        ? toObservationStatus(asNonEmptyString(finalSkillAgentVerdict.verdict.status))
-        : "blocked";
-  observationReport.overall_status = worstObservationStatus(observationReport.overall_status, finalVerdictStatus);
-  observationReport.final_analysis = {
-    ...asRecord(observationReport.final_analysis),
-    status: worstObservationStatus(asNonEmptyString(asRecord(observationReport.final_analysis).status), finalVerdictStatus),
-    findings: uniqueStrings([
-      ...asStringArray(asRecord(observationReport.final_analysis).findings),
-      ...asStringArray(asRecord(finalSkillAgentVerdict.verdict).findings),
-      ...asStringArray(finalSkillAgentVerdict.missingFindings),
-    ]),
-  };
   const observationValidation = validateContractDocument({
     family: "live-e2e-observation-report",
     document: observationReport,
@@ -2329,18 +2503,40 @@ export function writeProofRunnerArtifacts(options) {
     const issues = observationValidation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Live E2E observation report failed contract validation: ${issues}`);
   }
-  const agentArtifactReviewRequestFile = writeAgentArtifactReviewRequest({
-    runId: options.runId,
-    reportsRoot: options.layout.reportsRoot,
-    stepJournal: observationReport.step_journal,
-  });
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.live_e2e_step_observation_files = stepObservationFiles;
-  options.flowResult.artifacts.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
-  options.flowResult.artifacts.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
-  options.flowResult.artifacts.final_skill_agent_verdict = finalSkillAgentVerdict.verdict ?? null;
-  options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
+  const runHealthReportFile = path.join(
+    options.layout.reportsRoot,
+    `live-e2e-run-health-report-${normalizeId(options.runId)}.json`,
+  );
+  const runHealthReport = buildRunHealthReport({
+    runId: options.runId,
+    profile: options.profile,
+    summaryFile,
+    observationReportFile,
+    observationReport,
+    flowResult: options.flowResult,
+    stepObservationFiles,
+  });
+  const runHealthValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: runHealthReport,
+    source: `runtime://live-e2e-run-health/${options.runId}`,
+  });
+  if (!runHealthValidation.ok) {
+    const issues = runHealthValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Live E2E run-health report failed contract validation: ${issues}`);
+  }
+  options.flowResult.artifacts.live_e2e_run_health_report_file = runHealthReportFile;
+  options.flowResult.artifacts.live_e2e_run_health_overall_status = runHealthReport.overall_status;
+  const guidedBrowserTaskAppServerCleanup = cleanupGuidedBrowserTaskAppSurface(
+    options.flowResult.artifacts,
+    runHealthReport,
+  );
+  if (guidedBrowserTaskAppServerCleanup) {
+    options.flowResult.artifacts.guided_browser_task_app_server_cleanup = guidedBrowserTaskAppServerCleanup;
+  }
   const productionProof = applyProductionProofEvidence({
     productionProof: productionProofPolicy,
     flowResult: options.flowResult,
@@ -2348,74 +2544,7 @@ export function writeProofRunnerArtifacts(options) {
   if (productionProof) {
     options.flowResult.artifacts.production_proof = productionProof;
   }
-  const canonicalStatus = resolveSummaryCanonicalStatus({
-    profile: options.profile,
-    flowResult: options.flowResult,
-    observationStatus: observationReport.overall_status,
-  });
-  options.flowResult.artifacts.canonical_status = canonicalStatus;
-  options.flowResult.artifacts.command_status = canonicalStatus.command_status;
-  options.flowResult.artifacts.target_verification_status = canonicalStatus.target_verification_status;
-  options.flowResult.artifacts.artifact_quality_status = canonicalStatus.artifact_quality_status;
-  options.flowResult.artifacts.delivery_status = canonicalStatus.delivery_status;
-  options.flowResult.artifacts.coverage_status = canonicalStatus.coverage_status;
-  options.flowResult.artifacts.acceptance_status = canonicalStatus.acceptance_status;
-  options.flowResult.artifacts.run_tier = canonicalStatus.run_tier;
-  options.flowResult.artifacts.release_status = canonicalStatus.release_status;
-  options.flowResult.artifacts.proof_eligible_tier = canonicalStatus.proof_eligible_tier;
-  options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
-  if (
-    !(
-      typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
-      options.flowResult.artifacts.runner_quality_summary
-    )
-  ) {
-    options.flowResult.artifacts.runner_quality_summary = buildPartialRunnerQualitySummary({
-      canonicalStatus,
-      observationReport,
-      flowResult: options.flowResult,
-      finalSkillAgentVerdict,
-    });
-  }
-  if (finalSkillAgentVerdict.verdict) {
-    options.flowResult.artifacts.runner_quality_summary = applyFinalSkillAgentVerdictToRunnerQualitySummary({
-      base: asRecord(options.flowResult.artifacts.runner_quality_summary),
-      canonicalStatus,
-      observationReport,
-      finalSkillAgentVerdict,
-    });
-  }
-  if (
-    !(
-      typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
-    )
-  ) {
-    options.flowResult.artifacts.quality_judgement = buildPartialQualityJudgement({
-      profile: options.profile,
-      canonicalStatus,
-      runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
-      flowResult: options.flowResult,
-      observationReport,
-    });
-  }
-  if (finalSkillAgentVerdict.verdict) {
-    options.flowResult.artifacts.quality_judgement = applyFinalSkillAgentVerdictToQualityJudgement({
-      base: asRecord(options.flowResult.artifacts.quality_judgement),
-      runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
-      finalSkillAgentVerdict,
-    });
-  }
-  resolveFinalSkillAgentVerdict({
-    runId: options.runId,
-    reportsRoot: options.layout.reportsRoot,
-    sourceRoot: options.hostRoot,
-    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
-    observationReport,
-    canonicalStatus,
-    runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
-    qualityJudgement: asRecord(options.flowResult.artifacts.quality_judgement),
-    flowResult: options.flowResult,
-  });
+  refreshRuntimeHarnessChangeEvidenceForSummary(options.flowResult.artifacts, options.mission, productionProof);
   const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
   const latestRuntimeHarnessReportFile =
     asNonEmptyString(productionProof?.evidence_refs?.runtime_harness_report_file) ||
@@ -2446,26 +2575,22 @@ export function writeProofRunnerArtifacts(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
-    run_tier: canonicalStatus.run_tier,
+    run_tier: resolveSummaryRunTier(options.profile),
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
     started_at: options.flowResult.startedAt,
     finished_at: options.flowResult.finishedAt,
     status: observationReport.overall_status,
+    run_health_status: runHealthReport.overall_status,
     continuation_status: lifecycleCompleteness.continuation_status,
     blocked_step_id: lifecycleCompleteness.blocked_step_id,
     blocked_step_instance_id: lifecycleCompleteness.blocked_step_instance_id,
     lifecycle_completeness: lifecycleCompleteness,
-    canonical_status: canonicalStatus,
-    command_status: canonicalStatus.command_status,
-    target_verification_status: canonicalStatus.target_verification_status,
-    artifact_quality_status: canonicalStatus.artifact_quality_status,
-    delivery_status: canonicalStatus.delivery_status,
-    coverage_status: canonicalStatus.coverage_status,
-    acceptance_status: canonicalStatus.acceptance_status,
-    release_status: canonicalStatus.release_status,
-    proof_eligible_tier: canonicalStatus.proof_eligible_tier,
-    required_matrix_acceptance_closed: canonicalStatus.required_matrix_acceptance_closed,
+    run_health: runHealthReport,
+    command_health: runHealthReport.command_health,
+    controller_health: runHealthReport.controller_health,
+    evidence_health: runHealthReport.evidence_health,
+    failure_summary: runHealthReport.failure_summary,
     target_repo: asRecord(options.profile.target_repo),
     target_checkout_root:
       typeof options.flowResult.artifacts.target_checkout_root === "string"
@@ -2474,6 +2599,38 @@ export function writeProofRunnerArtifacts(options) {
     generated_project_profile_file:
       typeof options.flowResult.artifacts.generated_project_profile_file === "string"
         ? options.flowResult.artifacts.generated_project_profile_file
+        : null,
+    feature_request_file:
+      typeof options.flowResult.artifacts.feature_request_file === "string"
+        ? options.flowResult.artifacts.feature_request_file
+        : null,
+    intake_artifact_packet_file:
+      typeof options.flowResult.artifacts.intake_artifact_packet_file === "string"
+        ? options.flowResult.artifacts.intake_artifact_packet_file
+        : null,
+    intake_artifact_packet_body_file:
+      typeof options.flowResult.artifacts.intake_artifact_packet_body_file === "string"
+        ? options.flowResult.artifacts.intake_artifact_packet_body_file
+        : null,
+    discovery_analysis_report_file:
+      typeof options.flowResult.artifacts.discovery_analysis_report_file === "string"
+        ? options.flowResult.artifacts.discovery_analysis_report_file
+        : null,
+    spec_step_result_file:
+      typeof options.flowResult.artifacts.spec_step_result_file === "string"
+        ? options.flowResult.artifacts.spec_step_result_file
+        : null,
+    approved_handoff_packet_file:
+      typeof options.flowResult.artifacts.approved_handoff_packet_file === "string"
+        ? options.flowResult.artifacts.approved_handoff_packet_file
+        : null,
+    handoff_packet_file:
+      typeof options.flowResult.artifacts.handoff_packet_file === "string"
+        ? options.flowResult.artifacts.handoff_packet_file
+        : null,
+    execution_readiness_file:
+      typeof options.flowResult.artifacts.execution_readiness_file === "string"
+        ? options.flowResult.artifacts.execution_readiness_file
         : null,
     routed_step_result_file:
       typeof options.flowResult.artifacts.routed_step_result_file === "string"
@@ -2530,12 +2687,14 @@ export function writeProofRunnerArtifacts(options) {
         ? options.flowResult.artifacts.provider_step_status
         : null,
     real_code_change_status: asNonEmptyString(options.flowResult.artifacts.real_code_change_status) || null,
+    meaningful_changed_paths: Array.isArray(options.flowResult.artifacts.meaningful_changed_paths)
+      ? options.flowResult.artifacts.meaningful_changed_paths
+      : [],
     runtime_harness_decision: asNonEmptyString(options.flowResult.artifacts.runtime_harness_decision) || null,
     run_start_runtime_harness_decision:
       asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_decision) || null,
     latest_runtime_harness_decision:
       asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_decision) || null,
-    quality_gate_decision: asNonEmptyString(options.flowResult.artifacts.quality_gate_decision) || null,
     compiled_context_ref:
       typeof options.flowResult.artifacts.compiled_context_ref === "string"
         ? options.flowResult.artifacts.compiled_context_ref
@@ -2544,6 +2703,20 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.adapter_raw_evidence_ref === "string"
         ? options.flowResult.artifacts.adapter_raw_evidence_ref
         : null,
+    request_artifact_ref:
+      typeof options.flowResult.artifacts.request_artifact_ref === "string"
+        ? options.flowResult.artifacts.request_artifact_ref
+        : null,
+    provider_work_packet_ref:
+      typeof options.flowResult.artifacts.provider_work_packet_ref === "string"
+        ? options.flowResult.artifacts.provider_work_packet_ref
+        : null,
+    context_budget_status: asNonEmptyString(options.flowResult.artifacts.context_budget_status) || null,
+    context_budget_failure_class: asNonEmptyString(options.flowResult.artifacts.context_budget_failure_class) || null,
+    raw_provider_error_summary: asNonEmptyString(options.flowResult.artifacts.raw_provider_error_summary) || null,
+    top_context_size_sources: Array.isArray(options.flowResult.artifacts.top_context_size_sources)
+      ? options.flowResult.artifacts.top_context_size_sources
+      : [],
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,
@@ -2558,27 +2731,31 @@ export function writeProofRunnerArtifacts(options) {
       options.flowResult.artifacts.guided_journey_proof
         ? options.flowResult.artifacts.guided_journey_proof
         : null,
+    guided_web_smoke_summary_file: asNonEmptyString(options.flowResult.artifacts.guided_web_smoke_summary_file) || null,
+    guided_web_smoke_html_file: asNonEmptyString(options.flowResult.artifacts.guided_web_smoke_html_file) || null,
+    guided_web_dom_snapshot_file: asNonEmptyString(options.flowResult.artifacts.guided_web_dom_snapshot_file) || null,
+    guided_web_accessibility_summary_file:
+      asNonEmptyString(options.flowResult.artifacts.guided_web_accessibility_summary_file) || null,
+    guided_web_visual_guardrail_file:
+      asNonEmptyString(options.flowResult.artifacts.guided_web_visual_guardrail_file) || null,
+    guided_browser_task_proof_request_file:
+      asNonEmptyString(options.flowResult.artifacts.guided_browser_task_proof_request_file) || null,
+    guided_browser_task_proof_file: asNonEmptyString(options.flowResult.artifacts.guided_browser_task_proof_file) || null,
+    guided_browser_task_app_server_cleanup:
+      typeof options.flowResult.artifacts.guided_browser_task_app_server_cleanup === "object" &&
+      options.flowResult.artifacts.guided_browser_task_app_server_cleanup
+        ? options.flowResult.artifacts.guided_browser_task_app_server_cleanup
+        : null,
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,
     live_e2e_step_observation_files: stepObservationFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
+    live_e2e_run_health_report_file: runHealthReportFile,
+    live_e2e_run_health_overall_status: runHealthReport.overall_status,
     operator_context: observationReport.operator_context,
-    final_skill_agent_verdict_request_file: finalSkillAgentVerdict.requestFile,
-    final_skill_agent_verdict_file: finalSkillAgentVerdict.verdictFile,
-    final_skill_agent_verdict: finalSkillAgentVerdict.verdict ?? null,
-    agent_artifact_review_request_file: agentArtifactReviewRequestFile,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
         ? options.flowResult.artifacts.matrix_cell
-        : null,
-    quality_judgement:
-      typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
-        ? options.flowResult.artifacts.quality_judgement
-        : null,
-    runner_quality_summary:
-      typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
-      options.flowResult.artifacts.runner_quality_summary
-        ? options.flowResult.artifacts.runner_quality_summary
         : null,
     production_proof: productionProof,
     proof_scope: productionProof?.proof_scope ?? null,
@@ -2591,6 +2768,10 @@ export function writeProofRunnerArtifacts(options) {
       productionProof?.evidence_refs?.delivery_manifest_file ??
       asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file) ??
       null,
+    delivery_plan_file: asNonEmptyString(options.flowResult.artifacts.delivery_plan_file) || null,
+    release_packet_file: asNonEmptyString(options.flowResult.artifacts.release_packet_file) || null,
+    learning_loop_scorecard_file: asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file) || null,
+    learning_loop_handoff_file: asNonEmptyString(options.flowResult.artifacts.learning_loop_handoff_file) || null,
     review_report_file:
       productionProof?.evidence_refs?.review_report_file ??
       asNonEmptyString(options.flowResult.artifacts.review_report_file) ??
@@ -2611,6 +2792,10 @@ export function writeProofRunnerArtifacts(options) {
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
       step_evaluator:
         "node ./scripts/live-e2e/step-evaluator.mjs --project-ref <path> --profile <path>",
+      quality_assessment_prepare:
+        "node ./scripts/live-e2e/quality-assessment.mjs prepare --run-summary-file <live_e2e_run_summary_file>",
+      quality_assessment_validate:
+        "node ./scripts/live-e2e/quality-assessment.mjs validate --assessment-report-file <live_e2e_quality_assessment_report_file>",
       qualification_loop:
         "node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path>",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
@@ -2639,6 +2824,7 @@ export function writeProofRunnerArtifacts(options) {
   });
 
   writeJson(observationReportFile, observationReport);
+  writeJson(runHealthReportFile, runHealthReport);
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
 
@@ -2663,6 +2849,8 @@ export function writeProofRunnerArtifacts(options) {
     summaryFile,
     scorecard,
     scorecardFile,
+    runHealthReport,
+    runHealthReportFile,
     learningLoop,
   };
 }
@@ -2763,6 +2951,14 @@ function runCli(rawArgs) {
     runtimeRootOverride: effectiveRuntimeRoot,
     hostProjectId,
   });
+  const existingTerminalArtifacts = loadExistingTerminalProofRunnerArtifacts({ layout, runId, profile });
+  if (existingTerminalArtifacts) {
+    writeExistingProofRunnerOutput({
+      runId,
+      existing: existingTerminalArtifacts,
+    });
+    return 0;
+  }
   let aorInstallation;
   let installationFailure = null;
   try {
@@ -2990,18 +3186,13 @@ function runCli(rawArgs) {
         status: "ok",
         run_id: runId,
         live_e2e_run_status: written.summary.status,
-        acceptance_status: written.summary.acceptance_status,
-        coverage_status: written.summary.coverage_status,
+        live_e2e_run_health_status: written.runHealthReport.overall_status,
         live_e2e_run_summary_file: written.summaryFile,
+        live_e2e_run_health_report_file: written.runHealthReportFile,
         live_e2e_observation_report_file: written.summary.live_e2e_observation_report_file,
         aor_installation_proof_file: written.summary.aor_installation_proof_file,
         live_e2e_controller_state_file: written.summary.live_e2e_controller_state_file,
         live_e2e_step_observation_files: written.summary.live_e2e_step_observation_files,
-        final_skill_agent_verdict_request_file: written.summary.final_skill_agent_verdict_request_file,
-        final_skill_agent_verdict_file: written.summary.final_skill_agent_verdict_file,
-        final_skill_agent_verdict_status:
-          asNonEmptyString(asRecord(written.summary.final_skill_agent_verdict).status) || null,
-        agent_artifact_review_request_file: written.summary.agent_artifact_review_request_file,
         live_e2e_scorecard_files: [written.scorecardFile],
         learning_loop_scorecard_file: written.learningLoop?.scorecardFile ?? null,
         learning_loop_handoff_file: written.learningLoop?.handoffFile ?? null,

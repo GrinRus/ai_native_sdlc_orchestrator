@@ -78,7 +78,7 @@ Evidence summary:
 
 - The manual controller completed `discovery`, `spec`, `planning`, `handoff`, and reached `execution`.
 - `execution` used route `route.implement.default.open-code-primary`, adapter/provider `open-code`, and the external command `opencode run --format json --dangerously-skip-permissions ... --file <adapter request>`.
-- Request transport was `file-attachment`, matching the OpenCode adapter contract.
+- Request transport was `request-artifact`, matching the external-process adapter contract; OpenCode used its native `--file` binding for the provider work packet.
 - Runtime Harness blocked the run with `failure_class=provider-timeout`, `repair_status=exhausted`, and `runtime_harness_decision=block`.
 - The final OpenCode attempt used the previous `timeout_ms=600000` adapter bound, ended with `timed_out=true`, `signal=SIGKILL`, and `exit_code=null`, and established that the former 10 minute hard cap was too short for this proof lane.
 - Two repair retries were attempted; both hit `provider-timeout` at about 601 seconds, exhausting the policy budget.
@@ -87,7 +87,7 @@ Evidence summary:
 - The profile safety policy remained `no-upstream-write`; the target-cleanliness check before execution passed.
 - Strict code-changing inspection reported `strict_code_changing_noop_detection_applied=true` and `strict_code_changing_noop=true` with no meaningful changed paths, so the operator decision blocked continuation to `review`.
 
-This is committed blocked/pending evidence, not promotion evidence. Keep `open-code-primary` as extended candidate coverage until a passing full-journey proof completes with meaningful target changes and closed acceptance status.
+This is committed blocked/pending evidence, not promotion evidence. Keep `open-code-primary` as extended candidate coverage until a passing full-journey proof completes with meaningful target changes and passing run-health evidence.
 
 ## Interpretation
 - Claude Code and OpenCode confirm the v1 control-plane path: full-bypass stays non-interactive, while restricted mode can return permission evidence that AOR can surface as an interaction.

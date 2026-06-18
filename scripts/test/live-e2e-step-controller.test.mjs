@@ -255,7 +255,7 @@ test("live E2E decision helper prepares accepted continue decisions with all req
   });
 });
 
-test("live E2E decision helper preserves frontend evidence refs in the draft", () => {
+test("live E2E decision helper preserves AOR operator UI evidence refs in the draft", () => {
   withTempRoot((reportsRoot) => {
     const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui.json");
     const expectedDecisionFile = path.join(reportsRoot, "live-e2e-operator-decision-ui.json");
@@ -264,11 +264,14 @@ test("live E2E decision helper preserves frontend evidence refs in the draft", (
       path.join(reportsRoot, "live-e2e-agent-decision-request-ui.json"),
       path.join(reportsRoot, "live-e2e-step-inspection-ui.json"),
     ];
-    const frontendRefs = [
+    const aorOperatorUiRefs = [
       path.join(reportsRoot, "guided-web-dom.json"),
       path.join(reportsRoot, "guided-web-accessibility.json"),
       path.join(reportsRoot, "guided-web-screenshot.png"),
     ];
+    for (const aorOperatorUiRef of aorOperatorUiRefs) {
+      fs.writeFileSync(aorOperatorUiRef, "{}\n", "utf8");
+    }
     fs.writeFileSync(
       requestFile,
       `${JSON.stringify(
@@ -282,7 +285,122 @@ test("live E2E decision helper preserves frontend evidence refs in the draft", (
           deterministic_analysis: { status: "pass" },
           decision_rubric: {
             required_evidence_refs: requiredRefs,
-            frontend_evidence_refs: frontendRefs,
+            aor_operator_ui_evidence_refs: aorOperatorUiRefs,
+          },
+          operator_decision_expected_ref: expectedDecisionFile,
+          expected_response_shape: {
+            action: "continue|frontend_interact|diagnose|block",
+            inspected_evidence_refs: requiredRefs,
+            evidence_refs: requiredRefs,
+            ui_ux_analysis: {
+              status: "pass|warn|not_pass|blocked",
+              task_outcome: "pass|warn|not_pass|blocked",
+              findings: [],
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(expectedDecisionFile, "{}\n", "utf8");
+
+    const summary = prepareOperatorDecisionArtifact({
+      requestFile,
+      action: "continue",
+      findings: ["Frontend proof evidence inspected."],
+    });
+    const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
+    assert.deepEqual(preparedDecision.inspected_evidence_refs, [...requiredRefs, ...aorOperatorUiRefs]);
+    for (const aorOperatorUiRef of aorOperatorUiRefs) {
+      assert.equal(preparedDecision.evidence_refs.includes(aorOperatorUiRef), true);
+      assert.equal(preparedDecision.aor_operator_ui_evidence_refs.includes(aorOperatorUiRef), true);
+      assert.equal(preparedDecision.ui_ux_analysis.aor_operator_ui_evidence_refs.includes(aorOperatorUiRef), true);
+    }
+    const legacyEvidenceField = ["frontend", "evidence", "refs"].join("_");
+    assert.equal(preparedDecision[legacyEvidenceField], undefined);
+    assert.equal(preparedDecision.ui_ux_analysis[legacyEvidenceField], undefined);
+    assert.deepEqual(summary.validation_preview.missing_aor_operator_ui_evidence_refs, []);
+  });
+});
+
+test("live E2E decision helper hydrates late browser-task proof refs", () => {
+  withTempRoot((reportsRoot) => {
+    const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui-late-proof.json");
+    const expectedDecisionFile = path.join(reportsRoot, "live-e2e-operator-decision-ui-late-proof.json");
+    const requiredRefs = [
+      requestFile,
+      path.join(reportsRoot, "live-e2e-step-inspection-ui-late-proof.json"),
+    ];
+    const webSmokeFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.json");
+    const browserProofRequestFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-request-run.json");
+    const browserProofFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.json");
+    const screenshotFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.png");
+    const htmlFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.html");
+    const domFile = path.join(reportsRoot, "installed-user-guided-web-smoke-dom-run.json");
+    const accessibilityFile = path.join(reportsRoot, "installed-user-guided-web-smoke-accessibility-run.json");
+    const visualFile = path.join(reportsRoot, "installed-user-guided-web-smoke-visual-guardrail-run.json");
+    fs.writeFileSync(screenshotFile, "png", "utf8");
+    for (const evidenceFile of [htmlFile, domFile, accessibilityFile, visualFile]) {
+      fs.writeFileSync(evidenceFile, "{}", "utf8");
+    }
+    fs.writeFileSync(
+      browserProofRequestFile,
+      `${JSON.stringify(
+        {
+          expected_browser_task_proof_file: browserProofFile,
+          expected_rendered_html_file: htmlFile,
+          expected_dom_snapshot_file: domFile,
+          expected_accessibility_summary_file: accessibilityFile,
+          expected_visual_guardrail_file: visualFile,
+          evidence_refs: [htmlFile, domFile, accessibilityFile, visualFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      browserProofFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          screenshot_files: [screenshotFile],
+          task_outcome: { status: "pass", findings: [] },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      webSmokeFile,
+      `${JSON.stringify(
+        {
+          browser_task_proof_request_file: browserProofRequestFile,
+          browser_task_proof_file: null,
+          task_outcome: { status: "not_pass", findings: ["browser-task-proof requires skill-agent browser evidence."] },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          request_id: "ui-late-proof.operator-decision-request",
+          run_id: "ui-late-proof",
+          step_id: "learning",
+          step_instance_id: "learning",
+          iteration: 1,
+          operator_context: { operator_ref: "skill://live-e2e-runner" },
+          deterministic_analysis: { status: "pass" },
+          decision_rubric: {
+            required_evidence_refs: requiredRefs,
+            aor_operator_ui_evidence_refs: [webSmokeFile],
           },
           operator_decision_expected_ref: expectedDecisionFile,
           expected_response_shape: {
@@ -305,16 +423,126 @@ test("live E2E decision helper preserves frontend evidence refs in the draft", (
     const summary = prepareOperatorDecisionArtifact({
       requestFile,
       action: "continue",
-      findings: ["Frontend proof evidence inspected."],
     });
     const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
-    assert.deepEqual(preparedDecision.inspected_evidence_refs, requiredRefs);
-    for (const frontendRef of frontendRefs) {
-      assert.equal(preparedDecision.evidence_refs.includes(frontendRef), true);
-      assert.equal(preparedDecision.frontend_evidence_refs.includes(frontendRef), true);
-      assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(frontendRef), true);
+    for (const expectedRef of [
+      webSmokeFile,
+      browserProofRequestFile,
+      browserProofFile,
+      screenshotFile,
+      htmlFile,
+      domFile,
+      accessibilityFile,
+      visualFile,
+    ]) {
+      assert.equal(preparedDecision.inspected_evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.aor_operator_ui_evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.ui_ux_analysis.aor_operator_ui_evidence_refs.includes(expectedRef), true);
     }
-    assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
+    const legacyEvidenceField = ["frontend", "evidence", "refs"].join("_");
+    assert.equal(preparedDecision[legacyEvidenceField], undefined);
+    assert.equal(preparedDecision.ui_ux_analysis[legacyEvidenceField], undefined);
+    assert.equal(summary.aor_operator_ui_evidence_ref_count >= 8, true);
+    assert.deepEqual(summary.validation_preview.missing_aor_operator_ui_evidence_refs, []);
+  });
+});
+
+test("live E2E decision helper rejects continue when late browser-task proof is missing", () => {
+  withTempRoot((reportsRoot) => {
+    const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui-missing-late-proof.json");
+    const expectedDecisionFile = path.join(
+      reportsRoot,
+      "live-e2e-operator-decision-ui-missing-late-proof.json",
+    );
+    const requiredRefs = [
+      requestFile,
+      path.join(reportsRoot, "live-e2e-step-inspection-ui-missing-late-proof.json"),
+    ];
+    const webSmokeFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.json");
+    const browserProofRequestFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-request-run.json");
+    const browserProofFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.json");
+    const htmlFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.html");
+    const domFile = path.join(reportsRoot, "installed-user-guided-web-smoke-dom-run.json");
+    const accessibilityFile = path.join(reportsRoot, "installed-user-guided-web-smoke-accessibility-run.json");
+    const visualFile = path.join(reportsRoot, "installed-user-guided-web-smoke-visual-guardrail-run.json");
+    for (const evidenceFile of [htmlFile, domFile, accessibilityFile, visualFile]) {
+      fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    }
+    fs.writeFileSync(
+      browserProofRequestFile,
+      `${JSON.stringify(
+        {
+          expected_browser_task_proof_file: browserProofFile,
+          expected_rendered_html_file: htmlFile,
+          expected_dom_snapshot_file: domFile,
+          expected_accessibility_summary_file: accessibilityFile,
+          expected_visual_guardrail_file: visualFile,
+          evidence_refs: [htmlFile, domFile, accessibilityFile, visualFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      webSmokeFile,
+      `${JSON.stringify(
+        {
+          browser_task_proof_request_file: browserProofRequestFile,
+          browser_task_proof_file: null,
+          task_outcome: { status: "not_pass", findings: ["browser-task-proof requires skill-agent browser evidence."] },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          request_id: "ui-missing-late-proof.operator-decision-request",
+          run_id: "ui-missing-late-proof",
+          step_id: "learning",
+          step_instance_id: "learning",
+          iteration: 1,
+          operator_context: { operator_ref: "skill://live-e2e-runner" },
+          deterministic_analysis: { status: "pass" },
+          decision_rubric: {
+            required_evidence_refs: requiredRefs,
+            aor_operator_ui_evidence_refs: [webSmokeFile],
+          },
+          operator_decision_expected_ref: expectedDecisionFile,
+          expected_response_shape: {
+            action: "continue|frontend_interact|diagnose|block",
+            inspected_evidence_refs: requiredRefs,
+            evidence_refs: requiredRefs,
+            ui_ux_analysis: {
+              status: "pass|warn|not_pass|blocked",
+              task_outcome: "pass|warn|not_pass|blocked",
+              findings: [],
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const summary = prepareOperatorDecisionArtifact({
+      requestFile,
+      action: "continue",
+    });
+    assert.equal(summary.status, "rejected");
+    assert.equal(fs.existsSync(summary.output_ref), false);
+    assert.equal(summary.validation_preview.missing_aor_operator_ui_evidence_refs.includes(browserProofFile), true);
+    assert.equal(
+      summary.validation_preview.rejection_risks.includes("Decision is missing required AOR operator UI evidence refs."),
+      true,
+    );
+    assert.equal(summary.decision_preview.inspected_evidence_refs.includes(browserProofFile), false);
   });
 });
 
@@ -581,7 +809,7 @@ test("live E2E step controller marks execution not_pass when post-run verificati
   });
 });
 
-test("live E2E step controller rejects UI-capable decisions without frontend evidence refs", () => {
+test("live E2E step controller rejects UI-capable decisions without AOR operator UI evidence refs", () => {
   withTempRoot((reportsRoot) => {
     const summaryFile = path.join(reportsRoot, "web-smoke.json");
     const htmlFile = path.join(reportsRoot, "web-smoke.html");
@@ -661,8 +889,8 @@ test("live E2E step controller rejects UI-capable decisions without frontend evi
 
     const [entry] = controller.getStepJournal();
     assert.equal(entry.operator_decision_status, "rejected");
-    assert.match(entry.semantic_analysis.findings.join("\n"), /frontend evidence refs/);
-    assert.match(entry.operator_decision_rejection_reason, /frontend evidence refs/);
+    assert.match(entry.semantic_analysis.findings.join("\n"), /AOR operator UI evidence refs/);
+    assert.match(entry.operator_decision_rejection_reason, /AOR operator UI evidence refs/);
   });
 });
 
@@ -1606,6 +1834,19 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       profile,
       mode: "auto",
     });
+    const executionEvidence = {
+      request_artifact_ref: "evidence://request.json",
+      provider_work_packet_ref: "evidence://work-packet.json",
+      meaningful_changed_paths: ["source/core/Ky.ts", "test/hooks.ts"],
+      top_context_size_sources: [
+        {
+          source: "provider_work_packet.context",
+          bytes: 2048,
+          chars: 2048,
+          estimated_tokens: 683,
+        },
+      ],
+    };
     let sequence = 1;
     for (const [stage, label] of [
       ["discovery", "discovery-run"],
@@ -1621,7 +1862,7 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
         stage,
         stageResult: { stage, status: "pass", evidence_refs: [], summary: "ok" },
         commandResults: [{ label, command_surface: `aor ${stage}`, status: "pass" }],
-        artifacts: {},
+        artifacts: stage === "execution" ? executionEvidence : {},
       });
       sequence += 2;
     }
@@ -1653,6 +1894,9 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       "delivery",
     ]);
     assert.equal(state.current_step, null);
+    assert.equal(state.artifacts_snapshot.request_artifact_ref, "evidence://request.json");
+    assert.deepEqual(state.artifacts_snapshot.meaningful_changed_paths, ["source/core/Ky.ts", "test/hooks.ts"]);
+    assert.equal(state.artifacts_snapshot.top_context_size_sources[0].source, "provider_work_packet.context");
   });
 });
 

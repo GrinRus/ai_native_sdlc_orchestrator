@@ -41,6 +41,10 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `ky-retry-hooks-governance`
     - `large`, `governance|repair`
     - broader request lifecycle mission with stricter audit/learning closure
+    - post-run primary gate uses `test/main.ts`, `test/hooks.ts`, and focused
+      `test/retry.ts --match='*shouldRetry*'`; the full timing-heavy retry
+      suite remains diagnostic evidence with an 1800 second target command
+      budget on governance large profiles
   - `ky-request-lifecycle-observability-xlarge`
     - `xlarge`, `governance|repair`, manual-only
     - broader retry, hook, public type, and observability rehearsal with operator
@@ -55,7 +59,11 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `full-journey-regress-ky-small-qwen.yaml` (`regress/small/qwen-primary`, extended)
     - `full-journey-regress-ky-medium-qwen.yaml` (`regress/medium/qwen-primary`, extended)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+    - `full-journey-governance-ky-large-codex.yaml` (`governance/large/openai-primary`, codex-cli)
+    - `full-journey-governance-ky-large-anthropic.yaml` (`governance/large/anthropic-primary`)
   - installed-user browser-task candidate:
+    - `installed-user-guided-journey.yaml` (`regress/small/openai-primary`)
+    - `installed-user-guided-journey-anthropic.yaml` (`regress/small/anthropic-primary`)
     - `installed-user-guided-journey-qwen.yaml` (`regress/small/qwen-primary`, extended)
   - manual-only xlarge profiles:
     - `manual-xlarge-governance-ky-openai.yaml` (`governance/xlarge/openai-primary`)
@@ -97,6 +105,9 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - use `make install` before `make test` / `make codestyle`
 - Full-journey verification baseline:
   - use the bounded CLI pytest slice plus `make codestyle`, not the entire repo-wide `make test` matrix
+  - large and xlarge all-pass closure requires primary and diagnostic pytest
+    output to be warning-clean; exit-0 `ResourceWarning` stderr is a target
+    outcome-quality gap, not acceptable all-pass evidence
 - Failure-safe defaults:
   - `write_back_to_remote=false`
   - preferred delivery mode: `patch-only`
@@ -419,17 +430,24 @@ Feature-size taxonomy:
 - `large`: cross-package or release/governance lineage with broader artifact expectations.
 - `xlarge`: manual or overnight rehearsal only; do not add xlarge cells to required coverage or qualification sets. Legacy `xl` inputs are accepted as `xlarge`, but new catalog entries must use `xlarge`.
 
+Strict all-pass quality loops may include xlarge as manual observation evidence,
+but xlarge still cannot close required provider qualification or acceptance
+matrix coverage.
+
 Run-tier taxonomy:
 - `readme-smoke`: README-led no-write installed-user path.
 - `bounded-live`: fast fail-closed provider proof.
 - `full-journey-observation`: delivery-reaching evidence with findings allowed.
-- `acceptance`: required matrix closure when canonical status is fully passing.
+- `acceptance`: required matrix attempt that may qualify only when run-health passes and required evidence is materialized.
 - `production-proof`: strict real-runner proof with no mock and no upstream writes.
 
 Required matrix closure rule:
-- `coverage_status=covered_pass` closes required coverage only for `run_tier=acceptance` or `run_tier=production-proof`.
-- `coverage_status=covered_with_findings` is useful evidence but must not be reported as completed acceptance.
-- `coverage_status=attempted_failed` means the matrix cell was attempted and did not close.
+- required coverage can close only for `run_tier=acceptance` or `run_tier=production-proof` with `live-e2e-run-health-report.overall_status=pass`;
+- run-health findings identify why a run attempt did not qualify;
+- outcome quality findings belong in `live-e2e-quality-assessment-report` and are advisory for acceptance follow-up, not provider qualification status.
+- local quality-driven rerun loops may additionally require
+  `quality-assessment gate --policy all-pass`; that gate remains separate from
+  run-health and qualification accounting.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky-small-codex.yaml`
@@ -437,10 +455,12 @@ Canonical matrix-cell examples:
 - `small/regress/qwen-primary`: `full-journey-regress-ky-small-qwen.yaml`
 - `medium/regress/qwen-primary`: `full-journey-regress-ky-medium-qwen.yaml`
 - `medium/repair/anthropic-primary`: `full-journey-repair-httpie-medium-anthropic.yaml`
+- `large/governance/openai-primary`: `full-journey-governance-ky-large-codex.yaml`
+- `large/governance/anthropic-primary`: `full-journey-governance-ky-large-anthropic.yaml`
 - `large/release/openai-primary`: `full-journey-release-nextjs.yaml`
 
 Production-proof candidate:
-- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, required target verdicts `pass`, and a passing no-upstream-write assertion.
+- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, materialized runtime/review/delivery evidence refs, and a passing no-upstream-write assertion.
 - `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` is the committed sanitized proof fixture for the first completed production proof. It covers only the `ky.regress.small.openai` production cell and must not be generalized to Claude, OpenCode, or broader production-readiness claims without additional executable evidence.
 
 ## Shared no-write preflight baseline
@@ -452,6 +472,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory factual evidence for full-journey observation and contributes directly to the step journal, run-health, and post-run quality assessment.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

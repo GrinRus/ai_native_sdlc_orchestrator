@@ -41,31 +41,6 @@
     "feature_size": "small",
     "coverage_tier": "required"
   },
-  "quality_judgement": {
-    "scenario_family": "regress",
-    "provider_variant_id": "openai-primary",
-    "feature_size": "small",
-    "target_selection": "pass",
-    "feature_request_quality": "pass",
-    "scenario_coverage_status": "pass",
-    "provider_execution_status": "pass",
-    "target_baseline_status": "pass",
-    "real_code_change_status": "pass",
-    "post_run_verification_status": "pass",
-    "post_run_diagnostic_status": "pass",
-    "discovery_quality": "pass",
-    "runtime_success": "pass",
-    "runtime_harness_decision": "pass",
-    "run_start_runtime_harness_decision": "pass",
-    "latest_runtime_harness_decision": "pass",
-    "artifact_quality": "pass",
-    "code_quality": "pass",
-    "feature_size_fit_status": "pass",
-    "delivery_release_quality": "pass",
-    "learning_loop_closure": "pass",
-    "quality_gate_decision": "pass",
-    "overall_status": "pass"
-  },
   "targets": [
     {
       "cell_id": "ky.regress.small.openai",
@@ -84,30 +59,7 @@
   ],
   "production_proof": {
     "evidence_status": "pass",
-    "target_verdicts_status": "pass",
-    "required_target_verdicts": [
-      "target_selection",
-      "feature_request_quality",
-      "scenario_coverage_status",
-      "provider_execution_status",
-      "target_baseline_status",
-      "real_code_change_status",
-      "post_run_verification_status",
-      "post_run_diagnostic_status",
-      "discovery_quality",
-      "runtime_success",
-      "runtime_harness_decision",
-      "run_start_runtime_harness_decision",
-      "latest_runtime_harness_decision",
-      "artifact_quality",
-      "code_quality",
-      "feature_size_fit_status",
-      "delivery_release_quality",
-      "learning_loop_closure",
-      "quality_gate_decision",
-      "overall_status"
-    ],
-    "failed_target_verdicts": [],
+    "result_quality_assessment": "separate-post-run-report",
     "findings": []
   },
   "evidence": {

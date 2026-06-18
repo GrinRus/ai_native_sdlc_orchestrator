@@ -35,7 +35,8 @@ Runtime Harness controllers may add optional decision metadata:
 - `requested_interaction`
 
 These fields describe AOR runtime control decisions. They do not replace review, eval, delivery, learning, or promotion artifacts.
-`external_runner` is a routed live-execution evidence summary copied from the adapter response when an external runtime was invoked. It should preserve the selected runtime-agent permission mode, permission mode source, command surface, execution root, exit metadata, and raw evidence ref when available.
+`external_runner` is a routed live-execution evidence summary copied from the adapter response when an external runtime was invoked. It should preserve the selected runtime-agent permission mode, permission mode source, command surface, execution root, exit metadata, raw evidence ref, request artifact refs, provider work packet refs, and context-budget status when available.
+If an external runtime returns a provider work-packet echo or packet summary instead of an implementation report, the adapter should classify the response with `failure_kind=provider_work_packet_not_executed`. The step result should preserve that failure class so Runtime Harness and live E2E run-health can distinguish prompt/packet execution failures from target repository failures.
 `requested_interaction` is the operator-continuation surface for runner-requested input. It is optional and may be `null` when no operator input is required.
 
 When present, `requested_interaction` must stay query-safe and should carry:
@@ -64,7 +65,7 @@ The shared contract loader validates nested step-result fields that carry runtim
 - `runtime_harness_decision` must use `pass|retry|repair|escalate|block|fail` when present.
 - `project verify` command evidence is optional for backward compatibility, but when present `exit_code` is numeric or `null`, `signal` and `error_code` are strings or `null`, `output_excerpt` must stay a bounded summary rather than a full transcript, and `output_quality_findings[]` entries must carry string `rule_id`, `source`, `severity`, `summary`, and optional bounded `excerpt`. Baseline-accepted warning findings may add string `baseline_status` and `baseline_evidence_refs[]` pointing to the prior verify summaries that prove the warning class was pre-existing.
 - `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|resume_failed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
-- `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref` is validated as a string when available, and `exit_code` is numeric when available or `null` for missing-command preflight failures.
+- `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref`, `request_artifact_ref`, `provider_work_packet_ref`, `context_budget_status`, `context_budget_failure_class`, and `raw_provider_error_summary` are validated as strings when available; `top_context_size_sources[]` entries must be objects with source labels and numeric size estimates; and `exit_code` is numeric when available or `null` for missing-command preflight failures.
 - `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.
 - `mission_semantics` path arrays, including `runner_owned_state_paths[]` and `runner_owned_state_paths_during_step[]`, must contain strings when present. Legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, and `scope_violation_paths` must not be emitted.
 

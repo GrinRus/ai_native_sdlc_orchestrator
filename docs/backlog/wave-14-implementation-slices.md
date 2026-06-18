@@ -155,12 +155,12 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 1. Require `scenario_family` and `provider_variant_id` for full-journey profiles.
 2. Resolve scenario policies and provider variants from machine-readable catalogs.
 3. Materialize deterministic provider-pinned route overrides for matrix-cell runs and pass them through the public CLI flow.
-4. Extend run summary, scorecard, and verdict matrix with `scenario_family`, `provider_variant_id`, `feature_size`, `scenario_coverage_status`, `provider_execution_status`, and `feature_size_fit_status`.
+4. Extend run summary and scorecard evidence with `scenario_family`, `provider_variant_id`, `feature_size`, `scenario_coverage_status`, `provider_execution_status`, and `feature_size_fit_status`.
 
 ### Acceptance criteria
 1. The proof runner rejects unknown scenarios, unknown providers, and unsupported mission/scenario/provider combinations.
 2. The proof runner uses deterministic provider-pinned route overrides instead of default fallback routing for matrix-cell runs.
-3. Summaries and verdict matrices preserve matrix metadata and expanded verdict dimensions.
+3. Summaries and scorecards preserve matrix metadata and expanded status dimensions.
 4. Proof-runner tests cover invalid matrix cells and successful provider-pinned execution.
 
 ### Done evidence

@@ -240,8 +240,7 @@ feature_missions:
         - yarn g:typecheck
         - yarn workspace @your-org/ts-utils test-unit
         - yarn workspace @your-org/core-lib test-unit
-      diagnostic_commands:
-        - yarn g:test-unit
+      diagnostic_commands: []
       diagnostic_failure_mode: warn
     supported_scenarios:
       - release

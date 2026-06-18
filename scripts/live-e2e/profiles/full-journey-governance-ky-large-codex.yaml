@@ -1,4 +1,4 @@
-profile_id: live-e2e.full-journey.governance.ky.large.anthropic
+profile_id: live-e2e.full-journey.governance.ky.large.codex
 version: 1
 journey_mode: full-journey
 flow_kind: governance
@@ -24,7 +24,7 @@ implementation_loop:
 target_catalog_id: ky
 feature_mission_id: ky-retry-hooks-governance
 scenario_family: governance
-provider_variant_id: anthropic-primary
+provider_variant_id: openai-primary
 bootstrap_template: github-default
 runtime:
   mode: ephemeral

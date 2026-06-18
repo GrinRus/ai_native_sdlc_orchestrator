@@ -13,6 +13,7 @@ live_e2e:
   agent_decision_policy: required
   interaction_answer_policy: agent-required
   target_write_policy: aor-runtime-only-before-execution
+  target_command_timeout_sec: 1800
 implementation_loop:
   enabled: true
   max_iterations: 3
@@ -41,7 +42,7 @@ guided_journey:
     - operator-request-patch-only-document-proposal
     - interaction-inbox-answer-audit
     - durable-packets-and-reports
-    - final-skill-agent-verdict
+    - quality-assessment-report
     - no-upstream-write-assertions
   flow_loop_proof:
     enabled: true
@@ -63,9 +64,12 @@ guided_journey:
       - dom-snapshot
       - accessibility-summary
       - screenshot-or-visual-guardrail
-      - task-outcome
-      - ux-findings
-      - skill-agent-ui-ux-verdict
+      - aor-operator-task-success
+      - aor-flow-navigation-and-next-action-clarity
+      - aor-blocker-error-recovery-state-feedback
+      - aor-visual-stability-and-responsiveness
+      - aor-accessibility-findings
+      - browser-task-proof
 operator_requests:
   enabled: true
   default_delivery_mode: no-write
@@ -103,6 +107,8 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+    - npm install --prefer-offline --no-audit --no-fund
   eval_suites:
     - suite.regress.short@v1
   harness:

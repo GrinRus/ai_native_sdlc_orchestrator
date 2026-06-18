@@ -438,11 +438,40 @@ function executionEvidenceForFlow(selectedFlow, runs, runtimeTrace, { draft = fa
   if (traceRunIds.size === 0) return null;
   const candidates = (Array.isArray(runs) ? runs : []).filter((run) => traceRunIds.has(run.run_id) && run.execution_evidence);
   const selectedRun = candidates.find((run) => run.provider_step_status?.status && !["completed", "failed", "interrupted"].includes(run.provider_step_status.status))
-    ?? candidates.at(-1)
+    ?? strongestExecutionEvidenceRun(candidates)
     ?? null;
   return selectedRun?.execution_evidence
     ? { ...selectedRun.execution_evidence, run_id: selectedRun.run_id, provider_step_status: selectedRun.provider_step_status ?? null }
     : null;
+}
+
+function strongestExecutionEvidenceRun(candidates) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+  return candidates.reduce((best, run, index) => {
+    if (!run?.execution_evidence) return best;
+    const candidate = { run, score: executionEvidenceScore(run, index) };
+    return !best || candidate.score > best.score ? candidate : best;
+  }, null)?.run ?? null;
+}
+
+function executionEvidenceScore(run, index) {
+  const evidence = run?.execution_evidence ?? {};
+  const missionRelevant = Array.isArray(evidence.changed_path_groups)
+    ? evidence.changed_path_groups.find((group) => group.group_id === "mission-relevant")
+    : null;
+  const missionPathCount = Array.isArray(missionRelevant?.paths) ? missionRelevant.paths.length : 0;
+  let score = index;
+  if (evidence.status === "pass") score += 1000;
+  if (evidence.real_code_change_status === "pass") score += 800;
+  if (missionPathCount > 0) score += 600 + Math.min(missionPathCount, 20);
+  if (evidence.runtime_harness_decision === "pass") score += 300;
+  if (evidence.review_status === "pass") score += 200;
+  if (evidence.post_run_verification_status === "pass") score += 100;
+  if (Array.isArray(evidence.blockers) && evidence.blockers.length > 0) score -= 500;
+  const runId = String(run?.run_id ?? "");
+  if (runId.includes(".verify.")) score -= 200;
+  if (runId.includes(".routed-execution.")) score -= 100;
+  return score;
 }
 
 function executionStatusRows(evidence) {
@@ -808,9 +837,9 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
   const value = newFlowDraft ? "__new__" : selectedFlowId ?? "";
   return (
     <div className="flow-selector">
-      <label>
+      <label htmlFor="flow-selector-control">
         <span>Flow</span>
-        <select name="flow-selector" value={value} aria-label="Flow selector" onChange={(event) => onSelectFlow(event.target.value)}>
+        <select id="flow-selector-control" name="flow-selector" value={value} aria-label="Flow selector" onChange={(event) => onSelectFlow(event.target.value)}>
           {newFlowDraft ? <option value="__new__">New flow draft</option> : null}
           {flows.length === 0 ? <option value="">No active flow</option> : null}
           {activeFlows.length > 0 ? (
@@ -861,9 +890,11 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
   const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
   return (
     <div className="project-switcher" aria-label="Project switcher">
-      <label>
+      <label htmlFor="project-switcher-control">
         <span>Project switcher</span>
         <select
+          id="project-switcher-control"
+          name="project-switcher"
           value={activeProject?.project_id ?? ""}
           onChange={(event) => onSelectProject(event.target.value)}
           disabled={busy || projects.length === 0}
@@ -2572,6 +2603,14 @@ function App() {
     () => evidenceRowsForFlow(selectedFlow, evidenceRows, { draft: draftSurface }),
     [selectedFlow, evidenceRows, draftSurface],
   );
+  const selectedFlowRuntimeTrace = useMemo(() => {
+    if (!selectedFlow?.flow_id || flowRuntimeTrace?.flow_id !== selectedFlow.flow_id) return null;
+    return flowRuntimeTrace;
+  }, [flowRuntimeTrace, selectedFlow?.flow_id]);
+  const selectedFlowEvidenceGraph = useMemo(() => {
+    if (!selectedFlow?.flow_id || flowEvidenceGraph?.flow_id !== selectedFlow.flow_id) return null;
+    return flowEvidenceGraph;
+  }, [flowEvidenceGraph, selectedFlow?.flow_id]);
   const workbenchEvidenceRows = useMemo(
     () => {
       if (draftSurface) return [];
@@ -2591,17 +2630,17 @@ function App() {
   }, [workbenchEvidenceRows, selectedRef]);
 
   const interactions = useMemo(() => {
-    return flowScopedInteractions(stepResults, selectedFlow, flowRuntimeTrace, { draft: draftSurface });
-  }, [stepResults, selectedFlow, flowRuntimeTrace, draftSurface]);
+    return flowScopedInteractions(stepResults, selectedFlow, selectedFlowRuntimeTrace, { draft: draftSurface });
+  }, [stepResults, selectedFlow, selectedFlowRuntimeTrace, draftSurface]);
   const operatorDecisionRequests = useMemo(() => {
-    return operatorDecisionRequestsForFlow(selectedFlow, flowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface });
-  }, [selectedFlow, flowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
+    return operatorDecisionRequestsForFlow(selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface });
+  }, [selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
   const providerStepStatus = useMemo(
     () => resolveProviderStepStatus(projectState, runs),
     [projectState, runs],
   );
   const executionEvidence = useMemo(() => {
-    const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, flowRuntimeTrace, { draft: draftSurface });
+    const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, selectedFlowRuntimeTrace, { draft: draftSurface });
     if (flowExecutionEvidence || draftSurface || selectedFlow?.flow_id || !providerStepStatus) return flowExecutionEvidence;
     return {
       run_id: providerStepStatus.route_id ?? providerStepStatus.step_id ?? "live-e2e",
@@ -2618,7 +2657,7 @@ function App() {
       actions: [],
       provider_step_status: providerStepStatus,
     };
-  }, [selectedFlow, runs, flowRuntimeTrace, draftSurface, providerStepStatus]);
+  }, [selectedFlow, runs, selectedFlowRuntimeTrace, draftSurface, providerStepStatus]);
   const providerEvidenceRows = useMemo(() => {
     return workbenchEvidenceRows.filter((row) => artifactFilterMatches(row, "provider"));
   }, [workbenchEvidenceRows]);
@@ -2953,6 +2992,8 @@ function App() {
     setDraftFollowUpHandoffRef(null);
     setSelectedFlow(flow);
     setSelectedFlowId(flow?.flow_id ?? null);
+    setFlowEvidenceGraph(null);
+    setFlowRuntimeTrace(null);
     setSelectedStage(flowStageId(flow, nextAction, projectState));
     if (apiProjectBase) {
       loadFlowWorkbench(apiProjectBase, flow).catch((err) => setError(err instanceof Error ? err.message : String(err)));
@@ -3359,8 +3400,8 @@ function App() {
       </section>
 
       <section className="workbench-row graph-trace-row">
-        <EvidenceGraphPanel graph={flowEvidenceGraph} />
-        <RuntimeTracePanel trace={flowRuntimeTrace} />
+        <EvidenceGraphPanel graph={selectedFlowEvidenceGraph} />
+        <RuntimeTracePanel trace={selectedFlowRuntimeTrace} />
       </section>
 
       <section className="workbench-row secondary-workbench-row">

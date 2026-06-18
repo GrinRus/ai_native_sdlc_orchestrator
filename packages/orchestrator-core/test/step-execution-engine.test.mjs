@@ -121,6 +121,7 @@ function configureCodexExternalRuntime(repoRoot, runtime) {
     "          args:",
     ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
+    "    stdin_json_scope: test-only",
     "    timeout_ms: 30000",
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
@@ -152,6 +153,7 @@ function configureCodexExternalRuntimePermissionModes(repoRoot, runtime) {
     "          args:",
     ...runtime.restrictedArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
+    "    stdin_json_scope: test-only",
     "    timeout_ms: 30000",
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
@@ -225,6 +227,10 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
       assert.equal(
         result.stepResult.routed_execution.adapter_request.context.compiled_context_ref,
         contextCompilation.compiled_context_ref,
+      );
+      assert.equal(
+        result.stepResult.routed_execution.adapter_request.context.compiled_context_file,
+        contextCompilation.compiled_context_file,
       );
       assert.ok(
         result.stepResult.evidence_refs.includes(contextCompilation.compiled_context_ref),
@@ -650,6 +656,67 @@ test("executeRoutedStep keeps same-step routed artifacts distinct for repeated e
     const reportFiles = fs.readdirSync(first.runtimeLayout.reportsRoot).filter((entry) => entry.endsWith(".json"));
     assert.ok(reportFiles.filter((entry) => entry.startsWith("step-result-routed-")).length >= 2);
     assert.ok(reportFiles.filter((entry) => entry.startsWith("compiled-context-")).length >= 2);
+  });
+});
+
+test("executeRoutedStep injects mission traceability before adapter request", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json"),
+      `${JSON.stringify(
+        {
+          report_id: "project-analysis-report",
+          feature_traceability: {
+            mission_id: "ky-retry-hooks-governance",
+            required_path_prefixes: ["source/", "test/", "index.d.ts"],
+            expected_evidence: ["verify-summary", "review-report"],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const handoffFile = path.join(init.runtimeLayout.artifactsRoot, "approved-handoff.json");
+    fs.writeFileSync(
+      handoffFile,
+      `${JSON.stringify(
+        {
+          packet_id: "approved-handoff",
+          feature_traceability: {
+            mission_id: "ky-retry-hooks-governance",
+            request_title: "Exercise retry hooks",
+          },
+          allowed_paths: ["source/**", "test/**", "index.d.ts"],
+          repo_scopes: [{ repo_id: "sindresorhus/ky", paths: ["source/**", "test/**", "index.d.ts"] }],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId: "runtime-harness-traceability-adapter-request",
+      stepId: "run.start.implement",
+      approvedHandoffRef: handoffFile,
+      promotionEvidenceRefs: ["evidence://promotion/pass-traceability"],
+      executionRoot: repoRoot,
+    });
+
+    const adapterTraceability = result.stepResult.routed_execution.adapter_request.feature_traceability;
+    assert.deepEqual(adapterTraceability.required_path_prefixes, ["source/", "test/", "index.d.ts"]);
+    assert.deepEqual(adapterTraceability.allowed_paths, ["source/**", "test/**", "index.d.ts"]);
+    assert.deepEqual(result.stepResult.routed_execution.feature_traceability.allowed_paths, [
+      "source/**",
+      "test/**",
+      "index.d.ts",
+    ]);
   });
 });
 

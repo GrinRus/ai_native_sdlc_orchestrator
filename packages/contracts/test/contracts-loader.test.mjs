@@ -330,6 +330,75 @@ test("new runtime context family examples load through the shared contract path"
   }
 });
 
+test("compiled-context artifact requires budget and compaction reports", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/context/compiled/implement-runner-default.sample.yaml"),
+    family: "compiled-context-artifact",
+  });
+  assert.equal(loaded.ok, true, "expected compiled-context sample to load");
+
+  const missingBudget = structuredClone(loaded.document);
+  delete missingBudget.budget_report;
+
+  const missingBudgetValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: missingBudget,
+    source: "test://compiled-context-missing-budget",
+  });
+
+  assertValidationIssue(missingBudgetValidation, "required_field_missing", "budget_report");
+
+  const invalidSourceBreakdown = structuredClone(loaded.document);
+  invalidSourceBreakdown.budget_report.source_breakdown = [{ source: "context" }];
+
+  const invalidBreakdownValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: invalidSourceBreakdown,
+    source: "test://compiled-context-invalid-breakdown",
+  });
+
+  assertValidationIssue(invalidBreakdownValidation, "required_field_missing", "budget_report.source_breakdown[0].bytes");
+});
+
+test("adapter capability profile rejects unrestricted stdin-json for external-process adapters", () => {
+  const invalidProfile = {
+    adapter_id: "test-live-adapter",
+    version: 1,
+    capabilities: {},
+    constraints: {},
+    execution: {
+      runtime_mode: "external-process",
+      external_runtime: {
+        command: "node",
+        request_transport: "stdin-json",
+      },
+    },
+  };
+
+  const invalidValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: invalidProfile,
+    source: "test://adapter-stdin-json-unscoped",
+  });
+
+  assertValidationIssue(
+    invalidValidation,
+    "required_field_missing",
+    "execution.external_runtime.stdin_json_scope",
+  );
+
+  const validProfile = structuredClone(invalidProfile);
+  validProfile.execution.external_runtime.stdin_json_scope = "test-only";
+
+  const validValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: validProfile,
+    source: "test://adapter-stdin-json-test-only",
+  });
+
+  assert.equal(validValidation.ok, true);
+});
+
 test("runtime harness report example loads through the shared contract path", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"),
@@ -854,55 +923,52 @@ test("live E2E observation report loads and enforces status scale", () => {
 
   assert.equal(inProgressSkillAgentValidation.ok, true);
 
-  const inProgressMissingFinalVerdictCandidate = structuredClone(loaded.document);
-  inProgressMissingFinalVerdictCandidate.report_status = "in_progress";
-  delete inProgressMissingFinalVerdictCandidate.final_skill_agent_verdict_file;
-  delete inProgressMissingFinalVerdictCandidate.final_skill_agent_verdict;
+  for (const forbiddenField of [
+    "quality_judgement",
+    "runner_quality_summary",
+    "final_skill_agent_verdict_request_file",
+    "final_skill_agent_verdict_file",
+    "final_skill_agent_verdict",
+    "agent_artifact_review_request_file",
+    "canonical_status",
+    "artifact_quality_status",
+    "delivery_status",
+    "coverage_status",
+    "acceptance_status",
+  ]) {
+    const forbiddenCandidate = structuredClone(loaded.document);
+    forbiddenCandidate[forbiddenField] = forbiddenField.endsWith("_status") ? "pass" : {};
 
-  const inProgressMissingFinalVerdictValidation = validateContractDocument({
+    const forbiddenValidation = validateContractDocument({
+      family: "live-e2e-observation-report",
+      document: forbiddenCandidate,
+      source: `test://live-e2e-observation-forbidden-${forbiddenField}`,
+    });
+
+    assert.equal(forbiddenValidation.ok, false);
+    assert.ok(
+      forbiddenValidation.issues.some(
+        (problem) => problem.code === "unsupported_field_present" && problem.field === forbiddenField,
+      ),
+      `expected forbidden ${forbiddenField} to be rejected`,
+    );
+  }
+
+  const finalAnalysisQualityCandidate = structuredClone(loaded.document);
+  finalAnalysisQualityCandidate.final_analysis.code_quality = {};
+
+  const finalAnalysisQualityValidation = validateContractDocument({
     family: "live-e2e-observation-report",
-    document: inProgressMissingFinalVerdictCandidate,
-    source: "test://live-e2e-observation-in-progress-missing-final-verdict",
+    document: finalAnalysisQualityCandidate,
+    source: "test://live-e2e-observation-final-analysis-code-quality",
   });
 
-  assert.equal(inProgressMissingFinalVerdictValidation.ok, true);
-
-  const finalMissingInspectedRefsCandidate = structuredClone(loaded.document);
-  delete finalMissingInspectedRefsCandidate.final_skill_agent_verdict.inspected_evidence_refs;
-
-  const finalMissingInspectedRefsValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: finalMissingInspectedRefsCandidate,
-    source: "test://live-e2e-observation-final-missing-inspected-refs",
-  });
-
-  assert.equal(finalMissingInspectedRefsValidation.ok, false);
+  assert.equal(finalAnalysisQualityValidation.ok, false);
   assert.ok(
-    finalMissingInspectedRefsValidation.issues.some(
-      (problem) =>
-        problem.code === "required_field_missing" &&
-        problem.field === "final_skill_agent_verdict.inspected_evidence_refs",
+    finalAnalysisQualityValidation.issues.some(
+      (problem) => problem.code === "unsupported_field_present" && problem.field === "final_analysis.code_quality",
     ),
-    "expected final reports without inspected skill-agent evidence refs to be rejected",
-  );
-
-  const finalInvalidVerdictStatusCandidate = structuredClone(loaded.document);
-  finalInvalidVerdictStatusCandidate.final_skill_agent_verdict.status = "green";
-
-  const finalInvalidVerdictStatusValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: finalInvalidVerdictStatusCandidate,
-    source: "test://live-e2e-observation-final-invalid-verdict-status",
-  });
-
-  assert.equal(finalInvalidVerdictStatusValidation.ok, false);
-  assert.ok(
-    finalInvalidVerdictStatusValidation.issues.some(
-      (problem) =>
-        problem.code === "enum_value_invalid" &&
-        problem.field === "final_skill_agent_verdict.status",
-    ),
-    "expected final skill-agent verdict status to use the live E2E status scale",
+    "expected final_analysis.code_quality to be rejected",
   );
 
   const acceptedStepMissingInspectedRefsCandidate = structuredClone(loaded.document);
@@ -1030,21 +1096,33 @@ test("live E2E observation report loads and enforces status scale", () => {
     "expected frontend screenshot refs to contain strings only",
   );
 
-  const missingFrontendVerdictCandidate = structuredClone(loaded.document);
-  delete missingFrontendVerdictCandidate.frontend_interactions[0].agent_verdict_ref;
+  const legacyFrontendVerdictCandidate = structuredClone(loaded.document);
+  legacyFrontendVerdictCandidate.frontend_interactions[0].agent_verdict_ref = "runtime://reports/legacy-final-verdict.json";
 
-  const missingFrontendVerdictValidation = validateContractDocument({
+  const legacyFrontendVerdictValidation = validateContractDocument({
     family: "live-e2e-observation-report",
-    document: missingFrontendVerdictCandidate,
-    source: "test://live-e2e-observation-missing-frontend-verdict",
+    document: legacyFrontendVerdictCandidate,
+    source: "test://live-e2e-observation-legacy-frontend-verdict",
   });
 
-  assert.equal(missingFrontendVerdictValidation.ok, false);
-  assert.ok(
-    missingFrontendVerdictValidation.issues.some(
-      (problem) => problem.code === "required_field_missing" && problem.field === "frontend_interactions[0].agent_verdict_ref",
-    ),
-    "expected passing frontend evidence to require a skill-agent verdict ref",
+  assertValidationIssue(legacyFrontendVerdictValidation, "unsupported_field_present", "frontend_interactions[0].agent_verdict_ref");
+
+  const missingAccessibilityCheckCandidate = structuredClone(loaded.document);
+  missingAccessibilityCheckCandidate.frontend_interactions[0].accessibility_checks =
+    missingAccessibilityCheckCandidate.frontend_interactions[0].accessibility_checks.filter(
+      (entry) => entry.check_id !== "keyboard_navigation",
+    );
+
+  const missingAccessibilityCheckValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingAccessibilityCheckCandidate,
+    source: "test://live-e2e-observation-missing-accessibility-check",
+  });
+
+  assertValidationIssue(
+    missingAccessibilityCheckValidation,
+    "required_field_missing",
+    "frontend_interactions[0].accessibility_checks.keyboard_navigation",
   );
 
   for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {
@@ -1065,6 +1143,438 @@ test("live E2E observation report loads and enforces status scale", () => {
       `expected legacy ${legacyField} to be rejected`,
     );
   }
+});
+
+test("live E2E run-health report separates run failures from outcome quality", () => {
+  const source = path.join(workspaceRoot, "examples/reports/live-e2e-run-health-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-run-health-report" });
+  assert.equal(loaded.ok, true, "expected live-e2e-run-health-report sample to load");
+
+  const forbiddenQualityCandidate = structuredClone(loaded.document);
+  forbiddenQualityCandidate.quality_judgement = {};
+
+  const forbiddenQualityValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: forbiddenQualityCandidate,
+    source: "test://live-e2e-run-health-forbidden-quality",
+  });
+
+  assertValidationIssue(forbiddenQualityValidation, "unsupported_field_present", "quality_judgement");
+
+  for (const requiredFactualSection of [
+    "provider_health",
+    "target_environment_health",
+    "diagnostic_health",
+    "resume_interaction_health",
+  ]) {
+    const missingFactualSectionCandidate = structuredClone(loaded.document);
+    delete missingFactualSectionCandidate[requiredFactualSection];
+
+    const missingFactualSectionValidation = validateContractDocument({
+      family: "live-e2e-run-health-report",
+      document: missingFactualSectionCandidate,
+      source: `test://live-e2e-run-health-missing-${requiredFactualSection}`,
+    });
+
+    assertValidationIssue(missingFactualSectionValidation, "required_field_missing", requiredFactualSection);
+  }
+
+  const contextBudgetCandidate = structuredClone(loaded.document);
+  contextBudgetCandidate.overall_status = "blocked";
+  contextBudgetCandidate.provider_health.status = "blocked";
+  contextBudgetCandidate.provider_health.context_budget_status = "fail";
+  contextBudgetCandidate.provider_health.context_budget_failure_class = "compiled_context_budget_exceeded";
+  contextBudgetCandidate.provider_health.top_context_size_sources = [
+    {
+      source: "provider_work_packet.context",
+      bytes: 4096,
+      chars: 4096,
+      estimated_tokens: 1366,
+    },
+  ];
+  contextBudgetCandidate.failure_summary = {
+    owner: "aor",
+    phase: "provider_execution",
+    class: "compiled_context_budget_exceeded",
+    summary: "Provider work packet exceeded the configured context budget.",
+  };
+
+  const contextBudgetValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: contextBudgetCandidate,
+    source: "test://live-e2e-run-health-context-budget",
+  });
+
+  assert.equal(contextBudgetValidation.ok, true);
+
+  const diagnosticWarnCandidate = structuredClone(loaded.document);
+  diagnosticWarnCandidate.overall_status = "warn";
+  diagnosticWarnCandidate.diagnostic_health = {
+    status: "warn",
+    diagnostic_failure_mode: "warn",
+    post_run_diagnostic_status: "warn",
+    post_run_diagnostic_verify_summary_file: "runtime://reports/post-run-diagnostic-verify-summary-live-e2e.sample.run.json",
+    timed_out_command_count: 1,
+    failed_command_count: 1,
+    timed_out_commands: [
+      {
+        repo_scope: "ky",
+        command: "npm test",
+        status: "failed",
+        timed_out: true,
+        step_result_ref: "runtime://reports/step-result-post-run-diagnostic-1.json",
+        summary: "Diagnostic command timed out.",
+      },
+    ],
+    failed_commands: [
+      {
+        repo_scope: "ky",
+        command: "npm test",
+        status: "failed",
+        timed_out: true,
+        step_result_ref: "runtime://reports/step-result-post-run-diagnostic-1.json",
+        summary: "Diagnostic command timed out.",
+      },
+    ],
+    evidence_refs: [
+      "runtime://reports/post-run-diagnostic-verify-summary-live-e2e.sample.run.json",
+      "runtime://reports/step-result-post-run-diagnostic-1.json",
+    ],
+  };
+  diagnosticWarnCandidate.failure_summary = {
+    owner: "target_repository",
+    phase: "target_verification",
+    class: "post_run_diagnostic_warning",
+    summary: "Post-run diagnostic verification recorded a non-blocking factual warning.",
+  };
+
+  const diagnosticWarnValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticWarnCandidate,
+    source: "test://live-e2e-run-health-diagnostic-warn",
+  });
+
+  assert.equal(diagnosticWarnValidation.ok, true);
+
+  const diagnosticWarnPassCandidate = structuredClone(diagnosticWarnCandidate);
+  diagnosticWarnPassCandidate.overall_status = "pass";
+  diagnosticWarnPassCandidate.failure_summary = {
+    owner: null,
+    phase: null,
+    class: null,
+    summary: null,
+  };
+
+  const diagnosticWarnPassValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticWarnPassCandidate,
+    source: "test://live-e2e-run-health-diagnostic-warn-pass",
+  });
+
+  assertValidationIssue(diagnosticWarnPassValidation, "enum_value_invalid", "overall_status");
+
+  const diagnosticFailCandidate = structuredClone(loaded.document);
+  diagnosticFailCandidate.overall_status = "fail";
+  diagnosticFailCandidate.diagnostic_health = {
+    ...diagnosticWarnCandidate.diagnostic_health,
+    status: "fail",
+    diagnostic_failure_mode: "fail",
+    post_run_diagnostic_status: "fail",
+  };
+  diagnosticFailCandidate.failure_summary = {
+    owner: "target_repository",
+    phase: "target_verification",
+    class: "post_run_diagnostic_failed",
+    summary: "Post-run diagnostic verification failed under diagnostic_failure_mode=fail.",
+  };
+
+  const diagnosticFailValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticFailCandidate,
+    source: "test://live-e2e-run-health-diagnostic-fail",
+  });
+
+  assert.equal(diagnosticFailValidation.ok, true);
+
+  const diagnosticFailWrongClassCandidate = structuredClone(diagnosticFailCandidate);
+  diagnosticFailWrongClassCandidate.failure_summary.class = "target_verification_failed";
+
+  const diagnosticFailWrongClassValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticFailWrongClassCandidate,
+    source: "test://live-e2e-run-health-diagnostic-fail-wrong-class",
+  });
+
+  assertValidationIssue(diagnosticFailWrongClassValidation, "enum_value_invalid", "failure_summary.class");
+
+  const providerPacketNotExecutedCandidate = structuredClone(loaded.document);
+  providerPacketNotExecutedCandidate.overall_status = "fail";
+  providerPacketNotExecutedCandidate.provider_health.status = "pass";
+  providerPacketNotExecutedCandidate.provider_health.provider_execution_status = "completed";
+  providerPacketNotExecutedCandidate.failure_summary = {
+    owner: "provider",
+    phase: "provider_execution",
+    class: "provider_work_packet_not_executed",
+    summary: "External runtime summarized the provider work packet instead of executing implementation.",
+  };
+
+  const providerPacketNotExecutedValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: providerPacketNotExecutedCandidate,
+    source: "test://live-e2e-run-health-provider-work-packet-not-executed",
+  });
+
+  assert.equal(providerPacketNotExecutedValidation.ok, true);
+
+  const reviewLoopExhaustedCandidate = structuredClone(loaded.document);
+  reviewLoopExhaustedCandidate.overall_status = "blocked";
+  reviewLoopExhaustedCandidate.failure_summary = {
+    owner: "provider",
+    phase: "review",
+    class: "implementation_repair_loop_exhausted",
+    summary: "Implementation repair loop exhausted before review passed.",
+  };
+
+  const reviewLoopExhaustedValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: reviewLoopExhaustedCandidate,
+    source: "test://live-e2e-run-health-review-loop-exhausted",
+  });
+
+  assert.equal(reviewLoopExhaustedValidation.ok, true);
+
+  const blockedMissingOwnerCandidate = structuredClone(loaded.document);
+  blockedMissingOwnerCandidate.overall_status = "blocked";
+  blockedMissingOwnerCandidate.failure_summary.owner = null;
+  blockedMissingOwnerCandidate.failure_summary.phase = "provider_execution";
+  blockedMissingOwnerCandidate.failure_summary.class = "provider_timeout";
+
+  const blockedMissingOwnerValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: blockedMissingOwnerCandidate,
+    source: "test://live-e2e-run-health-missing-owner",
+  });
+
+  assert.equal(blockedMissingOwnerValidation.ok, false);
+  assert.ok(
+    blockedMissingOwnerValidation.issues.some(
+      (problem) => problem.code === "field_type_mismatch" && problem.field === "failure_summary.owner",
+    ),
+    "expected non-passing run-health reports to require failure_summary.owner",
+  );
+
+  const passWithOwnerCandidate = structuredClone(loaded.document);
+  passWithOwnerCandidate.failure_summary.owner = "provider";
+
+  const passWithOwnerValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: passWithOwnerCandidate,
+    source: "test://live-e2e-run-health-pass-with-owner",
+  });
+
+  assert.equal(passWithOwnerValidation.ok, false);
+  assert.ok(
+    passWithOwnerValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "failure_summary.owner",
+    ),
+    "expected passing run-health reports to keep failure owner null",
+  );
+});
+
+test("live E2E quality assessment report enforces dimensions and evidence gaps", () => {
+  const source = path.join(workspaceRoot, "examples/reports/live-e2e-quality-assessment-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-quality-assessment-report" });
+  assert.equal(loaded.ok, true, "expected live-e2e-quality-assessment-report sample to load");
+
+  const allPassSource = path.join(
+    workspaceRoot,
+    "examples/reports/live-e2e-quality-assessment-report.all-pass.sample.yaml",
+  );
+  const allPassLoaded = loadContractFile({
+    filePath: allPassSource,
+    family: "live-e2e-quality-assessment-report",
+  });
+  assert.equal(allPassLoaded.ok, true, "expected all-pass live-e2e-quality-assessment-report sample to load");
+
+  const missingDimensionCandidate = structuredClone(loaded.document);
+  delete missingDimensionCandidate.dimensions.security_review;
+
+  const missingDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: missingDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-missing-dimension",
+  });
+
+  assertValidationIssue(missingDimensionValidation, "required_field_missing", "dimensions.security_review");
+
+  const evaluatedMissingRefsCandidate = structuredClone(loaded.document);
+  evaluatedMissingRefsCandidate.dimensions.implementation_correctness.inspected_evidence_refs = [];
+
+  const evaluatedMissingRefsValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: evaluatedMissingRefsCandidate,
+    source: "test://live-e2e-quality-assessment-evaluated-missing-refs",
+  });
+
+  assertValidationIssue(
+    evaluatedMissingRefsValidation,
+    "required_field_missing",
+    "dimensions.implementation_correctness.inspected_evidence_refs",
+  );
+
+  const invalidNotEvaluatedCandidate = structuredClone(loaded.document);
+  invalidNotEvaluatedCandidate.dimensions.security_review.evidence_strength = "weak";
+
+  const invalidNotEvaluatedValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: invalidNotEvaluatedCandidate,
+    source: "test://live-e2e-quality-assessment-invalid-not-evaluated",
+  });
+
+  assertValidationIssue(
+    invalidNotEvaluatedValidation,
+    "enum_value_invalid",
+    "dimensions.security_review.evidence_strength",
+  );
+
+  const missingDimensionFollowupsCandidate = structuredClone(loaded.document);
+  delete missingDimensionFollowupsCandidate.dimensions.implementation_correctness.recommended_followups;
+
+  const missingDimensionFollowupsValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: missingDimensionFollowupsCandidate,
+    source: "test://live-e2e-quality-assessment-missing-dimension-followups",
+  });
+
+  assertValidationIssue(
+    missingDimensionFollowupsValidation,
+    "required_field_missing",
+    "dimensions.implementation_correctness.recommended_followups",
+  );
+
+  const missingGapDimensionCandidate = structuredClone(loaded.document);
+  missingGapDimensionCandidate.gap_report.not_evaluated_dimensions = [];
+
+  const missingGapDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: missingGapDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-missing-gap-dimension",
+  });
+
+  assertValidationIssue(
+    missingGapDimensionValidation,
+    "required_field_missing",
+    "gap_report.not_evaluated_dimensions",
+  );
+
+  const mismatchedGapDimensionCandidate = structuredClone(loaded.document);
+  mismatchedGapDimensionCandidate.gap_report.strong_evidence_dimensions.push("security_review");
+
+  const mismatchedGapDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: mismatchedGapDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-mismatched-gap-dimension",
+  });
+
+  assertValidationIssue(
+    mismatchedGapDimensionValidation,
+    "enum_value_invalid",
+    "gap_report.strong_evidence_dimensions[2]",
+  );
+
+  const invalidFindingCategoryCandidate = structuredClone(loaded.document);
+  invalidFindingCategoryCandidate.findings[0].category = "misc";
+
+  const invalidFindingCategoryValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: invalidFindingCategoryCandidate,
+    source: "test://live-e2e-quality-assessment-invalid-finding-category",
+  });
+
+  assertValidationIssue(invalidFindingCategoryValidation, "enum_value_invalid", "findings[0].category");
+
+  const legacyUiDimensionCandidate = structuredClone(loaded.document);
+  legacyUiDimensionCandidate.dimensions.ui_ux_quality = {
+    status: "warn",
+    evidence_strength: "weak",
+    inspected_evidence_refs: [],
+    findings: [],
+    recommended_followups: [],
+  };
+
+  const legacyUiDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: legacyUiDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-legacy-ui-dimension",
+  });
+
+  assertValidationIssue(legacyUiDimensionValidation, "unsupported_field_present", "dimensions.ui_ux_quality");
+
+  const legacyTargetUiDimensionCandidate = structuredClone(loaded.document);
+  legacyTargetUiDimensionCandidate.dimensions.target_ui_ux_quality = {
+    status: "warn",
+    evidence_strength: "weak",
+    inspected_evidence_refs: [],
+    findings: [],
+    recommended_followups: [],
+  };
+
+  const legacyTargetUiDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: legacyTargetUiDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-legacy-target-ui-dimension",
+  });
+
+  assertValidationIssue(
+    legacyTargetUiDimensionValidation,
+    "unsupported_field_present",
+    "dimensions.target_ui_ux_quality",
+  );
+
+  const missingUiSubdimensionCandidate = structuredClone(loaded.document);
+  delete missingUiSubdimensionCandidate.dimensions.aor_operator_ui_ux_quality.subdimensions.raw_json_independence;
+
+  const missingUiSubdimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: missingUiSubdimensionCandidate,
+    source: "test://live-e2e-quality-assessment-missing-ui-subdimension",
+  });
+
+  assertValidationIssue(
+    missingUiSubdimensionValidation,
+    "required_field_missing",
+    "dimensions.aor_operator_ui_ux_quality.subdimensions.raw_json_independence",
+  );
+
+  const evaluatedUiSubdimensionMissingRefsCandidate = structuredClone(loaded.document);
+  evaluatedUiSubdimensionMissingRefsCandidate.dimensions.aor_operator_ui_ux_quality.subdimensions.task_success.evidence_refs = [];
+
+  const evaluatedUiSubdimensionMissingRefsValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: evaluatedUiSubdimensionMissingRefsCandidate,
+    source: "test://live-e2e-quality-assessment-ui-subdimension-missing-refs",
+  });
+
+  assertValidationIssue(
+    evaluatedUiSubdimensionMissingRefsValidation,
+    "required_field_missing",
+    "dimensions.aor_operator_ui_ux_quality.subdimensions.task_success.evidence_refs",
+  );
+
+  const notEvaluatedUiSubdimensionMissingFindingCandidate = structuredClone(loaded.document);
+  notEvaluatedUiSubdimensionMissingFindingCandidate.dimensions.aor_operator_accessibility_quality.subdimensions.keyboard_navigation.findings = [];
+
+  const notEvaluatedUiSubdimensionMissingFindingValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: notEvaluatedUiSubdimensionMissingFindingCandidate,
+    source: "test://live-e2e-quality-assessment-ui-subdimension-missing-finding",
+  });
+
+  assertValidationIssue(
+    notEvaluatedUiSubdimensionMissingFindingValidation,
+    "required_field_missing",
+    "dimensions.aor_operator_accessibility_quality.subdimensions.keyboard_navigation.findings",
+  );
 });
 
 test("W23 nested canonical contract examples load through the shared contract path", () => {

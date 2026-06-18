@@ -1,4 +1,4 @@
-report_id: live-e2e.sample.observation.v2
+report_id: live-e2e.sample.observation.v3
 run_id: live-e2e.sample.run
 profile_id: live-e2e.full-journey.regress.ky
 report_status: final
@@ -31,32 +31,32 @@ flow_range:
     - release
     - learning
 flow_range_policy: delivery_default
-overall_status: warn
-provider_execution_status: interrupted
-failure_owner: operator
-failure_phase: provider_execution
-failure_class: operator_stopped
+overall_status: pass
+provider_execution_status: pass
+failure_owner: null
+failure_phase: null
+failure_class: null
 provider_step_status:
-  provider: qwen
-  adapter: qwen-code
-  route_id: route.implement.default.qwen-primary
-  step_id: run.start.implement
-  status: interrupted
+  provider: openai
+  adapter: codex-cli
+  route_id: route.implement.default.openai-primary
+  step_id: execution
+  status: completed
   elapsed_ms: 90000
   timeout_budget_ms: 3600000
   remaining_budget_ms: 3510000
-  last_output_at: null
-  last_artifact_update_at: "2026-05-18T00:02:00.000Z"
+  last_output_at: "2026-05-18T00:02:00.000Z"
+  last_artifact_update_at: "2026-05-18T00:01:59.000Z"
   last_progress_at: "2026-05-18T00:01:59.000Z"
   last_progress_kind: tool_call
-  last_progress_label: read_file
+  last_progress_label: edit_file
   progress_event_count: 42
   output_mode: stream-json
-  interruption_owner: operator
-  interruption_status: operator-stopped
-  interruption_reason: Operator stopped the provider through public run-control after collecting progress evidence.
+  interruption_owner: null
+  interruption_status: null
+  interruption_reason: null
   current_command_label: external-provider-runner
-  recommended_action: Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.
+  recommended_action: Continue with public verification.
   started_at: "2026-05-18T00:00:30.000Z"
   updated_at: "2026-05-18T00:02:00.000Z"
   finished_at: "2026-05-18T00:02:00.000Z"
@@ -77,8 +77,6 @@ aor_installation:
     - runtime://reports/live-e2e-aor-install/03-pnpm-build.json
     - runtime://reports/live-e2e-aor-install/04-pnpm-aor-help.json
 aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
-final_skill_agent_verdict_request_file: runtime://reports/live-e2e-final-skill-agent-verdict-request-live-e2e.sample.run.json
-final_skill_agent_verdict_file: runtime://reports/live-e2e-final-skill-agent-verdict-live-e2e.sample.run.json
 setup_journal:
   - sequence: 1
     step_id: install
@@ -97,7 +95,7 @@ setup_journal:
   - sequence: 3
     step_id: project_bootstrap
     status: pass
-    public_surface: aor project init or bundled profile materialization
+    public_surface: aor project init
     evidence_refs:
       - runtime://reports/generated-project-profile-live-e2e.sample.run.yaml
       - runtime://reports/bootstrap-artifact-packet-live-e2e.sample.run.yaml
@@ -105,11 +103,11 @@ setup_journal:
   - sequence: 4
     step_id: intake
     status: pass
-    public_surface: aor intake create or aor mission create
+    public_surface: aor intake create
     evidence_refs:
       - runtime://reports/intake-artifact-packet-live-e2e.sample.run.yaml
       - runtime://reports/feature-request-live-e2e.sample.run.yaml
-    summary: Feature request or intake evidence was materialized.
+    summary: Feature request evidence was materialized.
   - sequence: 5
     step_id: readiness
     status: pass
@@ -207,16 +205,9 @@ step_journal:
     frontend_interaction_refs: []
     final_step_verdict: pass
 final_analysis:
-  status: warn
-  summary: Live E2E completed with observed quality findings.
-  findings:
-    - post-delivery quality checks produced findings
-  code_quality:
-    status: warn
-    changed_paths:
-      - source/index.ts
-    evidence_refs:
-      - runtime://reports/review-report-live-e2e.json
+  status: pass
+  summary: Live E2E public-step journal completed.
+  findings: []
   failed_stages: []
   delivery:
     status: pass
@@ -228,26 +219,6 @@ final_analysis:
   learning:
     status: not_pass
     evidence_refs: []
-final_skill_agent_verdict:
-  verdict_id: live-e2e.sample.run.final-skill-agent-verdict
-  run_id: live-e2e.sample.run
-  status: warn
-  judge_source: skill-agent
-  accepted_step_count: 1
-  required_steps:
-    - discovery
-  missing_skill_agent_steps: []
-  operator_decision_refs:
-    - runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
-  evidence_refs:
-    - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
-  inspected_evidence_refs:
-    - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
-    - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json
-  findings:
-    - post-delivery quality checks produced findings
-  final_recommendation: review findings before acceptance closure
-  created_at: "2026-05-18T00:00:03.000Z"
 interactive_decisions: []
 frontend_interactions:
   - step_id: learning
@@ -268,6 +239,37 @@ frontend_interactions:
     browser_task_proof_ref: runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
     dom_snapshot_ref: runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
     accessibility_summary_ref: runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    accessibility_checks:
+      - check_id: keyboard_navigation
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+      - check_id: focus_order
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+      - check_id: contrast_and_readability
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings: []
+      - check_id: semantic_structure
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+        findings: []
+      - check_id: screen_reader_labels
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings: []
+      - check_id: accessible_error_feedback
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
     task_outcome:
       status: pass
       checked_tasks:
@@ -276,10 +278,10 @@ frontend_interactions:
         - evidence-links-rendered
         - closure-state-rendered
     ux_findings: []
-    agent_verdict_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
+    operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
     status: pass
-    summary: Guided frontend smoke interaction completed through the installed-user web surface.
+    summary: Guided AOR operator UI interaction completed through the installed-user web surface.
 evidence_refs:
-  - runtime://reports/live-e2e-run-summary.json
+  - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
   - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
-  - runtime://reports/live-e2e-final-skill-agent-verdict-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json

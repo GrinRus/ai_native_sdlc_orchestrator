@@ -232,7 +232,7 @@ function assertLiveE2ePolicy(profile, source) {
     if (flowLoopProof.enabled !== true) {
       problems.push("browser-task-proof profiles must declare guided_journey.flow_loop_proof.enabled=true");
     }
-    for (const required of ["browser-task-proof", "flow-loop-proof", "final-skill-agent-verdict"]) {
+    for (const required of ["browser-task-proof", "flow-loop-proof", "quality-assessment-report"]) {
       if (!proofRequirements.includes(required)) {
         problems.push(`browser-task-proof profiles must include guided_journey.proof_requirements '${required}'`);
       }

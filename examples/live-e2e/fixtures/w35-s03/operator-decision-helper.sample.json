@@ -23,7 +23,7 @@
         "evidence://live-e2e-demo/run-start-transcript.json",
         "evidence://live-e2e-demo/runtime-harness-report.json"
       ],
-      "frontend_evidence_refs": [
+      "aor_operator_ui_evidence_refs": [
         "evidence://live-e2e-demo/guided-web-dom.json",
         "evidence://live-e2e-demo/guided-web-accessibility.json",
         "evidence://live-e2e-demo/guided-web-screenshot.png"
@@ -70,7 +70,7 @@
       "evidence://live-e2e-demo/guided-web-accessibility.json",
       "evidence://live-e2e-demo/guided-web-screenshot.png"
     ],
-    "frontend_evidence_refs": [
+    "aor_operator_ui_evidence_refs": [
       "evidence://live-e2e-demo/guided-web-dom.json",
       "evidence://live-e2e-demo/guided-web-accessibility.json",
       "evidence://live-e2e-demo/guided-web-screenshot.png"

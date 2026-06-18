@@ -55,7 +55,7 @@ Make live E2E closer to a real installed-user black-box evaluator by proving the
 ### Local tasks
 1. Make bounded `full_lifecycle` profiles execute release and learning instead of silently skipping them.
 2. Submit deterministic auto answers only through public answer surfaces.
-3. Persist guided frontend evidence before the learning step decision finalizes.
+3. Persist guided AOR operator UI evidence before the learning step decision finalizes.
 4. Rename the live E2E evaluator script and docs from harness-evaluator to step-evaluator.
 
 ### Acceptance criteria

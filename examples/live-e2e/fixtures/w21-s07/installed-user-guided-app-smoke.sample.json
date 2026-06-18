@@ -30,5 +30,5 @@
   "ux_findings": [
     "Flow closure controls were visible and did not mutate completed-flow evidence."
   ],
-  "agent_verdict_ref": ".aor/projects/aor-core/reports/live-e2e-operator-decision-w21-s07-10-learning.json"
+  "operator_decision_ref": ".aor/projects/aor-core/reports/live-e2e-operator-decision-w21-s07-10-learning.json"
 }

@@ -290,20 +290,7 @@ function collectProofChangedPaths(proof) {
 
 function validateProofBundleIntegrity(proof, bundlePath) {
   const errors = [];
-  const targetVerdicts = Array.isArray(proof.targets)
-    ? proof.targets.map((target) => target.overall_status).filter(Boolean)
-    : [];
-  const hasPassWithFindings = targetVerdicts.includes("pass_with_findings");
   const externalRunnerMode = String(proof.proof_method?.external_runner_mode ?? "");
-
-  if (hasPassWithFindings) {
-    if (proof.proof_scope !== "coverage_with_findings") {
-      errors.push(`${bundlePath} uses pass_with_findings but lacks proof_scope=coverage_with_findings.`);
-    }
-    if (proof.real_code_change_proof_complete !== false) {
-      errors.push(`${bundlePath} uses pass_with_findings but does not set real_code_change_proof_complete=false.`);
-    }
-  }
 
   if (proof.proof_scope === "coverage_with_findings" && !externalRunnerMode.includes("mock")) {
     errors.push(`${bundlePath} is coverage_with_findings but does not record a mock external runner mode.`);
@@ -312,15 +299,6 @@ function validateProofBundleIntegrity(proof, bundlePath) {
   if (proof.proof_scope === "full_code_changing_runtime") {
     if (proof.real_code_change_proof_complete !== true) {
       errors.push(`${bundlePath} claims full_code_changing_runtime without real_code_change_proof_complete=true.`);
-    }
-    if (targetVerdicts.length === 0) {
-      errors.push(`${bundlePath} claims full_code_changing_runtime without target verdict evidence.`);
-    }
-    if (targetVerdicts.some((verdict) => verdict !== "pass")) {
-      errors.push(`${bundlePath} claims full_code_changing_runtime but not all target verdicts are pass.`);
-    }
-    if (proof.quality_judgement?.overall_status && proof.quality_judgement.overall_status !== "pass") {
-      errors.push(`${bundlePath} claims full_code_changing_runtime without quality_judgement.overall_status=pass.`);
     }
     if (externalRunnerMode.includes("mock")) {
       errors.push(`${bundlePath} claims full_code_changing_runtime but records a mock external runner mode.`);

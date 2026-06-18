@@ -2,7 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES, LIVE_E2E_OBSERVATION_STATUS_VALUES } from "./families.mjs";
+import {
+  CONTRACT_FAMILY_INDEX,
+  INTAKE_SOURCE_KIND_VALUES,
+  LIVE_E2E_OBSERVATION_STATUS_VALUES,
+} from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 
@@ -12,6 +16,89 @@ const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question",
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary", "qwen-primary"];
 const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
+const LIVE_E2E_RUN_HEALTH_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
+const LIVE_E2E_RUN_FAILURE_OWNER_VALUES = [
+  "aor",
+  "target_repository",
+  "provider",
+  "environment",
+  "operator",
+  "unknown",
+];
+const LIVE_E2E_RUN_FAILURE_PHASE_VALUES = [
+  "aor_install",
+  "target_checkout",
+  "project_bootstrap",
+  "intake",
+  "readiness",
+  "target_setup",
+  "target_verification",
+  "provider_execution",
+  "review",
+  "controller_decision",
+  "ui_validation",
+  "delivery",
+  "release",
+  "learning",
+  "summary_write",
+  "unknown",
+];
+const COMPILED_CONTEXT_BUDGET_STATUS_VALUES = ["pass", "warn", "fail", "not_configured"];
+const EXTERNAL_REQUEST_TRANSPORT_VALUES = ["request-artifact", "stdin-json", "file-attachment", "argv-json", "none"];
+const STDIN_JSON_SCOPE_VALUES = ["test-only", "small-only"];
+const LIVE_E2E_QUALITY_DIMENSION_KEYS = [
+  "artifact_content_quality",
+  "implementation_correctness",
+  "implementation_completeness",
+  "code_maintainability",
+  "test_adequacy",
+  "security_review",
+  "performance_regression_risk",
+  "verification_quality",
+  "delivery_safety",
+  "aor_operator_ui_ux_quality",
+  "aor_operator_accessibility_quality",
+  "evidence_strength",
+  "acceptance_criteria_traceability",
+];
+const LIVE_E2E_LEGACY_QUALITY_DIMENSION_KEYS = ["ui_ux_quality", "accessibility_quality", "target_ui_ux_quality"];
+const LIVE_E2E_AOR_OPERATOR_UI_SUBDIMENSION_KEYS = [
+  "task_success",
+  "flow_navigation_clarity",
+  "next_action_clarity",
+  "blocker_and_error_understandability",
+  "recovery_affordance",
+  "state_feedback_loading_empty_error",
+  "visual_stability_responsiveness",
+  "raw_json_independence",
+];
+const LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS = [
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+];
+const LIVE_E2E_DIAGNOSTIC_FAILURE_MODE_VALUES = ["warn", "fail"];
+const LIVE_E2E_AOR_OPERATOR_UI_QUALITY_SUBDIMENSION_KEYS = {
+  aor_operator_ui_ux_quality: LIVE_E2E_AOR_OPERATOR_UI_SUBDIMENSION_KEYS,
+  aor_operator_accessibility_quality: LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS,
+};
+const LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES = ["pass", "warn", "fail", "not_evaluated"];
+const LIVE_E2E_QUALITY_EVIDENCE_STRENGTH_VALUES = ["strong", "medium", "weak", "missing"];
+const LIVE_E2E_QUALITY_FINDING_CATEGORY_VALUES = [
+  "artifact-content",
+  "implementation-correctness",
+  "test-adequacy",
+  "security",
+  "performance",
+  "ui-ux",
+  "accessibility",
+  "evidence-gap",
+  "acceptance-traceability",
+  "follow-up-needed",
+];
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const REVIEW_STATUS_VALUES = ["pass", "warn", "fail"];
 const RUNTIME_HARNESS_DECISION_VALUES = ["pass", "retry", "repair", "escalate", "block", "fail"];
@@ -175,6 +262,22 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "live-e2e-observation-report") {
     issues.push(...validateLiveE2EObservationReport(document, source));
+  }
+
+  if (family === "live-e2e-run-health-report") {
+    issues.push(...validateLiveE2ERunHealthReport(document, source));
+  }
+
+  if (family === "live-e2e-quality-assessment-report") {
+    issues.push(...validateLiveE2EQualityAssessmentReport(document, source));
+  }
+
+  if (family === "adapter-capability-profile") {
+    issues.push(...validateAdapterCapabilityProfile(document, source));
+  }
+
+  if (family === "compiled-context-artifact") {
+    issues.push(...validateCompiledContextArtifact(document, source));
   }
 
   if (family === "intake-request-body") {
@@ -526,6 +629,219 @@ function validateArtifactPacket(document, source) {
  * @param {string} source
  * @returns {import("./index.d.ts").ContractValidationIssue[]}
  */
+function validateAdapterCapabilityProfile(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const execution = isPlainObject(document.execution) ? document.execution : null;
+  if (!execution) return issues;
+  const externalRuntime = validateOptionalObjectField({
+    record: execution,
+    source,
+    field: "execution.external_runtime",
+    issues,
+  });
+  if (!externalRuntime) return issues;
+
+  const requestTransport =
+    typeof externalRuntime.request_transport === "string" && externalRuntime.request_transport.length > 0
+      ? externalRuntime.request_transport
+      : externalRuntime.request_via_stdin === false
+        ? "none"
+        : "stdin-json";
+  validateEnumString(
+    requestTransport,
+    source,
+    "execution.external_runtime.request_transport",
+    EXTERNAL_REQUEST_TRANSPORT_VALUES,
+    issues,
+  );
+
+  const runtimeMode = typeof execution.runtime_mode === "string" ? execution.runtime_mode : null;
+  if (runtimeMode === "external-process" && requestTransport === "stdin-json") {
+    const scope = externalRuntime.stdin_json_scope;
+    if (typeof scope !== "string" || !STDIN_JSON_SCOPE_VALUES.includes(scope)) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: "execution.external_runtime.stdin_json_scope",
+          expected: STDIN_JSON_SCOPE_VALUES.join("|"),
+          actual: scope === undefined ? "missing" : describeActualType(scope),
+          message:
+            "External-process adapters using stdin-json must declare stdin_json_scope as test-only or small-only.",
+        }),
+      );
+    }
+  }
+
+  if (requestTransport === "request-artifact") {
+    const requestFile = validateOptionalObjectField({
+      record: externalRuntime,
+      source,
+      field: "execution.external_runtime.request_file",
+      issues,
+    });
+    if (requestFile) {
+      validateNestedStringField({
+        record: requestFile,
+        source,
+        field: "execution.external_runtime.request_file.mode",
+        issues,
+        required: false,
+      });
+      validateNestedStringField({
+        record: requestFile,
+        source,
+        field: "execution.external_runtime.request_file.message",
+        issues,
+        required: false,
+      });
+      validateNestedStringField({
+        record: requestFile,
+        source,
+        field: "execution.external_runtime.request_file.argument",
+        issues,
+        required: false,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} estimate
+ * @param {string} source
+ * @param {string} parentField
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ * @param {{ requireBudgetLimit?: boolean }} [options]
+ */
+function validateContextBudgetEstimate(estimate, source, parentField, issues, options = {}) {
+  for (const field of ["bytes", "chars", "estimated_tokens"]) {
+    validateNestedNumberField({
+      record: estimate,
+      source,
+      field: `${parentField}.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  validateNestedNumberField({
+    record: estimate,
+    source,
+    field: `${parentField}.budget_limit_tokens`,
+    issues,
+    required: options.requireBudgetLimit === true,
+    allowNull: true,
+  });
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} source
+ * @param {string} field
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ */
+function validateContextSizeSources(value, source, field, issues) {
+  if (!Array.isArray(value)) {
+    issues.push(
+      issue({
+        code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field,
+        expected: "array",
+        actual: value === undefined ? "missing" : describeActualType(value),
+        message: `Field '${field}' must be an array of context size source entries.`,
+      }),
+    );
+    return;
+  }
+  value.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source,
+          field: `${field}[${index}]`,
+          expected: "object",
+          actual: describeActualType(entry),
+          message: `Field '${field}[${index}]' must be 'object'.`,
+        }),
+      );
+      return;
+    }
+    validateNestedStringField({
+      record: entry,
+      source,
+      field: `${field}[${index}].source`,
+      issues,
+      required: true,
+    });
+    for (const sizeField of ["bytes", "chars", "estimated_tokens"]) {
+      validateNestedNumberField({
+        record: entry,
+        source,
+        field: `${field}[${index}].${sizeField}`,
+        issues,
+        required: true,
+      });
+    }
+  });
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateCompiledContextArtifact(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const budgetReport = isPlainObject(document.budget_report) ? document.budget_report : {};
+  validateContextBudgetEstimate(budgetReport, source, "budget_report", issues, { requireBudgetLimit: true });
+  validateEnumString(
+    budgetReport.budget_status,
+    source,
+    "budget_report.budget_status",
+    COMPILED_CONTEXT_BUDGET_STATUS_VALUES,
+    issues,
+  );
+  validateContextSizeSources(budgetReport.source_breakdown, source, "budget_report.source_breakdown", issues);
+
+  const compactionReport = isPlainObject(document.compaction_report) ? document.compaction_report : {};
+  validateNestedStringField({
+    record: compactionReport,
+    source,
+    field: "compaction_report.strategy",
+    issues,
+    required: true,
+  });
+  const originalEstimate = isPlainObject(compactionReport.original_estimate)
+    ? compactionReport.original_estimate
+    : {};
+  validateContextBudgetEstimate(originalEstimate, source, "compaction_report.original_estimate", issues);
+  const finalEstimate = isPlainObject(compactionReport.final_estimate) ? compactionReport.final_estimate : {};
+  validateContextBudgetEstimate(finalEstimate, source, "compaction_report.final_estimate", issues);
+  validateOptionalStringArrayField({
+    record: compactionReport,
+    source,
+    field: "compaction_report.dropped_or_summarized_sources",
+    issues,
+  });
+  validateOptionalStringArrayField({
+    record: compactionReport,
+    source,
+    field: "compaction_report.mandatory_refs_preserved",
+    issues,
+  });
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
 function validateStepResult(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
@@ -768,6 +1084,32 @@ function validateStepResult(document, source) {
       issues,
       required: false,
     });
+    for (const field of ["request_artifact_ref", "provider_work_packet_ref", "context_budget_status"]) {
+      validateNestedStringField({
+        record: externalRunner,
+        source,
+        field: `external_runner.${field}`,
+        issues,
+        required: false,
+      });
+    }
+    for (const field of ["context_budget_failure_class", "raw_provider_error_summary"]) {
+      validateNestedNullableStringField({
+        record: externalRunner,
+        source,
+        field: `external_runner.${field}`,
+        issues,
+        required: false,
+      });
+    }
+    if ("top_context_size_sources" in externalRunner) {
+      validateContextSizeSources(
+        externalRunner.top_context_size_sources,
+        source,
+        "external_runner.top_context_size_sources",
+        issues,
+      );
+    }
     validateNestedNumberField({
       record: externalRunner,
       source,
@@ -2230,101 +2572,16 @@ function validateLiveE2EObservationReport(document, source) {
       }),
     );
   }
-  if (typeof document.final_skill_agent_verdict_request_file !== "string" || document.final_skill_agent_verdict_request_file.length === 0) {
-    issues.push(
-      issue({
-        code: document.final_skill_agent_verdict_request_file === undefined ? "required_field_missing" : "field_type_mismatch",
-        source,
-        field: "final_skill_agent_verdict_request_file",
-        expected: "non-empty string",
-        actual:
-          document.final_skill_agent_verdict_request_file === undefined
-            ? "missing"
-            : describeActualType(document.final_skill_agent_verdict_request_file),
-        message: "Field 'final_skill_agent_verdict_request_file' is required for skill-agent-only live E2E reports.",
-      }),
-    );
-  }
-  if (
-    reportStatus === "final" &&
-    (typeof document.final_skill_agent_verdict_file !== "string" || document.final_skill_agent_verdict_file.length === 0)
-  ) {
-    issues.push(
-      issue({
-        code: document.final_skill_agent_verdict_file === undefined ? "required_field_missing" : "field_type_mismatch",
-        source,
-        field: "final_skill_agent_verdict_file",
-        expected: "non-empty string",
-        actual:
-          document.final_skill_agent_verdict_file === undefined
-            ? "missing"
-            : describeActualType(document.final_skill_agent_verdict_file),
-        message: "Field 'final_skill_agent_verdict_file' is required for final skill-agent-only live E2E reports.",
-      }),
-    );
-  }
-  if (reportStatus === "final" && !isPlainObject(document.final_skill_agent_verdict)) {
-    issues.push(
-      issue({
-        code: document.final_skill_agent_verdict === undefined ? "required_field_missing" : "field_type_mismatch",
-        source,
-        field: "final_skill_agent_verdict",
-        expected: "object",
-        actual:
-          document.final_skill_agent_verdict === undefined ? "missing" : describeActualType(document.final_skill_agent_verdict),
-        message: "Field 'final_skill_agent_verdict' is required for final skill-agent-only live E2E reports.",
-      }),
-    );
-  }
-  if (isPlainObject(document.final_skill_agent_verdict)) {
-    const finalVerdict = document.final_skill_agent_verdict;
-    validateObservationStatusField({
-      value: finalVerdict.status,
-      source,
-      field: "final_skill_agent_verdict.status",
-      issues,
-    });
-    if (finalVerdict.judge_source !== "skill-agent") {
-      issues.push(
-        issue({
-          code: finalVerdict.judge_source === undefined ? "required_field_missing" : "enum_value_invalid",
-          source,
-          field: "final_skill_agent_verdict.judge_source",
-          expected: "skill-agent",
-          actual: finalVerdict.judge_source === undefined ? "missing" : String(finalVerdict.judge_source),
-          message: "Field 'final_skill_agent_verdict.judge_source' must be skill-agent.",
-        }),
-      );
-    }
-    const inspectedRefs = Array.isArray(finalVerdict.inspected_evidence_refs)
-      ? finalVerdict.inspected_evidence_refs
-      : [];
-    if (inspectedRefs.length === 0) {
-      issues.push(
-        issue({
-          code: finalVerdict.inspected_evidence_refs === undefined ? "required_field_missing" : "array_empty",
-          source,
-          field: "final_skill_agent_verdict.inspected_evidence_refs",
-          expected: "non-empty string array",
-          actual:
-            finalVerdict.inspected_evidence_refs === undefined
-              ? "missing"
-              : describeActualType(finalVerdict.inspected_evidence_refs),
-          message: "Final skill-agent verdict must list inspected evidence refs.",
-        }),
-      );
-    } else {
-      validateStringArrayItems({
-        values: finalVerdict.inspected_evidence_refs,
-        source,
-        field: "final_skill_agent_verdict.inspected_evidence_refs",
-        issues,
-      });
-    }
-  }
   const finalAnalysis = isPlainObject(document.final_analysis)
     ? document.final_analysis
     : {};
+  validateUnsupportedNestedFields({
+    record: finalAnalysis,
+    source,
+    parentField: "final_analysis",
+    fields: ["code_quality", "artifact_quality", "quality_judgement", "runner_quality_summary"],
+    issues,
+  });
   validateObservationStatusField({
     value: finalAnalysis.status,
     source,
@@ -2357,6 +2614,755 @@ function validateLiveE2EObservationReport(document, source) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {string} source
+ * @param {string} field
+ * @param {string[]} allowedValues
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ */
+function validateEnumString(value, source, field, allowedValues, issues) {
+  if (typeof value !== "string" || value.length === 0) {
+    issues.push(
+      issue({
+        code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field,
+        expected: "non-empty string",
+        actual: value === undefined ? "missing" : describeActualType(value),
+        message: `Field '${field}' must be a non-empty string.`,
+      }),
+    );
+    return;
+  }
+  if (!allowedValues.includes(value)) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field,
+        expected: allowedValues.join("|"),
+        actual: value,
+        message: `Field '${field}' has unsupported value '${value}'.`,
+      }),
+    );
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateLiveE2ERunHealthReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  validateEnumString(document.overall_status, source, "overall_status", LIVE_E2E_RUN_HEALTH_STATUS_VALUES, issues);
+  validateStringArrayItems({ values: document.evidence_refs, source, field: "evidence_refs", issues });
+
+  for (const field of [
+    "lifecycle_completion",
+    "command_health",
+    "controller_health",
+    "provider_health",
+    "target_environment_health",
+    "diagnostic_health",
+    "evidence_health",
+    "failure_summary",
+    "resume_interaction_health",
+  ]) {
+    if (!isPlainObject(document[field])) {
+      issues.push(
+        issue({
+          code: document[field] === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field,
+          expected: "object",
+          actual: document[field] === undefined ? "missing" : describeActualType(document[field]),
+          message: `Field '${field}' is required for factual run-health reporting.`,
+        }),
+      );
+    }
+  }
+
+  const providerHealth = isPlainObject(document.provider_health) ? document.provider_health : {};
+  for (const field of ["request_artifact_ref", "provider_work_packet_ref", "context_budget_status"]) {
+    validateNestedNullableStringField({
+      record: providerHealth,
+      source,
+      field: `provider_health.${field}`,
+      issues,
+      required: false,
+    });
+  }
+  for (const field of ["context_budget_failure_class", "raw_provider_error_summary"]) {
+    validateNestedNullableStringField({
+      record: providerHealth,
+      source,
+      field: `provider_health.${field}`,
+      issues,
+      required: false,
+    });
+  }
+  if ("top_context_size_sources" in providerHealth) {
+    validateContextSizeSources(
+      providerHealth.top_context_size_sources,
+      source,
+      "provider_health.top_context_size_sources",
+      issues,
+    );
+  }
+
+  validateLiveE2EDiagnosticHealth(document.diagnostic_health, source, issues);
+
+  const failureSummary = isPlainObject(document.failure_summary) ? document.failure_summary : {};
+  const terminalStatus = typeof document.overall_status === "string" ? document.overall_status : "fail";
+  if (terminalStatus === "pass") {
+    for (const field of ["owner", "phase"]) {
+      const value = failureSummary[field];
+      if (value !== null && value !== undefined) {
+        issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source,
+            field: `failure_summary.${field}`,
+            expected: "null when overall_status=pass",
+            actual: String(value),
+            message: `Field 'failure_summary.${field}' must be null for passing run-health reports.`,
+          }),
+        );
+      }
+    }
+  } else {
+    validateEnumString(failureSummary.owner, source, "failure_summary.owner", LIVE_E2E_RUN_FAILURE_OWNER_VALUES, issues);
+    validateEnumString(failureSummary.phase, source, "failure_summary.phase", LIVE_E2E_RUN_FAILURE_PHASE_VALUES, issues);
+    if (typeof failureSummary.class !== "string" || failureSummary.class.length === 0) {
+      issues.push(
+        issue({
+          code: failureSummary.class === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field: "failure_summary.class",
+          expected: "non-empty string",
+          actual: failureSummary.class === undefined ? "missing" : describeActualType(failureSummary.class),
+          message: "Field 'failure_summary.class' must classify a non-passing run-health report.",
+        }),
+      );
+    }
+  }
+
+  const diagnosticHealth = isPlainObject(document.diagnostic_health) ? document.diagnostic_health : {};
+  if (diagnosticHealth.status === "warn" && terminalStatus === "pass") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "overall_status",
+        expected: "warn when diagnostic_health.status=warn",
+        actual: String(document.overall_status),
+        message: "Run-health cannot pass while diagnostic_health records a factual warning.",
+      }),
+    );
+  }
+  if (diagnosticHealth.status === "fail") {
+    for (const [field, expected] of [
+      ["owner", "target_repository"],
+      ["phase", "target_verification"],
+      ["class", "post_run_diagnostic_failed"],
+    ]) {
+      if (failureSummary[field] !== expected) {
+        issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source,
+            field: `failure_summary.${field}`,
+            expected,
+            actual: String(failureSummary[field]),
+            message: `Diagnostic failure reports must classify failure_summary.${field} as '${expected}'.`,
+          }),
+        );
+      }
+    }
+  }
+
+  if (Array.isArray(document.run_findings)) {
+    document.run_findings.forEach((entry, index) => {
+      const record = isPlainObject(entry) ? entry : {};
+      for (const field of ["category", "severity", "summary"]) {
+        const value = record[field];
+        if (typeof value !== "string" || value.length === 0) {
+          issues.push(
+            issue({
+              code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+              source,
+              field: `run_findings[${index}].${field}`,
+              expected: "non-empty string",
+              actual: value === undefined ? "missing" : describeActualType(value),
+              message: `Field 'run_findings[${index}].${field}' is required for actionable run-health findings.`,
+            }),
+          );
+        }
+      }
+      validateStringArrayItems({
+        values: record.evidence_refs,
+        source,
+        field: `run_findings[${index}].evidence_refs`,
+        issues,
+      });
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} source
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ */
+function validateLiveE2EDiagnosticHealth(value, source, issues) {
+  const diagnosticHealth = isPlainObject(value) ? value : {};
+  validateEnumString(
+    diagnosticHealth.status,
+    source,
+    "diagnostic_health.status",
+    LIVE_E2E_RUN_HEALTH_STATUS_VALUES,
+    issues,
+  );
+  if (
+    diagnosticHealth.diagnostic_failure_mode !== null &&
+    diagnosticHealth.diagnostic_failure_mode !== undefined
+  ) {
+    validateEnumString(
+      diagnosticHealth.diagnostic_failure_mode,
+      source,
+      "diagnostic_health.diagnostic_failure_mode",
+      LIVE_E2E_DIAGNOSTIC_FAILURE_MODE_VALUES,
+      issues,
+    );
+  }
+  if (
+    diagnosticHealth.post_run_diagnostic_status !== null &&
+    diagnosticHealth.post_run_diagnostic_status !== undefined
+  ) {
+    validateEnumString(
+      diagnosticHealth.post_run_diagnostic_status,
+      source,
+      "diagnostic_health.post_run_diagnostic_status",
+      LIVE_E2E_RUN_HEALTH_STATUS_VALUES,
+      issues,
+    );
+  }
+  validateNestedNullableStringField({
+    record: diagnosticHealth,
+    source,
+    field: "diagnostic_health.post_run_diagnostic_verify_summary_file",
+    issues,
+    required: true,
+  });
+  for (const field of ["timed_out_command_count", "failed_command_count"]) {
+    validateNestedNumberField({
+      record: diagnosticHealth,
+      source,
+      field: `diagnostic_health.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  for (const field of ["timed_out_commands", "failed_commands", "evidence_refs"]) {
+    validateNestedArrayField({
+      record: diagnosticHealth,
+      source,
+      field: `diagnostic_health.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  validateStringArrayItems({
+    values: diagnosticHealth.evidence_refs,
+    source,
+    field: "diagnostic_health.evidence_refs",
+    issues,
+  });
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateLiveE2EQualityAssessmentReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  validateEnumString(document.overall_status, source, "overall_status", LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES, issues);
+  validateStringArrayItems({ values: document.evidence_refs, source, field: "evidence_refs", issues });
+  validateStringArrayItems({ values: document.recommended_followups, source, field: "recommended_followups", issues });
+
+  const evaluator = isPlainObject(document.evaluator) ? document.evaluator : {};
+  validateEnumString(evaluator.kind, source, "evaluator.kind", ["swe-agent"], issues);
+  if (typeof evaluator.ref !== "string" || evaluator.ref.length === 0) {
+    issues.push(
+      issue({
+        code: evaluator.ref === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "evaluator.ref",
+        expected: "non-empty string",
+        actual: evaluator.ref === undefined ? "missing" : describeActualType(evaluator.ref),
+        message: "Field 'evaluator.ref' must identify the assessing SWE agent.",
+      }),
+    );
+  }
+
+  const dimensions = isPlainObject(document.dimensions) ? document.dimensions : {};
+  validateUnsupportedNestedFields({
+    record: dimensions,
+    source,
+    parentField: "dimensions",
+    fields: LIVE_E2E_LEGACY_QUALITY_DIMENSION_KEYS,
+    issues,
+  });
+  const expectedGapDimensions = {
+    not_evaluated_dimensions: [],
+    weak_signal_dimensions: [],
+    strong_evidence_dimensions: [],
+  };
+  for (const dimensionKey of LIVE_E2E_QUALITY_DIMENSION_KEYS) {
+    const dimension = isPlainObject(dimensions[dimensionKey]) ? dimensions[dimensionKey] : null;
+    if (!dimension) {
+      issues.push(
+        issue({
+          code: dimensions[dimensionKey] === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field: `dimensions.${dimensionKey}`,
+          expected: "object",
+          actual: dimensions[dimensionKey] === undefined ? "missing" : describeActualType(dimensions[dimensionKey]),
+          message: `Quality assessment must include dimension '${dimensionKey}'.`,
+        }),
+      );
+      continue;
+    }
+    validateEnumString(
+      dimension.status,
+      source,
+      `dimensions.${dimensionKey}.status`,
+      LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES,
+      issues,
+    );
+    validateEnumString(
+      dimension.evidence_strength,
+      source,
+      `dimensions.${dimensionKey}.evidence_strength`,
+      LIVE_E2E_QUALITY_EVIDENCE_STRENGTH_VALUES,
+      issues,
+    );
+    const inspectedRefs = Array.isArray(dimension.inspected_evidence_refs) ? dimension.inspected_evidence_refs : [];
+    if (!Array.isArray(dimension.inspected_evidence_refs)) {
+      issues.push(
+        issue({
+          code: dimension.inspected_evidence_refs === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field: `dimensions.${dimensionKey}.inspected_evidence_refs`,
+          expected: "array",
+          actual:
+            dimension.inspected_evidence_refs === undefined
+              ? "missing"
+              : describeActualType(dimension.inspected_evidence_refs),
+          message: `Dimension '${dimensionKey}' must list inspected evidence refs, even when empty for not_evaluated.`,
+        }),
+      );
+    } else {
+      validateStringArrayItems({
+        values: dimension.inspected_evidence_refs,
+        source,
+        field: `dimensions.${dimensionKey}.inspected_evidence_refs`,
+        issues,
+      });
+    }
+    const findings = Array.isArray(dimension.findings) ? dimension.findings : [];
+    if (!Array.isArray(dimension.findings)) {
+      issues.push(
+        issue({
+          code: dimension.findings === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field: `dimensions.${dimensionKey}.findings`,
+          expected: "array",
+          actual: dimension.findings === undefined ? "missing" : describeActualType(dimension.findings),
+          message: `Dimension '${dimensionKey}' must include structured findings.`,
+        }),
+      );
+    } else {
+      validateAssessmentFindings(
+        dimension.findings,
+        source,
+        `dimensions.${dimensionKey}.findings`,
+        issues,
+      );
+    }
+    if (dimension.status === "not_evaluated") {
+      if (dimension.evidence_strength !== "missing") {
+        issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source,
+            field: `dimensions.${dimensionKey}.evidence_strength`,
+            expected: "missing when status=not_evaluated",
+            actual: String(dimension.evidence_strength),
+            message: "A not_evaluated dimension must declare missing evidence strength.",
+          }),
+        );
+      }
+      if (findings.length === 0) {
+        issues.push(
+          issue({
+            code: "required_field_missing",
+            source,
+            field: `dimensions.${dimensionKey}.findings`,
+            expected: "finding explaining not_evaluated",
+            actual: "empty array",
+            message: "A not_evaluated dimension must include a finding explaining why it was not evaluated.",
+          }),
+        );
+      }
+    } else if (inspectedRefs.length === 0) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: `dimensions.${dimensionKey}.inspected_evidence_refs`,
+          expected: "non-empty string array",
+          actual: "empty array",
+          message: `Dimension '${dimensionKey}' must cite inspected evidence unless it is not_evaluated.`,
+        }),
+      );
+    }
+    if (dimension.evidence_strength === "missing" && dimension.status !== "not_evaluated") {
+      issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source,
+          field: `dimensions.${dimensionKey}.status`,
+          expected: "not_evaluated when evidence_strength=missing",
+          actual: String(dimension.status),
+          message: "Missing evidence strength cannot be reported as an evaluated dimension.",
+        }),
+      );
+    }
+    if (dimension.status === "not_evaluated") {
+      expectedGapDimensions.not_evaluated_dimensions.push(dimensionKey);
+    }
+    if (dimension.evidence_strength === "weak") {
+      expectedGapDimensions.weak_signal_dimensions.push(dimensionKey);
+    }
+    if (dimension.evidence_strength === "strong") {
+      expectedGapDimensions.strong_evidence_dimensions.push(dimensionKey);
+    }
+    if (!Array.isArray(dimension.recommended_followups)) {
+      issues.push(
+        issue({
+          code: dimension.recommended_followups === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field: `dimensions.${dimensionKey}.recommended_followups`,
+          expected: "array",
+          actual:
+            dimension.recommended_followups === undefined
+              ? "missing"
+              : describeActualType(dimension.recommended_followups),
+          message: `Dimension '${dimensionKey}' must include recommended_followups[].`,
+        }),
+      );
+    } else {
+      validateStringArrayItems({
+        values: dimension.recommended_followups,
+        source,
+        field: `dimensions.${dimensionKey}.recommended_followups`,
+        issues,
+      });
+    }
+    const requiredSubdimensions = LIVE_E2E_AOR_OPERATOR_UI_QUALITY_SUBDIMENSION_KEYS[dimensionKey];
+    if (requiredSubdimensions) {
+      validateQualityAssessmentSubdimensions({
+        dimensionKey,
+        dimension,
+        requiredSubdimensions,
+        source,
+        issues,
+      });
+    }
+  }
+
+  validateAssessmentFindings(document.findings, source, "findings", issues);
+  const gapReport = isPlainObject(document.gap_report) ? document.gap_report : {};
+  for (const field of ["not_evaluated_dimensions", "weak_signal_dimensions", "strong_evidence_dimensions"]) {
+    if (!Array.isArray(gapReport[field])) {
+      issues.push(
+        issue({
+          code: gapReport[field] === undefined ? "required_field_missing" : "field_type_mismatch",
+          source,
+          field: `gap_report.${field}`,
+          expected: "array",
+          actual: gapReport[field] === undefined ? "missing" : describeActualType(gapReport[field]),
+          message: `Field 'gap_report.${field}' must be an array of dimension keys.`,
+        }),
+      );
+      continue;
+    }
+    validateStringArrayItems({ values: gapReport[field], source, field: `gap_report.${field}`, issues });
+    validateQualityGapDimensionSet({
+      values: gapReport[field],
+      expectedValues: expectedGapDimensions[field],
+      source,
+      field: `gap_report.${field}`,
+      issues,
+    });
+  }
+  return issues;
+}
+
+/**
+ * @param {{
+ *   dimensionKey: string,
+ *   dimension: Record<string, unknown>,
+ *   requiredSubdimensions: string[],
+ *   source: string,
+ *   issues: import("./index.d.ts").ContractValidationIssue[],
+ * }} options
+ */
+function validateQualityAssessmentSubdimensions(options) {
+  const subdimensions = isPlainObject(options.dimension.subdimensions)
+    ? options.dimension.subdimensions
+    : null;
+  if (!subdimensions) {
+    options.issues.push(
+      issue({
+        code: options.dimension.subdimensions === undefined ? "required_field_missing" : "field_type_mismatch",
+        source: options.source,
+        field: `dimensions.${options.dimensionKey}.subdimensions`,
+        expected: "object",
+        actual:
+          options.dimension.subdimensions === undefined
+            ? "missing"
+            : describeActualType(options.dimension.subdimensions),
+        message: `Dimension '${options.dimensionKey}' must include AOR operator UI/UX subdimensions.`,
+      }),
+    );
+    return;
+  }
+  for (const subdimensionKey of options.requiredSubdimensions) {
+    const fieldPrefix = `dimensions.${options.dimensionKey}.subdimensions.${subdimensionKey}`;
+    const subdimension = isPlainObject(subdimensions[subdimensionKey]) ? subdimensions[subdimensionKey] : null;
+    if (!subdimension) {
+      options.issues.push(
+        issue({
+          code: subdimensions[subdimensionKey] === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: fieldPrefix,
+          expected: "object",
+          actual:
+            subdimensions[subdimensionKey] === undefined
+              ? "missing"
+              : describeActualType(subdimensions[subdimensionKey]),
+          message: `AOR operator UI/UX assessment must include subdimension '${subdimensionKey}'.`,
+        }),
+      );
+      continue;
+    }
+    validateEnumString(
+      subdimension.status,
+      options.source,
+      `${fieldPrefix}.status`,
+      LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES,
+      options.issues,
+    );
+    validateEnumString(
+      subdimension.evidence_strength,
+      options.source,
+      `${fieldPrefix}.evidence_strength`,
+      LIVE_E2E_QUALITY_EVIDENCE_STRENGTH_VALUES,
+      options.issues,
+    );
+    const evidenceRefs = Array.isArray(subdimension.evidence_refs) ? subdimension.evidence_refs : [];
+    if (!Array.isArray(subdimension.evidence_refs)) {
+      options.issues.push(
+        issue({
+          code: subdimension.evidence_refs === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: `${fieldPrefix}.evidence_refs`,
+          expected: "array",
+          actual:
+            subdimension.evidence_refs === undefined
+              ? "missing"
+              : describeActualType(subdimension.evidence_refs),
+          message: `AOR operator UI/UX subdimension '${subdimensionKey}' must list evidence refs.`,
+        }),
+      );
+    } else {
+      validateStringArrayItems({
+        values: subdimension.evidence_refs,
+        source: options.source,
+        field: `${fieldPrefix}.evidence_refs`,
+        issues: options.issues,
+      });
+    }
+    const findings = Array.isArray(subdimension.findings) ? subdimension.findings : [];
+    if (!Array.isArray(subdimension.findings)) {
+      options.issues.push(
+        issue({
+          code: subdimension.findings === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: `${fieldPrefix}.findings`,
+          expected: "array",
+          actual:
+            subdimension.findings === undefined
+              ? "missing"
+              : describeActualType(subdimension.findings),
+          message: `AOR operator UI/UX subdimension '${subdimensionKey}' must include findings.`,
+        }),
+      );
+    } else {
+      validateAssessmentFindings(subdimension.findings, options.source, `${fieldPrefix}.findings`, options.issues);
+    }
+    if (subdimension.status === "not_evaluated") {
+      if (subdimension.evidence_strength !== "missing") {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `${fieldPrefix}.evidence_strength`,
+            expected: "missing when status=not_evaluated",
+            actual: String(subdimension.evidence_strength),
+            message: "A not_evaluated AOR operator UI/UX subdimension must declare missing evidence strength.",
+          }),
+        );
+      }
+      if (findings.length === 0) {
+        options.issues.push(
+          issue({
+            code: "required_field_missing",
+            source: options.source,
+            field: `${fieldPrefix}.findings`,
+            expected: "finding explaining not_evaluated",
+            actual: "empty array",
+            message: "A not_evaluated AOR operator UI/UX subdimension must include a finding explaining the gap.",
+          }),
+        );
+      }
+    } else if (evidenceRefs.length === 0) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `${fieldPrefix}.evidence_refs`,
+          expected: "non-empty string array",
+          actual: "empty array",
+          message: `AOR operator UI/UX subdimension '${subdimensionKey}' must cite evidence unless it is not_evaluated.`,
+        }),
+      );
+    }
+    if (subdimension.evidence_strength === "missing" && subdimension.status !== "not_evaluated") {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `${fieldPrefix}.status`,
+          expected: "not_evaluated when evidence_strength=missing",
+          actual: String(subdimension.status),
+          message: "Missing evidence strength cannot be reported as an evaluated AOR operator UI/UX subdimension.",
+        }),
+      );
+    }
+  }
+}
+
+/**
+ * @param {{ values: unknown, expectedValues: string[], source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateQualityGapDimensionSet(options) {
+  const values = Array.isArray(options.values) ? options.values.filter((value) => typeof value === "string") : [];
+  const actualSet = new Set(values);
+  const expectedSet = new Set(options.expectedValues);
+  values.forEach((value, index) => {
+    if (!LIVE_E2E_QUALITY_DIMENSION_KEYS.includes(value)) {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `${options.field}[${index}]`,
+          expected: LIVE_E2E_QUALITY_DIMENSION_KEYS.join("|"),
+          actual: value,
+          message: `Gap report field '${options.field}' contains unknown dimension '${value}'.`,
+        }),
+      );
+      return;
+    }
+    if (!expectedSet.has(value)) {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `${options.field}[${index}]`,
+          expected: options.expectedValues.length > 0 ? options.expectedValues.join("|") : "empty array",
+          actual: value,
+          message: `Gap report field '${options.field}' contains dimension '${value}' that does not match its dimension status or evidence strength.`,
+        }),
+      );
+    }
+  });
+  for (const expectedValue of options.expectedValues) {
+    if (!actualSet.has(expectedValue)) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: options.field,
+          expected: `include ${expectedValue}`,
+          actual: values.length > 0 ? values.join(",") : "empty array",
+          message: `Gap report field '${options.field}' must include dimension '${expectedValue}'.`,
+        }),
+      );
+    }
+  }
+}
+
+/**
+ * @param {unknown} findings
+ * @param {string} source
+ * @param {string} fieldPrefix
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ */
+function validateAssessmentFindings(findings, source, fieldPrefix, issues) {
+  if (!Array.isArray(findings)) return;
+  findings.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    validateEnumString(
+      record.category,
+      source,
+      `${fieldPrefix}[${index}].category`,
+      LIVE_E2E_QUALITY_FINDING_CATEGORY_VALUES,
+      issues,
+    );
+    for (const field of ["severity", "summary"]) {
+      const value = record[field];
+      if (typeof value !== "string" || value.length === 0) {
+        issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source,
+            field: `${fieldPrefix}[${index}].${field}`,
+            expected: "non-empty string",
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Assessment finding field '${fieldPrefix}[${index}].${field}' is required.`,
+          }),
+        );
+      }
+    }
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source,
+      field: `${fieldPrefix}[${index}].evidence_refs`,
+      issues,
+    });
+  });
+}
+
+/**
  * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
  */
 function validateObservationFrontendInteractions(options) {
@@ -2371,6 +3377,7 @@ function validateObservationFrontendInteractions(options) {
       ["screenshot_refs", "array"],
       ["dom_snapshot_ref", "string"],
       ["accessibility_summary_ref", "string"],
+      ["accessibility_checks", "array"],
       ["task_outcome", "object"],
       ["ux_findings", "array"],
       ["status", "string"],
@@ -2390,6 +3397,29 @@ function validateObservationFrontendInteractions(options) {
         );
       }
     }
+    validateUnsupportedNestedFields({
+      record,
+      source: options.source,
+      parentField: `frontend_interactions[${index}]`,
+      fields: ["agent_verdict_ref"],
+      issues: options.issues,
+    });
+    if (
+      record.operator_decision_ref !== undefined &&
+      record.operator_decision_ref !== null &&
+      typeof record.operator_decision_ref !== "string"
+    ) {
+      options.issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source: options.source,
+          field: `frontend_interactions[${index}].operator_decision_ref`,
+          expected: "string",
+          actual: describeActualType(record.operator_decision_ref),
+          message: `Field 'frontend_interactions[${index}].operator_decision_ref' must be a string when present.`,
+        }),
+      );
+    }
     validateStringArrayItems({
       values: record.evidence_refs,
       source: options.source,
@@ -2408,6 +3438,12 @@ function validateObservationFrontendInteractions(options) {
       field: `frontend_interactions[${index}].ux_findings`,
       issues: options.issues,
     });
+    validateObservationAccessibilityChecks({
+      entries: record.accessibility_checks,
+      parentField: `frontend_interactions[${index}].accessibility_checks`,
+      source: options.source,
+      issues: options.issues,
+    });
     validateObservationStatusField({
       value: record.status,
       source: options.source,
@@ -2421,15 +3457,82 @@ function validateObservationFrontendInteractions(options) {
       field: `frontend_interactions[${index}].task_outcome.status`,
       issues: options.issues,
     });
-    if (record.status === "pass" && typeof record.agent_verdict_ref !== "string") {
+  });
+}
+
+/**
+ * @param {{ entries: unknown, parentField: string, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationAccessibilityChecks(options) {
+  if (!Array.isArray(options.entries)) return;
+  const checksById = new Map();
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    const fieldPrefix = `${options.parentField}[${index}]`;
+    for (const [field, expectedType] of [
+      ["check_id", "string"],
+      ["status", "string"],
+      ["evidence_refs", "array"],
+      ["findings", "array"],
+    ]) {
+      const value = record[field];
+      if (!isExpectedType(value, expectedType)) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `${fieldPrefix}.${field}`,
+            expected: value === undefined ? "present" : expectedType,
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field '${fieldPrefix}.${field}' is required for AOR operator accessibility evidence.`,
+          }),
+        );
+      }
+    }
+    if (typeof record.check_id === "string") {
+      checksById.set(record.check_id, record);
+      if (!LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS.includes(record.check_id)) {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `${fieldPrefix}.check_id`,
+            expected: LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS.join("|"),
+            actual: record.check_id,
+            message: `AOR operator accessibility check '${record.check_id}' is not supported.`,
+          }),
+        );
+      }
+    }
+    validateObservationStatusField({
+      value: record.status,
+      source: options.source,
+      field: `${fieldPrefix}.status`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source: options.source,
+      field: `${fieldPrefix}.evidence_refs`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.findings,
+      source: options.source,
+      field: `${fieldPrefix}.findings`,
+      issues: options.issues,
+    });
+  });
+  LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS.forEach((checkId) => {
+    if (!checksById.has(checkId)) {
       options.issues.push(
         issue({
           code: "required_field_missing",
           source: options.source,
-          field: `frontend_interactions[${index}].agent_verdict_ref`,
-          expected: "string",
-          actual: record.agent_verdict_ref === undefined ? "missing" : describeActualType(record.agent_verdict_ref),
-          message: "Passing UI/UX live E2E evidence must link the skill-agent UI verdict.",
+          field: `${options.parentField}.${checkId}`,
+          expected: "present",
+          actual: "missing",
+          message: `AOR operator accessibility evidence must include '${checkId}'.`,
         }),
       );
     }

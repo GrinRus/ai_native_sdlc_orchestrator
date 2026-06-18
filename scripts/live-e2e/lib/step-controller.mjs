@@ -134,6 +134,32 @@ export function getLiveE2eIncludedStepsForProfile(profile) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function artifactValuePresent(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(asRecord(value)).length > 0;
+  return value !== null && value !== undefined;
+}
+
+/**
+ * @param {Record<string, unknown>} previous
+ * @param {Record<string, unknown>} current
+ * @returns {Record<string, unknown>}
+ */
+function mergeArtifactSnapshots(previous, current) {
+  const merged = { ...previous };
+  for (const [key, value] of Object.entries(current)) {
+    if (artifactValuePresent(value) || !(key in merged)) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+/**
  * @param {Record<string, unknown>} controllerStop
  * @param {string[]} includedSteps
  * @returns {boolean}
@@ -449,7 +475,7 @@ function rejectInconsistentSkillAgentDecision(decision, action, entry, profile =
     const decisionEvidenceRefs = asStringArray(decision.evidence_refs);
     const missingFrontendRefs = frontendRefs.filter((ref) => !decisionEvidenceRefs.includes(ref));
     if (missingFrontendRefs.length > 0) {
-      return `Skill-agent UI/UX decisions must cite frontend evidence refs: ${missingFrontendRefs.join(", ")}.`;
+      return `Skill-agent AOR operator UI decisions must cite AOR operator UI evidence refs: ${missingFrontendRefs.join(", ")}.`;
     }
   }
   return null;
@@ -591,7 +617,6 @@ function resolveStepArtifactGateFailures(step, artifacts) {
   if (step === "review") {
     return uniqueStrings([
       failingArtifactGate(artifacts, "review_overall_status", "review"),
-      failingArtifactGate(artifacts, "quality_gate_decision", "quality gate"),
     ]);
   }
   if (step === "qa") {
@@ -1207,7 +1232,7 @@ export function createLiveE2eStepController(options) {
             : []),
         ]),
         required_evidence_refs: requiredInspectionRefs,
-        frontend_evidence_refs: asStringArray(entry.frontend_interaction_refs),
+        aor_operator_ui_evidence_refs: asStringArray(entry.frontend_interaction_refs),
         continuation_rule:
           "continue is allowed only when deterministic guardrails pass or warn and semantic_analysis.judge_source is skill-agent",
       },
@@ -1326,7 +1351,9 @@ export function createLiveE2eStepController(options) {
     );
     recordPhase(step, "persist", []);
     persistStep(step, entry);
-    state.artifacts_snapshot = JSON.parse(JSON.stringify(input.artifacts ?? {}));
+    state.artifacts_snapshot = JSON.parse(
+      JSON.stringify(mergeArtifactSnapshots(asRecord(state.artifacts_snapshot), input.artifacts ?? {})),
+    );
     state.command_results = JSON.parse(JSON.stringify(input.commandResults ?? []));
     writeJson(stateFile, state);
 

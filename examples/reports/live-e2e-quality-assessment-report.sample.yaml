@@ -1,0 +1,329 @@
+assessment_id: live-e2e.sample.quality-assessment.v1
+run_id: live-e2e.sample.run
+profile_id: live-e2e.full-journey.regress.ky
+generated_at: "2026-05-18T00:10:00.000Z"
+evaluator:
+  kind: swe-agent
+  ref: skill://live-e2e-runner
+  mode: post-run-freeform
+source_run_summary_file: runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+source_observation_report_file: runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+source_run_health_report_file: runtime://reports/live-e2e-run-health-report-live-e2e.sample.run.json
+assessment_request_file: runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json
+overall_status: warn
+dimensions:
+  artifact_content_quality:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/discovery-research-report-live-e2e.sample.run.yaml
+      - runtime://reports/handoff-packet-live-e2e.sample.run.yaml
+    findings: []
+    recommended_followups: []
+  implementation_correctness:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/review-report-live-e2e.sample.run.json
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    findings:
+      - category: implementation-correctness
+        severity: medium
+        summary: Verification passed, but no mission-specific behavioral eval oracle was available.
+        evidence_refs:
+          - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    recommended_followups:
+      - Add mission-specific behavioral assertions to the target verification path.
+  implementation_completeness:
+    status: pass
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/wave-ticket-live-e2e.sample.run.yaml
+      - runtime://reports/delivery-manifest-live-e2e.sample.run.json
+    findings: []
+    recommended_followups: []
+  code_maintainability:
+    status: warn
+    evidence_strength: weak
+    inspected_evidence_refs:
+      - runtime://reports/review-report-live-e2e.sample.run.json
+    findings:
+      - category: follow-up-needed
+        severity: low
+        summary: Static structure was reviewed heuristically; AST-level boundary checks were not run.
+        evidence_refs:
+          - runtime://reports/review-report-live-e2e.sample.run.json
+    recommended_followups:
+      - Run project-native static analysis when available.
+  test_adequacy:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    findings:
+      - category: test-adequacy
+        severity: medium
+        summary: Target verification passed, but changed-source coverage was not proven.
+        evidence_refs:
+          - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    recommended_followups:
+      - Map changed source files to executed target tests.
+  security_review:
+    status: not_evaluated
+    evidence_strength: missing
+    inspected_evidence_refs: []
+    findings:
+      - category: security
+        severity: medium
+        summary: No dedicated security review evidence was produced by this flow.
+        evidence_refs: []
+    recommended_followups:
+      - Inspect secret handling, injection surfaces, authz/authn changes, and file/network access.
+  performance_regression_risk:
+    status: not_evaluated
+    evidence_strength: missing
+    inspected_evidence_refs: []
+    findings:
+      - category: performance
+        severity: low
+        summary: No latency, memory, bundle size, or render-cost evidence was produced.
+        evidence_refs: []
+    recommended_followups:
+      - Add target-appropriate performance smoke evidence for performance-sensitive missions.
+  verification_quality:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+      - runtime://reports/evaluation-report-live-e2e.sample.run.json
+    findings:
+      - category: evidence-gap
+        severity: medium
+        summary: Evaluation report was inspected as supporting evidence, not as a strong semantic oracle.
+        evidence_refs:
+          - runtime://reports/evaluation-report-live-e2e.sample.run.json
+    recommended_followups:
+      - Confirm eval suite mission coverage before treating eval status as strong acceptance proof.
+  delivery_safety:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/delivery-manifest-live-e2e.sample.run.json
+      - runtime://reports/no-upstream-write-live-e2e.sample.run.json
+    findings: []
+    recommended_followups: []
+  aor_operator_ui_ux_quality:
+    status: warn
+    evidence_strength: weak
+    inspected_evidence_refs:
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+    findings:
+      - category: ui-ux
+        severity: medium
+        summary: Available evidence proves the AOR operator console rendered, but it does not prove every installed-user flow usability concern.
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+    recommended_followups:
+      - Inspect AOR task success, next-action clarity, blocker recovery, visual stability, and raw JSON independence through browser-task evidence.
+    subdimensions:
+      task_success:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: App smoke proves render markers, but no browser task transcript proves the operator completed the flow without assistance.
+            evidence_refs:
+              - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+      flow_navigation_clarity:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No direct evidence inspected flow navigation clarity across the installed-user journey.
+            evidence_refs: []
+      next_action_clarity:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+        findings:
+          - category: ui-ux
+            severity: low
+            summary: Next-action evidence is indirect through the observation report and not a browser-level usability proof.
+            evidence_refs:
+              - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+      blocker_and_error_understandability:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No blocker or error state was inspected through the AOR operator UI.
+            evidence_refs: []
+      recovery_affordance:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No recovery path was inspected through browser-task evidence.
+            evidence_refs: []
+      state_feedback_loading_empty_error:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: low
+            summary: Loading, empty, and error state feedback was not captured by the available evidence.
+            evidence_refs: []
+      visual_stability_responsiveness:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-smoke-visual-guardrail-live-e2e.sample.run.json
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: Visual evidence is a deterministic guardrail rather than a responsive browser inspection.
+            evidence_refs:
+              - runtime://reports/installed-user-guided-web-smoke-visual-guardrail-live-e2e.sample.run.json
+      raw_json_independence:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No evidence shows the operator could complete the flow without reading raw JSON artifacts.
+            evidence_refs: []
+  aor_operator_accessibility_quality:
+    status: warn
+    evidence_strength: weak
+    inspected_evidence_refs:
+      - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    findings:
+      - category: accessibility
+        severity: medium
+        summary: Accessibility evidence is checklist-oriented and lacks keyboard, focus order, contrast, and screen-reader proof.
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    recommended_followups:
+      - Add browser-level keyboard, focus, contrast, semantic, screen-reader label, and accessible error feedback evidence for the AOR operator flow.
+    subdimensions:
+      keyboard_navigation:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Keyboard navigation was not inspected.
+            evidence_refs: []
+      focus_order:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Focus order was not inspected.
+            evidence_refs: []
+      contrast_and_readability:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Contrast and readability were not inspected beyond smoke markers.
+            evidence_refs: []
+      semantic_structure:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Accessibility evidence is checklist-oriented and does not prove full semantic structure.
+            evidence_refs:
+              - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+      screen_reader_labels:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Screen-reader labels were not inspected.
+            evidence_refs: []
+      accessible_error_feedback:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Accessible error feedback was not inspected.
+            evidence_refs: []
+  evidence_strength:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-run-health-report-live-e2e.sample.run.json
+    findings:
+      - category: evidence-gap
+        severity: medium
+        summary: Some dimensions rely on heuristic or indirect evidence and are marked weak or not_evaluated.
+        evidence_refs:
+          - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+    recommended_followups:
+      - Promote weak dimensions only after adding direct evidence.
+  acceptance_criteria_traceability:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/wave-ticket-live-e2e.sample.run.yaml
+      - runtime://reports/review-report-live-e2e.sample.run.json
+    findings:
+      - category: acceptance-traceability
+        severity: medium
+        summary: KPI and DoD linkage was inspected from artifacts, but no strict criterion-to-evidence matrix was generated.
+        evidence_refs:
+          - runtime://reports/wave-ticket-live-e2e.sample.run.yaml
+    recommended_followups:
+      - Add an explicit acceptance criterion to evidence mapping to the assessment notes.
+gap_report:
+  not_evaluated_dimensions:
+    - security_review
+    - performance_regression_risk
+  weak_signal_dimensions:
+    - code_maintainability
+    - aor_operator_ui_ux_quality
+    - aor_operator_accessibility_quality
+  strong_evidence_dimensions:
+    - artifact_content_quality
+    - delivery_safety
+findings:
+  - category: evidence-gap
+    severity: medium
+    summary: Outcome quality is advisory and has weak or missing signals in security, performance, UI/UX, and accessibility.
+    evidence_refs:
+      - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json
+recommended_followups:
+  - Add direct semantic acceptance evidence for the target mission before treating this run as product-quality proof.
+evidence_refs:
+  - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-run-health-report-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json

@@ -8,29 +8,6 @@ import {
 } from "./common.mjs";
 import { resolveProductionProofPolicy } from "./profile-catalog.mjs";
 
-const PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS = Object.freeze([
-  "target_selection",
-  "feature_request_quality",
-  "scenario_coverage_status",
-  "provider_execution_status",
-  "target_baseline_status",
-  "real_code_change_status",
-  "post_run_verification_status",
-  "post_run_diagnostic_status",
-  "discovery_quality",
-  "runtime_success",
-  "runtime_harness_decision",
-  "run_start_runtime_harness_decision",
-  "latest_runtime_harness_decision",
-  "artifact_quality",
-  "code_quality",
-  "feature_size_fit_status",
-  "delivery_release_quality",
-  "learning_loop_closure",
-  "quality_gate_decision",
-  "overall_status",
-]);
-
 /**
  * @param {string | null | undefined} filePath
  * @returns {Record<string, unknown>}
@@ -79,20 +56,6 @@ export function buildProductionProofSummary(profile) {
     require_permission_readiness: policy.require_permission_readiness === true,
     require_blocking_target_verification: policy.require_blocking_target_verification === true,
     required_failure_mode: asNonEmptyString(policy.required_failure_mode),
-  };
-}
-
-/**
- * @param {Record<string, unknown>} verdictMatrix
- * @returns {{ ok: boolean, failed_fields: string[] }}
- */
-function assessProductionProofVerdicts(verdictMatrix) {
-  const failedFields = PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS.filter(
-    (field) => !isPassStatus(verdictMatrix[field]),
-  );
-  return {
-    ok: failedFields.length === 0,
-    failed_fields: failedFields,
   };
 }
 
@@ -206,14 +169,6 @@ function assessReviewProof(reviewReportFile) {
   if (!reportFile || !fileExists(reportFile)) {
     findings.push("review report is missing");
   }
-  if (!isPassStatus(report.overall_status)) {
-    findings.push("review overall_status is not pass");
-  }
-  for (const field of ["code_quality", "provider_traceability", "feature_size_fit"]) {
-    if (!isPassStatus(asRecord(report[field]).status)) {
-      findings.push(`review ${field}.status is not pass`);
-    }
-  }
   if (changedPaths.length === 0) {
     findings.push("review report has no changed paths");
   }
@@ -278,8 +233,6 @@ export function applyProductionProofEvidence(options) {
   }
 
   const artifacts = options.flowResult.artifacts;
-  const qualityJudgement = asRecord(artifacts.quality_judgement);
-  const verdicts = assessProductionProofVerdicts(qualityJudgement);
   const runtimeHarness = assessRuntimeHarnessProof(
     asNonEmptyString(artifacts.latest_runtime_harness_report_file) || asNonEmptyString(artifacts.runtime_harness_report_file),
   );
@@ -319,7 +272,6 @@ export function applyProductionProofEvidence(options) {
   const evidenceRefsExist = requiredEvidenceRefFields.every((field) => evidenceFileExists(evidenceRefs[field]));
   const findings = uniqueStrings([
     ...(isPassStatus(options.flowResult.status) ? [] : ["full-journey flow status is not pass"]),
-    ...(verdicts.ok ? [] : verdicts.failed_fields.map((field) => `quality_judgement.${field} is not pass`)),
     ...preflight.findings,
     ...runtimeHarness.findings,
     ...review.findings,
@@ -340,11 +292,6 @@ export function applyProductionProofEvidence(options) {
     evidence_status: complete ? "pass" : "pending",
     evidence_refs: evidenceRefs,
     changed_paths: changedPaths,
-    target_verdicts: {
-      status: verdicts.ok ? "pass" : "fail",
-      required_fields: [...PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS],
-      failed_fields: verdicts.failed_fields,
-    },
     runtime_harness: {
       status: runtimeHarness.status,
       meaningful_changed_paths: runtimeHarness.meaningful_changed_paths,

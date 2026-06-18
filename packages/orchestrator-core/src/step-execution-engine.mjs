@@ -63,6 +63,8 @@ const STEP_ARCHITECTURE_CONTRACT_REFS = Object.freeze([
   "docs/contracts/wave-ticket.md",
   "docs/contracts/handoff-packet.md",
 ]);
+const DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS = 180_000;
+const CONTEXT_BUDGET_WARN_RATIO = 0.8;
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -87,6 +89,71 @@ function asString(value) {
  */
 function sha256Hex(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function estimateContextValue(value) {
+  const text = JSON.stringify(value ?? null);
+  const chars = text.length;
+  return {
+    bytes: Buffer.byteLength(text, "utf8"),
+    chars,
+    estimated_tokens: Math.ceil(chars / 3),
+  };
+}
+
+/**
+ * @param {Array<{ source: string, value: unknown }>} sources
+ * @returns {Array<{ source: string, bytes: number, chars: number, estimated_tokens: number }>}
+ */
+function buildContextSourceBreakdown(sources) {
+  return sources.map((entry) => ({
+    source: entry.source,
+    ...estimateContextValue(entry.value),
+  }));
+}
+
+/**
+ * @param {Array<{ bytes: number, chars: number, estimated_tokens: number }>} entries
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function sumContextEstimates(entries) {
+  return entries.reduce(
+    (acc, entry) => ({
+      bytes: acc.bytes + entry.bytes,
+      chars: acc.chars + entry.chars,
+      estimated_tokens: acc.estimated_tokens + entry.estimated_tokens,
+    }),
+    { bytes: 0, chars: 0, estimated_tokens: 0 },
+  );
+}
+
+/**
+ * @param {number} estimatedTokens
+ * @param {number} budgetLimitTokens
+ * @returns {"pass" | "warn" | "fail"}
+ */
+function classifyContextBudgetStatus(estimatedTokens, budgetLimitTokens) {
+  if (estimatedTokens > budgetLimitTokens) return "fail";
+  if (estimatedTokens >= budgetLimitTokens * CONTEXT_BUDGET_WARN_RATIO) return "warn";
+  return "pass";
+}
+
+/**
+ * @param {Record<string, unknown>} adapterProfile
+ * @returns {number}
+ */
+function resolveContextBudgetLimitTokens(adapterProfile) {
+  const execution = asRecord(adapterProfile.execution);
+  const externalRuntime = asRecord(execution.external_runtime);
+  const contextBudget = asRecord(externalRuntime.context_budget);
+  const value = contextBudget.max_input_tokens;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS;
 }
 
 /**
@@ -575,6 +642,57 @@ function readLatestAnalysisFeatureTraceability(runtimeLayout) {
   } catch {
     return null;
   }
+}
+
+/**
+ * @param {unknown} handoffRef
+ * @returns {Record<string, unknown> | null}
+ */
+function readHandoffFeatureTraceability(handoffRef) {
+  const handoffPath = asString(handoffRef);
+  if (!handoffPath || !path.isAbsolute(handoffPath) || !fs.existsSync(handoffPath)) {
+    return null;
+  }
+  try {
+    const document = /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(handoffPath, "utf8")));
+    const featureTraceability = asRecord(document.feature_traceability);
+    const repoScopePaths = Array.isArray(document.repo_scopes)
+      ? document.repo_scopes.flatMap((scope) => asStringArray(asRecord(scope).paths))
+      : [];
+    return mergeFeatureTraceabilityRecords(
+      featureTraceability,
+      {
+        allowed_paths: uniqueStrings([...asStringArray(document.allowed_paths), ...repoScopePaths]),
+      },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {...(Record<string, unknown> | null | undefined)} records
+ * @returns {Record<string, unknown> | null}
+ */
+function mergeFeatureTraceabilityRecords(...records) {
+  /** @type {Record<string, unknown>} */
+  const merged = {};
+  for (const record of records) {
+    const source = asRecord(record);
+    for (const [key, value] of Object.entries(source)) {
+      if (Array.isArray(value)) {
+        merged[key] = uniqueStrings([...asStringArray(merged[key]), ...asStringArray(value)]);
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(merged, key)) {
+        continue;
+      }
+      if (value !== null && value !== undefined) {
+        merged[key] = value;
+      }
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : null;
 }
 
 /**
@@ -1163,6 +1281,11 @@ export function executeRoutedStep(options) {
         policyOverrides: options.policyOverrides,
       });
       const approvedHandoffRef = asString(options.approvedHandoffRef);
+      featureTraceability = mergeFeatureTraceabilityRecords(
+        featureTraceability,
+        readLatestAnalysisFeatureTraceability(init.runtimeLayout),
+        readHandoffFeatureTraceability(approvedHandoffRef),
+      );
       deliveryPlanResult = materializeDeliveryPlan({
         runtimeLayout: init.runtimeLayout,
         projectId: init.projectId,
@@ -1209,6 +1332,16 @@ export function executeRoutedStep(options) {
       );
       const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
       const expandedRefs = asRecord(contextBundles.expanded_refs);
+      const resolvedAdapterProfile = asRecord(asRecord(adapterResolution).adapter?.profile);
+      const budgetLimitTokens = resolveContextBudgetLimitTokens(resolvedAdapterProfile);
+      const contextSourceBreakdown = buildContextSourceBreakdown([
+        { source: "instruction_set", value: compiled.compiled_context.instruction_set },
+        { source: "required_inputs_resolved", value: compiled.compiled_context.required_inputs_resolved },
+        { source: "guardrails", value: compiled.compiled_context.guardrails },
+        { source: "context_refs", value: compiled.compiled_context.context_refs },
+        { source: "provenance", value: compiled.compiled_context.provenance },
+      ]);
+      const contextEstimate = sumContextEstimates(contextSourceBreakdown);
       const compiledContextId = buildCompiledContextId(
         init.projectId,
         runId,
@@ -1237,6 +1370,19 @@ export function executeRoutedStep(options) {
           route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
           wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,
           generated_at: new Date().toISOString(),
+        },
+        budget_report: {
+          ...contextEstimate,
+          budget_limit_tokens: budgetLimitTokens,
+          budget_status: classifyContextBudgetStatus(contextEstimate.estimated_tokens, budgetLimitTokens),
+          source_breakdown: contextSourceBreakdown,
+        },
+        compaction_report: {
+          strategy: "none",
+          original_estimate: contextEstimate,
+          final_estimate: contextEstimate,
+          dropped_or_summarized_sources: [],
+          mandatory_refs_preserved: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         },
       };
       compiledContextArtifactPath = writeCompiledContextArtifact({
@@ -1294,10 +1440,12 @@ export function executeRoutedStep(options) {
         route: routeResolution,
         asset_bundle: assetResolution,
         policy_bundle: policyResolution,
+        feature_traceability: featureTraceability,
         input_packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         dry_run: dryRun,
         context: {
           compiled_context_ref: compiledContextRef,
+          compiled_context_file: compiledContextArtifactPath,
           compiled_context_id: compiledContextId,
           compiled_context_fingerprint: compiled.context_compilation.compiled_context_fingerprint,
           context_bundle_refs: compiledContextArtifact.context_bundle_refs,
@@ -1377,9 +1525,6 @@ export function executeRoutedStep(options) {
           ...asStringArray(adapterResponse?.evidence_refs),
         ]),
       ];
-      if (featureTraceability === null) {
-        featureTraceability = readLatestAnalysisFeatureTraceability(init.runtimeLayout);
-      }
     } catch (error) {
       status = "failed";
       summary = error instanceof Error ? error.message : String(error);

@@ -55,6 +55,14 @@ const REQUIRED_DURABLE_ARTIFACT_FIELDS = Object.freeze([
   "new_flow_next_action_report_file",
   "flow_targeted_operator_request_file",
 ]);
+const AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+]);
 
 /**
  * @param {Record<string, unknown>} profile
@@ -112,6 +120,46 @@ function resolveBrowserTaskProofFile(artifacts, webSmoke) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const rawEntries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return rawEntries
+    .map((entry) => ({
+      check_id: asNonEmptyString(entry.check_id) || asNonEmptyString(entry.id) || asNonEmptyString(entry.key),
+      status: asNonEmptyString(entry.status) || "not_pass",
+      evidence_refs: uniqueStrings([...asStringArray(entry.evidence_refs), asNonEmptyString(entry.evidence_ref)]),
+      findings: asStringArray(entry.findings),
+    }))
+    .filter((entry) => AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.includes(entry.check_id))
+    .map((entry) => ({
+      ...entry,
+      evidence_refs: entry.evidence_refs.length > 0 ? entry.evidence_refs : uniqueStrings(fallbackEvidenceRefs),
+    }));
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function buildAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const byId = new Map(normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs).map((entry) => [entry.check_id, entry]));
+  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.map((checkId) => {
+    const existing = byId.get(checkId);
+    if (existing) return existing;
+    return {
+      check_id: checkId,
+      status: "not_pass",
+      evidence_refs: [],
+      findings: [`AOR operator accessibility check '${checkId}' was not materialized in browser-task proof.`],
+    };
+  });
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @param {Record<string, unknown>} webSmoke
  * @returns {Record<string, unknown>}
@@ -130,6 +178,16 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
   const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const proofEvidenceRefs = uniqueStrings([
+    browserTaskProofFile,
+    asNonEmptyString(proof.accessibility_summary_file),
+    asNonEmptyString(proof.accessibility_summary_ref),
+    asNonEmptyString(webSmoke.accessibility_summary_file),
+    ...screenshotFiles,
+  ]);
+  const retainedWebSmokeUxFindings = asStringArray(webSmoke.ux_findings).filter(
+    (finding) => !/browser-task-proof requires skill-agent browser evidence/iu.test(finding),
+  );
   return {
     ...webSmoke,
     rendered_html_file:
@@ -149,6 +207,7 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       asNonEmptyString(webSmoke.visual_guardrail_file),
     browser_task_proof_file: browserTaskProofFile,
     screenshot_files: screenshotFiles,
+    accessibility_checks: buildAorOperatorAccessibilityChecks(proof.accessibility_checks, proofEvidenceRefs),
     task_outcome: {
       status: "pass",
       checked_tasks: uniqueStrings([
@@ -157,10 +216,10 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       ]),
       findings: asStringArray(proofOutcome.findings),
     },
-    ux_findings: uniqueStrings([...asStringArray(webSmoke.ux_findings), ...asStringArray(proof.ux_findings)]),
-    agent_verdict_ref:
-      asNonEmptyString(proof.agent_verdict_ref) ||
-      asNonEmptyString(webSmoke.agent_verdict_ref),
+    ux_findings: uniqueStrings([...retainedWebSmokeUxFindings, ...asStringArray(proof.ux_findings)]),
+    operator_decision_ref:
+      asNonEmptyString(proof.operator_decision_ref) ||
+      asNonEmptyString(webSmoke.operator_decision_ref),
   };
 }
 
@@ -334,9 +393,14 @@ export function buildGuidedJourneyProof(options) {
         null,
       browser_task_proof_request_file: asNonEmptyString(webSmoke.browser_task_proof_request_file) || null,
       browser_task_proof_file: asNonEmptyString(webSmoke.browser_task_proof_file) || null,
+      accessibility_checks: buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
+        asNonEmptyString(webSmoke.accessibility_summary_file),
+        asNonEmptyString(webSmoke.browser_task_proof_file),
+        ...asStringArray(webSmoke.screenshot_files),
+      ]),
       task_outcome: asRecord(webSmoke.task_outcome),
       ux_findings: asStringArray(webSmoke.ux_findings),
-      agent_verdict_ref: asNonEmptyString(webSmoke.agent_verdict_ref) || null,
+      operator_decision_ref: asNonEmptyString(webSmoke.operator_decision_ref) || null,
       guided_lifecycle_state: asNonEmptyString(webSmoke.guided_lifecycle_state) || null,
       guided_current_stage_id: asNonEmptyString(webSmoke.guided_current_stage_id) || null,
       detached: webSmoke.detached === true,
@@ -414,6 +478,19 @@ export function validateGuidedJourneyProof(proof, options) {
   }
   if (!asNonEmptyString(webSmoke.accessibility_summary_file)) {
     issues.push("web smoke did not materialize an accessibility summary");
+  }
+  const accessibilityChecks = Array.isArray(webSmoke.accessibility_checks)
+    ? webSmoke.accessibility_checks.map((entry) => asRecord(entry))
+    : [];
+  for (const checkId of AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS) {
+    const check = accessibilityChecks.find((entry) => asNonEmptyString(entry.check_id) === checkId);
+    if (!check) {
+      issues.push(`web smoke did not materialize AOR accessibility check '${checkId}'`);
+      continue;
+    }
+    if (asStringArray(check.evidence_refs).length === 0) {
+      issues.push(`AOR accessibility check '${checkId}' has no evidence refs`);
+    }
   }
   if (asStringArray(webSmoke.screenshot_files).length === 0) {
     const visualGuardrailFile = asNonEmptyString(webSmoke.visual_guardrail_file);

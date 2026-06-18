@@ -138,8 +138,8 @@ feature_missions:
         - venv/bin/python -m pytest tests/test_httpie_cli.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
-          tests/test_regressions.py tests/test_httpie_cli.py
+        - venv/bin/python -m pytest tests/test_cli.py tests/test_regressions.py
+          tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
       - repair
@@ -173,6 +173,8 @@ feature_missions:
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - Bounded pytest and codestyle gates pass.
+      - Primary and diagnostic pytest output is warning-clean; exit-0 stderr
+        warnings such as ResourceWarning are not acceptable all-pass evidence.
       - Governance and learning artifacts trace back to the mission and target
         checkout.
       - No upstream write-back is attempted.
@@ -185,15 +187,20 @@ feature_missions:
     acceptance_checks:
       - keep governance evidence tied to the target checkout
       - preserve bounded pytest smoke plus codestyle linkage
+      - primary and diagnostic pytest commands emit no runtime warning tokens
       - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - httpie/
+        - tests/
     post_run_quality:
       primary_commands:
         - venv/bin/python -m pytest tests/test_httpie_cli.py
           tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
-          tests/test_regressions.py tests/test_httpie_cli.py
+        - venv/bin/python -m pytest tests/test_cli.py tests/test_regressions.py
+          tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
       - governance
@@ -237,6 +244,8 @@ feature_missions:
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - Bounded pytest and codestyle gates pass.
+      - Primary and diagnostic pytest output is warning-clean; exit-0 stderr
+        warnings such as ResourceWarning are not acceptable all-pass evidence.
       - Runtime package source, tests, and diagnostic/help behavior evidence are
         present.
       - Governance and learning artifacts trace back to the mission and target
@@ -253,15 +262,21 @@ feature_missions:
       - require source, tests, diagnostics or help behavior, and request policy
         traceability
       - preserve bounded pytest smoke plus codestyle linkage
+      - primary and diagnostic pytest commands emit no runtime warning tokens
+      - new tests use cleanup-safe fixtures or context-managed resources
       - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - httpie/
+        - tests/
     post_run_quality:
       primary_commands:
         - venv/bin/python -m pytest tests/test_httpie_cli.py
           tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
-          tests/test_regressions.py tests/test_httpie_cli.py
+        - venv/bin/python -m pytest tests/test_cli.py tests/test_regressions.py
+          tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
       - governance

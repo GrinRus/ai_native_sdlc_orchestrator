@@ -41,6 +41,18 @@ repository setup/build/test failures and local environment/auth blockers are
 valid fail-closed evidence, but they do not count as AOR product pass or
 provider quality pass.
 
+Provider qualification uses `live-e2e-run-health-report` only for run failure
+classification. It must not use post-run code quality, artifact content quality,
+UI/UX quality, accessibility quality, or the advisory
+`live-e2e-quality-assessment-report` to decide whether a provider path is
+qualified.
+
+Strict quality-driven fix-and-rerun work may additionally run
+`quality-assessment.mjs gate --policy all-pass` after a completed flow. That
+gate is a local outcome-quality closure check. It can create follow-up work and
+force a local rerun loop, but it does not change provider qualification status,
+release-blocking policy, or run-health owner/phase/class classification.
+
 ## Status rules
 
 - `qualified`: at least one accepted live E2E attempt satisfies the matrix cell's
@@ -61,9 +73,12 @@ docs for that release.
 Use public live E2E evidence only:
 - run summary;
 - live E2E observation report;
+- live E2E run-health report;
 - Runtime Harness report;
 - routed step result;
 - adapter raw evidence summary;
+- request artifact, provider work packet, and context-budget summary when an
+  external provider step was reached;
 - provider heartbeat/progress status;
 - target setup/verification status;
 - accepted skill-agent operator decisions.
@@ -100,6 +115,17 @@ node ./scripts/live-e2e/qualification-loop.mjs \
 The generated qualification set includes `provider_qualification_matrix`.
 Short/small diagnostic runs may be cited as blocker or candidate evidence, but
 they do not replace medium-or-larger qualification-loop evidence.
+
+The generated qualification analysis includes `run_health_report_ref`,
+`run_health_status`, and `run_health_gaps`. Treat these as the source for
+provider/environment/operator/AOR-owner follow-up. Use the separate quality
+assessment report for outcome backlog items only after provider qualification is
+recorded.
+
+Context-budget blockers such as `compiled_context_budget_exceeded` and
+provider-side overflow blockers such as `provider_context_window_exceeded` are
+run-health issues in `phase=provider_execution`. They do not evaluate produced
+code or artifacts.
 
 ## W40 proof notes
 

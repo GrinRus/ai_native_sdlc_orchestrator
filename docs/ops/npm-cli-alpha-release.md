@@ -63,8 +63,9 @@ must also prove the packaged flow-centric bundle still contains the flow
 selector and `New Flow` markers. This remains a deterministic release guardrail;
 installed-user live E2E acceptance still comes from
 `installed-user-guided-journey.yaml` with `browser-task-proof`, flow-loop
-fields, accepted skill-agent decisions, a final skill-agent verdict, and
-no-upstream-write assertions.
+fields, accepted skill-agent decisions, run-health evidence, post-run quality
+assessment evidence when outcome quality is claimed, and no-upstream-write
+assertions.
 W36 extends the same deterministic smoke so it must also prove the first-run
 wizard marker, project switcher marker, `/api/projects` project index, and
 matching `default_project_id` fields while preserving the single-project

@@ -21,7 +21,7 @@ Live adapter baselines can add optional execution metadata without changing requ
 - `execution.external_runtime.command`
 - `execution.external_runtime.permission_policy.default_mode`
 - `execution.external_runtime.permission_policy.modes.<mode>.args`
-- `execution.external_runtime.request_transport` or legacy `execution.external_runtime.request_via_stdin`
+- `execution.external_runtime.request_transport: request-artifact`
 - `execution.external_runtime.timeout_ms`
 
 `execution.external_runtime.env` is optional and should only carry safe, non-secret runner overrides. Installed-user live E2E runs should inherit host CLI authentication by default instead of encoding auth paths or secrets in adapter profiles.
@@ -30,15 +30,42 @@ Live adapter baselines can add optional execution metadata without changing requ
 
 `execution.external_runtime.execution_root_mode` is optional and defaults to direct execution from the canonical target checkout. Adapters whose native CLI derives local state paths from `cwd` may set `execution_root_mode: short-symlink`; AOR then invokes the external process from a run-scoped short symlink while preserving the canonical checkout in evidence as `canonical_execution_root`. This is intended for runner path-length limits only and must not change target checkout ownership, delivery guardrails, or no-upstream-write semantics.
 
-`execution.external_runtime.request_transport` declares how AOR passes the adapter request envelope to the external runner. Supported values are:
-- `stdin-json`: write the JSON request envelope to stdin. This is the default when `request_transport` is omitted and `request_via_stdin` is not `false`.
-- `file-attachment`: write the JSON request envelope to a runtime evidence file, append a short message argument, and append a file argument such as `--file <path>`. Use `execution.external_runtime.request_file.message` and `execution.external_runtime.request_file.argument` to tune the runner-specific CLI surface.
-- `argv-json`: append the serialized JSON request envelope as one argv argument. This is for small local shims only; prefer `stdin-json` or `file-attachment` for real runners.
+`execution.external_runtime.request_transport` declares how AOR passes work to the external runner. Supported values are:
+- `request-artifact`: persist the full internal adapter request envelope as AOR evidence, build a bounded provider work packet, and pass only a short pointer prompt plus a runner-specific file argument to the CLI. This is the canonical transport for live external-process adapters.
+- `stdin-json`: write the JSON request envelope to stdin. This is allowed only for deterministic small/test shims or explicitly scoped small-only diagnostics.
+- `file-attachment`: legacy spelling for request-file based adapters. New live adapters should use `request-artifact`.
+- `argv-json`: append the serialized JSON request envelope as one argv argument. This is for small local shims only.
 - `none`: invoke the runner without passing the request envelope.
 
-`request_via_stdin` is retained for existing profiles as a compatibility shorthand. New external-process adapters should use `request_transport` when the runner has a documented non-stdin prompt surface.
+`request_via_stdin` is retained for existing profiles as a compatibility shorthand. New external-process adapters should use `request_transport`. Live baseline adapters must not rely on unrestricted `stdin-json`; if a profile uses `stdin-json`, it must declare `stdin_json_scope: test-only` or `stdin_json_scope: small-only` so the limitation is visible to routing and live E2E preflight.
+
+For `request-artifact`, `execution.external_runtime.request_file` declares only the mechanical CLI binding:
+- `argument`: optional runner-specific flag that accepts a local file path, such as `--file`.
+- `message`: optional short launcher prompt. It must instruct the runtime agent to execute the approved implementation, read the provider work packet, open required `resolved_local_refs[].local_path` files, make direct edits in the ephemeral target checkout when required, avoid upstream writes, run requested verification when feasible, and only then return the final report; it must not embed the full AOR request envelope.
+- `mode`: optional binding label such as `native-file-argument` or `pointer-prompt`.
+
+`request-artifact` has provider-agnostic semantics. AOR always persists:
+- the full `request_artifact_ref`, which is AOR/operator evidence and may be large;
+- the bounded `provider_work_packet_ref`, which is the only file the runtime agent is instructed to open initially;
+- a context budget report and compaction report before provider invocation.
+
+The bounded provider work packet must include `resolved_local_refs[]` for provider-visible local files. Required entries include the full request artifact, provider work packet, compiled context, and required input packets such as handoff/spec when present. Each entry carries `role`, `evidence_ref`, `local_path`, `required`, and `kind`. The packet must also include an `execution_contract` that states whether a meaningful target change is required, which target paths may prove it, which AOR runtime paths are ignored, that direct edits in the ephemeral target checkout are allowed during execution, that upstream writes remain forbidden, which verification commands are expected, and which final report sections prove execution. `execution_contract.output_quality_policy` records the provider-visible rule that stdout/stderr warning tokens from required, primary, or diagnostic verification must be resolved before final reporting; exit-0 warning output is not all-pass evidence unless the same command reproduces the same warning on an unchanged baseline. `execution_contract.expected_meaningful_change.allowed_target_paths[]` is derived from mission traceability, including `feature_traceability.required_path_prefixes[]` and any explicit allowed paths; prefix hints such as `source/` are rendered as provider-visible globs such as `source/**`. Live code-changing execution must forbid no-op packet summaries.
+
+Adapters may differ in the CLI flag used to pass the provider work packet, output format, timeout argument, or permission-mode args. They must not define provider-specific policies for how much AOR context is placed into the provider work packet.
 
 `execution.external_runtime.preflight_timeout_ms` is optional and controls live adapter preflight probes separately from full step execution. When omitted, live E2E derives a conservative probe timeout from `timeout_ms`. Preflight reports must record both the full `timeout_ms` and selected `preflight_timeout_ms` so slow readiness probes can be distinguished from full runtime execution limits.
+
+Edit-readiness and permission-readiness probes may retry transient external-runner timeouts or generic runner failures once. Contract consumers must read `edit_readiness.attempts[]` and `permission_readiness.attempts[]` as the complete factual attempt history; final readiness still requires a successful marker write or a post-marker-timeout warning with matching marker contents.
+
+For `request-artifact` adapters, live adapter preflight is itself the external
+runtime invocation. The preflight work packet must declare an explicit
+`request.preflight_contract`, and the launcher prompt must keep the runtime on
+that contract: auth-only probes return a concise final preflight report without
+running shell commands, while edit or permission probes may only read/write the
+named nonce and marker files. Preflight prompts must forbid recursive provider
+CLI calls such as invoking `codex`, `claude`, `opencode`, or `qwen` from inside
+the already-running provider process; otherwise readiness can time out while
+testing the provider by launching another provider.
 
 `execution.external_runtime.native_timeout_arg` is optional and lets AOR pass the resolved per-request timeout to CLIs that can self-terminate before AOR has to kill the process group. The object supports:
 - `flag`: the CLI flag to append, such as `--max-wall-time`.
@@ -62,7 +89,7 @@ External-process adapters must enforce `execution.external_runtime.timeout_ms` a
 - `default_mode` selects the adapter default when `AOR_RUNTIME_AGENT_PERMISSION_MODE` is not set.
 - `modes.<mode>.args` is the selected runtime invocation argument list.
 
-Live E2E defaults to `full-bypass` so installed-user acceptance runs do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. Codex uses `--ask-for-approval never` for the full-bypass mode and omits that approval bypass in restricted mode. Claude Code uses `--dangerously-skip-permissions` for full-bypass and `--permission-mode auto` for restricted mode. OpenCode candidate profiles may declare `opencode run --format json --dangerously-skip-permissions` for full-bypass and `opencode run --format json` for restricted mode, with `request_transport=file-attachment` so the adapter request is passed through OpenCode's documented message/file CLI surface. Qwen candidate profiles use `--bare`, `--output-format stream-json`, `--include-partial-messages`, and `--exclude-tools skill` to avoid buffered final-output silence and runner-local `.qwen/` skill state in target checkouts; Runtime Harness still blocks such state if the runner creates it. W22-S03 keeps OpenCode out of required baseline status until future real-runner certification. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, or if an external-process adapter profile omits `permission_policy`, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Legacy `execution.external_runtime.args` is intentionally unsupported for permission selection.
+Live E2E defaults to `full-bypass` so installed-user acceptance runs do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. Codex uses `--ask-for-approval never` for the full-bypass mode and omits that approval bypass in restricted mode. Claude Code uses `--dangerously-skip-permissions` for full-bypass and `--permission-mode auto` for restricted mode. OpenCode candidate profiles may declare `opencode run --format json --dangerously-skip-permissions` for full-bypass and `opencode run --format json` for restricted mode, with `request_transport=request-artifact` and `request_file.argument=--file` so the provider work packet is passed through OpenCode's documented message/file CLI surface. Qwen candidate profiles use `--bare`, `--output-format stream-json`, `--include-partial-messages`, and `--exclude-tools skill` to avoid buffered final-output silence and runner-local `.qwen/` skill state in target checkouts; Runtime Harness still blocks such state if the runner creates it. W22-S03 keeps OpenCode out of required baseline status until future real-runner certification. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, or if an external-process adapter profile omits `permission_policy`, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Legacy `execution.external_runtime.args` is intentionally unsupported for permission selection.
 
 `approval_features` may additionally declare how runtime permission requests are mediated after the adapter normalizes provider output:
 - `continuation_strategy` is `reinvoke`, `session-resume`, or `none`. Current external-process baseline adapters use `reinvoke`.

@@ -1,13 +1,24 @@
 # Live E2E observation report
 
 ## Purpose
-Black-box step journal for one live E2E run.
+Factual black-box step journal for one live E2E run.
 
-The report records each public CLI/API/web step as an ordered observation written by the online step controller. Each entry carries the step plan, transcript, materialized artifact refs, deterministic command analysis, semantic operator/agent analysis, interactive decisions, resume results, and the final step verdict.
+The observation report records what the installed-user live E2E controller did through public CLI/API/web surfaces. It is not a quality oracle for the produced code, artifacts, or UX. Outcome-oriented judgement belongs in a separate `live-e2e-quality-assessment-report`; run failures and gaps in the run itself belong in `live-e2e-run-health-report`.
 
-Before the SDLC journal starts, the report must also preserve installed-user setup evidence. AOR installation/source-channel proof, target checkout, project bootstrap, intake, and readiness are setup/prelude observations, not SDLC step verdicts.
+This contract is intentionally breaking. Producers must not emit the old result-quality aggregation fields:
+- `quality_judgement`
+- `runner_quality_summary`
+- `final_skill_agent_verdict_request_file`
+- `final_skill_agent_verdict_file`
+- `final_skill_agent_verdict`
+- `agent_artifact_review_request_file`
+- `canonical_status`
+- `artifact_quality_status`
+- `delivery_status`
+- `coverage_status`
+- `acceptance_status`
 
-This contract intentionally replaces the legacy post-run `step_matrix`, `verdict_matrix`, `artifact_quality_matrix`, and synthetic `continuation_decisions` model. Producers must not emit those fields.
+Legacy `step_matrix`, `verdict_matrix`, `artifact_quality_matrix`, `code_quality_after_delivery`, and synthetic `continuation_decisions` remain forbidden.
 
 ## Required fields
 - `report_id`
@@ -21,7 +32,6 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `overall_status`
 - `aor_installation`
 - `aor_installation_proof_file`
-- `final_skill_agent_verdict_request_file`
 - `setup_journal`
 - `step_journal`
 - `final_analysis`
@@ -30,7 +40,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `evidence_refs`
 
 ## Status semantics
-`overall_status`, `final_analysis.status`, and step-level statuses must use:
+`overall_status`, `final_analysis.status`, and step-level statuses use:
 - `pass`
 - `warn`
 - `not_pass`
@@ -38,228 +48,97 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `interaction_required`
 - `resumed`
 
-`not_pass` is terminal for a failed black-box flow. Delivery evidence no longer downgrades failures to `warn`.
+These statuses describe the factual live E2E run and controller flow. They do not certify implementation correctness, artifact content quality, security, performance, accessibility, or product UX.
 
-`interaction_required` means the public step produced a persisted `requested_interaction` that has not yet been answered.
-
-`resumed` means an operator/agent answer was accepted and the runtime resumed from the recorded checkpoint.
+`report_status` is `final` or `in_progress`. `in_progress` is only for resumable controller artifacts waiting for a step-level public action or operator decision.
 
 ## Section expectations
-`flow_range` should preserve:
+`flow_range` preserves:
 - `start_step`
 - `end_step`
 - `included_steps`
 - `prelude_steps`
 - `excluded_steps`
 
-`aor_installation` should preserve:
-- `status`
-- `declared_policy`
-- `effective_policy`
-- `install_mode`
-- `source_channel`
-- `workspace_root`
-- `runtime_root`
-- `original_source_root`
-- `installed_source_root`
-- `launcher_ref`
-- `command_transcripts`
+`flow_range_policy` is one of:
+- `delivery_default`
+- `full_lifecycle`
 
-`setup_journal[]` should preserve:
-- `sequence`
-- `step_id`
-- `status`
-- `public_surface`
-- `evidence_refs`
-- `summary`
+`aor_installation` preserves install/source-channel proof, source roots, runtime roots, launcher refs, and command transcripts.
 
-The `readiness` setup entry may also include target setup and verification
-status details. These details must separate AOR runner/controller failures from
-target repository failures:
+`setup_journal[]` preserves installed-user prelude evidence:
+- `install`
+- `target_checkout`
+- `project_bootstrap`
+- `intake`
+- `readiness`
+
+Readiness entries may include target setup and target verification details. These fields must separate owner and phase for run-health classification:
 - `target_setup_status`
 - `target_verification_status`
 - `failure_owner` (`aor|target_repository|provider|environment|operator`)
 - `failure_phase`
-  (`aor_install|target_checkout|target_setup|target_verification|provider_execution|controller_decision|ui_validation`)
 - `failure_class`
 
-Target repository setup, test, build, browser dependency, or timeout blockers
-are valid fail-closed evidence, but they are not provider-quality signals and
-must not be reported as AOR product passes.
+`step_journal[]` preserves the public-step controller evidence:
+- plan and `plan_ref`
+- public surface and command transcript refs
+- execution, inspection, and classification refs
+- materialized artifact refs
+- deterministic analysis
+- semantic analysis from the live E2E operator for step continuation only
+- agent decision request refs
+- operator decision refs and statuses
+- inspected evidence refs
+- requested interaction and resume result
+- frontend interaction refs
+- final step verdict
 
-`flow_range_policy` must be one of:
-- `delivery_default`
-- `full_lifecycle`
+Step-level operator decisions are control-flow evidence only. They decide whether the next public step may run; they are not the final outcome-quality judgement.
 
-For `full_lifecycle`, terminal lifecycle steps are profile-declared:
-`release` is included only when the profile declares a `release` stage, and
-`learning` is included only when the profile declares a `learning` stage.
-This lets governance profiles close audit/learning evidence without requiring
-a release packet when the scenario policy does not require release.
+`frontend_interactions[]` preserves factual AOR operator UI/browser evidence refs:
+- rendered HTML
+- screenshot or visual guardrail refs
+- browser-task proof refs
+- DOM snapshot
+- accessibility summary
+- structured AOR operator accessibility checks
+- AOR operator task outcome
+- AOR operator UX findings captured during the run
+- optional operator decision refs from guided browser-task proof flows
 
-When available, the report-level summary should also surface the same owner and
-phase separation used by readiness and step entries:
-- `target_setup_status`
-- `target_verification_status`
-- `provider_step_status`
-- `provider_execution_status`
-- `failure_owner`
-- `failure_phase`
-- `failure_class`
+These are factual evidence refs. AOR operator UI/UX quality, accessibility depth, visual responsiveness, and installed-user usability are assessed in `live-e2e-quality-assessment-report`.
+When browser-task proof is produced after the deterministic smoke summary, final
+report assembly should hydrate `frontend_interactions[]` from the proof file so
+the observation links the proof ref, screenshot refs, structured accessibility
+checks, and task outcome.
 
-Manual resume must not drop this context. If controller state already captured
-target pre-execution status or provider heartbeat, the final observation report
-must preserve it so operator UI and reports do not collapse target repository
-blockers, provider blockers, and AOR failures into an unclassified blocked run.
+`frontend_interactions[].accessibility_checks[]` must include one entry for each
+AOR operator accessibility check:
+- `keyboard_navigation`
+- `focus_order`
+- `contrast_and_readability`
+- `semantic_structure`
+- `screen_reader_labels`
+- `accessible_error_feedback`
 
-`step_journal[]` should preserve:
-- `sequence`
-- `step_id`
-- `step_instance_id`
-- `iteration`
-- `flow_stage`
-- `plan`
-- `plan_ref`
-- `public_surface`
-- `transcript_ref`
-- `execution_ref`
-- `inspection_ref`
-- `classification_ref`
-- `artifact_refs`
-- `started_at`
-- `finished_at`
-- `duration_sec`
-- `deterministic_analysis`
-- `semantic_analysis`
-- `agent_decision_request_ref`
-- `operator_decision_ref`
-- `operator_decision_status`
-- `inspected_evidence_refs`
-- `requested_interaction`
-- `decision`
-- `resume_result`
-- `frontend_interaction_refs`
-- `final_step_verdict`
+Each check is factual evidence only and must include `check_id`, `status`,
+`evidence_refs[]`, and `findings[]`.
 
-When a step invokes an external provider, `step_journal[]` may also include
-`provider_step_status`. This is the same query-safe heartbeat exposed by the
-control plane and must preserve provider, adapter, route, step, status,
-elapsed/budget fields, last output/artifact/progress timestamps, progress kind,
-progress label, progress event count, output mode, command label, and
-recommended action. For interrupted provider steps, it may also include
-`interruption_owner` (`operator|provider|environment|unknown`),
-`interruption_status` (for example `operator-stopped`), and a sanitized
-`interruption_reason`. Public operator cancel must be classified as
-`failure_owner=operator` and `failure_phase=provider_execution`; provider
-crashes, provider timeouts, target setup failures, and environment blockers
-must remain separately owned. It must not include raw process commands, command args,
-prompt text, file contents, environment variables, tokens, or secrets. Qwen
-`~/.qwen/**` files may be referenced only as manual debug context; normal live
-E2E reports must use public adapter stream evidence.
-
-`plan` should preserve:
-- `objective`
-- `public_surface`
-- `command_labels`
-- `expected_artifacts`
-- `inspection_sources`
-- `safety_constraints`
-
-`deterministic_analysis` should preserve:
-- `status`
-- `exit_code`
-- `failure_class`
-- `missing_evidence`
-- `recommendation`
-
-`semantic_analysis` should preserve:
-- `status`
-- `judge_source` (`skill-agent`)
-- `findings`
-
-`operator_context` should preserve:
-- `operator_kind` (`skill-agent`)
-- `operator_ref`
-- `decision_policy` (`required`)
-- `answer_policy` (`agent-public-control-plane`)
-- `target_write_policy`
-
-`report_status` must be `final` or `in_progress`. `in_progress` is only for resumable controller artifacts waiting for an operator decision; it is not an acceptance report and cannot close qualification.
-
-`operator_decision_status` must be one of:
-- `accepted`
-- `missing`
-- `rejected`
-
-`agent_decision_request_ref` is the source of truth for preparing skill-agent
-operator decisions. Each decision request must include `decision_rubric` with
-`required_evidence_refs[]`, optional `frontend_evidence_refs[]`,
-`operator_decision_expected_ref`, and `expected_response_shape`. A helper-
-prepared operator decision must preserve:
-- `request_id`
-- `step_id`
-- `step_instance_id`
-- `iteration`
-- `status` (`accepted`)
-- `operator_ref`
-- `action` (`continue|answer|frontend_interact|retry_public_step|diagnose|block`)
-- `reason`
-- `semantic_analysis.status`
-- `semantic_analysis.judge_source` (`skill-agent`)
-- `semantic_analysis.findings[]`
-- `inspected_evidence_refs[]` copied from
-  `decision_rubric.required_evidence_refs[]`
-- `evidence_refs[]` including required inspected refs and any frontend refs
-- `frontend_evidence_refs[]` when UI/browser proof is required
-- `source_agent_decision_request_ref`
-- `created_at`
-
-Rejected decisions must keep a readable `operator_decision_rejection_reason`.
-The correction path is to prepare a new draft from the same
-`agent_decision_request_ref` and selected public action; operators should not
-need to hand-edit raw JSON to copy required evidence refs.
-
-`interactive_decisions[]` should preserve:
-- `step_id`
-- `decision`
-- `reason`
-- `answer_audit_refs`
-- `resume_result`
-- `next_step`
-
-`frontend_interactions[]` should preserve:
-- `step_id`
-- `surface`
-- `evidence_refs`
-- `html_ref`
-- `screenshot_refs`
-- `visual_guardrail_refs`
-- `browser_task_proof_ref`
-- `dom_snapshot_ref`
-- `accessibility_summary_ref`
-- `task_outcome`
-- `ux_findings`
-- `agent_verdict_ref`
-- `status`
-- `summary`
-
-`final_analysis` should preserve:
+`final_analysis` preserves factual run closure:
 - `status`
 - `summary`
 - `findings`
-- `code_quality`
 - `failed_stages`
 - `delivery`
 - `release`
 - `learning`
 
-`final_skill_agent_verdict_request_file` must point to the final request packet that tells the skill-agent which evidence to inspect. The request must be generated after controller-state hydration and pre-verdict status normalization, so its `completion_summary`, `current_artifact_status`, `canonical_status`, `runner_quality_summary`, and `quality_judgement` reflect the latest materialized delivery, review, verification, release, and changed-path evidence. If those refs exist, the request must not report their corresponding dimensions as `not_materialized` or `not_attempted`; pre-verdict artifact quality must reflect materialized `review-report.artifact_quality.status` and `evaluation-report.status` evidence even while final acceptance is still waiting for the final skill-agent verdict. For `report_status=final`, `final_skill_agent_verdict_file` must point to an accepted skill-agent verdict artifact. A final acceptance/proof report requires every included `step_journal[]` entry to have `operator_decision_status=accepted`, every included step semantic analysis to have `judge_source=skill-agent`, and the final verdict artifact to have `judge_source=skill-agent` plus non-empty `inspected_evidence_refs[]`.
-
-Profiles that declare `live_e2e.frontend_capability` other than `none` must treat `frontend_interactions[]` as first-class proof evidence. Deterministic web smoke output can establish that the installed-user web surface rendered, but final acceptance also requires browser-task proof refs, screenshot or visual-guardrail refs, and a linked skill-agent UI/UX verdict through `agent_verdict_ref`. Missing HTML, DOM snapshot, screenshot or visual guardrail, accessibility summary, failed `task_outcome`, or missing agent UI verdict blocks acceptance.
+`final_analysis` must not contain `code_quality`, `artifact_quality`, `quality_judgement`, or `runner_quality_summary`.
 
 ## Notes
-`failed_stages[]` records deterministic stage-level failures that are inside the observed step range or setup/prelude range. Stages outside the active flow range, such as `release` or `learning` in `delivery_default` profiles, may remain outside terminal status accounting unless they are part of `step_journal[]`.
+The observation report is not a post-run reconstruction. The controller must persist each step observation after `plan -> execute -> inspect -> classify -> decide -> persist`, before the next public step executes.
 
-Artifact quality for live E2E proof is judged by the live E2E skill-agent through public artifacts, logs, CLI/API output, and control-plane surfaces. Deterministic runner checks remain guardrails and diagnostics; they are not valid live E2E operator evidence and cannot replace accepted skill-agent decisions.
+Run-health consumers should inspect this report plus the run summary to produce `live-e2e-run-health-report`.
 
-The journal is not a post-run reconstruction. The controller must persist the step observation and `controller_state_ref` after `plan -> execute -> inspect -> classify -> decide -> persist`, before the next public step is allowed to execute.
+The SWE agent that launched the check should inspect this report, run-health, and all linked evidence to produce `live-e2e-quality-assessment-report` after the full flow.

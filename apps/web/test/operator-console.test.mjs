@@ -105,6 +105,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Project Context",
     "Runtime Readiness",
     "Project switcher",
+    'htmlFor="project-switcher-control"',
+    'id="project-switcher-control"',
+    'name="project-switcher"',
     "Add local project",
     "Runtime root preview",
     "Add and initialize",
@@ -129,6 +132,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "activeProject?.runtime_root",
     "Create the first no-write mission packet, then resolve the first next action.",
     "No active flow",
+    'htmlFor="flow-selector-control"',
+    'id="flow-selector-control"',
+    'name="flow-selector"',
     "Readiness prepares the runtime before a flow is created",
     "selectedStageRuntimeState",
     "Upcoming stage. The current recommended action remains scoped",
@@ -169,7 +175,17 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     '"exit-0"',
     "Execution Evidence",
     "executionEvidenceForFlow",
+    "strongestExecutionEvidenceRun",
+    "executionEvidenceScore",
+    "selectedFlowRuntimeTrace",
+    "flowRuntimeTrace?.flow_id !== selectedFlow.flow_id",
+    "setFlowRuntimeTrace(null)",
+    "setFlowEvidenceGraph(null)",
     "execution_evidence",
+    'real_code_change_status === "pass"',
+    'group.group_id === "mission-relevant"',
+    'runId.includes(".verify.")',
+    'runId.includes(".routed-execution.")',
     "Provider execution",
     "Runtime Harness",
     "Real code change",
@@ -196,13 +212,33 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
+  assert.equal(
+    source.includes("candidates.at(-1)"),
+    false,
+    "SPA should not show the last trace run when a stronger implementation execution evidence run exists",
+  );
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
   assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher\s*\{[\s\S]*?grid-template-columns: 1fr;[\s\S]*?min-width: 0;/u,
+    "SPA CSS should collapse the project switcher on mobile instead of creating horizontal scroll",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher-meta code,\s*\.top-context code\s*\{[\s\S]*?white-space: normal;/u,
+    "SPA CSS should wrap long runtime paths on mobile",
+  );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
   assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.graph-flow-node::after\s*\{[\s\S]*?display: none;/u,
+    "SPA CSS should disable graph connector overflow on mobile",
+  );
   assert.ok(css.includes(".trace-table table"), "SPA CSS should make runtime trace tables responsive on mobile");
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });

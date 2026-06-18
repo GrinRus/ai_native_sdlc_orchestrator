@@ -225,6 +225,107 @@ test("review report warns when changed test files are outside explicit primary v
   });
 });
 
+test("review report treats package workspace test commands as covering changed package tests", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-workspace-coverage";
+    const packageRoot = path.join(repoRoot, "packages/ts-utils");
+    const testPath = path.join(packageRoot, "src/typeguards/__tests__/typeguards.test.ts");
+    fs.mkdirSync(path.dirname(testPath), { recursive: true });
+    fs.writeFileSync(
+      path.join(packageRoot, "package.json"),
+      `${JSON.stringify({ name: "@your-org/ts-utils" }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(testPath, "test('existing typeguard coverage', t => t.pass());\n", "utf8");
+    runGit(repoRoot, ["add", "."]);
+    runGit(repoRoot, ["-c", "user.name=AOR Test", "-c", "user.email=aor@example.test", "commit", "-m", "add workspace package"]);
+    fs.writeFileSync(
+      testPath,
+      [
+        "test('existing typeguard coverage', t => t.pass());",
+        "test('strict numeric string coverage', t => t.pass());",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    writeJson(path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"), {
+      run_id: `${runId}.verify.post-run-primary.v1`,
+      verification_label: "post-run-primary",
+      status: "passed",
+      command_source: "cli-override",
+      command_overrides: {
+        build_commands: ["yarn g:typecheck"],
+        lint_commands: [],
+        test_commands: ["yarn workspace @your-org/ts-utils test-unit"],
+      },
+      step_result_refs: [],
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    assert.equal(reviewReport.overall_status, "pass");
+    assert.equal(reviewReport.review_recommendation, "proceed");
+    assert.ok(
+      reviewReport.artifact_quality.findings.every(
+        (finding) => !String(finding.summary).includes("Primary verification did not explicitly exercise changed test file"),
+      ),
+    );
+  });
+});
+
+test("review report does not treat test support config files as changed test specs", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-test-support-config";
+    const supportPath = path.join(repoRoot, "apps/nextjs-app/config/tests/AppTestProviders.tsx");
+    fs.mkdirSync(path.dirname(supportPath), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoRoot, "apps/nextjs-app/package.json"),
+      `${JSON.stringify({ name: "@your-org/nextjs-app" }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(supportPath, "export function AppTestProviders({ children }) { return children; }\n", "utf8");
+    runGit(repoRoot, ["add", "."]);
+    runGit(repoRoot, ["-c", "user.name=AOR Test", "-c", "user.email=aor@example.test", "commit", "-m", "add test support config"]);
+    fs.writeFileSync(
+      supportPath,
+      "export function AppTestProviders({ children }) { return <>{children}</>; }\n",
+      "utf8",
+    );
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    writeJson(path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"), {
+      run_id: `${runId}.verify.post-run-primary.v1`,
+      verification_label: "post-run-primary",
+      status: "passed",
+      command_source: "cli-override",
+      command_overrides: {
+        build_commands: ["yarn g:typecheck"],
+        lint_commands: [],
+        test_commands: ["yarn workspace @your-org/ts-utils test-unit"],
+      },
+      step_result_refs: [],
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    assert.ok(
+      reviewReport.artifact_quality.findings.every(
+        (finding) => !String(finding.summary).includes("Primary verification did not explicitly exercise changed test file"),
+      ),
+    );
+  });
+});
+
 test("review report fails changed paths outside approved handoff scope", () => {
   withGitRepo((repoRoot) => {
     const runId = "run.review-handoff-scope";
