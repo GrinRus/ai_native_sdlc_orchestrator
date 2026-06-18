@@ -181,7 +181,7 @@ skill-agent-only live E2E model so it proves the full flow-centric loop:
 5. Prove that the second flow writes a new mission/intake packet.
 6. Prove that operator-request targeting includes the selected flow.
 7. Preserve the existing no-upstream-write default.
-8. Preserve frontend evidence refs for rendered HTML, DOM snapshot,
+8. Preserve AOR operator UI evidence refs for rendered HTML, DOM snapshot,
    accessibility summary, screenshot or visual evidence, task outcome, UX
    findings, and inspected browser-task evidence.
 9. Preserve run-health refs and post-run quality assessment refs with non-empty

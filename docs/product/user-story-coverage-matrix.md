@@ -8,7 +8,7 @@ Coverage status values:
 - `partial` - current implementation covers part of the outcome, but a backlog slice owns the missing behavior, hardening, or proof evidence.
 - `blocked` - the outcome cannot be closed honestly until a named prerequisite or real proof slice lands.
 
-Current W34-S06 status counts: `baseline-covered=108`, `proof-covered=4`, `partial=0`, `blocked=2`. W34-S06 adds the installed-user browser-task proof contract for the flow loop: first completed flow, read-only completed evidence, second follow-up flow lineage, flow-targeted Ask AOR evidence, frontend evidence refs, accepted skill-agent decisions, run-health evidence, post-run quality assessment refs, and no-upstream-write assertions.
+Current W34-S06 status counts: `baseline-covered=108`, `proof-covered=4`, `partial=0`, `blocked=2`. W34-S06 adds the installed-user browser-task proof contract for the flow loop: first completed flow, read-only completed evidence, second follow-up flow lineage, flow-targeted Ask AOR evidence, AOR operator UI evidence refs, accepted skill-agent decisions, run-health evidence, post-run quality assessment refs, and no-upstream-write assertions.
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |
 |---|---|---|---|---|---|---|

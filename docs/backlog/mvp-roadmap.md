@@ -636,7 +636,7 @@ boundaries.
 - The packaged local SPA implements the accepted W34 design references for flow selector, active cockpit, advanced views, and learning closure.
 - Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery, release, and learning surfaces preserve selected-flow boundaries.
 - Release smoke for `aor app --smoke --open false --json` proves the packaged flow-centric bundle still exposes the flow selector and `New Flow` markers.
-- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted operator decisions, frontend evidence refs, no-upstream-write assertions, first-flow completion evidence, a distinct follow-up flow, flow-targeted operator-request proof, and separate post-run quality assessment when outcome quality is evaluated.
+- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted operator decisions, AOR operator UI evidence refs, no-upstream-write assertions, first-flow completion evidence, a distinct follow-up flow, flow-targeted operator-request proof, and separate post-run quality assessment when outcome quality is evaluated.
 - Deleted bounded profiles and mock-backed proof bundles remain out of the current proof path.
 
 **Detailed slices:** `docs/backlog/wave-34-implementation-slices.md`

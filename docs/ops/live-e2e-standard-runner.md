@@ -341,7 +341,7 @@ used, and `--run-id`; the helper finds the latest pending
 `agent_decision_request_ref`. The helper writes to the request's
 `operator_decision_expected_ref` by default, or to `--output <decision.json>` for
 a draft file. It automatically fills `inspected_evidence_refs[]` from
-`decision_rubric.required_evidence_refs[]`, preserves frontend evidence refs, and
+`decision_rubric.required_evidence_refs[]`, preserves AOR operator UI evidence refs, and
 prints a validation preview with readable rejection risks. Supported actions are
 `continue`, `diagnose`, `block`, `retry_public_step`, `answer`, and
 `frontend_interact`.
@@ -473,7 +473,7 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
 - proof-runner bootstrap asset overrides are not supported.
 
-Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the first product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, create a follow-up mission with `--follow-up-source-handoff-ref`, refresh `next` for the second flow, and create a flow-targeted `request create --target-flow-id`. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, flow-loop fields, browser-task/frontend evidence refs, and no-upstream-write assertions must be materialized.
+Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the first product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, create a follow-up mission with `--follow-up-source-handoff-ref`, refresh `next` for the second flow, and create a flow-targeted `request create --target-flow-id`. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, flow-loop fields, browser-task AOR operator UI evidence refs, and no-upstream-write assertions must be materialized.
 
 Guided installed-user proof profiles keep provider execution timeouts long enough
 for real runtime work, but target verification commands stay bounded. The guided
@@ -633,8 +633,8 @@ The runner performs deterministic analysis for every step from public command tr
 
 The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis during the run comes only from accepted skill-agent step decisions. Outcome quality is assessed after the run in `live-e2e-quality-assessment-report`.
 
-Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. Use `manual-live-e2e.mjs --prepare-decision` as the default draft path so required refs and frontend refs are copied from the request rather than typed by hand. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not replace `browser-task-proof` evidence.
-If browser-task proof is written after the decision request was created, the helper should hydrate the draft from the guided smoke/proof request files so the proof JSON and screenshots are also cited as inspected frontend evidence.
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. Use `manual-live-e2e.mjs --prepare-decision` as the default draft path so required refs and AOR operator UI refs are copied from the request rather than typed by hand. For UI-capable profiles, the decision must cite the AOR operator UI evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not replace `browser-task-proof` evidence.
+If browser-task proof is written after the decision request was created, the helper should hydrate the draft from the guided smoke/proof request files so the proof JSON and screenshots are also cited as inspected AOR operator UI evidence.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
@@ -811,7 +811,7 @@ W35-S05 adds operator-UX proof evidence for the hardened live E2E surfaces:
   verification, record it as provider-quality/environment blocker evidence
   instead of a product pass.
 - Proof closure still requires accepted skill-agent decisions, non-empty
-  `inspected_evidence_refs[]`, frontend refs when the profile requires browser
+  `inspected_evidence_refs[]`, AOR operator UI refs when the profile requires browser
   proof, run-health evidence, post-run quality assessment evidence when outcome
   quality is being claimed, and no-upstream-write assertions.
   Deleted bounded or mock-backed proof profiles must not be restored.

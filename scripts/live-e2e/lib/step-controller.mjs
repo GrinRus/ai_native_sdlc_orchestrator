@@ -475,7 +475,7 @@ function rejectInconsistentSkillAgentDecision(decision, action, entry, profile =
     const decisionEvidenceRefs = asStringArray(decision.evidence_refs);
     const missingFrontendRefs = frontendRefs.filter((ref) => !decisionEvidenceRefs.includes(ref));
     if (missingFrontendRefs.length > 0) {
-      return `Skill-agent UI/UX decisions must cite frontend evidence refs: ${missingFrontendRefs.join(", ")}.`;
+      return `Skill-agent UI/UX decisions must cite AOR operator UI evidence refs: ${missingFrontendRefs.join(", ")}.`;
     }
   }
   return null;

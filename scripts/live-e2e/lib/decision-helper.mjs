@@ -290,7 +290,7 @@ function buildValidationPreview(options) {
   const rejectionRisks = uniqueStrings([
     supportedActions.includes(options.action) ? "" : `Action '${options.action}' is not supported by the request.`,
     missingRequired.length > 0 ? "Decision is missing required inspected evidence refs." : "",
-    missingFrontend.length > 0 ? "Decision is missing required frontend evidence refs." : "",
+    missingFrontend.length > 0 ? "Decision is missing required AOR operator UI evidence refs." : "",
     options.action === "continue" && !["pass", "warn", "resumed"].includes(deterministicStatus)
       ? `Continue is not allowed with deterministic status '${deterministicStatus}'.`
       : "",

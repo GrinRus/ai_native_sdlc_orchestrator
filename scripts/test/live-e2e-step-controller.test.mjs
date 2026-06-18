@@ -255,7 +255,7 @@ test("live E2E decision helper prepares accepted continue decisions with all req
   });
 });
 
-test("live E2E decision helper preserves frontend evidence refs in the draft", () => {
+test("live E2E decision helper preserves AOR operator UI evidence refs in the draft", () => {
   withTempRoot((reportsRoot) => {
     const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui.json");
     const expectedDecisionFile = path.join(reportsRoot, "live-e2e-operator-decision-ui.json");
@@ -533,7 +533,7 @@ test("live E2E decision helper rejects continue when late browser-task proof is 
     assert.equal(fs.existsSync(summary.output_ref), false);
     assert.equal(summary.validation_preview.missing_frontend_evidence_refs.includes(browserProofFile), true);
     assert.equal(
-      summary.validation_preview.rejection_risks.includes("Decision is missing required frontend evidence refs."),
+      summary.validation_preview.rejection_risks.includes("Decision is missing required AOR operator UI evidence refs."),
       true,
     );
     assert.equal(summary.decision_preview.inspected_evidence_refs.includes(browserProofFile), false);
@@ -803,7 +803,7 @@ test("live E2E step controller marks execution not_pass when post-run verificati
   });
 });
 
-test("live E2E step controller rejects UI-capable decisions without frontend evidence refs", () => {
+test("live E2E step controller rejects UI-capable decisions without AOR operator UI evidence refs", () => {
   withTempRoot((reportsRoot) => {
     const summaryFile = path.join(reportsRoot, "web-smoke.json");
     const htmlFile = path.join(reportsRoot, "web-smoke.html");
@@ -883,8 +883,8 @@ test("live E2E step controller rejects UI-capable decisions without frontend evi
 
     const [entry] = controller.getStepJournal();
     assert.equal(entry.operator_decision_status, "rejected");
-    assert.match(entry.semantic_analysis.findings.join("\n"), /frontend evidence refs/);
-    assert.match(entry.operator_decision_rejection_reason, /frontend evidence refs/);
+    assert.match(entry.semantic_analysis.findings.join("\n"), /AOR operator UI evidence refs/);
+    assert.match(entry.operator_decision_rejection_reason, /AOR operator UI evidence refs/);
   });
 });
 

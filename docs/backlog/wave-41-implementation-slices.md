@@ -153,7 +153,7 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 - **Primary user story surfaces:** OPS-01, OPS-06, OPS-10, OPS-11.
 
 ### Local tasks
-1. Review W41-S02 and W41-S03 evidence against the W34-W40 target UI, UX, and live E2E architecture.
+1. Review W41-S02 and W41-S03 evidence against the W34-W40 AOR operator UI/UX and live E2E architecture.
 2. Separate true AOR defects from target repository, provider, environment, and operator blockers.
 3. Implement only small scoped fixes that are already proven by W41 evidence.
 4. Split larger findings into new backlog slices with owner, phase, acceptance criteria, and done evidence.
