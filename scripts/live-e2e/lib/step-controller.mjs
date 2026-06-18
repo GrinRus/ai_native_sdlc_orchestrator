@@ -475,7 +475,7 @@ function rejectInconsistentSkillAgentDecision(decision, action, entry, profile =
     const decisionEvidenceRefs = asStringArray(decision.evidence_refs);
     const missingFrontendRefs = frontendRefs.filter((ref) => !decisionEvidenceRefs.includes(ref));
     if (missingFrontendRefs.length > 0) {
-      return `Skill-agent UI/UX decisions must cite AOR operator UI evidence refs: ${missingFrontendRefs.join(", ")}.`;
+      return `Skill-agent AOR operator UI decisions must cite AOR operator UI evidence refs: ${missingFrontendRefs.join(", ")}.`;
     }
   }
   return null;
@@ -1232,7 +1232,7 @@ export function createLiveE2eStepController(options) {
             : []),
         ]),
         required_evidence_refs: requiredInspectionRefs,
-        frontend_evidence_refs: asStringArray(entry.frontend_interaction_refs),
+        aor_operator_ui_evidence_refs: asStringArray(entry.frontend_interaction_refs),
         continuation_rule:
           "continue is allowed only when deterministic guardrails pass or warn and semantic_analysis.judge_source is skill-agent",
       },

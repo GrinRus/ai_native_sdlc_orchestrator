@@ -264,13 +264,13 @@ test("live E2E decision helper preserves AOR operator UI evidence refs in the dr
       path.join(reportsRoot, "live-e2e-agent-decision-request-ui.json"),
       path.join(reportsRoot, "live-e2e-step-inspection-ui.json"),
     ];
-    const frontendRefs = [
+    const aorOperatorUiRefs = [
       path.join(reportsRoot, "guided-web-dom.json"),
       path.join(reportsRoot, "guided-web-accessibility.json"),
       path.join(reportsRoot, "guided-web-screenshot.png"),
     ];
-    for (const frontendRef of frontendRefs) {
-      fs.writeFileSync(frontendRef, "{}\n", "utf8");
+    for (const aorOperatorUiRef of aorOperatorUiRefs) {
+      fs.writeFileSync(aorOperatorUiRef, "{}\n", "utf8");
     }
     fs.writeFileSync(
       requestFile,
@@ -285,7 +285,7 @@ test("live E2E decision helper preserves AOR operator UI evidence refs in the dr
           deterministic_analysis: { status: "pass" },
           decision_rubric: {
             required_evidence_refs: requiredRefs,
-            frontend_evidence_refs: frontendRefs,
+            aor_operator_ui_evidence_refs: aorOperatorUiRefs,
           },
           operator_decision_expected_ref: expectedDecisionFile,
           expected_response_shape: {
@@ -312,13 +312,16 @@ test("live E2E decision helper preserves AOR operator UI evidence refs in the dr
       findings: ["Frontend proof evidence inspected."],
     });
     const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
-    assert.deepEqual(preparedDecision.inspected_evidence_refs, [...requiredRefs, ...frontendRefs]);
-    for (const frontendRef of frontendRefs) {
-      assert.equal(preparedDecision.evidence_refs.includes(frontendRef), true);
-      assert.equal(preparedDecision.frontend_evidence_refs.includes(frontendRef), true);
-      assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(frontendRef), true);
+    assert.deepEqual(preparedDecision.inspected_evidence_refs, [...requiredRefs, ...aorOperatorUiRefs]);
+    for (const aorOperatorUiRef of aorOperatorUiRefs) {
+      assert.equal(preparedDecision.evidence_refs.includes(aorOperatorUiRef), true);
+      assert.equal(preparedDecision.aor_operator_ui_evidence_refs.includes(aorOperatorUiRef), true);
+      assert.equal(preparedDecision.ui_ux_analysis.aor_operator_ui_evidence_refs.includes(aorOperatorUiRef), true);
     }
-    assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
+    const legacyEvidenceField = ["frontend", "evidence", "refs"].join("_");
+    assert.equal(preparedDecision[legacyEvidenceField], undefined);
+    assert.equal(preparedDecision.ui_ux_analysis[legacyEvidenceField], undefined);
+    assert.deepEqual(summary.validation_preview.missing_aor_operator_ui_evidence_refs, []);
   });
 });
 
@@ -397,7 +400,7 @@ test("live E2E decision helper hydrates late browser-task proof refs", () => {
           deterministic_analysis: { status: "pass" },
           decision_rubric: {
             required_evidence_refs: requiredRefs,
-            frontend_evidence_refs: [webSmokeFile],
+            aor_operator_ui_evidence_refs: [webSmokeFile],
           },
           operator_decision_expected_ref: expectedDecisionFile,
           expected_response_shape: {
@@ -434,11 +437,14 @@ test("live E2E decision helper hydrates late browser-task proof refs", () => {
     ]) {
       assert.equal(preparedDecision.inspected_evidence_refs.includes(expectedRef), true);
       assert.equal(preparedDecision.evidence_refs.includes(expectedRef), true);
-      assert.equal(preparedDecision.frontend_evidence_refs.includes(expectedRef), true);
-      assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.aor_operator_ui_evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.ui_ux_analysis.aor_operator_ui_evidence_refs.includes(expectedRef), true);
     }
-    assert.equal(summary.frontend_evidence_ref_count >= 8, true);
-    assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
+    const legacyEvidenceField = ["frontend", "evidence", "refs"].join("_");
+    assert.equal(preparedDecision[legacyEvidenceField], undefined);
+    assert.equal(preparedDecision.ui_ux_analysis[legacyEvidenceField], undefined);
+    assert.equal(summary.aor_operator_ui_evidence_ref_count >= 8, true);
+    assert.deepEqual(summary.validation_preview.missing_aor_operator_ui_evidence_refs, []);
   });
 });
 
@@ -505,7 +511,7 @@ test("live E2E decision helper rejects continue when late browser-task proof is 
           deterministic_analysis: { status: "pass" },
           decision_rubric: {
             required_evidence_refs: requiredRefs,
-            frontend_evidence_refs: [webSmokeFile],
+            aor_operator_ui_evidence_refs: [webSmokeFile],
           },
           operator_decision_expected_ref: expectedDecisionFile,
           expected_response_shape: {
@@ -531,7 +537,7 @@ test("live E2E decision helper rejects continue when late browser-task proof is 
     });
     assert.equal(summary.status, "rejected");
     assert.equal(fs.existsSync(summary.output_ref), false);
-    assert.equal(summary.validation_preview.missing_frontend_evidence_refs.includes(browserProofFile), true);
+    assert.equal(summary.validation_preview.missing_aor_operator_ui_evidence_refs.includes(browserProofFile), true);
     assert.equal(
       summary.validation_preview.rejection_risks.includes("Decision is missing required AOR operator UI evidence refs."),
       true,

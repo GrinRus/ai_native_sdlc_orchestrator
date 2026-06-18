@@ -50,7 +50,7 @@ function validateControllerEvidence(report, state) {
       }
     }
     if (asStringArray(entry.evidence_refs).length === 0) {
-      issues.push(`${interactionId} missing frontend evidence_refs`);
+      issues.push(`${interactionId} missing AOR operator UI evidence_refs`);
     }
     if (asStringArray(entry.screenshot_refs).length === 0 && asStringArray(entry.visual_guardrail_refs).length === 0) {
       issues.push(`${interactionId} missing screenshot or visual guardrail refs`);

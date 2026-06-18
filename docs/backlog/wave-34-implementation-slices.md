@@ -234,7 +234,7 @@ terminal verdict artifact.
 ## W34-S06 — Installed-user browser-task flow-loop proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
-- **Outcome:** Live E2E proves the flow-centric console through the hardened installed-user guided journey with browser-task frontend evidence and accepted operator decisions.
+- **Outcome:** Live E2E proves the flow-centric console through the hardened installed-user guided journey with browser-task AOR operator UI evidence and accepted operator decisions.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests
 - **Hard dependencies:** W34-S03, W34-S04, W34-S05
 - **Primary user story surfaces:** OPS-06, OPS-07, PBO-09, OPS-11.

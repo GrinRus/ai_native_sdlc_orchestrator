@@ -208,7 +208,7 @@
     "operator_kind": "skill-agent",
     "accepted_decisions_required": true,
     "quality_assessment_report_required": true,
-    "frontend_evidence_refs_required_when_profile_requires_frontend": true,
+    "aor_operator_ui_evidence_refs_required_when_profile_requires_browser_proof": true,
     "no_upstream_write": true,
     "legacy_bounded_or_mock_backed_profiles_restored": false
   }
