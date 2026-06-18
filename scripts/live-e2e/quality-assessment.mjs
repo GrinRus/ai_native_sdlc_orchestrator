@@ -322,7 +322,6 @@ function collectFrontendRefs(observationReport) {
       asNonEmptyString(interaction.dom_snapshot_ref),
       asNonEmptyString(interaction.accessibility_summary_ref),
       asNonEmptyString(interaction.visual_guardrail_ref),
-      asNonEmptyString(interaction.agent_verdict_ref),
       asNonEmptyString(interaction.operator_decision_ref),
       ...asStringArray(interaction.screenshot_refs),
       ...asStringArray(interaction.visual_guardrail_refs),

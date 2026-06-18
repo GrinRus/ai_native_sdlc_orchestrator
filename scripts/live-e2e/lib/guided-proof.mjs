@@ -161,9 +161,9 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       findings: asStringArray(proofOutcome.findings),
     },
     ux_findings: uniqueStrings([...retainedWebSmokeUxFindings, ...asStringArray(proof.ux_findings)]),
-    agent_verdict_ref:
-      asNonEmptyString(proof.agent_verdict_ref) ||
-      asNonEmptyString(webSmoke.agent_verdict_ref),
+    operator_decision_ref:
+      asNonEmptyString(proof.operator_decision_ref) ||
+      asNonEmptyString(webSmoke.operator_decision_ref),
   };
 }
 
@@ -339,7 +339,7 @@ export function buildGuidedJourneyProof(options) {
       browser_task_proof_file: asNonEmptyString(webSmoke.browser_task_proof_file) || null,
       task_outcome: asRecord(webSmoke.task_outcome),
       ux_findings: asStringArray(webSmoke.ux_findings),
-      agent_verdict_ref: asNonEmptyString(webSmoke.agent_verdict_ref) || null,
+      operator_decision_ref: asNonEmptyString(webSmoke.operator_decision_ref) || null,
       guided_lifecycle_state: asNonEmptyString(webSmoke.guided_lifecycle_state) || null,
       guided_current_stage_id: asNonEmptyString(webSmoke.guided_current_stage_id) || null,
       detached: webSmoke.detached === true,

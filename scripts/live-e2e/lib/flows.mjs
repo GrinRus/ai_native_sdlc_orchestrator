@@ -1527,7 +1527,7 @@ export function runGuidedWebSmoke(options) {
   summary.dom_snapshot_ref = summary.dom_snapshot_file;
   summary.accessibility_summary_ref = summary.accessibility_summary_file;
   summary.screenshot_refs = browserTaskScreenshotFiles;
-  summary.agent_verdict_ref = asNonEmptyString(browserTaskProof.agent_verdict_ref) || null;
+  summary.operator_decision_ref = asNonEmptyString(browserTaskProof.operator_decision_ref) || null;
   summary.detached = true;
   summary.guided_lifecycle_state = asNonEmptyString(summary.status) || null;
   summary.guided_current_stage_id = "learning";

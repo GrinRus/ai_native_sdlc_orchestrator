@@ -28,9 +28,9 @@ fixture bundles. W34 must not reintroduce those paths.
 Frontend proof is now `live_e2e.frontend_capability=browser-task-proof`.
 Deterministic web smoke remains a guardrail, but acceptance requires
 frontend-interaction evidence such as HTML, DOM snapshot, accessibility summary,
-screenshot or visual evidence, and an accepted skill-agent UI/UX verdict. The
-proof path must preserve `final_skill_agent_verdict_request_file`,
-`final_skill_agent_verdict_file`, and non-empty `inspected_evidence_refs[]`.
+screenshot or visual evidence, and accepted operator decision evidence. Outcome
+quality now comes from the separate post-run quality assessment report, not a
+terminal verdict artifact.
 
 ## Wave exit criteria
 
@@ -234,7 +234,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 ## W34-S06 — Installed-user browser-task flow-loop proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
-- **Outcome:** Live E2E proves the flow-centric console through the hardened installed-user guided journey with browser-task frontend evidence and accepted skill-agent verdicts.
+- **Outcome:** Live E2E proves the flow-centric console through the hardened installed-user guided journey with browser-task frontend evidence and accepted operator decisions.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests
 - **Hard dependencies:** W34-S03, W34-S04, W34-S05
 - **Primary user story surfaces:** OPS-06, OPS-07, PBO-09, OPS-11.
@@ -243,7 +243,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 1. Update `installed-user-guided-journey.yaml` to require flow-loop proof fields and preserve `live_e2e.frontend_capability=browser-task-proof`.
 2. Extend guided proof generation with first-flow, completed-flow, second-flow, follow-up, and target-flow operator-request evidence.
 3. Capture frontend interaction evidence: rendered HTML, DOM snapshot, accessibility summary, screenshot or visual guardrail evidence, task outcome, UX findings, and skill-agent UI/UX verdict refs.
-4. Require `final_skill_agent_verdict_request_file`, `final_skill_agent_verdict_file`, accepted step decisions, and non-empty `inspected_evidence_refs[]`.
+4. Require accepted step-level operator decisions, browser-task proof refs, and non-empty `inspected_evidence_refs[]`.
 5. Update fixtures and tests without reintroducing deleted bounded profiles or mock-backed bundles.
 6. Document the refreshed proof path in live E2E runbooks.
 
@@ -252,8 +252,8 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 2. Proof records `follow_up_source_handoff_ref` when the second flow starts from learning closure.
 3. Proof records `new_flow_mission_artifact_packet_file` and a refreshed next-action report for the second flow.
 4. Proof records `operator_request.target_flow_id` for flow-targeted Ask AOR scenarios.
-5. Frontend proof includes HTML, DOM, accessibility, screenshot or visual guardrail refs, task outcome, UX findings, and `agent_verdict_ref`.
-6. Acceptance fails closed when skill-agent decisions, final verdict, inspected refs, browser-task evidence, or no-upstream-write assertions are missing.
+5. Frontend proof includes HTML, DOM, accessibility, screenshot or visual guardrail refs, task outcome, UX findings, and `operator_decision_ref`.
+6. Acceptance fails closed when operator decisions, inspected refs, browser-task evidence, or no-upstream-write assertions are missing.
 
 ### Done evidence
 - updated installed-user guided profile

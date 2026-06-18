@@ -225,7 +225,7 @@ The W35 backlog comes from real local live E2E operation:
 2. Add browser-task or web-smoke proof checks that verify heartbeat and artifact summaries are visible during a synthetic silent provider step.
 3. Add proof-runner tests that helper-generated decisions satisfy required inspected refs and that rejected decision correction is visible.
 4. Run at least one Codex small/medium proof and one Qwen small proof, or record a provider-quality blocker with UI evidence showing the run is still understandable and fail-closed.
-5. Preserve current skill-agent-only proof model: final skill-agent verdict, non-empty inspected refs, frontend evidence refs when profile requires them, and no-upstream-write assertions.
+5. Preserve the current skill-agent-operated proof model: accepted operator decisions, non-empty inspected refs, frontend evidence refs when profile requires them, and no-upstream-write assertions.
 6. Update docs/backlog/ops traceability with the final proof result, remaining blockers, and any provider-specific limitations.
 7. Preserve W37 owner/phase evidence so target repository setup/test/build failures remain distinct from AOR runner/controller failures and provider quality failures.
 
@@ -274,8 +274,8 @@ closed the slice:
 
 - Codex small proof `w35-s05-codex-small-proof-20260603094440` completed with
   `summary_status=pass`, `acceptance_status=pass`, `coverage_status=covered_pass`,
-  accepted skill-agent decisions for all eight included steps, final
-  skill-agent verdict `pass`, `target_setup_status.status=pass`,
+  accepted operator decisions for all eight included steps,
+  `target_setup_status.status=pass`,
   `target_verification_status_detail.status=pass`, and
   `provider_step_status.status=completed`.
 - Qwen small proof `w35-s05-qwen-interrupt-proof-20260603102247` is intentionally
@@ -286,8 +286,8 @@ closed the slice:
   `status=blocked`, `provider_execution_status=interrupted`,
   `provider_step_status.status=interrupted`,
   `failure_owner=provider`, `failure_phase=provider_execution`, and
-  `failure_class=provider_blocked`; final skill-agent verdict is `blocked` with
-  non-empty inspected evidence refs.
+  `failure_class=provider_blocked`; run-health remains blocked with non-empty
+  inspected evidence refs.
 - Public Stop Provider now interrupts the supervised external runner process and
   preserves interrupted state through final run-control summary/report writes,
   so a stopped provider no longer looks like a generic crash or unclassified

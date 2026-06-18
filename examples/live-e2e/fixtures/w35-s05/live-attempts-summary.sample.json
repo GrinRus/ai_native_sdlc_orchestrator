@@ -56,7 +56,7 @@
       "provider_variant_id": "qwen-primary",
       "status": "blocked",
       "blocked_stage": "provider execution",
-      "public_observation": "Qwen reached provider execution after bounded target setup and verification passed, remained silent-running, and was stopped through public run-control. Final skill-agent verdict is blocked.",
+      "public_observation": "Qwen reached provider execution after bounded target setup and verification passed, remained silent-running, and was stopped through public run-control. Run-health is blocked before outcome quality assessment.",
       "blocker_class": "operator_stopped",
       "failure_owner": "operator",
       "failure_phase": "provider_execution",

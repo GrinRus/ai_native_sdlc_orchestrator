@@ -3287,6 +3287,29 @@ function validateObservationFrontendInteractions(options) {
         );
       }
     }
+    validateUnsupportedNestedFields({
+      record,
+      source: options.source,
+      parentField: `frontend_interactions[${index}]`,
+      fields: ["agent_verdict_ref"],
+      issues: options.issues,
+    });
+    if (
+      record.operator_decision_ref !== undefined &&
+      record.operator_decision_ref !== null &&
+      typeof record.operator_decision_ref !== "string"
+    ) {
+      options.issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source: options.source,
+          field: `frontend_interactions[${index}].operator_decision_ref`,
+          expected: "string",
+          actual: describeActualType(record.operator_decision_ref),
+          message: `Field 'frontend_interactions[${index}].operator_decision_ref' must be a string when present.`,
+        }),
+      );
+    }
     validateStringArrayItems({
       values: record.evidence_refs,
       source: options.source,

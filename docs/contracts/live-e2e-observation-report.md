@@ -104,7 +104,7 @@ Step-level operator decisions are control-flow evidence only. They decide whethe
 - accessibility summary
 - AOR operator task outcome
 - AOR operator UX findings captured during the run
-- optional agent verdict refs from legacy or guided flows
+- optional operator decision refs from guided browser-task proof flows
 
 These are factual evidence refs. AOR operator UI/UX quality, accessibility depth, visual responsiveness, and installed-user usability are assessed in `live-e2e-quality-assessment-report`.
 When browser-task proof is produced after the deterministic smoke summary, final

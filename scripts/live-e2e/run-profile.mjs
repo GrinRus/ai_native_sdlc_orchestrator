@@ -447,9 +447,9 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       findings: asStringArray(proofOutcome.findings),
     },
     ux_findings: uniqueStrings([...retainedWebSmokeUxFindings, ...asStringArray(proof.ux_findings)]),
-    agent_verdict_ref:
-      asNonEmptyString(proof.agent_verdict_ref) ||
-      asNonEmptyString(webSmoke.agent_verdict_ref),
+    operator_decision_ref:
+      asNonEmptyString(proof.operator_decision_ref) ||
+      asNonEmptyString(webSmoke.operator_decision_ref),
   };
 }
 
@@ -815,11 +815,11 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
       asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
   );
-  const agentVerdictRef =
-    asNonEmptyString(webSmoke.agent_verdict_ref) ||
+  const operatorDecisionRef =
+    asNonEmptyString(webSmoke.operator_decision_ref) ||
     asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) ||
     null;
-  const interactionStatus = agentVerdictRef ? status : "blocked";
+  const interactionStatus = operatorDecisionRef ? status : "blocked";
   return [
     {
       step_id: "learning",
@@ -847,7 +847,7 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
         findings: asStringArray(taskOutcome.findings),
       },
       ux_findings: asStringArray(webSmoke.ux_findings),
-      agent_verdict_ref: agentVerdictRef,
+      operator_decision_ref: operatorDecisionRef,
       status: interactionStatus,
       summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
     },

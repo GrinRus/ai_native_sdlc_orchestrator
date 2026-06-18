@@ -247,7 +247,7 @@ frontend_interactions:
         - evidence-links-rendered
         - closure-state-rendered
     ux_findings: []
-    agent_verdict_ref: null
+    operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
     status: pass
     summary: Guided frontend smoke interaction completed through the installed-user web surface.
 evidence_refs:

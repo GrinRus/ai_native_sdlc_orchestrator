@@ -1096,20 +1096,16 @@ test("live E2E observation report loads and enforces status scale", () => {
     "expected frontend screenshot refs to contain strings only",
   );
 
-  const missingFrontendVerdictCandidate = structuredClone(loaded.document);
-  delete missingFrontendVerdictCandidate.frontend_interactions[0].agent_verdict_ref;
+  const legacyFrontendVerdictCandidate = structuredClone(loaded.document);
+  legacyFrontendVerdictCandidate.frontend_interactions[0].agent_verdict_ref = "runtime://reports/legacy-final-verdict.json";
 
-  const missingFrontendVerdictValidation = validateContractDocument({
+  const legacyFrontendVerdictValidation = validateContractDocument({
     family: "live-e2e-observation-report",
-    document: missingFrontendVerdictCandidate,
-    source: "test://live-e2e-observation-missing-frontend-verdict",
+    document: legacyFrontendVerdictCandidate,
+    source: "test://live-e2e-observation-legacy-frontend-verdict",
   });
 
-  assert.equal(
-    missingFrontendVerdictValidation.ok,
-    true,
-    "frontend agent verdict refs are factual evidence, not observation-report acceptance gates",
-  );
+  assertValidationIssue(legacyFrontendVerdictValidation, "unsupported_field_present", "frontend_interactions[0].agent_verdict_ref");
 
   for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {
     const legacyCandidate = structuredClone(loaded.document);
