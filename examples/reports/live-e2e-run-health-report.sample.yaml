@@ -53,6 +53,17 @@ target_environment_health:
   failure_owner: null
   failure_phase: null
   failure_class: null
+diagnostic_health:
+  status: pass
+  diagnostic_failure_mode: warn
+  post_run_diagnostic_status: pass
+  post_run_diagnostic_verify_summary_file: runtime://reports/post-run-diagnostic-verify-summary-live-e2e.sample.run.json
+  timed_out_command_count: 0
+  failed_command_count: 0
+  timed_out_commands: []
+  failed_commands: []
+  evidence_refs:
+    - runtime://reports/post-run-diagnostic-verify-summary-live-e2e.sample.run.json
 evidence_health:
   status: pass
   missing_evidence_refs: []

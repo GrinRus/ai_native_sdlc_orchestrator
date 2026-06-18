@@ -196,6 +196,8 @@ const EVIDENCE_GROUP_FIELDS = Object.freeze({
     "delivery_runtime_harness_report_file",
     "post_run_verify_summary_file",
     "post_run_diagnostic_verify_summary_file",
+    "post_run_diagnostic_verify_step_result_files",
+    "post_run_diagnostic_verify_preserved_files",
     "post_run_verify_step_result_files",
     "post_run_primary_verify_step_result_files",
   ],
@@ -642,6 +644,7 @@ function prepareCli(rawArgs) {
       "Treat AOR operator UI/UX as strong only when browser/task inspection or explicit SWE inspection cites concrete evidence refs.",
       "For all-pass policy, security_review and performance_regression_risk must be evaluated with pass status and medium or strong evidence.",
       "For all-pass policy, AOR operator UI/UX and accessibility may cite a paired guided AOR operator proof from the same AOR commit because those dimensions assess AOR itself, not the target repository UI.",
+      "For all-pass policy, aor_operator_accessibility_quality requires browser-task proof or SWE-inspected evidence refs for every AOR operator accessibility subdimension.",
     ],
     evidence_refs: buildEvidenceGroups({
       runSummaryFile,

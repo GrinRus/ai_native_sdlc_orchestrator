@@ -182,6 +182,13 @@ Under all-pass, `security_review` and `performance_regression_risk` must be
 explicitly evaluated with medium or strong evidence. AOR operator UI/UX and
 accessibility must cite guided/browser-task evidence, either from the same run or
 from a paired guided AOR operator proof for the same AOR commit.
+For `aor_operator_accessibility_quality`, all-pass evidence must cover every
+structured AOR operator accessibility check from browser-task proof or explicit
+SWE-inspected refs: keyboard navigation, focus order, contrast/readability,
+semantic structure, screen-reader labels, and accessible error feedback.
+Non-passing diagnostic evidence remains a factual run-health warning/failure and
+also blocks all-pass closure when the source run summary records
+`post_run_diagnostic_status` other than `pass`.
 
 ## Forbidden fields
 Quality assessment reports must not include old runner aggregation fields:

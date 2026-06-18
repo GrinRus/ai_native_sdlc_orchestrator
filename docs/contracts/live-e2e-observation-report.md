@@ -102,6 +102,7 @@ Step-level operator decisions are control-flow evidence only. They decide whethe
 - browser-task proof refs
 - DOM snapshot
 - accessibility summary
+- structured AOR operator accessibility checks
 - AOR operator task outcome
 - AOR operator UX findings captured during the run
 - optional operator decision refs from guided browser-task proof flows
@@ -109,7 +110,20 @@ Step-level operator decisions are control-flow evidence only. They decide whethe
 These are factual evidence refs. AOR operator UI/UX quality, accessibility depth, visual responsiveness, and installed-user usability are assessed in `live-e2e-quality-assessment-report`.
 When browser-task proof is produced after the deterministic smoke summary, final
 report assembly should hydrate `frontend_interactions[]` from the proof file so
-the observation links the proof ref, screenshot refs, and passing task outcome.
+the observation links the proof ref, screenshot refs, structured accessibility
+checks, and task outcome.
+
+`frontend_interactions[].accessibility_checks[]` must include one entry for each
+AOR operator accessibility check:
+- `keyboard_navigation`
+- `focus_order`
+- `contrast_and_readability`
+- `semantic_structure`
+- `screen_reader_labels`
+- `accessible_error_feedback`
+
+Each check is factual evidence only and must include `check_id`, `status`,
+`evidence_refs[]`, and `findings[]`.
 
 `final_analysis` preserves factual run closure:
 - `status`

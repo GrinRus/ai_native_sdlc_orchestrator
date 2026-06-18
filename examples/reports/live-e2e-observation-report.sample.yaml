@@ -239,6 +239,37 @@ frontend_interactions:
     browser_task_proof_ref: runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
     dom_snapshot_ref: runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
     accessibility_summary_ref: runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    accessibility_checks:
+      - check_id: keyboard_navigation
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+      - check_id: focus_order
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+      - check_id: contrast_and_readability
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings: []
+      - check_id: semantic_structure
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+        findings: []
+      - check_id: screen_reader_labels
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings: []
+      - check_id: accessible_error_feedback
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
     task_outcome:
       status: pass
       checked_tasks:
@@ -249,7 +280,7 @@ frontend_interactions:
     ux_findings: []
     operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
     status: pass
-    summary: Guided frontend smoke interaction completed through the installed-user web surface.
+    summary: Guided AOR operator UI interaction completed through the installed-user web surface.
 evidence_refs:
   - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
   - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json

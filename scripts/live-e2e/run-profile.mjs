@@ -68,6 +68,14 @@ const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
   "diagnose",
   "block",
 ]);
+const AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+]);
 
 /**
  * @param {string} cwd
@@ -385,6 +393,61 @@ function resolveBrowserTaskProofFile(artifacts, webSmoke) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const rawEntries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return rawEntries
+    .map((entry) => ({
+      check_id: asNonEmptyString(entry.check_id) || asNonEmptyString(entry.id) || asNonEmptyString(entry.key),
+      status: toObservationStatus(asNonEmptyString(entry.status) || "not_pass"),
+      evidence_refs: uniqueStrings([...asStringArray(entry.evidence_refs), asNonEmptyString(entry.evidence_ref)]),
+      findings: asStringArray(entry.findings),
+    }))
+    .filter((entry) => AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.includes(entry.check_id))
+    .map((entry) => ({
+      ...entry,
+      evidence_refs: entry.evidence_refs.length > 0 ? entry.evidence_refs : uniqueStrings(fallbackEvidenceRefs),
+    }));
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function buildAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const normalized = normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs);
+  const byId = new Map(normalized.map((entry) => [entry.check_id, entry]));
+  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.map((checkId) => {
+    const existing = byId.get(checkId);
+    if (existing) return existing;
+    return {
+      check_id: checkId,
+      status: "not_pass",
+      evidence_refs: [],
+      findings: [`AOR operator accessibility check '${checkId}' was not materialized in browser-task proof.`],
+    };
+  });
+}
+
+/**
+ * @param {Record<string, unknown>} proof
+ * @returns {string[]}
+ */
+function findAorOperatorAccessibilityCheckGaps(proof) {
+  const checks = normalizeAorOperatorAccessibilityChecks(proof.accessibility_checks);
+  const byId = new Map(checks.map((entry) => [entry.check_id, entry]));
+  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.flatMap((checkId) => {
+    const entry = byId.get(checkId);
+    if (!entry) return [`browser-task-proof.accessibility_checks.${checkId}`];
+    return entry.evidence_refs.length === 0 ? [`browser-task-proof.accessibility_checks.${checkId}.evidence_refs`] : [];
+  });
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @param {Record<string, unknown>} webSmoke
  * @returns {Record<string, unknown>}
@@ -403,6 +466,13 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
   const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const proofEvidenceRefs = uniqueStrings([
+    browserTaskProofFile,
+    asNonEmptyString(proof.accessibility_summary_file),
+    asNonEmptyString(proof.accessibility_summary_ref),
+    asNonEmptyString(webSmoke.accessibility_summary_file),
+    ...screenshotFiles,
+  ]);
   const retainedWebSmokeUxFindings = asStringArray(webSmoke.ux_findings).filter(
     (finding) => !/browser-task-proof requires skill-agent browser evidence/iu.test(finding),
   );
@@ -438,6 +508,7 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
     browser_task_proof_file: browserTaskProofFile,
     screenshot_files: screenshotFiles,
     screenshot_refs: screenshotFiles,
+    accessibility_checks: buildAorOperatorAccessibilityChecks(proof.accessibility_checks, proofEvidenceRefs),
     task_outcome: {
       status: "pass",
       checked_tasks: uniqueStrings([
@@ -799,6 +870,11 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
     ...asStringArray(webSmoke.screenshot_files),
     ...asStringArray(webSmoke.screenshot_refs),
   ]);
+  const accessibilityChecks = buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
+    accessibilitySummaryFile,
+    browserTaskProofFile,
+    ...screenshotRefs,
+  ]);
   if (
     !summaryFile &&
     !htmlFile &&
@@ -841,6 +917,7 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       browser_task_proof_ref: browserTaskProofFile || null,
       dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
       accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
+      accessibility_checks: accessibilityChecks,
       task_outcome: {
         status,
         checked_tasks: asStringArray(taskOutcome.checked_tasks),
@@ -849,7 +926,7 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       ux_findings: asStringArray(webSmoke.ux_findings),
       operator_decision_ref: operatorDecisionRef,
       status: interactionStatus,
-      summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
+      summary: "Guided AOR operator UI interaction completed through the installed-user web surface.",
     },
   ];
 }
@@ -903,6 +980,8 @@ function buildGuidedUiEvidenceGaps(options) {
   }
   if (!browserTaskProofFile || !fileExists(browserTaskProofFile)) {
     gaps.push("guided-browser-task-proof");
+  } else {
+    gaps.push(...findAorOperatorAccessibilityCheckGaps(readJsonIfPresent(browserTaskProofFile)));
   }
   const taskOutcome = asRecord(webSmoke.task_outcome);
   if (asNonEmptyString(taskOutcome.status) && asNonEmptyString(taskOutcome.status) !== "pass") {
@@ -1823,6 +1902,137 @@ function buildTargetEnvironmentHealth(artifacts) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {"pass" | "warn" | "fail" | "blocked" | null}
+ */
+function toRunHealthStatusOrNull(value) {
+  const normalized = asNonEmptyString(value).toLowerCase();
+  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
+  if (normalized === "warn" || normalized === "warning") return "warn";
+  if (normalized === "fail" || normalized === "failed" || normalized === "not_pass") return "fail";
+  if (normalized === "blocked" || normalized === "block") return "blocked";
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @param {string | null} stepResultRef
+ * @returns {Record<string, unknown>}
+ */
+function summarizeDiagnosticCommand(stepResult, stepResultRef) {
+  return {
+    repo_scope: asNonEmptyString(stepResult.repo_scope) || null,
+    command: asNonEmptyString(stepResult.command) || null,
+    status: asNonEmptyString(stepResult.status) || "unknown",
+    timed_out: stepResult.timed_out === true,
+    step_result_ref: stepResultRef,
+    summary: asNonEmptyString(stepResult.summary) || null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @returns {Record<string, unknown>}
+ */
+function summarizeDiagnosticSummaryCommand(entry) {
+  return {
+    repo_scope: asNonEmptyString(entry.repo_scope) || null,
+    command: asNonEmptyString(entry.command) || null,
+    status: asNonEmptyString(entry.status) || "failed",
+    timed_out: entry.timed_out === true,
+    step_result_ref: asNonEmptyString(entry.step_result_ref) || null,
+    summary: asNonEmptyString(entry.summary) || null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
+ */
+function buildDiagnosticHealth(artifacts) {
+  const policy = asRecord(artifacts.post_run_quality_policy);
+  const diagnosticFailureMode =
+    asNonEmptyString(policy.diagnosticFailureMode) ||
+    asNonEmptyString(policy.diagnostic_failure_mode) ||
+    null;
+  const summaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+  const summary = readJsonIfPresent(summaryFile);
+  const summaryStatus = toRunHealthStatusOrNull(summary.status);
+  const artifactStatus = toRunHealthStatusOrNull(artifacts.post_run_diagnostic_status);
+  const inferredStatus =
+    artifactStatus ||
+    (summaryStatus === "pass"
+      ? "pass"
+      : summaryStatus
+        ? diagnosticFailureMode === "fail"
+          ? "fail"
+          : "warn"
+        : "pass");
+  const status = inferredStatus === "fail" && diagnosticFailureMode !== "fail" ? "warn" : inferredStatus;
+  const stepResultRefs = uniqueStrings([
+    ...asStringArray(summary.step_result_refs),
+    ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+  ]);
+  const stepResultEntries = stepResultRefs.map((ref) => ({
+    ref,
+    stepResult: readJsonIfPresent(ref),
+  }));
+  const failedCommandsFromStepResults = stepResultEntries
+    .filter(({ stepResult }) => asNonEmptyString(stepResult.status) === "failed")
+    .map(({ ref, stepResult }) => summarizeDiagnosticCommand(stepResult, ref));
+  const timedOutCommands = Array.isArray(summary.timed_out_commands)
+    ? summary.timed_out_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
+    : failedCommandsFromStepResults.filter((entry) => entry.timed_out === true);
+  const outputQualityFailedCommands = Array.isArray(summary.output_quality_failed_commands)
+    ? summary.output_quality_failed_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
+    : [];
+  const failedCommands = uniqueDiagnosticCommands([
+    ...failedCommandsFromStepResults,
+    ...outputQualityFailedCommands,
+    ...timedOutCommands,
+  ]);
+  const evidenceRefs = uniqueStrings([
+    summaryFile,
+    ...stepResultRefs,
+    ...timedOutCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
+    ...failedCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
+    ...asStringArray(artifacts.post_run_diagnostic_verify_preserved_files),
+  ]);
+  return {
+    status,
+    diagnostic_failure_mode: diagnosticFailureMode === "warn" || diagnosticFailureMode === "fail" ? diagnosticFailureMode : null,
+    post_run_diagnostic_status: artifactStatus || (summaryStatus ? status : null),
+    post_run_diagnostic_verify_summary_file: summaryFile || null,
+    timed_out_command_count: timedOutCommands.length,
+    failed_command_count: failedCommands.length,
+    timed_out_commands: timedOutCommands,
+    failed_commands: failedCommands,
+    evidence_refs: evidenceRefs,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>[]} entries
+ * @returns {Record<string, unknown>[]}
+ */
+function uniqueDiagnosticCommands(entries) {
+  const seen = new Set();
+  const result = [];
+  for (const entry of entries) {
+    const key = [
+      asNonEmptyString(entry.repo_scope),
+      asNonEmptyString(entry.command),
+      asNonEmptyString(entry.step_result_ref),
+      asNonEmptyString(entry.status),
+    ].join("::");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(entry);
+  }
+  return result;
+}
+
+/**
  * @param {{
  *   profile: Record<string, unknown>,
  *   artifacts: Record<string, unknown>,
@@ -1904,6 +2114,7 @@ function buildResumeInteractionHealth(observationReport) {
  *   controllerHealth: Record<string, unknown>,
  *   providerHealth: Record<string, unknown>,
  *   targetEnvironmentHealth: Record<string, unknown>,
+ *   diagnosticHealth: Record<string, unknown>,
  *   evidenceHealth: Record<string, unknown>,
  *   resumeInteractionHealth: Record<string, unknown>,
  *   lifecycleCompletion: Record<string, unknown>,
@@ -2006,6 +2217,14 @@ function resolveRunHealthFailure(options) {
       summary: "Target setup or target verification failed during the run.",
     };
   }
+  if (asNonEmptyString(options.diagnosticHealth.status) === "fail") {
+    return {
+      owner: "target_repository",
+      phase: "target_verification",
+      class: "post_run_diagnostic_failed",
+      summary: "Post-run diagnostic verification failed under diagnostic_failure_mode=fail.",
+    };
+  }
   if (asNonEmptyString(options.commandHealth.status) === "fail") {
     return {
       owner: "aor",
@@ -2040,6 +2259,14 @@ function resolveRunHealthFailure(options) {
       phase: "unknown",
       class: "run_completed_with_findings",
       summary: "Run completed with factual findings.",
+    };
+  }
+  if (asNonEmptyString(options.diagnosticHealth.status) === "warn") {
+    return {
+      owner: "target_repository",
+      phase: "target_verification",
+      class: "post_run_diagnostic_warning",
+      summary: "Post-run diagnostic verification recorded a non-blocking factual warning.",
     };
   }
   if (
@@ -2085,6 +2312,7 @@ function buildRunHealthReport(options) {
   const controllerHealth = buildControllerHealth({ observationReport: options.observationReport });
   const providerHealth = buildProviderHealth(options.flowResult.artifacts);
   const targetEnvironmentHealth = buildTargetEnvironmentHealth(options.flowResult.artifacts);
+  const diagnosticHealth = buildDiagnosticHealth(options.flowResult.artifacts);
   const evidenceHealth = buildEvidenceHealth({
     profile: options.profile,
     artifacts: options.flowResult.artifacts,
@@ -2100,20 +2328,24 @@ function buildRunHealthReport(options) {
     asNonEmptyString(controllerHealth.status) === "blocked" ||
     asNonEmptyString(providerHealth.status) === "blocked" ||
     asNonEmptyString(targetEnvironmentHealth.status) === "blocked" ||
+    asNonEmptyString(diagnosticHealth.status) === "blocked" ||
     asNonEmptyString(evidenceHealth.status) === "blocked" ||
     asNonEmptyString(resumeInteractionHealth.status) === "blocked";
   const hasFailedRun =
     observationStatus === "not_pass" ||
     asNonEmptyString(commandHealth.status) === "fail" ||
     asNonEmptyString(providerHealth.status) === "fail" ||
-    asNonEmptyString(targetEnvironmentHealth.status) === "fail";
+    asNonEmptyString(targetEnvironmentHealth.status) === "fail" ||
+    asNonEmptyString(diagnosticHealth.status) === "fail";
   const overallStatus = hasBlockingRunControl
     ? "blocked"
     : hasFailedRun
       ? "fail"
       : asNonEmptyString(lifecycleCompletion.continuation_status) !== "complete"
         ? "blocked"
-        : observationStatus === "warn" || asNonEmptyString(evidenceHealth.status) === "warn"
+        : observationStatus === "warn" ||
+            asNonEmptyString(evidenceHealth.status) === "warn" ||
+            asNonEmptyString(diagnosticHealth.status) === "warn"
           ? "warn"
           : "pass";
   const failureSummary =
@@ -2125,6 +2357,7 @@ function buildRunHealthReport(options) {
           controllerHealth,
           providerHealth,
           targetEnvironmentHealth,
+          diagnosticHealth,
           evidenceHealth,
           resumeInteractionHealth,
           lifecycleCompletion,
@@ -2136,6 +2369,14 @@ function buildRunHealthReport(options) {
   const runFindingSummaries = uniqueStrings([
     ...asStringArray(asRecord(options.observationReport.final_analysis).findings),
     ...failedCommandFindings,
+    ...(Array.isArray(diagnosticHealth.failed_commands) ? diagnosticHealth.failed_commands : []).map(
+      (entry) =>
+        `Post-run diagnostic command '${asNonEmptyString(asRecord(entry).command) || "unknown"}' did not pass.`,
+    ),
+    ...(Array.isArray(diagnosticHealth.timed_out_commands) ? diagnosticHealth.timed_out_commands : []).map(
+      (entry) =>
+        `Post-run diagnostic command '${asNonEmptyString(asRecord(entry).command) || "unknown"}' timed out.`,
+    ),
     ...asStringArray(controllerHealth.missing_operator_decision_steps).map((step) => `Missing operator decision for ${step}.`),
     ...asStringArray(evidenceHealth.missing_evidence_refs).map((ref) => `Missing evidence ref: ${ref}.`),
     ...asStringArray(evidenceHealth.weak_evidence_refs).map((ref) => `Weak or missing required evidence: ${ref}.`),
@@ -2153,6 +2394,7 @@ function buildRunHealthReport(options) {
     controller_health: controllerHealth,
     provider_health: providerHealth,
     target_environment_health: targetEnvironmentHealth,
+    diagnostic_health: diagnosticHealth,
     evidence_health: evidenceHealth,
     failure_summary: failureSummary,
     resume_interaction_health: resumeInteractionHealth,
@@ -2170,6 +2412,7 @@ function buildRunHealthReport(options) {
       options.observationReportFile,
       asNonEmptyString(options.observationReport.controller_state_ref),
       ...options.stepObservationFiles,
+      ...asStringArray(diagnosticHealth.evidence_refs),
     ]),
   };
 }

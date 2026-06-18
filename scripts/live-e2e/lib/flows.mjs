@@ -41,6 +41,14 @@ import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.m
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
+const AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+]);
 
 /**
  * @param {Record<string, string>} routeOverrides
@@ -1400,11 +1408,12 @@ export function runGuidedWebSmoke(options) {
       "AOR accessibility findings",
       "browser-task proof ref",
     ],
+    required_accessibility_checks: AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS,
     assessment_scope:
       "AOR operator and installed-user UI/UX only; checked-repository frontend behavior belongs to implementation and verification evidence.",
     instructions: [
       "Open app_url, not smoke_app_url. smoke_app_url is the short-lived deterministic render guardrail.",
-      "Capture browser-task evidence for AOR operator task success, next-action clarity, recovery/error states, responsive stability, and accessibility.",
+      "Capture browser-task evidence for AOR operator task success, next-action clarity, recovery/error states, responsive stability, and each required_accessibility_checks entry.",
       "Write the completed proof to expected_browser_task_proof_file before accepting the learning operator decision.",
     ],
     app_url: browserTaskAppUrl,

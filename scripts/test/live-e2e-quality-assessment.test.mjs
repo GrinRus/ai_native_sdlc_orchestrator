@@ -173,6 +173,8 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
   const runHealthFile = path.join(reportsRoot, "live-e2e-run-health-report-live-e2e.test.run.json");
   const reviewFile = touch(path.join(reportsRoot, "review-report-live-e2e.test.run.json"));
   const verifyFile = touch(path.join(reportsRoot, "post-run-verify-summary-live-e2e.test.run.json"));
+  const diagnosticVerifyFile = touch(path.join(reportsRoot, "post-run-diagnostic-verify-summary-live-e2e.test.run.json"));
+  const diagnosticStepResultFile = touch(path.join(reportsRoot, "step-result-post-run-diagnostic-live-e2e.test.run.json"));
   const browserProofFile = touch(path.join(reportsRoot, "browser-task-proof-live-e2e.test.run.json"));
   const featureRequestFile = touch(path.join(reportsRoot, "feature-request-live-e2e.test.run.json"));
   const intakeArtifactPacketFile = touch(path.join(reportsRoot, "intake-artifact-packet-live-e2e.test.run.json"));
@@ -208,6 +210,8 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
     live_e2e_run_health_report_file: runHealthFile,
     review_report_file: reviewFile,
     post_run_verify_summary_file: verifyFile,
+    post_run_diagnostic_verify_summary_file: diagnosticVerifyFile,
+    post_run_diagnostic_verify_step_result_files: [diagnosticStepResultFile],
     guided_browser_task_proof_file: browserProofFile,
     feature_request_file: featureRequestFile,
     intake_artifact_packet_file: intakeArtifactPacketFile,
@@ -232,6 +236,13 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
   assert.equal(JSON.stringify(request.dimension_rubric).includes(["target", "product", "UI"].join(" ")), false);
   assert.ok(request.evidence_refs.review_eval_harness.includes(reviewFile));
   assert.ok(request.evidence_refs.aor_operator_ui.includes(browserProofFile));
+  assert.ok(request.evidence_refs.review_eval_harness.includes(diagnosticVerifyFile));
+  assert.ok(request.evidence_refs.review_eval_harness.includes(diagnosticStepResultFile));
+  assert.ok(
+    request.quality_report_requirements.some((entry) =>
+      /aor_operator_accessibility_quality requires browser-task proof/u.test(entry),
+    ),
+  );
   assert.ok(request.evidence_refs.acceptance_kpi_dod.includes(featureRequestFile));
   assert.ok(request.evidence_refs.acceptance_kpi_dod.includes(intakeArtifactPacketFile));
   assert.ok(request.evidence_refs.acceptance_kpi_dod.includes(specStepResultFile));

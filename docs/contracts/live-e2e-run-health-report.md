@@ -20,6 +20,7 @@ It must not evaluate outcome quality of produced artifacts, code, tests, securit
 - `controller_health`
 - `provider_health`
 - `target_environment_health`
+- `diagnostic_health`
 - `evidence_health`
 - `failure_summary`
 - `resume_interaction_health`
@@ -81,6 +82,29 @@ When Runtime Harness detects a strict code-changing no-op after provider executi
 
 `target_environment_health` should include target setup and target verification facts, without converting target repository failures into provider or AOR product failures.
 
+`diagnostic_health` should include optional post-run diagnostic verification
+facts, separated from the primary post-run verification gate:
+- `status`
+- `diagnostic_failure_mode`
+- `post_run_diagnostic_status`
+- `post_run_diagnostic_verify_summary_file`
+- `timed_out_command_count`
+- `failed_command_count`
+- `timed_out_commands[]`
+- `failed_commands[]`
+- `evidence_refs[]`
+
+If a configured diagnostic command times out or fails with
+`diagnostic_failure_mode=warn`, run-health must use
+`diagnostic_health.status: warn` and top-level `overall_status: warn`. This is a
+factual run warning, not an outcome-quality verdict.
+
+If a configured diagnostic command fails with `diagnostic_failure_mode=fail`,
+run-health must use:
+- `failure_summary.owner: target_repository`
+- `failure_summary.phase: target_verification`
+- `failure_summary.class: post_run_diagnostic_failed`
+
 When baseline target verification passed but post-run target verification fails after provider execution, run-health must preserve the later post-run fact:
 - `target_environment_health.target_verification_status: fail`
 - `failure_summary.owner: target_repository`
@@ -111,10 +135,13 @@ The corresponding `guided_browser_task_proof_request_file` should identify the
 live browser inspection surface via `app_url`, `control_plane`, and
 `app_server_pid`. `smoke_app_url` is only the short-lived render-guardrail URL
 from `aor app --smoke`. The request should also carry the expected browser proof
-file and deterministic HTML/DOM/accessibility/visual guardrail refs. Before
-final run-health classification, the runner should rehydrate late browser proof
-into the guided web smoke evidence; only missing or non-passing evidence after
-that hydration is a `guided_browser_task_proof_missing` blocker.
+file, deterministic HTML/DOM/accessibility/visual guardrail refs, and
+`required_accessibility_checks[]`. Before final run-health classification, the
+runner should rehydrate late browser proof into the guided web smoke evidence.
+Missing proof, missing screenshot/visual evidence, or missing structured
+accessibility check refs is a `guided_browser_task_proof_missing` blocker. The
+quality of the AOR accessibility experience is assessed only later in
+`live-e2e-quality-assessment-report`.
 
 `resume_interaction_health` should include pending interactions, pending decisions, resume failures, and answer audit gaps.
 

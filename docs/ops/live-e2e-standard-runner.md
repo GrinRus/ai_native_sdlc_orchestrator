@@ -474,6 +474,10 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - proof-runner bootstrap asset overrides are not supported.
 
 Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the first product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, create a follow-up mission with `--follow-up-source-handoff-ref`, refresh `next` for the second flow, and create a flow-targeted `request create --target-flow-id`. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, flow-loop fields, browser-task AOR operator UI evidence refs, and no-upstream-write assertions must be materialized.
+Run guided profiles through the manual live E2E loop when browser-task proof or
+operator decisions are required. A plain `run-profile.mjs` invocation is allowed
+to fail closed at the first missing decision request; that is not a completed
+guided proof.
 
 Guided installed-user proof profiles keep provider execution timeouts long enough
 for real runtime work, but target verification commands stay bounded. The guided
@@ -498,6 +502,7 @@ The proof runner is a black-box step controller. Inspect `live_e2e_run_summary_f
 - inspect `agent_decision_request_ref` and the matching `operator_decision_ref` for each step; acceptance profiles require accepted skill-agent decisions before continuation;
 - inspect `artifacts.routed_step_result_file`, `artifacts.review_report_file`, delivery artifacts, and public closure artifacts when present;
 - inspect `live_e2e_run_health_report_file` for run-health status and owner/phase/class classification;
+- inspect `diagnostic_health` before post-run quality assessment; optional diagnostic timeouts/failures are factual run warnings or failures, not outcome-quality verdicts;
 - prepare and validate a separate post-run quality assessment when outcome quality is needed.
 
 Full-journey summaries must carry:
@@ -590,8 +595,9 @@ The browser proof must be captured against the live app surface recorded in
 The request also preserves `smoke_app_url` as guardrail history, but that smoke
 server is short-lived and must not be used as the browser-task inspection target.
 The same request must also name the expected proof file and deterministic
-HTML/DOM/accessibility/visual guardrail refs so the operator can cite stable
-local evidence without re-deriving paths.
+HTML/DOM/accessibility/visual guardrail refs plus
+`required_accessibility_checks[]` so the operator can cite stable local evidence
+without re-deriving paths.
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
@@ -653,6 +659,10 @@ surface specifically for skill-agent/browser inspection. Do not rely on the
 guardrail summary. If browser proof is written after the smoke summary, final
 report assembly must rehydrate `guided_web_smoke.task_outcome` and
 `frontend_interactions[]` from the proof file before run-health is finalized.
+The proof must include structured accessibility checks for keyboard navigation,
+focus order, contrast/readability, semantic structure, screen-reader labels, and
+accessible error feedback. Run-health checks that these evidence fields exist;
+the quality of the AOR accessibility experience belongs to post-run assessment.
 After the lifecycle is complete, the temporary proof app surface should be
 terminated and recorded in the run summary cleanup field.
 
@@ -663,11 +673,12 @@ The run summary links `live_e2e_run_health_report_file`. This report is the only
 - controller gaps and missing operator decisions;
 - provider execution status;
 - target setup and target verification environment status;
+- optional post-run diagnostic verification health;
 - missing factual evidence refs;
 - resume or interaction issues;
 - primary failure `owner`, `phase`, and `class`.
 
-Run-health must not evaluate produced code, artifact content, test adequacy, security, performance, AOR operator UI/UX, accessibility, or release readiness. A run can have `overall_status=pass` while the post-run quality assessment still reports weak or failing outcome quality.
+Run-health must not evaluate produced code, artifact content, test adequacy, security, performance, AOR operator UI/UX, accessibility, or release readiness. A run can have `overall_status=warn` from factual diagnostic evidence while still being eligible for post-run assessment, and a run can have passing run-health while the post-run quality assessment still reports weak or failing outcome quality.
 
 ## Post-Run Quality Assessment
 After the full flow, the launching SWE agent prepares an assessment request:

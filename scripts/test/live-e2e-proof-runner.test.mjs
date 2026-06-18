@@ -112,6 +112,24 @@ function writeJsonFixture(filePath, payload = {}) {
   return filePath;
 }
 
+const aorOperatorAccessibilityCheckIds = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+]);
+
+function buildAccessibilityChecks(evidenceRef) {
+  return aorOperatorAccessibilityCheckIds.map((checkId) => ({
+    check_id: checkId,
+    status: "pass",
+    evidence_refs: [evidenceRef],
+    findings: [],
+  }));
+}
+
 function writeGuidedProofFixture(tempRoot) {
   const targetCheckoutRoot = path.join(tempRoot, "target");
   const reportsRoot = path.join(tempRoot, "reports");
@@ -135,7 +153,7 @@ function writeGuidedProofFixture(tempRoot) {
     webDom: writeJsonFixture(path.join(reportsRoot, "web-dom.json")),
     webAccessibility: writeJsonFixture(path.join(reportsRoot, "web-accessibility.json")),
     webVisual: writeJsonFixture(path.join(reportsRoot, "web-visual.json")),
-    browserTaskProof: writeJsonFixture(path.join(reportsRoot, "browser-task-proof.json")),
+    browserTaskProof: path.join(reportsRoot, "browser-task-proof.json"),
     newMissionPacket: writeJsonFixture(path.join(targetCheckoutRoot, ".aor/projects/local-target/artifacts/local-target.artifact.intake.second-flow.v1.json")),
     newMissionBody: writeJsonFixture(path.join(targetCheckoutRoot, ".aor/projects/local-target/artifacts/local-target.artifact.intake.second-flow.v1.body.json")),
     newNext: writeJsonFixture(path.join(targetCheckoutRoot, ".aor/projects/local-target/reports/next-action-report-second-flow.json")),
@@ -146,6 +164,17 @@ function writeGuidedProofFixture(tempRoot) {
       delivery_mode: "no-write",
     }),
   };
+  writeJsonFixture(files.browserTaskProof, {
+    status: "pass",
+    accessibility_summary_file: files.webAccessibility,
+    visual_guardrail_file: files.webVisual,
+    accessibility_checks: buildAccessibilityChecks(files.webAccessibility),
+    task_outcome: {
+      status: "pass",
+      checked_tasks: ["AOR operator accessibility proof"],
+      findings: [],
+    },
+  });
   const commandResults = REQUIRED_GUIDED_COMMAND_LABELS.map((label, index) => ({
     label,
     transcript_file: writeJsonFixture(path.join(reportsRoot, `${String(index + 1).padStart(2, "0")}-${label}.json`)),
@@ -1972,6 +2001,29 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     fs.writeFileSync(screenshotFile, "png", "utf8");
     writeJsonFixture(browserTaskProofFile, {
       status: "pass",
+      visual_guardrail_file: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
+      ),
+      screenshot_files: [screenshotFile],
+      task_outcome: {
+        status: "pass",
+        checked_tasks: ["browser-task evidence capture"],
+        findings: [],
+      },
+    });
+
+    const missingAccessibilityChecks = writeProofRunnerArtifacts(writeOptions);
+    assert.equal(missingAccessibilityChecks.runHealthReport.overall_status, "blocked");
+    assert.equal(
+      missingAccessibilityChecks.runHealthReport.evidence_health.weak_evidence_refs.includes(
+        "browser-task-proof.accessibility_checks.keyboard_navigation",
+      ),
+      true,
+    );
+
+    writeJsonFixture(browserTaskProofFile, {
+      status: "pass",
       rendered_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`),
       dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`),
       accessibility_summary_file: path.join(
@@ -1983,6 +2035,7 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
         `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
       ),
       screenshot_files: [screenshotFile],
+      accessibility_checks: buildAccessibilityChecks(screenshotFile),
       task_outcome: {
         status: "pass",
         checked_tasks: ["browser-task evidence capture", "operator task interaction"],
@@ -1998,6 +2051,10 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(hydratedObservation.frontend_interactions[0].task_outcome.status, "pass");
     assert.equal(hydratedObservation.frontend_interactions[0].browser_task_proof_ref, browserTaskProofFile);
     assert.deepEqual(hydratedObservation.frontend_interactions[0].screenshot_refs, [screenshotFile]);
+    assert.deepEqual(
+      hydratedObservation.frontend_interactions[0].accessibility_checks.map((entry) => entry.check_id),
+      aorOperatorAccessibilityCheckIds,
+    );
     assert.equal(hydratedWebSmoke.task_outcome.status, "pass");
     assert.equal(hydratedWebSmoke.browser_task_proof_file, browserTaskProofFile);
     assert.deepEqual(hydratedWebSmoke.screenshot_files, [screenshotFile]);
@@ -2100,6 +2157,7 @@ test("guided browser-task proof request points at a live app surface, not the sh
       request.accessibility_summary_file,
       request.visual_guardrail_file,
     ]);
+    assert.deepEqual(request.required_accessibility_checks, aorOperatorAccessibilityCheckIds);
     assert.match(request.instructions.join("\n"), /Open app_url, not smoke_app_url/u);
     assert.ok(Number.isInteger(request.app_server_pid));
     assert.equal(result.summary.browser_task_app_url, "http://127.0.0.1:61002/");
@@ -4596,7 +4654,7 @@ test("proof runner does not consume final skill-agent verdicts or emit result-qu
   });
 });
 
-test("proof runner run-health uses hydrated delivery and verification facts", () => {
+test("proof runner run-health uses hydrated delivery, verification, and diagnostic facts", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
     const runtimeRoot = path.join(tempRoot, "runtime");
@@ -4620,6 +4678,8 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
         "evaluation-report.json",
         "runtime-harness-report.json",
         "post-run-verify-summary.json",
+        "post-run-diagnostic-summary.json",
+        "post-run-diagnostic-step-result.json",
         ...includedSteps.map((step) => `${step}-artifact.json`),
       ].map((name) => [name, path.join(reportsRoot, name)]),
     );
@@ -4634,6 +4694,24 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
     writeJsonFixture(files["evaluation-report.json"]);
     writeJsonFixture(files["post-run-verify-summary.json"], {
       status: "passed",
+    });
+    writeJsonFixture(files["post-run-diagnostic-step-result.json"], {
+      status: "failed",
+      command: "npm test",
+      repo_scope: "httpie-cli",
+      timed_out: true,
+      summary: "Diagnostic command timed out.",
+    });
+    writeJsonFixture(files["post-run-diagnostic-summary.json"], {
+      status: "failed",
+      step_result_refs: [files["post-run-diagnostic-step-result.json"]],
+      timed_out_commands: [
+        {
+          repo_scope: "httpie-cli",
+          command: "npm test",
+          step_result_ref: files["post-run-diagnostic-step-result.json"],
+        },
+      ],
     });
     writeJsonFixture(files["review-report.json"], {
       overall_status: "pass",
@@ -4733,6 +4811,13 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
         evaluation_report_file: files["evaluation-report.json"],
         post_run_verify_summary_file: files["post-run-verify-summary.json"],
         post_run_verify_status: "pass",
+        post_run_quality_policy: {
+          diagnosticFailureMode: "warn",
+          diagnosticCommands: ["npm test"],
+        },
+        post_run_diagnostic_status: "warn",
+        post_run_diagnostic_verify_summary_file: files["post-run-diagnostic-summary.json"],
+        post_run_diagnostic_verify_step_result_files: [files["post-run-diagnostic-step-result.json"]],
         provider_execution_status: "completed",
         runtime_harness_report_file: files["runtime-harness-report.json"],
         context_budget_status: "pass",
@@ -4825,18 +4910,22 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
     });
 
     assert.equal(written.summary.status, "pass");
-    assert.equal(written.summary.live_e2e_run_health_overall_status, "pass");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "warn");
     assert.equal(written.summary.final_skill_agent_verdict_request_file, undefined);
     assert.equal(written.summary.delivery_manifest_file, files["delivery-manifest.json"]);
     assert.equal(written.summary.review_report_file, files["review-report.json"]);
     assert.equal(written.summary.post_run_verify_status, "pass");
     assert.equal(written.summary.real_code_change_status, "pass");
     assert.deepEqual(written.summary.meaningful_changed_paths, ["source/httpie/core.py", "tests/test_core.py"]);
-    assert.equal(written.runHealthReport.overall_status, "pass");
+    assert.equal(written.runHealthReport.overall_status, "warn");
+    assert.equal(written.runHealthReport.diagnostic_health.status, "warn");
+    assert.equal(written.runHealthReport.diagnostic_health.timed_out_command_count, 1);
+    assert.equal(written.runHealthReport.diagnostic_health.failed_command_count, 1);
+    assert.equal(written.runHealthReport.failure_summary.class, "post_run_diagnostic_warning");
     assert.equal(written.runHealthReport.provider_health.provider_execution_status, "completed");
     assert.equal(written.runHealthReport.provider_health.top_context_size_sources[0].source, "provider_work_packet.context");
     assert.equal(written.runHealthReport.target_environment_health.target_verification_status, "pass");
-    assert.equal(written.runHealthReport.failure_summary.owner, null);
+    assert.equal(written.runHealthReport.failure_summary.owner, "target_repository");
   });
 });
 

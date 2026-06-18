@@ -80,6 +80,7 @@ const LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS = [
   "screen_reader_labels",
   "accessible_error_feedback",
 ];
+const LIVE_E2E_DIAGNOSTIC_FAILURE_MODE_VALUES = ["warn", "fail"];
 const LIVE_E2E_AOR_OPERATOR_UI_QUALITY_SUBDIMENSION_KEYS = {
   aor_operator_ui_ux_quality: LIVE_E2E_AOR_OPERATOR_UI_SUBDIMENSION_KEYS,
   aor_operator_accessibility_quality: LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS,
@@ -2664,6 +2665,7 @@ function validateLiveE2ERunHealthReport(document, source) {
     "controller_health",
     "provider_health",
     "target_environment_health",
+    "diagnostic_health",
     "evidence_health",
     "failure_summary",
     "resume_interaction_health",
@@ -2710,6 +2712,8 @@ function validateLiveE2ERunHealthReport(document, source) {
     );
   }
 
+  validateLiveE2EDiagnosticHealth(document.diagnostic_health, source, issues);
+
   const failureSummary = isPlainObject(document.failure_summary) ? document.failure_summary : {};
   const terminalStatus = typeof document.overall_status === "string" ? document.overall_status : "fail";
   if (terminalStatus === "pass") {
@@ -2745,6 +2749,40 @@ function validateLiveE2ERunHealthReport(document, source) {
     }
   }
 
+  const diagnosticHealth = isPlainObject(document.diagnostic_health) ? document.diagnostic_health : {};
+  if (diagnosticHealth.status === "warn" && terminalStatus === "pass") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "overall_status",
+        expected: "warn when diagnostic_health.status=warn",
+        actual: String(document.overall_status),
+        message: "Run-health cannot pass while diagnostic_health records a factual warning.",
+      }),
+    );
+  }
+  if (diagnosticHealth.status === "fail") {
+    for (const [field, expected] of [
+      ["owner", "target_repository"],
+      ["phase", "target_verification"],
+      ["class", "post_run_diagnostic_failed"],
+    ]) {
+      if (failureSummary[field] !== expected) {
+        issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source,
+            field: `failure_summary.${field}`,
+            expected,
+            actual: String(failureSummary[field]),
+            message: `Diagnostic failure reports must classify failure_summary.${field} as '${expected}'.`,
+          }),
+        );
+      }
+    }
+  }
+
   if (Array.isArray(document.run_findings)) {
     document.run_findings.forEach((entry, index) => {
       const record = isPlainObject(entry) ? entry : {};
@@ -2773,6 +2811,77 @@ function validateLiveE2ERunHealthReport(document, source) {
   }
 
   return issues;
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} source
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ */
+function validateLiveE2EDiagnosticHealth(value, source, issues) {
+  const diagnosticHealth = isPlainObject(value) ? value : {};
+  validateEnumString(
+    diagnosticHealth.status,
+    source,
+    "diagnostic_health.status",
+    LIVE_E2E_RUN_HEALTH_STATUS_VALUES,
+    issues,
+  );
+  if (
+    diagnosticHealth.diagnostic_failure_mode !== null &&
+    diagnosticHealth.diagnostic_failure_mode !== undefined
+  ) {
+    validateEnumString(
+      diagnosticHealth.diagnostic_failure_mode,
+      source,
+      "diagnostic_health.diagnostic_failure_mode",
+      LIVE_E2E_DIAGNOSTIC_FAILURE_MODE_VALUES,
+      issues,
+    );
+  }
+  if (
+    diagnosticHealth.post_run_diagnostic_status !== null &&
+    diagnosticHealth.post_run_diagnostic_status !== undefined
+  ) {
+    validateEnumString(
+      diagnosticHealth.post_run_diagnostic_status,
+      source,
+      "diagnostic_health.post_run_diagnostic_status",
+      LIVE_E2E_RUN_HEALTH_STATUS_VALUES,
+      issues,
+    );
+  }
+  validateNestedNullableStringField({
+    record: diagnosticHealth,
+    source,
+    field: "diagnostic_health.post_run_diagnostic_verify_summary_file",
+    issues,
+    required: true,
+  });
+  for (const field of ["timed_out_command_count", "failed_command_count"]) {
+    validateNestedNumberField({
+      record: diagnosticHealth,
+      source,
+      field: `diagnostic_health.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  for (const field of ["timed_out_commands", "failed_commands", "evidence_refs"]) {
+    validateNestedArrayField({
+      record: diagnosticHealth,
+      source,
+      field: `diagnostic_health.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  validateStringArrayItems({
+    values: diagnosticHealth.evidence_refs,
+    source,
+    field: "diagnostic_health.evidence_refs",
+    issues,
+  });
 }
 
 /**
@@ -3268,6 +3377,7 @@ function validateObservationFrontendInteractions(options) {
       ["screenshot_refs", "array"],
       ["dom_snapshot_ref", "string"],
       ["accessibility_summary_ref", "string"],
+      ["accessibility_checks", "array"],
       ["task_outcome", "object"],
       ["ux_findings", "array"],
       ["status", "string"],
@@ -3328,6 +3438,12 @@ function validateObservationFrontendInteractions(options) {
       field: `frontend_interactions[${index}].ux_findings`,
       issues: options.issues,
     });
+    validateObservationAccessibilityChecks({
+      entries: record.accessibility_checks,
+      parentField: `frontend_interactions[${index}].accessibility_checks`,
+      source: options.source,
+      issues: options.issues,
+    });
     validateObservationStatusField({
       value: record.status,
       source: options.source,
@@ -3341,6 +3457,85 @@ function validateObservationFrontendInteractions(options) {
       field: `frontend_interactions[${index}].task_outcome.status`,
       issues: options.issues,
     });
+  });
+}
+
+/**
+ * @param {{ entries: unknown, parentField: string, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationAccessibilityChecks(options) {
+  if (!Array.isArray(options.entries)) return;
+  const checksById = new Map();
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    const fieldPrefix = `${options.parentField}[${index}]`;
+    for (const [field, expectedType] of [
+      ["check_id", "string"],
+      ["status", "string"],
+      ["evidence_refs", "array"],
+      ["findings", "array"],
+    ]) {
+      const value = record[field];
+      if (!isExpectedType(value, expectedType)) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `${fieldPrefix}.${field}`,
+            expected: value === undefined ? "present" : expectedType,
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field '${fieldPrefix}.${field}' is required for AOR operator accessibility evidence.`,
+          }),
+        );
+      }
+    }
+    if (typeof record.check_id === "string") {
+      checksById.set(record.check_id, record);
+      if (!LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS.includes(record.check_id)) {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `${fieldPrefix}.check_id`,
+            expected: LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS.join("|"),
+            actual: record.check_id,
+            message: `AOR operator accessibility check '${record.check_id}' is not supported.`,
+          }),
+        );
+      }
+    }
+    validateObservationStatusField({
+      value: record.status,
+      source: options.source,
+      field: `${fieldPrefix}.status`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source: options.source,
+      field: `${fieldPrefix}.evidence_refs`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.findings,
+      source: options.source,
+      field: `${fieldPrefix}.findings`,
+      issues: options.issues,
+    });
+  });
+  LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS.forEach((checkId) => {
+    if (!checksById.has(checkId)) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `${options.parentField}.${checkId}`,
+          expected: "present",
+          actual: "missing",
+          message: `AOR operator accessibility evidence must include '${checkId}'.`,
+        }),
+      );
+    }
   });
 }
 

@@ -1107,6 +1107,24 @@ test("live E2E observation report loads and enforces status scale", () => {
 
   assertValidationIssue(legacyFrontendVerdictValidation, "unsupported_field_present", "frontend_interactions[0].agent_verdict_ref");
 
+  const missingAccessibilityCheckCandidate = structuredClone(loaded.document);
+  missingAccessibilityCheckCandidate.frontend_interactions[0].accessibility_checks =
+    missingAccessibilityCheckCandidate.frontend_interactions[0].accessibility_checks.filter(
+      (entry) => entry.check_id !== "keyboard_navigation",
+    );
+
+  const missingAccessibilityCheckValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingAccessibilityCheckCandidate,
+    source: "test://live-e2e-observation-missing-accessibility-check",
+  });
+
+  assertValidationIssue(
+    missingAccessibilityCheckValidation,
+    "required_field_missing",
+    "frontend_interactions[0].accessibility_checks.keyboard_navigation",
+  );
+
   for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {
     const legacyCandidate = structuredClone(loaded.document);
     legacyCandidate[legacyField] = [];
@@ -1146,6 +1164,7 @@ test("live E2E run-health report separates run failures from outcome quality", (
   for (const requiredFactualSection of [
     "provider_health",
     "target_environment_health",
+    "diagnostic_health",
     "resume_interaction_health",
   ]) {
     const missingFactualSectionCandidate = structuredClone(loaded.document);
@@ -1187,6 +1206,106 @@ test("live E2E run-health report separates run failures from outcome quality", (
   });
 
   assert.equal(contextBudgetValidation.ok, true);
+
+  const diagnosticWarnCandidate = structuredClone(loaded.document);
+  diagnosticWarnCandidate.overall_status = "warn";
+  diagnosticWarnCandidate.diagnostic_health = {
+    status: "warn",
+    diagnostic_failure_mode: "warn",
+    post_run_diagnostic_status: "warn",
+    post_run_diagnostic_verify_summary_file: "runtime://reports/post-run-diagnostic-verify-summary-live-e2e.sample.run.json",
+    timed_out_command_count: 1,
+    failed_command_count: 1,
+    timed_out_commands: [
+      {
+        repo_scope: "ky",
+        command: "npm test",
+        status: "failed",
+        timed_out: true,
+        step_result_ref: "runtime://reports/step-result-post-run-diagnostic-1.json",
+        summary: "Diagnostic command timed out.",
+      },
+    ],
+    failed_commands: [
+      {
+        repo_scope: "ky",
+        command: "npm test",
+        status: "failed",
+        timed_out: true,
+        step_result_ref: "runtime://reports/step-result-post-run-diagnostic-1.json",
+        summary: "Diagnostic command timed out.",
+      },
+    ],
+    evidence_refs: [
+      "runtime://reports/post-run-diagnostic-verify-summary-live-e2e.sample.run.json",
+      "runtime://reports/step-result-post-run-diagnostic-1.json",
+    ],
+  };
+  diagnosticWarnCandidate.failure_summary = {
+    owner: "target_repository",
+    phase: "target_verification",
+    class: "post_run_diagnostic_warning",
+    summary: "Post-run diagnostic verification recorded a non-blocking factual warning.",
+  };
+
+  const diagnosticWarnValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticWarnCandidate,
+    source: "test://live-e2e-run-health-diagnostic-warn",
+  });
+
+  assert.equal(diagnosticWarnValidation.ok, true);
+
+  const diagnosticWarnPassCandidate = structuredClone(diagnosticWarnCandidate);
+  diagnosticWarnPassCandidate.overall_status = "pass";
+  diagnosticWarnPassCandidate.failure_summary = {
+    owner: null,
+    phase: null,
+    class: null,
+    summary: null,
+  };
+
+  const diagnosticWarnPassValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticWarnPassCandidate,
+    source: "test://live-e2e-run-health-diagnostic-warn-pass",
+  });
+
+  assertValidationIssue(diagnosticWarnPassValidation, "enum_value_invalid", "overall_status");
+
+  const diagnosticFailCandidate = structuredClone(loaded.document);
+  diagnosticFailCandidate.overall_status = "fail";
+  diagnosticFailCandidate.diagnostic_health = {
+    ...diagnosticWarnCandidate.diagnostic_health,
+    status: "fail",
+    diagnostic_failure_mode: "fail",
+    post_run_diagnostic_status: "fail",
+  };
+  diagnosticFailCandidate.failure_summary = {
+    owner: "target_repository",
+    phase: "target_verification",
+    class: "post_run_diagnostic_failed",
+    summary: "Post-run diagnostic verification failed under diagnostic_failure_mode=fail.",
+  };
+
+  const diagnosticFailValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticFailCandidate,
+    source: "test://live-e2e-run-health-diagnostic-fail",
+  });
+
+  assert.equal(diagnosticFailValidation.ok, true);
+
+  const diagnosticFailWrongClassCandidate = structuredClone(diagnosticFailCandidate);
+  diagnosticFailWrongClassCandidate.failure_summary.class = "target_verification_failed";
+
+  const diagnosticFailWrongClassValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: diagnosticFailWrongClassCandidate,
+    source: "test://live-e2e-run-health-diagnostic-fail-wrong-class",
+  });
+
+  assertValidationIssue(diagnosticFailWrongClassValidation, "enum_value_invalid", "failure_summary.class");
 
   const providerPacketNotExecutedCandidate = structuredClone(loaded.document);
   providerPacketNotExecutedCandidate.overall_status = "fail";
