@@ -7,6 +7,23 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.12] - 2026-06-22
+
+- Added outcome-oriented live E2E quality assessment with factual-only
+  observation reports, separate run-health reports, post-run quality
+  assessment reports, and an all-pass advisory gate.
+- Added `diagnostic_health` run-health evidence so diagnostic warnings and
+  failures stay separate from code, artifact, and outcome quality.
+- Refined AOR operator UI/UX assessment with structured guided-browser
+  accessibility proof for keyboard, focus, contrast, semantics, screen-reader,
+  and error-feedback checks.
+- Hardened live adapter request-artifact and provider work-packet handling so
+  long prompts are measured, compacted, bounded, and failed fast before
+  provider calls when needed.
+- Added execution no-op and provider work-packet non-execution classification
+  with target-change proof surfaced through run-health and Runtime Harness
+  evidence.
+
 ## [0.1.0-alpha.11] - 2026-06-11
 
 - Added live E2E quality gates for mission-scoped verification, delivery path
