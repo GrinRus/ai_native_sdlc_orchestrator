@@ -392,5 +392,15 @@ This is the master index for the implementation slices across all defined waves.
 | W45-S05 | Repair-loop proof fixtures and live profile | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
 | W45-S06 | Documentation refresh and live E2E acceptance | EPIC-7, EPIC-0 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `scripts/live-e2e/**`, `examples/live-e2e/**`, tests | W45-S05 |
 
+## W46 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W46-S01 | Contract/docs breaking policy | EPIC-0, EPIC-7 | ready | `docs/contracts/**`, `docs/ops/**`, `packages/contracts/**` | W45-S06 |
+| W46-S02 | Step evaluator report and runner behavior | EPIC-7 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `scripts/test/**` | W46-S01 |
+| W46-S03 | Catalog budget and small-canary migration | EPIC-7 | ready | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S01 |
+| W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S03 |
+| W46-S05 | Hard target expansion | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S04 |
+| W46-S06 | Proof run, findings intake, docs refresh | EPIC-0, EPIC-7 | ready | `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

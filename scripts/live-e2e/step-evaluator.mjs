@@ -13,6 +13,7 @@ import {
   readJson,
   resolveOptionalStringFlag,
 } from "./lib/common.mjs";
+import { writeStepQualityAssessmentReports as writeStepQualityAssessmentReportsForEntries } from "./lib/step-quality-assessment.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
@@ -107,6 +108,28 @@ function validateControllerEvidence(report, state) {
 }
 
 /**
+ * @param {{
+ *   runProfileOutput: Record<string, unknown>,
+ *   report: Record<string, unknown>,
+ *   summary: Record<string, unknown>,
+ *   outputDir: string,
+ * }} options
+ * @returns {string[]}
+ */
+function writeStepQualityAssessmentReports(options) {
+  const stepJournal = Array.isArray(options.report.step_journal)
+    ? options.report.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const runId = asNonEmptyString(options.summary.run_id) || asNonEmptyString(options.runProfileOutput.run_id) || "live-e2e-run";
+  return writeStepQualityAssessmentReportsForEntries({
+    runId,
+    summary: options.summary,
+    entries: stepJournal,
+    outputDir: options.outputDir,
+  });
+}
+
+/**
  * @param {string[]} rawArgs
  */
 function runCli(rawArgs) {
@@ -145,13 +168,21 @@ function runCli(rawArgs) {
   const runProfileOutput = JSON.parse(child.stdout);
   const observationReportFile = asNonEmptyString(runProfileOutput.live_e2e_observation_report_file);
   const controllerStateFile = asNonEmptyString(runProfileOutput.live_e2e_controller_state_file);
+  const runSummaryFile = asNonEmptyString(runProfileOutput.live_e2e_run_summary_file);
   const report = observationReportFile ? readJson(observationReportFile) : {};
   const state = controllerStateFile ? readJson(controllerStateFile) : {};
+  const summary = runSummaryFile ? readJson(runSummaryFile) : {};
   const issues = validateControllerEvidence(report, state);
   if (issues.length > 0) {
     process.stderr.write(`Step evaluator failed closed: ${issues.join("; ")}\n`);
     return 1;
   }
+  const stepQualityAssessmentReportFiles = writeStepQualityAssessmentReports({
+    runProfileOutput,
+    report,
+    summary,
+    outputDir: observationReportFile ? path.dirname(observationReportFile) : process.cwd(),
+  });
 
   const pendingDecision = asRecord(state.pending_decision);
   const action = asNonEmptyString(pendingDecision.action) || "unknown";
@@ -170,6 +201,7 @@ function runCli(rawArgs) {
         aor_installation_proof_file: asNonEmptyString(runProfileOutput.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: controllerStateFile || null,
         live_e2e_observation_report_file: observationReportFile || null,
+        live_e2e_step_quality_assessment_report_files: stepQualityAssessmentReportFiles,
         live_e2e_step_observation_files: Array.isArray(runProfileOutput.live_e2e_step_observation_files)
           ? runProfileOutput.live_e2e_step_observation_files
           : [],

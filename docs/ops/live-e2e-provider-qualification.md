@@ -43,9 +43,9 @@ provider quality pass.
 
 Provider qualification uses `live-e2e-run-health-report` only for run failure
 classification. It must not use post-run code quality, artifact content quality,
-UI/UX quality, accessibility quality, or the advisory
-`live-e2e-quality-assessment-report` to decide whether a provider path is
-qualified.
+UI/UX quality, accessibility quality, `live-e2e-step-quality-assessment-report`,
+or `live-e2e-quality-assessment-report` to decide whether a provider path is
+qualified. Medium+ product acceptance consumes those quality reports separately.
 
 Strict quality-driven fix-and-rerun work may additionally run
 `quality-assessment.mjs gate --policy all-pass` after a completed flow. That

@@ -306,14 +306,15 @@ For canonical setup and verification dependency details per profile, use `docs/o
   Rust build and snapshot costs are proven stable in live runs.
 
 ## Extended candidate targets
-- `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.
-- `date-fns/date-fns` (`date-fns`): TypeScript utility library, extended small regress cell, `pnpm install`, `pnpm vitest run`, `pnpm run lint`, `pnpm run types`.
 - `colinhacks/zod` (`zod`): TypeScript schema validator, extended medium JSON Schema regression cell, `pnpm install`, `pnpm run build`, `pnpm test`, `pnpm run lint:check`.
 - `encode/httpx` (`httpx`): Python HTTP client, extended medium timeout/transport regression cell, `.aor` venv install, targeted pytest, Ruff, and mypy.
 - `eslint/eslint` (`eslint`): JavaScript lint rule engine, extended medium autofix regression cell, `npm install`, rule tests, and rule/type metadata checks.
 - `fastify/fastify` (`fastify`): Node.js web framework, extended medium schema/plugin repair cell, `npm install`, `npm run test:ci`, `npm run lint`.
 - `prettier/prettier` (`prettier`): formatter snapshot target, extended medium TypeScript formatting regression cell, `yarn install --immutable`, typecheck, ESLint, and focused format tests.
 - `astral-sh/ruff` (`ruff`): Rust Python linter/formatter, extended large rule/autofix regression cell, `cargo fetch`, targeted crate tests.
+- `vitest-dev/vitest` (`vitest`): hard runner diagnostics target, extended large product-change cell, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`.
+- `sqlalchemy/sqlalchemy` (`sqlalchemy`): hard Python SQL/ORM target, extended large product-change cell, `.aor` venv editable install, targeted SQL/ORM pytest.
+- `biomejs/biome` (`biome`): hard Rust/TypeScript formatter and rule target, extended large product-change cell, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`.
 
 ## Why these targets
 Together these targets cover:
@@ -399,14 +400,15 @@ Extended candidate cells:
 - `nextjs.release.xlarge.openai` / `nextjs.release.xlarge.anthropic` (`nextjs-cross-package-release-orchestration`, manual-only)
 - `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
-- `cobra.regress.small.openai`
-- `date-fns.regress.small.openai`
 - `zod.regress.medium.openai` (`zod-json-schema-regression`)
 - `httpx.regress.medium.openai` (`httpx-timeout-transport-regression`)
 - `eslint.regress.medium.openai` (`eslint-rule-autofix-regression`)
 - `fastify.repair.medium.openai` (`fastify-schema-plugin-repair`)
 - `prettier.regress.medium.openai` (`prettier-typescript-format-regression`)
 - `ruff.regress.large.openai` (`ruff-rule-autofix-regression`)
+- `vitest.regress.large.openai` (`vitest-runner-diagnostics-regression`)
+- `sqlalchemy.regress.large.openai` (`sqlalchemy-query-typing-regression`)
+- `biome.regress.large.openai` (`biome-rule-or-formatter-regression`)
 
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
@@ -424,11 +426,15 @@ are not delivery path allowlists or blocklists; they are the minimum surfaces
 that can prove the provider changed the target in a way that could satisfy the
 selected mission.
 
-Feature-size taxonomy:
-- `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
-- `medium`: bounded source plus test/type integration, usually 3-6 files.
-- `large`: cross-package or release/governance lineage with broader artifact expectations.
-- `xlarge`: manual or overnight rehearsal only; do not add xlarge cells to required coverage or qualification sets. Legacy `xl` inputs are accepted as `xlarge`, but new catalog entries must use `xlarge`.
+Feature-size taxonomy and budgets:
+- `small`: flow-regression canary only, `max_changed_files >= 16`, `max_added_lines >= 900`.
+- `medium`: product-change mission, `max_changed_files >= 32`, `max_added_lines >= 2200`.
+- `large`: product-change mission, `max_changed_files >= 64`, `max_added_lines >= 4500`.
+- `xlarge`: product-change mission for manual or overnight rehearsal only, `max_changed_files >= 100`, `max_added_lines >= 10000`; do not add xlarge cells to required coverage or qualification sets.
+
+`mission_class=flow-regression` is allowed only for small canary missions.
+`mission_class=product-change` is required for medium, large, and xlarge.
+Legacy `xl` inputs are rejected.
 
 Strict all-pass quality loops may include xlarge as manual observation evidence,
 but xlarge still cannot close required provider qualification or acceptance
@@ -444,10 +450,9 @@ Run-tier taxonomy:
 Required matrix closure rule:
 - required coverage can close only for `run_tier=acceptance` or `run_tier=production-proof` with `live-e2e-run-health-report.overall_status=pass`;
 - run-health findings identify why a run attempt did not qualify;
-- outcome quality findings belong in `live-e2e-quality-assessment-report` and are advisory for acceptance follow-up, not provider qualification status.
-- local quality-driven rerun loops may additionally require
-  `quality-assessment gate --policy all-pass`; that gate remains separate from
-  run-health and qualification accounting.
+- step quality findings belong in `live-e2e-step-quality-assessment-report`;
+- outcome quality findings belong in `live-e2e-quality-assessment-report` and remain separate from provider qualification status;
+- medium+ product-change product acceptance requires accepted step-quality reports and `quality-assessment gate --policy all-pass`; that gate remains separate from run-health and qualification accounting.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky-small-codex.yaml`

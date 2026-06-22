@@ -1,0 +1,128 @@
+catalog_id: sqlalchemy
+repo:
+  repo_id: sqlalchemy/sqlalchemy
+  repo_url: https://github.com/sqlalchemy/sqlalchemy.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - python3 -m venv .aor/live-e2e-venv
+    - .aor/live-e2e-venv/bin/python -m pip install -U pip
+    - .aor/live-e2e-venv/bin/python -m pip install -e .[test]
+  commands:
+    - .aor/live-e2e-venv/bin/python -m pytest test/sql test/orm
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: sqlalchemy.regress.large.openai
+    scenario_family: regress
+    feature_size: large
+    feature_mission_id: sqlalchemy-query-typing-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: sqlalchemy-query-typing-regression
+    title: Improve one SQLAlchemy query typing or ORM behavior
+    brief: Deliver a real query construction, typing, or ORM behavior improvement with focused
+      regression tests across the relevant SQLAlchemy package boundary.
+    feature_size: large
+    mission_class: product-change
+    goals:
+      - Improve one user-visible SQL or ORM behavior without weakening existing compatibility.
+      - Add focused regression coverage that proves the behavior in the target suite.
+      - Keep the relevant SQLAlchemy tests green.
+    kpis:
+      - kpi_id: sqlalchemy-query-behavior-green
+        name: SQLAlchemy behavior gate
+        target: targeted SQL/ORM tests pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Tests demonstrate the fixed SQL, typing, or ORM behavior.
+      - Review evidence explains compatibility impact and changed path relevance.
+      - Delivery evidence is materialized without upstream writes.
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside SQLAlchemy runtime, typing, tests, or docs required by the behavior
+      - preserve targeted SQL/ORM pytest evidence
+      - avoid broad dialect churn unless the behavior explicitly requires it
+      - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - lib/sqlalchemy/
+        - test/
+        - doc/
+    post_run_quality:
+      primary_commands:
+        - .aor/live-e2e-venv/bin/python -m pytest test/sql test/orm
+      diagnostic_commands:
+        - .aor/live-e2e-venv/bin/python -m pytest test
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 64
+      max_added_lines: 4500
+    size_rationale: SQLAlchemy product changes can cross runtime behavior, typing, docs, and
+      compatibility tests, so they remain large hard-target missions.
+    change_budget:
+      max_changed_files: 64
+      max_added_lines: 4500
+    quality_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    agent_visible_request:
+      user_problem: Deliver a real query construction, typing, or ORM behavior improvement with
+        focused regression tests across the relevant SQLAlchemy package boundary.
+      desired_outcome: Users get the corrected SQL/ORM behavior, and the diff proves it through
+        targeted tests and compatibility-aware review evidence.
+      constraints:
+        - Deliver a real product change through the full public AOR flow.
+        - Use SQLAlchemy conventions, test helpers, and compatibility expectations.
+        - Keep upstream writes disabled and materialize delivery evidence through patch-only mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+      non_goals:
+        - Do not satisfy the mission with docs-only or metadata-only churn.
+        - Do not rewrite unrelated dialect, engine, or ORM subsystems.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - Meaningful changed path under lib/sqlalchemy/
+        - Meaningful changed path under test/
+        - "Primary verification command: .aor/live-e2e-venv/bin/python -m pytest test/sql test/orm"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - lib/sqlalchemy/
+        - test/
+        - doc/
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

@@ -12,6 +12,7 @@ import {
   isLiveE2eControllerStop,
 } from "../live-e2e/lib/step-controller.mjs";
 import { prepareOperatorDecisionArtifact } from "../live-e2e/lib/decision-helper.mjs";
+import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
 
 function withTempRoot(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-controller-"));
@@ -132,6 +133,78 @@ test("live E2E step controller persists observation and state before next step",
     const [entry] = controller.getStepJournal();
     assert.equal(fs.existsSync(entry.observation_ref), true);
     assert.equal(entry.plan.public_surface, "aor discovery run");
+  });
+});
+
+test("live E2E product-change steps materialize accepted step-quality report before continuation", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-product-step-quality",
+      profile: {
+        profile_id: "live-e2e.test.product-step-quality",
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+        live_e2e: { flow_range_policy: "delivery_default" },
+      },
+      mode: "auto",
+    });
+    writeSkillAgentDecision(reportsRoot, "controller-product-step-quality", 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile],
+    });
+    const artifacts = {
+      target_catalog_id: "httpx",
+      feature_mission_id: "httpx-timeout-transport-regression",
+      feature_size: "medium",
+      mission_class: "product-change",
+    };
+
+    const result = controller.observeStage({
+      stage: "discovery",
+      stageResult: {
+        stage: "discovery",
+        status: "pass",
+        evidence_refs: [transcriptFile],
+        summary: "Discovery passed.",
+      },
+      commandResults: [
+        {
+          label: "discovery-run",
+          command_surface: "aor discovery run",
+          status: "pass",
+          transcript_file: transcriptFile,
+          artifact_refs: [transcriptFile],
+          exit_code: 0,
+        },
+      ],
+      artifacts,
+    });
+
+    assert.equal(result.action, "continue");
+    assert.equal(artifacts.live_e2e_step_quality_assessment_report_files.length, 1);
+    const [reportFile] = artifacts.live_e2e_step_quality_assessment_report_files;
+    assert.equal(fs.existsSync(reportFile), true);
+    const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+    assert.equal(report.feature_size, "medium");
+    assert.equal(report.mission_class, "product-change");
+    assert.equal(report.status, "accepted");
+    assert.equal(report.decision, "continue");
+    assert.equal(report.source_agent_decision_request_file.endsWith("discovery.json"), true);
+    assert.equal(report.source_operator_decision_file.endsWith("discovery.json"), true);
+    const validation = validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: report,
+      source: reportFile,
+    });
+    assert.equal(validation.ok, true);
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.step_quality_assessment_ref, reportFile);
+    const state = JSON.parse(fs.readFileSync(controller.stateFile, "utf8"));
+    assert.deepEqual(state.step_quality_assessment_refs, [reportFile]);
+    assert.ok(state.evidence_refs.includes(reportFile));
   });
 });
 
@@ -1952,7 +2025,10 @@ test("live E2E step controller exposes cached public command results for complet
     assert.equal(second.shouldUseCachedCommand("discovery-run"), true);
     assert.equal(second.shouldUseCachedCommand("spec-build"), false);
     assert.equal(second.getCachedCommandResult("discovery-run").transcript_file, transcriptFile);
-    assert.deepEqual(second.getState().artifacts_snapshot, { analysis_report_file: analysisFile });
+    const artifactsSnapshot = second.getState().artifacts_snapshot;
+    assert.equal(artifactsSnapshot.analysis_report_file, analysisFile);
+    assert.equal(artifactsSnapshot.live_e2e_step_observation_files.length, 1);
+    assert.equal(artifactsSnapshot.live_e2e_step_quality_assessment_report_files.length, 1);
   });
 });
 

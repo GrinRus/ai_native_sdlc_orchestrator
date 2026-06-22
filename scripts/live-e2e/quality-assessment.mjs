@@ -564,6 +564,12 @@ function prepareCli(rawArgs) {
   );
   const runId = asNonEmptyString(runSummary.run_id) || "live-e2e-run";
   const profileId = asNonEmptyString(runSummary.profile_id) || null;
+  const featureSize = asNonEmptyString(runSummary.feature_size) || null;
+  const missionClass =
+    asNonEmptyString(runSummary.mission_class) ||
+    (featureSize === "small" ? "flow-regression" : featureSize ? "product-change" : null);
+  const productAcceptanceRequired =
+    missionClass === "product-change" && ["medium", "large", "xlarge"].includes(featureSize ?? "");
   const baseDir = path.dirname(runSummaryFile);
   const observationFile = asNonEmptyString(runSummary.live_e2e_observation_report_file);
   const runHealthFile =
@@ -612,14 +618,16 @@ function prepareCli(rawArgs) {
     separation_contract: {
       live_e2e_observation_report: "factual-only setup, step, command, artifact, and evidence journal",
       live_e2e_run_health_report: "run health only: command, controller, provider, target, environment, operator, and AOR-owner issues",
-      live_e2e_quality_assessment_report: "post-run advisory outcome assessment for artifacts, code, verification, delivery safety, AOR operator UI/UX, AOR operator accessibility, and traceability",
+      live_e2e_quality_assessment_report: "post-run outcome assessment for artifacts, code, verification, delivery safety, AOR operator UI/UX, AOR operator accessibility, and traceability; mandatory for medium+ product acceptance",
     },
     run_identity: {
       target_catalog_id: asNonEmptyString(runSummary.target_catalog_id) || null,
       feature_mission_id: asNonEmptyString(runSummary.feature_mission_id) || null,
       scenario_family: asNonEmptyString(runSummary.scenario_family) || null,
       provider_variant_id: asNonEmptyString(runSummary.provider_variant_id) || null,
-      feature_size: asNonEmptyString(runSummary.feature_size) || null,
+      feature_size: featureSize,
+      mission_class: missionClass,
+      product_acceptance_required: productAcceptanceRequired,
       commit_sha: asNonEmptyString(runSummary.commit_sha) || null,
       branch_name: asNonEmptyString(runSummary.branch_name) || null,
       run_health_status:
@@ -632,6 +640,9 @@ function prepareCli(rawArgs) {
     dimension_rubric: DIMENSION_RUBRIC,
     finding_taxonomy: [...FINDING_TAXONOMY],
     quality_report_requirements: [
+      productAcceptanceRequired
+        ? "This medium+ product-change mission requires final all-pass quality for product acceptance."
+        : "This small flow-regression mission uses lightweight canary quality follow-up unless a stricter local gate is requested.",
       "Use status pass|warn|fail|not_evaluated for every required dimension.",
       "Use evidence_strength strong|medium|weak|missing for every required dimension.",
       "Populate inspected_evidence_refs for every evaluated dimension.",
@@ -655,7 +666,7 @@ function prepareCli(rawArgs) {
     instructions: [
       "Inspect evidence freely as a SWE evaluator; no predetermined fixtures are assumed.",
       "Do not rewrite the factual observation report or run-health report.",
-      "Do not change run/qualification exit status from this assessment; it is advisory outcome quality evidence.",
+      "Do not change run-health or provider qualification status from this assessment; medium+ product acceptance consumes the separate all-pass gate.",
       "Call out dimensions that were not checked, checked with weak signal, or confirmed by strong evidence.",
     ],
   };

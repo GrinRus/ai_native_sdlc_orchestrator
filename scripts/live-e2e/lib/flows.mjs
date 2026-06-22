@@ -1034,13 +1034,20 @@ function buildGuidedMissionCreateArgs(options) {
     asNonEmptyString(options.featureRequest.requestDocument.title) ||
     missionId ||
     "Guided mission";
+  const agentVisibleRequest = asRecord(options.mission.agent_visible_request);
   const brief =
     asNonEmptyString(options.briefOverride) ||
+    asNonEmptyString(agentVisibleRequest.user_problem) ||
     asNonEmptyString(options.featureRequest.requestDocument.brief) ||
     asNonEmptyString(options.mission.brief) ||
     "Prepare one bounded guided mission request.";
-  const goals = asStringArray(options.mission.goals);
-  const constraints = asStringArray(options.mission.acceptance_checks);
+  const desiredOutcome = asNonEmptyString(agentVisibleRequest.desired_outcome);
+  const goals = uniqueStrings([...(desiredOutcome ? [desiredOutcome] : []), ...asStringArray(options.mission.goals)]);
+  const constraints = uniqueStrings([
+    ...asStringArray(agentVisibleRequest.constraints),
+    ...asStringArray(agentVisibleRequest.non_goals).map((entry) => `Non-goal: ${entry}`),
+    ...asStringArray(options.mission.acceptance_checks),
+  ]);
   const definitionOfDone =
     asStringArray(options.mission.definition_of_done).length > 0
       ? asStringArray(options.mission.definition_of_done)
@@ -2192,7 +2199,7 @@ function resolveRunTier(profile) {
  * @returns {boolean}
  */
 function requiresStrictMissionIntake(featureSize) {
-  return featureSize === "medium" || featureSize === "large" || featureSize === "xlarge" || featureSize === "xl";
+  return featureSize === "medium" || featureSize === "large" || featureSize === "xlarge";
 }
 
 /**
@@ -2246,12 +2253,19 @@ function evaluateMissionIntakeQuality(options) {
 function buildIntakeCreateArgs(options) {
   const missionId = asNonEmptyString(options.mission.mission_id);
   const title = asNonEmptyString(options.featureRequest.requestDocument.title) || missionId || "Feature mission";
+  const agentVisibleRequest = asRecord(options.mission.agent_visible_request);
   const brief =
+    asNonEmptyString(agentVisibleRequest.user_problem) ||
     asNonEmptyString(options.featureRequest.requestDocument.brief) ||
     asNonEmptyString(options.mission.brief) ||
     "Prepare one bounded catalog mission request.";
-  const goals = asStringArray(options.mission.goals);
-  const constraints = asStringArray(options.mission.acceptance_checks);
+  const desiredOutcome = asNonEmptyString(agentVisibleRequest.desired_outcome);
+  const goals = uniqueStrings([...(desiredOutcome ? [desiredOutcome] : []), ...asStringArray(options.mission.goals)]);
+  const constraints = uniqueStrings([
+    ...asStringArray(agentVisibleRequest.constraints),
+    ...asStringArray(agentVisibleRequest.non_goals).map((entry) => `Non-goal: ${entry}`),
+    ...asStringArray(options.mission.acceptance_checks),
+  ]);
   const definitionOfDone =
     asStringArray(options.mission.definition_of_done).length > 0
       ? asStringArray(options.mission.definition_of_done)
@@ -3534,6 +3548,7 @@ export function executeFullJourneyFlow(options) {
     scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
     provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
     feature_size: options.featureSize,
+    mission_class: asNonEmptyString(options.mission.mission_class) || null,
     run_tier: resolveRunTier(options.profile),
     matrix_cell: options.matrixCell,
     coverage_follow_up: options.coverageFollowUp,

@@ -49,8 +49,7 @@ provider_comparison_pairs:
 feature_missions:
   - mission_id: pluggy-hook-order-regression
     title: Preserve hook ordering regression behavior
-    brief: Add or adjust one focused hook ordering or call result regression with
-      targeted test coverage.
+    brief: Add or adjust one focused hook ordering or call result regression with targeted test coverage.
     feature_size: small
     expected_evidence: &a1
       - verify-summary
@@ -70,21 +69,61 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 5
-      max_added_lines: 200
+      max_changed_files: 16
+      max_added_lines: 900
     size_rationale: Small pluggy regressions should stay inside one hook behavior seam.
     change_budget:
-      max_changed_files: 5
-      max_added_lines: 200
+      max_changed_files: 16
+      max_added_lines: 900
     quality_evidence: *a1
+    mission_class: flow-regression
+    agent_visible_request:
+      user_problem: Add or adjust one focused hook ordering or call result regression with targeted test
+        coverage.
+      desired_outcome: Add or adjust one focused hook ordering or call result regression with targeted
+        test coverage.
+      constraints:
+        - Use this mission only as a live E2E canary that proves the public flow still works.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change inside hook behavior and tests
+        - preserve .aor/live-e2e-venv/bin/python -m pytest testing evidence
+      non_goals:
+        - Do not expand this small canary into a product-quality acceptance mission.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: flow-health
+      step_quality_required: false
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted public step decision refs for the canary flow.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - "Primary verification command: .aor/live-e2e-venv/bin/python -m pytest testing"
+    final_code_rubric:
+      quality_gate: flow-health
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - flow_completion
+        - public_artifact_materialization
+        - canary_verification
   - mission_id: pluggy-diagnostics-repair
     title: Repair one diagnostics or error-message seam
-    brief: Fix one bounded diagnostics, warning, or error-message behavior with
-      regression coverage.
+    brief: Fix one bounded diagnostics, warning, or error-message behavior with regression coverage.
     feature_size: medium
     goals:
-      - Repair one diagnostics behavior without changing unrelated hook
-        execution semantics.
+      - Repair one diagnostics behavior without changing unrelated hook execution semantics.
     kpis:
       - kpi_id: pluggy-diagnostics-green
         name: Pluggy diagnostics gate
@@ -113,18 +152,64 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 8
-      max_added_lines: 300
-    size_rationale: Medium pluggy repair may touch runtime and tests but should
-      remain inside one diagnostic seam.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium pluggy repair may touch runtime and tests but should remain inside one diagnostic seam.
     change_budget:
-      max_changed_files: 8
-      max_added_lines: 300
+      max_changed_files: 32
+      max_added_lines: 2200
     quality_evidence: *a2
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Fix one bounded diagnostics, warning, or error-message behavior with regression coverage.
+      desired_outcome: Regression tests cover the repaired diagnostic. Review and delivery evidence stay
+        anchored to the target checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the fix inside pluggy runtime/tests
+        - preserve bounded pytest evidence
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: .aor/live-e2e-venv/bin/python -m pytest testing"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: pluggy-typing-governance
     title: Govern one typing and hook-contract change
-    brief: Exercise one broader typing or hook contract adjustment with strict audit
-      and learning closure.
+    brief: Exercise one broader typing or hook contract adjustment with strict audit and learning closure.
     feature_size: medium
     goals:
       - Preserve type/hook contract lineage for one bounded governance change.
@@ -132,13 +217,11 @@ feature_missions:
     kpis:
       - kpi_id: pluggy-governance-lineage
         name: Pluggy governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix
-          cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - .aor/live-e2e-venv/bin/python -m pytest testing passes.
-      - Governance and learning artifacts link to the same mission and target
-        checkout.
+      - Governance and learning artifacts link to the same mission and target checkout.
     expected_evidence: &a3
       - verify-summary
       - review-report
@@ -160,11 +243,60 @@ feature_missions:
       - anthropic-primary
       - open-code-primary
     size_budget:
-      max_changed_files: 10
-      max_added_lines: 360
-    size_rationale: Governance changes may touch hook contract and tests, but should
-      remain bounded to pluggy package behavior.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Governance changes may touch hook contract and tests, but should remain bounded to
+      pluggy package behavior.
     change_budget:
-      max_changed_files: 10
-      max_added_lines: 360
+      max_changed_files: 32
+      max_added_lines: 2200
     quality_evidence: *a3
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Exercise one broader typing or hook contract adjustment with strict audit and learning
+        closure.
+      desired_outcome: .aor/live-e2e-venv/bin/python -m pytest testing passes. Governance and learning
+        artifacts link to the same mission and target checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep governance evidence tied to the target checkout
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - review-report
+        - delivery-manifest
+        - learning-loop-handoff
+        - "Primary verification command: .aor/live-e2e-venv/bin/python -m pytest testing"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

@@ -2512,6 +2512,24 @@ test("xlarge catalog profiles resolve as manual-only matrix cells", () => {
   assert.equal(resolved.resolvedProfile.run_tier, "full-journey-observation");
 });
 
+test("full-journey resolver rejects profiles without explicit catalog matrix cell", () => {
+  const loaded = loadProofRunnerProfile({
+    hostRoot: repoRoot,
+    profileRef: "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml",
+  });
+  const profile = structuredClone(loaded.profile);
+  profile.provider_variant_id = "anthropic-primary";
+
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /must match an explicit required_matrix_cells or manual_matrix_cells entry/u,
+  );
+});
+
 test("run-profile rejects xlarge profiles outside manual controller mode", () => {
   const result = spawnSync(
     process.execPath,

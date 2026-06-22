@@ -3,7 +3,7 @@
 ## Purpose
 Outcome-oriented quality report written after a full live E2E flow by the launching SWE agent.
 
-This report is separate from the run itself. It assesses the quality of the artifacts produced by the flow, the resulting code and verification evidence, delivery safety, and AOR operator UI/UX/accessibility evidence where applicable. It is advisory for qualification and acceptance unless a separate policy explicitly consumes it.
+This report is separate from the run itself. It assesses the quality of the artifacts produced by the flow, the resulting code and verification evidence, delivery safety, and AOR operator UI/UX/accessibility evidence where applicable. It remains separate from provider qualification. For `mission_class=product-change` with `feature_size=medium|large|xlarge`, an all-pass final quality gate is mandatory for product acceptance. For `mission_class=flow-regression` with `feature_size=small`, it may be used as lightweight canary follow-up evidence.
 
 The assessment is free-form expert work over the linked evidence. It does not rely on predefined fixtures.
 
@@ -166,7 +166,9 @@ node ./scripts/live-e2e/quality-assessment.mjs gate \
   --assessment-report-file <report>
 ```
 
-The gate is advisory and does not mutate run-health or provider qualification.
+The gate does not mutate run-health or provider qualification. It is mandatory
+product-acceptance evidence for medium+ product-change missions and optional
+local closure evidence for small flow-regression canaries.
 It fails when:
 - the report contract or local evidence refs are invalid;
 - `overall_status` is not `pass`;

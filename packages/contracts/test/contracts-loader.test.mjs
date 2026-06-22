@@ -315,6 +315,48 @@ test("W14 live-e2e target catalog documents validate", () => {
   );
 });
 
+test("live E2E target catalog enforces product mission policy", () => {
+  const source = path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-target-catalog" });
+  assert.equal(loaded.ok, true, "expected ky target catalog to load before mutation");
+
+  const smallProductChange = structuredClone(loaded.document);
+  smallProductChange.feature_missions[0].mission_class = "product-change";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-target-catalog",
+      document: smallProductChange,
+      source: "test://target-catalog-small-product-change",
+    }),
+    "enum_value_invalid",
+    "feature_missions[0].mission_class",
+  );
+
+  const mediumMissingRubric = structuredClone(loaded.document);
+  delete mediumMissingRubric.feature_missions[1].agent_visible_request;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-target-catalog",
+      document: mediumMissingRubric,
+      source: "test://target-catalog-medium-missing-request",
+    }),
+    "required_field_missing",
+    "feature_missions[1].agent_visible_request",
+  );
+
+  const legacySize = structuredClone(loaded.document);
+  legacySize.feature_missions[1].feature_size = "xl";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-target-catalog",
+      document: legacySize,
+      source: "test://target-catalog-legacy-xl",
+    }),
+    "enum_value_invalid",
+    "feature_missions[1].feature_size",
+  );
+});
+
 test("new runtime context family examples load through the shared contract path", () => {
   const examples = [
     [path.join(workspaceRoot, "examples/context/docs/repo-map-core.yaml"), "context-doc"],
@@ -1574,6 +1616,72 @@ test("live E2E quality assessment report enforces dimensions and evidence gaps",
     notEvaluatedUiSubdimensionMissingFindingValidation,
     "required_field_missing",
     "dimensions.aor_operator_accessibility_quality.subdimensions.keyboard_navigation.findings",
+  );
+});
+
+test("live E2E step quality assessment report enforces accepted step shape", () => {
+  const source = path.join(workspaceRoot, "examples/reports/live-e2e-step-quality-assessment-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-step-quality-assessment-report" });
+  assert.equal(loaded.ok, true, "expected live-e2e-step-quality-assessment-report sample to load");
+
+  const acceptedWithRepairDecision = structuredClone(loaded.document);
+  acceptedWithRepairDecision.decision = "request-repair";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: acceptedWithRepairDecision,
+      source: "test://step-quality-accepted-repair",
+    }),
+    "enum_value_invalid",
+    "decision",
+  );
+
+  const acceptedWeakDimension = structuredClone(loaded.document);
+  acceptedWeakDimension.dimensions.traceability.evidence_strength = "weak";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: acceptedWeakDimension,
+      source: "test://step-quality-accepted-weak",
+    }),
+    "enum_value_invalid",
+    "dimensions.traceability",
+  );
+
+  const missingEvaluatorResponsibility = structuredClone(loaded.document);
+  delete missingEvaluatorResponsibility.evaluator.responsibility;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingEvaluatorResponsibility,
+      source: "test://step-quality-missing-evaluator-responsibility",
+    }),
+    "required_field_missing",
+    "evaluator.responsibility",
+  );
+
+  const missingEvidence = structuredClone(loaded.document);
+  missingEvidence.evidence_refs = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingEvidence,
+      source: "test://step-quality-empty-evidence",
+    }),
+    "required_field_missing",
+    "evidence_refs",
+  );
+
+  const invalidFinding = structuredClone(loaded.document);
+  invalidFinding.dimensions.traceability.findings = [{ finding_id: "not-a-string" }];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: invalidFinding,
+      source: "test://step-quality-invalid-finding",
+    }),
+    "field_type_mismatch",
+    "dimensions.traceability.findings[0]",
   );
 });
 

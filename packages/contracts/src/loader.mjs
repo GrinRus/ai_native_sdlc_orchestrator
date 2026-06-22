@@ -15,6 +15,8 @@ const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_f
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary", "qwen-primary"];
+const LIVE_E2E_FEATURE_SIZE_VALUES = ["small", "medium", "large", "xlarge"];
+const LIVE_E2E_MISSION_CLASS_VALUES = ["flow-regression", "product-change"];
 const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
 const LIVE_E2E_RUN_HEALTH_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const LIVE_E2E_RUN_FAILURE_OWNER_VALUES = [
@@ -87,6 +89,21 @@ const LIVE_E2E_AOR_OPERATOR_UI_QUALITY_SUBDIMENSION_KEYS = {
 };
 const LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES = ["pass", "warn", "fail", "not_evaluated"];
 const LIVE_E2E_QUALITY_EVIDENCE_STRENGTH_VALUES = ["strong", "medium", "weak", "missing"];
+const LIVE_E2E_STEP_QUALITY_STATUS_VALUES = ["accepted", "request_repair", "retry", "blocked"];
+const LIVE_E2E_STEP_QUALITY_DECISION_VALUES = ["continue", "request-repair", "retry", "block"];
+const LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS = [
+  "traceability",
+  "completeness",
+  "actionability",
+  "evidence_strength",
+  "black_box_boundary",
+];
+const LIVE_E2E_MISSION_SIZE_BUDGETS = {
+  small: { max_changed_files: 16, max_added_lines: 900 },
+  medium: { max_changed_files: 32, max_added_lines: 2200 },
+  large: { max_changed_files: 64, max_added_lines: 4500 },
+  xlarge: { max_changed_files: 100, max_added_lines: 10000 },
+};
 const LIVE_E2E_QUALITY_FINDING_CATEGORY_VALUES = [
   "artifact-content",
   "implementation-correctness",
@@ -270,6 +287,14 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "live-e2e-quality-assessment-report") {
     issues.push(...validateLiveE2EQualityAssessmentReport(document, source));
+  }
+
+  if (family === "live-e2e-step-quality-assessment-report") {
+    issues.push(...validateLiveE2EStepQualityAssessmentReport(document, source));
+  }
+
+  if (family === "live-e2e-target-catalog") {
+    issues.push(...validateLiveE2ETargetCatalog(document, source));
   }
 
   if (family === "adapter-capability-profile") {
@@ -1988,6 +2013,655 @@ function validateCoverageFollowUp(coverageFollowUp, source, parentField, issues)
     }
     validateMatrixCell(entry, source, `${parentField}.remaining_required_matrix_cells[${index}]`, issues);
   });
+}
+
+/**
+ * @param {{ record: Record<string, unknown>, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function validateRequiredObjectField(options) {
+  const fieldName = options.field.split(".").at(-1) ?? options.field;
+  if (!(fieldName in options.record)) {
+    options.issues.push(
+      issue({
+        code: "required_field_missing",
+        source: options.source,
+        field: options.field,
+        expected: "present",
+        actual: "missing",
+        message: `Missing required field '${options.field}'.`,
+      }),
+    );
+    return null;
+  }
+  const value = options.record[fieldName];
+  if (!isPlainObject(value)) {
+    options.issues.push(
+      issue({
+        code: "field_type_mismatch",
+        source: options.source,
+        field: options.field,
+        expected: "object",
+        actual: describeActualType(value),
+        message: `Field '${options.field}' must be 'object'.`,
+      }),
+    );
+    return null;
+  }
+  return value;
+}
+
+/**
+ * @param {{
+ *   mission: Record<string, unknown>,
+ *   source: string,
+ *   parentField: string,
+ *   budgetField: string,
+ *   featureSize: string,
+ *   issues: import("./index.d.ts").ContractValidationIssue[],
+ * }} options
+ */
+function validateMissionBudget(options) {
+  const budget = validateRequiredObjectField({
+    record: options.mission,
+    source: options.source,
+    field: `${options.parentField}.${options.budgetField}`,
+    issues: options.issues,
+  });
+  if (!budget) return;
+  const expectedBudget = LIVE_E2E_MISSION_SIZE_BUDGETS[options.featureSize];
+  for (const budgetKey of ["max_changed_files", "max_added_lines"]) {
+    validateNestedNumberField({
+      record: budget,
+      source: options.source,
+      field: `${options.parentField}.${options.budgetField}.${budgetKey}`,
+      issues: options.issues,
+      required: true,
+    });
+    const value = budget[budgetKey];
+    if (!expectedBudget || typeof value !== "number" || !Number.isFinite(value)) {
+      continue;
+    }
+    if (value < expectedBudget[budgetKey]) {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `${options.parentField}.${options.budgetField}.${budgetKey}`,
+          expected: `>=${expectedBudget[budgetKey]}`,
+          actual: String(value),
+          message: `Field '${options.parentField}.${options.budgetField}.${budgetKey}' must be at least ${expectedBudget[budgetKey]} for feature_size=${options.featureSize}.`,
+        }),
+      );
+    }
+  }
+}
+
+/**
+ * @param {{
+ *   record: Record<string, unknown>,
+ *   source: string,
+ *   parentField: string,
+ *   issues: import("./index.d.ts").ContractValidationIssue[],
+ * }} options
+ */
+function validateAgentVisibleRequest(options) {
+  const request = validateRequiredObjectField({
+    record: options.record,
+    source: options.source,
+    field: `${options.parentField}.agent_visible_request`,
+    issues: options.issues,
+  });
+  if (!request) return;
+  validateNestedStringField({
+    record: request,
+    source: options.source,
+    field: `${options.parentField}.agent_visible_request.user_problem`,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedStringField({
+    record: request,
+    source: options.source,
+    field: `${options.parentField}.agent_visible_request.desired_outcome`,
+    issues: options.issues,
+    required: true,
+  });
+  for (const field of ["constraints", "non_goals"]) {
+    validateNestedArrayField({
+      record: request,
+      source: options.source,
+      field: `${options.parentField}.agent_visible_request.${field}`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: request[field],
+      source: options.source,
+      field: `${options.parentField}.agent_visible_request.${field}`,
+      issues: options.issues,
+    });
+  }
+}
+
+/**
+ * @param {{
+ *   record: Record<string, unknown>,
+ *   source: string,
+ *   parentField: string,
+ *   featureSize: string,
+ *   missionClass: string,
+ *   issues: import("./index.d.ts").ContractValidationIssue[],
+ * }} options
+ */
+function validateEvaluatorRubric(options) {
+  const rubric = validateRequiredObjectField({
+    record: options.record,
+    source: options.source,
+    field: `${options.parentField}.evaluator_rubric`,
+    issues: options.issues,
+  });
+  if (!rubric) return;
+  validateNestedStringField({
+    record: rubric,
+    source: options.source,
+    field: `${options.parentField}.evaluator_rubric.quality_gate`,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedBooleanField({
+    record: rubric,
+    source: options.source,
+    field: `${options.parentField}.evaluator_rubric.step_quality_required`,
+    issues: options.issues,
+    required: true,
+  });
+  for (const field of ["step_quality_dimensions", "evidence_expectations"]) {
+    validateNestedArrayField({
+      record: rubric,
+      source: options.source,
+      field: `${options.parentField}.evaluator_rubric.${field}`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: rubric[field],
+      source: options.source,
+      field: `${options.parentField}.evaluator_rubric.${field}`,
+      issues: options.issues,
+    });
+  }
+  if (options.missionClass === "product-change" && options.featureSize !== "small" && rubric.step_quality_required !== true) {
+    options.issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source: options.source,
+        field: `${options.parentField}.evaluator_rubric.step_quality_required`,
+        expected: "true",
+        actual: String(rubric.step_quality_required),
+        message: `Product-change feature_size=${options.featureSize} missions require accepted step-quality assessment before continuation.`,
+      }),
+    );
+  }
+}
+
+/**
+ * @param {{
+ *   record: Record<string, unknown>,
+ *   source: string,
+ *   parentField: string,
+ *   issues: import("./index.d.ts").ContractValidationIssue[],
+ * }} options
+ */
+function validateFinalCodeRubric(options) {
+  const rubric = validateRequiredObjectField({
+    record: options.record,
+    source: options.source,
+    field: `${options.parentField}.final_code_rubric`,
+    issues: options.issues,
+  });
+  if (!rubric) return;
+  validateNestedStringField({
+    record: rubric,
+    source: options.source,
+    field: `${options.parentField}.final_code_rubric.quality_gate`,
+    issues: options.issues,
+    required: true,
+  });
+  for (const field of ["required_changed_surfaces", "acceptance_dimensions"]) {
+    validateNestedArrayField({
+      record: rubric,
+      source: options.source,
+      field: `${options.parentField}.final_code_rubric.${field}`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: rubric[field],
+      source: options.source,
+      field: `${options.parentField}.final_code_rubric.${field}`,
+      issues: options.issues,
+    });
+  }
+}
+
+/**
+ * @param {{
+ *   cell: Record<string, unknown>,
+ *   source: string,
+ *   parentField: string,
+ *   missionById: Map<string, Record<string, unknown>>,
+ *   issues: import("./index.d.ts").ContractValidationIssue[],
+ * }} options
+ */
+function validateTargetMatrixCell(options) {
+  for (const field of ["cell_id", "feature_mission_id", "feature_size", "coverage_tier"]) {
+    validateNestedStringField({
+      record: options.cell,
+      source: options.source,
+      field: `${options.parentField}.${field}`,
+      issues: options.issues,
+      required: true,
+    });
+  }
+  validateNestedEnumStringField({
+    record: options.cell,
+    source: options.source,
+    field: `${options.parentField}.scenario_family`,
+    allowedValues: LIVE_E2E_SCENARIO_VALUES,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: options.cell,
+    source: options.source,
+    field: `${options.parentField}.provider_variant_id`,
+    allowedValues: LIVE_E2E_PROVIDER_VARIANT_VALUES,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: options.cell,
+    source: options.source,
+    field: `${options.parentField}.feature_size`,
+    allowedValues: LIVE_E2E_FEATURE_SIZE_VALUES,
+    issues: options.issues,
+    required: true,
+  });
+  const missionId = typeof options.cell.feature_mission_id === "string" ? options.cell.feature_mission_id : "";
+  const featureSize = typeof options.cell.feature_size === "string" ? options.cell.feature_size : "";
+  const mission = options.missionById.get(missionId);
+  if (!mission) {
+    options.issues.push(
+      issue({
+        code: "required_field_missing",
+        source: options.source,
+        field: `${options.parentField}.feature_mission_id`,
+        expected: "existing feature_missions[].mission_id",
+        actual: missionId || "missing",
+        message: `Field '${options.parentField}.feature_mission_id' must reference an existing feature mission.`,
+      }),
+    );
+  } else if (featureSize && mission.feature_size !== featureSize) {
+    options.issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source: options.source,
+        field: `${options.parentField}.feature_size`,
+        expected: String(mission.feature_size),
+        actual: featureSize,
+        message: `Field '${options.parentField}.feature_size' must match referenced mission '${missionId}'.`,
+      }),
+    );
+  }
+  const coverageTier = typeof options.cell.coverage_tier === "string" ? options.cell.coverage_tier : "required";
+  if (featureSize === "xlarge" && coverageTier === "required") {
+    options.issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source: options.source,
+        field: `${options.parentField}.coverage_tier`,
+        expected: "manual|extended",
+        actual: "required",
+        message: "feature_size=xlarge is manual or overnight only and must not be required coverage.",
+      }),
+    );
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateLiveE2ETargetCatalog(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const missions = Array.isArray(document.feature_missions) ? document.feature_missions : [];
+  /** @type {Map<string, Record<string, unknown>>} */
+  const missionById = new Map();
+
+  missions.forEach((entry, index) => {
+    const parentField = `feature_missions[${index}]`;
+    if (!isPlainObject(entry)) {
+      issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source,
+          field: parentField,
+          expected: "object",
+          actual: describeActualType(entry),
+          message: `Field '${parentField}' must be 'object'.`,
+        }),
+      );
+      return;
+    }
+
+    for (const field of ["mission_id", "title", "brief", "feature_size", "mission_class"]) {
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${parentField}.${field}`,
+        issues,
+        required: true,
+      });
+    }
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `${parentField}.feature_size`,
+      allowedValues: LIVE_E2E_FEATURE_SIZE_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `${parentField}.mission_class`,
+      allowedValues: LIVE_E2E_MISSION_CLASS_VALUES,
+      issues,
+      required: true,
+    });
+    validateUnsupportedNestedFields({
+      record: entry,
+      source,
+      parentField,
+      fields: ["allowed_paths", "forbidden_paths"],
+      issues,
+    });
+
+    const missionId = typeof entry.mission_id === "string" ? entry.mission_id : "";
+    if (missionId) {
+      missionById.set(missionId, entry);
+    }
+    const featureSize = typeof entry.feature_size === "string" ? entry.feature_size : "";
+    const missionClass = typeof entry.mission_class === "string" ? entry.mission_class : "";
+    if (featureSize === "small" && missionClass !== "flow-regression") {
+      issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source,
+          field: `${parentField}.mission_class`,
+          expected: "flow-regression",
+          actual: missionClass || "missing",
+          message: "feature_size=small is reserved for flow-regression canary missions.",
+        }),
+      );
+    }
+    if (["medium", "large", "xlarge"].includes(featureSize) && missionClass !== "product-change") {
+      issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source,
+          field: `${parentField}.mission_class`,
+          expected: "product-change",
+          actual: missionClass || "missing",
+          message: `feature_size=${featureSize} missions must be product-change missions.`,
+        }),
+      );
+    }
+
+    validateAgentVisibleRequest({ record: entry, source, parentField, issues });
+    validateEvaluatorRubric({ record: entry, source, parentField, featureSize, missionClass, issues });
+    validateFinalCodeRubric({ record: entry, source, parentField, issues });
+    if (LIVE_E2E_FEATURE_SIZE_VALUES.includes(featureSize)) {
+      validateMissionBudget({ mission: entry, source, parentField, budgetField: "size_budget", featureSize, issues });
+      validateMissionBudget({ mission: entry, source, parentField, budgetField: "change_budget", featureSize, issues });
+    }
+  });
+
+  for (const matrixField of ["required_matrix_cells", "manual_matrix_cells"]) {
+    const cells = Array.isArray(document[matrixField]) ? document[matrixField] : [];
+    cells.forEach((entry, index) => {
+      const parentField = `${matrixField}[${index}]`;
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: parentField,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field '${parentField}' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+      validateTargetMatrixCell({ cell: entry, source, parentField, missionById, issues });
+    });
+  }
+
+  const comparisonPairs = Array.isArray(document.provider_comparison_pairs) ? document.provider_comparison_pairs : [];
+  comparisonPairs.forEach((entry, index) => {
+    if (!isPlainObject(entry)) return;
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `provider_comparison_pairs[${index}].feature_size`,
+      allowedValues: LIVE_E2E_FEATURE_SIZE_VALUES,
+      issues,
+      required: false,
+    });
+  });
+
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateLiveE2EStepQualityAssessmentReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const evaluator = isPlainObject(document.evaluator) ? document.evaluator : {};
+  for (const field of ["kind", "mode", "responsibility"]) {
+    validateNestedStringField({
+      record: evaluator,
+      source,
+      field: `evaluator.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "feature_size",
+    allowedValues: LIVE_E2E_FEATURE_SIZE_VALUES,
+    issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "mission_class",
+    allowedValues: LIVE_E2E_MISSION_CLASS_VALUES,
+    issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "status",
+    allowedValues: LIVE_E2E_STEP_QUALITY_STATUS_VALUES,
+    issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "decision",
+    allowedValues: LIVE_E2E_STEP_QUALITY_DECISION_VALUES,
+    issues,
+    required: true,
+  });
+  validateStringArrayItems({
+    values: document.inspected_evidence_refs,
+    source,
+    field: "inspected_evidence_refs",
+    issues,
+  });
+  for (const field of ["findings", "repair_instructions", "evidence_refs"]) {
+    validateStringArrayItems({
+      values: document[field],
+      source,
+      field,
+      issues,
+    });
+  }
+  if (Array.isArray(document.inspected_evidence_refs) && document.inspected_evidence_refs.length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "inspected_evidence_refs",
+        expected: "non-empty array",
+        actual: "empty",
+        message: "Step quality assessment must cite inspected public evidence refs.",
+      }),
+    );
+  }
+  if (Array.isArray(document.evidence_refs) && document.evidence_refs.length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "evidence_refs",
+        expected: "non-empty array",
+        actual: "empty",
+        message: "Step quality assessment must cite materialized public evidence refs.",
+      }),
+    );
+  }
+
+  if (document.feature_size === "small" && document.mission_class !== "flow-regression") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "mission_class",
+        expected: "flow-regression",
+        actual: String(document.mission_class),
+        message: "feature_size=small step assessments are canary-only flow-regression evidence.",
+      }),
+    );
+  }
+  if (["medium", "large", "xlarge"].includes(String(document.feature_size)) && document.mission_class !== "product-change") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "mission_class",
+        expected: "product-change",
+        actual: String(document.mission_class),
+        message: "medium+ step assessments must belong to product-change missions.",
+      }),
+    );
+  }
+  if (document.status === "accepted" && document.decision !== "continue") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "decision",
+        expected: "continue",
+        actual: String(document.decision),
+        message: "Accepted step quality assessments must make decision=continue.",
+      }),
+    );
+  }
+
+  const dimensions = isPlainObject(document.dimensions) ? document.dimensions : {};
+  for (const dimensionKey of LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS) {
+    const dimension = dimensions[dimensionKey];
+    const field = `dimensions.${dimensionKey}`;
+    if (!isPlainObject(dimension)) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field,
+          expected: "object",
+          actual: describeActualType(dimension),
+          message: `Missing required field '${field}'.`,
+        }),
+      );
+      continue;
+    }
+    validateNestedEnumStringField({
+      record: dimension,
+      source,
+      field: `${field}.status`,
+      allowedValues: ["pass", "warn", "fail", "not_evaluated"],
+      issues,
+      required: true,
+    });
+    validateNestedEnumStringField({
+      record: dimension,
+      source,
+      field: `${field}.evidence_strength`,
+      allowedValues: LIVE_E2E_QUALITY_EVIDENCE_STRENGTH_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedArrayField({
+      record: dimension,
+      source,
+      field: `${field}.inspected_evidence_refs`,
+      issues,
+    });
+    validateStringArrayItems({
+      values: dimension.inspected_evidence_refs,
+      source,
+      field: `${field}.inspected_evidence_refs`,
+      issues,
+    });
+    validateNestedArrayField({
+      record: dimension,
+      source,
+      field: `${field}.findings`,
+      issues,
+    });
+    validateStringArrayItems({
+      values: dimension.findings,
+      source,
+      field: `${field}.findings`,
+      issues,
+    });
+    if (document.status === "accepted" && (dimension.status !== "pass" || !["strong", "medium"].includes(String(dimension.evidence_strength)))) {
+      issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source,
+          field,
+          expected: "status=pass with evidence_strength=strong|medium",
+          actual: `status=${String(dimension.status)}, evidence_strength=${String(dimension.evidence_strength)}`,
+          message: "Accepted step quality assessments require passing dimensions with medium or strong evidence.",
+        }),
+      );
+    }
+  }
+
+  return issues;
 }
 
 /**

@@ -11,6 +11,10 @@ import {
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
+import {
+  requiresAcceptedProductStepQuality,
+  writeStepQualityAssessmentReport,
+} from "./step-quality-assessment.mjs";
 
 const DELIVERY_STEPS = Object.freeze(["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"]);
 const FULL_LIFECYCLE_STEPS = Object.freeze([...DELIVERY_STEPS, "release", "learning"]);
@@ -713,6 +717,7 @@ export function createLiveE2eStepController(options) {
     pending_decision: null,
     operator_context: operatorContext,
     retry_counters: retryCounters,
+    step_quality_assessment_refs: [],
     evidence_refs: [],
     artifacts_snapshot: {},
     command_results: [],
@@ -827,9 +832,14 @@ export function createLiveE2eStepController(options) {
       .filter(Boolean);
     state.current_step = resolveCurrentStep();
     state.pending_decision = entry.decision ?? null;
+    state.step_quality_assessment_refs = uniqueStrings([
+      ...asStringArray(state.step_quality_assessment_refs),
+      asNonEmptyString(entry.step_quality_assessment_ref),
+    ]);
     state.evidence_refs = uniqueStrings([
       ...asStringArray(state.evidence_refs),
       observationFile,
+      asNonEmptyString(entry.step_quality_assessment_ref),
       asNonEmptyString(entry.plan_ref),
       asNonEmptyString(entry.execution_ref),
       asNonEmptyString(entry.inspection_ref),
@@ -1340,6 +1350,38 @@ export function createLiveE2eStepController(options) {
       entry.decision.action = resolveDecisionAction(entry);
     }
 
+    if (asNonEmptyString(entry.operator_decision_status) === "accepted") {
+      const builtStepQuality = writeStepQualityAssessmentReport({
+        runId: options.runId,
+        profile: options.profile,
+        artifacts: input.artifacts,
+        entry,
+        outputDir: options.reportsRoot,
+      });
+      entry.step_quality_assessment_ref = builtStepQuality.reportFile;
+      if (
+        requiresAcceptedProductStepQuality(builtStepQuality.context) &&
+        asNonEmptyString(asRecord(entry.decision).action) === "continue" &&
+        (asNonEmptyString(builtStepQuality.assessment.status) !== "accepted" ||
+          asNonEmptyString(builtStepQuality.assessment.decision) !== "continue")
+      ) {
+        entry.semantic_analysis = {
+          ...asRecord(entry.semantic_analysis),
+          status: "blocked",
+          findings: uniqueStrings([
+            ...asStringArray(asRecord(entry.semantic_analysis).findings),
+            "Product-change step continuation requires an accepted step-quality assessment.",
+          ]),
+        };
+        entry.final_step_verdict = "blocked";
+        entry.decision = {
+          ...asRecord(entry.decision),
+          action: "block",
+          reason: "Product-change step continuation requires an accepted step-quality assessment.",
+        };
+      }
+    }
+
     recordPhase(step, "plan", []);
     recordPhase(step, "execute", uniqueStrings([asNonEmptyString(entry.transcript_ref)]));
     recordPhase(step, "inspect", artifactRefs);
@@ -1361,9 +1403,16 @@ export function createLiveE2eStepController(options) {
     input.artifacts.live_e2e_step_observation_files = Object.values(entryByStep).map((stepEntry) =>
       asNonEmptyString(stepEntry.observation_ref),
     );
+    input.artifacts.live_e2e_step_quality_assessment_report_files = Object.values(entryByStep)
+      .map((stepEntry) => asNonEmptyString(stepEntry.step_quality_assessment_ref))
+      .filter(Boolean);
     input.artifacts.live_e2e_step_journal_entries = Object.values(entryByStep).sort(
       (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
     );
+    state.artifacts_snapshot = JSON.parse(
+      JSON.stringify(mergeArtifactSnapshots(asRecord(state.artifacts_snapshot), input.artifacts ?? {})),
+    );
+    writeJson(stateFile, state);
 
     const action = asNonEmptyString(asRecord(entry.decision).action) || "continue";
     const actionContinuesController = action === "continue" || (mode === "auto" && action === "retry_public_step");

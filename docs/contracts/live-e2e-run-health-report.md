@@ -165,4 +165,4 @@ Run-health reports must not include:
 - `aor_operator_accessibility_quality`
 
 ## Relationship to qualification
-Provider qualification and run acceptance should use run-health and factual run summary status. They must not depend on code/artifact/UI quality assessment, which is advisory post-run outcome analysis.
+Provider qualification should use run-health and factual run summary status. It must not depend on code/artifact/UI quality assessment. Medium+ product acceptance is separate and consumes step-quality reports plus the final all-pass quality gate.

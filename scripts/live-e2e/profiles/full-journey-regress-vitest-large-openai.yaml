@@ -1,0 +1,55 @@
+profile_id: live-e2e.full-journey.regress.vitest.large.openai
+version: 1
+journey_mode: full-journey
+flow_kind: regress
+duration_class: long
+live_e2e:
+  flow_range_policy: delivery_default
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: skill-agent
+  agent_decision_policy: required
+  interaction_answer_policy: agent-required
+  target_write_policy: aor-runtime-only-before-execution
+  target_command_timeout_sec: 1800
+implementation_loop:
+  enabled: true
+  max_iterations: 3
+  review_repair_actions:
+    - request-repair
+    - failed-quality-findings
+  stop_on_blocking_review: true
+target_catalog_id: vitest
+feature_mission_id: vitest-runner-diagnostics-regression
+scenario_family: regress
+provider_variant_id: openai-primary
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only

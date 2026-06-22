@@ -25,31 +25,28 @@ provider_comparison_pairs: []
 feature_missions:
   - mission_id: eslint-rule-autofix-regression
     title: Preserve one rule autofix regression
-    brief: Add or repair one bounded ESLint rule or autofix edge case with
-      RuleTester coverage and rule/type metadata checks.
+    brief: Add or repair one bounded ESLint rule or autofix edge case with RuleTester coverage and
+      rule/type metadata checks.
     feature_size: medium
     goals:
-      - Preserve one AST rule or autofix behavior without changing unrelated
-        rule semantics.
+      - Preserve one AST rule or autofix behavior without changing unrelated rule semantics.
       - Keep CLI rule tests and rule metadata checks green.
     kpis:
       - kpi_id: eslint-rule-autofix-green
         name: ESLint rule autofix gate
-        target: CLI rule test coverage plus rule metadata/type checks pass after
-          the change
+        target: CLI rule test coverage plus rule metadata/type checks pass after the change
         measurement: post-run primary verification
     definition_of_done:
       - RuleTester coverage demonstrates the autofix or rule behavior.
       - Generated rule metadata remains coherent.
       - Review and delivery evidence remain anchored to the target checkout.
-    expected_evidence: &evidence
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
       - delivery-manifest
     acceptance_checks:
-      - keep the change inside one ESLint rule surface, fixtures, tests, and
-        required metadata
+      - keep the change inside one ESLint rule surface, fixtures, tests, and required metadata
       - preserve rule test and metadata/type evidence
       - avoid any upstream write-back
     post_run_quality:
@@ -66,11 +63,64 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 10
-      max_added_lines: 360
-    size_rationale: Medium ESLint rule work may touch one rule, tests, fixtures,
-      and metadata but should avoid broader config or CLI rewrites.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium ESLint rule work may touch one rule, tests, fixtures, and metadata but should
+      avoid broader config or CLI rewrites.
     change_budget:
-      max_changed_files: 10
-      max_added_lines: 360
-    quality_evidence: *evidence
+      max_changed_files: 32
+      max_added_lines: 2200
+    quality_evidence: *a1
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Add or repair one bounded ESLint rule or autofix edge case with RuleTester coverage
+        and rule/type metadata checks.
+      desired_outcome: RuleTester coverage demonstrates the autofix or rule behavior. Generated rule
+        metadata remains coherent. Review and delivery evidence remain anchored to the target
+        checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change inside one ESLint rule surface, fixtures, tests, and required metadata
+        - preserve rule test and metadata/type evidence
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: npm run test:cli"
+        - "Primary verification command: npm run lint:rule-types"
+        - "Primary verification command: npm run lint:types"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

@@ -878,7 +878,7 @@ export function materializeReviewReport(options) {
     typeof declaredSizeBudget.max_added_lines === "number" ? declaredSizeBudget.max_added_lines : null;
   const maxTouchedLines =
     typeof declaredSizeBudget.max_touched_lines === "number" ? declaredSizeBudget.max_touched_lines : null;
-  if (featureSize && !["small", "medium", "large", "xlarge", "xl"].includes(featureSize)) {
+  if (featureSize && !["small", "medium", "large", "xlarge"].includes(featureSize)) {
     pushFinding({
       findings: featureSizeFindings,
       severity: "warn",

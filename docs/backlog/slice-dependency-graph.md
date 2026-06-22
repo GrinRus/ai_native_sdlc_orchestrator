@@ -216,6 +216,12 @@ graph TD
   W45S04[W45-S04 Web repair-cycle observability]
   W45S05[W45-S05 Repair-loop proof fixtures and live profile]
   W45S06[W45-S06 Documentation refresh and live E2E acceptance]
+  W46S01[W46-S01 Contract/docs breaking policy]
+  W46S02[W46-S02 Step evaluator report and runner behavior]
+  W46S03[W46-S03 Catalog budget and small-canary migration]
+  W46S04[W46-S04 Product-change mission rewrite for current targets]
+  W46S05[W46-S05 Hard target expansion]
+  W46S06[W46-S06 Proof run, findings intake, docs refresh]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -539,6 +545,12 @@ graph TD
   W45S03 --> W45S05
   W45S04 --> W45S05
   W45S05 --> W45S06
+  W45S06 --> W46S01
+  W46S01 --> W46S02
+  W46S01 --> W46S03
+  W46S03 --> W46S04
+  W46S04 --> W46S05
+  W46S05 --> W46S06
 ```
 
 ## W0 hard dependencies
@@ -937,6 +949,16 @@ graph TD
 | W45-S05 | W45-S02, W45-S03, W45-S04 |
 | W45-S06 | W45-S05 |
 
+## W46 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W46-S01 | W45-S06 |
+| W46-S02 | W46-S01 |
+| W46-S03 | W46-S01 |
+| W46-S04 | W46-S03 |
+| W46-S05 | W46-S04 |
+| W46-S06 | W46-S05 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1150,6 +1172,12 @@ graph TD
 210. W45-S04
 211. W45-S05
 212. W45-S06
+213. W46-S01
+214. W46-S02
+215. W46-S03
+216. W46-S04
+217. W46-S05
+218. W46-S06
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

@@ -259,6 +259,9 @@ function writeExistingProofRunnerOutput(options) {
         aor_installation_proof_file: asNonEmptyString(summary.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: asNonEmptyString(summary.live_e2e_controller_state_file) || null,
         live_e2e_step_observation_files: asStringArray(summary.live_e2e_step_observation_files),
+        live_e2e_step_quality_assessment_report_files: asStringArray(
+          summary.live_e2e_step_quality_assessment_report_files,
+        ),
         live_e2e_scorecard_files: asStringArray(summary.scorecard_files),
         learning_loop_scorecard_file: asNonEmptyString(summary.learning_loop_scorecard_file) || null,
         learning_loop_handoff_file: asNonEmptyString(summary.learning_loop_handoff_file) || null,
@@ -630,6 +633,7 @@ function buildScorecard(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
+    mission_class: options.flowResult.artifacts.mission_class ?? null,
     run_tier: asNonEmptyString(options.flowResult.artifacts.run_tier) || resolveSummaryRunTier(options.profile),
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
@@ -1296,6 +1300,8 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "incident_report_file",
     "feature_mission_id",
     "feature_size",
+    "mission_class",
+    "live_e2e_step_quality_assessment_report_files",
     "matrix_cell",
     "coverage_follow_up",
   ]) {
@@ -2486,6 +2492,12 @@ export function writeProofRunnerArtifacts(options) {
     reportsRoot: options.layout.reportsRoot,
     stepJournal: observationReport.step_journal,
   });
+  const stepQualityAssessmentReportFiles = uniqueStrings([
+    ...asStringArray(options.flowResult.artifacts.live_e2e_step_quality_assessment_report_files),
+    ...observationReport.step_journal
+      .map((entry) => asNonEmptyString(asRecord(entry).step_quality_assessment_ref))
+      .filter(Boolean),
+  ]);
   const observationReportFile = path.join(
     options.layout.reportsRoot,
     `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
@@ -2493,6 +2505,7 @@ export function writeProofRunnerArtifacts(options) {
   observationReport.evidence_refs = uniqueStrings([
     ...asStringArray(observationReport.evidence_refs),
     ...stepObservationFiles,
+    ...stepQualityAssessmentReportFiles,
   ]);
   const observationValidation = validateContractDocument({
     family: "live-e2e-observation-report",
@@ -2505,6 +2518,7 @@ export function writeProofRunnerArtifacts(options) {
   }
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.live_e2e_step_observation_files = stepObservationFiles;
+  options.flowResult.artifacts.live_e2e_step_quality_assessment_report_files = stepQualityAssessmentReportFiles;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
   const runHealthReportFile = path.join(
     options.layout.reportsRoot,
@@ -2575,6 +2589,7 @@ export function writeProofRunnerArtifacts(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
+    mission_class: options.flowResult.artifacts.mission_class ?? null,
     run_tier: resolveSummaryRunTier(options.profile),
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
@@ -2749,6 +2764,7 @@ export function writeProofRunnerArtifacts(options) {
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,
     live_e2e_step_observation_files: stepObservationFiles,
+    live_e2e_step_quality_assessment_report_files: stepQualityAssessmentReportFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
     live_e2e_run_health_report_file: runHealthReportFile,
     live_e2e_run_health_overall_status: runHealthReport.overall_status,
@@ -3193,6 +3209,7 @@ function runCli(rawArgs) {
         aor_installation_proof_file: written.summary.aor_installation_proof_file,
         live_e2e_controller_state_file: written.summary.live_e2e_controller_state_file,
         live_e2e_step_observation_files: written.summary.live_e2e_step_observation_files,
+        live_e2e_step_quality_assessment_report_files: written.summary.live_e2e_step_quality_assessment_report_files,
         live_e2e_scorecard_files: [written.scorecardFile],
         learning_loop_scorecard_file: written.learningLoop?.scorecardFile ?? null,
         learning_loop_handoff_file: written.learningLoop?.handoffFile ?? null,

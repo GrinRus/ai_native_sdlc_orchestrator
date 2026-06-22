@@ -60,10 +60,14 @@ export function materializeFeatureRequestFile(options) {
   fs.mkdirSync(requestsRoot, { recursive: true });
   const missionId = asNonEmptyString(options.mission.mission_id) || "feature-mission";
   const filePath = path.join(requestsRoot, `feature-request-${normalizeId(options.runId)}-${normalizeId(missionId)}.json`);
+  const agentVisibleRequest = asRecord(options.mission.agent_visible_request);
   const requestDocument = {
     mission_id: missionId,
     title: asNonEmptyString(options.mission.title) || missionId,
-    brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
+    brief:
+      asNonEmptyString(agentVisibleRequest.user_problem) ||
+      asNonEmptyString(options.mission.brief) ||
+      "Catalog-backed full-journey feature request.",
     goals: asStringArray(options.mission.goals),
     kpis: Array.isArray(options.mission.kpis)
       ? options.mission.kpis.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
@@ -76,6 +80,10 @@ export function materializeFeatureRequestFile(options) {
     scenario_family: options.scenarioFamily,
     provider_variant_id: options.providerVariantId,
     feature_size: options.featureSize,
+    mission_class: asNonEmptyString(options.mission.mission_class) || null,
+    agent_visible_request: agentVisibleRequest,
+    evaluator_rubric: asRecord(options.mission.evaluator_rubric),
+    final_code_rubric: asRecord(options.mission.final_code_rubric),
     supported_scenarios: asStringArray(options.mission.supported_scenarios),
     recommended_provider_variants: asStringArray(options.mission.recommended_provider_variants),
     size_budget: asRecord(options.mission.size_budget),

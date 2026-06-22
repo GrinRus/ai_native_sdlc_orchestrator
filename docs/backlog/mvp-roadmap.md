@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-45-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-46-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -56,6 +56,7 @@ The authoritative planning model for implementation lives in:
 | W43 | Validate the published alpha.10 package and refresh installed-user/live E2E confidence evidence after the operator interruption classification release. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-43-implementation-slices.md` |
 | W44 | Split discovery/research/spec prompt assets and define readiness transitions while preserving artifact execution compatibility. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-44-implementation-slices.md` |
 | W45 | Make review/QA repair cycles bounded, contract-first, operator-visible, and replayable from prompt/context lineage through proof evidence. | 6 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-45-implementation-slices.md` |
+| W46 | Rebuild live E2E as black-box product-change assessment with step-quality gates, larger mission budgets, catalog migration, and hard target expansion. | 6 | EPIC-0, EPIC-7 | `docs/backlog/wave-46-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -555,7 +556,7 @@ The authoritative planning model for implementation lives in:
 - Live E2E reports include `aor_installation_proof_file` and `setup_journal[]`.
 - Full-lifecycle profiles execute release and learning rather than skipping them.
 - Step evaluator terminology is separated from Runtime Harness certification.
-- Commander.js and pluggy are required matrix targets, while Cobra and date-fns are extended candidates.
+- Commander.js and pluggy are required matrix targets; Cobra and date-fns were retired from the active matrix by W46 instead of remaining catalog-only candidates.
 
 **Detailed slices:** `docs/backlog/wave-28-implementation-slices.md`
 

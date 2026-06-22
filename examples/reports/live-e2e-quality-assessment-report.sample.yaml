@@ -317,7 +317,7 @@ gap_report:
 findings:
   - category: evidence-gap
     severity: medium
-    summary: Outcome quality is advisory and has weak or missing signals in security, performance, UI/UX, and accessibility.
+    summary: Outcome quality has weak or missing signals in security, performance, UI/UX, and accessibility.
     evidence_refs:
       - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json
 recommended_followups:
