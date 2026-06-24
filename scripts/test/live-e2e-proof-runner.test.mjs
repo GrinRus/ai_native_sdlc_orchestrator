@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { loadContractFile } from "../../packages/contracts/src/index.mjs";
 import {
   discoverHostProjectId,
+  createProofRunnerEnvironment,
+  createSessionRoots,
   ensureRuntimeLayout,
   loadCatalogTarget,
   loadProofRunnerProfile,
@@ -128,6 +130,23 @@ const aorOperatorAccessibilityCheckIds = Object.freeze([
   "screen_reader_labels",
   "accessible_error_feedback",
 ]);
+
+test("proof runner TMPDIR stays short for socket-sensitive target verification", () => {
+  withTempRoot((tempRoot) => {
+    const sessionsRoot = path.join(tempRoot, "projects", "aor-core", "sessions");
+    const runId = "w47-control-fastify-repair-medium-20260624-4b263c3e73b4";
+    const sessionRoots = createSessionRoots({ sessionsRoot, runId });
+    const { env } = createProofRunnerEnvironment({
+      sessionRoots,
+      runnerAuthMode: "isolated",
+    });
+
+    assert.equal(env.TMPDIR, sessionRoots.tmpRoot);
+    assert.equal(sessionRoots.tmpRoot.startsWith(sessionRoots.sessionRoot), false);
+    assert.ok(sessionRoots.tmpRoot.length < 80, `expected short TMPDIR, got ${sessionRoots.tmpRoot}`);
+    assert.equal(fs.existsSync(sessionRoots.tmpRoot), true);
+  });
+});
 
 test("step evaluator keeps resuming when an included current step is still pending", () => {
   const pendingDeliveryState = {

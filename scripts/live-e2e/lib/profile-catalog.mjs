@@ -1,4 +1,6 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
@@ -92,6 +94,22 @@ export function ensureRuntimeLayout(options) {
 }
 
 /**
+ * Keep TMPDIR short for target verification commands. Several real target
+ * suites create Unix sockets under TMPDIR, and macOS/Linux socket paths have a
+ * small fixed limit that long live E2E run ids can exceed.
+ *
+ * @param {string} runId
+ * @returns {string}
+ */
+function createShortTmpRoot(runId) {
+  const shortTmpBase = process.platform !== "win32" && fs.existsSync("/tmp") ? "/tmp" : os.tmpdir();
+  const digest = crypto.createHash("sha256").update(runId).digest("hex").slice(0, 10);
+  const tmpRoot = path.join(shortTmpBase, "aorlt", `${digest}-${process.pid}`);
+  fs.mkdirSync(tmpRoot, { recursive: true });
+  return tmpRoot;
+}
+
+/**
  * @param {{
  *   sessionsRoot: string,
  *   runId: string,
@@ -101,8 +119,8 @@ export function createSessionRoots(options) {
   const sessionRoot = path.join(options.sessionsRoot, normalizeId(options.runId));
   const aorHome = path.join(sessionRoot, "aor-home");
   const codexHome = path.join(sessionRoot, "codex-home");
-  const tmpRoot = path.join(sessionRoot, "tmp");
-  for (const dirPath of [sessionRoot, aorHome, codexHome, tmpRoot]) {
+  const tmpRoot = createShortTmpRoot(options.runId);
+  for (const dirPath of [sessionRoot, aorHome, codexHome]) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
   return {
