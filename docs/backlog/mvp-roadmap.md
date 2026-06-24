@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-46-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-47-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -57,6 +57,7 @@ The authoritative planning model for implementation lives in:
 | W44 | Split discovery/research/spec prompt assets and define readiness transitions while preserving artifact execution compatibility. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-44-implementation-slices.md` |
 | W45 | Make review/QA repair cycles bounded, contract-first, operator-visible, and replayable from prompt/context lineage through proof evidence. | 6 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-45-implementation-slices.md` |
 | W46 | Rebuild live E2E as black-box product-change assessment with step-quality gates, larger mission budgets, catalog migration, and hard target expansion. | 6 | EPIC-0, EPIC-7 | `docs/backlog/wave-46-implementation-slices.md` |
+| W47 | Convert W46 classified blockers into strict product acceptance by closing AOR UI accessibility, hard-target verification isolation, repair convergence evidence, and proof reruns. | 4 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-47-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -809,6 +810,27 @@ operator-visible next actions, and replayable proof.
   as all-ok without passing live E2E run refs.
 
 **Detailed slices:** `docs/backlog/wave-45-implementation-slices.md`
+
+## W47 - product live E2E acceptance closure
+**Goal:** Keep the W46 black-box product-quality policy intact while removing
+the concrete blockers that prevented all-pass product acceptance: AOR operator
+keyboard accessibility, live E2E target verification contamination, Vitest setup
+readiness, and repair/review convergence evidence.
+
+**Exit criteria:**
+- Same-commit guided AOR UI proof can pass every required UI/accessibility
+  dimension or records a specific blocker.
+- `httpx-medium` is product-accepted only after paired final
+  `quality-assessment gate --policy all-pass`.
+- `fastify-repair-medium` proves public repair convergence or records a more
+  specific terminal provider/AOR blocker.
+- `vitest-large` no longer fails because `.aor` runtime state is scanned by
+  target verification, and setup/environment blockers are classified before
+  product execution.
+- Runtime artifacts remain uncommitted and blocked proof runs remain
+  non-accepted.
+
+**Detailed slices:** `docs/backlog/wave-47-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

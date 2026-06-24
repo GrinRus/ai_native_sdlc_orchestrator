@@ -18,8 +18,8 @@ assessment.
   agent-visible requests and runner-only evaluator/final-code rubrics.
 - The target catalog rejects legacy `xl`, raw repo/objective profiles, and
   generated matrix cells.
-- Step-quality assessment reports are contract-valid and required before
-  medium+ continuation.
+- Step-quality assessment requests/reports are contract-valid, linked, and
+  required before medium+ continuation.
 - Final all-pass quality is mandatory for medium+ product acceptance.
 - Current target catalog cells are migrated or removed, and hard targets are
   introduced with runnable profiles.
@@ -39,7 +39,8 @@ assessment.
 1. Update `live-e2e-target-catalog` with `mission_class`,
    `agent_visible_request`, `evaluator_rubric`, `final_code_rubric`, and widened
    budgets.
-2. Add `live-e2e-step-quality-assessment-report`.
+2. Add `live-e2e-step-quality-assessment-request` and
+   `live-e2e-step-quality-assessment-report`.
 3. Update `live-e2e-quality-assessment-report` so medium+ all-pass is product
    acceptance evidence.
 4. Document the removal of `xl`, raw repo/objective profiles, and generated
@@ -73,20 +74,21 @@ assessment.
 - **Hard dependencies:** W46-S01
 
 ### Local tasks
-1. Generate step-quality reports from public observation, decision, and evidence
-   artifacts.
-2. Require accepted step reports for medium+ continuation.
+1. Generate step-quality assessment requests from public observation, decision,
+   and evidence artifacts.
+2. Require linked evaluator-authored accepted step reports for medium+
+   continuation.
 3. Keep small profiles on lightweight flow-health assessment.
 4. Ensure `request-repair` routes through public AOR repair, not private target
    mutation.
 
 ### Acceptance criteria
-1. Missing medium+ step assessment blocks continuation.
-2. Accepted medium+ step assessment allows continuation.
+1. Missing medium+ step assessment blocks continuation after writing a request.
+2. Linked accepted medium+ step assessment allows continuation.
 3. Repair decisions never inject private patches or handoffs.
 
 ### Done evidence
-- step-quality report contract validation
+- step-quality request/report contract validation
 - runner output includes step-quality report refs
 - live E2E runner tests for continuation behavior
 - `pnpm live-e2e:test`
@@ -193,32 +195,54 @@ assessment.
 
 ---
 
-## W46-S06 — Proof run, findings intake, docs refresh
+## W46-S06 — Proof-complete acceptance closure and findings intake
 - **Epic:** EPIC-0 Foundation; EPIC-7 Live E2E and rehearsal
-- **State:** ready
-- **Outcome:** Run the updated live E2E proof set, collect findings, and refresh
-  source-of-truth documentation.
+- **State:** done
+- **Outcome:** Move live E2E from implementation-complete local gates to
+  proof-complete acceptance by rerunning the required medium, repair, and large
+  product-change profiles, collecting terminal pass evidence or classified
+  blockers, and keeping source-of-truth documentation honest.
 - **Primary modules:** `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`,
   root checks
 - **Hard dependencies:** W46-S05
 
 ### Local tasks
-1. Run `pnpm live-e2e:test`.
-2. Run `pnpm test`, `pnpm build`, and `pnpm check`.
-3. Intake findings into backlog or docs.
-4. Refresh live E2E runbooks and proof expectations.
+1. Preserve the completed implementation hardening: canonical
+   `target_checkout_root` changed-path lineage, evaluator-authored
+   step-quality gates, fail-closed final quality gates, and public repair-loop
+   routing.
+2. Rerun `full-journey-regress-httpx-medium-openai.yaml` from a fresh runtime
+   root after the changed-path and stale-journal fixes.
+3. Rerun `full-journey-repair-fastify-medium-openai.yaml` and verify public
+   repair request/report lineage across iterations.
+4. Rerun `full-journey-regress-vitest-large-openai.yaml` as the hard-target
+   proof, or record a classified provider/environment blocker.
+5. For every terminal pass, prepare, validate, and all-pass gate the final
+   product-quality assessment.
+6. Record every terminal outcome as accepted proof evidence or a classified
+   blocker in `docs/ops/live-e2e-proof-complete-findings.md`.
+7. Run `git diff --check`, `pnpm live-e2e:test`, `pnpm test`, `pnpm build`,
+   and `pnpm check`.
 
 ### Acceptance criteria
 1. Regression checks pass or blockers are documented.
-2. Findings are assigned to slices or follow-up backlog.
-3. Live E2E docs match the implemented black-box product assessment policy.
+2. Required medium, repair, and large proof outcomes are summarized with
+   profile id, run id, terminal status, owner, phase, class, and next ticket.
+3. Terminal pass runs have validated final quality assessment and all-pass
+   proof-acceptance evidence.
+4. Blocked proof runs are not counted as product-quality acceptance.
+5. Findings are assigned to W46-F follow-ups or closed with evidence.
+6. Live E2E docs match the implemented black-box product assessment policy.
+7. Product-change final acceptance cannot pass with missing canonical target
+   checkout evidence, empty meaningful changed paths, missing accepted
+   step-quality reports, or source-report/summary changed-path mismatch.
 
 ### Done evidence
 - `pnpm live-e2e:test`
 - `pnpm test`
 - `pnpm build`
 - `pnpm check`
-- updated findings or blocker notes
+- `docs/ops/live-e2e-proof-complete-findings.md`
 
 ### Out of scope
 - Publishing provider qualification results.

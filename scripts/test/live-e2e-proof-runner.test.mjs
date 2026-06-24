@@ -28,9 +28,12 @@ import { applyProductionProofEvidence } from "../live-e2e/lib/production-proof.m
 import {
   archivedNextActionReportForMission,
   buildTargetPreExecutionStatusReport,
+  collectReviewChangedPaths,
+  collectRuntimeHarnessChangedPaths,
   evaluateBaselineVerifyGate,
   nextActionReportClosesFlow,
   prepareAorInstallationProof,
+  reconcileSummaryMeaningfulChangedPaths,
   runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
@@ -40,6 +43,11 @@ import {
   buildGuidedJourneyProof,
   validateGuidedJourneyProof,
 } from "../live-e2e/lib/guided-proof.mjs";
+import {
+  hasPendingIncludedControllerStep,
+  preparePendingOperatorDecision,
+  shouldAwaitFirstControllerObservation,
+} from "../live-e2e/step-evaluator.mjs";
 import { writeProofRunnerArtifacts } from "../live-e2e/run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -121,6 +129,91 @@ const aorOperatorAccessibilityCheckIds = Object.freeze([
   "accessible_error_feedback",
 ]);
 
+test("step evaluator keeps resuming when an included current step is still pending", () => {
+  const pendingDeliveryState = {
+    current_step: "delivery",
+    included_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+    completed_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa"],
+  };
+  assert.equal(
+    hasPendingIncludedControllerStep(pendingDeliveryState),
+    true,
+  );
+  assert.equal(shouldAwaitFirstControllerObservation({ step_journal: [] }, pendingDeliveryState), true);
+  assert.equal(shouldAwaitFirstControllerObservation({ step_journal: [{ step_id: "delivery" }] }, pendingDeliveryState), false);
+  assert.equal(
+    hasPendingIncludedControllerStep({
+      current_step: "delivery",
+      included_steps: ["discovery", "qa", "delivery"],
+      completed_steps: ["discovery", "qa", "delivery"],
+    }),
+    false,
+  );
+  assert.equal(
+    hasPendingIncludedControllerStep({
+      current_step: "learning",
+      included_steps: ["discovery", "qa", "delivery"],
+      completed_steps: ["discovery", "qa", "delivery"],
+    }),
+    false,
+  );
+  assert.equal(
+    shouldAwaitFirstControllerObservation(
+      { step_journal: [] },
+      {
+        current_step: "learning",
+        included_steps: ["discovery", "qa", "delivery"],
+        completed_steps: ["discovery", "qa", "delivery"],
+      },
+    ),
+    false,
+  );
+});
+
+test("step evaluator writes a public block decision for deterministic non-pass evidence", () => {
+  withTempRoot((tempRoot) => {
+    const requestFile = path.join(tempRoot, "live-e2e-agent-decision-request-run-09-execution.json");
+    const decisionFile = path.join(tempRoot, "live-e2e-operator-decision-run-09-execution.json");
+    writeJsonFixture(requestFile, {
+      request_id: "run.execution.operator-decision-request",
+      step_id: "execution",
+      step_instance_id: "execution",
+      iteration: 1,
+      deterministic_analysis: { status: "not_pass" },
+      expected_response_shape: {
+        action: "continue|block|diagnose",
+        inspected_evidence_refs: [],
+        evidence_refs: [],
+      },
+      operator_context: {
+        operator_ref: "skill://live-e2e-runner",
+      },
+      operator_decision_expected_ref: decisionFile,
+    });
+
+    const result = preparePendingOperatorDecision({
+      step_journal: [
+        {
+          sequence: 9,
+          step_id: "execution",
+          step_instance_id: "execution",
+          agent_decision_request_ref: requestFile,
+          operator_decision_status: "missing",
+          deterministic_analysis: { status: "not_pass" },
+        },
+      ],
+    });
+
+    assert.equal(result.status, "prepared");
+    assert.equal(result.action, "block");
+    assert.equal(fs.existsSync(decisionFile), true);
+    const decision = JSON.parse(fs.readFileSync(decisionFile, "utf8"));
+    assert.equal(decision.action, "block");
+    assert.equal(decision.semantic_analysis.status, "blocked");
+    assert.match(decision.reason, /deterministic status 'not_pass'/u);
+  });
+});
+
 function buildAccessibilityChecks(evidenceRef) {
   return aorOperatorAccessibilityCheckIds.map((checkId) => ({
     check_id: checkId,
@@ -168,6 +261,10 @@ function writeGuidedProofFixture(tempRoot) {
     status: "pass",
     accessibility_summary_file: files.webAccessibility,
     visual_guardrail_file: files.webVisual,
+    keyboard_focus_sequence: [
+      { index: 1, role: "button", label: "New Flow", selector: "button.new-flow-button" },
+      { index: 2, role: "button", label: "Ask AOR", selector: "button.topbar-ask-button" },
+    ],
     accessibility_checks: buildAccessibilityChecks(files.webAccessibility),
     task_outcome: {
       status: "pass",
@@ -321,6 +418,49 @@ test("Runtime Harness real-code evidence must match mission-relevant changed pat
       ],
     });
     assert.equal(runtimeHarnessReportHasMissionRelevantChanges(reportPath, mission), true);
+  });
+});
+
+test("summary changed-path collection uses meaningful paths without diagnostic fallbacks", () => {
+  withTempRoot((tempRoot) => {
+    const runtimeHarnessReport = writeJsonFixture(path.join(tempRoot, "runtime-harness-report.json"), {
+      step_decisions: [
+        {
+          mission_semantics: {
+            meaningful_changed_paths: ["source/utils/merge.ts"],
+            non_bootstrap_changed_paths: ["source/utils/merge.ts", "test"],
+          },
+        },
+      ],
+    });
+    const reviewReport = writeJsonFixture(path.join(tempRoot, "review-report.json"), {
+      code_quality: {
+        changed_paths: ["source/utils/merge.ts"],
+        changed_path_diagnostics: {
+          meaningful_changed_paths: ["source/utils/merge.ts"],
+          non_input_changed_paths: ["source/utils/merge.ts", "test"],
+        },
+      },
+    });
+
+    assert.deepEqual(collectRuntimeHarnessChangedPaths(runtimeHarnessReport), ["source/utils/merge.ts"]);
+    assert.deepEqual(collectReviewChangedPaths(reviewReport), ["source/utils/merge.ts"]);
+  });
+});
+
+test("summary changed-path reconciliation drops diagnostic paths using canonical target evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(path.join(targetRoot, "source"), { recursive: true });
+    const gitInit = spawnSync("git", ["init"], { cwd: targetRoot, encoding: "utf8" });
+    assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
+    fs.writeFileSync(path.join(targetRoot, "source/utils.py"), "print('target change')\n", "utf8");
+    fs.writeFileSync(path.join(targetRoot, "test"), "# TLS secrets log file, generated by OpenSSL / Python\n", "utf8");
+
+    assert.deepEqual(
+      reconcileSummaryMeaningfulChangedPaths(["source/utils.py", "test"], { targetCheckoutRoot: targetRoot }),
+      ["source/utils.py"],
+    );
   });
 });
 
@@ -768,6 +908,19 @@ test("HTTPie medium catalog mission declares bounded machine-readable path and w
   );
 });
 
+test("W46 canary targets keep required coverage small-only", () => {
+  const catalogRoot = resolveCatalogRoot({ hostRoot: repoRoot, catalogRootOverride: null });
+  for (const targetCatalogId of ["ky", "commander-js", "pluggy"]) {
+    const target = loadCatalogTarget({ catalogRoot, targetCatalogId });
+    const requiredCells = target.entry.required_matrix_cells.filter((entry) => entry.coverage_tier === "required");
+    assert.ok(requiredCells.length > 0, `${targetCatalogId} should retain a small required canary cell`);
+    assert.ok(
+      requiredCells.every((entry) => entry.feature_size === "small"),
+      `${targetCatalogId} required coverage must be small-only`,
+    );
+  }
+});
+
 test("generated live E2E profile allows selected guided provider adapters", () => {
   withTempRoot((tempRoot) => {
     const cases = [
@@ -857,6 +1010,7 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
       family: "project-profile",
     });
     assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
     assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
@@ -953,6 +1107,7 @@ test("generated ky large Anthropic profile uses bounded governance verification"
       family: "project-profile",
     });
     assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
     assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
@@ -967,6 +1122,50 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     ]);
     assert.equal(loaded.document.repos[0].test_commands.includes("npm test"), false);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+  });
+});
+
+test("generated Vitest large profile isolates verification and checks hard-target setup before execution", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "assets");
+    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+    const result = materializeGeneratedProjectProfile({
+      hostRoot: repoRoot,
+      profilePath: loadedProfile.profilePath,
+      profile: resolved.resolvedProfile,
+      catalogEntry: resolved.catalogEntry,
+      mission: resolved.mission,
+      providerVariant: resolved.providerVariant,
+      runId: "vitest-large-hard-target-readiness",
+      targetCheckout: {
+        targetRepoId: "vitest",
+        targetRepoRef: "main",
+      },
+      generatedAssetsRoot,
+    });
+
+    const loaded = loadContractFile({
+      filePath: result.generatedProjectProfileFile,
+      family: "project-profile",
+    });
+
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
+    assert.equal(
+      loaded.document.repos[0].lint_commands.some((command) =>
+        command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
+      ),
+      true,
+    );
+    assert.equal(loaded.document.repos[0].lint_commands.includes("pnpm build"), true);
+    assert.deepEqual(loaded.document.repos[0].test_commands, ["pnpm test", "pnpm lint"]);
   });
 });
 
@@ -1011,6 +1210,36 @@ test("target pre-execution status separates target setup, target verification, a
     assert.equal(setupReport.failure_class, "target_setup_blocked");
     assert.equal(setupReport.target_setup_status.timed_out, true);
     assert.equal(setupReport.target_verification_status.status, "blocked");
+
+    const nodeStepFile = writeJsonFixture(path.join(tempRoot, "node-step.json"), {
+      status: "failed",
+      command:
+        "node -e \"console.error('Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got ' + process.version); process.exit(1)\"",
+      summary: "Verification command failed: missing prerequisite(s) detected.",
+      stderr: "Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got v25.9.0",
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "node-transcript.json"))],
+      command_timeout_ms: 120000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+    const nodeReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 120000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary-node.json") },
+      stepResultFiles: [nodeStepFile],
+      setupCommands: [
+        "node -e \"console.error('Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got ' + process.version); process.exit(1)\"",
+      ],
+      verificationCommands: ["pnpm test"],
+      baselineGateDecision: { status: "fail", decision: "block", summary: "node-preflight-failed" },
+      runResult: {
+        durationSec: 1,
+        timeoutMs: 300000,
+        transcriptFile: path.join(tempRoot, "project-verify-node.json"),
+      },
+    });
+    assert.equal(nodeReport.failure_owner, "environment");
+    assert.equal(nodeReport.failure_phase, "target_setup");
+    assert.equal(nodeReport.failure_class, "environment_node_version_unsupported");
 
     const verificationReport = buildTargetPreExecutionStatusReport({
       verifySummary: { status: "failed", command_timeout_ms: 120000 },
@@ -2035,6 +2264,10 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
         `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
       ),
       screenshot_files: [screenshotFile],
+      keyboard_focus_sequence: [
+        { index: 1, role: "button", label: "New Flow", selector: "button.new-flow-button" },
+        { index: 2, role: "button", label: "Ask AOR", selector: "button.topbar-ask-button" },
+      ],
       accessibility_checks: buildAccessibilityChecks(screenshotFile),
       task_outcome: {
         status: "pass",
@@ -2051,6 +2284,8 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(hydratedObservation.frontend_interactions[0].task_outcome.status, "pass");
     assert.equal(hydratedObservation.frontend_interactions[0].browser_task_proof_ref, browserTaskProofFile);
     assert.deepEqual(hydratedObservation.frontend_interactions[0].screenshot_refs, [screenshotFile]);
+    assert.equal(hydratedObservation.frontend_interactions[0].keyboard_focus_sequence.length, 2);
+    assert.equal(hydratedWebSmoke.keyboard_focus_sequence.length, 2);
     assert.deepEqual(
       hydratedObservation.frontend_interactions[0].accessibility_checks.map((entry) => entry.check_id),
       aorOperatorAccessibilityCheckIds,
@@ -2658,6 +2893,11 @@ test("full journey review warnings request repair instead of passing into QA app
   assert.match(flowsSource, /implementation_repair_loop_exhausted/u);
   assert.match(flowsSource, /canRepair \? "warn" : terminalReviewFailure \? "fail" : "pass"/u);
   assert.match(flowsSource, /reviewOverallStatus !== "pass" \|\| artifacts\.post_run_verify_status === "fail"/u);
+  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
+  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
+  assert.match(flowsSource, /previous_repair_decision_files: asStringArray\(artifacts\.review_repair_decision_files\)/u);
+  assert.match(flowsSource, /Unresolved findings:/u);
+  assert.match(flowsSource, /Runtime Harness decision:/u);
 });
 
 test("proof runner writes run-health reports for blocked live E2E reports", () => {
@@ -3232,7 +3472,7 @@ test("proof runner keeps partial controller observations in progress when pendin
           pending_decision: {
             action: "continue",
             reason: "Skill-agent accepted public evidence and required inspection refs.",
-            next_step: null,
+            next_step: "delivery",
           },
         },
         null,
@@ -3283,6 +3523,18 @@ test("proof runner keeps partial controller observations in progress when pendin
           host_runtime_root: runtimeRoot,
           host_reports_root: reportsRoot,
           live_e2e_controller_state_file: terminalControllerState,
+          live_e2e_controller_stop: {
+            reason: "Stale controller stop from an earlier resume before delivery completed.",
+            state: {
+              current_step: "delivery",
+              completed_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa"],
+            },
+            decision: {
+              action: "continue",
+              reason: "Earlier QA continue decision.",
+              next_step: "delivery",
+            },
+          },
           live_e2e_step_journal_entries: terminalEntries,
           aor_installation: {
             status: "pass",
@@ -4120,6 +4372,16 @@ test("proof runner run-health prioritizes post-run target verification failure o
         final_step_verdict: executionStep ? "blocked" : "pass",
       };
     });
+    writeJsonFixture(files["controller-state.json"], {
+      current_step: "execution",
+      included_steps: deliverySteps,
+      completed_steps: ["discovery", "spec", "planning", "handoff", "execution"],
+      pending_decision: {
+        action: "block",
+        reason: "Post-run target verification failed.",
+        next_step: "review",
+      },
+    });
 
     const written = writeProofRunnerArtifacts({
       hostRoot: repoRoot,
@@ -4934,7 +5196,12 @@ test("proof runner run-health uses hydrated delivery, verification, and diagnost
     assert.equal(written.summary.review_report_file, files["review-report.json"]);
     assert.equal(written.summary.post_run_verify_status, "pass");
     assert.equal(written.summary.real_code_change_status, "pass");
-    assert.deepEqual(written.summary.meaningful_changed_paths, ["source/httpie/core.py", "tests/test_core.py"]);
+    assert.deepEqual(written.summary.meaningful_changed_paths, [
+      "source/httpie/core.py",
+      "tests/test_core.py",
+      "httpie/manager/tasks/plugins.py",
+      "tests/test_httpie_cli.py",
+    ]);
     assert.equal(written.runHealthReport.overall_status, "warn");
     assert.equal(written.runHealthReport.diagnostic_health.status, "warn");
     assert.equal(written.runHealthReport.diagnostic_health.timed_out_command_count, 1);

@@ -37,13 +37,13 @@ required_matrix_cells:
     feature_size: medium
     feature_mission_id: ky-fetch-options-regression
     provider_variant_id: anthropic-primary
-    coverage_tier: required
+    coverage_tier: extended
   - cell_id: ky.release.medium.openai
     scenario_family: release
     feature_size: medium
     feature_mission_id: ky-release-doc-typing
     provider_variant_id: openai-primary
-    coverage_tier: required
+    coverage_tier: extended
   - cell_id: ky.regress.small.open-code
     scenario_family: regress
     feature_size: small

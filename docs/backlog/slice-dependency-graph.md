@@ -221,7 +221,11 @@ graph TD
   W46S03[W46-S03 Catalog budget and small-canary migration]
   W46S04[W46-S04 Product-change mission rewrite for current targets]
   W46S05[W46-S05 Hard target expansion]
-  W46S06[W46-S06 Proof run, findings intake, docs refresh]
+  W46S06[W46-S06 Proof-complete acceptance closure and findings intake]
+  W47S01[W47-S01 AOR operator keyboard accessibility and guided proof closure]
+  W47S02[W47-S02 Live E2E target verification isolation and Vitest readiness]
+  W47S03[W47-S03 AOR repair/review convergence hardening]
+  W47S04[W47-S04 Full proof rerun and product acceptance closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -551,6 +555,10 @@ graph TD
   W46S03 --> W46S04
   W46S04 --> W46S05
   W46S05 --> W46S06
+  W46S06 --> W47S01
+  W47S01 --> W47S02
+  W47S02 --> W47S03
+  W47S03 --> W47S04
 ```
 
 ## W0 hard dependencies
@@ -959,6 +967,14 @@ graph TD
 | W46-S05 | W46-S04 |
 | W46-S06 | W46-S05 |
 
+## W47 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W47-S01 | W46-S06 |
+| W47-S02 | W47-S01 |
+| W47-S03 | W47-S02 |
+| W47-S04 | W47-S03 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1178,6 +1194,10 @@ graph TD
 216. W46-S04
 217. W46-S05
 218. W46-S06
+219. W47-S01
+220. W47-S02
+221. W47-S03
+222. W47-S04
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

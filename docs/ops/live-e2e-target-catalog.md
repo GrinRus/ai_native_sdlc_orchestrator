@@ -50,15 +50,15 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - broader retry, hook, public type, and observability rehearsal with operator
       review required for every controller step
 - Best profiles:
-  - full-journey required cells:
+  - full-journey required/candidate cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-small-codex.yaml` (`regress/small/openai-primary`, codex-cli)
-    - `full-journey-regress-ky-medium-codex.yaml` (`regress/medium/openai-primary`, codex-cli)
-    - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
+    - `full-journey-regress-ky-medium-codex.yaml` (`regress/medium/openai-primary`, codex-cli, extended)
+    - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`, extended)
     - `full-journey-regress-ky-medium-open-code.yaml` (`regress/medium/open-code-primary`)
     - `full-journey-regress-ky-small-qwen.yaml` (`regress/small/qwen-primary`, extended)
     - `full-journey-regress-ky-medium-qwen.yaml` (`regress/medium/qwen-primary`, extended)
-    - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+    - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`, extended)
     - `full-journey-governance-ky-large-codex.yaml` (`governance/large/openai-primary`, codex-cli)
     - `full-journey-governance-ky-large-anthropic.yaml` (`governance/large/anthropic-primary`)
   - installed-user browser-task candidate:
@@ -155,8 +155,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `commander-cli-governance-lineage` (`medium`, `governance`)
 - Best profiles:
   - `full-journey-regress-commander-js.yaml`
-  - `full-journey-repair-commander-js-medium-anthropic.yaml`
-  - `full-journey-governance-commander-js-medium-openai.yaml`
+  - `full-journey-repair-commander-js-medium-anthropic.yaml` (extended)
+  - `full-journey-governance-commander-js-medium-openai.yaml` (extended)
 - Verification baseline: `npm ci`, `npm run test`, `npm run check`.
 
 ## Target 5 — `pytest-dev/pluggy`
@@ -169,8 +169,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `pluggy-typing-governance` (`medium`, `governance|repair`)
 - Best profiles:
   - `full-journey-regress-pluggy.yaml`
-  - `full-journey-repair-pluggy-medium-anthropic.yaml`
-  - `full-journey-governance-pluggy-medium-openai.yaml`
+  - `full-journey-repair-pluggy-medium-anthropic.yaml` (extended)
+  - `full-journey-governance-pluggy-medium-openai.yaml` (extended)
   - `full-journey-governance-pluggy-medium-open-code.yaml` (extended)
 - Verification baseline: `python3 -m venv .aor/live-e2e-venv`,
   `.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
@@ -312,7 +312,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - `fastify/fastify` (`fastify`): Node.js web framework, extended medium schema/plugin repair cell, `npm install`, `npm run test:ci`, `npm run lint`.
 - `prettier/prettier` (`prettier`): formatter snapshot target, extended medium TypeScript formatting regression cell, `yarn install --immutable`, typecheck, ESLint, and focused format tests.
 - `astral-sh/ruff` (`ruff`): Rust Python linter/formatter, extended large rule/autofix regression cell, `cargo fetch`, targeted crate tests.
-- `vitest-dev/vitest` (`vitest`): hard runner diagnostics target, extended large product-change cell, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`.
+- `vitest-dev/vitest` (`vitest`): hard runner diagnostics target, extended large product-change cell, Node engine preflight, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm test`, `pnpm lint`, isolated verification workspace.
 - `sqlalchemy/sqlalchemy` (`sqlalchemy`): hard Python SQL/ORM target, extended large product-change cell, `.aor` venv editable install, targeted SQL/ORM pytest.
 - `biomejs/biome` (`biome`): hard Rust/TypeScript formatter and rule target, extended large product-change cell, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`.
 
@@ -342,7 +342,7 @@ Mandatory full-journey live E2E is valid only when:
 6. baseline target verification is recorded separately from execution readiness;
 7. provider execution attempts a real code-changing run;
 8. post-run target verification, Runtime Harness, review, QA, and delivery artifacts are present;
-9. the resulting observation report preserves the same matrix cell and records post-delivery code/artifact findings without turning quality failures into hard runner failures.
+9. medium+ product-change steps have accepted linked step-quality reports before continuation, and final product acceptance requires all-pass outcome quality.
 
 ## Run selection and product rotation
 For live E2E success-rate analysis, choose different products and different
@@ -367,8 +367,6 @@ the runner around one known-good repository.
 Required coverage matrix:
 - `ky`
   - `regress/small/openai-primary`
-  - `regress/medium/anthropic-primary`
-  - `release/medium/openai-primary`
 - `httpie/cli`
   - `regress/small/openai-primary`
   - `repair/medium/anthropic-primary`
@@ -379,26 +377,27 @@ Required coverage matrix:
   - `governance/large/openai-primary`
 - `commander-js`
   - `regress/small/openai-primary`
-  - `repair/medium/anthropic-primary`
-  - `governance/medium/openai-primary`
 - `pluggy`
   - `regress/small/openai-primary`
-  - `repair/medium/anthropic-primary`
-  - `governance/medium/openai-primary`
-  - `governance/medium/open-code-primary` (extended)
 
 Extended candidate cells:
 - `ky.regress.small.openai.codex` (`ky-header-regression`)
 - `ky.regress.medium.openai.codex` (`ky-fetch-options-regression`)
+- `ky.regress.medium.anthropic` (`ky-fetch-options-regression`)
+- `ky.release.medium.openai` (`ky-release-doc-typing`)
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
 - `ky.governance.large.anthropic` (`ky-retry-hooks-governance`)
 - `ky.regress.small.qwen` (`ky-header-regression`)
 - `ky.regress.medium.qwen` (`ky-fetch-options-regression`)
+- `commander-js.repair.medium.anthropic` (`commander-help-typing-repair`)
+- `commander-js.governance.medium.openai` (`commander-cli-governance-lineage`)
+- `pluggy.repair.medium.anthropic` (`pluggy-diagnostics-repair`)
+- `pluggy.governance.medium.openai` (`pluggy-typing-governance`)
+- `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
 - `ky.governance.xlarge.openai` / `ky.governance.xlarge.anthropic` (`ky-request-lifecycle-observability-xlarge`, manual-only)
 - `httpie-cli.governance.xlarge.openai` / `httpie-cli.governance.xlarge.anthropic` (`httpie-cli-request-policy-orchestration-xlarge`, manual-only)
 - `nextjs.release.xlarge.openai` / `nextjs.release.xlarge.anthropic` (`nextjs-cross-package-release-orchestration`, manual-only)
-- `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
 - `zod.regress.medium.openai` (`zod-json-schema-regression`)
 - `httpx.regress.medium.openai` (`httpx-timeout-transport-regression`)

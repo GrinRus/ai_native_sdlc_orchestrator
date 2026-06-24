@@ -160,6 +160,23 @@ function buildAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Array<{ index: number, role: string | null, label: string | null, selector: string | null, tag_name: string | null }>}
+ */
+function normalizeKeyboardFocusSequence(value) {
+  const entries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return entries
+    .map((entry, index) => ({
+      index: Number.isFinite(Number(entry.index)) ? Number(entry.index) : index + 1,
+      role: asNonEmptyString(entry.role) || null,
+      label: asNonEmptyString(entry.label) || asNonEmptyString(entry.accessible_name) || asNonEmptyString(entry.text) || null,
+      selector: asNonEmptyString(entry.selector) || null,
+      tag_name: asNonEmptyString(entry.tag_name) || asNonEmptyString(entry.tagName) || null,
+    }))
+    .filter((entry) => entry.role || entry.label || entry.selector || entry.tag_name);
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @param {Record<string, unknown>} webSmoke
  * @returns {Record<string, unknown>}
@@ -178,6 +195,10 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
   const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const keyboardNavigation = asRecord(proof.keyboard_navigation);
+  const keyboardFocusSequence = normalizeKeyboardFocusSequence(
+    Array.isArray(proof.keyboard_focus_sequence) ? proof.keyboard_focus_sequence : keyboardNavigation.focus_sequence,
+  );
   const proofEvidenceRefs = uniqueStrings([
     browserTaskProofFile,
     asNonEmptyString(proof.accessibility_summary_file),
@@ -207,6 +228,7 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       asNonEmptyString(webSmoke.visual_guardrail_file),
     browser_task_proof_file: browserTaskProofFile,
     screenshot_files: screenshotFiles,
+    keyboard_focus_sequence: keyboardFocusSequence,
     accessibility_checks: buildAorOperatorAccessibilityChecks(proof.accessibility_checks, proofEvidenceRefs),
     task_outcome: {
       status: "pass",
@@ -393,6 +415,7 @@ export function buildGuidedJourneyProof(options) {
         null,
       browser_task_proof_request_file: asNonEmptyString(webSmoke.browser_task_proof_request_file) || null,
       browser_task_proof_file: asNonEmptyString(webSmoke.browser_task_proof_file) || null,
+      keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
       accessibility_checks: buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
         asNonEmptyString(webSmoke.accessibility_summary_file),
         asNonEmptyString(webSmoke.browser_task_proof_file),
@@ -491,6 +514,16 @@ export function validateGuidedJourneyProof(proof, options) {
     if (asStringArray(check.evidence_refs).length === 0) {
       issues.push(`AOR accessibility check '${checkId}' has no evidence refs`);
     }
+    if (asNonEmptyString(check.status) !== "pass") {
+      issues.push(`AOR accessibility check '${checkId}' did not pass`);
+    }
+  }
+  const keyboardFocusSequence = normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence);
+  const distinctFocusTargets = new Set(
+    keyboardFocusSequence.map((entry) => entry.selector || entry.label || `${entry.role ?? ""}:${entry.tag_name ?? ""}`),
+  );
+  if (keyboardFocusSequence.length < 2 || distinctFocusTargets.size < 2) {
+    issues.push("AOR keyboard navigation proof did not record focus movement across at least two controls");
   }
   if (asStringArray(webSmoke.screenshot_files).length === 0) {
     const visualGuardrailFile = asNonEmptyString(webSmoke.visual_guardrail_file);

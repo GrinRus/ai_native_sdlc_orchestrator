@@ -91,6 +91,11 @@ const LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES = ["pass", "warn", "fail", "not_
 const LIVE_E2E_QUALITY_EVIDENCE_STRENGTH_VALUES = ["strong", "medium", "weak", "missing"];
 const LIVE_E2E_STEP_QUALITY_STATUS_VALUES = ["accepted", "request_repair", "retry", "blocked"];
 const LIVE_E2E_STEP_QUALITY_DECISION_VALUES = ["continue", "request-repair", "retry", "block"];
+const LIVE_E2E_STEP_QUALITY_ASSESSMENT_METHOD_VALUES = [
+  "flow-health-automatic",
+  "external-skill-agent",
+  "manual-skill-agent",
+];
 const LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS = [
   "traceability",
   "completeness",
@@ -98,6 +103,12 @@ const LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS = [
   "evidence_strength",
   "black_box_boundary",
 ];
+const LIVE_E2E_PRODUCT_EXECUTION_STEP_QUALITY_DIMENSION_KEYS = [
+  "mission_relevance",
+  "verification_relevance",
+  "repair_necessity",
+];
+const LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS = 24;
 const LIVE_E2E_MISSION_SIZE_BUDGETS = {
   small: { max_changed_files: 16, max_added_lines: 900 },
   medium: { max_changed_files: 32, max_added_lines: 2200 },
@@ -287,6 +298,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "live-e2e-quality-assessment-report") {
     issues.push(...validateLiveE2EQualityAssessmentReport(document, source));
+  }
+
+  if (family === "live-e2e-step-quality-assessment-request") {
+    issues.push(...validateLiveE2EStepQualityAssessmentRequest(document, source));
   }
 
   if (family === "live-e2e-step-quality-assessment-report") {
@@ -2469,7 +2484,7 @@ function validateLiveE2ETargetCatalog(document, source) {
  * @param {string} source
  * @returns {import("./index.d.ts").ContractValidationIssue[]}
  */
-function validateLiveE2EStepQualityAssessmentReport(document, source) {
+function validateLiveE2EStepQualityAssessmentRequest(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
   const evaluator = isPlainObject(document.evaluator) ? document.evaluator : {};
@@ -2501,6 +2516,151 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
   validateNestedEnumStringField({
     record: document,
     source,
+    field: "requested_assessment_method",
+    allowedValues: LIVE_E2E_STEP_QUALITY_ASSESSMENT_METHOD_VALUES,
+    issues,
+    required: true,
+  });
+  for (const field of [
+    "source_agent_decision_request_file",
+    "source_operator_decision_file",
+    "rubric_version",
+    "expected_assessment_report_file",
+  ]) {
+    validateNestedStringField({
+      record: document,
+      source,
+      field,
+      issues,
+      required: true,
+    });
+  }
+  for (const field of ["evaluator_input_refs", "evidence_refs"]) {
+    validateStringArrayItems({
+      values: document[field],
+      source,
+      field,
+      issues,
+    });
+    if (Array.isArray(document[field]) && document[field].length === 0) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field,
+          expected: "non-empty array",
+          actual: "empty",
+          message: `Step quality assessment request must cite ${field}.`,
+        }),
+      );
+    }
+  }
+  if (document.feature_size === "small" && document.mission_class !== "flow-regression") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "mission_class",
+        expected: "flow-regression",
+        actual: String(document.mission_class),
+        message: "feature_size=small step-quality requests are canary-only flow-regression evidence.",
+      }),
+    );
+  }
+  if (["medium", "large", "xlarge"].includes(String(document.feature_size)) && document.mission_class !== "product-change") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "mission_class",
+        expected: "product-change",
+        actual: String(document.mission_class),
+        message: "medium+ step-quality requests must belong to product-change missions.",
+      }),
+    );
+  }
+  if (
+    ["medium", "large", "xlarge"].includes(String(document.feature_size)) &&
+    document.mission_class === "product-change" &&
+    document.requested_assessment_method === "flow-health-automatic"
+  ) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "requested_assessment_method",
+        expected: "external-skill-agent|manual-skill-agent",
+        actual: String(document.requested_assessment_method),
+        message: "medium+ product-change step-quality requests require an external or manual skill-agent evaluator.",
+      }),
+    );
+  }
+
+  const rubric = isPlainObject(document.rubric) ? document.rubric : {};
+  validateNestedArrayField({
+    record: rubric,
+    source,
+    field: "rubric.required_dimensions",
+    issues,
+  });
+  validateStringArrayItems({
+    values: rubric.required_dimensions,
+    source,
+    field: "rubric.required_dimensions",
+    issues,
+  });
+
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateLiveE2EStepQualityAssessmentReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const isProductChangeStep =
+    document.mission_class === "product-change" && ["medium", "large", "xlarge"].includes(String(document.feature_size));
+  const isAcceptedProductChangeStep = isProductChangeStep && document.status === "accepted";
+  const evaluator = isPlainObject(document.evaluator) ? document.evaluator : {};
+  for (const field of ["kind", "mode", "responsibility"]) {
+    validateNestedStringField({
+      record: evaluator,
+      source,
+      field: `evaluator.${field}`,
+      issues,
+      required: true,
+    });
+  }
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "feature_size",
+    allowedValues: LIVE_E2E_FEATURE_SIZE_VALUES,
+    issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "mission_class",
+    allowedValues: LIVE_E2E_MISSION_CLASS_VALUES,
+    issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "assessment_method",
+    allowedValues: LIVE_E2E_STEP_QUALITY_ASSESSMENT_METHOD_VALUES,
+    issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
     field: "status",
     allowedValues: LIVE_E2E_STEP_QUALITY_STATUS_VALUES,
     issues,
@@ -2520,7 +2680,7 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
     field: "inspected_evidence_refs",
     issues,
   });
-  for (const field of ["findings", "repair_instructions", "evidence_refs"]) {
+  for (const field of ["findings", "repair_instructions", "evaluator_input_refs", "evidence_refs"]) {
     validateStringArrayItems({
       values: document[field],
       source,
@@ -2549,6 +2709,18 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
         expected: "non-empty array",
         actual: "empty",
         message: "Step quality assessment must cite materialized public evidence refs.",
+      }),
+    );
+  }
+  if (Array.isArray(document.evaluator_input_refs) && isAcceptedProductChangeStep && document.evaluator_input_refs.length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "evaluator_input_refs",
+        expected: "non-empty array",
+        actual: "empty",
+        message: "Accepted product-change step quality assessments must cite evaluator input refs.",
       }),
     );
   }
@@ -2589,9 +2761,111 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
       }),
     );
   }
+  if (document.status !== "accepted" && document.decision === "continue") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "decision",
+        expected: "request-repair|retry|block when status is not accepted",
+        actual: String(document.decision),
+        message: "Non-accepted step quality assessments must not continue the runner.",
+      }),
+    );
+  }
+  if (isAcceptedProductChangeStep && document.assessment_method === "flow-health-automatic") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "assessment_method",
+        expected: "external-skill-agent|manual-skill-agent",
+        actual: String(document.assessment_method),
+        message: "Accepted medium+ product-change step quality assessments must be evaluator-authored.",
+      }),
+    );
+  }
+  if (isAcceptedProductChangeStep) {
+    for (const field of ["source_assessment_request_file", "rubric_version", "evaluator_output_ref"]) {
+      if (typeof document[field] !== "string" || document[field].trim().length === 0) {
+        issues.push(
+          issue({
+            code: "required_field_missing",
+            source,
+            field,
+            expected: "non-empty string",
+            actual: typeof document[field] === "string" ? "empty" : describeActualType(document[field]),
+            message: `Accepted product-change step quality assessments require '${field}'.`,
+          }),
+        );
+      }
+    }
+  }
+  if (isAcceptedProductChangeStep && (!Array.isArray(document.findings) || document.findings.length === 0)) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "findings",
+        expected: "non-empty array",
+        actual: Array.isArray(document.findings) ? "empty" : describeActualType(document.findings),
+        message: "Accepted product-change step quality assessments require evidence-backed top-level findings.",
+      }),
+    );
+  }
+  if (isAcceptedProductChangeStep && Array.isArray(document.findings)) {
+    document.findings.forEach((finding, index) => {
+      if (
+        typeof finding === "string" &&
+        finding.trim().length < LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS
+      ) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: `findings[${index}]`,
+            expected: `evidence-backed rationale string with at least ${LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS} characters`,
+            actual: "superficial string",
+            message: "Accepted product-change step quality findings must contain non-template rationale.",
+          }),
+        );
+      }
+    });
+  }
+  if (document.decision === "request-repair" && (!Array.isArray(document.repair_instructions) || document.repair_instructions.length === 0)) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "repair_instructions",
+        expected: "non-empty array",
+        actual: Array.isArray(document.repair_instructions) ? "empty" : describeActualType(document.repair_instructions),
+        message: "request-repair step quality assessments must describe the public repair loop instruction.",
+      }),
+    );
+  }
+  if (document.decision === "request-repair") {
+    const repairLineage = isPlainObject(document.repair_lineage) ? document.repair_lineage : {};
+    for (const field of ["source_assessment_request_file", "source_operator_decision_file", "public_repair_command"]) {
+      validateNestedStringField({
+        record: repairLineage,
+        source,
+        field: `repair_lineage.${field}`,
+        issues,
+        required: true,
+      });
+    }
+  }
 
   const dimensions = isPlainObject(document.dimensions) ? document.dimensions : {};
-  for (const dimensionKey of LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS) {
+  const requiredDimensionKeys =
+    isAcceptedProductChangeStep && ["execution", "review"].includes(String(document.step_id))
+      ? [
+          ...LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS,
+          ...LIVE_E2E_PRODUCT_EXECUTION_STEP_QUALITY_DIMENSION_KEYS,
+        ]
+      : LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS;
+  for (const dimensionKey of requiredDimensionKeys) {
     const dimension = dimensions[dimensionKey];
     const field = `dimensions.${dimensionKey}`;
     if (!isPlainObject(dimension)) {
@@ -2623,6 +2897,13 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
       issues,
       required: true,
     });
+    validateNestedStringField({
+      record: dimension,
+      source,
+      field: `${field}.summary`,
+      issues,
+      required: true,
+    });
     validateNestedArrayField({
       record: dimension,
       source,
@@ -2647,6 +2928,80 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
       field: `${field}.findings`,
       issues,
     });
+    if (isAcceptedProductChangeStep && (typeof dimension.summary !== "string" || dimension.summary.trim().length === 0)) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: `${field}.summary`,
+          expected: "non-empty string",
+          actual: typeof dimension.summary === "string" ? "empty" : describeActualType(dimension.summary),
+          message: "Accepted product-change step quality dimensions require a non-empty summary.",
+        }),
+      );
+    }
+    if (
+      isAcceptedProductChangeStep &&
+      typeof dimension.summary === "string" &&
+      dimension.summary.trim().length < LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS
+    ) {
+      issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source,
+          field: `${field}.summary`,
+          expected: `evidence-backed rationale string with at least ${LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS} characters`,
+          actual: "superficial string",
+          message: "Accepted product-change step quality dimension summaries must contain non-template rationale.",
+        }),
+      );
+    }
+    if (
+      isAcceptedProductChangeStep &&
+      (!Array.isArray(dimension.inspected_evidence_refs) || dimension.inspected_evidence_refs.length === 0)
+    ) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: `${field}.inspected_evidence_refs`,
+          expected: "non-empty array",
+          actual: Array.isArray(dimension.inspected_evidence_refs) ? "empty" : describeActualType(dimension.inspected_evidence_refs),
+          message: "Accepted product-change step quality dimensions require inspected evidence refs.",
+        }),
+      );
+    }
+    if (isAcceptedProductChangeStep && (!Array.isArray(dimension.findings) || dimension.findings.length === 0)) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: `${field}.findings`,
+          expected: "non-empty array",
+          actual: Array.isArray(dimension.findings) ? "empty" : describeActualType(dimension.findings),
+          message: "Accepted product-change step quality dimensions require evidence-backed findings.",
+        }),
+      );
+    }
+    if (isAcceptedProductChangeStep && Array.isArray(dimension.findings)) {
+      dimension.findings.forEach((finding, index) => {
+        if (
+          typeof finding === "string" &&
+          finding.trim().length < LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS
+        ) {
+          issues.push(
+            issue({
+              code: "field_type_mismatch",
+              source,
+              field: `${field}.findings[${index}]`,
+              expected: `evidence-backed rationale string with at least ${LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS} characters`,
+              actual: "superficial string",
+              message: "Accepted product-change step quality dimension findings must contain non-template rationale.",
+            }),
+          );
+        }
+      });
+    }
     if (document.status === "accepted" && (dimension.status !== "pass" || !["strong", "medium"].includes(String(dimension.evidence_strength)))) {
       issues.push(
         issue({

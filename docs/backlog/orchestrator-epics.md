@@ -25,7 +25,8 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W43:** `W43-S01` Post-alpha.10 backlog and confidence baseline; `W43-S04` Alpha.10 findings closure and next-release decision
 - **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S05` Post-implementation docs and live E2E validation
 - **W45:** `W45-S06` Documentation refresh and live E2E acceptance
-- **W46:** `W46-S01` Contract/docs breaking policy; `W46-S06` Proof run, findings intake, docs refresh
+- **W46:** `W46-S01` Contract/docs breaking policy; `W46-S06` Proof-complete acceptance closure and findings intake
+- **W47:** `W47-S04` Full proof rerun and product acceptance closure
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -83,6 +84,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W24:** `W24-S01` Run-level Runtime Harness controller
 - **W44:** `W44-S04` Context, skill, and policy overlays from evidence
 - **W45:** `W45-S01` Quality repair request contract and operating model; `W45-S02` Cross-stage repair state machine and next-action resolver
+- **W47:** `W47-S03` AOR repair/review convergence hardening
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -132,6 +134,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W43:** `W43-S02` Alpha.10 installed-user onboarding and evidence smoke; `W43-S04` Alpha.10 findings closure and next-release decision
 - **W44:** `W44-S03` Artifact readiness state machine and stale transitions
 - **W45:** `W45-S02` Cross-stage repair state machine and next-action resolver; `W45-S03` CLI and control-plane quality repair surfaces; `W45-S04` Web repair-cycle observability
+- **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -172,4 +175,5 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W43:** `W43-S03` Alpha.10 live E2E interruption and provider smoke
 - **W44:** `W44-S05` Post-implementation docs and live E2E validation
 - **W45:** `W45-S05` Repair-loop proof fixtures and live profile; `W45-S06` Documentation refresh and live E2E acceptance
-- **W46:** `W46-S01` Contract/docs breaking policy; `W46-S02` Step evaluator report and runner behavior; `W46-S03` Catalog budget and small-canary migration; `W46-S04` Product-change mission rewrite for current targets; `W46-S05` Hard target expansion; `W46-S06` Proof run, findings intake, docs refresh
+- **W46:** `W46-S01` Contract/docs breaking policy; `W46-S02` Step evaluator report and runner behavior; `W46-S03` Catalog budget and small-canary migration; `W46-S04` Product-change mission rewrite for current targets; `W46-S05` Hard target expansion; `W46-S06` Proof-complete acceptance closure and findings intake
+- **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure; `W47-S02` Live E2E target verification isolation and Vitest readiness; `W47-S03` AOR repair/review convergence hardening; `W47-S04` Full proof rerun and product acceptance closure

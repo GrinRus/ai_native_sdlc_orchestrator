@@ -172,6 +172,11 @@ local closure evidence for small flow-regression canaries.
 It fails when:
 - the report contract or local evidence refs are invalid;
 - `overall_status` is not `pass`;
+- medium+ product-change source run-health is not `pass`;
+- medium+ product-change source evidence does not include an accepted linked
+  step-quality report for every observed step;
+- source runtime/review reports record meaningful changed paths but the run
+  summary loses them;
 - any required dimension or AOR operator subdimension is not `pass`;
 - any dimension or subdimension uses `evidence_strength: weak|missing`;
 - the source run summary has `post_run_diagnostic_status` and it is not `pass`;

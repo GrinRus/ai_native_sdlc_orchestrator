@@ -25,6 +25,7 @@
 - `live-e2e-observation-report.md`
 - `live-e2e-run-health-report.md`
 - `live-e2e-quality-assessment-report.md`
+- `live-e2e-step-quality-assessment-request.md`
 - `live-e2e-step-quality-assessment-report.md`
 - `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`
@@ -34,7 +35,7 @@
 - `compiled-context-artifact.md`
 - `operator-request.md`
 
-Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; per-step product quality belongs in `live-e2e-step-quality-assessment-report`, and final outcome quality remains in `live-e2e-quality-assessment-report`. For medium+ product-change missions, all-pass final quality is mandatory for product acceptance, while provider qualification remains a separate policy.
+Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; per-step product quality starts with `live-e2e-step-quality-assessment-request`, is accepted or blocked by `live-e2e-step-quality-assessment-report`, and final outcome quality remains in `live-e2e-quality-assessment-report`. For medium+ product-change missions, accepted linked step-quality reports and all-pass final quality are mandatory for product acceptance, while provider qualification remains a separate policy.
 
 ## Platform assets
 - `provider-route-profile.md`

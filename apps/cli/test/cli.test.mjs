@@ -4731,6 +4731,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "project.aor.yaml",
         "--run-id",
         runId,
+        "--execution-root",
+        projectRoot,
       ]);
       assert.equal(reviewRun.exitCode, 0, reviewRun.stderr);
       const reviewPayload = JSON.parse(reviewRun.stdout);
@@ -4756,6 +4758,13 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       assert.equal(reviewReport.feature_traceability.provider_variant_id, "openai-primary");
       assert.equal(reviewReport.feature_traceability.feature_size, "small");
       assert.equal(reviewReport.code_quality.status, "pass");
+      assert.equal(path.resolve(reviewReport.code_quality.target_checkout_root), path.resolve(projectRoot));
+      assert.equal(reviewReport.code_quality.changed_path_diagnostics.git_status_root, projectRoot);
+      assert.ok(reviewReport.code_quality.changed_paths.includes("source/mission.js"));
+      assert.ok(
+        runtimeHarnessReport.step_decisions[0].mission_semantics.meaningful_changed_paths.includes("source/mission.js"),
+      );
+      assert.equal(runtimeHarnessReport.step_decisions[0].mission_semantics.git_status_root, projectRoot);
       assert.equal(reviewReport.discovery_quality.status, "pass");
       assert.equal(reviewReport.feature_size_fit.status, "pass");
       assert.equal(reviewReport.provider_traceability.status, "pass");

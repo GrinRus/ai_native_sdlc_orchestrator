@@ -25,13 +25,13 @@ required_matrix_cells:
     feature_size: medium
     feature_mission_id: pluggy-diagnostics-repair
     provider_variant_id: anthropic-primary
-    coverage_tier: required
+    coverage_tier: extended
   - cell_id: pluggy.governance.medium.openai
     scenario_family: governance
     feature_size: medium
     feature_mission_id: pluggy-typing-governance
     provider_variant_id: openai-primary
-    coverage_tier: required
+    coverage_tier: extended
   - cell_id: pluggy.governance.medium.open-code
     scenario_family: governance
     feature_size: medium

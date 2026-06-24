@@ -6,8 +6,8 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import {
+  collectMissionChangeEvidence,
   isTransientBackupPath,
-  listChangedPaths,
   matchesScopePattern,
 } from "./shared/mission-scope.mjs";
 
@@ -537,10 +537,14 @@ function isChangedPathInsideApprovedScope(changedPath, allowedPaths) {
  *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId: string,
+ *   executionRoot?: string | null,
  * }} options
  */
 export function materializeReviewReport(options) {
   const init = initializeProjectRuntime(options);
+  const evidenceRoot = asString(options.executionRoot)
+    ? path.resolve(init.projectRoot, /** @type {string} */ (options.executionRoot))
+    : init.projectRoot;
   const packetArtifacts = loadPacketArtifacts(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const stepResults = loadStepResults(init.projectRoot, init.runtimeLayout.reportsRoot);
   const analysisReport = loadOptionalQualityArtifact(
@@ -754,7 +758,8 @@ export function materializeReviewReport(options) {
   if (deliveryManifest) {
     const repoDeliveries = Array.isArray(deliveryManifest.document.repo_deliveries) ? deliveryManifest.document.repo_deliveries : [];
     const firstRepoDelivery = asRecord(repoDeliveries[0]);
-    if (asString(firstRepoDelivery.repo_root) && asString(firstRepoDelivery.repo_root) !== init.projectRoot) {
+    const deliveryRepoRoot = asString(firstRepoDelivery.repo_root);
+    if (deliveryRepoRoot && path.resolve(deliveryRepoRoot) !== path.resolve(evidenceRoot)) {
       pushFinding({
         findings: artifactFindings,
         severity: "fail",
@@ -776,27 +781,28 @@ export function materializeReviewReport(options) {
 
   /** @type {Array<Record<string, unknown>>} */
   const codeFindings = [];
-  const bootstrapOwnedPrefixes = ["examples/", "context/", ".aor/"];
-  const bootstrapOwnedFiles = new Set(["project.aor.yaml"]);
-  const ignoredInputFiles = new Set();
-  const requestFile = asString(featureRequest.request_file);
-  if (requestFile) {
-    const resolvedRequestFile = path.isAbsolute(requestFile)
-      ? requestFile
-      : path.resolve(init.projectRoot, requestFile);
-    const relativeRequestFile = path.relative(init.projectRoot, resolvedRequestFile).replace(/\\/g, "/");
-    if (!relativeRequestFile.startsWith("../") && relativeRequestFile !== "") {
-      ignoredInputFiles.add(relativeRequestFile);
-    }
-  }
-  const rawChangedPaths = listChangedPaths(init.projectRoot).changedPaths;
-  const codeChangedPaths = rawChangedPaths.filter((candidate) => {
-    if (ignoredInputFiles.has(candidate)) return false;
-    if (bootstrapOwnedFiles.has(candidate)) return false;
-    return !bootstrapOwnedPrefixes.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
+  const changeEvidence = collectMissionChangeEvidence({
+    projectRoot: init.projectRoot,
+    artifactsRoot: init.runtimeLayout.artifactsRoot,
+    evidenceRoot,
   });
-  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths, init.projectRoot);
+  const ignoredInputFiles = new Set(changeEvidence.ignoredInputFiles);
+  const transientChangedPaths = changeEvidence.nonBootstrapChangedPaths.filter(
+    (changedPath) => !ignoredInputFiles.has(changedPath) && isTransientBackupPath(changedPath),
+  );
+  const rawChangedPaths = changeEvidence.changedPaths;
+  const codeChangedPaths = changeEvidence.meaningfulChangedPaths;
+  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths, evidenceRoot);
   const approvedHandoffAllowedPaths = resolveApprovedHandoffAllowedPaths(latestHandoffPacket?.document);
+  if (!changeEvidence.gitStatusAvailable) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "fail",
+      category: "code-quality",
+      summary: `Git status was unavailable for review evidence root '${changeEvidence.gitStatusRoot}'.`,
+      evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
+    });
+  }
   if (changedTestVerification.uncoveredTestPaths.length > 0) {
     const commandSummary =
       changedTestVerification.testCommands.length > 0
@@ -833,15 +839,15 @@ export function materializeReviewReport(options) {
       evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
     });
   }
+  for (const changedPath of transientChangedPaths) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "warn",
+      category: "code-quality",
+      summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
+    });
+  }
   for (const changedPath of codeChangedPaths) {
-    if (isTransientBackupPath(changedPath)) {
-      pushFinding({
-        findings: codeFindings,
-        severity: "warn",
-        category: "code-quality",
-        summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
-      });
-    }
     if (
       changedPath.startsWith("docs/backlog/") ||
       changedPath.startsWith(".agents/") ||
@@ -855,13 +861,13 @@ export function materializeReviewReport(options) {
       });
     }
   }
-  for (const weakening of detectTestWeakening(init.projectRoot, codeChangedPaths)) {
+  for (const weakening of detectTestWeakening(evidenceRoot, codeChangedPaths)) {
     pushFinding({
       findings: codeFindings,
       severity: "warn",
       category: "code-quality",
       summary: weakening.summary,
-      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(init.projectRoot, weakening.path))],
+      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(evidenceRoot, weakening.path))],
     });
   }
 
@@ -871,7 +877,7 @@ export function materializeReviewReport(options) {
     Object.keys(asRecord(requestDocument.size_budget)).length > 0
       ? asRecord(requestDocument.size_budget)
       : asRecord(requestDocument.change_budget);
-  const diffBudget = summarizeDiffBudget(init.projectRoot, codeChangedPaths);
+  const diffBudget = summarizeDiffBudget(evidenceRoot, codeChangedPaths);
   const maxChangedFiles =
     typeof declaredSizeBudget.max_changed_files === "number" ? declaredSizeBudget.max_changed_files : null;
   const maxAddedLines =
@@ -1031,6 +1037,17 @@ export function materializeReviewReport(options) {
     code_quality: {
       status: summarizeFindings(codeFindings),
       changed_paths: codeChangedPaths,
+      target_checkout_root: evidenceRoot,
+      git_status_available: changeEvidence.gitStatusAvailable,
+      changed_path_diagnostics: {
+        git_status_root: changeEvidence.gitStatusRoot,
+        raw_changed_paths: rawChangedPaths,
+        non_bootstrap_changed_paths: changeEvidence.nonBootstrapChangedPaths,
+        non_input_changed_paths: changeEvidence.nonInputChangedPaths,
+        meaningful_changed_paths: changeEvidence.meaningfulChangedPaths,
+        runner_owned_state_paths: changeEvidence.runnerOwnedStatePaths,
+        ignored_input_files: changeEvidence.ignoredInputFiles,
+      },
       findings: codeFindings,
     },
     feature_size_fit: {

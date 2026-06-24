@@ -28,6 +28,7 @@ provider_variant_id: openai-primary
 bootstrap_template: github-default
 runtime:
   mode: ephemeral
+  target_verification_workspace_mode: workspace-clone
   runtime_root: .aor
   persist_workspace: false
 stages:

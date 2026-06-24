@@ -352,6 +352,7 @@ export function executeRuntimeHarnessRun(options) {
     cwd: routedExecution.projectRoot,
     runtimeRoot: routedExecution.runtimeRoot,
     runId,
+    executionRoot: asString(options.executionRoot),
     runController: controllerEvidence.runController,
     runTransitions: controllerEvidence.runTransitions,
     runDecision: controllerEvidence.runDecision,

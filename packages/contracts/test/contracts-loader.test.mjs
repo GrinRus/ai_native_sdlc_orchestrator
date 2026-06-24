@@ -1620,6 +1620,34 @@ test("live E2E quality assessment report enforces dimensions and evidence gaps",
 });
 
 test("live E2E step quality assessment report enforces accepted step shape", () => {
+  const requestSource = path.join(workspaceRoot, "examples/reports/live-e2e-step-quality-assessment-request.sample.yaml");
+  const loadedRequest = loadContractFile({ filePath: requestSource, family: "live-e2e-step-quality-assessment-request" });
+  assert.equal(loadedRequest.ok, true, "expected live-e2e-step-quality-assessment-request sample to load");
+
+  const productRequestWithFlowHealth = structuredClone(loadedRequest.document);
+  productRequestWithFlowHealth.requested_assessment_method = "flow-health-automatic";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-request",
+      document: productRequestWithFlowHealth,
+      source: "test://step-quality-request-flow-health-product",
+    }),
+    "enum_value_invalid",
+    "requested_assessment_method",
+  );
+
+  const requestMissingBoundaryFile = structuredClone(loadedRequest.document);
+  delete requestMissingBoundaryFile.source_operator_decision_file;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-request",
+      document: requestMissingBoundaryFile,
+      source: "test://step-quality-request-missing-operator-decision",
+    }),
+    "required_field_missing",
+    "source_operator_decision_file",
+  );
+
   const source = path.join(workspaceRoot, "examples/reports/live-e2e-step-quality-assessment-report.sample.yaml");
   const loaded = loadContractFile({ filePath: source, family: "live-e2e-step-quality-assessment-report" });
   assert.equal(loaded.ok, true, "expected live-e2e-step-quality-assessment-report sample to load");
@@ -1660,6 +1688,30 @@ test("live E2E step quality assessment report enforces accepted step shape", () 
     "evaluator.responsibility",
   );
 
+  const missingAssessmentRequest = structuredClone(loaded.document);
+  delete missingAssessmentRequest.source_assessment_request_file;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingAssessmentRequest,
+      source: "test://step-quality-missing-assessment-request",
+    }),
+    "required_field_missing",
+    "source_assessment_request_file",
+  );
+
+  const autoAcceptedProduct = structuredClone(loaded.document);
+  autoAcceptedProduct.assessment_method = "flow-health-automatic";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: autoAcceptedProduct,
+      source: "test://step-quality-product-auto-method",
+    }),
+    "enum_value_invalid",
+    "assessment_method",
+  );
+
   const missingEvidence = structuredClone(loaded.document);
   missingEvidence.evidence_refs = [];
   assertValidationIssue(
@@ -1683,6 +1735,78 @@ test("live E2E step quality assessment report enforces accepted step shape", () 
     "field_type_mismatch",
     "dimensions.traceability.findings[0]",
   );
+
+  const missingDimensionRationale = structuredClone(loaded.document);
+  missingDimensionRationale.dimensions.traceability.findings = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingDimensionRationale,
+      source: "test://step-quality-missing-dimension-rationale",
+    }),
+    "required_field_missing",
+    "dimensions.traceability.findings",
+  );
+
+  const superficialAcceptedReport = structuredClone(loaded.document);
+  superficialAcceptedReport.findings = ["ok"];
+  superficialAcceptedReport.dimensions.traceability.summary = "ok";
+  superficialAcceptedReport.dimensions.traceability.findings = ["ok"];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: superficialAcceptedReport,
+      source: "test://step-quality-superficial-accepted-product-report",
+    }),
+    "field_type_mismatch",
+    "findings[0]",
+  );
+
+  const executionMissingProductDimension = structuredClone(loaded.document);
+  executionMissingProductDimension.step_id = "execution";
+  executionMissingProductDimension.step_name = "execution";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: executionMissingProductDimension,
+      source: "test://step-quality-execution-missing-product-dimension",
+    }),
+    "required_field_missing",
+    "dimensions.mission_relevance",
+  );
+
+  const requestRepairMissingLineage = structuredClone(loaded.document);
+  requestRepairMissingLineage.status = "request_repair";
+  requestRepairMissingLineage.decision = "request-repair";
+  requestRepairMissingLineage.repair_instructions = [
+    "Run repair only through the public AOR review/repair loop.",
+  ];
+  delete requestRepairMissingLineage.repair_lineage;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: requestRepairMissingLineage,
+      source: "test://step-quality-request-repair-missing-lineage",
+    }),
+    "required_field_missing",
+    "repair_lineage.source_assessment_request_file",
+  );
+
+  const smallFlowHealth = structuredClone(loaded.document);
+  smallFlowHealth.feature_size = "small";
+  smallFlowHealth.mission_class = "flow-regression";
+  smallFlowHealth.assessment_method = "flow-health-automatic";
+  smallFlowHealth.findings = [];
+  smallFlowHealth.evaluator_input_refs = [];
+  for (const dimension of Object.values(smallFlowHealth.dimensions)) {
+    dimension.findings = [];
+  }
+  const smallFlowHealthValidation = validateContractDocument({
+    family: "live-e2e-step-quality-assessment-report",
+    document: smallFlowHealth,
+    source: "test://step-quality-small-flow-health",
+  });
+  assert.equal(smallFlowHealthValidation.ok, true, JSON.stringify(smallFlowHealthValidation.issues, null, 2));
 });
 
 test("W23 nested canonical contract examples load through the shared contract path", () => {

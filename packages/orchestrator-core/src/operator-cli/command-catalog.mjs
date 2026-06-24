@@ -1626,6 +1626,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
+      "--execution-root <path> (optional, canonical target checkout root for changed-path evidence)",
       "--help",
     ],
     outputs: [
@@ -1657,6 +1658,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--decision <approve|hold|request-repair>",
+      "--execution-root <path> (optional, canonical target checkout root for changed-path evidence)",
       "--reason <text> (optional)",
       "--decider-ref <ref> (optional, defaults to operator://cli)",
       "--help",

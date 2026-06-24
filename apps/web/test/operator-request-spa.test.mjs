@@ -9,6 +9,7 @@ const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
   const source = fs.readFileSync(path.join(webRoot, "src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(webRoot, "src/spa.css"), "utf8");
 
   for (const stage of ["readiness", "mission", "discovery", "implement", "review", "delivery", "learning"]) {
     assert.match(source, new RegExp(`id: "${stage}"`, "u"));
@@ -101,4 +102,7 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Create and run request/u);
   assert.match(source, /Latest run/u);
   assert.match(source, /Attach as request target/u);
+  assert.match(css, /button:focus-visible/u);
+  assert.match(css, /\.decision-action-grid button:focus-visible/u);
+  assert.match(css, /\.execution-action-grid button:focus-visible/u);
 });

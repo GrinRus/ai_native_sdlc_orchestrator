@@ -32,6 +32,12 @@ Durable approval decision for one reviewed run.
 `hold` preserves a human stop without claiming repair has started.
 
 `request-repair` records that downstream work should repair the linked run before delivery/release approval.
+For public repair loops, `request-repair` reason/evidence should preserve the
+unresolved review findings, latest meaningful changed paths, verification
+status, previous repair decision refs, and the stop reason that made another
+public repair iteration necessary. It must still route repair through public AOR
+run/review lifecycle commands rather than providing a private patch or direct
+target mutation.
 
 ## Decision basis
 `decision_basis` should preserve:

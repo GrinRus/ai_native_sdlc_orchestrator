@@ -6,7 +6,15 @@ repo:
   checkout_strategy: shallow
 verification:
   setup_commands:
+    - >-
+      node -e "const [major, minor] = process.versions.node.split('.').map(Number);
+      const ok = (major === 22 && minor >= 12) || major === 24 || major >= 26;
+      if (!ok) {
+        console.error('Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got ' + process.version);
+        process.exit(1);
+      }"
     - pnpm install --frozen-lockfile
+    - pnpm build
   commands:
     - pnpm test
     - pnpm lint

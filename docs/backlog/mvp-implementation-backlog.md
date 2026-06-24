@@ -400,7 +400,15 @@ This is the master index for the implementation slices across all defined waves.
 | W46-S03 | Catalog budget and small-canary migration | EPIC-7 | ready | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S01 |
 | W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S03 |
 | W46-S05 | Hard target expansion | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S04 |
-| W46-S06 | Proof run, findings intake, docs refresh | EPIC-0, EPIC-7 | ready | `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
+| W46-S06 | Proof-complete acceptance closure and findings intake | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
+
+## W47 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W47-S01 | AOR operator keyboard accessibility and guided proof closure | EPIC-6, EPIC-7 | ready | `apps/web/**`, `scripts/live-e2e/**`, tests | W46-S06 |
+| W47-S02 | Live E2E target verification isolation and Vitest readiness | EPIC-7 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, target catalog/profile docs, tests | W47-S01 |
+| W47-S03 | AOR repair/review convergence hardening | EPIC-4, EPIC-7 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, review/repair docs, tests | W47-S02 |
+| W47-S04 | Full proof rerun and product acceptance closure | EPIC-0, EPIC-7 | ready | `scripts/live-e2e/**`, `docs/ops/**`, root checks | W47-S03 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

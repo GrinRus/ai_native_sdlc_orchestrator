@@ -19,6 +19,7 @@ import {
 } from "./common.mjs";
 
 const DEFAULT_GENERATED_PROFILE_VERIFICATION_TIMEOUT_SEC = 1800;
+const PRODUCT_CHANGE_FEATURE_SIZES = new Set(["medium", "large", "xlarge"]);
 
 const LIVE_E2E_STEP_POLICY_CLASSES = Object.freeze({
   discovery: "artifact",
@@ -264,6 +265,31 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
 }
 
 /**
+ * @param {Record<string, unknown>} mission
+ * @returns {boolean}
+ */
+function requiresIsolatedProductVerification(mission) {
+  return (
+    asNonEmptyString(mission.mission_class) === "product-change" &&
+    PRODUCT_CHANGE_FEATURE_SIZES.has(asNonEmptyString(mission.feature_size))
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} mission
+ * @returns {string}
+ */
+function resolveGeneratedWorkspaceMode(profile, mission) {
+  const runtime = asRecord(profile.runtime);
+  const explicitVerificationMode = asNonEmptyString(runtime.target_verification_workspace_mode);
+  if (explicitVerificationMode) return explicitVerificationMode;
+  const declaredMode = asNonEmptyString(runtime.mode);
+  if (declaredMode && declaredMode !== "ephemeral") return declaredMode;
+  return requiresIsolatedProductVerification(mission) ? "workspace-clone" : declaredMode || "ephemeral";
+}
+
+/**
  * @param {{
  *   catalogVerification: Record<string, unknown>,
  *   profileVerification: Record<string, unknown>,
@@ -389,7 +415,7 @@ export function materializeGeneratedProjectProfile(options) {
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";
-  runtimeDefaults.workspace_mode = asNonEmptyString(asRecord(options.profile.runtime).mode) || "ephemeral";
+  runtimeDefaults.workspace_mode = resolveGeneratedWorkspaceMode(options.profile, asRecord(options.mission));
   runtimeDefaults.verification_command_timeout_sec = resolveGeneratedProfileVerificationTimeoutSec(
     options.profile,
     runtimeDefaults,

@@ -16,11 +16,10 @@ import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import {
+  collectMissionChangeEvidence,
   filterNonBootstrapChangedPaths,
   filterRunnerOwnedStatePaths,
   listChangedPaths,
-  loadMissionScope,
-  resolveMissionScopedChanges,
 } from "./shared/mission-scope.mjs";
 import {
   classifyRuntimeStepOutcome,
@@ -1540,21 +1539,22 @@ export function executeRoutedStep(options) {
     changedPathStatusBefore.available && changedPathStatusAfter.available
       ? diffChangedPaths(changedPathStatusBefore.changedPaths, changedPathStatusAfter.changedPaths)
       : [];
-  const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatusAfter.changedPaths);
   const nonBootstrapChangedPathsDuringStep = filterNonBootstrapChangedPaths(changedPathsDuringStep);
-  const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatusAfter.changedPaths);
   const runnerOwnedStatePathsDuringStep = filterRunnerOwnedStatePaths(changedPathsDuringStep);
-  const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
-  const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
+  const missionEvidence = collectMissionChangeEvidence({
+    projectRoot: init.projectRoot,
+    artifactsRoot: init.runtimeLayout.artifactsRoot,
+    evidenceRoot: executionRoot,
+  });
   const strictCodeChangingNoopDetectionApplied =
     !dryRun &&
     requestedStepClass === "implement" &&
     (missionProfile.missionType === "code-changing" || missionProfile.missionType === "release") &&
     changedPathStatusBefore.available &&
-    changedPathStatusAfter.available;
+    missionEvidence.gitStatusAvailable;
   const strictCodeChangingNoop =
-    strictCodeChangingNoopDetectionApplied && missionScopedChanges.meaningfulChangedPaths.length === 0;
+    strictCodeChangingNoopDetectionApplied && missionEvidence.meaningfulChangedPaths.length === 0;
   const adapterOutputForStep = asRecord(adapterResponse?.output);
   const externalRunnerForStep = asRecord(adapterOutputForStep.external_runner);
   const stepResult = {
@@ -1637,33 +1637,38 @@ export function executeRoutedStep(options) {
       evidence_root: init.runtimeLayout.reportsRoot,
     },
     mission_semantics: {
-      git_status_available: changedPathStatusBefore.available && changedPathStatusAfter.available,
-      git_status_root: executionRoot,
+      git_status_available: changedPathStatusBefore.available && missionEvidence.gitStatusAvailable,
+      git_status_root: missionEvidence.gitStatusRoot,
       changed_paths_before_step: changedPathStatusBefore.changedPaths,
-      changed_paths_after_step: changedPathStatusAfter.changedPaths,
+      changed_paths_after_step: missionEvidence.changedPaths,
       changed_paths_during_step: changedPathsDuringStep,
-      non_bootstrap_changed_paths: nonBootstrapChangedPaths,
+      non_bootstrap_changed_paths: missionEvidence.nonBootstrapChangedPaths,
       non_bootstrap_changed_paths_during_step: nonBootstrapChangedPathsDuringStep,
-      non_input_changed_paths: missionScopedChanges.nonInputChangedPaths,
-      meaningful_changed_paths: missionScopedChanges.meaningfulChangedPaths,
-      runner_owned_state_paths: runnerOwnedStatePaths,
+      non_input_changed_paths: missionEvidence.nonInputChangedPaths,
+      meaningful_changed_paths: missionEvidence.meaningfulChangedPaths,
+      runner_owned_state_paths: missionEvidence.runnerOwnedStatePaths,
       runner_owned_state_paths_during_step: runnerOwnedStatePathsDuringStep,
-      ignored_input_files: missionScopedChanges.ignoredInputFiles,
+      ignored_input_files: missionEvidence.ignoredInputFiles,
       strict_code_changing_noop_detection_applied: strictCodeChangingNoopDetectionApplied,
       strict_code_changing_noop: strictCodeChangingNoop,
       mission_type: missionProfile.missionType,
       strictness_profile: missionProfile.strictnessProfile,
+      evidence_root_lineage: {
+        project_root: init.projectRoot,
+        canonical_target_checkout_root: executionRoot,
+        git_status_root: missionEvidence.gitStatusRoot,
+      },
     },
   };
   if (Object.keys(externalRunnerForStep).length > 0) {
     stepResult.external_runner = externalRunnerForStep;
   }
   let runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
-    gitStatusAvailable: changedPathStatusBefore.available && changedPathStatusAfter.available,
+    gitStatusAvailable: changedPathStatusBefore.available && missionEvidence.gitStatusAvailable,
     strictCodeChangingNoop,
-    nonBootstrapChangedPaths,
-    meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
-    runnerOwnedStatePaths,
+    nonBootstrapChangedPaths: missionEvidence.nonBootstrapChangedPaths,
+    meaningfulChangedPaths: missionEvidence.meaningfulChangedPaths,
+    runnerOwnedStatePaths: missionEvidence.runnerOwnedStatePaths,
   });
   let runtimePermissionRequest = null;
   let runtimePermissionDecision = null;

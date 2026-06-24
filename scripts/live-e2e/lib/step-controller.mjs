@@ -12,7 +12,9 @@ import {
   writeJson,
 } from "./common.mjs";
 import {
+  readStepQualityAssessmentReport,
   requiresAcceptedProductStepQuality,
+  writeStepQualityAssessmentRequest,
   writeStepQualityAssessmentReport,
 } from "./step-quality-assessment.mjs";
 
@@ -717,7 +719,9 @@ export function createLiveE2eStepController(options) {
     pending_decision: null,
     operator_context: operatorContext,
     retry_counters: retryCounters,
+    step_quality_assessment_request_refs: [],
     step_quality_assessment_refs: [],
+    pending_step_quality_assessment: null,
     evidence_refs: [],
     artifacts_snapshot: {},
     command_results: [],
@@ -785,11 +789,19 @@ export function createLiveE2eStepController(options) {
         ),
     ) ??
     null;
+  const resolveLatestEntry = () => {
+    const entries = Object.values(entryByStep).sort(
+      (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
+    );
+    return entries[entries.length - 1] ?? null;
+  };
   state.completed_steps = Object.values(entryByStep)
     .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
     .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
     .filter(Boolean);
   state.current_step = resolveCurrentStep();
+  const latestEntry = resolveLatestEntry();
+  state.pending_decision = latestEntry ? asRecord(latestEntry.decision) : null;
 
   /**
    * @returns {Record<string, unknown>}
@@ -831,14 +843,31 @@ export function createLiveE2eStepController(options) {
       .map((stepEntry) => asNonEmptyString(stepEntry.step_instance_id) || asNonEmptyString(stepEntry.step_id))
       .filter(Boolean);
     state.current_step = resolveCurrentStep();
-    state.pending_decision = entry.decision ?? null;
+    state.pending_decision = asRecord(resolveLatestEntry()?.decision) ?? null;
+    state.step_quality_assessment_request_refs = uniqueStrings([
+      ...asStringArray(state.step_quality_assessment_request_refs),
+      asNonEmptyString(entry.step_quality_assessment_request_ref),
+    ]);
     state.step_quality_assessment_refs = uniqueStrings([
       ...asStringArray(state.step_quality_assessment_refs),
       asNonEmptyString(entry.step_quality_assessment_ref),
     ]);
+    state.pending_step_quality_assessment =
+      asNonEmptyString(entry.step_quality_assessment_status) === "awaiting-assessment"
+        ? {
+            status: "awaiting-assessment",
+            step_id: asNonEmptyString(entry.step_id),
+            step_instance_id: stepInstanceId,
+            iteration,
+            assessment_request_file: asNonEmptyString(entry.step_quality_assessment_request_ref),
+            expected_assessment_report_file: asNonEmptyString(entry.step_quality_assessment_expected_report_ref),
+            reason: "Product-change step continuation requires an evaluator-authored step-quality assessment.",
+          }
+        : null;
     state.evidence_refs = uniqueStrings([
       ...asStringArray(state.evidence_refs),
       observationFile,
+      asNonEmptyString(entry.step_quality_assessment_request_ref),
       asNonEmptyString(entry.step_quality_assessment_ref),
       asNonEmptyString(entry.plan_ref),
       asNonEmptyString(entry.execution_ref),
@@ -850,6 +879,31 @@ export function createLiveE2eStepController(options) {
       asNonEmptyString(entry.transcript_ref),
     ]);
     state.updated_at = nowIso();
+    writeJson(stateFile, state);
+  }
+
+  /**
+   * @param {Record<string, unknown>} artifacts
+   * @param {Array<Record<string, unknown>>} commandResults
+   */
+  function syncLiveE2eArtifactRefs(artifacts, commandResults = []) {
+    artifacts.live_e2e_controller_state_file = stateFile;
+    artifacts.live_e2e_step_observation_files = Object.values(entryByStep).map((stepEntry) =>
+      asNonEmptyString(stepEntry.observation_ref),
+    );
+    artifacts.live_e2e_step_quality_assessment_request_files = Object.values(entryByStep)
+      .map((stepEntry) => asNonEmptyString(stepEntry.step_quality_assessment_request_ref))
+      .filter(Boolean);
+    artifacts.live_e2e_step_quality_assessment_report_files = Object.values(entryByStep)
+      .map((stepEntry) => asNonEmptyString(stepEntry.step_quality_assessment_ref))
+      .filter(Boolean);
+    artifacts.live_e2e_step_journal_entries = Object.values(entryByStep).sort(
+      (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
+    );
+    state.artifacts_snapshot = JSON.parse(
+      JSON.stringify(mergeArtifactSnapshots(asRecord(state.artifacts_snapshot), artifacts ?? {})),
+    );
+    state.command_results = JSON.parse(JSON.stringify(commandResults ?? []));
     writeJson(stateFile, state);
   }
 
@@ -925,6 +979,7 @@ export function createLiveE2eStepController(options) {
             : null) ||
           "Skill-agent operator decision accepted.",
       };
+      applyStepQualityGate(entry, asRecord(state.artifacts_snapshot));
     } else if (operatorDecision.status === "rejected") {
       const rejectionReason =
         asNonEmptyString(asRecord(operatorDecision.decision).rejection_reason) ||
@@ -951,6 +1006,139 @@ export function createLiveE2eStepController(options) {
       uniqueStrings([asNonEmptyString(entry.operator_decision_ref), asNonEmptyString(entry.transcript_ref), ...asStringArray(entry.artifact_refs)]),
     );
     persistStep(step, entry);
+    return entry;
+  }
+
+  /**
+   * @param {Record<string, unknown>} entry
+   * @param {Record<string, unknown>} artifacts
+   * @returns {Record<string, unknown>}
+   */
+  function applyStepQualityGate(entry, artifacts) {
+    if (asNonEmptyString(entry.operator_decision_status) !== "accepted") return entry;
+    const builtStepQualityRequest = writeStepQualityAssessmentRequest({
+      runId: options.runId,
+      profile: options.profile,
+      artifacts,
+      entry,
+      outputDir: options.reportsRoot,
+    });
+    entry.step_quality_assessment_request_ref = builtStepQualityRequest.requestFile;
+    entry.step_quality_assessment_expected_report_ref = builtStepQualityRequest.reportFile;
+    if (requiresAcceptedProductStepQuality(builtStepQualityRequest.context)) {
+      const existingStepQuality = readStepQualityAssessmentReport({
+        reportFile: builtStepQualityRequest.reportFile,
+        requestFile: builtStepQualityRequest.requestFile,
+      });
+      if (existingStepQuality) {
+        const assessment = asRecord(existingStepQuality.assessment);
+        const assessmentDecision = asNonEmptyString(assessment.decision);
+        const assessmentStatus = asNonEmptyString(assessment.status);
+        const priorSemantic = asRecord(entry.semantic_analysis);
+        const priorFindings = asStringArray(priorSemantic.findings).filter(
+          (finding) => finding !== "Product-change step continuation requires an evaluator-authored step-quality assessment.",
+        );
+        entry.step_quality_assessment_ref = existingStepQuality.reportFile;
+        entry.step_quality_assessment_status = assessmentStatus;
+        entry.decision = {
+          ...asRecord(entry.decision),
+          action: assessmentDecision || asNonEmptyString(asRecord(entry.decision).action),
+          reason:
+            asStringArray(assessment.findings)[0] ||
+            asNonEmptyString(asRecord(entry.decision).reason) ||
+            "Evaluator-authored step-quality assessment accepted.",
+        };
+        if (assessmentStatus === "accepted" && assessmentDecision === "continue") {
+          entry.semantic_analysis = {
+            ...priorSemantic,
+            status: "pass",
+            findings: uniqueStrings([
+              ...priorFindings,
+              ...asStringArray(assessment.findings),
+              "Step-quality evaluator accepted product-change evidence before continuation.",
+            ]),
+          };
+          entry.final_step_verdict = "pass";
+        } else if (assessmentDecision === "request-repair") {
+          entry.semantic_analysis = {
+            ...priorSemantic,
+            status: "blocked",
+            findings: uniqueStrings([
+              ...priorFindings,
+              ...asStringArray(assessment.findings),
+              "Step-quality evaluator requested public AOR repair before continuation.",
+            ]),
+          };
+          entry.final_step_verdict = "blocked";
+        }
+      } else if (asNonEmptyString(asRecord(entry.decision).action) === "continue") {
+        entry.step_quality_candidate_decision = asRecord(entry.decision);
+        entry.step_quality_assessment_status = "awaiting-assessment";
+        entry.semantic_analysis = {
+          ...asRecord(entry.semantic_analysis),
+          status: "blocked",
+          findings: uniqueStrings([
+            ...asStringArray(asRecord(entry.semantic_analysis).findings),
+            "Product-change step continuation requires an evaluator-authored step-quality assessment.",
+          ]),
+        };
+        entry.final_step_verdict = "blocked";
+        entry.decision = {
+          ...asRecord(entry.decision),
+          action: "block",
+          reason: "Product-change step continuation requires an evaluator-authored step-quality assessment.",
+        };
+      }
+    } else {
+      const builtStepQuality = writeStepQualityAssessmentReport({
+        runId: options.runId,
+        profile: options.profile,
+        artifacts,
+        entry,
+        outputDir: options.reportsRoot,
+        assessmentRequestFile: builtStepQualityRequest.requestFile,
+        assessmentRequest: builtStepQualityRequest.request,
+        assessmentMethod: "flow-health-automatic",
+        evaluatorOutputRef: builtStepQualityRequest.requestFile,
+      });
+      entry.step_quality_assessment_ref = builtStepQuality.reportFile;
+      entry.step_quality_assessment_status = asNonEmptyString(builtStepQuality.assessment.status);
+      if (
+        asNonEmptyString(asRecord(entry.decision).action) === "continue" &&
+        (asNonEmptyString(builtStepQuality.assessment.status) !== "accepted" ||
+          asNonEmptyString(builtStepQuality.assessment.decision) !== "continue")
+      ) {
+        entry.semantic_analysis = {
+          ...asRecord(entry.semantic_analysis),
+          status: "blocked",
+          findings: uniqueStrings([
+            ...asStringArray(asRecord(entry.semantic_analysis).findings),
+            "Flow-health step continuation requires an accepted step-quality assessment.",
+          ]),
+        };
+        entry.final_step_verdict = "blocked";
+        entry.decision = {
+          ...asRecord(entry.decision),
+          action: "block",
+          reason: "Flow-health step continuation requires an accepted step-quality assessment.",
+        };
+      }
+    }
+    if (asNonEmptyString(entry.step_quality_assessment_status) === "awaiting-assessment") {
+      entry.decision = {
+        ...asRecord(entry.decision),
+        next_step: asNonEmptyString(asRecord(entry.decision).next_step) || asNonEmptyString(entry.step_id),
+      };
+    }
+    if (
+      asNonEmptyString(entry.step_quality_assessment_status) !== "awaiting-assessment" &&
+      asNonEmptyString(asRecord(entry.decision).action) === "continue"
+    ) {
+      entry.final_step_verdict =
+        asNonEmptyString(entry.final_step_verdict) === "blocked"
+          ? asNonEmptyString(asRecord(entry.semantic_analysis).status) || "pass"
+          : entry.final_step_verdict;
+    }
     return entry;
   }
 
@@ -1010,15 +1198,26 @@ export function createLiveE2eStepController(options) {
     const persistedEntry = entryByStep[stepInstanceId];
     if (persistedEntry) {
       const persistedAction = asNonEmptyString(asRecord(persistedEntry.decision).action);
-      if (["continue", "retry_public_step"].includes(persistedAction)) {
-        if (asNonEmptyString(persistedEntry.operator_decision_status) === "accepted") {
-          const semantic = asRecord(persistedEntry.semantic_analysis);
-          persistedEntry.semantic_analysis = {
+      if (asNonEmptyString(persistedEntry.operator_decision_status) === "accepted") {
+        const entry = applyStepQualityGate(persistedEntry, input.artifacts);
+        const action = asNonEmptyString(asRecord(entry.decision).action);
+        if (["continue", "retry_public_step"].includes(action)) {
+          const semantic = asRecord(entry.semantic_analysis);
+          entry.semantic_analysis = {
             ...semantic,
             findings: resolvedSkillAgentFindings(...asStringArray(semantic.findings)),
           };
+          persistStep(step, entry);
+          syncLiveE2eArtifactRefs(input.artifacts, input.commandResults);
+          return { action: "continue", decision: asRecord(entry.decision) };
         }
-        return { action: "continue", decision: asRecord(persistedEntry.decision) };
+        persistStep(step, entry);
+        syncLiveE2eArtifactRefs(input.artifacts, input.commandResults);
+        throw new LiveE2eControllerStop({
+          reason: `Live E2E controller stopped at '${step}' with decision '${action || "block"}'.`,
+          state: cloneState(),
+          decision: asRecord(entry.decision),
+        });
       }
       if (["missing", "rejected"].includes(asNonEmptyString(persistedEntry.operator_decision_status))) {
         const files = operatorFilePaths({
@@ -1350,37 +1549,7 @@ export function createLiveE2eStepController(options) {
       entry.decision.action = resolveDecisionAction(entry);
     }
 
-    if (asNonEmptyString(entry.operator_decision_status) === "accepted") {
-      const builtStepQuality = writeStepQualityAssessmentReport({
-        runId: options.runId,
-        profile: options.profile,
-        artifacts: input.artifacts,
-        entry,
-        outputDir: options.reportsRoot,
-      });
-      entry.step_quality_assessment_ref = builtStepQuality.reportFile;
-      if (
-        requiresAcceptedProductStepQuality(builtStepQuality.context) &&
-        asNonEmptyString(asRecord(entry.decision).action) === "continue" &&
-        (asNonEmptyString(builtStepQuality.assessment.status) !== "accepted" ||
-          asNonEmptyString(builtStepQuality.assessment.decision) !== "continue")
-      ) {
-        entry.semantic_analysis = {
-          ...asRecord(entry.semantic_analysis),
-          status: "blocked",
-          findings: uniqueStrings([
-            ...asStringArray(asRecord(entry.semantic_analysis).findings),
-            "Product-change step continuation requires an accepted step-quality assessment.",
-          ]),
-        };
-        entry.final_step_verdict = "blocked";
-        entry.decision = {
-          ...asRecord(entry.decision),
-          action: "block",
-          reason: "Product-change step continuation requires an accepted step-quality assessment.",
-        };
-      }
-    }
+    applyStepQualityGate(entry, input.artifacts);
 
     recordPhase(step, "plan", []);
     recordPhase(step, "execute", uniqueStrings([asNonEmptyString(entry.transcript_ref)]));
@@ -1389,7 +1558,13 @@ export function createLiveE2eStepController(options) {
     recordPhase(
       step,
       "decide",
-      uniqueStrings([asNonEmptyString(entry.operator_decision_ref), asNonEmptyString(entry.transcript_ref), ...artifactRefs]),
+      uniqueStrings([
+        asNonEmptyString(entry.operator_decision_ref),
+        asNonEmptyString(entry.step_quality_assessment_request_ref),
+        asNonEmptyString(entry.step_quality_assessment_ref),
+        asNonEmptyString(entry.transcript_ref),
+        ...artifactRefs,
+      ]),
     );
     recordPhase(step, "persist", []);
     persistStep(step, entry);
@@ -1403,6 +1578,9 @@ export function createLiveE2eStepController(options) {
     input.artifacts.live_e2e_step_observation_files = Object.values(entryByStep).map((stepEntry) =>
       asNonEmptyString(stepEntry.observation_ref),
     );
+    input.artifacts.live_e2e_step_quality_assessment_request_files = Object.values(entryByStep)
+      .map((stepEntry) => asNonEmptyString(stepEntry.step_quality_assessment_request_ref))
+      .filter(Boolean);
     input.artifacts.live_e2e_step_quality_assessment_report_files = Object.values(entryByStep)
       .map((stepEntry) => asNonEmptyString(stepEntry.step_quality_assessment_ref))
       .filter(Boolean);
@@ -1508,6 +1686,11 @@ export function createLiveE2eStepController(options) {
       );
       if (transcriptMatched) return transcriptMatched;
       if (fileExists(persistedTranscriptRef)) {
+        const persistedTranscript = asRecord(readJson(persistedTranscriptRef));
+        const persistedTranscriptLabel = asNonEmptyString(persistedTranscript.label);
+        if (persistedTranscriptLabel && persistedTranscriptLabel !== normalizedLabel) {
+          return null;
+        }
         return {
           label: normalizedLabel,
           command_surface: asNonEmptyString(persistedEntry.public_surface) || "cached public AOR command",
@@ -1541,7 +1724,6 @@ export function createLiveE2eStepController(options) {
     hasPersistedProgress: () => asStringArray(state.completed_steps).length > 0,
     getCachedCommandResult: findCachedCommandResult,
     applyPendingOperatorDecision: () => {
-      if (mode === "evaluator") return null;
       const pendingEntry = Object.values(entryByStep)
         .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
         .find((entry) => {
@@ -1573,6 +1755,9 @@ export function createLiveE2eStepController(options) {
       const normalizedIteration = Number(iteration) || 1;
       const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
       if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) {
+        return findCachedCommandResult(label, normalizedIteration) !== null;
+      }
+      if (mode === "evaluator" && observedStepInstances().includes(stepInstanceId)) {
         return findCachedCommandResult(label, normalizedIteration) !== null;
       }
       if (completedControllerStepInstances().includes(stepInstanceId)) {

@@ -38,6 +38,7 @@ import {
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
+import { collectMissionChangeEvidence } from "../../../packages/orchestrator-core/src/shared/mission-scope.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
@@ -102,6 +103,40 @@ function collectStringRefs(value) {
     return Object.values(value).flatMap((entry) => collectStringRefs(entry));
   }
   return [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function collectFindingSummaries(value) {
+  if (typeof value === "string" && value.trim().length > 0) return [value.trim()];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") return entry.trim();
+      const record = asRecord(entry);
+      return (
+        asNonEmptyString(record.summary) ||
+        asNonEmptyString(record.message) ||
+        asNonEmptyString(record.finding) ||
+        asNonEmptyString(record.reason) ||
+        asNonEmptyString(record.title)
+      );
+    })
+    .filter(Boolean);
+}
+
+/**
+ * @param {Record<string, unknown>} reviewReport
+ * @returns {string[]}
+ */
+function collectReviewFindingSummaries(reviewReport) {
+  return uniqueStrings([
+    ...collectFindingSummaries(reviewReport.blocking_findings),
+    ...collectFindingSummaries(reviewReport.findings),
+    ...collectFindingSummaries(reviewReport.recommended_followups),
+  ]).slice(0, 12);
 }
 
 /**
@@ -1413,6 +1448,7 @@ export function runGuidedWebSmoke(options) {
       "AOR blocker, error, recovery, loading, empty, and state-feedback findings",
       "AOR visual stability and responsive-state findings",
       "AOR accessibility findings",
+      "structured keyboard focus sequence with at least two distinct focused controls",
       "browser-task proof ref",
     ],
     required_accessibility_checks: AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS,
@@ -1421,6 +1457,7 @@ export function runGuidedWebSmoke(options) {
     instructions: [
       "Open app_url, not smoke_app_url. smoke_app_url is the short-lived deterministic render guardrail.",
       "Capture browser-task evidence for AOR operator task success, next-action clarity, recovery/error states, responsive stability, and each required_accessibility_checks entry.",
+      "For keyboard_navigation, record keyboard_focus_sequence entries with role, label, selector or tag_name after repeated Tab probes.",
       "Write the completed proof to expected_browser_task_proof_file before accepting the learning operator decision.",
     ],
     app_url: browserTaskAppUrl,
@@ -1540,6 +1577,9 @@ export function runGuidedWebSmoke(options) {
   summary.browser_task_app_server_stdout_file = asNonEmptyString(browserTaskAppSurface.stdout_file) || null;
   summary.browser_task_app_server_stderr_file = asNonEmptyString(browserTaskAppSurface.stderr_file) || null;
   summary.screenshot_files = browserTaskScreenshotFiles;
+  summary.keyboard_focus_sequence = Array.isArray(browserTaskProof.keyboard_focus_sequence)
+    ? browserTaskProof.keyboard_focus_sequence
+    : asRecord(browserTaskProof.keyboard_navigation).focus_sequence;
   summary.dom_snapshot_ref = summary.dom_snapshot_file;
   summary.accessibility_summary_ref = summary.accessibility_summary_file;
   summary.screenshot_refs = browserTaskScreenshotFiles;
@@ -1803,6 +1843,15 @@ function resolveTargetEnvironmentFailureClass(stepResult) {
     corpus.includes("not enough space")
   ) {
     return "environment_disk_space_exhausted";
+  }
+  if (
+    corpus.includes("requires node") ||
+    corpus.includes("unsupported engine") ||
+    (corpus.includes("wanted:") && corpus.includes("current:") && corpus.includes("node")) ||
+    corpus.includes("node ^22.12.0") ||
+    corpus.includes("node v25.")
+  ) {
+    return "environment_node_version_unsupported";
   }
   return null;
 }
@@ -2372,11 +2421,83 @@ export function collectRuntimeHarnessChangedPaths(reportFile) {
   const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
   return uniqueStrings(stepDecisions.flatMap((entry) => {
     const semantics = asRecord(asRecord(entry).mission_semantics);
-    return [
-      ...asStringArray(semantics.meaningful_changed_paths),
-      ...asStringArray(semantics.non_bootstrap_changed_paths),
-    ].map(normalizeChangedPath);
+    return asStringArray(semantics.meaningful_changed_paths).map(normalizeChangedPath);
   }));
+}
+
+/**
+ * @param {string | null | undefined} reportFile
+ * @returns {string[]}
+ */
+export function collectReviewChangedPaths(reportFile) {
+  const resolvedReportFile = asNonEmptyString(reportFile);
+  if (!resolvedReportFile || !fileExists(resolvedReportFile)) {
+    return [];
+  }
+  const report = asRecord(readJson(resolvedReportFile));
+  const codeQuality = asRecord(report.code_quality);
+  const diagnostics = asRecord(codeQuality.changed_path_diagnostics);
+  return uniqueStrings([
+    ...asStringArray(codeQuality.changed_paths),
+    ...asStringArray(diagnostics.meaningful_changed_paths),
+  ].map(normalizeChangedPath));
+}
+
+/**
+ * @param {string[]} changedPaths
+ * @param {Record<string, unknown>} [mission]
+ * @returns {boolean}
+ */
+export function changedPathsHaveMissionRelevantChanges(changedPaths, mission = {}) {
+  const normalizedChangedPaths = uniqueStrings(changedPaths.map(normalizeChangedPath)).filter(Boolean);
+  if (normalizedChangedPaths.length === 0) {
+    return false;
+  }
+  const requiredPrefixes = missionRequiredChangePathPrefixes(mission);
+  if (requiredPrefixes.length === 0) {
+    return true;
+  }
+  return normalizedChangedPaths.some((changedPath) =>
+    requiredPrefixes.some((prefix) => changedPathMatchesRequiredPrefix(changedPath, prefix)),
+  );
+}
+
+/**
+ * @param {string | null | undefined} targetCheckoutRoot
+ * @returns {ReturnType<typeof collectMissionChangeEvidence> | null}
+ */
+export function collectCanonicalTargetChangeEvidence(targetCheckoutRoot) {
+  const root = asNonEmptyString(targetCheckoutRoot);
+  if (!root || !fs.existsSync(root)) {
+    return null;
+  }
+  return collectMissionChangeEvidence({
+    projectRoot: root,
+    evidenceRoot: root,
+    artifactsRoot: path.join(root, ".aor/artifacts"),
+  });
+}
+
+/**
+ * @param {string[]} changedPaths
+ * @param {{ targetCheckoutRoot?: string | null }} options
+ * @returns {string[]}
+ */
+export function reconcileSummaryMeaningfulChangedPaths(changedPaths, options = {}) {
+  const candidates = uniqueStrings(changedPaths.map(normalizeChangedPath)).filter(Boolean);
+  const canonicalEvidence = collectCanonicalTargetChangeEvidence(options.targetCheckoutRoot);
+  if (!canonicalEvidence?.gitStatusAvailable) {
+    return candidates;
+  }
+  const canonicalMeaningfulPaths = uniqueStrings(
+    canonicalEvidence.meaningfulChangedPaths.map(normalizeChangedPath),
+  ).filter(Boolean);
+  if (canonicalMeaningfulPaths.length === 0) {
+    return [];
+  }
+  const candidateSet = new Set(candidates);
+  const intersection = canonicalMeaningfulPaths.filter((candidate) => candidateSet.has(candidate));
+  return intersection.length > 0 ? intersection : canonicalMeaningfulPaths;
 }
 
 /**
@@ -2385,17 +2506,7 @@ export function collectRuntimeHarnessChangedPaths(reportFile) {
  * @returns {boolean}
  */
 export function runtimeHarnessReportHasMissionRelevantChanges(reportFile, mission = {}) {
-  const changedPaths = collectRuntimeHarnessChangedPaths(reportFile);
-  if (changedPaths.length === 0) {
-    return false;
-  }
-  const requiredPrefixes = missionRequiredChangePathPrefixes(mission);
-  if (requiredPrefixes.length === 0) {
-    return true;
-  }
-  return changedPaths.some((changedPath) =>
-    requiredPrefixes.some((prefix) => changedPathMatchesRequiredPrefix(changedPath, prefix)),
-  );
+  return changedPathsHaveMissionRelevantChanges(collectRuntimeHarnessChangedPaths(reportFile), mission);
 }
 
 /**
@@ -4500,6 +4611,8 @@ export function executeFullJourneyFlow(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
+        "--execution-root",
+        targetCheckout.targetCheckoutRoot,
       ], { allowNonZeroWithPayload: true, iteration });
       artifacts.review_report_file = getStringField(reviewRun.payload, "review_report_file");
       artifacts.latest_runtime_harness_report_file =
@@ -4579,6 +4692,20 @@ export function executeFullJourneyFlow(options) {
             }
           : { iteration },
       );
+      const unresolvedReviewFindings = collectReviewFindingSummaries(reviewReport);
+      const repairStopReason =
+        terminalReviewFailure
+          ? asNonEmptyString(artifacts.implementation_loop_failure_summary) ||
+            "Implementation review or post-run verification did not pass."
+          : null;
+      const repairNecessity =
+        reviewNeedsRepair && artifacts.post_run_verify_status === "fail"
+          ? "review-and-verification"
+          : reviewNeedsRepair
+            ? "review"
+            : artifacts.post_run_verify_status === "fail"
+              ? "verification"
+              : "none";
       const iterationRecord = {
         iteration,
         run_id: iterationRunId,
@@ -4586,8 +4713,15 @@ export function executeFullJourneyFlow(options) {
         post_run_verify_summary_file: postRunVerifySummaryPath,
         review_report_file: asNonEmptyString(artifacts.review_report_file) || null,
         runtime_harness_report_file: asNonEmptyString(artifacts.runtime_harness_report_file) || null,
+        runtime_harness_decision: asNonEmptyString(artifacts.runtime_harness_overall_decision) || null,
         review_status: reviewOverallStatus,
+        review_recommendation: asNonEmptyString(reviewReport.review_recommendation) || null,
+        feature_size_fit_status: featureSizeFitStatus,
         post_run_verify_status: asNonEmptyString(artifacts.post_run_verify_status),
+        repair_necessity: repairNecessity,
+        unresolved_review_findings: unresolvedReviewFindings,
+        previous_repair_decision_files: asStringArray(artifacts.review_repair_decision_files),
+        repair_stop_reason: repairStopReason,
         repair_requested: canRepair,
       };
       {
@@ -4617,12 +4751,22 @@ export function executeFullJourneyFlow(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
+        "--execution-root",
+        targetCheckout.targetCheckoutRoot,
         "--decision",
         "request-repair",
         "--decider-ref",
         "operator://live-e2e-step-controller",
         "--reason",
-        `Live E2E review iteration ${iteration} requested public repair before delivery.`,
+        [
+          `Live E2E review iteration ${iteration} requested public repair before delivery.`,
+          `Repair necessity: ${repairNecessity}.`,
+          unresolvedReviewFindings.length > 0
+            ? `Unresolved findings: ${unresolvedReviewFindings.slice(0, 5).join(" | ")}.`
+            : "Unresolved findings were not summarized by the review report.",
+          `Post-run verification status: ${asNonEmptyString(artifacts.post_run_verify_status) || "unknown"}.`,
+          `Runtime Harness decision: ${asNonEmptyString(artifacts.runtime_harness_overall_decision) || "unknown"}.`,
+        ].join(" "),
       ], { allowNonZeroWithPayload: true, iteration });
       artifacts.review_repair_decision_files = uniqueStrings([
         ...asStringArray(artifacts.review_repair_decision_files),
@@ -4686,6 +4830,8 @@ export function executeFullJourneyFlow(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
+        "--execution-root",
+        targetCheckout.targetCheckoutRoot,
         "--decision",
         "approve",
         "--decider-ref",
@@ -5310,17 +5456,20 @@ export function executeFullJourneyFlow(options) {
       asNonEmptyString(artifacts.runtime_harness_report_file),
       asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
     ]);
-    const meaningfulChangedPaths = uniqueStrings(
-      runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
-    );
+    const meaningfulChangedPaths = reconcileSummaryMeaningfulChangedPaths(uniqueStrings([
+      ...runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
+      ...collectReviewChangedPaths(artifacts.review_report_file),
+    ]), { targetCheckoutRoot: targetCheckout.targetCheckoutRoot });
     const runtimeHarnessDecision =
       asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
       asNonEmptyString(artifacts.runtime_harness_overall_decision) ||
       "unknown";
     const latestRuntimeHarnessDecision =
       asNonEmptyString(artifacts.latest_runtime_harness_decision) || runtimeHarnessDecision;
-    const realCodeChangeStatus = runtimeHarnessReportFiles.some((reportFile) =>
-      runtimeHarnessReportHasMissionRelevantChanges(reportFile, options.mission),
+    const realCodeChangeStatus = (
+      runtimeHarnessReportFiles.some((reportFile) =>
+        runtimeHarnessReportHasMissionRelevantChanges(reportFile, options.mission),
+      ) || changedPathsHaveMissionRelevantChanges(collectReviewChangedPaths(artifacts.review_report_file), options.mission)
     )
       ? "pass"
       : "fail";
