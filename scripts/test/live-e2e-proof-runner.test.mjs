@@ -1954,6 +1954,18 @@ test("live E2E generated project profile wiring preserves provider variants in e
   assert.match(flowsSource, /--policy-overrides/u);
 });
 
+test("live E2E post-run verification reruns target setup commands inside isolated clones", () => {
+  const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
+  assert.match(
+    flowsSource,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,/u,
+  );
+  assert.match(
+    flowsSource,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,/u,
+  );
+});
+
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
   withTempRoot((tempRoot) => {
     const { proof, targetCheckoutRoot } = writeGuidedProofFixture(tempRoot);

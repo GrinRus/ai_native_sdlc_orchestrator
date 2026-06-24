@@ -2360,16 +2360,18 @@ function buildIntakeCreateArgs(options) {
 }
 
 /**
- * @param {{ label: string, commands: string[] }} options
+ * @param {{ label: string, commands: string[], setupCommands?: string[] }} options
  * @returns {string[]}
  */
 function buildVerifyOverrideArgs(options) {
+  const setupCommands = asStringArray(options.setupCommands);
   const lintCommands = options.commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
   const buildCommands = options.commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
   const testCommands = options.commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
   return [
     "--verification-label",
     options.label,
+    ...setupCommands.flatMap((entry) => ["--repo-lint-command", entry]),
     ...buildCommands.flatMap((entry) => ["--repo-build-command", entry]),
     ...lintCommands.flatMap((entry) => ["--repo-lint-command", entry]),
     ...testCommands.flatMap((entry) => ["--repo-test-command", entry]),
@@ -4548,6 +4550,7 @@ export function executeFullJourneyFlow(options) {
         ...buildVerifyOverrideArgs({
           label: "post-run-primary",
           commands: postRunQualityPolicy.primaryCommands,
+          setupCommands: repoLintCommands,
         }),
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
@@ -4896,6 +4899,7 @@ export function executeFullJourneyFlow(options) {
           ...buildVerifyOverrideArgs({
             label: "post-run-diagnostic",
             commands: postRunQualityPolicy.diagnosticCommands,
+            setupCommands: repoLintCommands,
           }),
           ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
             ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
