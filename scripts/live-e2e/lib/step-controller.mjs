@@ -821,6 +821,81 @@ export function createLiveE2eStepController(options) {
   state.pending_decision = latestEntry ? asRecord(latestEntry.decision) : null;
 
   /**
+   * @returns {Record<string, unknown> | null}
+   */
+  function resolvePendingStepQualityAssessment() {
+    const awaitingEntry = Object.values(entryByStep)
+      .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
+      .findLast((entry) => asNonEmptyString(entry.step_quality_assessment_status) === "awaiting-assessment");
+    if (!awaitingEntry) return null;
+    const iteration = Number(awaitingEntry.iteration) || 1;
+    const step = asNonEmptyString(awaitingEntry.step_id);
+    const stepInstanceId = asNonEmptyString(awaitingEntry.step_instance_id) || buildStepInstanceId(step, iteration);
+    return {
+      status: "awaiting-assessment",
+      step_id: step,
+      step_instance_id: stepInstanceId,
+      iteration,
+      assessment_request_file: asNonEmptyString(awaitingEntry.step_quality_assessment_request_ref),
+      expected_assessment_report_file: asNonEmptyString(awaitingEntry.step_quality_assessment_expected_report_ref),
+      reason: "Product-change step continuation requires an evaluator-authored step-quality assessment.",
+    };
+  }
+
+  function refreshDerivedControllerState() {
+    const orderedEntries = Object.values(entryByStep).sort(
+      (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
+    );
+    state.completed_steps = orderedEntries
+      .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
+      .filter(Boolean);
+    state.current_step = resolveCurrentStep();
+    state.pending_decision = asRecord(resolveLatestEntry()?.decision) ?? null;
+    state.step_quality_assessment_request_refs = uniqueStrings([
+      ...asStringArray(state.step_quality_assessment_request_refs),
+      ...orderedEntries.map((entry) => asNonEmptyString(entry.step_quality_assessment_request_ref)),
+    ]);
+    state.step_quality_assessment_refs = uniqueStrings([
+      ...asStringArray(state.step_quality_assessment_refs),
+      ...orderedEntries.map((entry) => asNonEmptyString(entry.step_quality_assessment_ref)),
+    ]);
+    state.pending_step_quality_assessment = resolvePendingStepQualityAssessment();
+  }
+
+  function reconcilePendingStepQualityReports() {
+    let reconciled = false;
+    const beforeState = JSON.stringify(state);
+    const awaitingEntries = Object.values(entryByStep)
+      .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
+      .filter((entry) => asNonEmptyString(entry.step_quality_assessment_status) === "awaiting-assessment");
+    for (const pendingEntry of awaitingEntries) {
+      const before = {
+        status: asNonEmptyString(pendingEntry.step_quality_assessment_status),
+        reportRef: asNonEmptyString(pendingEntry.step_quality_assessment_ref),
+        action: asNonEmptyString(asRecord(pendingEntry.decision).action),
+      };
+      const entry = applyStepQualityGate(pendingEntry, asRecord(state.artifacts_snapshot));
+      const after = {
+        status: asNonEmptyString(entry.step_quality_assessment_status),
+        reportRef: asNonEmptyString(entry.step_quality_assessment_ref),
+        action: asNonEmptyString(asRecord(entry.decision).action),
+      };
+      if (before.status !== after.status || before.reportRef !== after.reportRef || before.action !== after.action) {
+        persistStep(asNonEmptyString(entry.step_id), entry);
+        reconciled = true;
+      }
+    }
+    refreshDerivedControllerState();
+    if (reconciled || JSON.stringify(state) !== beforeState) {
+      state.updated_at = nowIso();
+      writeJson(stateFile, state);
+    }
+    return reconciled;
+  }
+
+  refreshDerivedControllerState();
+
+  /**
    * @returns {Record<string, unknown>}
    */
   function cloneState() {
@@ -855,32 +930,7 @@ export function createLiveE2eStepController(options) {
     writeJson(observationFile, entry);
     entryByStep[stepInstanceId] = entry;
 
-    state.completed_steps = Object.values(entryByStep)
-      .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
-      .map((stepEntry) => asNonEmptyString(stepEntry.step_instance_id) || asNonEmptyString(stepEntry.step_id))
-      .filter(Boolean);
-    state.current_step = resolveCurrentStep();
-    state.pending_decision = asRecord(resolveLatestEntry()?.decision) ?? null;
-    state.step_quality_assessment_request_refs = uniqueStrings([
-      ...asStringArray(state.step_quality_assessment_request_refs),
-      asNonEmptyString(entry.step_quality_assessment_request_ref),
-    ]);
-    state.step_quality_assessment_refs = uniqueStrings([
-      ...asStringArray(state.step_quality_assessment_refs),
-      asNonEmptyString(entry.step_quality_assessment_ref),
-    ]);
-    state.pending_step_quality_assessment =
-      asNonEmptyString(entry.step_quality_assessment_status) === "awaiting-assessment"
-        ? {
-            status: "awaiting-assessment",
-            step_id: asNonEmptyString(entry.step_id),
-            step_instance_id: stepInstanceId,
-            iteration,
-            assessment_request_file: asNonEmptyString(entry.step_quality_assessment_request_ref),
-            expected_assessment_report_file: asNonEmptyString(entry.step_quality_assessment_expected_report_ref),
-            reason: "Product-change step continuation requires an evaluator-authored step-quality assessment.",
-          }
-        : null;
+    refreshDerivedControllerState();
     state.evidence_refs = uniqueStrings([
       ...asStringArray(state.evidence_refs),
       observationFile,
@@ -1643,6 +1693,7 @@ export function createLiveE2eStepController(options) {
       .filter(Boolean);
 
   const findPersistedControllerStop = () => {
+    reconcilePendingStepQualityReports();
     if (mode === "evaluator") return null;
     const entry = Object.values(entryByStep)
       .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
@@ -1737,10 +1788,20 @@ export function createLiveE2eStepController(options) {
     stateFile,
     planCommand,
     observeStage,
-    getState: cloneState,
-    hasPersistedProgress: () => asStringArray(state.completed_steps).length > 0,
-    getCachedCommandResult: findCachedCommandResult,
+    getState: () => {
+      reconcilePendingStepQualityReports();
+      return cloneState();
+    },
+    hasPersistedProgress: () => {
+      reconcilePendingStepQualityReports();
+      return asStringArray(state.completed_steps).length > 0;
+    },
+    getCachedCommandResult: (label, iteration = 1) => {
+      reconcilePendingStepQualityReports();
+      return findCachedCommandResult(label, iteration);
+    },
     applyPendingOperatorDecision: () => {
+      reconcilePendingStepQualityReports();
       const pendingEntry = Object.values(entryByStep)
         .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
         .find((entry) => {
@@ -1765,6 +1826,7 @@ export function createLiveE2eStepController(options) {
     },
     getPersistedControllerStop: findPersistedControllerStop,
     shouldUseCachedCommand: (label, iteration = 1) => {
+      reconcilePendingStepQualityReports();
       const step = resolveLiveE2eCommandStep(label);
       if (!step) {
         return mode === "auto" && asStringArray(state.completed_steps).length > 0 && findCachedCommandResult(label, iteration) !== null;
@@ -1782,7 +1844,9 @@ export function createLiveE2eStepController(options) {
       }
       return mode === "manual" && observedStepInstances().includes(stepInstanceId) && findCachedCommandResult(label, normalizedIteration) !== null;
     },
-    getStepJournal: () =>
-      Object.values(entryByStep).sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0)),
+    getStepJournal: () => {
+      reconcilePendingStepQualityReports();
+      return Object.values(entryByStep).sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0));
+    },
   };
 }

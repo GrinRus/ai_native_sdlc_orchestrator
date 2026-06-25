@@ -383,6 +383,100 @@ test("live E2E product-change steps wait for evaluator-authored step-quality rep
   });
 });
 
+test("live E2E product-change step-quality report is reconciled on controller resume", () => {
+  withTempRoot((reportsRoot) => {
+    const runId = "controller-product-step-quality-resume";
+    const transcriptFile = path.join(reportsRoot, "13-qa.json");
+    const evalReportFile = path.join(reportsRoot, "evaluation-report.json");
+    const diagnosticSummaryFile = path.join(reportsRoot, "post-run-diagnostic-summary.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(evalReportFile, "{}\n", "utf8");
+    fs.writeFileSync(diagnosticSummaryFile, "{}\n", "utf8");
+    const profile = {
+      profile_id: "live-e2e.test.product-step-quality-resume",
+      target_catalog_id: "httpx",
+      feature_mission_id: "httpx-timeout-transport-regression",
+      live_e2e: { flow_range_policy: "delivery_default" },
+    };
+    const artifacts = {
+      target_catalog_id: "httpx",
+      feature_mission_id: "httpx-timeout-transport-regression",
+      feature_size: "medium",
+      mission_class: "product-change",
+      evaluation_status: "pass",
+      evaluation_report_file: evalReportFile,
+      post_run_verify_status: "pass",
+      post_run_diagnostic_status: "pass",
+      post_run_diagnostic_verify_summary_file: diagnosticSummaryFile,
+      meaningful_changed_paths: ["httpx/_client.py", "tests/test_timeouts.py"],
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "evaluator",
+    });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "qa", {
+      nextStep: "delivery",
+      inspectedEvidenceRefs: [transcriptFile, evalReportFile, diagnosticSummaryFile],
+    });
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "qa",
+          stageResult: {
+            stage: "qa",
+            status: "pass",
+            evidence_refs: [transcriptFile, evalReportFile, diagnosticSummaryFile],
+            summary: "QA passed.",
+          },
+          commandResults: [
+            {
+              label: "eval-run",
+              command_surface: "aor eval run",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: [transcriptFile, evalReportFile, diagnosticSummaryFile],
+              exit_code: 0,
+            },
+          ],
+          artifacts,
+        }),
+      LiveE2eControllerStop,
+    );
+    const [pendingEntry] = controller.getStepJournal();
+    assert.equal(pendingEntry.step_quality_assessment_status, "awaiting-assessment");
+    const builtAssessment = writeStepQualityAssessmentReport({
+      runId,
+      profile,
+      artifacts,
+      entry: pendingEntry,
+      outputDir: reportsRoot,
+      assessmentRequestFile: pendingEntry.step_quality_assessment_request_ref,
+      assessmentMethod: "external-skill-agent",
+      evaluatorOutputRef: pendingEntry.step_quality_assessment_request_ref,
+    });
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "evaluator",
+    });
+    const [acceptedEntry] = resumed.getStepJournal();
+    assert.equal(acceptedEntry.step_quality_assessment_status, "accepted");
+    assert.equal(acceptedEntry.step_quality_assessment_ref, builtAssessment.reportFile);
+    assert.equal(acceptedEntry.decision.action, "continue");
+    assert.equal(acceptedEntry.final_step_verdict, "pass");
+    const state = resumed.getState();
+    assert.equal(state.pending_step_quality_assessment, null);
+    assert.equal(state.pending_decision.action, "continue");
+    assert.ok(state.step_quality_assessment_refs.includes(builtAssessment.reportFile));
+    assert.ok(state.evidence_refs.includes(builtAssessment.reportFile));
+  });
+});
+
 test("live E2E product-change pending operator decisions open step-quality gate on resume", () => {
   withTempRoot((reportsRoot) => {
     const runId = "controller-product-terminal-step-quality";
