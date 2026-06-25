@@ -27,6 +27,16 @@ after the current required proof set is stable.
 4. Update proof findings with run ids, commit SHA, gate results, and artifact
    hygiene confirmation.
 
+### Current blocker
+
+- `w51-clean-guided-aor-ui-20260625-c0945a744018` reached terminal evidence
+  before browser proof because review/repair anti-loop enforcement blocked on
+  `provider/review/repeated_repair_context_without_new_evidence`. The repair
+  iteration did not resolve a review finding that the implementation lowered
+  `test/headers.ts` assertion-plan coverage from `t.plan(4)` to `t.plan(3)`.
+  W51-S01 stays `ready`; HTTPX/Fastify clean proof reruns remain gated on a new
+  accepted same-commit guided UI proof.
+
 ### Acceptance criteria
 1. Guided AOR UI run passes and includes browser-task/accessibility evidence.
 2. HTTPX medium and Fastify repair medium both have terminal run-health pass and

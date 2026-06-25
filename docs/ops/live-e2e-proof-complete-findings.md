@@ -40,14 +40,27 @@ product-quality acceptance.
 ## W51 Clean-Commit Proof Rerun
 
 W51-S01 started from clean commit `2a4bd06c16d6` after the backlog repair commit.
-The first required proof, `guided-aor-ui`, did not produce accepted paired AOR
-UI proof because run-health blocked on target post-run diagnostics. HTTPX and
-Fastify W51 clean reruns were not started from this batch because final
-product-quality gates require an accepted same-commit guided AOR UI proof.
+That first required proof, `guided-aor-ui`, did not produce accepted paired AOR
+UI proof because the run did not materialize browser-task proof refs and also
+recorded target-side `ky` timing-sensitive diagnostic warnings.
+
+The guided proof pipeline was hardened and committed in follow-up source commits
+`dfd6bf3473f5` and `c0945a744018`. A fresh clean run on `c0945a744018`
+confirmed that optional warn-mode target diagnostics no longer block before the
+browser-proof phase. The run still did not produce accepted paired UI proof,
+because the public implementation quality cycle blocked earlier in review/repair:
+the first implementation lowered `t.plan(4)` to `t.plan(3)` in
+`test/headers.ts`, review requested public repair, and the repair iteration did
+not restore that weakened coverage signal. Anti-loop enforcement correctly
+stopped the run as repeated repair context without new evidence.
+
+HTTPX and Fastify W51 clean reruns were not started from either batch because
+final product-quality gates require an accepted same-commit guided AOR UI proof.
 
 | Proof | Profile | W51 run id | Terminal status | Owner | Phase | Class | Acceptance |
 |---|---|---|---|---|---|---|---|
 | `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-2a4bd06c16d6` | run summary `pass`; run-health `blocked` | `operator` | `controller_decision` | `controller_incomplete` | blocked, not accepted as paired UI proof |
+| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-c0945a744018` | run summary `not_pass`; run-health `blocked` | `provider` | `review` | `repeated_repair_context_without_new_evidence` | blocked, not accepted as paired UI proof |
 | `httpx-medium` | `scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
 | `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
 
@@ -63,6 +76,17 @@ Accepted evidence:
   commit run.
 - Blocking diagnostic evidence:
   `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-post-run-diagnostic-verify-1-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6-01-verify-summary-post-run-diagnostic-b0b102410ca0.json`.
+- Hardened-guided run summary:
+  `.aor/live-e2e-w51-clean-guided-ui-20260625-c0945a744018/projects/aor-core/reports/live-e2e-run-summary-w51-clean-guided-aor-ui-20260625-c0945a744018.json`.
+- Hardened-guided run-health report:
+  `.aor/live-e2e-w51-clean-guided-ui-20260625-c0945a744018/projects/aor-core/reports/live-e2e-run-health-report-w51-clean-guided-aor-ui-20260625-c0945a744018.json`.
+- Public repair lineage:
+  `review-decision-w51-clean-guided-aor-ui-20260625-c0945a744018-request-repair-625162201831.json`
+  referenced unresolved finding `Test plan count was lowered in 'test/headers.ts'`.
+- Repair execution evidence:
+  `step-result-routed-w51-clean-guided-aor-ui-20260625-c0945a744018.repair-2.run.start.implement.implement.attempt.1.json`
+  passed, but the final target diff still lowered `test/headers.ts` from
+  `t.plan(4)` to `t.plan(3)`.
 
 Finding:
 
@@ -77,6 +101,16 @@ Finding:
   `ui_validation/guided_browser_task_proof_missing`, diagnostic warnings remain
   factual `warn` evidence, and a new clean-commit guided proof can be paired
   with HTTPX and Fastify final quality gates.
+- `W51-F02`: The hardened clean-commit guided proof on `c0945a744018` is blocked
+  by AOR/provider repair convergence, not by target diagnostics. Review correctly
+  flagged the lowered `test/headers.ts` plan count as a coverage weakening,
+  public `request-repair` lineage was created, and repair execution completed,
+  but the repair did not restore the weakened assertion plan or otherwise produce
+  new evidence that resolved the finding. Anti-loop enforcement stopped the run
+  as `provider/review/repeated_repair_context_without_new_evidence`. Next action:
+  harden repair instructions/context so provider repair must explicitly address
+  each unresolved review finding, especially coverage-weakening findings, before
+  W51-S01 can be rerun and used as paired UI proof.
 
 ## Guided AOR UI Proof
 
