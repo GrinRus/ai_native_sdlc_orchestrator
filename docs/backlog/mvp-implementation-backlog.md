@@ -376,7 +376,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W44 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W44-S01 | Artifact workflow taxonomy and transition invariants | EPIC-0, EPIC-3 | ready | `docs/architecture/**`, `docs/contracts/**`, `docs/backlog/**`, `examples/**` | W43-S04 |
+| W44-S01 | Artifact workflow taxonomy and transition invariants | EPIC-0, EPIC-3 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/backlog/**`, `examples/**` | W43-S04 |
 | W44-S02 | Discovery/research/spec prompt bundle split | EPIC-3 | blocked | `examples/prompts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, `packages/orchestrator-core/**`, tests | W44-S01 |
 | W44-S03 | Artifact readiness state machine and stale transitions | EPIC-1, EPIC-6 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests | W44-S01 |
 | W44-S04 | Context, skill, and policy overlays from evidence | EPIC-4, EPIC-3 | blocked | `examples/context/**`, `examples/skills/**`, `examples/policies/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `docs/architecture/**`, tests | W44-S02, W44-S03 |
@@ -395,11 +395,11 @@ This is the master index for the implementation slices across all defined waves.
 ## W46 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W46-S01 | Contract/docs breaking policy | EPIC-0, EPIC-7 | ready | `docs/contracts/**`, `docs/ops/**`, `packages/contracts/**` | W45-S06 |
-| W46-S02 | Step evaluator report and runner behavior | EPIC-7 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `scripts/test/**` | W46-S01 |
-| W46-S03 | Catalog budget and small-canary migration | EPIC-7 | ready | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S01 |
-| W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S03 |
-| W46-S05 | Hard target expansion | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S04 |
+| W46-S01 | Contract/docs breaking policy | EPIC-0, EPIC-7 | done | `docs/contracts/**`, `docs/ops/**`, `packages/contracts/**` | W43-S04 |
+| W46-S02 | Step evaluator report and runner behavior | EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `scripts/test/**` | W46-S01 |
+| W46-S03 | Catalog budget and small-canary migration | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S01 |
+| W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | done | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S03 |
+| W46-S05 | Hard target expansion | EPIC-7 | done | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S04 |
 | W46-S06 | Proof-complete acceptance closure and findings intake | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
 
 ## W47 slices
@@ -422,18 +422,18 @@ This is the master index for the implementation slices across all defined waves.
 ## W49 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W49-S01 | Proof findings hygiene and evidence truthfulness | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `docs/backlog/**` | W48-S05 |
+| W49-S01 | Proof findings hygiene and evidence truthfulness | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `docs/backlog/**` | W48-S04 |
 | W49-S02 | Repeated repair anti-loop enforcement | EPIC-4, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `scripts/live-e2e/lib/flows.mjs`, tests | W49-S01 |
 | W49-S03 | QA-specific step-quality evaluator hardening | EPIC-4, EPIC-7 | done | `docs/contracts/live-e2e-step-quality-assessment-*.md`, `packages/contracts/**`, `scripts/live-e2e/lib/step-quality-assessment.mjs`, `scripts/live-e2e/lib/flows.mjs`, tests | W49-S02 |
-| W49-S04 | Full Control live E2E rerun and product acceptance closure | EPIC-0, EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W49-S03 |
+| W49-S04 | Full Control live E2E rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W49-S03 |
 
 ## W50 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W50-S01 | Review verification mapping and residual-risk classification | EPIC-4, EPIC-7 | ready | `docs/contracts/review-report.md`, `packages/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, tests | W49-S04 |
-| W50-S02 | Live E2E target toolchain fail-fast and setup-journal hygiene | EPIC-7 | ready | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/run-profile.mjs`, runner tests | W50-S01 |
-| W50-S03 | Fastify/Vitest control rerun and product acceptance closure | EPIC-0, EPIC-7 | ready | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W50-S02 |
-| W50-S04 | Findings/backlog state sync | EPIC-0, EPIC-7 | ready | `docs/backlog/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W50-S03 |
+| W50-S01 | Review verification mapping and residual-risk classification | EPIC-4, EPIC-7 | done | `docs/contracts/review-report.md`, `packages/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, tests | W49-S04 |
+| W50-S02 | Live E2E target toolchain fail-fast and setup-journal hygiene | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/run-profile.mjs`, runner tests | W50-S01 |
+| W50-S03 | Fastify/Vitest control rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W50-S02 |
+| W50-S04 | Findings/backlog state sync | EPIC-0, EPIC-7 | done | `docs/backlog/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W50-S03 |
 
 ## W51 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

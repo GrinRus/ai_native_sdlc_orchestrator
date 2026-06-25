@@ -567,7 +567,7 @@ graph TD
   W45S03 --> W45S05
   W45S04 --> W45S05
   W45S05 --> W45S06
-  W45S06 --> W46S01
+  W43S04 --> W46S01
   W46S01 --> W46S02
   W46S01 --> W46S03
   W46S03 --> W46S04
@@ -582,7 +582,7 @@ graph TD
   W48S02 --> W48S03
   W48S03 --> W48S04
   W48S04 --> W48S05
-  W48S05 --> W49S01
+  W48S04 --> W49S01
   W49S01 --> W49S02
   W49S02 --> W49S03
   W49S03 --> W49S04
@@ -996,7 +996,7 @@ graph TD
 ## W46 hard dependencies
 | Slice ID | Depends on |
 |---|---|
-| W46-S01 | W45-S06 |
+| W46-S01 | W43-S04 |
 | W46-S02 | W46-S01 |
 | W46-S03 | W46-S01 |
 | W46-S04 | W46-S03 |
@@ -1023,7 +1023,7 @@ graph TD
 ## W49 hard dependencies
 | Slice ID | Depends on |
 |---|---|
-| W49-S01 | W48-S05 |
+| W49-S01 | W48-S04 |
 | W49-S02 | W49-S01 |
 | W49-S03 | W49-S02 |
 | W49-S04 | W49-S03 |

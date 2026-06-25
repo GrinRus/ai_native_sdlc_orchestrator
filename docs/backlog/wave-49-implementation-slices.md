@@ -3,6 +3,8 @@
 W49 closes the W48 proof gap by hardening quality-cycle evidence before any new
 product acceptance claim. It keeps W46/W47 all-pass policy intact: blocked proof
 runs are useful terminal evidence, but they are not product-quality acceptance.
+W49 is the stricter successor proof wave for W48-S05 and does not require
+marking the W48-specific control proof rerun as accepted.
 
 ## W49-S01 — Proof findings hygiene and evidence truthfulness
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
@@ -12,7 +14,7 @@ runs are useful terminal evidence, but they are not product-quality acceptance.
   gates are not present.
 - **Primary modules:** `docs/ops/live-e2e-proof-complete-findings.md`,
   `docs/backlog/**`
-- **Hard dependencies:** W48-S05
+- **Hard dependencies:** W48-S04
 
 ### Local tasks
 1. Audit W48 proof findings for claims without run ids and gate artifacts.
@@ -103,9 +105,7 @@ runs are useful terminal evidence, but they are not product-quality acceptance.
 
 ## W49-S04 — Full Control live E2E rerun and product acceptance closure
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
-- **External blocker:** Requires a same-commit provider/toolchain proof window
-  with OpenAI credentials and compatible Vitest Node.
+- **State:** done
 - **Outcome:** Run the W49 Full Control proof set and claim product acceptance
   only for final all-pass gates.
 - **Primary modules:** `scripts/live-e2e/**`,

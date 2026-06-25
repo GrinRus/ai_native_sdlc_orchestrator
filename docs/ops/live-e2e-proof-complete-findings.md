@@ -12,6 +12,16 @@ This note records W47-W50 control proof evidence for black-box product live E2E.
 - Required control proof set: guided AOR UI proof, paired `httpx` medium final acceptance, `fastify` repair medium, and `vitest` large.
 - Product-quality acceptance is claimed only for runs where final `quality-assessment gate --policy all-pass` passed.
 
+## Backlog Reconciliation Before W51
+
+- W48-S05 remains blocked as a historical W48-specific proof rerun gap; no
+  W48-only product acceptance is claimed.
+- W49/W50 are stricter successor proof waves and provide terminal control proof
+  evidence without depending on W48-S05 acceptance.
+- W50 closes product acceptance only for `httpx-medium` and
+  `fastify-repair-medium`; `vitest-large` remains a non-accepted classified
+  setup blocker until W51-S02 runs with a compatible Node toolchain.
+
 ## Required Proof Set
 
 | Proof | Profile | Latest run id | Terminal status | Owner | Phase | Class | Acceptance |
