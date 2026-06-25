@@ -10,6 +10,7 @@ import {
   findLiveE2eCommandByPreferredLabel,
   isLiveE2eControllerStopInProgress,
   isLiveE2eControllerStop,
+  resolveStepArtifactGateFailures,
 } from "../live-e2e/lib/step-controller.mjs";
 import { prepareOperatorDecisionArtifact } from "../live-e2e/lib/decision-helper.mjs";
 import {
@@ -138,6 +139,34 @@ test("live E2E step controller persists observation and state before next step",
     assert.equal(fs.existsSync(entry.observation_ref), true);
     assert.equal(entry.plan.public_surface, "aor discovery run");
   });
+});
+
+test("live E2E QA artifact gate allows guided warn diagnostic deferral only", () => {
+  assert.deepEqual(
+    resolveStepArtifactGateFailures("qa", {
+      evaluation_status: "pass",
+      post_run_verify_status: "pass",
+      post_run_diagnostic_status: "deferred",
+      post_run_diagnostic_deferred_until_guided_proof: true,
+      post_run_quality_policy: {
+        diagnostic_failure_mode: "warn",
+      },
+    }),
+    [],
+  );
+
+  assert.deepEqual(
+    resolveStepArtifactGateFailures("qa", {
+      evaluation_status: "pass",
+      post_run_verify_status: "pass",
+      post_run_diagnostic_status: "deferred",
+      post_run_diagnostic_deferred_until_guided_proof: true,
+      post_run_quality_policy: {
+        diagnostic_failure_mode: "fail",
+      },
+    }),
+    ["post-run diagnostic verification reported 'deferred'."],
+  );
 });
 
 test("live E2E step controller repairs stale pending decisions from persisted journal on resume", () => {

@@ -589,9 +589,10 @@ function resolveFinalStepVerdict(requestedInteraction, deterministicStatus) {
  * @param {string} label
  * @returns {string | null}
  */
-function failingArtifactGate(artifacts, key, label) {
+function failingArtifactGate(artifacts, key, label, options = {}) {
   const rawStatus = asNonEmptyString(artifacts[key]);
   if (!rawStatus) return null;
+  if (rawStatus === "deferred" && options.allowDeferred === true) return null;
   const status = toLiveE2eObservationStatus(rawStatus);
   if (status === "not_pass" || status === "blocked") return `${label} reported '${rawStatus}'.`;
   return null;
@@ -612,7 +613,21 @@ function artifactBooleanFailure(artifacts, key, message) {
  * @param {Record<string, unknown>} artifacts
  * @returns {string[]}
  */
-function resolveStepArtifactGateFailures(step, artifacts) {
+function postRunDiagnosticDeferralIsNonBlocking(artifacts) {
+  const policy = asRecord(artifacts.post_run_quality_policy);
+  return (
+    artifacts.post_run_diagnostic_deferred_until_guided_proof === true &&
+    asNonEmptyString(artifacts.post_run_diagnostic_status) === "deferred" &&
+    (asNonEmptyString(policy.diagnosticFailureMode) || asNonEmptyString(policy.diagnostic_failure_mode)) === "warn"
+  );
+}
+
+/**
+ * @param {string} step
+ * @param {Record<string, unknown>} artifacts
+ * @returns {string[]}
+ */
+export function resolveStepArtifactGateFailures(step, artifacts) {
   if (step === "execution") {
     return uniqueStrings([
       failingArtifactGate(artifacts, "provider_execution_status", "provider execution"),
@@ -629,7 +644,9 @@ function resolveStepArtifactGateFailures(step, artifacts) {
     return uniqueStrings([
       failingArtifactGate(artifacts, "evaluation_status", "evaluation"),
       failingArtifactGate(artifacts, "post_run_verify_status", "post-run verification"),
-      failingArtifactGate(artifacts, "post_run_diagnostic_status", "post-run diagnostic verification"),
+      failingArtifactGate(artifacts, "post_run_diagnostic_status", "post-run diagnostic verification", {
+        allowDeferred: postRunDiagnosticDeferralIsNonBlocking(artifacts),
+      }),
     ]);
   }
   if (step === "delivery") {
