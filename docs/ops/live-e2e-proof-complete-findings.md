@@ -37,6 +37,38 @@ and `fastify-repair-medium` are product-accepted through final all-pass gates;
 `vitest-large` remains useful classified setup evidence but is not
 product-quality acceptance.
 
+## W51 Clean-Commit Proof Rerun
+
+W51-S01 started from clean commit `2a4bd06c16d6` after the backlog repair commit.
+The first required proof, `guided-aor-ui`, did not produce accepted paired AOR
+UI proof because run-health blocked on target post-run diagnostics. HTTPX and
+Fastify W51 clean reruns were not started from this batch because final
+product-quality gates require an accepted same-commit guided AOR UI proof.
+
+| Proof | Profile | W51 run id | Terminal status | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|---|---|---|
+| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-2a4bd06c16d6` | run summary `pass`; run-health `blocked` | `target_repository` | `post_run_diagnostic` | `post_run_diagnostic_failed` | blocked, not accepted as paired UI proof |
+| `httpx-medium` | `scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
+| `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
+
+Accepted evidence:
+
+- Run summary:
+  `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-run-summary-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6.json`.
+- Run-health report:
+  `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-run-health-report-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6.json`.
+- Blocking diagnostic evidence:
+  `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-post-run-diagnostic-verify-1-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6-01-verify-summary-post-run-diagnostic-b0b102410ca0.json`.
+
+Finding:
+
+- `W51-F01`: The clean-commit guided proof is blocked by target-side
+  `npm test` failures in `sindresorhus/ky` retry timing tests. The failure is
+  not an AOR UI/accessibility acceptance failure, but W51-S01 cannot claim
+  paired UI proof while run-health is blocked. Next action: decide whether to
+  use a lighter guided UI target verification policy for installed-user UI
+  proof or choose a guided proof target without timing-sensitive target tests.
+
 ## Guided AOR UI Proof
 
 - Run id: `w47-control-guided-aor-ui-20260624-47eee2ffa2a7`.
