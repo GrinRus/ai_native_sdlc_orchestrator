@@ -2474,6 +2474,20 @@ function resolveLiveE2eTargetCommandTimeoutMs(profile) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {number}
+ */
+function resolveGuidedWarnDiagnosticTimeoutMs(profile) {
+  const livePolicy = asRecord(profile.live_e2e);
+  const explicitTimeoutSec =
+    positiveIntegerOrNull(livePolicy.guided_warn_diagnostic_timeout_sec) ??
+    positiveIntegerOrNull(livePolicy.non_blocking_diagnostic_timeout_sec);
+  const timeoutMs = (explicitTimeoutSec ?? 120) * 1000;
+  const targetTimeoutMs = resolveLiveE2eTargetCommandTimeoutMs(profile);
+  return targetTimeoutMs === null ? timeoutMs : Math.min(timeoutMs, targetTimeoutMs);
+}
+
+/**
  * @param {{ profile: Record<string, unknown>, setupCommands: string[], verificationCommands: string[] }} options
  * @returns {number | null}
  */
@@ -4688,6 +4702,67 @@ export function executeFullJourneyFlow(options) {
       }
       return result;
     };
+    const runPostRunDiagnosticVerify = (runOptions = {}) => {
+      const iteration = Number(runOptions.iteration) || 1;
+      const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
+        "project",
+        "verify",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
+        "--runtime-root",
+        ".aor",
+        "--require-validation-pass",
+        "true",
+        ...buildVerifyOverrideArgs({
+          label: "post-run-diagnostic",
+          commands: postRunQualityPolicy.diagnosticCommands,
+          setupCommands: repoLintCommands,
+        }),
+        ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
+          ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
+          : []),
+      ], {
+        iteration,
+        timeoutMs:
+          typeof runOptions.timeoutMs === "number" && Number.isFinite(runOptions.timeoutMs)
+            ? Number(runOptions.timeoutMs)
+            : null,
+        allowFailureResult: runOptions.allowFailureResult === true,
+      });
+      artifacts.post_run_diagnostic_transcript_file = postRunDiagnosticVerify.transcriptFile;
+      artifacts.post_run_diagnostic_verify_summary_file = getStringField(
+        postRunDiagnosticVerify.payload,
+        "verify_summary_file",
+      );
+      artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
+        postRunDiagnosticVerify.payload,
+        "step_result_files",
+      );
+      const diagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+      const diagnosticSummary =
+        diagnosticSummaryFile && fileExists(diagnosticSummaryFile) ? readJson(diagnosticSummaryFile) : {};
+      const diagnosticPassed = asNonEmptyString(diagnosticSummary.status) === "passed";
+      artifacts.post_run_diagnostic_status = diagnosticPassed ? "pass" : postRunQualityPolicy.diagnosticFailureMode;
+      const preservedDiagnostic = diagnosticSummaryFile
+        ? preserveVerifyArtifacts({
+            verifyPayload: asRecord(postRunDiagnosticVerify.payload),
+            summaryFile: diagnosticSummaryFile,
+            reportsRoot: options.layout.reportsRoot,
+            runId: options.runId,
+            phase: `post-run-diagnostic-verify-${iteration}`,
+          })
+        : { preserved_summary_file: null, preserved_step_result_files: [], preserved_files: [] };
+      artifacts.post_run_diagnostic_verify_preserved_files = preservedDiagnostic.preserved_files;
+      if (preservedDiagnostic.preserved_summary_file) {
+        artifacts.post_run_diagnostic_verify_summary_file = preservedDiagnostic.preserved_summary_file;
+      }
+      if (preservedDiagnostic.preserved_step_result_files.length > 0) {
+        artifacts.post_run_diagnostic_verify_step_result_files = preservedDiagnostic.preserved_step_result_files;
+      }
+      return postRunDiagnosticVerify;
+    };
 
     if (guidedJourneyEnabled) {
       const guidedDoctor = runCommand("guided-doctor", [
@@ -5661,62 +5736,26 @@ export function executeFullJourneyFlow(options) {
           qaEvaluationStatus = "skipped";
         }
 
-        if (postRunQualityPolicy.diagnosticCommands.length > 0) {
-          const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
-            "project",
-            "verify",
-            "--project-ref",
-            ".",
-            "--project-profile",
-            generatedProfile.generatedProjectProfileFile,
-            "--runtime-root",
-            ".aor",
-            "--require-validation-pass",
-            "true",
-            ...buildVerifyOverrideArgs({
-              label: "post-run-diagnostic",
-              commands: postRunQualityPolicy.diagnosticCommands,
-              setupCommands: repoLintCommands,
-            }),
-            ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
-              ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
-              : []),
-          ], { iteration });
-          artifacts.post_run_diagnostic_verify_summary_file = getStringField(
-            postRunDiagnosticVerify.payload,
-            "verify_summary_file",
-          );
-          artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
-            postRunDiagnosticVerify.payload,
-            "step_result_files",
-          );
-          const diagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
-          const diagnosticSummary =
-            diagnosticSummaryFile && fileExists(diagnosticSummaryFile) ? readJson(diagnosticSummaryFile) : {};
-          const diagnosticPassed = asNonEmptyString(diagnosticSummary.status) === "passed";
-          artifacts.post_run_diagnostic_status = diagnosticPassed ? "pass" : postRunQualityPolicy.diagnosticFailureMode;
-          const preservedDiagnostic = diagnosticSummaryFile
-            ? preserveVerifyArtifacts({
-                verifyPayload: asRecord(postRunDiagnosticVerify.payload),
-                summaryFile: diagnosticSummaryFile,
-                reportsRoot: options.layout.reportsRoot,
-                runId: options.runId,
-                phase: `post-run-diagnostic-verify-${iteration}`,
-              })
-            : { preserved_summary_file: null, preserved_step_result_files: [], preserved_files: [] };
-          artifacts.post_run_diagnostic_verify_preserved_files = preservedDiagnostic.preserved_files;
-          if (preservedDiagnostic.preserved_summary_file) {
-            artifacts.post_run_diagnostic_verify_summary_file = preservedDiagnostic.preserved_summary_file;
-          }
-          if (preservedDiagnostic.preserved_step_result_files.length > 0) {
-            artifacts.post_run_diagnostic_verify_step_result_files = preservedDiagnostic.preserved_step_result_files;
-          }
+        const deferGuidedWarnDiagnostic =
+          guidedJourneyEnabled &&
+          postRunQualityPolicy.diagnosticFailureMode === "warn" &&
+          postRunQualityPolicy.diagnosticCommands.length > 0;
+        if (postRunQualityPolicy.diagnosticCommands.length > 0 && !deferGuidedWarnDiagnostic) {
+          const postRunDiagnosticVerify = runPostRunDiagnosticVerify({ iteration });
           qaDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "fail";
           qaEvidenceRefs = uniqueStrings([
             ...qaEvidenceRefs,
             postRunDiagnosticVerify.transcriptFile,
             asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
             ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+          ]);
+        } else if (deferGuidedWarnDiagnostic) {
+          artifacts.post_run_diagnostic_status = "deferred";
+          artifacts.post_run_diagnostic_deferred_until_guided_proof = true;
+          qaDiagnosticStatus = "deferred";
+          qaEvidenceRefs = uniqueStrings([
+            ...qaEvidenceRefs,
+            "diagnostic://post-run-diagnostic-deferred-until-guided-proof",
           ]);
         } else {
           artifacts.post_run_diagnostic_status = "pass";
@@ -5754,7 +5793,9 @@ export function executeFullJourneyFlow(options) {
             ? `QA requested public repair iteration ${iteration + 1}.`
             : terminalCycleFailure
               ? "QA or post-run diagnostic evidence did not pass."
-              : "Evaluation and diagnostic QA evidence passed.",
+              : qaDiagnosticStatus === "deferred"
+                ? "Evaluation passed; non-blocking diagnostic QA evidence was deferred until guided UI proof materializes."
+                : "Evaluation and diagnostic QA evidence passed.",
           canRepair
             ? {
                 iteration,
@@ -6513,6 +6554,27 @@ export function executeFullJourneyFlow(options) {
       artifacts.guided_browser_task_proof_request_file = webSmoke.browserTaskProofRequestFile;
       artifacts.guided_browser_task_proof_file = webSmoke.browserTaskProofFile;
       artifacts.guided_web_smoke = webSmoke.summary;
+      if (
+        artifacts.post_run_diagnostic_deferred_until_guided_proof === true &&
+        postRunQualityPolicy.diagnosticFailureMode === "warn" &&
+        postRunQualityPolicy.diagnosticCommands.length > 0
+      ) {
+        const loopIterations = Array.isArray(asRecord(artifacts.implementation_loop).iterations)
+          ? asRecord(artifacts.implementation_loop).iterations
+          : [];
+        const lastIteration = asRecord(loopIterations.at(-1));
+        const deferredDiagnosticIteration = Number(lastIteration.iteration) || 1;
+        const deferredDiagnosticTimeoutMs = resolveGuidedWarnDiagnosticTimeoutMs(options.profile);
+        artifacts.post_run_diagnostic_deferred_timeout_ms = deferredDiagnosticTimeoutMs;
+        const deferredDiagnostic = runPostRunDiagnosticVerify({
+          iteration: deferredDiagnosticIteration,
+          timeoutMs: deferredDiagnosticTimeoutMs,
+          allowFailureResult: true,
+        });
+        artifacts.post_run_diagnostic_deferred_until_guided_proof = false;
+        artifacts.post_run_diagnostic_deferred_after_guided_proof = true;
+        artifacts.post_run_diagnostic_deferred_transcript_file = deferredDiagnostic.transcriptFile;
+      }
     }
     markStage(
       stageMap,

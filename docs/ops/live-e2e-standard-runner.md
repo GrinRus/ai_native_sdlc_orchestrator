@@ -18,6 +18,10 @@ verification commands that run before provider execution. The runner must expose
 test, build, browser dependency, or timeout blocker is not a Codex/Qwen quality
 signal. Conversely, AOR runner/controller/API/UI failures must be classified as
 `failure_owner=aor`, not hidden behind target repository blocker wording.
+Installed-user guided profiles may set
+`live_e2e.guided_warn_diagnostic_timeout_sec` for non-blocking post-guided-proof
+diagnostics; this timeout only applies when the mission diagnostic failure mode
+is `warn`.
 
 Live E2E provider parity is required across Codex, Claude, OpenCode, and Qwen.
 Provider-specific behavior belongs only at the adapter boundary: command shape,
@@ -480,6 +484,10 @@ Full-journey layer:
   remains a `ui_validation` blocker; optional target diagnostics with
   `diagnostic_failure_mode=warn` remain factual warning evidence and do not
   replace required AOR operator UI proof refs;
+- for installed-user guided UI proof, optional `warn` diagnostics are deferred
+  until after guided browser proof materializes and use
+  `live_e2e.guided_warn_diagnostic_timeout_sec` (default `120`) so target-side
+  timing-sensitive tests cannot prevent UI/accessibility evidence collection;
 - has the runner prepare one structured feature request input under AOR run state;
 - requires small catalog missions to use `mission_class=flow-regression`; requires medium, large, and xlarge catalog missions to use `mission_class=product-change` with `agent_visible_request`, evaluator/final-code rubrics, widened budgets, goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands; xlarge remains manual observation evidence and cannot close required acceptance;
 - materializes provider-pinned route and policy overrides in host-side AOR run

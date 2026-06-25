@@ -2398,6 +2398,7 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
 
     const diagnosticStepResultFile = path.join(reportsRoot, "guided-post-run-diagnostic-step-result.json");
     const diagnosticSummaryFile = path.join(reportsRoot, "guided-post-run-diagnostic-summary.json");
+    const diagnosticTranscriptFile = path.join(reportsRoot, "guided-post-run-diagnostic-transcript.json");
     writeJsonFixture(diagnosticStepResultFile, {
       status: "failed",
       command: "npm test",
@@ -2414,12 +2415,18 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
       diagnostic_commands: ["npm test"],
     };
     writeOptions.flowResult.artifacts.post_run_diagnostic_status = "warn";
+    writeOptions.flowResult.artifacts.post_run_diagnostic_transcript_file = diagnosticTranscriptFile;
     writeOptions.flowResult.artifacts.post_run_diagnostic_verify_summary_file = diagnosticSummaryFile;
     writeOptions.flowResult.artifacts.post_run_diagnostic_verify_step_result_files = [diagnosticStepResultFile];
+    writeJsonFixture(diagnosticTranscriptFile, { status: "failed", timed_out: true });
 
     const hydratedWithDiagnosticWarn = writeProofRunnerArtifacts(writeOptions);
     assert.equal(hydratedWithDiagnosticWarn.runHealthReport.guided_ui_evidence.status, "pass");
     assert.equal(hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.status, "warn");
+    assert.equal(
+      hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.evidence_refs.includes(diagnosticTranscriptFile),
+      true,
+    );
     assert.equal(hydratedWithDiagnosticWarn.runHealthReport.overall_status, "warn");
     assert.equal(hydratedWithDiagnosticWarn.runHealthReport.failure_summary.class, "post_run_diagnostic_warning");
   });
@@ -2813,6 +2820,25 @@ test("run summary uses run-health instead of canonical outcome verdicts", () => 
   assert.doesNotMatch(runProfileSource, /runner_quality_summary/u);
   assert.doesNotMatch(runProfileSource, /final_skill_agent_verdict/u);
   assert.doesNotMatch(runProfileSource, /canonical_status/u);
+});
+
+test("guided UI proof defers warn diagnostics until browser evidence is materialized", () => {
+  const flowSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+  const profileSource = fs.readFileSync(
+    path.join(repoRoot, "scripts/live-e2e/profiles/installed-user-guided-journey.yaml"),
+    "utf8",
+  );
+  const qaDeferredMarkerIndex = flowSource.indexOf("diagnostic://post-run-diagnostic-deferred-until-guided-proof");
+  const guidedWebSmokeIndex = flowSource.indexOf("const webSmoke = runGuidedWebSmoke");
+  const deferredDiagnosticRunIndex = flowSource.indexOf("artifacts.post_run_diagnostic_deferred_after_guided_proof = true");
+  assert.notEqual(qaDeferredMarkerIndex, -1);
+  assert.notEqual(guidedWebSmokeIndex, -1);
+  assert.notEqual(deferredDiagnosticRunIndex, -1);
+  assert.ok(qaDeferredMarkerIndex < guidedWebSmokeIndex);
+  assert.ok(guidedWebSmokeIndex < deferredDiagnosticRunIndex);
+  assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
+  assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
+  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 120/u);
 });
 
 test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {

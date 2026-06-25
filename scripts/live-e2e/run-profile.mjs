@@ -2207,6 +2207,7 @@ function buildDiagnosticHealth(artifacts) {
   ]);
   const evidenceRefs = uniqueStrings([
     summaryFile,
+    asNonEmptyString(artifacts.post_run_diagnostic_transcript_file),
     ...stepResultRefs,
     ...timedOutCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
     ...failedCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),

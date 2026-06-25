@@ -94,6 +94,9 @@ facts, separated from the primary post-run verification gate:
 - `failed_commands[]`
 - `evidence_refs[]`
 
+`evidence_refs[]` may include the public `project verify` transcript when a
+non-blocking diagnostic times out before a verify summary can be materialized.
+
 If a configured diagnostic command times out or fails with
 `diagnostic_failure_mode=warn`, run-health must use
 `diagnostic_health.status: warn` and top-level `overall_status: warn`. This is a
