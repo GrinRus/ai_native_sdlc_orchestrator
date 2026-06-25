@@ -830,8 +830,10 @@ of implementation and verification evidence when the mission requires it.
   `post_run_verification_failed`.
 - If the next public repair request has the same `repair_context.context_fingerprint`
   as the previous repair decision and `new_context_since_previous` is empty, the
-  runner must stop before issuing another repair command and choose the most
-  specific supported class: `verification_mapping_gap`,
+  runner must stop before issuing another repair command, but only after the
+  repair execution has produced fresh primary verification and fresh
+  `review#N`/`qa#N` evidence for that iteration. The runner then chooses the
+  most specific supported class: `verification_mapping_gap`,
   `review_finding_stale`, `provider_did_not_address_finding`,
   `acceptable_residual_risk_not_recognized`, or the generic
   `repeated_repair_context_without_new_evidence` only when no narrower class is

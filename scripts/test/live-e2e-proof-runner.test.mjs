@@ -3321,13 +3321,20 @@ test("full journey requests repair only for actionable review or QA findings bef
   assert.match(flowsSource, /source_phase: repairSource \?\? "review"/u);
   assert.match(flowsSource, /qaOverallStatus === "fail"/u);
 	  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
+	  assert.match(flowsSource, /const unresolvedReviewFindingDetails = collectReviewFindingDetails\(reviewReport\)/u);
+	  assert.match(flowsSource, /unresolved_finding_details: repairFindingDetails/u);
 	  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
 	  assert.match(flowsSource, /previous_repair_decision_files: previousRepairDecisionRefs/u);
 	  assert.match(flowsSource, /repair_context_fingerprint: pendingRepairContextFingerprint/u);
 	  assert.match(flowsSource, /new_context_since_previous: newRepairContextSignals/u);
+	  assert.match(flowsSource, /newRepairContextSignals,\s*\n\s*\}\);/u);
 	  assert.match(flowsSource, /repeated_repair_context_without_new_evidence/u);
 	  assert.match(flowsSource, /Unresolved findings:/u);
 	  assert.match(flowsSource, /Runtime Harness decision:/u);
+	  assert.ok(
+	    flowsSource.indexOf('runCommand("review-run"') < flowsSource.indexOf("const previousRepairContexts = readRepairDecisionContexts"),
+	    "expected fresh review evidence before repeated repair context comparison",
+	  );
 	});
 
 test("proof runner writes run-health reports for blocked live E2E reports", () => {

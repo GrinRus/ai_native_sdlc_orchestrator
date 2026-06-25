@@ -34,8 +34,11 @@ after the current required proof set is stable.
   `provider/review/repeated_repair_context_without_new_evidence`. The repair
   iteration did not resolve a review finding that the implementation lowered
   `test/headers.ts` assertion-plan coverage from `t.plan(4)` to `t.plan(3)`.
-  W51-S01 stays `ready`; HTTPX/Fastify clean proof reruns remain gated on a new
-  accepted same-commit guided UI proof.
+  The repair packet must make each unresolved finding a structured
+  provider-visible closure requirement, and the runner must classify identical
+  fresh review findings as `provider_did_not_address_finding` before it would
+  issue another repair. W51-S01 stays `ready`; HTTPX/Fastify clean proof reruns
+  remain gated on a new accepted same-commit guided UI proof.
 
 ### Acceptance criteria
 1. Guided AOR UI run passes and includes browser-task/accessibility evidence.

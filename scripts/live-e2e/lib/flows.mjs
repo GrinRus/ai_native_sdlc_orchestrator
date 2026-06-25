@@ -157,6 +157,78 @@ function collectReviewFindingSummaries(reviewReport) {
 
 /**
  * @param {Record<string, unknown>} finding
+ * @returns {string}
+ */
+function reviewFindingSummary(finding) {
+  return (
+    asNonEmptyString(finding.summary) ||
+    asNonEmptyString(finding.message) ||
+    asNonEmptyString(finding.finding) ||
+    asNonEmptyString(finding.reason) ||
+    asNonEmptyString(finding.title) ||
+    "Review finding requires repair."
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} finding
+ * @param {number} index
+ * @returns {string}
+ */
+function reviewFindingId(finding, index) {
+  const explicitId =
+    asNonEmptyString(finding.finding_id) ||
+    asNonEmptyString(finding.id) ||
+    asNonEmptyString(finding.code) ||
+    asNonEmptyString(finding.rule_id);
+  if (explicitId) return explicitId;
+  const category = asNonEmptyString(finding.category) || "review-finding";
+  return `${category}.${shortHash(`${category}\n${reviewFindingSummary(finding)}\n${index}`)}`;
+}
+
+/**
+ * @param {Record<string, unknown>} finding
+ * @returns {string}
+ */
+function resolutionRequirementForFinding(finding) {
+  const category = asNonEmptyString(finding.category).toLowerCase();
+  const summary = reviewFindingSummary(finding).toLowerCase();
+  if (
+    category === "code-quality" &&
+    (summary.includes("coverage") ||
+      summary.includes("assertion") ||
+      summary.includes("plan") ||
+      summary.includes("weaken"))
+  ) {
+    return "Restore the weakened assertion or plan coverage, or add equivalent stronger coverage, and include final diff and verification evidence that proves this finding is resolved.";
+  }
+  if (isVerificationMappingFinding(finding)) {
+    return "Map the changed test paths to primary verification evidence, or provide fresh verification evidence that makes the mapping warning stale.";
+  }
+  return "Address this finding directly in the next implementation iteration, or provide fresh public evidence that the finding is stale or already resolved.";
+}
+
+/**
+ * @param {Record<string, unknown>} reviewReport
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectReviewFindingDetails(reviewReport) {
+  return collectReviewFindingRecords(reviewReport).slice(0, 12).map((finding, index) => ({
+    finding_id: reviewFindingId(finding, index),
+    category: asNonEmptyString(finding.category) || "review",
+    severity: asNonEmptyString(finding.severity) || "blocking",
+    summary: reviewFindingSummary(finding),
+    evidence_refs: uniqueStrings([
+      ...asStringArray(finding.evidence_refs),
+      ...asStringArray(finding.evidenceRefs),
+      ...collectStringRefs(finding),
+    ]),
+    resolution_requirement: resolutionRequirementForFinding(finding),
+  }));
+}
+
+/**
+ * @param {Record<string, unknown>} finding
  * @returns {boolean}
  */
 function isVerificationMappingFinding(finding) {
@@ -230,13 +302,14 @@ function classifyNonRepairReviewBlocker(options) {
 }
 
 /**
- * @param {{ repairSource: string | null, pendingRepairContext: Record<string, unknown>, artifacts: Record<string, unknown> }} options
+ * @param {{ repairSource: string | null, pendingRepairContext: Record<string, unknown>, artifacts: Record<string, unknown>, newRepairContextSignals?: string[] }} options
  * @returns {string}
  */
 function classifyRepeatedRepairContextBlocker(options) {
   const findingsText = asStringArray(options.pendingRepairContext.unresolved_findings).join("\n").toLowerCase();
   const verificationStatus = asNonEmptyString(options.pendingRepairContext.verification_status);
   const changedPaths = asStringArray(options.pendingRepairContext.meaningful_changed_paths);
+  const newSignals = asStringArray(options.newRepairContextSignals);
   if (
     verificationStatus === "pass" &&
     findingsText.includes("primary verification") &&
@@ -257,6 +330,7 @@ function classifyRepeatedRepairContextBlocker(options) {
   }
   if (
     changedPaths.length === 0 ||
+    newSignals.length === 0 ||
     asStringArray(options.artifacts.latest_repair_context_new_signals).length === 0
   ) {
     return "provider_did_not_address_finding";
@@ -2315,6 +2389,20 @@ function repairContextFingerprint(context) {
   const payload = {
     source_phase: asNonEmptyString(context.source_phase) || "review",
     unresolved_findings: uniqueStrings(asStringArray(context.unresolved_findings)).sort(),
+    unresolved_finding_details: Array.isArray(context.unresolved_finding_details)
+      ? context.unresolved_finding_details
+          .map((entry) => {
+            const record = asRecord(entry);
+            return {
+              finding_id: asNonEmptyString(record.finding_id) || "",
+              category: asNonEmptyString(record.category) || "",
+              severity: asNonEmptyString(record.severity) || "",
+              summary: asNonEmptyString(record.summary) || "",
+              resolution_requirement: asNonEmptyString(record.resolution_requirement) || "",
+            };
+          })
+          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+      : [],
     meaningful_changed_paths: uniqueStrings(asStringArray(context.meaningful_changed_paths)).sort(),
     verification_status: asNonEmptyString(context.verification_status) || "unknown",
     requested_next_step: asNonEmptyString(context.requested_next_step) || "execution",
@@ -2358,6 +2446,23 @@ function resolveNewRepairContextSignals(previousContext, currentContext) {
     JSON.stringify(uniqueStrings(asStringArray(currentContext.unresolved_findings)).sort())
   ) {
     signals.push("unresolved-findings-changed");
+  }
+  const normalizeFindingDetails = (context) =>
+    Array.isArray(context.unresolved_finding_details)
+      ? context.unresolved_finding_details
+          .map((entry) => {
+            const record = asRecord(entry);
+            return {
+              finding_id: asNonEmptyString(record.finding_id) || "",
+              category: asNonEmptyString(record.category) || "",
+              summary: asNonEmptyString(record.summary) || "",
+              resolution_requirement: asNonEmptyString(record.resolution_requirement) || "",
+            };
+          })
+          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+      : [];
+  if (JSON.stringify(normalizeFindingDetails(previousContext)) !== JSON.stringify(normalizeFindingDetails(currentContext))) {
+    signals.push("unresolved-finding-details-changed");
   }
   if (
     JSON.stringify(uniqueStrings(asStringArray(previousContext.meaningful_changed_paths)).sort()) !==
@@ -5698,7 +5803,9 @@ export function executeFullJourneyFlow(options) {
           : { iteration },
       );
       const unresolvedReviewFindings = collectReviewFindingSummaries(reviewReport);
+      const unresolvedReviewFindingDetails = collectReviewFindingDetails(reviewReport);
       let unresolvedRepairFindings = [...unresolvedReviewFindings];
+      let unresolvedRepairFindingDetails = [...unresolvedReviewFindingDetails];
       let repairStopReason = null;
       let repairNecessity = repairSource ?? "none";
 	      let qaEvidenceRefs = uniqueStrings([
@@ -5784,6 +5891,35 @@ export function executeFullJourneyFlow(options) {
           qaNeedsRepair ? `QA evaluation status '${qaEvaluationStatus}' did not pass.` : "",
           diagnosticNeedsRepair ? `Post-run diagnostic status '${qaDiagnosticStatus}' did not pass.` : "",
         ]);
+        unresolvedRepairFindingDetails = [
+          ...unresolvedRepairFindingDetails,
+          ...(qaNeedsRepair
+            ? [
+                {
+                  finding_id: `qa.${iteration}.evaluation-status`,
+                  category: "qa",
+                  severity: "blocking",
+                  summary: `QA evaluation status '${qaEvaluationStatus}' did not pass.`,
+                  evidence_refs: qaEvidenceRefs,
+                  resolution_requirement:
+                    "Repair the product change so the next QA evaluation passes, or provide fresh evidence that the QA finding is stale.",
+                },
+              ]
+            : []),
+          ...(diagnosticNeedsRepair
+            ? [
+                {
+                  finding_id: `qa.${iteration}.post-run-diagnostic-status`,
+                  category: "post-run-diagnostic",
+                  severity: "blocking",
+                  summary: `Post-run diagnostic status '${qaDiagnosticStatus}' did not pass.`,
+                  evidence_refs: qaEvidenceRefs,
+                  resolution_requirement:
+                    "Repair the product change or diagnostic setup so post-run diagnostic verification passes, or provide fresh evidence that this diagnostic is non-blocking.",
+                },
+              ]
+            : []),
+        ];
         markStage(
           stageMap,
           "qa",
@@ -5877,12 +6013,44 @@ export function executeFullJourneyFlow(options) {
 	      let pendingRepairContextFingerprint = null;
 	      let newRepairContextSignals = [];
 	      if (canRepair) {
+	        const repairFindingDetails = unresolvedRepairFindingDetails.map((entry, index) => {
+	          const record = asRecord(entry);
+	          return {
+	            finding_id:
+	              asNonEmptyString(record.finding_id) ||
+	              `${repairSource ?? "review"}.${iteration}.finding-${index + 1}`,
+	            category: asNonEmptyString(record.category) || repairSource || "review",
+	            severity: asNonEmptyString(record.severity) || "blocking",
+	            summary: asNonEmptyString(record.summary) || "Repair was requested before delivery.",
+	            evidence_refs: uniqueStrings([
+	              ...asStringArray(record.evidence_refs),
+	              ...asStringArray(record.evidenceRefs),
+	              ...repairVerificationRefs,
+	            ]),
+	            resolution_requirement:
+	              asNonEmptyString(record.resolution_requirement) ||
+	              "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
+	          };
+	        });
 	        pendingRepairContext = {
 	          source_phase: repairSource ?? "review",
 	          cycle_iteration: iteration,
 	          unresolved_findings: unresolvedRepairFindings.length > 0
 	            ? unresolvedRepairFindings
 	            : ["Repair was requested before delivery."],
+	          unresolved_finding_details: repairFindingDetails.length > 0
+	            ? repairFindingDetails
+	            : [
+	                {
+	                  finding_id: `${repairSource ?? "review"}.${iteration}.unspecified-repair`,
+	                  category: repairSource ?? "review",
+	                  severity: "blocking",
+	                  summary: "Repair was requested before delivery.",
+	                  evidence_refs: repairVerificationRefs,
+	                  resolution_requirement:
+	                    "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
+	                },
+	              ],
 	          meaningful_changed_paths: repairChangedPaths,
 	          verification_status:
 	            repairSource === "qa"
@@ -5909,6 +6077,7 @@ export function executeFullJourneyFlow(options) {
 	            repairSource,
 	            pendingRepairContext,
 	            artifacts,
+	            newRepairContextSignals,
 	          });
 	          artifacts.implementation_loop_failure_summary =
 	            "Implementation quality cycle stopped because repeated repair context had no new actionable evidence.";
@@ -5942,8 +6111,10 @@ export function executeFullJourneyFlow(options) {
         post_run_diagnostic_status: qaDiagnosticStatus,
         repair_source: repairSource,
         repair_necessity: repairNecessity,
-        unresolved_review_findings: unresolvedReviewFindings,
+	        unresolved_review_findings: unresolvedReviewFindings,
+	        unresolved_review_finding_details: unresolvedReviewFindingDetails,
 	        unresolved_repair_findings: unresolvedRepairFindings,
+	        unresolved_repair_finding_details: unresolvedRepairFindingDetails,
 	        previous_repair_decision_files: previousRepairDecisionRefs,
 	        repair_context_fingerprint: pendingRepairContextFingerprint,
 	        new_context_since_previous: newRepairContextSignals,

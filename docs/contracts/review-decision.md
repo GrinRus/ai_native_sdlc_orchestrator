@@ -35,10 +35,11 @@ Durable approval decision for one reviewed run.
 `request-repair` records that downstream work should repair the linked run before delivery/release approval.
 For public repair loops, `request-repair` must preserve structured
 `repair_context` in addition to the operator-readable reason. The context
-	records `source_phase`, `cycle_iteration`, `unresolved_findings`,
-	`meaningful_changed_paths`, `verification_status`, `verification_refs`,
-	`previous_repair_decision_refs`, `context_fingerprint`,
-	`new_context_since_previous`, `stop_reason`, and `requested_next_step`.
+records `source_phase`, `cycle_iteration`, `unresolved_findings`,
+`unresolved_finding_details`, `meaningful_changed_paths`,
+`verification_status`, `verification_refs`, `previous_repair_decision_refs`,
+`context_fingerprint`, `new_context_since_previous`, `stop_reason`, and
+`requested_next_step`.
 It must still route repair through public AOR run/review lifecycle commands
 rather than providing a private patch or direct target mutation.
 
@@ -54,12 +55,23 @@ rather than providing a private patch or direct target mutation.
 `source_phase=none`, `cycle_iteration=0`, and empty evidence arrays. For
 `request-repair`, it records the phase that requested repair (`review`, `qa`,
 `post-run-primary`, or `post-run-diagnostic`), the quality-cycle iteration,
-	unresolved findings, changed paths, verification status and refs, prior repair
-	decision refs, a deterministic context fingerprint, the new evidence/context
-	seen since the previous repair, the stop reason, and the requested next step.
-	`request-repair` is invalid when this context is empty, omits the fingerprint,
-	repeats prior repair lineage without new context, or points anywhere other than
-	`execution` as the next public repair step.
+unresolved findings, structured unresolved finding details, changed paths,
+verification status and refs, prior repair decision refs, a deterministic
+context fingerprint, the new evidence/context seen since the previous repair,
+the stop reason, and the requested next step. `request-repair` is invalid when
+this context is empty, omits structured finding details or the fingerprint,
+repeats prior repair lineage without new context, or points anywhere other than
+`execution` as the next public repair step.
+
+Each `repair_context.unresolved_finding_details[]` entry must include
+`finding_id`, `category`, `severity`, `summary`, `evidence_refs`, and
+`resolution_requirement`. The `finding_id` should remain stable across repair
+iterations so the runner can distinguish a stale finding from a provider repair
+that did not address the finding. `resolution_requirement` must be concrete
+enough for the next execution packet to prove closure; for example, coverage
+weakening findings should require restoring the weakened assertion or plan
+coverage, or adding equivalent stronger coverage with final diff and
+verification evidence.
 
 ## Delivery gate
 `delivery_gate` should preserve:

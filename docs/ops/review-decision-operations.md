@@ -46,10 +46,13 @@ aor review decide \
 ```
 
 The repair context records `source_phase`, `cycle_iteration`,
-`unresolved_findings`, `meaningful_changed_paths`, `verification_status`,
-`verification_refs`, `previous_repair_decision_refs`,
-`context_fingerprint`, `new_context_since_previous`, `stop_reason`, and
-`requested_next_step=execution`. If a later repair decision references previous
+`unresolved_findings`, structured `unresolved_finding_details`,
+`meaningful_changed_paths`, `verification_status`, `verification_refs`,
+`previous_repair_decision_refs`, `context_fingerprint`,
+`new_context_since_previous`, `stop_reason`, and `requested_next_step=execution`.
+Each structured finding detail must include stable identity, category, severity,
+summary, evidence refs, and a concrete resolution requirement that the next
+execution can prove closed. If a later repair decision references previous
 repair decisions, `new_context_since_previous` must explain the new finding,
 changed path, verification status, or evidence ref that makes another public
 repair actionable. The runner must create this decision through the public

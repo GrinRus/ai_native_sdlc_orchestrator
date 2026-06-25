@@ -143,6 +143,7 @@ function writeCompletedClosure(init, runId) {
       source_phase: "none",
       cycle_iteration: 0,
       unresolved_findings: [],
+      unresolved_finding_details: [],
       meaningful_changed_paths: [],
 	      verification_status: "pass",
 	      verification_refs: [],

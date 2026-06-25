@@ -106,11 +106,16 @@ Finding:
   flagged the lowered `test/headers.ts` plan count as a coverage weakening,
   public `request-repair` lineage was created, and repair execution completed,
   but the repair did not restore the weakened assertion plan or otherwise produce
-  new evidence that resolved the finding. Anti-loop enforcement stopped the run
-  as `provider/review/repeated_repair_context_without_new_evidence`. Next action:
-  harden repair instructions/context so provider repair must explicitly address
-  each unresolved review finding, especially coverage-weakening findings, before
-  W51-S01 can be rerun and used as paired UI proof.
+  new evidence that resolved the finding. The repair packet carried the prior
+  review decision as evidence but did not make each unresolved finding a
+  first-class provider-visible closure requirement. Anti-loop enforcement also
+  reported the generic `repeated_repair_context_without_new_evidence` class
+  instead of the narrower `provider_did_not_address_finding` after fresh repair
+  evidence. Next action: harden repair instructions/context so provider repair
+  must explicitly address each unresolved review finding, especially
+  coverage-weakening findings, and ensure repeated-context classification uses
+  the current iteration's fresh review/verification signals before W51-S01 is
+  rerun and used as paired UI proof.
 
 ## Guided AOR UI Proof
 

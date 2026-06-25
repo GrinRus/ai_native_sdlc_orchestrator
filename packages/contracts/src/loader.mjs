@@ -1434,6 +1434,98 @@ function validateReviewReport(document, source) {
 }
 
 /**
+ * @param {{ repairContext: Record<string, unknown>, source: string, issues: import("./index.d.ts").ContractValidationIssue[], requireNonEmpty: boolean }} options
+ */
+function validateRepairContextFindingDetails(options) {
+  validateNestedArrayField({
+    record: options.repairContext,
+    source: options.source,
+    field: "repair_context.unresolved_finding_details",
+    issues: options.issues,
+    required: true,
+  });
+  const details = options.repairContext.unresolved_finding_details;
+  if (!Array.isArray(details)) return;
+  if (options.requireNonEmpty && details.length === 0) {
+    options.issues.push(
+      issue({
+        code: "required_field_missing",
+        source: options.source,
+        field: "repair_context.unresolved_finding_details",
+        expected: "non-empty array",
+        actual: "empty",
+        message: "Review repair decisions must preserve structured unresolved finding details.",
+      }),
+    );
+    return;
+  }
+
+  details.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      options.issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source: options.source,
+          field: `repair_context.unresolved_finding_details[${index}]`,
+          expected: "object",
+          actual: describeActualType(entry),
+          message: "Repair finding details must be objects.",
+        }),
+      );
+      return;
+    }
+
+    for (const field of ["finding_id", "category", "severity", "summary", "resolution_requirement"]) {
+      validateNestedStringField({
+        record: entry,
+        source: options.source,
+        field: `repair_context.unresolved_finding_details[${index}].${field}`,
+        issues: options.issues,
+        required: true,
+      });
+      if (typeof entry[field] === "string" && entry[field].trim().length === 0) {
+        options.issues.push(
+          issue({
+            code: "required_field_missing",
+            source: options.source,
+            field: `repair_context.unresolved_finding_details[${index}].${field}`,
+            expected: "non-empty string",
+            actual: "empty",
+            message: `Repair finding detail '${field}' must be non-empty.`,
+          }),
+        );
+      }
+    }
+
+    validateNestedArrayField({
+      record: entry,
+      source: options.source,
+      field: `repair_context.unresolved_finding_details[${index}].evidence_refs`,
+      issues: options.issues,
+      required: true,
+    });
+    validateStringArrayItems({
+      values: entry.evidence_refs,
+      source: options.source,
+      field: `repair_context.unresolved_finding_details[${index}].evidence_refs`,
+      issues: options.issues,
+    });
+    if (options.requireNonEmpty && (!Array.isArray(entry.evidence_refs) || entry.evidence_refs.length === 0)) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `repair_context.unresolved_finding_details[${index}].evidence_refs`,
+          expected: "non-empty array",
+          actual: "empty",
+          message: "Repair finding details must preserve evidence refs for request-repair decisions.",
+        }),
+      );
+    }
+  });
+}
+
+/**
  * @param {Record<string, unknown>} document
  * @param {string} source
  * @returns {import("./index.d.ts").ContractValidationIssue[]}
@@ -1463,13 +1555,13 @@ function validateReviewDecision(document, source) {
     issues,
     required: true,
   });
-	  for (const field of [
-	    "unresolved_findings",
-	    "meaningful_changed_paths",
-	    "verification_refs",
-	    "previous_repair_decision_refs",
-	    "new_context_since_previous",
-	  ]) {
+  for (const field of [
+    "unresolved_findings",
+    "meaningful_changed_paths",
+    "verification_refs",
+    "previous_repair_decision_refs",
+    "new_context_since_previous",
+  ]) {
     validateNestedArrayField({
       record: repairContext,
       source,
@@ -1484,19 +1576,25 @@ function validateReviewDecision(document, source) {
       issues,
     });
   }
-	  validateNestedStringField({
-	    record: repairContext,
-	    source,
-	    field: "repair_context.context_fingerprint",
-	    issues,
-	    required: true,
-	  });
-	  validateNestedStringField({
-	    record: repairContext,
-	    source,
-	    field: "repair_context.verification_status",
-	    issues,
-	    required: true,
+  validateRepairContextFindingDetails({
+    repairContext,
+    source,
+    issues,
+    requireNonEmpty: document.decision === "request-repair",
+  });
+  validateNestedStringField({
+    record: repairContext,
+    source,
+    field: "repair_context.context_fingerprint",
+    issues,
+    required: true,
+  });
+  validateNestedStringField({
+    record: repairContext,
+    source,
+    field: "repair_context.verification_status",
+    issues,
+    required: true,
   });
   validateNestedStringField({
     record: repairContext,
@@ -1558,7 +1656,7 @@ function validateReviewDecision(document, source) {
       }),
     );
   }
-	  if (!Array.isArray(repairContext.verification_refs) || repairContext.verification_refs.length === 0) {
+  if (!Array.isArray(repairContext.verification_refs) || repairContext.verification_refs.length === 0) {
     issues.push(
       issue({
         code: "required_field_missing",
@@ -1569,19 +1667,19 @@ function validateReviewDecision(document, source) {
         message: "Review repair decisions must preserve verification evidence refs.",
       }),
     );
-	  }
-	  if (typeof repairContext.context_fingerprint !== "string" || repairContext.context_fingerprint.trim().length === 0) {
-	    issues.push(
-	      issue({
-	        code: "required_field_missing",
-	        source,
-	        field: "repair_context.context_fingerprint",
-	        expected: "non-empty string",
-	        actual: describeActualType(repairContext.context_fingerprint),
-	        message: "Review repair decisions must preserve a deterministic repair-context fingerprint.",
-	      }),
-	    );
-	  }
+  }
+  if (typeof repairContext.context_fingerprint !== "string" || repairContext.context_fingerprint.trim().length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "repair_context.context_fingerprint",
+        expected: "non-empty string",
+        actual: describeActualType(repairContext.context_fingerprint),
+        message: "Review repair decisions must preserve a deterministic repair-context fingerprint.",
+      }),
+    );
+  }
 	  if (
 	    Array.isArray(repairContext.previous_repair_decision_refs) &&
 	    repairContext.previous_repair_decision_refs.length > 0 &&

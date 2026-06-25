@@ -494,6 +494,7 @@ test("review decision example preserves explicit approval vocabulary", () => {
     source_phase: "none",
     cycle_iteration: 0,
     unresolved_findings: [],
+    unresolved_finding_details: [],
     meaningful_changed_paths: [],
 	    verification_status: "pass",
 	    verification_refs: [],
@@ -535,6 +536,7 @@ test("review decision example preserves explicit approval vocabulary", () => {
     source_phase: "none",
     cycle_iteration: 0,
     unresolved_findings: [],
+    unresolved_finding_details: [],
     meaningful_changed_paths: [],
     verification_status: "not_pass",
     verification_refs: [],
@@ -568,6 +570,12 @@ test("review decision example preserves explicit approval vocabulary", () => {
     ),
     "expected request-repair decisions to preserve a context fingerprint",
   );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.unresolved_finding_details",
+    ),
+    "expected request-repair decisions to preserve structured unresolved finding details",
+  );
 
   const validRepair = structuredClone(loaded.document);
   validRepair.decision = "request-repair";
@@ -575,6 +583,16 @@ test("review decision example preserves explicit approval vocabulary", () => {
     source_phase: "qa",
     cycle_iteration: 2,
     unresolved_findings: ["QA evaluation found a regression that requires another implementation iteration."],
+    unresolved_finding_details: [
+      {
+        finding_id: "qa.evaluation-status",
+        category: "qa",
+        severity: "blocking",
+        summary: "QA evaluation found a regression that requires another implementation iteration.",
+        evidence_refs: [loaded.document.review_report_ref],
+        resolution_requirement: "Repair the regression or provide fresh evidence that the QA finding is stale.",
+      },
+    ],
     meaningful_changed_paths: ["src/client.py", "tests/test_client.py"],
     verification_status: "fail",
     verification_refs: [loaded.document.review_report_ref],
