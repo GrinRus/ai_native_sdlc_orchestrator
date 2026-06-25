@@ -41,6 +41,22 @@ function writeRuntimeJson(filePath, document) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} projection
+ */
+function normalizeProjectionForRepeatRead(projection) {
+  if (!projection) return projection;
+  const normalized = structuredClone(projection);
+  if (Array.isArray(normalized.artifact_display_summaries)) {
+    for (const summary of normalized.artifact_display_summaries) {
+      if (summary && typeof summary === "object") {
+        delete summary.timestamp;
+      }
+    }
+  }
+  return normalized;
+}
+
+/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} missionId
  * @param {string} deliveryMode
@@ -123,6 +139,19 @@ function writeCompletedClosure(init, runId) {
       runtime_harness_overall_decision: "pass",
       blocking_findings: [],
     },
+    repair_context: {
+      source_phase: "none",
+      cycle_iteration: 0,
+      unresolved_findings: [],
+      meaningful_changed_paths: [],
+	      verification_status: "pass",
+	      verification_refs: [],
+	      previous_repair_decision_refs: [],
+	      context_fingerprint: "none",
+	      new_context_since_previous: [],
+	      stop_reason: "none",
+	      requested_next_step: "none",
+	    },
     delivery_gate: {
       status: "pass",
       blocks_downstream: false,
@@ -228,7 +257,7 @@ test("flow projections keep completed evidence read-only while new flow selectio
     const afterRead = runtimeJsonSnapshot(init);
     assert.deepEqual(afterRead, beforeRead);
     assert.equal(selectedOnce?.flow_id, followUpFlowId);
-    assert.deepEqual(selectedTwice, selectedOnce);
+    assert.deepEqual(normalizeProjectionForRepeatRead(selectedTwice), normalizeProjectionForRepeatRead(selectedOnce));
 
     flowList = listFlowProjections({ cwd: repoRoot, projectRef: repoRoot });
     assert.ok(flowList.active_flow_ids.includes(followUpFlowId));

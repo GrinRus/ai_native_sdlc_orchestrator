@@ -121,6 +121,8 @@ function writeReviewEvidence(init, runId) {
 function writeReviewDecision(init, runId, decision) {
   const held = decision !== "approve";
   const filePath = path.join(init.runtimeLayout.reportsRoot, `review-decision-${runId}-${decision}.json`);
+  const reviewRef = `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`;
+  const harnessRef = `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`;
   writeRuntimeJson(filePath, {
     decision_id: `${runId}.review-decision.${decision}.v1`,
     project_id: init.projectId,
@@ -128,8 +130,8 @@ function writeReviewDecision(init, runId, decision) {
     decision,
     decider_ref: "operator://test",
     reason: `Fixture ${decision} decision.`,
-    review_report_ref: `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`,
-    runtime_harness_report_ref: `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`,
+    review_report_ref: reviewRef,
+    runtime_harness_report_ref: harnessRef,
     delivery_manifest_refs: [],
     learning_handoff_refs: [],
     decision_basis: {
@@ -138,6 +140,34 @@ function writeReviewDecision(init, runId, decision) {
       runtime_harness_overall_decision: "pass",
       blocking_findings: [],
     },
+    repair_context:
+      decision === "request-repair"
+        ? {
+            source_phase: "review",
+            cycle_iteration: 1,
+            unresolved_findings: ["Fixture repair decision blocks downstream delivery."],
+            meaningful_changed_paths: [],
+	            verification_status: "not_pass",
+	            verification_refs: [reviewRef, harnessRef],
+	            previous_repair_decision_refs: [],
+	            context_fingerprint: "sha256:next-action-fixture-repair",
+	            new_context_since_previous: ["first-repair-decision"],
+	            stop_reason: "Fixture repair decision requested another execution iteration.",
+	            requested_next_step: "execution",
+	          }
+        : {
+            source_phase: "none",
+            cycle_iteration: 0,
+            unresolved_findings: [],
+            meaningful_changed_paths: [],
+	            verification_status: held ? "not_pass" : "pass",
+	            verification_refs: [],
+	            previous_repair_decision_refs: [],
+	            context_fingerprint: "none",
+	            new_context_since_previous: [],
+	            stop_reason: "none",
+	            requested_next_step: "none",
+	          },
     delivery_gate: {
       status: held ? "blocked" : "pass",
       blocks_downstream: held,
@@ -145,8 +175,8 @@ function writeReviewDecision(init, runId, decision) {
       findings: held ? [`${decision} blocks downstream delivery.`] : [],
     },
     evidence_refs: [
-      `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`,
-      `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`,
+      reviewRef,
+      harnessRef,
     ],
     decided_at: "2026-05-06T00:00:00.000Z",
   });

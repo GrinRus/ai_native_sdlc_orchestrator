@@ -113,12 +113,31 @@ When baseline target verification passed but post-run target verification fails 
 
 This is still factual run-health classification. It does not evaluate whether the implementation idea was semantically good; the incomplete run must stop at run-health and must not produce an outcome quality assessment request.
 
-When the public `execution#N -> review#N` repair loop exhausts before review passes, run-health must classify the terminal blocker from the final review evidence instead of letting the next QA step fail with missing evidence:
+When the public `execution#N -> review#N -> qa#N` quality cycle exhausts before
+review passes, run-health must classify the terminal blocker from the final
+review evidence instead of letting the next QA step fail with missing evidence:
 - `failure_summary.owner: provider`
 - `failure_summary.phase: review`
-- `failure_summary.class: implementation_repair_loop_exhausted`
+- `failure_summary.class: review_repair_loop_exhausted`
+
+When review passes but QA-origin repair exhausts before delivery, run-health
+must classify the QA blocker and must not prepare final product acceptance:
+- `failure_summary.owner: target_repository` or `provider`
+- `failure_summary.phase: qa`
+- `failure_summary.class: qa_repair_loop_exhausted`
 
 When review is non-passing and no repair action is available, but the configured repair loop was not exhausted, use `failure_summary.class: review_quality_not_approved`. Both cases are run-completion blockers; they are not substitutes for post-run outcome quality assessment because the declared flow did not complete.
+
+When the next repair request would repeat the previous repair context without
+new findings, changed paths, verification status, or evidence refs, use:
+- `failure_summary.owner: provider`
+- `failure_summary.phase: review`, `qa`, or `target_verification`
+- `failure_summary.class: repeated_repair_context_without_new_evidence`
+
+More specific convergence blockers may use
+`provider_did_not_address_finding`, `review_finding_stale`,
+`verification_mapping_gap`, or `acceptable_residual_risk_not_recognized` when
+the public evidence supports that classification.
 
 `evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
 
@@ -165,4 +184,4 @@ Run-health reports must not include:
 - `aor_operator_accessibility_quality`
 
 ## Relationship to qualification
-Provider qualification and run acceptance should use run-health and factual run summary status. They must not depend on code/artifact/UI quality assessment, which is advisory post-run outcome analysis.
+Provider qualification should use run-health and factual run summary status. It must not depend on code/artifact/UI quality assessment. Medium+ product acceptance is separate and consumes step-quality reports plus the final all-pass quality gate.

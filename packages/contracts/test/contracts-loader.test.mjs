@@ -315,6 +315,48 @@ test("W14 live-e2e target catalog documents validate", () => {
   );
 });
 
+test("live E2E target catalog enforces product mission policy", () => {
+  const source = path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-target-catalog" });
+  assert.equal(loaded.ok, true, "expected ky target catalog to load before mutation");
+
+  const smallProductChange = structuredClone(loaded.document);
+  smallProductChange.feature_missions[0].mission_class = "product-change";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-target-catalog",
+      document: smallProductChange,
+      source: "test://target-catalog-small-product-change",
+    }),
+    "enum_value_invalid",
+    "feature_missions[0].mission_class",
+  );
+
+  const mediumMissingRubric = structuredClone(loaded.document);
+  delete mediumMissingRubric.feature_missions[1].agent_visible_request;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-target-catalog",
+      document: mediumMissingRubric,
+      source: "test://target-catalog-medium-missing-request",
+    }),
+    "required_field_missing",
+    "feature_missions[1].agent_visible_request",
+  );
+
+  const legacySize = structuredClone(loaded.document);
+  legacySize.feature_missions[1].feature_size = "xl";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-target-catalog",
+      document: legacySize,
+      source: "test://target-catalog-legacy-xl",
+    }),
+    "enum_value_invalid",
+    "feature_missions[1].feature_size",
+  );
+});
+
 test("new runtime context family examples load through the shared contract path", () => {
   const examples = [
     [path.join(workspaceRoot, "examples/context/docs/repo-map-core.yaml"), "context-doc"],
@@ -448,6 +490,19 @@ test("review decision example preserves explicit approval vocabulary", () => {
   assert.equal(loaded.ok, true, "expected review-decision example to load");
   assert.equal(loaded.document.decision, "approve");
   assert.equal(loaded.document.delivery_gate.status, "pass");
+  assert.deepEqual(loaded.document.repair_context, {
+    source_phase: "none",
+    cycle_iteration: 0,
+    unresolved_findings: [],
+    meaningful_changed_paths: [],
+	    verification_status: "pass",
+	    verification_refs: [],
+	    previous_repair_decision_refs: [],
+	    context_fingerprint: "none",
+	    new_context_since_previous: [],
+	    stop_reason: "none",
+	    requested_next_step: "none",
+	  });
 
   const invalid = structuredClone(loaded.document);
   invalid.decision = "proceed";
@@ -460,6 +515,93 @@ test("review decision example preserves explicit approval vocabulary", () => {
   assert.ok(
     validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "decision"),
     "expected invalid review decision value to be rejected",
+  );
+
+  const missingRepairContext = structuredClone(loaded.document);
+  delete missingRepairContext.repair_context;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-decision",
+      document: missingRepairContext,
+      source: "test://review-decision-missing-repair-context",
+    }),
+    "required_field_missing",
+    "repair_context",
+  );
+
+  const invalidRepair = structuredClone(loaded.document);
+  invalidRepair.decision = "request-repair";
+  invalidRepair.repair_context = {
+    source_phase: "none",
+    cycle_iteration: 0,
+    unresolved_findings: [],
+    meaningful_changed_paths: [],
+    verification_status: "not_pass",
+    verification_refs: [],
+    previous_repair_decision_refs: [],
+    context_fingerprint: "",
+    new_context_since_previous: [],
+    stop_reason: "",
+    requested_next_step: "none",
+  };
+  const invalidRepairValidation = validateContractDocument({
+    family: "review-decision",
+    document: invalidRepair,
+    source: "test://review-decision-invalid-repair-context",
+  });
+  assert.equal(invalidRepairValidation.ok, false);
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "repair_context.source_phase",
+    ),
+    "expected request-repair decisions to require a supported repair source phase",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.unresolved_findings",
+    ),
+    "expected request-repair decisions to preserve unresolved findings",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.context_fingerprint",
+    ),
+    "expected request-repair decisions to preserve a context fingerprint",
+  );
+
+  const validRepair = structuredClone(loaded.document);
+  validRepair.decision = "request-repair";
+  validRepair.repair_context = {
+    source_phase: "qa",
+    cycle_iteration: 2,
+    unresolved_findings: ["QA evaluation found a regression that requires another implementation iteration."],
+    meaningful_changed_paths: ["src/client.py", "tests/test_client.py"],
+    verification_status: "fail",
+    verification_refs: [loaded.document.review_report_ref],
+    previous_repair_decision_refs: [],
+    context_fingerprint: "sha256:valid-qa-repair-context",
+    new_context_since_previous: ["first-repair-decision"],
+    stop_reason: "QA failed after a passing review.",
+    requested_next_step: "execution",
+  };
+  const validRepairValidation = validateContractDocument({
+    family: "review-decision",
+    document: validRepair,
+    source: "test://review-decision-valid-qa-repair-context",
+  });
+  assert.equal(validRepairValidation.ok, true, JSON.stringify(validRepairValidation.issues, null, 2));
+
+  const repeatedRepair = structuredClone(validRepair);
+  repeatedRepair.repair_context.previous_repair_decision_refs = ["evidence://reports/review-decision-1.json"];
+  repeatedRepair.repair_context.new_context_since_previous = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-decision",
+      document: repeatedRepair,
+      source: "test://review-decision-repeated-repair-without-new-context",
+    }),
+    "required_field_missing",
+    "repair_context.new_context_since_previous",
   );
 });
 
@@ -1331,8 +1473,8 @@ test("live E2E run-health report separates run failures from outcome quality", (
   reviewLoopExhaustedCandidate.failure_summary = {
     owner: "provider",
     phase: "review",
-    class: "implementation_repair_loop_exhausted",
-    summary: "Implementation repair loop exhausted before review passed.",
+    class: "review_repair_loop_exhausted",
+    summary: "Implementation quality cycle exhausted before review passed.",
   };
 
   const reviewLoopExhaustedValidation = validateContractDocument({
@@ -1577,6 +1719,266 @@ test("live E2E quality assessment report enforces dimensions and evidence gaps",
   );
 });
 
+test("live E2E step quality assessment report enforces accepted step shape", () => {
+  const requestSource = path.join(workspaceRoot, "examples/reports/live-e2e-step-quality-assessment-request.sample.yaml");
+  const loadedRequest = loadContractFile({ filePath: requestSource, family: "live-e2e-step-quality-assessment-request" });
+  assert.equal(loadedRequest.ok, true, "expected live-e2e-step-quality-assessment-request sample to load");
+
+  const productRequestWithFlowHealth = structuredClone(loadedRequest.document);
+  productRequestWithFlowHealth.requested_assessment_method = "flow-health-automatic";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-request",
+      document: productRequestWithFlowHealth,
+      source: "test://step-quality-request-flow-health-product",
+    }),
+    "enum_value_invalid",
+    "requested_assessment_method",
+  );
+
+  const requestMissingBoundaryFile = structuredClone(loadedRequest.document);
+  delete requestMissingBoundaryFile.source_operator_decision_file;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-request",
+      document: requestMissingBoundaryFile,
+      source: "test://step-quality-request-missing-operator-decision",
+    }),
+    "required_field_missing",
+    "source_operator_decision_file",
+  );
+
+  const qaRequestMissingContext = structuredClone(loadedRequest.document);
+  qaRequestMissingContext.step_id = "qa";
+  qaRequestMissingContext.step_name = "qa";
+  qaRequestMissingContext.rubric.required_dimensions = [
+    ...qaRequestMissingContext.rubric.required_dimensions,
+    "verification_relevance",
+    "regression_signal_quality",
+    "mission_relevance",
+    "repair_necessity",
+  ];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-request",
+      document: qaRequestMissingContext,
+      source: "test://step-quality-qa-request-missing-quality-cycle-context",
+    }),
+    "required_field_missing",
+    "quality_cycle_context",
+  );
+
+  const source = path.join(workspaceRoot, "examples/reports/live-e2e-step-quality-assessment-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-step-quality-assessment-report" });
+  assert.equal(loaded.ok, true, "expected live-e2e-step-quality-assessment-report sample to load");
+
+  const acceptedWithRepairDecision = structuredClone(loaded.document);
+  acceptedWithRepairDecision.decision = "request-repair";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: acceptedWithRepairDecision,
+      source: "test://step-quality-accepted-repair",
+    }),
+    "enum_value_invalid",
+    "decision",
+  );
+
+  const acceptedWeakDimension = structuredClone(loaded.document);
+  acceptedWeakDimension.dimensions.traceability.evidence_strength = "weak";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: acceptedWeakDimension,
+      source: "test://step-quality-accepted-weak",
+    }),
+    "enum_value_invalid",
+    "dimensions.traceability",
+  );
+
+  const missingEvaluatorResponsibility = structuredClone(loaded.document);
+  delete missingEvaluatorResponsibility.evaluator.responsibility;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingEvaluatorResponsibility,
+      source: "test://step-quality-missing-evaluator-responsibility",
+    }),
+    "required_field_missing",
+    "evaluator.responsibility",
+  );
+
+  const missingAssessmentRequest = structuredClone(loaded.document);
+  delete missingAssessmentRequest.source_assessment_request_file;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingAssessmentRequest,
+      source: "test://step-quality-missing-assessment-request",
+    }),
+    "required_field_missing",
+    "source_assessment_request_file",
+  );
+
+  const autoAcceptedProduct = structuredClone(loaded.document);
+  autoAcceptedProduct.assessment_method = "flow-health-automatic";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: autoAcceptedProduct,
+      source: "test://step-quality-product-auto-method",
+    }),
+    "enum_value_invalid",
+    "assessment_method",
+  );
+
+  const missingEvidence = structuredClone(loaded.document);
+  missingEvidence.evidence_refs = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingEvidence,
+      source: "test://step-quality-empty-evidence",
+    }),
+    "required_field_missing",
+    "evidence_refs",
+  );
+
+  const invalidFinding = structuredClone(loaded.document);
+  invalidFinding.dimensions.traceability.findings = [{ finding_id: "not-a-string" }];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: invalidFinding,
+      source: "test://step-quality-invalid-finding",
+    }),
+    "field_type_mismatch",
+    "dimensions.traceability.findings[0]",
+  );
+
+  const missingDimensionRationale = structuredClone(loaded.document);
+  missingDimensionRationale.dimensions.traceability.findings = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: missingDimensionRationale,
+      source: "test://step-quality-missing-dimension-rationale",
+    }),
+    "required_field_missing",
+    "dimensions.traceability.findings",
+  );
+
+  const superficialAcceptedReport = structuredClone(loaded.document);
+  superficialAcceptedReport.findings = ["ok"];
+  superficialAcceptedReport.dimensions.traceability.summary = "ok";
+  superficialAcceptedReport.dimensions.traceability.findings = ["ok"];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: superficialAcceptedReport,
+      source: "test://step-quality-superficial-accepted-product-report",
+    }),
+    "field_type_mismatch",
+    "findings[0]",
+  );
+
+  const executionMissingProductDimension = structuredClone(loaded.document);
+  executionMissingProductDimension.step_id = "execution";
+  executionMissingProductDimension.step_name = "execution";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: executionMissingProductDimension,
+      source: "test://step-quality-execution-missing-product-dimension",
+    }),
+    "required_field_missing",
+    "dimensions.mission_relevance",
+  );
+
+  const qaAcceptedReport = structuredClone(loaded.document);
+  qaAcceptedReport.step_id = "qa";
+  qaAcceptedReport.step_name = "qa";
+  qaAcceptedReport.dimensions.verification_relevance = {
+    status: "pass",
+    evidence_strength: "strong",
+    summary: "QA verification evidence covers the final reviewed implementation behavior.",
+    inspected_evidence_refs: ["runtime://reports/evaluation-report-live-e2e.sample.run.json"],
+    findings: ["QA verification relevance is backed by evaluation and diagnostic verification evidence."],
+  };
+  qaAcceptedReport.dimensions.regression_signal_quality = {
+    status: "pass",
+    evidence_strength: "strong",
+    summary: "QA evidence includes a regression signal tied to the mission acceptance behavior.",
+    inspected_evidence_refs: ["runtime://reports/evaluation-report-live-e2e.sample.run.json"],
+    findings: ["QA regression signal quality is backed by public evaluation and verification artifacts."],
+  };
+  qaAcceptedReport.dimensions.mission_relevance = {
+    status: "pass",
+    evidence_strength: "medium",
+    summary: "QA evidence is relevant to the catalog mission and the final changed paths.",
+    inspected_evidence_refs: ["runtime://reports/review-report-live-e2e.sample.run.json"],
+    findings: ["QA mission relevance is supported by review, changed-path, and verification evidence."],
+  };
+  qaAcceptedReport.dimensions.repair_necessity = {
+    status: "pass",
+    evidence_strength: "medium",
+    summary: "QA evidence supports continuing to delivery without another public repair iteration.",
+    inspected_evidence_refs: ["runtime://reports/live-e2e-step-observation-live-e2e.sample.run-qa.json"],
+    findings: ["QA repair necessity was assessed before delivery from public step evidence."],
+  };
+  const qaAcceptedValidation = validateContractDocument({
+    family: "live-e2e-step-quality-assessment-report",
+    document: qaAcceptedReport,
+    source: "test://step-quality-qa-accepted-report",
+  });
+  assert.equal(qaAcceptedValidation.ok, true, JSON.stringify(qaAcceptedValidation.issues, null, 2));
+
+  const qaMissingRegressionSignal = structuredClone(qaAcceptedReport);
+  delete qaMissingRegressionSignal.dimensions.regression_signal_quality;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: qaMissingRegressionSignal,
+      source: "test://step-quality-qa-missing-regression-signal",
+    }),
+    "required_field_missing",
+    "dimensions.regression_signal_quality",
+  );
+
+  const requestRepairMissingLineage = structuredClone(loaded.document);
+  requestRepairMissingLineage.status = "request_repair";
+  requestRepairMissingLineage.decision = "request-repair";
+  requestRepairMissingLineage.repair_instructions = [
+    "Run repair only through the public AOR review/repair loop.",
+  ];
+  delete requestRepairMissingLineage.repair_lineage;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: requestRepairMissingLineage,
+      source: "test://step-quality-request-repair-missing-lineage",
+    }),
+    "required_field_missing",
+    "repair_lineage.source_assessment_request_file",
+  );
+
+  const smallFlowHealth = structuredClone(loaded.document);
+  smallFlowHealth.feature_size = "small";
+  smallFlowHealth.mission_class = "flow-regression";
+  smallFlowHealth.assessment_method = "flow-health-automatic";
+  smallFlowHealth.findings = [];
+  smallFlowHealth.evaluator_input_refs = [];
+  for (const dimension of Object.values(smallFlowHealth.dimensions)) {
+    dimension.findings = [];
+  }
+  const smallFlowHealthValidation = validateContractDocument({
+    family: "live-e2e-step-quality-assessment-report",
+    document: smallFlowHealth,
+    source: "test://step-quality-small-flow-health",
+  });
+  assert.equal(smallFlowHealthValidation.ok, true, JSON.stringify(smallFlowHealthValidation.issues, null, 2));
+});
+
 test("W23 nested canonical contract examples load through the shared contract path", () => {
   const examples = [
     [path.join(workspaceRoot, "examples/packets/artifact-packet.canonical.yaml"), "artifact-packet"],
@@ -1684,6 +2086,17 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     }),
     "field_type_mismatch",
     "findings[0].evidence_refs",
+  );
+  const missingVerificationCoverageReport = structuredClone(reviewReport.document);
+  delete missingVerificationCoverageReport.artifact_quality.verification_coverage;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: missingVerificationCoverageReport,
+      source: "test://w50-review-report-missing-verification-coverage",
+    }),
+    "required_field_missing",
+    "artifact_quality.verification_coverage",
   );
   const invalidReviewTraceability = structuredClone(reviewReport.document);
   invalidReviewTraceability.feature_traceability.required_path_prefixes = ["source/", 42];

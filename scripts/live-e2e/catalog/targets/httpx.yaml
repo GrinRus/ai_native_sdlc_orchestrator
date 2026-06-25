@@ -28,26 +28,22 @@ provider_comparison_pairs: []
 feature_missions:
   - mission_id: httpx-timeout-transport-regression
     title: Preserve timeout and transport regression behavior
-    brief: Add or repair one bounded sync/async timeout or transport edge case
-      with focused pytest coverage and static quality evidence.
+    brief: Add or repair one bounded sync/async timeout or transport edge case with focused pytest
+      coverage and static quality evidence.
     feature_size: medium
     goals:
-      - Preserve one timeout or transport behavior across the HTTPX client
-        boundary.
+      - Preserve one timeout or transport behavior across the HTTPX client boundary.
       - Keep the targeted pytest, Ruff, and mypy evidence green.
     kpis:
       - kpi_id: httpx-timeout-transport-green
         name: HTTPX timeout transport gate
-        target: targeted timeout pytest plus Ruff and mypy checks pass after the
-          change
+        target: targeted timeout pytest plus Ruff and mypy checks pass after the change
         measurement: post-run primary verification
     definition_of_done:
-      - Focused pytest coverage demonstrates the fixed timeout or transport edge
-        case.
-      - Sync and async behavior are considered when the touched surface supports
-        both.
+      - Focused pytest coverage demonstrates the fixed timeout or transport edge case.
+      - Sync and async behavior are considered when the touched surface supports both.
       - Review and delivery evidence remain anchored to the target checkout.
-    expected_evidence: &evidence
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -73,12 +69,68 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 10
-      max_added_lines: 380
-    size_rationale: Medium HTTPX work may cross client behavior, transport
-      tests, and typing checks but should stay inside one network semantics
-      surface.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium HTTPX work may cross client behavior, transport tests, and typing checks but
+      should stay inside one network semantics surface.
     change_budget:
-      max_changed_files: 10
-      max_added_lines: 380
-    quality_evidence: *evidence
+      max_changed_files: 32
+      max_added_lines: 2200
+    quality_evidence: *a1
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Add or repair one bounded sync/async timeout or transport edge case with focused
+        pytest coverage and static quality evidence.
+      desired_outcome: Focused pytest coverage demonstrates the fixed timeout or transport edge case. Sync
+        and async behavior are considered when the touched surface supports both. Review and
+        delivery evidence remain anchored to the target checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change inside HTTPX runtime/tests and local tooling surfaces
+        - preserve targeted pytest, Ruff, and mypy evidence
+        - avoid real external network dependencies in the regression
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: ./scripts/sync-version"
+        - "Primary verification command: .aor/live-e2e-venv/bin/python -m pytest
+          tests/test_timeouts.py"
+        - "Primary verification command: .aor/live-e2e-venv/bin/ruff check httpx tests"
+        - "Primary verification command: .aor/live-e2e-venv/bin/mypy httpx tests"
+        - "Diagnostic evidence command: .aor/live-e2e-venv/bin/python -m pytest tests"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

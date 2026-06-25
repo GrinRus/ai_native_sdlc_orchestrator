@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { loadContractFile } from "../../packages/contracts/src/index.mjs";
 import {
   discoverHostProjectId,
+  createProofRunnerEnvironment,
+  createSessionRoots,
   ensureRuntimeLayout,
   loadCatalogTarget,
   loadProofRunnerProfile,
@@ -28,9 +30,15 @@ import { applyProductionProofEvidence } from "../live-e2e/lib/production-proof.m
 import {
   archivedNextActionReportForMission,
   buildTargetPreExecutionStatusReport,
+  collectGuidedBrowserTaskProof,
+  collectReviewChangedPaths,
+  collectRuntimeHarnessChangedPaths,
   evaluateBaselineVerifyGate,
+  evaluateTargetToolchainPreflight,
   nextActionReportClosesFlow,
+  nodeVersionSatisfiesRequiredRange,
   prepareAorInstallationProof,
+  reconcileSummaryMeaningfulChangedPaths,
   runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
@@ -40,6 +48,11 @@ import {
   buildGuidedJourneyProof,
   validateGuidedJourneyProof,
 } from "../live-e2e/lib/guided-proof.mjs";
+import {
+  hasPendingIncludedControllerStep,
+  preparePendingOperatorDecision,
+  shouldAwaitFirstControllerObservation,
+} from "../live-e2e/step-evaluator.mjs";
 import { writeProofRunnerArtifacts } from "../live-e2e/run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -121,6 +134,108 @@ const aorOperatorAccessibilityCheckIds = Object.freeze([
   "accessible_error_feedback",
 ]);
 
+test("proof runner TMPDIR stays short for socket-sensitive target verification", () => {
+  withTempRoot((tempRoot) => {
+    const sessionsRoot = path.join(tempRoot, "projects", "aor-core", "sessions");
+    const runId = "w47-control-fastify-repair-medium-20260624-4b263c3e73b4";
+    const sessionRoots = createSessionRoots({ sessionsRoot, runId });
+    const { env } = createProofRunnerEnvironment({
+      sessionRoots,
+      runnerAuthMode: "isolated",
+    });
+
+    assert.equal(env.TMPDIR, sessionRoots.tmpRoot);
+    assert.equal(sessionRoots.tmpRoot.startsWith(sessionRoots.sessionRoot), false);
+    assert.ok(sessionRoots.tmpRoot.length < 80, `expected short TMPDIR, got ${sessionRoots.tmpRoot}`);
+    assert.equal(fs.existsSync(sessionRoots.tmpRoot), true);
+  });
+});
+
+test("step evaluator keeps resuming when an included current step is still pending", () => {
+  const pendingDeliveryState = {
+    current_step: "delivery",
+    included_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+    completed_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa"],
+  };
+  assert.equal(
+    hasPendingIncludedControllerStep(pendingDeliveryState),
+    true,
+  );
+  assert.equal(shouldAwaitFirstControllerObservation({ step_journal: [] }, pendingDeliveryState), true);
+  assert.equal(shouldAwaitFirstControllerObservation({ step_journal: [{ step_id: "delivery" }] }, pendingDeliveryState), false);
+  assert.equal(
+    hasPendingIncludedControllerStep({
+      current_step: "delivery",
+      included_steps: ["discovery", "qa", "delivery"],
+      completed_steps: ["discovery", "qa", "delivery"],
+    }),
+    false,
+  );
+  assert.equal(
+    hasPendingIncludedControllerStep({
+      current_step: "learning",
+      included_steps: ["discovery", "qa", "delivery"],
+      completed_steps: ["discovery", "qa", "delivery"],
+    }),
+    false,
+  );
+  assert.equal(
+    shouldAwaitFirstControllerObservation(
+      { step_journal: [] },
+      {
+        current_step: "learning",
+        included_steps: ["discovery", "qa", "delivery"],
+        completed_steps: ["discovery", "qa", "delivery"],
+      },
+    ),
+    false,
+  );
+});
+
+test("step evaluator writes a public block decision for deterministic non-pass evidence", () => {
+  withTempRoot((tempRoot) => {
+    const requestFile = path.join(tempRoot, "live-e2e-agent-decision-request-run-09-execution.json");
+    const decisionFile = path.join(tempRoot, "live-e2e-operator-decision-run-09-execution.json");
+    writeJsonFixture(requestFile, {
+      request_id: "run.execution.operator-decision-request",
+      step_id: "execution",
+      step_instance_id: "execution",
+      iteration: 1,
+      deterministic_analysis: { status: "not_pass" },
+      expected_response_shape: {
+        action: "continue|block|diagnose",
+        inspected_evidence_refs: [],
+        evidence_refs: [],
+      },
+      operator_context: {
+        operator_ref: "skill://live-e2e-runner",
+      },
+      operator_decision_expected_ref: decisionFile,
+    });
+
+    const result = preparePendingOperatorDecision({
+      step_journal: [
+        {
+          sequence: 9,
+          step_id: "execution",
+          step_instance_id: "execution",
+          agent_decision_request_ref: requestFile,
+          operator_decision_status: "missing",
+          deterministic_analysis: { status: "not_pass" },
+        },
+      ],
+    });
+
+    assert.equal(result.status, "prepared");
+    assert.equal(result.action, "block");
+    assert.equal(fs.existsSync(decisionFile), true);
+    const decision = JSON.parse(fs.readFileSync(decisionFile, "utf8"));
+    assert.equal(decision.action, "block");
+    assert.equal(decision.semantic_analysis.status, "blocked");
+    assert.match(decision.reason, /deterministic status 'not_pass'/u);
+  });
+});
+
 function buildAccessibilityChecks(evidenceRef) {
   return aorOperatorAccessibilityCheckIds.map((checkId) => ({
     check_id: checkId,
@@ -168,6 +283,10 @@ function writeGuidedProofFixture(tempRoot) {
     status: "pass",
     accessibility_summary_file: files.webAccessibility,
     visual_guardrail_file: files.webVisual,
+    keyboard_focus_sequence: [
+      { index: 1, role: "button", label: "New Flow", selector: "button.new-flow-button" },
+      { index: 2, role: "button", label: "Ask AOR", selector: "button.topbar-ask-button" },
+    ],
     accessibility_checks: buildAccessibilityChecks(files.webAccessibility),
     task_outcome: {
       status: "pass",
@@ -321,6 +440,49 @@ test("Runtime Harness real-code evidence must match mission-relevant changed pat
       ],
     });
     assert.equal(runtimeHarnessReportHasMissionRelevantChanges(reportPath, mission), true);
+  });
+});
+
+test("summary changed-path collection uses meaningful paths without diagnostic fallbacks", () => {
+  withTempRoot((tempRoot) => {
+    const runtimeHarnessReport = writeJsonFixture(path.join(tempRoot, "runtime-harness-report.json"), {
+      step_decisions: [
+        {
+          mission_semantics: {
+            meaningful_changed_paths: ["source/utils/merge.ts"],
+            non_bootstrap_changed_paths: ["source/utils/merge.ts", "test"],
+          },
+        },
+      ],
+    });
+    const reviewReport = writeJsonFixture(path.join(tempRoot, "review-report.json"), {
+      code_quality: {
+        changed_paths: ["source/utils/merge.ts"],
+        changed_path_diagnostics: {
+          meaningful_changed_paths: ["source/utils/merge.ts"],
+          non_input_changed_paths: ["source/utils/merge.ts", "test"],
+        },
+      },
+    });
+
+    assert.deepEqual(collectRuntimeHarnessChangedPaths(runtimeHarnessReport), ["source/utils/merge.ts"]);
+    assert.deepEqual(collectReviewChangedPaths(reviewReport), ["source/utils/merge.ts"]);
+  });
+});
+
+test("summary changed-path reconciliation drops diagnostic paths using canonical target evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(path.join(targetRoot, "source"), { recursive: true });
+    const gitInit = spawnSync("git", ["init"], { cwd: targetRoot, encoding: "utf8" });
+    assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
+    fs.writeFileSync(path.join(targetRoot, "source/utils.py"), "print('target change')\n", "utf8");
+    fs.writeFileSync(path.join(targetRoot, "test"), "# TLS secrets log file, generated by OpenSSL / Python\n", "utf8");
+
+    assert.deepEqual(
+      reconcileSummaryMeaningfulChangedPaths(["source/utils.py", "test"], { targetCheckoutRoot: targetRoot }),
+      ["source/utils.py"],
+    );
   });
 });
 
@@ -768,6 +930,19 @@ test("HTTPie medium catalog mission declares bounded machine-readable path and w
   );
 });
 
+test("W46 canary targets keep required coverage small-only", () => {
+  const catalogRoot = resolveCatalogRoot({ hostRoot: repoRoot, catalogRootOverride: null });
+  for (const targetCatalogId of ["ky", "commander-js", "pluggy"]) {
+    const target = loadCatalogTarget({ catalogRoot, targetCatalogId });
+    const requiredCells = target.entry.required_matrix_cells.filter((entry) => entry.coverage_tier === "required");
+    assert.ok(requiredCells.length > 0, `${targetCatalogId} should retain a small required canary cell`);
+    assert.ok(
+      requiredCells.every((entry) => entry.feature_size === "small"),
+      `${targetCatalogId} required coverage must be small-only`,
+    );
+  }
+});
+
 test("generated live E2E profile allows selected guided provider adapters", () => {
   withTempRoot((tempRoot) => {
     const cases = [
@@ -857,6 +1032,7 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
       family: "project-profile",
     });
     assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
     assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
@@ -953,6 +1129,7 @@ test("generated ky large Anthropic profile uses bounded governance verification"
       family: "project-profile",
     });
     assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
     assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
@@ -967,6 +1144,68 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     ]);
     assert.equal(loaded.document.repos[0].test_commands.includes("npm test"), false);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+  });
+});
+
+test("generated Vitest large profile isolates verification and checks hard-target setup before execution", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "assets");
+    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+    const result = materializeGeneratedProjectProfile({
+      hostRoot: repoRoot,
+      profilePath: loadedProfile.profilePath,
+      profile: resolved.resolvedProfile,
+      catalogEntry: resolved.catalogEntry,
+      mission: resolved.mission,
+      providerVariant: resolved.providerVariant,
+      runId: "vitest-large-hard-target-readiness",
+      targetCheckout: {
+        targetRepoId: "vitest",
+        targetRepoRef: "main",
+      },
+      generatedAssetsRoot,
+    });
+
+    const loaded = loadContractFile({
+      filePath: result.generatedProjectProfileFile,
+      family: "project-profile",
+    });
+
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
+    assert.equal(loaded.document.target_toolchain.node.required_range, "^22.12.0 || ^24.0.0 || >=26.0.0");
+    assert.equal(loaded.document.target_toolchain.node.env_override, "AOR_LIVE_E2E_TARGET_NODE_BIN");
+    assert.equal(
+      loaded.document.repos[0].lint_commands.some((command) =>
+        command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.document.repos[0].lint_commands.some((command) =>
+        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm build"),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.document.repos[0].test_commands.some((command) =>
+        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm test"),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.document.repos[0].test_commands.some((command) =>
+        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm lint"),
+      ),
+      true,
+    );
   });
 });
 
@@ -1012,6 +1251,36 @@ test("target pre-execution status separates target setup, target verification, a
     assert.equal(setupReport.target_setup_status.timed_out, true);
     assert.equal(setupReport.target_verification_status.status, "blocked");
 
+    const nodeStepFile = writeJsonFixture(path.join(tempRoot, "node-step.json"), {
+      status: "failed",
+      command:
+        "node -e \"console.error('Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got ' + process.version); process.exit(1)\"",
+      summary: "Verification command failed: missing prerequisite(s) detected.",
+      stderr: "Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got v25.9.0",
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "node-transcript.json"))],
+      command_timeout_ms: 120000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+    const nodeReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 120000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary-node.json") },
+      stepResultFiles: [nodeStepFile],
+      setupCommands: [
+        "node -e \"console.error('Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got ' + process.version); process.exit(1)\"",
+      ],
+      verificationCommands: ["pnpm test"],
+      baselineGateDecision: { status: "fail", decision: "block", summary: "node-preflight-failed" },
+      runResult: {
+        durationSec: 1,
+        timeoutMs: 300000,
+        transcriptFile: path.join(tempRoot, "project-verify-node.json"),
+      },
+    });
+    assert.equal(nodeReport.failure_owner, "environment");
+    assert.equal(nodeReport.failure_phase, "target_setup");
+    assert.equal(nodeReport.failure_class, "environment_node_version_unsupported");
+
     const verificationReport = buildTargetPreExecutionStatusReport({
       verifySummary: { status: "failed", command_timeout_ms: 120000 },
       verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
@@ -1046,6 +1315,43 @@ test("target pre-execution status separates target setup, target verification, a
     assert.equal(aorReport.failure_owner, "aor");
     assert.equal(aorReport.failure_phase, "target_verification");
     assert.equal(aorReport.failure_class, "aor_failure");
+  });
+});
+
+test("target toolchain preflight blocks incompatible Node before target commands", () => {
+  withTempRoot((tempRoot) => {
+    assert.equal(nodeVersionSatisfiesRequiredRange("22.12.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);
+    assert.equal(nodeVersionSatisfiesRequiredRange("24.1.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);
+    assert.equal(nodeVersionSatisfiesRequiredRange("25.9.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), false);
+    assert.equal(nodeVersionSatisfiesRequiredRange("26.0.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);
+
+    const fakeNode = path.join(tempRoot, "fake-node");
+    fs.writeFileSync(fakeNode, "#!/bin/sh\necho 25.9.0\n", "utf8");
+    fs.chmodSync(fakeNode, 0o755);
+    const result = evaluateTargetToolchainPreflight({
+      profile: {
+        target_toolchain: {
+          node: {
+            required_range: "^22.12.0 || ^24.0.0 || >=26.0.0",
+            env_override: "AOR_LIVE_E2E_TARGET_NODE_BIN",
+          },
+        },
+      },
+      env: {
+        ...process.env,
+        AOR_LIVE_E2E_TARGET_NODE_BIN: fakeNode,
+      },
+      reportsRoot: tempRoot,
+      runId: "toolchain-preflight-node-block",
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.report.failure_owner, "environment");
+    assert.equal(result.report.failure_phase, "target_setup");
+    assert.equal(result.report.failure_class, "environment_node_version_unsupported");
+    assert.equal(result.report.selected_binary, fakeNode);
+    assert.equal(result.report.observed_version, "25.9.0");
+    assert.equal(fs.existsSync(result.reportFile), true);
   });
 });
 
@@ -1706,6 +2012,18 @@ test("live E2E generated project profile wiring preserves provider variants in e
   assert.match(flowsSource, /--policy-overrides/u);
 });
 
+test("live E2E post-run verification reruns target setup commands inside isolated clones", () => {
+  const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
+  assert.match(
+    flowsSource,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,/u,
+  );
+  assert.match(
+    flowsSource,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,/u,
+  );
+});
+
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
   withTempRoot((tempRoot) => {
     const { proof, targetCheckoutRoot } = writeGuidedProofFixture(tempRoot);
@@ -2035,6 +2353,10 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
         `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
       ),
       screenshot_files: [screenshotFile],
+      keyboard_focus_sequence: [
+        { index: 1, role: "button", label: "New Flow", selector: "button.new-flow-button" },
+        { index: 2, role: "button", label: "Ask AOR", selector: "button.topbar-ask-button" },
+      ],
       accessibility_checks: buildAccessibilityChecks(screenshotFile),
       task_outcome: {
         status: "pass",
@@ -2051,6 +2373,8 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(hydratedObservation.frontend_interactions[0].task_outcome.status, "pass");
     assert.equal(hydratedObservation.frontend_interactions[0].browser_task_proof_ref, browserTaskProofFile);
     assert.deepEqual(hydratedObservation.frontend_interactions[0].screenshot_refs, [screenshotFile]);
+    assert.equal(hydratedObservation.frontend_interactions[0].keyboard_focus_sequence.length, 2);
+    assert.equal(hydratedWebSmoke.keyboard_focus_sequence.length, 2);
     assert.deepEqual(
       hydratedObservation.frontend_interactions[0].accessibility_checks.map((entry) => entry.check_id),
       aorOperatorAccessibilityCheckIds,
@@ -2166,6 +2490,104 @@ test("guided browser-task proof request points at a live app surface, not the sh
     } catch {
       // Test cleanup only.
     }
+  });
+});
+
+test("guided browser-task collector materializes proof through configured Python runtime", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const fakePython = path.join(tempRoot, "fake-python.cjs");
+    fs.writeFileSync(
+      fakePython,
+      [
+        "#!/usr/bin/env node",
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "if (process.argv[2] === '-c') process.exit(0);",
+        "const payload = JSON.parse(process.argv[3]);",
+        "const evidenceRefs = [",
+        "  payload.browser_task_proof_file,",
+        "  payload.rendered_html_file,",
+        "  payload.dom_snapshot_file,",
+        "  payload.accessibility_summary_file,",
+        "  payload.visual_guardrail_file,",
+        "  payload.screenshot_file,",
+        "];",
+        "for (const file of evidenceRefs) fs.mkdirSync(path.dirname(file), { recursive: true });",
+        "fs.writeFileSync(payload.rendered_html_file, '<main><button>New Flow</button><button>Ask AOR</button></main>\\n');",
+        "fs.writeFileSync(payload.dom_snapshot_file, JSON.stringify({ status: 'pass' }, null, 2) + '\\n');",
+        "fs.writeFileSync(payload.accessibility_summary_file, JSON.stringify({ status: 'pass' }, null, 2) + '\\n');",
+        "fs.writeFileSync(payload.visual_guardrail_file, JSON.stringify({ status: 'pass' }, null, 2) + '\\n');",
+        "fs.writeFileSync(payload.screenshot_file, 'png');",
+        "const checks = [",
+        "  'keyboard_navigation',",
+        "  'focus_order',",
+        "  'contrast_and_readability',",
+        "  'semantic_structure',",
+        "  'screen_reader_labels',",
+        "  'accessible_error_feedback',",
+        "].map((check_id) => ({ check_id, status: 'pass', evidence_refs: evidenceRefs, findings: [] }));",
+        "const proof = {",
+        "  status: 'pass',",
+        "  proof_source: 'fake-python-guided-browser-task-collector',",
+        "  env_playwright_browsers_path: process.env.PLAYWRIGHT_BROWSERS_PATH || null,",
+        "  browser_task_proof_request_file: payload.browser_task_proof_request_file,",
+        "  rendered_html_file: payload.rendered_html_file,",
+        "  dom_snapshot_file: payload.dom_snapshot_file,",
+        "  accessibility_summary_file: payload.accessibility_summary_file,",
+        "  visual_guardrail_file: payload.visual_guardrail_file,",
+        "  screenshot_files: [payload.screenshot_file],",
+        "  keyboard_focus_sequence: [",
+        "    { index: 1, role: 'button', label: 'New Flow', selector: 'button.new-flow-button' },",
+        "    { index: 2, role: 'button', label: 'Ask AOR', selector: 'button.topbar-ask-button' },",
+        "  ],",
+        "  accessibility_checks: checks,",
+        "  task_outcome: { status: 'pass', checked_tasks: ['browser-task evidence capture'], findings: [] },",
+        "};",
+        "fs.writeFileSync(payload.browser_task_proof_file, JSON.stringify(proof, null, 2) + '\\n');",
+        "console.log(JSON.stringify({ status: 'pass', proof_file: payload.browser_task_proof_file }));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.chmodSync(fakePython, 0o755);
+
+    const runId = "guided-collector";
+    const result = collectGuidedBrowserTaskProof({
+      enabled: true,
+      runId,
+      reportsRoot,
+      env: {
+        ...process.env,
+        AOR_LIVE_E2E_BROWSER_PROOF_PYTHON_BIN: fakePython,
+        PLAYWRIGHT_BROWSERS_PATH: path.join(tempRoot, "target-cache", "ms-playwright"),
+      },
+      appUrl: "http://127.0.0.1:61002/",
+      browserTaskProofRequestFile: path.join(
+        reportsRoot,
+        `installed-user-guided-browser-task-proof-request-${runId}.json`,
+      ),
+      browserTaskProofFile: path.join(reportsRoot, `installed-user-guided-browser-task-proof-${runId}.json`),
+      outputHtml: path.join(reportsRoot, `installed-user-guided-web-smoke-${runId}.html`),
+      domSnapshotFile: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${runId}.json`),
+      accessibilitySummaryFile: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-accessibility-${runId}.json`,
+      ),
+      visualSnapshotFile: path.join(reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${runId}.json`),
+    });
+
+    assert.equal(result.status, "pass");
+    assert.equal(fs.existsSync(result.proof_file), true);
+    assert.equal(fs.existsSync(result.screenshot_file), true);
+    const proof = JSON.parse(fs.readFileSync(result.proof_file, "utf8"));
+    assert.equal(proof.task_outcome.status, "pass");
+    assert.equal(proof.env_playwright_browsers_path, null);
+    assert.deepEqual(
+      proof.accessibility_checks.map((entry) => entry.check_id),
+      aorOperatorAccessibilityCheckIds,
+    );
   });
 });
 
@@ -2512,6 +2934,53 @@ test("xlarge catalog profiles resolve as manual-only matrix cells", () => {
   assert.equal(resolved.resolvedProfile.run_tier, "full-journey-observation");
 });
 
+test("full-journey resolver rejects profiles without explicit catalog matrix cell", () => {
+  const loaded = loadProofRunnerProfile({
+    hostRoot: repoRoot,
+    profileRef: "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml",
+  });
+  const profile = structuredClone(loaded.profile);
+  profile.provider_variant_id = "anthropic-primary";
+
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /must match an explicit required_matrix_cells or manual_matrix_cells entry/u,
+  );
+});
+
+test("medium product-change profiles must declare the full implementation quality cycle", () => {
+  const loaded = loadProofRunnerProfile({
+    hostRoot: repoRoot,
+    profileRef: "scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml",
+  });
+  const profile = structuredClone(loaded.profile);
+  profile.implementation_loop.cycle_steps = ["execution", "review"];
+
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /implementation_loop\.cycle_steps must include qa/u,
+  );
+
+  const missingRepairSources = structuredClone(loaded.profile);
+  missingRepairSources.implementation_loop.repair_sources = ["review"];
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile: missingRepairSources,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /implementation_loop\.repair_sources must include qa, post-run-primary, post-run-diagnostic/u,
+  );
+});
+
 test("run-profile rejects xlarge profiles outside manual controller mode", () => {
   const result = spawnSync(
     process.execPath,
@@ -2631,16 +3100,33 @@ test("source install proof force-refreshes dependencies and smokes intake CLI", 
   assert.match(flowsSource, /\["aor", "intake", "create", "--help"\]/u);
 });
 
-test("full journey review warnings request repair instead of passing into QA approval", () => {
+test("full journey requests repair only for actionable review or QA findings before delivery approval", () => {
   const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
 
-  assert.match(flowsSource, /const reviewNeedsRepair = reviewOverallStatus !== "pass"/u);
+  assert.match(flowsSource, /const reviewNeedsRepair = reviewRequiresActionableRepair\(reviewReport, reviewOverallStatus\)/u);
+  assert.match(flowsSource, /const reviewHasNonRepairWarnings = reviewOverallStatus === "warn" && !reviewNeedsRepair/u);
   assert.match(flowsSource, /reviewNeedsRepair[\s\S]*reviewRepairActions\.has\("request-repair"\)/u);
-  assert.match(flowsSource, /const terminalReviewFailure = !canRepair && \(reviewNeedsRepair \|\| artifacts\.post_run_verify_status === "fail"\)/u);
-  assert.match(flowsSource, /implementation_repair_loop_exhausted/u);
-  assert.match(flowsSource, /canRepair \? "warn" : terminalReviewFailure \? "fail" : "pass"/u);
-  assert.match(flowsSource, /reviewOverallStatus !== "pass" \|\| artifacts\.post_run_verify_status === "fail"/u);
-});
+  assert.match(flowsSource, /reviewHasOnlyVerificationMappingFindings/u);
+  assert.match(flowsSource, /verification_mapping_gap/u);
+  assert.match(flowsSource, /acceptable_residual_risk_not_recognized/u);
+  assert.match(flowsSource, /provider_did_not_address_finding/u);
+  assert.match(flowsSource, /const qaNeedsRepair = qaEvaluationStatus === "fail"/u);
+  assert.match(flowsSource, /const diagnosticNeedsRepair = qaDiagnosticStatus === "fail"/u);
+  assert.match(flowsSource, /terminalCycleFailure = !canRepair && \(qaNeedsRepair \|\| diagnosticNeedsRepair\)/u);
+  assert.match(flowsSource, /qa_repair_loop_exhausted/u);
+  assert.match(flowsSource, /review_repair_loop_exhausted/u);
+  assert.match(flowsSource, /--repair-context-file/u);
+  assert.match(flowsSource, /source_phase: repairSource \?\? "review"/u);
+  assert.match(flowsSource, /qaOverallStatus === "fail"/u);
+	  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
+	  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
+	  assert.match(flowsSource, /previous_repair_decision_files: previousRepairDecisionRefs/u);
+	  assert.match(flowsSource, /repair_context_fingerprint: pendingRepairContextFingerprint/u);
+	  assert.match(flowsSource, /new_context_since_previous: newRepairContextSignals/u);
+	  assert.match(flowsSource, /repeated_repair_context_without_new_evidence/u);
+	  assert.match(flowsSource, /Unresolved findings:/u);
+	  assert.match(flowsSource, /Runtime Harness decision:/u);
+	});
 
 test("proof runner writes run-health reports for blocked live E2E reports", () => {
   withTempRoot((tempRoot) => {
@@ -2820,7 +3306,7 @@ test("proof runner writes run-health reports for blocked live E2E reports", () =
   });
 });
 
-test("proof runner preserves exhausted implementation repair loop as review run-health failure", () => {
+test("proof runner preserves exhausted review repair loop as review run-health failure", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
     const runtimeRoot = path.join(tempRoot, "runtime");
@@ -3001,7 +3487,7 @@ test("proof runner preserves exhausted implementation repair loop as review run-
           feature_size: "small",
           failure_owner: "provider",
           failure_phase: "review",
-          failure_class: "implementation_repair_loop_exhausted",
+          failure_class: "review_repair_loop_exhausted",
         },
       },
       aorLaunch: {
@@ -3014,10 +3500,10 @@ test("proof runner preserves exhausted implementation repair loop as review run-
     assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
     assert.equal(written.summary.failure_owner, "provider");
     assert.equal(written.summary.failure_phase, "review");
-    assert.equal(written.summary.failure_class, "implementation_repair_loop_exhausted");
+    assert.equal(written.summary.failure_class, "review_repair_loop_exhausted");
     assert.equal(written.runHealthReport.failure_summary.owner, "provider");
     assert.equal(written.runHealthReport.failure_summary.phase, "review");
-    assert.equal(written.runHealthReport.failure_summary.class, "implementation_repair_loop_exhausted");
+    assert.equal(written.runHealthReport.failure_summary.class, "review_repair_loop_exhausted");
   });
 });
 
@@ -3214,7 +3700,7 @@ test("proof runner keeps partial controller observations in progress when pendin
           pending_decision: {
             action: "continue",
             reason: "Skill-agent accepted public evidence and required inspection refs.",
-            next_step: null,
+            next_step: "delivery",
           },
         },
         null,
@@ -3265,6 +3751,18 @@ test("proof runner keeps partial controller observations in progress when pendin
           host_runtime_root: runtimeRoot,
           host_reports_root: reportsRoot,
           live_e2e_controller_state_file: terminalControllerState,
+          live_e2e_controller_stop: {
+            reason: "Stale controller stop from an earlier resume before delivery completed.",
+            state: {
+              current_step: "delivery",
+              completed_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa"],
+            },
+            decision: {
+              action: "continue",
+              reason: "Earlier QA continue decision.",
+              next_step: "delivery",
+            },
+          },
           live_e2e_step_journal_entries: terminalEntries,
           aor_installation: {
             status: "pass",
@@ -4102,6 +4600,16 @@ test("proof runner run-health prioritizes post-run target verification failure o
         final_step_verdict: executionStep ? "blocked" : "pass",
       };
     });
+    writeJsonFixture(files["controller-state.json"], {
+      current_step: "execution",
+      included_steps: deliverySteps,
+      completed_steps: ["discovery", "spec", "planning", "handoff", "execution"],
+      pending_decision: {
+        action: "block",
+        reason: "Post-run target verification failed.",
+        next_step: "review",
+      },
+    });
 
     const written = writeProofRunnerArtifacts({
       hostRoot: repoRoot,
@@ -4916,7 +5424,12 @@ test("proof runner run-health uses hydrated delivery, verification, and diagnost
     assert.equal(written.summary.review_report_file, files["review-report.json"]);
     assert.equal(written.summary.post_run_verify_status, "pass");
     assert.equal(written.summary.real_code_change_status, "pass");
-    assert.deepEqual(written.summary.meaningful_changed_paths, ["source/httpie/core.py", "tests/test_core.py"]);
+    assert.deepEqual(written.summary.meaningful_changed_paths, [
+      "source/httpie/core.py",
+      "tests/test_core.py",
+      "httpie/manager/tasks/plugins.py",
+      "tests/test_httpie_cli.py",
+    ]);
     assert.equal(written.runHealthReport.overall_status, "warn");
     assert.equal(written.runHealthReport.diagnostic_health.status, "warn");
     assert.equal(written.runHealthReport.diagnostic_health.timed_out_command_count, 1);

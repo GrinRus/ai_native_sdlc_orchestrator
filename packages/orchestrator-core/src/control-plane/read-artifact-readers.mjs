@@ -36,7 +36,7 @@ const ARTIFACT_BODY_REGEX = /^.+\.artifact\..+\.body\.json$/;
 const ONBOARDING_REPORT_REGEX = /^onboarding-report\.json$/;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
-const LIVE_E2E_ARTIFACT_REGEX = /^live-e2e-(agent-decision-request|operator-decision|step-observation|observation-report|run-summary|run-health-report|quality-assessment-request|quality-assessment-report|controller-state|baseline-verify).*\.json$/;
+const LIVE_E2E_ARTIFACT_REGEX = /^live-e2e-(agent-decision-request|operator-decision|step-observation|step-quality-assessment-request|step-quality-assessment-report|observation-report|run-summary|run-health-report|quality-assessment-request|quality-assessment-report|controller-state|baseline-verify).*\.json$/;
 const LIVE_E2E_COMMAND_TRACE_DIR_REGEX = /^live-e2e-command-traces-/;
 
 /**
@@ -432,6 +432,24 @@ function liveE2eSummaryParts(filePath, document) {
       status: "ready",
       label: "Live E2E quality assessment request",
       description: "Post-run request for the launching SWE agent to assess outcome quality separately from run health.",
+    };
+  }
+  if (/live-e2e-step-quality-assessment-request-/u.test(basename)) {
+    return {
+      type: "live-e2e-report",
+      stage: asString(document.step_name) ?? asString(document.step_id) ?? "execution",
+      status: "awaiting-assessment",
+      label: "Live E2E step quality assessment request",
+      description: "Per-step request for an external skill-agent evaluator to assess public live E2E evidence before continuation.",
+    };
+  }
+  if (/live-e2e-step-quality-assessment-report-/u.test(basename)) {
+    return {
+      type: "live-e2e-report",
+      stage: asString(document.step_name) ?? asString(document.step_id) ?? "execution",
+      status: asString(document.status) ?? "ready",
+      label: "Live E2E step quality assessment report",
+      description: asString(document.summary) ?? "Per-step black-box evaluator assessment based on public live E2E artifacts and operator decision evidence.",
     };
   }
   if (/live-e2e-quality-assessment-report-/u.test(basename)) {

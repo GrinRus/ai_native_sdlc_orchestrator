@@ -6,8 +6,8 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import {
+  collectMissionChangeEvidence,
   isTransientBackupPath,
-  listChangedPaths,
   matchesScopePattern,
 } from "./shared/mission-scope.mjs";
 
@@ -78,6 +78,15 @@ function isTestSourcePath(candidate) {
 function isBroadTestCommand(command) {
   const normalized = command.trim();
   if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+run\s+test:[^\s]+(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:python3?|uv\s+run\s+python)\s+-m\s+pytest(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:uv\s+run\s+)?pytest(?:\s|$)/u.test(normalized)) {
     return true;
   }
   if (/(?:^|\s)(?:npx\s+)?ava(?:\s|$)/u.test(normalized) && !/(?:^|\s)(?:test|tests|spec|__tests__)\/[^\s]+/u.test(normalized)) {
@@ -159,44 +168,89 @@ function testCommandCoversChangedPackage(command, packageContext) {
  * @param {string} command
  * @param {string} changedPath
  * @param {string} projectRoot
- * @returns {boolean}
+ * @returns {string | null}
  */
-function testCommandCoversChangedPath(command, changedPath, projectRoot) {
+function describeTestCommandCoverage(command, changedPath, projectRoot) {
   if (isBroadTestCommand(command)) {
-    return true;
+    return "broad-repo-test-command";
   }
   const normalizedCommand = command.replace(/\\/g, "/");
   const normalizedPath = changedPath.replace(/\\/g, "/");
-  return (
-    normalizedCommand.includes(normalizedPath) ||
-    normalizedCommand.includes(`./${normalizedPath}`) ||
-    normalizedCommand.includes(path.posix.basename(normalizedPath)) ||
-    testCommandCoversChangedPackage(command, findNearestPackageContext(projectRoot, changedPath))
-  );
+  if (normalizedCommand.includes(normalizedPath) || normalizedCommand.includes(`./${normalizedPath}`)) {
+    return "explicit-test-path";
+  }
+  if (normalizedCommand.includes(path.posix.basename(normalizedPath))) {
+    return "explicit-test-file-name";
+  }
+  if (testCommandCoversChangedPackage(command, findNearestPackageContext(projectRoot, changedPath))) {
+    return "workspace-or-package-scoped-test-command";
+  }
+  return null;
 }
 
 /**
  * @param {Record<string, unknown> | null} verifySummary
  * @param {string[]} changedPaths
  * @param {string} projectRoot
- * @returns {{ changedTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[] }}
+ * @returns {{ changedTestPaths: string[], coveredTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[], coveringCommands: string[], coverageReason: string }}
  */
 function findChangedTestVerificationGaps(verifySummary, changedPaths, projectRoot) {
   const changedTestPaths = changedPaths.filter((candidate) => isTestSourcePath(candidate));
   const commandOverrides = asRecord(asRecord(verifySummary).command_overrides);
   const testCommands = asStringArray(commandOverrides.test_commands);
   if (changedTestPaths.length === 0) {
-    return { changedTestPaths, uncoveredTestPaths: [], testCommands };
+    return {
+      changedTestPaths,
+      coveredTestPaths: [],
+      uncoveredTestPaths: [],
+      testCommands,
+      coveringCommands: [],
+      coverageReason: "no-changed-test-paths",
+    };
   }
   if (testCommands.length === 0) {
-    return { changedTestPaths, uncoveredTestPaths: changedTestPaths, testCommands };
+    return {
+      changedTestPaths,
+      coveredTestPaths: [],
+      uncoveredTestPaths: changedTestPaths,
+      testCommands,
+      coveringCommands: [],
+      coverageReason: "no-primary-test-commands-recorded",
+    };
+  }
+  /** @type {string[]} */
+  const coveredTestPaths = [];
+  /** @type {string[]} */
+  const uncoveredTestPaths = [];
+  /** @type {string[]} */
+  const coveringCommands = [];
+  /** @type {string[]} */
+  const coverageReasons = [];
+  for (const changedPath of changedTestPaths) {
+    const covering = testCommands
+      .map((command) => ({
+        command,
+        reason: describeTestCommandCoverage(command, changedPath, projectRoot),
+      }))
+      .find((candidate) => candidate.reason !== null);
+    if (covering) {
+      coveredTestPaths.push(changedPath);
+      coveringCommands.push(covering.command);
+      coverageReasons.push(/** @type {string} */ (covering.reason));
+    } else {
+      uncoveredTestPaths.push(changedPath);
+    }
   }
   return {
     changedTestPaths,
-    uncoveredTestPaths: changedTestPaths.filter(
-      (changedPath) => !testCommands.some((command) => testCommandCoversChangedPath(command, changedPath, projectRoot)),
-    ),
+    coveredTestPaths,
+    uncoveredTestPaths,
     testCommands,
+    coveringCommands: uniqueStrings(coveringCommands),
+    coverageReason:
+      uncoveredTestPaths.length > 0
+        ? "some-changed-test-paths-not-covered"
+        : uniqueStrings(coverageReasons).join(",") || "covered",
   };
 }
 
@@ -537,10 +591,14 @@ function isChangedPathInsideApprovedScope(changedPath, allowedPaths) {
  *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId: string,
+ *   executionRoot?: string | null,
  * }} options
  */
 export function materializeReviewReport(options) {
   const init = initializeProjectRuntime(options);
+  const evidenceRoot = asString(options.executionRoot)
+    ? path.resolve(init.projectRoot, /** @type {string} */ (options.executionRoot))
+    : init.projectRoot;
   const packetArtifacts = loadPacketArtifacts(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const stepResults = loadStepResults(init.projectRoot, init.runtimeLayout.reportsRoot);
   const analysisReport = loadOptionalQualityArtifact(
@@ -754,7 +812,8 @@ export function materializeReviewReport(options) {
   if (deliveryManifest) {
     const repoDeliveries = Array.isArray(deliveryManifest.document.repo_deliveries) ? deliveryManifest.document.repo_deliveries : [];
     const firstRepoDelivery = asRecord(repoDeliveries[0]);
-    if (asString(firstRepoDelivery.repo_root) && asString(firstRepoDelivery.repo_root) !== init.projectRoot) {
+    const deliveryRepoRoot = asString(firstRepoDelivery.repo_root);
+    if (deliveryRepoRoot && path.resolve(deliveryRepoRoot) !== path.resolve(evidenceRoot)) {
       pushFinding({
         findings: artifactFindings,
         severity: "fail",
@@ -776,27 +835,28 @@ export function materializeReviewReport(options) {
 
   /** @type {Array<Record<string, unknown>>} */
   const codeFindings = [];
-  const bootstrapOwnedPrefixes = ["examples/", "context/", ".aor/"];
-  const bootstrapOwnedFiles = new Set(["project.aor.yaml"]);
-  const ignoredInputFiles = new Set();
-  const requestFile = asString(featureRequest.request_file);
-  if (requestFile) {
-    const resolvedRequestFile = path.isAbsolute(requestFile)
-      ? requestFile
-      : path.resolve(init.projectRoot, requestFile);
-    const relativeRequestFile = path.relative(init.projectRoot, resolvedRequestFile).replace(/\\/g, "/");
-    if (!relativeRequestFile.startsWith("../") && relativeRequestFile !== "") {
-      ignoredInputFiles.add(relativeRequestFile);
-    }
-  }
-  const rawChangedPaths = listChangedPaths(init.projectRoot).changedPaths;
-  const codeChangedPaths = rawChangedPaths.filter((candidate) => {
-    if (ignoredInputFiles.has(candidate)) return false;
-    if (bootstrapOwnedFiles.has(candidate)) return false;
-    return !bootstrapOwnedPrefixes.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
+  const changeEvidence = collectMissionChangeEvidence({
+    projectRoot: init.projectRoot,
+    artifactsRoot: init.runtimeLayout.artifactsRoot,
+    evidenceRoot,
   });
-  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths, init.projectRoot);
+  const ignoredInputFiles = new Set(changeEvidence.ignoredInputFiles);
+  const transientChangedPaths = changeEvidence.nonBootstrapChangedPaths.filter(
+    (changedPath) => !ignoredInputFiles.has(changedPath) && isTransientBackupPath(changedPath),
+  );
+  const rawChangedPaths = changeEvidence.changedPaths;
+  const codeChangedPaths = changeEvidence.meaningfulChangedPaths;
+  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths, evidenceRoot);
   const approvedHandoffAllowedPaths = resolveApprovedHandoffAllowedPaths(latestHandoffPacket?.document);
+  if (!changeEvidence.gitStatusAvailable) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "fail",
+      category: "code-quality",
+      summary: `Git status was unavailable for review evidence root '${changeEvidence.gitStatusRoot}'.`,
+      evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
+    });
+  }
   if (changedTestVerification.uncoveredTestPaths.length > 0) {
     const commandSummary =
       changedTestVerification.testCommands.length > 0
@@ -833,15 +893,15 @@ export function materializeReviewReport(options) {
       evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
     });
   }
+  for (const changedPath of transientChangedPaths) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "warn",
+      category: "code-quality",
+      summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
+    });
+  }
   for (const changedPath of codeChangedPaths) {
-    if (isTransientBackupPath(changedPath)) {
-      pushFinding({
-        findings: codeFindings,
-        severity: "warn",
-        category: "code-quality",
-        summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
-      });
-    }
     if (
       changedPath.startsWith("docs/backlog/") ||
       changedPath.startsWith(".agents/") ||
@@ -855,13 +915,13 @@ export function materializeReviewReport(options) {
       });
     }
   }
-  for (const weakening of detectTestWeakening(init.projectRoot, codeChangedPaths)) {
+  for (const weakening of detectTestWeakening(evidenceRoot, codeChangedPaths)) {
     pushFinding({
       findings: codeFindings,
       severity: "warn",
       category: "code-quality",
       summary: weakening.summary,
-      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(init.projectRoot, weakening.path))],
+      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(evidenceRoot, weakening.path))],
     });
   }
 
@@ -871,14 +931,14 @@ export function materializeReviewReport(options) {
     Object.keys(asRecord(requestDocument.size_budget)).length > 0
       ? asRecord(requestDocument.size_budget)
       : asRecord(requestDocument.change_budget);
-  const diffBudget = summarizeDiffBudget(init.projectRoot, codeChangedPaths);
+  const diffBudget = summarizeDiffBudget(evidenceRoot, codeChangedPaths);
   const maxChangedFiles =
     typeof declaredSizeBudget.max_changed_files === "number" ? declaredSizeBudget.max_changed_files : null;
   const maxAddedLines =
     typeof declaredSizeBudget.max_added_lines === "number" ? declaredSizeBudget.max_added_lines : null;
   const maxTouchedLines =
     typeof declaredSizeBudget.max_touched_lines === "number" ? declaredSizeBudget.max_touched_lines : null;
-  if (featureSize && !["small", "medium", "large", "xlarge", "xl"].includes(featureSize)) {
+  if (featureSize && !["small", "medium", "large", "xlarge"].includes(featureSize)) {
     pushFinding({
       findings: featureSizeFindings,
       severity: "warn",
@@ -1026,11 +1086,30 @@ export function materializeReviewReport(options) {
       execution_step_result_refs: executionStepResults.map((artifact) => artifact.artifact_ref),
       delivery_manifest_ref: deliveryManifest?.artifact_ref ?? null,
       release_packet_ref: releasePacket?.artifact_ref ?? null,
+      verification_coverage: {
+        changed_test_paths: changedTestVerification.changedTestPaths,
+        covered_test_paths: changedTestVerification.coveredTestPaths,
+        uncovered_test_paths: changedTestVerification.uncoveredTestPaths,
+        covering_commands: changedTestVerification.coveringCommands,
+        recorded_test_commands: changedTestVerification.testCommands,
+        coverage_reason: changedTestVerification.coverageReason,
+      },
       findings: artifactFindings,
     },
     code_quality: {
       status: summarizeFindings(codeFindings),
       changed_paths: codeChangedPaths,
+      target_checkout_root: evidenceRoot,
+      git_status_available: changeEvidence.gitStatusAvailable,
+      changed_path_diagnostics: {
+        git_status_root: changeEvidence.gitStatusRoot,
+        raw_changed_paths: rawChangedPaths,
+        non_bootstrap_changed_paths: changeEvidence.nonBootstrapChangedPaths,
+        non_input_changed_paths: changeEvidence.nonInputChangedPaths,
+        meaningful_changed_paths: changeEvidence.meaningfulChangedPaths,
+        runner_owned_state_paths: changeEvidence.runnerOwnedStatePaths,
+        ignored_input_files: changeEvidence.ignoredInputFiles,
+      },
       findings: codeFindings,
     },
     feature_size_fit: {

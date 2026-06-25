@@ -20,18 +20,30 @@ required_matrix_cells:
     feature_mission_id: ky-header-regression
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: ky.regress.small.anthropic
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: ky-header-regression
+    provider_variant_id: anthropic-primary
+    coverage_tier: extended
+  - cell_id: ky.regress.medium.openai
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: ky-fetch-options-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
   - cell_id: ky.regress.medium.anthropic
     scenario_family: regress
     feature_size: medium
     feature_mission_id: ky-fetch-options-regression
     provider_variant_id: anthropic-primary
-    coverage_tier: required
+    coverage_tier: extended
   - cell_id: ky.release.medium.openai
     scenario_family: release
     feature_size: medium
     feature_mission_id: ky-release-doc-typing
     provider_variant_id: openai-primary
-    coverage_tier: required
+    coverage_tier: extended
   - cell_id: ky.regress.small.open-code
     scenario_family: regress
     feature_size: small
@@ -106,12 +118,11 @@ manual_matrix_cells:
 feature_missions:
   - mission_id: ky-header-regression
     title: Preserve narrow header-normalization regression coverage
-    brief: Add or adjust one bounded regression test around header handling and the
-      smallest source fix needed to satisfy it.
+    brief: Add or adjust one bounded regression test around header handling and the smallest source fix
+      needed to satisfy it.
     feature_size: small
     goals:
-      - Preserve one focused header-normalization behavior with a source or test
-        change.
+      - Preserve one focused header-normalization behavior with a source or test change.
     kpis:
       - kpi_id: ky-header-regression-green
         name: Header regression gate
@@ -149,23 +160,72 @@ feature_missions:
       - open-code-primary
       - qwen-primary
     size_budget:
-      max_changed_files: 6
-      max_added_lines: 220
-    size_rationale: One narrow library regression should stay inside one behavior
-      surface and one test seam.
+      max_changed_files: 16
+      max_added_lines: 900
+    size_rationale: One narrow library regression should stay inside one behavior surface and one test seam.
     change_budget:
-      max_changed_files: 6
-      max_added_lines: 220
+      max_changed_files: 16
+      max_added_lines: 900
     quality_evidence: *a1
+    mission_class: flow-regression
+    agent_visible_request:
+      user_problem: Add or adjust one bounded regression test around header handling and the smallest
+        source fix needed to satisfy it.
+      desired_outcome: The header regression gate, lint, and build commands pass. Review evidence links
+        the changed paths to the catalog mission.
+      constraints:
+        - Use this mission only as a live E2E canary that proves the public flow still works.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep changes inside source and test folders only
+        - preserve Playwright setup and npm test as full-suite diagnostic evidence
+        - pass the mission-scoped headers regression gate
+      non_goals:
+        - Do not expand this small canary into a product-quality acceptance mission.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: flow-health
+      step_quality_required: false
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted public step decision refs for the canary flow.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - "Primary verification command: npx xo"
+        - "Primary verification command: npm run build"
+        - "Primary verification command: npx ava test/headers.ts"
+        - "Diagnostic evidence command: npx playwright install"
+        - "Diagnostic evidence command: npm test"
+        - Meaningful changed path under source/
+        - Meaningful changed path under test/
+    final_code_rubric:
+      quality_gate: flow-health
+      required_changed_surfaces:
+        - source/
+        - test/
+      acceptance_dimensions:
+        - flow_completion
+        - public_artifact_materialization
+        - canary_verification
   - mission_id: ky-fetch-options-regression
     title: Extend one bounded fetch-options regression across source and typings
-    brief: Adjust one multi-file options-handling or retry-surface regression with
-      matching tests and the smallest typing touch needed to keep the public API
-      coherent.
+    brief: Adjust one multi-file options-handling or retry-surface regression with matching tests and
+      the smallest typing touch needed to keep the public API coherent.
     feature_size: medium
     goals:
-      - Repair one bounded fetch-options or retry-surface regression across
-        source, tests, and type surface.
+      - Repair one bounded fetch-options or retry-surface regression across source, tests, and type
+        surface.
     kpis:
       - kpi_id: ky-fetch-options-bounded-green
         name: Bounded fetch-options gate
@@ -173,8 +233,8 @@ feature_missions:
         measurement: post-run primary verification
     definition_of_done:
       - The change stays inside source, tests, and public type surface.
-      - Bounded primary verification passes and Playwright-backed full npm test
-        is recorded as diagnostic evidence.
+      - Bounded primary verification passes and Playwright-backed full npm test is recorded as
+        diagnostic evidence.
     expected_evidence: &a2
       - verify-summary
       - routed-step-result
@@ -193,7 +253,7 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
-        - "npx ava test/retry.ts --match='*shouldRetry*'"
+        - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
         - npm test
@@ -207,37 +267,93 @@ feature_missions:
       - open-code-primary
       - qwen-primary
     size_budget:
-      max_changed_files: 8
-      max_added_lines: 300
-    size_rationale: Medium ky missions may cross one behavior seam plus one type
-      boundary, but should remain bounded to one package.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium ky missions may cross one behavior seam plus one type boundary, but should
+      remain bounded to one package.
     change_budget:
-      max_changed_files: 8
-      max_added_lines: 300
+      max_changed_files: 32
+      max_added_lines: 2200
     quality_evidence: *a2
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Adjust one multi-file options-handling or retry-surface regression with matching tests
+        and the smallest typing touch needed to keep the public API coherent.
+      desired_outcome: The change stays inside source, tests, and public type surface. Bounded primary
+        verification passes and Playwright-backed full npm test is recorded as diagnostic evidence.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the fix inside source, tests, and type surface only
+        - preserve Playwright setup and npm test as full-suite diagnostic evidence
+        - keep delivery evidence anchored to the target checkout
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: npx xo"
+        - "Primary verification command: npm run build"
+        - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
+        - "Diagnostic evidence command: npx playwright install"
+        - "Diagnostic evidence command: npm test"
+        - Meaningful changed path under source/
+        - Meaningful changed path under test/
+        - Meaningful changed path under index.d.ts
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - source/
+        - test/
+        - index.d.ts
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: ky-release-doc-typing
     title: Prepare one release-shaped typed API adjustment
-    brief: Land one bounded API or typing fix with matching regression coverage and
-      release-ready lineage.
+    brief: Land one bounded API or typing fix with matching regression coverage and release-ready lineage.
     feature_size: medium
     goals:
-      - Land one release-shaped API or typing adjustment with matching
-        regression evidence.
-      - Preserve patch-only delivery and release lineage without upstream
-        write-back.
+      - Land one release-shaped API or typing adjustment with matching regression evidence.
+      - Preserve patch-only delivery and release lineage without upstream write-back.
     kpis:
       - kpi_id: ky-release-typing-lineage
         name: Release typing lineage
-        target: delivery-manifest, release-packet, and review-report are materialized
-          from the same target checkout
+        target: delivery-manifest, release-packet, and review-report are materialized from the same target
+          checkout
         measurement: live E2E summary and delivery artifacts
       - kpi_id: ky-release-bounded-quality
         name: Bounded release quality gate
         target: lint, build, and targeted AVA coverage pass after the change
         measurement: post-run primary verification
     definition_of_done:
-      - Bounded primary verification passes and full npm test is preserved as
-        diagnostic evidence.
+      - Bounded primary verification passes and full npm test is preserved as diagnostic evidence.
       - Delivery and release packet evidence are anchored to the target checkout.
       - No upstream write-back is attempted.
     expected_evidence: &a3
@@ -267,34 +383,89 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 8
-      max_added_lines: 260
-    size_rationale: Release-shaped ky work can span code, tests, and typings, but
-      should still stay within one bounded public API adjustment.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Release-shaped ky work can span code, tests, and typings, but should still stay
+      within one bounded public API adjustment.
     change_budget:
-      max_changed_files: 8
-      max_added_lines: 260
+      max_changed_files: 32
+      max_added_lines: 2200
     quality_evidence: *a3
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Land one bounded API or typing fix with matching regression coverage and release-ready
+        lineage.
+      desired_outcome: Bounded primary verification passes and full npm test is preserved as diagnostic
+        evidence. Delivery and release packet evidence are anchored to the target checkout. No
+        upstream write-back is attempted.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep release evidence anchored to the target checkout
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - delivery-manifest
+        - release-packet
+        - review-report
+        - "Primary verification command: npx xo"
+        - "Primary verification command: npm run build"
+        - "Primary verification command: npx ava test/hooks.ts"
+        - "Diagnostic evidence command: npx ava test/hooks.ts test/core.ts test/options.ts"
+        - Meaningful changed path under source/
+        - Meaningful changed path under test/
+        - Meaningful changed path under index.d.ts
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - source/
+        - test/
+        - index.d.ts
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: ky-retry-hooks-governance
     title: Exercise one broader retry and hooks governance-safe change
-    brief: Touch one broader request lifecycle surface with bounded regression
-      coverage, stricter audit expectations, and no control-plane leakage.
+    brief: Touch one broader request lifecycle surface with bounded regression coverage, stricter audit
+      expectations, and no control-plane leakage.
     feature_size: large
     goals:
-      - Exercise one broader retry or hooks lifecycle change with
-        governance-safe evidence.
+      - Exercise one broader retry or hooks lifecycle change with governance-safe evidence.
       - Keep audit, review, and learning closure linked to the target checkout.
     kpis:
       - kpi_id: ky-governance-lineage
         name: Governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix
-          cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
-      - Bounded primary verification passes and Playwright-backed diagnostic
-        full-suite output is recorded.
-      - Governance, audit, and learning evidence links back to the mission and
-        target checkout.
+      - Bounded primary verification passes and Playwright-backed diagnostic full-suite output is
+        recorded.
+      - Governance, audit, and learning evidence links back to the mission and target checkout.
     expected_evidence: &a4
       - verify-summary
       - routed-step-result
@@ -315,7 +486,7 @@ feature_missions:
         - npx xo
         - npm run build
         - npx ava test/main.ts test/hooks.ts
-        - "npx ava test/retry.ts --match='*shouldRetry*'"
+        - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
         - npm test
@@ -328,46 +499,105 @@ feature_missions:
       - anthropic-primary
       - open-code-primary
     size_budget:
-      max_changed_files: 12
-      max_added_lines: 460
-    size_rationale: Large ky missions can cross multiple request lifecycle seams,
-      but must still remain inside one repository package and explicit bounds.
+      max_changed_files: 64
+      max_added_lines: 4500
+    size_rationale: Large ky missions can cross multiple request lifecycle seams, but must still remain
+      inside one repository package and explicit bounds.
     change_budget:
-      max_changed_files: 12
-      max_added_lines: 460
+      max_changed_files: 64
+      max_added_lines: 4500
     quality_evidence: *a4
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Touch one broader request lifecycle surface with bounded regression coverage, stricter
+        audit expectations, and no control-plane leakage.
+      desired_outcome: Bounded primary verification passes and Playwright-backed diagnostic full-suite
+        output is recorded. Governance, audit, and learning evidence links back to the mission and
+        target checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - preserve repo-local request lifecycle boundaries
+        - keep governance and audit evidence linked to the target checkout
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - learning-loop-handoff
+        - "Primary verification command: npx xo"
+        - "Primary verification command: npm run build"
+        - "Primary verification command: npx ava test/main.ts test/hooks.ts"
+        - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
+        - "Diagnostic evidence command: npx playwright install"
+        - "Diagnostic evidence command: npm test"
+        - Meaningful changed path under source/
+        - Meaningful changed path under test/
+        - Meaningful changed path under index.d.ts
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - source/
+        - test/
+        - index.d.ts
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: ky-request-lifecycle-observability-xlarge
     title: Govern a request lifecycle observability extension
-    brief: Manually rehearse a broader request lifecycle change that extends retry,
-      hook, and type/documentation surfaces with audit-grade evidence and no
-      upstream write-back.
+    brief: Manually rehearse a broader request lifecycle change that extends retry, hook, and
+      type/documentation surfaces with audit-grade evidence and no upstream write-back.
     feature_size: xlarge
     execution_policy: manual-only
     goals:
-      - Extend request lifecycle observability across core retry behavior, hook
-        state, public types, and tests.
-      - Preserve backwards-compatible request lifecycle boundaries and avoid
-        provider/control-plane leakage into the target library.
-      - Keep audit, review, delivery, and learning closure linked to the target
-        checkout.
+      - Extend request lifecycle observability across core retry behavior, hook state, public types,
+        and tests.
+      - Preserve backwards-compatible request lifecycle boundaries and avoid provider/control-plane
+        leakage into the target library.
+      - Keep audit, review, delivery, and learning closure linked to the target checkout.
     kpis:
       - kpi_id: ky-xlarge-lifecycle-depth
         name: Request lifecycle depth
-        target: core source, hook/type surface, targeted AVA tests, and
-          documentation or type export evidence all trace to one lifecycle intent
+        target: core source, hook/type surface, targeted AVA tests, and documentation or type export
+          evidence all trace to one lifecycle intent
         measurement: target diff review plus post-run primary verification
       - kpi_id: ky-xlarge-governance-lineage
         name: Xlarge governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same
-          manual matrix cell
+        target: review, delivery, audit, and learning artifacts preserve the same manual matrix cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
-      - Bounded primary verification passes and Playwright-backed diagnostic
-        full-suite output is recorded.
-      - Runtime source, tests, public types, and docs or exported type evidence
-        are all present when the change affects public API behavior.
-      - Governance, audit, and learning evidence links back to the mission and
-        target checkout.
+      - Bounded primary verification passes and Playwright-backed diagnostic full-suite output is
+        recorded.
+      - Runtime source, tests, public types, and docs or exported type evidence are all present when
+        the change affects public API behavior.
+      - Governance, audit, and learning evidence links back to the mission and target checkout.
       - No upstream write-back is attempted.
     expected_evidence:
       - verify-summary
@@ -396,17 +626,75 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 18
-      max_added_lines: 900
-    size_rationale: Xlarge ky missions are manual-only because request lifecycle
-      API changes can require maintainer judgement over hook ordering, public type
-      compatibility, retry semantics, and release risk.
+      max_changed_files: 100
+      max_added_lines: 10000
+    size_rationale: Xlarge ky missions are manual-only because request lifecycle API changes can require
+      maintainer judgement over hook ordering, public type compatibility, retry semantics, and
+      release risk.
     change_budget:
-      max_changed_files: 18
-      max_added_lines: 900
+      max_changed_files: 100
+      max_added_lines: 10000
     quality_evidence:
       - verify-summary
       - routed-step-result
       - review-report
       - delivery-manifest
       - learning-loop-handoff
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Manually rehearse a broader request lifecycle change that extends retry, hook, and
+        type/documentation surfaces with audit-grade evidence and no upstream write-back.
+      desired_outcome: Bounded primary verification passes and Playwright-backed diagnostic full-suite
+        output is recorded. Runtime source, tests, public types, and docs or exported type evidence
+        are all present when the change affects public API behavior. Governance, audit, and learning
+        evidence links back to the mission and target checkout. No upstream write-back is attempted.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - preserve repo-local request lifecycle boundaries
+        - require source, tests, public type surface, and docs or export evidence
+        - keep governance and audit evidence linked to the target checkout
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - learning-loop-handoff
+        - "Primary verification command: npx xo"
+        - "Primary verification command: npm run build"
+        - "Primary verification command: npx ava test/main.ts test/hooks.ts"
+        - "Diagnostic evidence command: npx playwright install"
+        - "Diagnostic evidence command: npm test"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

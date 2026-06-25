@@ -216,6 +216,34 @@ graph TD
   W45S04[W45-S04 Web repair-cycle observability]
   W45S05[W45-S05 Repair-loop proof fixtures and live profile]
   W45S06[W45-S06 Documentation refresh and live E2E acceptance]
+  W46S01[W46-S01 Contract/docs breaking policy]
+  W46S02[W46-S02 Step evaluator report and runner behavior]
+  W46S03[W46-S03 Catalog budget and small-canary migration]
+  W46S04[W46-S04 Product-change mission rewrite for current targets]
+  W46S05[W46-S05 Hard target expansion]
+  W46S06[W46-S06 Proof-complete acceptance closure and findings intake]
+  W47S01[W47-S01 AOR operator keyboard accessibility and guided proof closure]
+  W47S02[W47-S02 Live E2E target verification isolation and Vitest readiness]
+  W47S03[W47-S03 AOR repair/review convergence hardening]
+  W47S04[W47-S04 Full proof rerun and product acceptance closure]
+  W48S01[W48-S01 Quality-cycle contract and profile policy]
+  W48S02[W48-S02 Quality-cycle runner and controller implementation]
+  W48S03[W48-S03 Structured repair context and convergence classification]
+  W48S04[W48-S04 Vitest target toolchain policy]
+  W48S05[W48-S05 Control quality-cycle proof rerun and product acceptance closure]
+  W49S01[W49-S01 Proof findings hygiene and evidence truthfulness]
+  W49S02[W49-S02 Repeated repair anti-loop enforcement]
+  W49S03[W49-S03 QA-specific step-quality evaluator hardening]
+  W49S04[W49-S04 Full Control live E2E rerun and product acceptance closure]
+  W50S01[W50-S01 Review verification mapping and residual-risk classification]
+  W50S02[W50-S02 Live E2E target toolchain fail-fast and setup-journal hygiene]
+  W50S03[W50-S03 Fastify/Vitest control rerun and product acceptance closure]
+  W50S04[W50-S04 Findings/backlog state sync]
+  W51S01[W51-S01 Clean-commit W50 proof rerun]
+  W51S02[W51-S02 Vitest compatible Node large acceptance]
+  W51S03[W51-S03 Automated final quality report hydration]
+  W51S04[W51-S04 Explicit target-readiness phase]
+  W51S05[W51-S05 Next hard-target expansion after large acceptance]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -539,6 +567,34 @@ graph TD
   W45S03 --> W45S05
   W45S04 --> W45S05
   W45S05 --> W45S06
+  W45S06 --> W46S01
+  W46S01 --> W46S02
+  W46S01 --> W46S03
+  W46S03 --> W46S04
+  W46S04 --> W46S05
+  W46S05 --> W46S06
+  W46S06 --> W47S01
+  W47S01 --> W47S02
+  W47S02 --> W47S03
+  W47S03 --> W47S04
+  W47S04 --> W48S01
+  W48S01 --> W48S02
+  W48S02 --> W48S03
+  W48S03 --> W48S04
+  W48S04 --> W48S05
+  W48S05 --> W49S01
+  W49S01 --> W49S02
+  W49S02 --> W49S03
+  W49S03 --> W49S04
+  W49S04 --> W50S01
+  W50S01 --> W50S02
+  W50S02 --> W50S03
+  W50S03 --> W50S04
+  W50S04 --> W51S01
+  W51S01 --> W51S02
+  W51S02 --> W51S03
+  W51S03 --> W51S04
+  W51S04 --> W51S05
 ```
 
 ## W0 hard dependencies
@@ -937,6 +993,58 @@ graph TD
 | W45-S05 | W45-S02, W45-S03, W45-S04 |
 | W45-S06 | W45-S05 |
 
+## W46 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W46-S01 | W45-S06 |
+| W46-S02 | W46-S01 |
+| W46-S03 | W46-S01 |
+| W46-S04 | W46-S03 |
+| W46-S05 | W46-S04 |
+| W46-S06 | W46-S05 |
+
+## W47 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W47-S01 | W46-S06 |
+| W47-S02 | W47-S01 |
+| W47-S03 | W47-S02 |
+| W47-S04 | W47-S03 |
+
+## W48 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W48-S01 | W47-S04 |
+| W48-S02 | W48-S01 |
+| W48-S03 | W48-S02 |
+| W48-S04 | W48-S03 |
+| W48-S05 | W48-S04 |
+
+## W49 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W49-S01 | W48-S05 |
+| W49-S02 | W49-S01 |
+| W49-S03 | W49-S02 |
+| W49-S04 | W49-S03 |
+
+## W50 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W50-S01 | W49-S04 |
+| W50-S02 | W50-S01 |
+| W50-S03 | W50-S02 |
+| W50-S04 | W50-S03 |
+
+## W51 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W51-S01 | W50-S04 |
+| W51-S02 | W51-S01 |
+| W51-S03 | W51-S02 |
+| W51-S04 | W51-S03 |
+| W51-S05 | W51-S04 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1150,6 +1258,34 @@ graph TD
 210. W45-S04
 211. W45-S05
 212. W45-S06
+213. W46-S01
+214. W46-S02
+215. W46-S03
+216. W46-S04
+217. W46-S05
+218. W46-S06
+219. W47-S01
+220. W47-S02
+221. W47-S03
+222. W47-S04
+223. W48-S01
+224. W48-S02
+225. W48-S03
+226. W48-S04
+227. W48-S05
+228. W49-S01
+229. W49-S02
+230. W49-S03
+231. W49-S04
+232. W50-S01
+233. W50-S02
+234. W50-S03
+235. W50-S04
+236. W51-S01
+237. W51-S02
+238. W51-S03
+239. W51-S04
+240. W51-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

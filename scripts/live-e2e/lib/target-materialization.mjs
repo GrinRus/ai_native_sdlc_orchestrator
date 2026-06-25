@@ -19,6 +19,7 @@ import {
 } from "./common.mjs";
 
 const DEFAULT_GENERATED_PROFILE_VERIFICATION_TIMEOUT_SEC = 1800;
+const PRODUCT_CHANGE_FEATURE_SIZES = new Set(["medium", "large", "xlarge"]);
 
 const LIVE_E2E_STEP_POLICY_CLASSES = Object.freeze({
   discovery: "artifact",
@@ -60,10 +61,14 @@ export function materializeFeatureRequestFile(options) {
   fs.mkdirSync(requestsRoot, { recursive: true });
   const missionId = asNonEmptyString(options.mission.mission_id) || "feature-mission";
   const filePath = path.join(requestsRoot, `feature-request-${normalizeId(options.runId)}-${normalizeId(missionId)}.json`);
+  const agentVisibleRequest = asRecord(options.mission.agent_visible_request);
   const requestDocument = {
     mission_id: missionId,
     title: asNonEmptyString(options.mission.title) || missionId,
-    brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
+    brief:
+      asNonEmptyString(agentVisibleRequest.user_problem) ||
+      asNonEmptyString(options.mission.brief) ||
+      "Catalog-backed full-journey feature request.",
     goals: asStringArray(options.mission.goals),
     kpis: Array.isArray(options.mission.kpis)
       ? options.mission.kpis.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
@@ -76,6 +81,10 @@ export function materializeFeatureRequestFile(options) {
     scenario_family: options.scenarioFamily,
     provider_variant_id: options.providerVariantId,
     feature_size: options.featureSize,
+    mission_class: asNonEmptyString(options.mission.mission_class) || null,
+    agent_visible_request: agentVisibleRequest,
+    evaluator_rubric: asRecord(options.mission.evaluator_rubric),
+    final_code_rubric: asRecord(options.mission.final_code_rubric),
     supported_scenarios: asStringArray(options.mission.supported_scenarios),
     recommended_provider_variants: asStringArray(options.mission.recommended_provider_variants),
     size_budget: asRecord(options.mission.size_budget),
@@ -256,6 +265,60 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
 }
 
 /**
+ * @param {string} command
+ * @returns {string}
+ */
+function wrapCommandWithTargetNodeEnv(command) {
+  return `[ -z "\${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; ${command}`;
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, verification: Record<string, unknown> }} options
+ * @returns {Record<string, unknown>}
+ */
+function applyTargetToolchainPolicy(options) {
+  const nodePolicy = asRecord(asRecord(options.profile.target_toolchain).node);
+  const requiredRange = asNonEmptyString(nodePolicy.required_range);
+  if (!requiredRange) return options.verification;
+  return {
+    ...options.verification,
+    target_toolchain: {
+      node: {
+        required_range: requiredRange,
+        env_override: asNonEmptyString(nodePolicy.env_override) || "AOR_LIVE_E2E_TARGET_NODE_BIN",
+      },
+    },
+    setup_commands: asStringArray(options.verification.setup_commands).map(wrapCommandWithTargetNodeEnv),
+    commands: asStringArray(options.verification.commands).map(wrapCommandWithTargetNodeEnv),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} mission
+ * @returns {boolean}
+ */
+function requiresIsolatedProductVerification(mission) {
+  return (
+    asNonEmptyString(mission.mission_class) === "product-change" &&
+    PRODUCT_CHANGE_FEATURE_SIZES.has(asNonEmptyString(mission.feature_size))
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} mission
+ * @returns {string}
+ */
+function resolveGeneratedWorkspaceMode(profile, mission) {
+  const runtime = asRecord(profile.runtime);
+  const explicitVerificationMode = asNonEmptyString(runtime.target_verification_workspace_mode);
+  if (explicitVerificationMode) return explicitVerificationMode;
+  const declaredMode = asNonEmptyString(runtime.mode);
+  if (declaredMode && declaredMode !== "ephemeral") return declaredMode;
+  return requiresIsolatedProductVerification(mission) ? "workspace-clone" : declaredMode || "ephemeral";
+}
+
+/**
  * @param {{
  *   catalogVerification: Record<string, unknown>,
  *   profileVerification: Record<string, unknown>,
@@ -369,19 +432,23 @@ export function materializeGeneratedProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  hydrateRepoVerificationCommands(
-    selectedRepo,
-    resolveGeneratedProfileVerification({
+  const generatedVerification = applyTargetToolchainPolicy({
+    profile: options.profile,
+    verification: resolveGeneratedProfileVerification({
       catalogVerification: asRecord(asRecord(options.catalogEntry).verification),
       profileVerification: asRecord(options.profile.verification),
       mission: asRecord(options.mission),
     }),
-  );
+  });
+  hydrateRepoVerificationCommands(selectedRepo, generatedVerification);
   generatedProjectProfile.repos = [selectedRepo];
+  if (asRecord(generatedVerification.target_toolchain).node) {
+    generatedProjectProfile.target_toolchain = generatedVerification.target_toolchain;
+  }
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";
-  runtimeDefaults.workspace_mode = asNonEmptyString(asRecord(options.profile.runtime).mode) || "ephemeral";
+  runtimeDefaults.workspace_mode = resolveGeneratedWorkspaceMode(options.profile, asRecord(options.mission));
   runtimeDefaults.verification_command_timeout_sec = resolveGeneratedProfileVerificationTimeoutSec(
     options.profile,
     runtimeDefaults,

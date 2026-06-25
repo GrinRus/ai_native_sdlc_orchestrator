@@ -36,10 +36,13 @@ import {
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
 import {
+  changedPathsHaveMissionRelevantChanges,
+  collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
   executeFullJourneyFlow,
   executeInstalledUserFlow,
   prepareAorInstallationProof,
+  reconcileSummaryMeaningfulChangedPaths,
   runtimeHarnessReportHasMissionRelevantChanges,
 } from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
@@ -96,6 +99,41 @@ function resolveHostSourceMetadata(hostRoot) {
     branch_name: gitOutputOrNull(hostRoot, ["branch", "--show-current"]),
   };
 }
+
+/**
+ * @param {unknown} error
+ * @returns {{ owner: string, phase: string, class: string }}
+ */
+function classifyEarlyFlowFailure(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/target checkout clone|git clone|unable to access|ssl_connect|could not resolve host|failed to connect|connection timed out/iu.test(message)) {
+    return {
+      owner: "environment",
+      phase: "target_checkout",
+      class: "target_checkout_unavailable",
+    };
+  }
+  if (/target checkout ref resolution|pathspec|remote branch|not found in upstream/iu.test(message)) {
+    return {
+      owner: "target_repository",
+      phase: "target_checkout",
+      class: "target_ref_unavailable",
+    };
+  }
+  if (/project init|project bootstrap|bootstrap profile|bootstrap asset/iu.test(message)) {
+    return {
+      owner: "aor",
+      phase: "project_bootstrap",
+      class: "project_bootstrap_failed",
+    };
+  }
+  return {
+    owner: "aor",
+    phase: "project_bootstrap",
+    class: "bootstrap_failed",
+  };
+}
+
 /**
  * @param {string} status
  * @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"}
@@ -177,9 +215,8 @@ function isLiveE2eControllerStateInProgress(controllerState, includedSteps) {
   const hasCurrentStep = Boolean(asNonEmptyString(state.current_step));
   const pendingDecision = asRecord(state.pending_decision);
   const pendingAction = asNonEmptyString(pendingDecision.action);
-  const pendingNextStep = asNonEmptyString(pendingDecision.next_step);
   const terminalPendingContinue =
-    pendingAction === "continue" && !pendingNextStep && !hasCurrentStep && allIncludedStepsCompleted;
+    pendingAction === "continue" && !hasCurrentStep && allIncludedStepsCompleted;
   const hasPendingDecision = Object.keys(pendingDecision).length > 0 && !terminalPendingContinue;
   return hasCurrentStep || hasPendingDecision || !allIncludedStepsCompleted;
 }
@@ -259,6 +296,12 @@ function writeExistingProofRunnerOutput(options) {
         aor_installation_proof_file: asNonEmptyString(summary.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: asNonEmptyString(summary.live_e2e_controller_state_file) || null,
         live_e2e_step_observation_files: asStringArray(summary.live_e2e_step_observation_files),
+        live_e2e_step_quality_assessment_request_files: asStringArray(
+          summary.live_e2e_step_quality_assessment_request_files,
+        ),
+        live_e2e_step_quality_assessment_report_files: asStringArray(
+          summary.live_e2e_step_quality_assessment_report_files,
+        ),
         live_e2e_scorecard_files: asStringArray(summary.scorecard_files),
         learning_loop_scorecard_file: asNonEmptyString(summary.learning_loop_scorecard_file) || null,
         learning_loop_handoff_file: asNonEmptyString(summary.learning_loop_handoff_file) || null,
@@ -434,17 +477,52 @@ function buildAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Array<{ index: number, role: string | null, label: string | null, selector: string | null, tag_name: string | null }>}
+ */
+function normalizeKeyboardFocusSequence(value) {
+  const entries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return entries
+    .map((entry, index) => ({
+      index: Number.isFinite(Number(entry.index)) ? Number(entry.index) : index + 1,
+      role: asNonEmptyString(entry.role) || null,
+      label: asNonEmptyString(entry.label) || asNonEmptyString(entry.accessible_name) || asNonEmptyString(entry.text) || null,
+      selector: asNonEmptyString(entry.selector) || null,
+      tag_name: asNonEmptyString(entry.tag_name) || asNonEmptyString(entry.tagName) || null,
+    }))
+    .filter((entry) => entry.role || entry.label || entry.selector || entry.tag_name);
+}
+
+/**
  * @param {Record<string, unknown>} proof
  * @returns {string[]}
  */
 function findAorOperatorAccessibilityCheckGaps(proof) {
   const checks = normalizeAorOperatorAccessibilityChecks(proof.accessibility_checks);
   const byId = new Map(checks.map((entry) => [entry.check_id, entry]));
-  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.flatMap((checkId) => {
+  const gaps = AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.flatMap((checkId) => {
     const entry = byId.get(checkId);
     if (!entry) return [`browser-task-proof.accessibility_checks.${checkId}`];
-    return entry.evidence_refs.length === 0 ? [`browser-task-proof.accessibility_checks.${checkId}.evidence_refs`] : [];
+    const checkGaps = [];
+    if (entry.evidence_refs.length === 0) {
+      checkGaps.push(`browser-task-proof.accessibility_checks.${checkId}.evidence_refs`);
+    }
+    if (entry.status !== "pass") {
+      checkGaps.push(`browser-task-proof.accessibility_checks.${checkId}.status`);
+    }
+    return checkGaps;
   });
+  const keyboardNavigation = asRecord(proof.keyboard_navigation);
+  const keyboardFocusSequence = normalizeKeyboardFocusSequence(
+    Array.isArray(proof.keyboard_focus_sequence) ? proof.keyboard_focus_sequence : keyboardNavigation.focus_sequence,
+  );
+  const distinctFocusTargets = new Set(
+    keyboardFocusSequence.map((entry) => entry.selector || entry.label || `${entry.role ?? ""}:${entry.tag_name ?? ""}`),
+  );
+  if (keyboardFocusSequence.length < 2 || distinctFocusTargets.size < 2) {
+    gaps.push("browser-task-proof.keyboard_focus_sequence");
+  }
+  return gaps;
 }
 
 /**
@@ -466,6 +544,10 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
   const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const keyboardNavigation = asRecord(proof.keyboard_navigation);
+  const keyboardFocusSequence = normalizeKeyboardFocusSequence(
+    Array.isArray(proof.keyboard_focus_sequence) ? proof.keyboard_focus_sequence : keyboardNavigation.focus_sequence,
+  );
   const proofEvidenceRefs = uniqueStrings([
     browserTaskProofFile,
     asNonEmptyString(proof.accessibility_summary_file),
@@ -508,6 +590,7 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
     browser_task_proof_file: browserTaskProofFile,
     screenshot_files: screenshotFiles,
     screenshot_refs: screenshotFiles,
+    keyboard_focus_sequence: keyboardFocusSequence,
     accessibility_checks: buildAorOperatorAccessibilityChecks(proof.accessibility_checks, proofEvidenceRefs),
     task_outcome: {
       status: "pass",
@@ -630,6 +713,7 @@ function buildScorecard(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
+    mission_class: options.flowResult.artifacts.mission_class ?? null,
     run_tier: asNonEmptyString(options.flowResult.artifacts.run_tier) || resolveSummaryRunTier(options.profile),
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
@@ -658,6 +742,7 @@ function buildScorecard(options) {
       options.flowResult.artifacts.target_pre_execution_status
         ? options.flowResult.artifacts.target_pre_execution_status
         : null,
+    target_toolchain_preflight_file: asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file) || null,
     failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
     failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
     failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
@@ -913,6 +998,7 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       ]),
       html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
       screenshot_refs: screenshotRefs,
+      keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
       visual_guardrail_refs: uniqueStrings([visualGuardrailFile]),
       browser_task_proof_ref: browserTaskProofFile || null,
       dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
@@ -1035,15 +1121,22 @@ function buildSetupJournal(artifacts) {
     {
       sequence: 3,
       step_id: "project_bootstrap",
-      status: asNonEmptyString(artifacts.generated_project_profile_file) ? "pass" : "not_pass",
+      status:
+        asNonEmptyString(artifacts.project_init_transcript_file) ||
+        asNonEmptyString(artifacts.generated_project_profile_file)
+          ? "pass"
+          : "not_pass",
       public_surface: "aor project init or bundled profile materialization",
       evidence_refs: uniqueStrings([
+        asNonEmptyString(artifacts.project_init_transcript_file),
         asNonEmptyString(artifacts.generated_project_profile_file),
         asNonEmptyString(artifacts.bootstrap_artifact_packet_file),
         asNonEmptyString(artifacts.onboarding_report_file),
       ]),
-      summary: asNonEmptyString(artifacts.generated_project_profile_file)
-        ? "AOR project bootstrap evidence was materialized."
+      summary:
+        asNonEmptyString(artifacts.project_init_transcript_file) ||
+        asNonEmptyString(artifacts.generated_project_profile_file)
+        ? "AOR project bootstrap evidence was materialized through public project init."
         : "AOR project bootstrap evidence is missing.",
     },
     {
@@ -1078,6 +1171,7 @@ function buildSetupJournal(artifacts) {
         asNonEmptyString(artifacts.validation_report_file),
         asNonEmptyString(artifacts.baseline_verify_summary_file),
         asNonEmptyString(artifacts.verify_summary_file),
+        asNonEmptyString(artifacts.target_toolchain_preflight_file),
         asNonEmptyString(artifacts.target_pre_execution_status_file),
         asNonEmptyString(artifacts.execution_readiness_file),
         asNonEmptyString(artifacts.live_adapter_preflight_file),
@@ -1221,6 +1315,8 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "target_checkout_root",
     "target_pre_execution_status_file",
     "target_pre_execution_status",
+    "target_toolchain_preflight_file",
+    "target_toolchain_preflight",
     "target_setup_status",
     "target_verification_status_detail",
     "failure_owner",
@@ -1229,6 +1325,7 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "baseline_verify_status",
     "baseline_verify_summary_file",
     "baseline_verify_gate_decision",
+    "project_init_transcript_file",
     "execution_readiness_file",
     "target_cleanliness_before_execution_file",
     "target_cleanliness_before_execution",
@@ -1296,6 +1393,9 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "incident_report_file",
     "feature_mission_id",
     "feature_size",
+    "mission_class",
+    "live_e2e_step_quality_assessment_request_files",
+    "live_e2e_step_quality_assessment_report_files",
     "matrix_cell",
     "coverage_follow_up",
   ]) {
@@ -1332,17 +1432,21 @@ function runtimeHarnessReportFilesForSummary(artifacts, productionProof = null) 
 
 function refreshRuntimeHarnessChangeEvidenceForSummary(artifacts, mission, productionProof = null) {
   const runtimeHarnessReportFiles = runtimeHarnessReportFilesForSummary(artifacts, productionProof);
-  if (runtimeHarnessReportFiles.length === 0) {
+  const reviewChangedPaths = collectReviewChangedPaths(artifacts.review_report_file);
+  if (runtimeHarnessReportFiles.length === 0 && reviewChangedPaths.length === 0) {
     return;
   }
-  const meaningfulChangedPaths = uniqueStrings(
-    runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
-  );
+  const meaningfulChangedPaths = reconcileSummaryMeaningfulChangedPaths(uniqueStrings([
+    ...runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
+    ...reviewChangedPaths,
+  ]), { targetCheckoutRoot: asNonEmptyString(artifacts.target_checkout_root) });
   if (meaningfulChangedPaths.length > 0) {
     artifacts.meaningful_changed_paths = meaningfulChangedPaths;
   }
-  artifacts.real_code_change_status = runtimeHarnessReportFiles.some((reportFile) =>
-    runtimeHarnessReportHasMissionRelevantChanges(reportFile, mission),
+  artifacts.real_code_change_status = (
+    runtimeHarnessReportFiles.some((reportFile) =>
+      runtimeHarnessReportHasMissionRelevantChanges(reportFile, mission),
+    ) || changedPathsHaveMissionRelevantChanges(reviewChangedPaths, mission)
   )
     ? "pass"
     : "fail";
@@ -1606,11 +1710,15 @@ function buildObservationReport(options) {
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
   const controllerState = readJsonIfPresent(asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file));
+  const controllerStateAvailable = Object.keys(controllerState).length > 0;
+  const controllerStateInProgress = controllerStateAvailable
+    ? isLiveE2eControllerStateInProgress(controllerState, includedSteps)
+    : false;
+  const controllerStopInProgress = !controllerStateAvailable
+    ? isLiveE2eControllerStopInProgress(controllerStop, includedSteps)
+    : false;
   const reportStatus =
-    isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ||
-    isLiveE2eControllerStateInProgress(controllerState, includedSteps)
-      ? "in_progress"
-      : "final";
+    controllerStopInProgress || controllerStateInProgress ? "in_progress" : "final";
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,
@@ -1645,6 +1753,7 @@ function buildObservationReport(options) {
       options.flowResult.artifacts.target_verification_status_detail
         ? options.flowResult.artifacts.target_verification_status_detail
         : null,
+    target_toolchain_preflight_file: asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file) || null,
     provider_step_status:
       typeof options.flowResult.artifacts.provider_step_status === "object" && options.flowResult.artifacts.provider_step_status
         ? options.flowResult.artifacts.provider_step_status
@@ -1671,6 +1780,7 @@ function buildObservationReport(options) {
       asNonEmptyString(options.flowResult.artifacts.review_report_file),
       asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
       asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
+      asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file),
     ]),
   };
 }
@@ -2170,6 +2280,29 @@ function resolveRunHealthFailure(options) {
       summary: asNonEmptyString(liveAdapterPreflight.summary) || "Live adapter preflight did not pass.",
     };
   }
+  if (asNonEmptyString(options.providerHealth.status) !== "pass") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: asNonEmptyString(options.providerHealth.provider_execution_status) || "provider_execution_failed",
+      summary: "Provider execution did not complete cleanly.",
+    };
+  }
+  if (asNonEmptyString(options.targetEnvironmentHealth.status) !== "pass") {
+    const targetOwner = asNonEmptyString(options.targetEnvironmentHealth.failure_owner);
+    const targetPhase = asNonEmptyString(options.targetEnvironmentHealth.failure_phase);
+    const targetClass = asNonEmptyString(options.targetEnvironmentHealth.failure_class);
+    return {
+      owner: targetOwner || "target_repository",
+      phase:
+        targetPhase ||
+        (asNonEmptyString(options.targetEnvironmentHealth.target_setup_status) === "fail"
+          ? "target_setup"
+          : "target_verification"),
+      class: targetClass || "target_environment_failed",
+      summary: "Target setup or target verification failed during the run.",
+    };
+  }
   if (asNonEmptyString(options.observationReport.report_status) === "in_progress") {
     return {
       owner: "operator",
@@ -2192,29 +2325,6 @@ function resolveRunHealthFailure(options) {
       phase: "controller_decision",
       class: "resume_or_interaction_blocked",
       summary: "Run has pending or failed interaction/resume evidence.",
-    };
-  }
-  if (asNonEmptyString(options.providerHealth.status) !== "pass") {
-    return {
-      owner: "provider",
-      phase: "provider_execution",
-      class: asNonEmptyString(options.providerHealth.provider_execution_status) || "provider_execution_failed",
-      summary: "Provider execution did not complete cleanly.",
-    };
-  }
-  if (asNonEmptyString(options.targetEnvironmentHealth.status) !== "pass") {
-    const targetOwner = asNonEmptyString(options.targetEnvironmentHealth.failure_owner);
-    const targetPhase = asNonEmptyString(options.targetEnvironmentHealth.failure_phase);
-    const targetClass = asNonEmptyString(options.targetEnvironmentHealth.failure_class);
-    return {
-      owner: targetOwner || "target_repository",
-      phase:
-        targetPhase ||
-        (asNonEmptyString(options.targetEnvironmentHealth.target_setup_status) === "fail"
-          ? "target_setup"
-          : "target_verification"),
-      class: targetClass || "target_environment_failed",
-      summary: "Target setup or target verification failed during the run.",
     };
   }
   if (asNonEmptyString(options.diagnosticHealth.status) === "fail") {
@@ -2486,6 +2596,18 @@ export function writeProofRunnerArtifacts(options) {
     reportsRoot: options.layout.reportsRoot,
     stepJournal: observationReport.step_journal,
   });
+  const stepQualityAssessmentReportFiles = uniqueStrings([
+    ...asStringArray(options.flowResult.artifacts.live_e2e_step_quality_assessment_report_files),
+    ...observationReport.step_journal
+      .map((entry) => asNonEmptyString(asRecord(entry).step_quality_assessment_ref))
+      .filter(Boolean),
+  ]);
+  const stepQualityAssessmentRequestFiles = uniqueStrings([
+    ...asStringArray(options.flowResult.artifacts.live_e2e_step_quality_assessment_request_files),
+    ...observationReport.step_journal
+      .map((entry) => asNonEmptyString(asRecord(entry).step_quality_assessment_request_ref))
+      .filter(Boolean),
+  ]);
   const observationReportFile = path.join(
     options.layout.reportsRoot,
     `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
@@ -2493,6 +2615,8 @@ export function writeProofRunnerArtifacts(options) {
   observationReport.evidence_refs = uniqueStrings([
     ...asStringArray(observationReport.evidence_refs),
     ...stepObservationFiles,
+    ...stepQualityAssessmentRequestFiles,
+    ...stepQualityAssessmentReportFiles,
   ]);
   const observationValidation = validateContractDocument({
     family: "live-e2e-observation-report",
@@ -2505,6 +2629,8 @@ export function writeProofRunnerArtifacts(options) {
   }
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.live_e2e_step_observation_files = stepObservationFiles;
+  options.flowResult.artifacts.live_e2e_step_quality_assessment_request_files = stepQualityAssessmentRequestFiles;
+  options.flowResult.artifacts.live_e2e_step_quality_assessment_report_files = stepQualityAssessmentReportFiles;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
   const runHealthReportFile = path.join(
     options.layout.reportsRoot,
@@ -2575,6 +2701,7 @@ export function writeProofRunnerArtifacts(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
+    mission_class: options.flowResult.artifacts.mission_class ?? null,
     run_tier: resolveSummaryRunTier(options.profile),
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
@@ -2628,6 +2755,10 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.handoff_packet_file === "string"
         ? options.flowResult.artifacts.handoff_packet_file
         : null,
+    project_init_transcript_file:
+      typeof options.flowResult.artifacts.project_init_transcript_file === "string"
+        ? options.flowResult.artifacts.project_init_transcript_file
+        : null,
     execution_readiness_file:
       typeof options.flowResult.artifacts.execution_readiness_file === "string"
         ? options.flowResult.artifacts.execution_readiness_file
@@ -2658,6 +2789,15 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
       options.flowResult.artifacts.target_pre_execution_status
         ? options.flowResult.artifacts.target_pre_execution_status
+        : null,
+    target_toolchain_preflight_file:
+      typeof options.flowResult.artifacts.target_toolchain_preflight_file === "string"
+        ? options.flowResult.artifacts.target_toolchain_preflight_file
+        : null,
+    target_toolchain_preflight:
+      typeof options.flowResult.artifacts.target_toolchain_preflight === "object" &&
+      options.flowResult.artifacts.target_toolchain_preflight
+        ? options.flowResult.artifacts.target_toolchain_preflight
         : null,
     target_setup_status:
       typeof options.flowResult.artifacts.target_setup_status === "object" && options.flowResult.artifacts.target_setup_status
@@ -2749,6 +2889,8 @@ export function writeProofRunnerArtifacts(options) {
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,
     live_e2e_step_observation_files: stepObservationFiles,
+    live_e2e_step_quality_assessment_request_files: stepQualityAssessmentRequestFiles,
+    live_e2e_step_quality_assessment_report_files: stepQualityAssessmentReportFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
     live_e2e_run_health_report_file: runHealthReportFile,
     live_e2e_run_health_overall_status: runHealthReport.overall_status,
@@ -3129,6 +3271,8 @@ function runCli(rawArgs) {
                 examplesRoot,
               });
         } catch (error) {
+          const classification = classifyEarlyFlowFailure(error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
           flowResult = {
             startedAt: nowIso(),
             finishedAt: nowIso(),
@@ -3138,7 +3282,10 @@ function runCli(rawArgs) {
                 stage: "bootstrap",
                 status: "fail",
                 evidence_refs: [],
-                summary: error instanceof Error ? error.message : String(error),
+                summary: errorMessage,
+                failure_owner: classification.owner,
+                failure_phase: classification.phase,
+                failure_class: classification.class,
               },
             ],
             commandResults: [],
@@ -3147,6 +3294,9 @@ function runCli(rawArgs) {
               host_reports_root: layout.reportsRoot,
               live_e2e_controller_state_file: stepController.stateFile,
               live_e2e_step_journal_entries: stepController.getStepJournal(),
+              failure_owner: classification.owner,
+              failure_phase: classification.phase,
+              failure_class: classification.class,
               aor_installation: aorInstallation.proof,
               aor_installation_proof_file: aorInstallation.proofFile,
               live_e2e_setup_journal_entries: [aorInstallation.setupEntry],
@@ -3164,9 +3314,7 @@ function runCli(rawArgs) {
   flowResult.artifacts.live_e2e_setup_journal_entries = [aorInstallation.setupEntry];
   flowResult.artifacts.live_e2e_controller_state_file =
     asNonEmptyString(flowResult.artifacts.live_e2e_controller_state_file) || stepController.stateFile;
-  if (!Array.isArray(flowResult.artifacts.live_e2e_step_journal_entries)) {
-    flowResult.artifacts.live_e2e_step_journal_entries = stepController.getStepJournal();
-  }
+  flowResult.artifacts.live_e2e_step_journal_entries = stepController.getStepJournal();
 
   const written = writeProofRunnerArtifacts({
     hostRoot,
@@ -3193,6 +3341,8 @@ function runCli(rawArgs) {
         aor_installation_proof_file: written.summary.aor_installation_proof_file,
         live_e2e_controller_state_file: written.summary.live_e2e_controller_state_file,
         live_e2e_step_observation_files: written.summary.live_e2e_step_observation_files,
+        live_e2e_step_quality_assessment_request_files: written.summary.live_e2e_step_quality_assessment_request_files,
+        live_e2e_step_quality_assessment_report_files: written.summary.live_e2e_step_quality_assessment_report_files,
         live_e2e_scorecard_files: [written.scorecardFile],
         learning_loop_scorecard_file: written.learningLoop?.scorecardFile ?? null,
         learning_loop_handoff_file: written.learningLoop?.handoffFile ?? null,

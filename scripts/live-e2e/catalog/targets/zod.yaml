@@ -25,25 +25,22 @@ provider_comparison_pairs: []
 feature_missions:
   - mission_id: zod-json-schema-regression
     title: Preserve JSON Schema conversion regression behavior
-    brief: Add or repair one bounded JSON Schema conversion edge case with runtime
-      coverage and the smallest public type-surface adjustment needed to keep
-      schema inference coherent.
+    brief: Add or repair one bounded JSON Schema conversion edge case with runtime coverage and the
+      smallest public type-surface adjustment needed to keep schema inference coherent.
     feature_size: medium
     goals:
-      - Preserve one JSON Schema conversion behavior without broad parser or
-        package rewrites.
+      - Preserve one JSON Schema conversion behavior without broad parser or package rewrites.
       - Keep runtime tests, build output, and lint evidence green.
     kpis:
       - kpi_id: zod-json-schema-regression-green
         name: Zod JSON Schema regression gate
-        target: pnpm run build, pnpm test, and pnpm run lint:check pass after the
-          change
+        target: pnpm run build, pnpm test, and pnpm run lint:check pass after the change
         measurement: post-run primary verification
     definition_of_done:
       - The regression is covered by Vitest.
       - The public type surface remains coherent for the changed schema behavior.
       - Review and delivery evidence remain anchored to the target checkout.
-    expected_evidence: &evidence
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -66,11 +63,64 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 8
-      max_added_lines: 320
-    size_rationale: Medium Zod work may cross runtime behavior, tests, and type
-      declarations but should stay inside one schema-conversion surface.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium Zod work may cross runtime behavior, tests, and type declarations but should
+      stay inside one schema-conversion surface.
     change_budget:
-      max_changed_files: 8
-      max_added_lines: 320
-    quality_evidence: *evidence
+      max_changed_files: 32
+      max_added_lines: 2200
+    quality_evidence: *a1
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Add or repair one bounded JSON Schema conversion edge case with runtime coverage and
+        the smallest public type-surface adjustment needed to keep schema inference coherent.
+      desired_outcome: The regression is covered by Vitest. The public type surface remains coherent for
+        the changed schema behavior. Review and delivery evidence remain anchored to the target
+        checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change inside the Zod package runtime, tests, and type surface
+        - preserve build, test, and lint evidence
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: pnpm run build"
+        - "Primary verification command: pnpm test"
+        - "Primary verification command: pnpm run lint:check"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

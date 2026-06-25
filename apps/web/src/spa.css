@@ -885,6 +885,23 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
+button:focus-visible,
+[role="button"]:focus-visible,
+.stage-row:focus-visible,
+.template-card:focus-visible,
+.artifact-summary-button:focus-visible,
+.artifact-chip-button:focus-visible,
+.decision-action-grid button:focus-visible,
+.execution-action-grid button:focus-visible {
+  outline: 3px solid #0f766e;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .primary,
 .secondary,
 .utility-button {

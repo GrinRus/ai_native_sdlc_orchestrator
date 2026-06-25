@@ -21,6 +21,8 @@ export type ContractFamily =
   | "live-e2e-observation-report"
   | "live-e2e-run-health-report"
   | "live-e2e-quality-assessment-report"
+  | "live-e2e-step-quality-assessment-request"
+  | "live-e2e-step-quality-assessment-report"
   | "multirepo-coordination-status"
   | "planner-metrics-snapshot"
   | "finance-monitoring-snapshot"

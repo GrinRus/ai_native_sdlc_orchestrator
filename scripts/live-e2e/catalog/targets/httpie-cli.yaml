@@ -8,8 +8,8 @@ verification:
   setup_commands:
     - make install
   commands:
-    - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
-      tests/test_regressions.py tests/test_httpie_cli.py
+    - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py
+      tests/test_httpie_cli.py
     - make codestyle
 safety_defaults:
   write_back_to_remote: false
@@ -21,6 +21,12 @@ required_matrix_cells:
     feature_mission_id: httpie-cli-output-regression
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: httpie-cli.regress.small.anthropic
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: httpie-cli-output-regression
+    provider_variant_id: anthropic-primary
+    coverage_tier: extended
   - cell_id: httpie-cli.repair.medium.anthropic
     scenario_family: repair
     feature_size: medium
@@ -63,8 +69,8 @@ manual_matrix_cells:
 feature_missions:
   - mission_id: httpie-cli-output-regression
     title: Preserve one bounded CLI output regression
-    brief: Implement one narrow CLI behavior fix with matching regression coverage
-      and keep the blast radius inside the relevant command surface.
+    brief: Implement one narrow CLI behavior fix with matching regression coverage and keep the blast
+      radius inside the relevant command surface.
     feature_size: small
     expected_evidence: &a1
       - verify-summary
@@ -79,31 +85,68 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 10
-      max_added_lines: 320
-    size_rationale: Small httpie missions should remain inside one CLI surface with
-      one focused regression slice.
+      max_changed_files: 16
+      max_added_lines: 900
+    size_rationale: Small httpie missions should remain inside one CLI surface with one focused regression slice.
     change_budget:
-      max_changed_files: 10
-      max_added_lines: 320
+      max_changed_files: 16
+      max_added_lines: 900
     quality_evidence: *a1
+    mission_class: flow-regression
+    agent_visible_request:
+      user_problem: Implement one narrow CLI behavior fix with matching regression coverage and keep the
+        blast radius inside the relevant command surface.
+      desired_outcome: Implement one narrow CLI behavior fix with matching regression coverage and keep
+        the blast radius inside the relevant command surface.
+      constraints:
+        - Use this mission only as a live E2E canary that proves the public flow still works.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change isolated to one CLI behavior surface
+        - preserve bounded CLI regression smoke plus codestyle linkage
+      non_goals:
+        - Do not expand this small canary into a product-quality acceptance mission.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: flow-health
+      step_quality_required: false
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted public step decision refs for the canary flow.
+        - verify-summary
+        - routed-step-result
+        - review-report
+    final_code_rubric:
+      quality_gate: flow-health
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - flow_completion
+        - public_artifact_materialization
+        - canary_verification
   - mission_id: httpie-cli-repair-exit-codes
     title: Repair one bounded CLI exit-code and formatting seam
     brief: "Fix the plugin upgrade failure propagation and debug formatting seam in
-      `httpie/manager/tasks/plugins.py`: `PluginInstaller.upgrade()` must return
-      the `_install()` exit status after handling pip stdout so failed installs
-      are not coerced to success, and debug pip stderr must use
-      `textwrap.indent(stderr, '  ')` so every stderr line is indented
-      correctly. Add focused regression coverage in `tests/test_httpie_cli.py`
-      for failed upgrade propagation, successful upgrade return, and debug
-      stderr indentation while preserving the bounded pytest and codestyle
-      slice. The primary pytest command must complete without stderr warning
-      tokens, and new regression tests must use cleanup-safe fixtures or
-      context-managed resources."
+      `httpie/manager/tasks/plugins.py`: `PluginInstaller.upgrade()` must return the `_install()`
+      exit status after handling pip stdout so failed installs are not coerced to success, and debug
+      pip stderr must use `textwrap.indent(stderr, '  ')` so every stderr line is indented
+      correctly. Add focused regression coverage in `tests/test_httpie_cli.py` for failed upgrade
+      propagation, successful upgrade return, and debug stderr indentation while preserving the
+      bounded pytest and codestyle slice. The primary pytest command must complete without stderr
+      warning tokens, and new regression tests must use cleanup-safe fixtures or context-managed
+      resources."
     feature_size: medium
     goals:
-      - Repair failed plugin upgrade exit status propagation and debug stderr
-        indentation.
+      - Repair failed plugin upgrade exit status propagation and debug stderr indentation.
       - Keep the bounded CLI pytest and codestyle evidence green.
     kpis:
       - kpi_id: httpie-exit-code-repair-green
@@ -121,12 +164,10 @@ feature_missions:
       - delivery-manifest
     acceptance_checks:
       - keep the fix inside the CLI/runtime surface and its tests
-      - preserve failed plugin upgrade exit status instead of falling through to
-        implicit success
+      - preserve failed plugin upgrade exit status instead of falling through to implicit success
       - indent every debug pip stderr line with two spaces
       - primary pytest stderr has no runtime warning tokens
-      - prefer cleanup-safe pytest fixtures or context-managed resources in new
-        tests
+      - prefer cleanup-safe pytest fixtures or context-managed resources in new tests
       - preserve bounded pytest smoke plus codestyle linkage
       - keep delivery evidence anchored to the target checkout
     change_evidence:
@@ -148,19 +189,87 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 12
-      max_added_lines: 420
-    size_rationale: Medium httpie missions can cross one producer-consumer CLI
-      boundary but should remain inside one subsystem and test slice.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium httpie missions can cross one producer-consumer CLI boundary but should
+      remain inside one subsystem and test slice.
     change_budget:
-      max_changed_files: 12
-      max_added_lines: 420
+      max_changed_files: 32
+      max_added_lines: 2200
     quality_evidence: *a2
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: "Fix the plugin upgrade failure propagation and debug formatting seam in
+        `httpie/manager/tasks/plugins.py`: `PluginInstaller.upgrade()` must return the `_install()`
+        exit status after handling pip stdout so failed installs are not coerced to success, and
+        debug pip stderr must use `textwrap.indent(stderr, '  ')` so every stderr line is indented
+        correctly. Add focused regression coverage in `tests/test_httpie_cli.py` for failed upgrade
+        propagation, successful upgrade return, and debug stderr indentation while preserving the
+        bounded pytest and codestyle slice. The primary pytest command must complete without stderr
+        warning tokens, and new regression tests must use cleanup-safe fixtures or context-managed
+        resources."
+      desired_outcome: Failed plugin upgrade installs return the failing install status. Debug pip stderr
+        lines are indented consistently. Delivery and review evidence are anchored to the target
+        checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the fix inside the CLI/runtime surface and its tests
+        - preserve failed plugin upgrade exit status instead of falling through to implicit success
+        - indent every debug pip stderr line with two spaces
+        - primary pytest stderr has no runtime warning tokens
+        - prefer cleanup-safe pytest fixtures or context-managed resources in new tests
+        - preserve bounded pytest smoke plus codestyle linkage
+        - keep delivery evidence anchored to the target checkout
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: venv/bin/python -m pytest tests/test_httpie_cli.py"
+        - "Primary verification command: make codestyle"
+        - "Diagnostic evidence command: venv/bin/python -m pytest tests/test_cli.py
+          tests/test_regressions.py tests/test_httpie_cli.py"
+        - Meaningful changed path under httpie/manager/tasks/plugins.py
+        - Meaningful changed path under tests/test_httpie_cli.py
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - httpie/manager/tasks/plugins.py
+        - tests/test_httpie_cli.py
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: httpie-cli-config-surface-hardening
     title: Govern one broader CLI config and request-surface hardening change
-    brief: Touch a broader CLI configuration or request-handling surface with strict
-      audit and learning closure, but keep the scope bounded to the runtime
-      package and tests.
+    brief: Touch a broader CLI configuration or request-handling surface with strict audit and learning
+      closure, but keep the scope bounded to the runtime package and tests.
     feature_size: large
     goals:
       - Harden one bounded CLI config or request-handling surface.
@@ -168,15 +277,13 @@ feature_missions:
     kpis:
       - kpi_id: httpie-governance-lineage
         name: HTTPie governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix
-          cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - Bounded pytest and codestyle gates pass.
-      - Primary and diagnostic pytest output is warning-clean; exit-0 stderr
-        warnings such as ResourceWarning are not acceptable all-pass evidence.
-      - Governance and learning artifacts trace back to the mission and target
-        checkout.
+      - Primary and diagnostic pytest output is warning-clean; exit-0 stderr warnings such as
+        ResourceWarning are not acceptable all-pass evidence.
+      - Governance and learning artifacts trace back to the mission and target checkout.
       - No upstream write-back is attempted.
     expected_evidence: &a3
       - verify-summary
@@ -195,8 +302,7 @@ feature_missions:
         - tests/
     post_run_quality:
       primary_commands:
-        - venv/bin/python -m pytest tests/test_httpie_cli.py
-          tests/test_regressions.py
+        - venv/bin/python -m pytest tests/test_httpie_cli.py tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
         - venv/bin/python -m pytest tests/test_cli.py tests/test_regressions.py
@@ -210,46 +316,104 @@ feature_missions:
       - anthropic-primary
       - open-code-primary
     size_budget:
-      max_changed_files: 16
-      max_added_lines: 620
-    size_rationale: Large httpie missions may cross several CLI/config seams, but
-      must remain inside the application package and explicit test boundaries.
+      max_changed_files: 64
+      max_added_lines: 4500
+    size_rationale: Large httpie missions may cross several CLI/config seams, but must remain inside the
+      application package and explicit test boundaries.
     change_budget:
-      max_changed_files: 16
-      max_added_lines: 620
+      max_changed_files: 64
+      max_added_lines: 4500
     quality_evidence: *a3
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Touch a broader CLI configuration or request-handling surface with strict audit and
+        learning closure, but keep the scope bounded to the runtime package and tests.
+      desired_outcome: Bounded pytest and codestyle gates pass. Primary and diagnostic pytest output is
+        warning-clean; exit-0 stderr warnings such as ResourceWarning are not acceptable all-pass
+        evidence. Governance and learning artifacts trace back to the mission and target checkout.
+        No upstream write-back is attempted.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep governance evidence tied to the target checkout
+        - preserve bounded pytest smoke plus codestyle linkage
+        - primary and diagnostic pytest commands emit no runtime warning tokens
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - learning-loop-handoff
+        - "Primary verification command: venv/bin/python -m pytest tests/test_httpie_cli.py
+          tests/test_regressions.py"
+        - "Primary verification command: make codestyle"
+        - "Diagnostic evidence command: venv/bin/python -m pytest tests/test_cli.py
+          tests/test_regressions.py tests/test_httpie_cli.py"
+        - Meaningful changed path under httpie/
+        - Meaningful changed path under tests/
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - httpie/
+        - tests/
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: httpie-cli-request-policy-orchestration-xlarge
     title: Govern a cross-surface request policy change
-    brief: Manually rehearse a broad CLI request-policy change that spans
-      configuration precedence, request construction, diagnostics, and tests with
-      strict audit and learning closure.
+    brief: Manually rehearse a broad CLI request-policy change that spans configuration precedence,
+      request construction, diagnostics, and tests with strict audit and learning closure.
     feature_size: xlarge
     execution_policy: manual-only
     goals:
-      - Harden a coherent request policy across CLI/config parsing, request
-        construction, and diagnostics.
-      - Preserve user-visible CLI behavior with explicit tests for precedence,
-        formatting, and failure messages.
+      - Harden a coherent request policy across CLI/config parsing, request construction, and
+        diagnostics.
+      - Preserve user-visible CLI behavior with explicit tests for precedence, formatting, and
+        failure messages.
       - Preserve governance, audit, and learning lineage for the target checkout.
     kpis:
       - kpi_id: httpie-xlarge-request-policy-depth
         name: Request policy depth
-        target: runtime source, CLI/config tests, diagnostics, and user-facing
-          behavior evidence trace to one request policy intent
+        target: runtime source, CLI/config tests, diagnostics, and user-facing behavior evidence trace to
+          one request policy intent
         measurement: target diff review plus post-run primary verification
       - kpi_id: httpie-xlarge-governance-lineage
         name: Xlarge governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same
-          manual matrix cell
+        target: review, delivery, audit, and learning artifacts preserve the same manual matrix cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - Bounded pytest and codestyle gates pass.
-      - Primary and diagnostic pytest output is warning-clean; exit-0 stderr
-        warnings such as ResourceWarning are not acceptable all-pass evidence.
-      - Runtime package source, tests, and diagnostic/help behavior evidence are
-        present.
-      - Governance and learning artifacts trace back to the mission and target
-        checkout.
+      - Primary and diagnostic pytest output is warning-clean; exit-0 stderr warnings such as
+        ResourceWarning are not acceptable all-pass evidence.
+      - Runtime package source, tests, and diagnostic/help behavior evidence are present.
+      - Governance and learning artifacts trace back to the mission and target checkout.
       - No upstream write-back is attempted.
     expected_evidence:
       - verify-summary
@@ -259,8 +423,7 @@ feature_missions:
       - learning-loop-handoff
     acceptance_checks:
       - keep governance evidence tied to the target checkout
-      - require source, tests, diagnostics or help behavior, and request policy
-        traceability
+      - require source, tests, diagnostics or help behavior, and request policy traceability
       - preserve bounded pytest smoke plus codestyle linkage
       - primary and diagnostic pytest commands emit no runtime warning tokens
       - new tests use cleanup-safe fixtures or context-managed resources
@@ -271,8 +434,7 @@ feature_missions:
         - tests/
     post_run_quality:
       primary_commands:
-        - venv/bin/python -m pytest tests/test_httpie_cli.py
-          tests/test_regressions.py
+        - venv/bin/python -m pytest tests/test_httpie_cli.py tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
         - venv/bin/python -m pytest tests/test_cli.py tests/test_regressions.py
@@ -285,17 +447,83 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 24
-      max_added_lines: 1200
-    size_rationale: Xlarge HTTPie missions are manual-only because request policy
-      changes can cross config parsing, request building, diagnostics, and
-      user-facing CLI behavior that need operator judgement before acceptance.
+      max_changed_files: 100
+      max_added_lines: 10000
+    size_rationale: Xlarge HTTPie missions are manual-only because request policy changes can cross
+      config parsing, request building, diagnostics, and user-facing CLI behavior that need operator
+      judgement before acceptance.
     change_budget:
-      max_changed_files: 24
-      max_added_lines: 1200
+      max_changed_files: 100
+      max_added_lines: 10000
     quality_evidence:
       - verify-summary
       - routed-step-result
       - review-report
       - delivery-manifest
       - learning-loop-handoff
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Manually rehearse a broad CLI request-policy change that spans configuration
+        precedence, request construction, diagnostics, and tests with strict audit and learning
+        closure.
+      desired_outcome: Bounded pytest and codestyle gates pass. Primary and diagnostic pytest output is
+        warning-clean; exit-0 stderr warnings such as ResourceWarning are not acceptable all-pass
+        evidence. Runtime package source, tests, and diagnostic/help behavior evidence are present.
+        Governance and learning artifacts trace back to the mission and target checkout. No upstream
+        write-back is attempted.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep governance evidence tied to the target checkout
+        - require source, tests, diagnostics or help behavior, and request policy traceability
+        - preserve bounded pytest smoke plus codestyle linkage
+        - primary and diagnostic pytest commands emit no runtime warning tokens
+        - new tests use cleanup-safe fixtures or context-managed resources
+        - avoid any upstream write-back
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - learning-loop-handoff
+        - "Primary verification command: venv/bin/python -m pytest tests/test_httpie_cli.py
+          tests/test_regressions.py"
+        - "Primary verification command: make codestyle"
+        - "Diagnostic evidence command: venv/bin/python -m pytest tests/test_cli.py
+          tests/test_regressions.py tests/test_httpie_cli.py"
+        - Meaningful changed path under httpie/
+        - Meaningful changed path under tests/
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - httpie/
+        - tests/
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

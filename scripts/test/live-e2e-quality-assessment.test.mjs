@@ -449,6 +449,51 @@ test("quality assessment all-pass gate accepts fully passing assessment with tar
   assert.equal(output.gate_issue_count, 0);
 });
 
+test("quality assessment all-pass gate rejects changed-path lineage mismatch", () => {
+  const tempRoot = makeTempRoot();
+  const reportsRoot = path.join(tempRoot, "reports");
+  const evidenceFile = touch(path.join(reportsRoot, "review-report-live-e2e.test.run.json"));
+  const runtimeHarnessFile = path.join(reportsRoot, "runtime-harness-report-live-e2e.test.run.json");
+  const summaryFile = path.join(reportsRoot, "live-e2e-run-summary-live-e2e.test.run.json");
+  const observationFile = touch(path.join(reportsRoot, "live-e2e-observation-report-live-e2e.test.run.json"));
+  const runHealthFile = touch(path.join(reportsRoot, "live-e2e-run-health-report-live-e2e.test.run.json"));
+  const requestFile = touch(path.join(reportsRoot, "live-e2e-quality-assessment-request-live-e2e.test.run.json"));
+  const assessmentFile = path.join(reportsRoot, "live-e2e-quality-assessment-report-live-e2e.test.run.json");
+  writeJson(runtimeHarnessFile, {
+    step_decisions: [
+      {
+        mission_semantics: {
+          meaningful_changed_paths: ["source/index.ts"],
+          non_bootstrap_changed_paths: ["source/index.ts"],
+        },
+      },
+    ],
+  });
+  writeJson(summaryFile, {
+    run_id: "live-e2e.test.run",
+    runtime_harness_report_file: runtimeHarnessFile,
+    meaningful_changed_paths: [],
+  });
+  writeJson(
+    assessmentFile,
+    buildAssessmentReport({
+      evidenceFile,
+      summaryFile,
+      observationFile,
+      runHealthFile,
+      requestFile,
+      allPass: true,
+    }),
+  );
+
+  const result = runQualityAssessment(["gate", "--policy", "all-pass", "--assessment-report-file", assessmentFile]);
+  assert.equal(result.status, 1, result.stdout);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.status, "fail");
+  assert.ok(output.gate_issues.some((issue) => issue.code === "changed_path_lineage_mismatch"));
+  assert.ok(output.gate_issues.some((issue) => issue.code === "meaningful_target_change_missing"));
+});
+
 test("quality assessment all-pass gate rejects warning, missing evidence, and missing target change", () => {
   const tempRoot = makeTempRoot();
   const reportsRoot = path.join(tempRoot, "reports");

@@ -457,6 +457,71 @@ function resolveLocalEvidenceRef(ref, baseDir) {
 }
 
 /**
+ * @param {Record<string, unknown>} report
+ * @returns {string[]}
+ */
+function collectRuntimeHarnessMeaningfulChangedPaths(report) {
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions.map((entry) => asRecord(entry)) : [];
+  return uniqueStrings(
+    stepDecisions.flatMap((entry) => {
+      const semantics = asRecord(entry.mission_semantics);
+      return [
+        ...asStringArray(semantics.meaningful_changed_paths),
+        ...asStringArray(semantics.non_bootstrap_changed_paths),
+      ];
+    }),
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {string[]}
+ */
+function collectReviewMeaningfulChangedPaths(report) {
+  const codeQuality = asRecord(report.code_quality);
+  const diagnostics = asRecord(codeQuality.changed_path_diagnostics);
+  return uniqueStrings([
+    ...asStringArray(codeQuality.changed_paths),
+    ...asStringArray(diagnostics.meaningful_changed_paths),
+  ]);
+}
+
+/**
+ * @param {Record<string, unknown>} runSummary
+ * @param {string} summaryBaseDir
+ * @returns {{ runtimeHarnessChangedPaths: string[], reviewChangedPaths: string[], sourceRefs: string[] }}
+ */
+function collectSourceReportChangedPaths(runSummary, summaryBaseDir) {
+  const runtimeHarnessRefs = uniqueStrings([
+    asNonEmptyString(runSummary.runtime_harness_report_file),
+    asNonEmptyString(runSummary.latest_runtime_harness_report_file),
+    asNonEmptyString(runSummary.run_start_runtime_harness_report_file),
+    asNonEmptyString(runSummary.delivery_runtime_harness_report_file),
+  ]);
+  const reviewRefs = uniqueStrings([asNonEmptyString(runSummary.review_report_file)]);
+  const runtimeHarnessChangedPaths = [];
+  const reviewChangedPaths = [];
+  const sourceRefs = [];
+  for (const reportRef of runtimeHarnessRefs) {
+    const reportFile = resolveLocalEvidenceRef(reportRef, summaryBaseDir);
+    if (!reportFile || !fs.existsSync(reportFile)) continue;
+    sourceRefs.push(reportRef);
+    runtimeHarnessChangedPaths.push(...collectRuntimeHarnessMeaningfulChangedPaths(asRecord(readJson(reportFile))));
+  }
+  for (const reportRef of reviewRefs) {
+    const reportFile = resolveLocalEvidenceRef(reportRef, summaryBaseDir);
+    if (!reportFile || !fs.existsSync(reportFile)) continue;
+    sourceRefs.push(reportRef);
+    reviewChangedPaths.push(...collectReviewMeaningfulChangedPaths(asRecord(readJson(reportFile))));
+  }
+  return {
+    runtimeHarnessChangedPaths: uniqueStrings(runtimeHarnessChangedPaths),
+    reviewChangedPaths: uniqueStrings(reviewChangedPaths),
+    sourceRefs: uniqueStrings(sourceRefs),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} runSummary
  * @param {Record<string, unknown>} observationReport
  * @param {Record<string, unknown>} runHealthReport
@@ -564,6 +629,12 @@ function prepareCli(rawArgs) {
   );
   const runId = asNonEmptyString(runSummary.run_id) || "live-e2e-run";
   const profileId = asNonEmptyString(runSummary.profile_id) || null;
+  const featureSize = asNonEmptyString(runSummary.feature_size) || null;
+  const missionClass =
+    asNonEmptyString(runSummary.mission_class) ||
+    (featureSize === "small" ? "flow-regression" : featureSize ? "product-change" : null);
+  const productAcceptanceRequired =
+    missionClass === "product-change" && ["medium", "large", "xlarge"].includes(featureSize ?? "");
   const baseDir = path.dirname(runSummaryFile);
   const observationFile = asNonEmptyString(runSummary.live_e2e_observation_report_file);
   const runHealthFile =
@@ -612,14 +683,16 @@ function prepareCli(rawArgs) {
     separation_contract: {
       live_e2e_observation_report: "factual-only setup, step, command, artifact, and evidence journal",
       live_e2e_run_health_report: "run health only: command, controller, provider, target, environment, operator, and AOR-owner issues",
-      live_e2e_quality_assessment_report: "post-run advisory outcome assessment for artifacts, code, verification, delivery safety, AOR operator UI/UX, AOR operator accessibility, and traceability",
+      live_e2e_quality_assessment_report: "post-run outcome assessment for artifacts, code, verification, delivery safety, AOR operator UI/UX, AOR operator accessibility, and traceability; mandatory for medium+ product acceptance",
     },
     run_identity: {
       target_catalog_id: asNonEmptyString(runSummary.target_catalog_id) || null,
       feature_mission_id: asNonEmptyString(runSummary.feature_mission_id) || null,
       scenario_family: asNonEmptyString(runSummary.scenario_family) || null,
       provider_variant_id: asNonEmptyString(runSummary.provider_variant_id) || null,
-      feature_size: asNonEmptyString(runSummary.feature_size) || null,
+      feature_size: featureSize,
+      mission_class: missionClass,
+      product_acceptance_required: productAcceptanceRequired,
       commit_sha: asNonEmptyString(runSummary.commit_sha) || null,
       branch_name: asNonEmptyString(runSummary.branch_name) || null,
       run_health_status:
@@ -632,6 +705,9 @@ function prepareCli(rawArgs) {
     dimension_rubric: DIMENSION_RUBRIC,
     finding_taxonomy: [...FINDING_TAXONOMY],
     quality_report_requirements: [
+      productAcceptanceRequired
+        ? "This medium+ product-change mission requires final all-pass quality for product acceptance."
+        : "This small flow-regression mission uses lightweight canary quality follow-up unless a stricter local gate is requested.",
       "Use status pass|warn|fail|not_evaluated for every required dimension.",
       "Use evidence_strength strong|medium|weak|missing for every required dimension.",
       "Populate inspected_evidence_refs for every evaluated dimension.",
@@ -655,7 +731,7 @@ function prepareCli(rawArgs) {
     instructions: [
       "Inspect evidence freely as a SWE evaluator; no predetermined fixtures are assumed.",
       "Do not rewrite the factual observation report or run-health report.",
-      "Do not change run/qualification exit status from this assessment; it is advisory outcome quality evidence.",
+      "Do not change run-health or provider qualification status from this assessment; medium+ product acceptance consumes the separate all-pass gate.",
       "Call out dimensions that were not checked, checked with weak signal, or confirmed by strong evidence.",
     ],
   };
@@ -767,13 +843,87 @@ function evaluateAllPassGate(assessment, baseDir) {
   const resolvedSummaryFile = sourceRunSummaryFile ? resolveLocalEvidenceRef(sourceRunSummaryFile, baseDir) : null;
   if (resolvedSummaryFile && fs.existsSync(resolvedSummaryFile)) {
     const runSummary = asRecord(readJson(resolvedSummaryFile));
+    const featureSize = asNonEmptyString(runSummary.feature_size);
+    const missionClass =
+      asNonEmptyString(runSummary.mission_class) ||
+      (featureSize === "small" ? "flow-regression" : featureSize ? "product-change" : "");
+    const productAcceptanceRequired =
+      missionClass === "product-change" && ["medium", "large", "xlarge"].includes(featureSize);
+    const runHealthStatus =
+      asNonEmptyString(runSummary.live_e2e_run_health_overall_status) ||
+      asNonEmptyString(runSummary.run_health_status) ||
+      asNonEmptyString(asRecord(runSummary.run_health).overall_status);
+    if (productAcceptanceRequired && runHealthStatus !== "pass") {
+      issues.push({
+        code: "run_health_not_pass",
+        field: "source_run_summary_file.live_e2e_run_health_overall_status",
+        message: `Product acceptance requires run-health pass, got '${runHealthStatus || "missing"}'.`,
+      });
+    }
+    if (productAcceptanceRequired) {
+      const stepObservationFiles = asStringArray(runSummary.live_e2e_step_observation_files);
+      const stepQualityAssessmentReportFiles = asStringArray(runSummary.live_e2e_step_quality_assessment_report_files);
+      if (!asNonEmptyString(runSummary.target_checkout_root)) {
+        issues.push({
+          code: "target_checkout_root_missing",
+          field: "source_run_summary_file.target_checkout_root",
+          message: "Product acceptance requires a canonical target_checkout_root in the run summary.",
+        });
+      }
+      if (stepQualityAssessmentReportFiles.length < stepObservationFiles.length) {
+        issues.push({
+          code: "step_quality_assessment_missing",
+          field: "source_run_summary_file.live_e2e_step_quality_assessment_report_files",
+          message: `Product acceptance requires an accepted step-quality report for every observed step (${stepQualityAssessmentReportFiles.length}/${stepObservationFiles.length}).`,
+        });
+      }
+      for (const [index, reportRef] of stepQualityAssessmentReportFiles.entries()) {
+        const resolvedReport = resolveLocalEvidenceRef(reportRef, path.dirname(resolvedSummaryFile));
+        if (!resolvedReport || !fs.existsSync(resolvedReport)) {
+          issues.push({
+            code: "step_quality_assessment_missing",
+            field: `source_run_summary_file.live_e2e_step_quality_assessment_report_files[${index}]`,
+            message: `Step-quality assessment report '${reportRef}' was not found.`,
+          });
+          continue;
+        }
+        const stepQualityReport = asRecord(readJson(resolvedReport));
+        if (asNonEmptyString(stepQualityReport.status) !== "accepted" || asNonEmptyString(stepQualityReport.decision) !== "continue") {
+          issues.push({
+            code: "step_quality_assessment_not_accepted",
+            field: `source_run_summary_file.live_e2e_step_quality_assessment_report_files[${index}]`,
+            message: `Step-quality assessment report '${reportRef}' must be accepted/continue for product acceptance.`,
+          });
+        }
+      }
+    }
     const meaningfulChangedPaths = asStringArray(runSummary.meaningful_changed_paths);
     const targetChangedPaths = meaningfulChangedPaths.filter((entry) => !entry.startsWith(".aor/"));
+    const sourceChangedPaths = collectSourceReportChangedPaths(runSummary, path.dirname(resolvedSummaryFile));
+    const sourceReportChangedPaths = uniqueStrings([
+      ...sourceChangedPaths.runtimeHarnessChangedPaths,
+      ...sourceChangedPaths.reviewChangedPaths,
+    ]).filter((entry) => !entry.startsWith(".aor/"));
+    if (sourceReportChangedPaths.length > 0 && targetChangedPaths.length === 0) {
+      issues.push({
+        code: "changed_path_lineage_mismatch",
+        field: "source_run_summary_file.meaningful_changed_paths",
+        message: `Source runtime/review reports recorded meaningful changed paths (${sourceReportChangedPaths.join(", ")}) but the run summary did not preserve them.`,
+      });
+    }
     if (targetChangedPaths.length === 0) {
       issues.push({
         code: "meaningful_target_change_missing",
         field: "source_run_summary_file.meaningful_changed_paths",
         message: "All-pass policy requires at least one meaningful target changed path outside .aor/.",
+      });
+    }
+    const postRunVerifyStatus = asNonEmptyString(runSummary.post_run_verify_status);
+    if (productAcceptanceRequired && postRunVerifyStatus && postRunVerifyStatus !== "pass") {
+      issues.push({
+        code: "post_run_verify_not_pass",
+        field: "source_run_summary_file.post_run_verify_status",
+        message: `Product acceptance requires post_run_verify_status=pass when primary verification evidence is present, got '${postRunVerifyStatus}'.`,
       });
     }
     const postRunDiagnosticStatus = asNonEmptyString(runSummary.post_run_diagnostic_status);

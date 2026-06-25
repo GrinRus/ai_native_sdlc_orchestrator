@@ -1,0 +1,138 @@
+catalog_id: vitest
+repo:
+  repo_id: vitest-dev/vitest
+  repo_url: https://github.com/vitest-dev/vitest.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - >-
+      node -e "const [major, minor] = process.versions.node.split('.').map(Number);
+      const ok = (major === 22 && minor >= 12) || major === 24 || major >= 26;
+      if (!ok) {
+        console.error('Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0, got ' + process.version);
+        process.exit(1);
+      }"
+    - pnpm install --frozen-lockfile
+    - pnpm build
+  commands:
+    - pnpm test
+    - pnpm lint
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: vitest.regress.large.openai
+    scenario_family: regress
+    feature_size: large
+    feature_mission_id: vitest-runner-diagnostics-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: vitest-runner-diagnostics-regression
+    title: Improve one Vitest runner diagnostics workflow
+    brief: Deliver a real runner or browser-mode diagnostics improvement with focused tests and
+      release-quality evidence across the affected package boundary.
+    feature_size: large
+    mission_class: product-change
+    goals:
+      - Improve one user-visible runner diagnostics behavior without weakening existing reporting.
+      - Add focused regression coverage that proves the new behavior through the public Vitest test
+        surface.
+      - Keep monorepo lint and relevant test evidence green.
+    kpis:
+      - kpi_id: vitest-diagnostics-green
+        name: Vitest diagnostics gate
+        target: targeted runner diagnostics tests plus lint pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - The changed diagnostics behavior is observable through tests or snapshots.
+      - Review evidence explains why the change is scoped to one runner or browser-mode workflow.
+      - Delivery evidence is materialized without upstream writes.
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside Vitest runtime, diagnostics, fixtures, docs, or tests required by
+        the behavior
+      - preserve relevant package tests and lint evidence
+      - avoid unrelated monorepo build or generated metadata churn
+      - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - packages/
+        - test/
+        - docs/
+    post_run_quality:
+      primary_commands:
+        - pnpm test
+        - pnpm lint
+      diagnostic_commands:
+        - pnpm typecheck
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 64
+      max_added_lines: 4500
+    size_rationale: Vitest diagnostics work can cross runner packages, fixtures, docs, and
+      snapshots, so it is a large product-change target.
+    change_budget:
+      max_changed_files: 64
+      max_added_lines: 4500
+    quality_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    agent_visible_request:
+      user_problem: Deliver a real runner or browser-mode diagnostics improvement with focused
+        tests and release-quality evidence across the affected package boundary.
+      desired_outcome: Users get clearer diagnostics for one runner workflow, and the target diff
+        proves the behavior through tests plus lint evidence.
+      constraints:
+        - Deliver a real product change through the full public AOR flow.
+        - Use existing Vitest package boundaries, fixtures, and test style.
+        - Keep upstream writes disabled and materialize delivery evidence through patch-only mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+      non_goals:
+        - Do not satisfy the mission with docs-only or metadata-only churn.
+        - Do not rewrite unrelated runner, browser, or workspace infrastructure.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - Meaningful changed path under packages/
+        - Meaningful changed path under test/
+        - "Primary verification command: pnpm test"
+        - "Primary verification command: pnpm lint"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - packages/
+        - test/
+        - docs/
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

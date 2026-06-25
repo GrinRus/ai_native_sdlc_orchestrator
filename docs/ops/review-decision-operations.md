@@ -32,15 +32,28 @@ aor review decide \
   --reason "Waiting for product-owner confirmation."
 ```
 
-Use `request-repair` when review or Runtime Harness findings must be repaired before delivery:
+Use `request-repair` when review, QA, Runtime Harness, or post-run
+verification findings must be repaired before delivery. Live E2E runners pass
+structured context with the operator-readable reason:
 
 ```bash
 aor review decide \
   --project-ref <repo> \
   --run-id <run_id> \
   --decision request-repair \
+  --repair-context-file <repair-context.json> \
   --reason "Feature-size-fit and Runtime Harness findings require repair."
 ```
+
+The repair context records `source_phase`, `cycle_iteration`,
+`unresolved_findings`, `meaningful_changed_paths`, `verification_status`,
+`verification_refs`, `previous_repair_decision_refs`,
+`context_fingerprint`, `new_context_since_previous`, `stop_reason`, and
+`requested_next_step=execution`. If a later repair decision references previous
+repair decisions, `new_context_since_previous` must explain the new finding,
+changed path, verification status, or evidence ref that makes another public
+repair actionable. The runner must create this decision through the public
+CLI/API lifecycle; it must not mutate the target checkout directly.
 
 ## Delivery and release gate
 Delivery and release can require an explicit approval decision:
@@ -70,6 +83,8 @@ When the gate is required:
 - `hold` blocks delivery/release;
 - `request-repair` blocks delivery/release;
 - `approve` passes only when the decision artifact itself records a passing delivery gate.
+- repeated repair context without new evidence blocks the implementation cycle
+  before delivery/release gates are reached.
 
 ## Evidence to inspect
 - `aor evidence show --project-ref <repo> --run-id <run_id>` lists run-linked `review-report`, `review-decision`, Runtime Harness, learning-loop, incident, and delivery evidence.

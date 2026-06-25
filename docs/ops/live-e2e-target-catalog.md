@@ -11,7 +11,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Never push to upstream public repositories by default.
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
-- Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N` repair loop.
+- Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N -> qa#N` implementation quality cycle.
 - Always materialize review, QA, and delivery artifacts for full-journey observation runs; release and learning become observed steps when the profile declares `live_e2e.flow_range_policy=full_lifecycle`.
 - Every mandatory full-journey run must resolve one curated matrix cell:
   - `repo`
@@ -20,6 +20,20 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `provider variant`
   - `feature size`
   - `run tier`
+- Medium+ product-change profiles must declare
+  `implementation_loop.cycle_steps: [execution, review, qa]` and
+  `implementation_loop.repair_sources: [review, qa, post-run-primary, post-run-diagnostic]`.
+- Medium+ QA steps must produce product-quality evaluator requests with
+  `quality_cycle_context` and accepted QA reports covering verification
+  relevance, regression signal quality, mission relevance, and repair necessity.
+- Repeated repair requests must carry `repair_context.context_fingerprint` and
+  `new_context_since_previous`; a repeated fingerprint without new context is a
+  terminal live proof blocker, not another retry opportunity.
+- Hard-target profiles may declare `target_toolchain.node.required_range` plus
+  `env_override: AOR_LIVE_E2E_TARGET_NODE_BIN`; when the override is set,
+  target setup and verification commands must run with that Node binary first
+  on `PATH`, otherwise incompatible host Node must block before product
+  execution as target setup/environment evidence.
 
 ## Target 1 — `sindresorhus/ky`
 - Catalog id: `ky`
@@ -50,15 +64,15 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - broader retry, hook, public type, and observability rehearsal with operator
       review required for every controller step
 - Best profiles:
-  - full-journey required cells:
+  - full-journey required/candidate cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-small-codex.yaml` (`regress/small/openai-primary`, codex-cli)
-    - `full-journey-regress-ky-medium-codex.yaml` (`regress/medium/openai-primary`, codex-cli)
-    - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
+    - `full-journey-regress-ky-medium-codex.yaml` (`regress/medium/openai-primary`, codex-cli, extended)
+    - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`, extended)
     - `full-journey-regress-ky-medium-open-code.yaml` (`regress/medium/open-code-primary`)
     - `full-journey-regress-ky-small-qwen.yaml` (`regress/small/qwen-primary`, extended)
     - `full-journey-regress-ky-medium-qwen.yaml` (`regress/medium/qwen-primary`, extended)
-    - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+    - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`, extended)
     - `full-journey-governance-ky-large-codex.yaml` (`governance/large/openai-primary`, codex-cli)
     - `full-journey-governance-ky-large-anthropic.yaml` (`governance/large/anthropic-primary`)
   - installed-user browser-task candidate:
@@ -155,8 +169,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `commander-cli-governance-lineage` (`medium`, `governance`)
 - Best profiles:
   - `full-journey-regress-commander-js.yaml`
-  - `full-journey-repair-commander-js-medium-anthropic.yaml`
-  - `full-journey-governance-commander-js-medium-openai.yaml`
+  - `full-journey-repair-commander-js-medium-anthropic.yaml` (extended)
+  - `full-journey-governance-commander-js-medium-openai.yaml` (extended)
 - Verification baseline: `npm ci`, `npm run test`, `npm run check`.
 
 ## Target 5 — `pytest-dev/pluggy`
@@ -169,8 +183,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `pluggy-typing-governance` (`medium`, `governance|repair`)
 - Best profiles:
   - `full-journey-regress-pluggy.yaml`
-  - `full-journey-repair-pluggy-medium-anthropic.yaml`
-  - `full-journey-governance-pluggy-medium-openai.yaml`
+  - `full-journey-repair-pluggy-medium-anthropic.yaml` (extended)
+  - `full-journey-governance-pluggy-medium-openai.yaml` (extended)
   - `full-journey-governance-pluggy-medium-open-code.yaml` (extended)
 - Verification baseline: `python3 -m venv .aor/live-e2e-venv`,
   `.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
@@ -306,14 +320,15 @@ For canonical setup and verification dependency details per profile, use `docs/o
   Rust build and snapshot costs are proven stable in live runs.
 
 ## Extended candidate targets
-- `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.
-- `date-fns/date-fns` (`date-fns`): TypeScript utility library, extended small regress cell, `pnpm install`, `pnpm vitest run`, `pnpm run lint`, `pnpm run types`.
 - `colinhacks/zod` (`zod`): TypeScript schema validator, extended medium JSON Schema regression cell, `pnpm install`, `pnpm run build`, `pnpm test`, `pnpm run lint:check`.
 - `encode/httpx` (`httpx`): Python HTTP client, extended medium timeout/transport regression cell, `.aor` venv install, targeted pytest, Ruff, and mypy.
 - `eslint/eslint` (`eslint`): JavaScript lint rule engine, extended medium autofix regression cell, `npm install`, rule tests, and rule/type metadata checks.
 - `fastify/fastify` (`fastify`): Node.js web framework, extended medium schema/plugin repair cell, `npm install`, `npm run test:ci`, `npm run lint`.
 - `prettier/prettier` (`prettier`): formatter snapshot target, extended medium TypeScript formatting regression cell, `yarn install --immutable`, typecheck, ESLint, and focused format tests.
 - `astral-sh/ruff` (`ruff`): Rust Python linter/formatter, extended large rule/autofix regression cell, `cargo fetch`, targeted crate tests.
+- `vitest-dev/vitest` (`vitest`): hard runner diagnostics target, extended large product-change cell, Node engine preflight, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm test`, `pnpm lint`, isolated verification workspace.
+- `sqlalchemy/sqlalchemy` (`sqlalchemy`): hard Python SQL/ORM target, extended large product-change cell, `.aor` venv editable install, targeted SQL/ORM pytest.
+- `biomejs/biome` (`biome`): hard Rust/TypeScript formatter and rule target, extended large product-change cell, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`.
 
 ## Why these targets
 Together these targets cover:
@@ -341,7 +356,7 @@ Mandatory full-journey live E2E is valid only when:
 6. baseline target verification is recorded separately from execution readiness;
 7. provider execution attempts a real code-changing run;
 8. post-run target verification, Runtime Harness, review, QA, and delivery artifacts are present;
-9. the resulting observation report preserves the same matrix cell and records post-delivery code/artifact findings without turning quality failures into hard runner failures.
+9. medium+ product-change steps have accepted linked step-quality reports before continuation, and final product acceptance requires all-pass outcome quality.
 
 ## Run selection and product rotation
 For live E2E success-rate analysis, choose different products and different
@@ -366,8 +381,6 @@ the runner around one known-good repository.
 Required coverage matrix:
 - `ky`
   - `regress/small/openai-primary`
-  - `regress/medium/anthropic-primary`
-  - `release/medium/openai-primary`
 - `httpie/cli`
   - `regress/small/openai-primary`
   - `repair/medium/anthropic-primary`
@@ -378,35 +391,37 @@ Required coverage matrix:
   - `governance/large/openai-primary`
 - `commander-js`
   - `regress/small/openai-primary`
-  - `repair/medium/anthropic-primary`
-  - `governance/medium/openai-primary`
 - `pluggy`
   - `regress/small/openai-primary`
-  - `repair/medium/anthropic-primary`
-  - `governance/medium/openai-primary`
-  - `governance/medium/open-code-primary` (extended)
 
 Extended candidate cells:
 - `ky.regress.small.openai.codex` (`ky-header-regression`)
 - `ky.regress.medium.openai.codex` (`ky-fetch-options-regression`)
+- `ky.regress.medium.anthropic` (`ky-fetch-options-regression`)
+- `ky.release.medium.openai` (`ky-release-doc-typing`)
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
 - `ky.governance.large.anthropic` (`ky-retry-hooks-governance`)
 - `ky.regress.small.qwen` (`ky-header-regression`)
 - `ky.regress.medium.qwen` (`ky-fetch-options-regression`)
+- `commander-js.repair.medium.anthropic` (`commander-help-typing-repair`)
+- `commander-js.governance.medium.openai` (`commander-cli-governance-lineage`)
+- `pluggy.repair.medium.anthropic` (`pluggy-diagnostics-repair`)
+- `pluggy.governance.medium.openai` (`pluggy-typing-governance`)
+- `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
 - `ky.governance.xlarge.openai` / `ky.governance.xlarge.anthropic` (`ky-request-lifecycle-observability-xlarge`, manual-only)
 - `httpie-cli.governance.xlarge.openai` / `httpie-cli.governance.xlarge.anthropic` (`httpie-cli-request-policy-orchestration-xlarge`, manual-only)
 - `nextjs.release.xlarge.openai` / `nextjs.release.xlarge.anthropic` (`nextjs-cross-package-release-orchestration`, manual-only)
-- `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
-- `cobra.regress.small.openai`
-- `date-fns.regress.small.openai`
 - `zod.regress.medium.openai` (`zod-json-schema-regression`)
 - `httpx.regress.medium.openai` (`httpx-timeout-transport-regression`)
 - `eslint.regress.medium.openai` (`eslint-rule-autofix-regression`)
 - `fastify.repair.medium.openai` (`fastify-schema-plugin-repair`)
 - `prettier.regress.medium.openai` (`prettier-typescript-format-regression`)
 - `ruff.regress.large.openai` (`ruff-rule-autofix-regression`)
+- `vitest.regress.large.openai` (`vitest-runner-diagnostics-regression`)
+- `sqlalchemy.regress.large.openai` (`sqlalchemy-query-typing-regression`)
+- `biome.regress.large.openai` (`biome-rule-or-formatter-regression`)
 
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
@@ -424,11 +439,15 @@ are not delivery path allowlists or blocklists; they are the minimum surfaces
 that can prove the provider changed the target in a way that could satisfy the
 selected mission.
 
-Feature-size taxonomy:
-- `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
-- `medium`: bounded source plus test/type integration, usually 3-6 files.
-- `large`: cross-package or release/governance lineage with broader artifact expectations.
-- `xlarge`: manual or overnight rehearsal only; do not add xlarge cells to required coverage or qualification sets. Legacy `xl` inputs are accepted as `xlarge`, but new catalog entries must use `xlarge`.
+Feature-size taxonomy and budgets:
+- `small`: flow-regression canary only, `max_changed_files >= 16`, `max_added_lines >= 900`.
+- `medium`: product-change mission, `max_changed_files >= 32`, `max_added_lines >= 2200`.
+- `large`: product-change mission, `max_changed_files >= 64`, `max_added_lines >= 4500`.
+- `xlarge`: product-change mission for manual or overnight rehearsal only, `max_changed_files >= 100`, `max_added_lines >= 10000`; do not add xlarge cells to required coverage or qualification sets.
+
+`mission_class=flow-regression` is allowed only for small canary missions.
+`mission_class=product-change` is required for medium, large, and xlarge.
+Legacy `xl` inputs are rejected.
 
 Strict all-pass quality loops may include xlarge as manual observation evidence,
 but xlarge still cannot close required provider qualification or acceptance
@@ -444,10 +463,9 @@ Run-tier taxonomy:
 Required matrix closure rule:
 - required coverage can close only for `run_tier=acceptance` or `run_tier=production-proof` with `live-e2e-run-health-report.overall_status=pass`;
 - run-health findings identify why a run attempt did not qualify;
-- outcome quality findings belong in `live-e2e-quality-assessment-report` and are advisory for acceptance follow-up, not provider qualification status.
-- local quality-driven rerun loops may additionally require
-  `quality-assessment gate --policy all-pass`; that gate remains separate from
-  run-health and qualification accounting.
+- step quality findings belong in `live-e2e-step-quality-assessment-report`;
+- outcome quality findings belong in `live-e2e-quality-assessment-report` and remain separate from provider qualification status;
+- medium+ product-change product acceptance requires accepted step-quality reports and `quality-assessment gate --policy all-pass`; that gate remains separate from run-health and qualification accounting.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky-small-codex.yaml`

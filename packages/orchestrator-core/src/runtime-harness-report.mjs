@@ -5,12 +5,9 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import {
+  collectMissionChangeEvidence,
   filterMeaningfulCodeChangedPaths,
   filterNonBootstrapChangedPaths,
-  filterRunnerOwnedStatePaths,
-  listChangedPaths,
-  loadMissionScope,
-  resolveMissionScopedChanges,
 } from "./shared/mission-scope.mjs";
 
 const RUNTIME_HARNESS_DECISIONS = new Set(["pass", "retry", "repair", "escalate", "block", "fail"]);
@@ -627,7 +624,7 @@ export function synthesizeRepairAttempts(stepResult, classification, artifactRef
 /**
  * @param {Record<string, unknown>} stepResult
  * @param {string} artifactRef
- * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], runnerOwnedStatePaths?: string[], ignoredInputFiles: string[], strictCodeChangingNoopDetectionApplied?: boolean, strictCodeChangingNoop: boolean }} missionSemantics
+ * @param {{ gitStatusAvailable: boolean, gitStatusRoot?: string, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], runnerOwnedStatePaths?: string[], ignoredInputFiles: string[], strictCodeChangingNoopDetectionApplied?: boolean, strictCodeChangingNoop: boolean }} missionSemantics
  */
 function buildStepDecision(stepResult, artifactRef, missionSemantics) {
   const routedExecution = asRecord(stepResult.routed_execution);
@@ -660,6 +657,7 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
     },
     mission_semantics: {
       git_status_available: missionSemantics.gitStatusAvailable,
+      git_status_root: asString(missionSemantics.gitStatusRoot),
       changed_paths: missionSemantics.changedPaths,
       non_bootstrap_changed_paths: missionSemantics.nonBootstrapChangedPaths,
       non_input_changed_paths: missionSemantics.nonInputChangedPaths,
@@ -1087,6 +1085,7 @@ function recommendationActionForFinding(finding) {
  *   runController?: Record<string, unknown>,
  *   runTransitions?: Array<Record<string, unknown>>,
  *   runDecision?: Record<string, unknown>,
+ *   executionRoot?: string | null,
  * }} options
  */
 export function materializeRuntimeHarnessReport(options) {
@@ -1115,22 +1114,26 @@ export function materializeRuntimeHarnessReport(options) {
   const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionType = options.missionType ?? missionProfile.missionType;
   const strictnessProfile = options.strictnessProfile ?? missionProfile.strictnessProfile;
-  const changedPathStatus = listChangedPaths(init.projectRoot);
-  const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatus.changedPaths);
-  const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatus.changedPaths);
-  const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
-  const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
+  const executionRoot = asString(options.executionRoot)
+    ? path.resolve(init.projectRoot, /** @type {string} */ (options.executionRoot))
+    : init.projectRoot;
+  const missionEvidence = collectMissionChangeEvidence({
+    projectRoot: init.projectRoot,
+    artifactsRoot: init.runtimeLayout.artifactsRoot,
+    evidenceRoot: executionRoot,
+  });
   const strictCodeChangingNoopDetectionApplied = missionType === "code-changing" || missionType === "release";
   const strictCodeChangingNoop =
-    strictCodeChangingNoopDetectionApplied && missionScopedChanges.meaningfulChangedPaths.length === 0;
+    strictCodeChangingNoopDetectionApplied && missionEvidence.meaningfulChangedPaths.length === 0;
   const missionSemantics = {
-    gitStatusAvailable: changedPathStatus.available,
-    changedPaths: changedPathStatus.changedPaths,
-    nonBootstrapChangedPaths,
-    nonInputChangedPaths: missionScopedChanges.nonInputChangedPaths,
-    meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
-    runnerOwnedStatePaths,
-    ignoredInputFiles: missionScopedChanges.ignoredInputFiles,
+    gitStatusAvailable: missionEvidence.gitStatusAvailable,
+    gitStatusRoot: missionEvidence.gitStatusRoot,
+    changedPaths: missionEvidence.changedPaths,
+    nonBootstrapChangedPaths: missionEvidence.nonBootstrapChangedPaths,
+    nonInputChangedPaths: missionEvidence.nonInputChangedPaths,
+    meaningfulChangedPaths: missionEvidence.meaningfulChangedPaths,
+    runnerOwnedStatePaths: missionEvidence.runnerOwnedStatePaths,
+    ignoredInputFiles: missionEvidence.ignoredInputFiles,
     strictCodeChangingNoopDetectionApplied,
     strictCodeChangingNoop,
   };

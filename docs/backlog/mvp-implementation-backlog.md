@@ -392,5 +392,57 @@ This is the master index for the implementation slices across all defined waves.
 | W45-S05 | Repair-loop proof fixtures and live profile | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
 | W45-S06 | Documentation refresh and live E2E acceptance | EPIC-7, EPIC-0 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `scripts/live-e2e/**`, `examples/live-e2e/**`, tests | W45-S05 |
 
+## W46 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W46-S01 | Contract/docs breaking policy | EPIC-0, EPIC-7 | ready | `docs/contracts/**`, `docs/ops/**`, `packages/contracts/**` | W45-S06 |
+| W46-S02 | Step evaluator report and runner behavior | EPIC-7 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `scripts/test/**` | W46-S01 |
+| W46-S03 | Catalog budget and small-canary migration | EPIC-7 | ready | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S01 |
+| W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S03 |
+| W46-S05 | Hard target expansion | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S04 |
+| W46-S06 | Proof-complete acceptance closure and findings intake | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
+
+## W47 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W47-S01 | AOR operator keyboard accessibility and guided proof closure | EPIC-6, EPIC-7 | done | `apps/web/**`, `scripts/live-e2e/**`, tests | W46-S06 |
+| W47-S02 | Live E2E target verification isolation and Vitest readiness | EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, target catalog/profile docs, tests | W47-S01 |
+| W47-S03 | AOR repair/review convergence hardening | EPIC-4, EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, review/repair docs, tests | W47-S02 |
+| W47-S04 | Full proof rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, root checks | W47-S03 |
+
+## W48 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W48-S01 | Quality-cycle contract and profile policy | EPIC-0, EPIC-7 | done | `docs/contracts/**`, `docs/ops/**`, `scripts/live-e2e/profiles/**`, `scripts/live-e2e/lib/profile-catalog.mjs`, tests | W47-S04 |
+| W48-S02 | Quality-cycle runner and controller implementation | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/test/**` | W48-S01 |
+| W48-S03 | Structured repair context and convergence classification | EPIC-4, EPIC-6, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `packages/orchestrator-core/**`, tests | W48-S02 |
+| W48-S04 | Vitest target toolchain policy | EPIC-7 | done | `scripts/live-e2e/lib/target-materialization.mjs`, `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, tests | W48-S03 |
+| W48-S05 | Control quality-cycle proof rerun and product acceptance closure | EPIC-0, EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W48-S04 |
+
+## W49 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W49-S01 | Proof findings hygiene and evidence truthfulness | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `docs/backlog/**` | W48-S05 |
+| W49-S02 | Repeated repair anti-loop enforcement | EPIC-4, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `scripts/live-e2e/lib/flows.mjs`, tests | W49-S01 |
+| W49-S03 | QA-specific step-quality evaluator hardening | EPIC-4, EPIC-7 | done | `docs/contracts/live-e2e-step-quality-assessment-*.md`, `packages/contracts/**`, `scripts/live-e2e/lib/step-quality-assessment.mjs`, `scripts/live-e2e/lib/flows.mjs`, tests | W49-S02 |
+| W49-S04 | Full Control live E2E rerun and product acceptance closure | EPIC-0, EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W49-S03 |
+
+## W50 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W50-S01 | Review verification mapping and residual-risk classification | EPIC-4, EPIC-7 | ready | `docs/contracts/review-report.md`, `packages/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, tests | W49-S04 |
+| W50-S02 | Live E2E target toolchain fail-fast and setup-journal hygiene | EPIC-7 | ready | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/run-profile.mjs`, runner tests | W50-S01 |
+| W50-S03 | Fastify/Vitest control rerun and product acceptance closure | EPIC-0, EPIC-7 | ready | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W50-S02 |
+| W50-S04 | Findings/backlog state sync | EPIC-0, EPIC-7 | ready | `docs/backlog/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W50-S03 |
+
+## W51 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W51-S01 | Clean-commit W50 proof rerun | EPIC-0, EPIC-7 | ready | `docs/ops/live-e2e-proof-complete-findings.md`, `scripts/live-e2e/**`, root checks, live proof artifacts | W50-S04 |
+| W51-S02 | Vitest compatible Node large acceptance | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W51-S01 |
+| W51-S03 | Automated final quality report hydration | EPIC-4, EPIC-7 | blocked | `scripts/live-e2e/quality-assessment.mjs`, `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests | W51-S02 |
+| W51-S04 | Explicit target-readiness phase | EPIC-7 | blocked | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests | W51-S03 |
+| W51-S05 | Next hard-target expansion after large acceptance | EPIC-7 | blocked | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W51-S04 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

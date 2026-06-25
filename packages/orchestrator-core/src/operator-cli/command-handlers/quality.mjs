@@ -336,6 +336,7 @@ export function handleQualityCommand(context) {
     if (!runId) {
       throw new CliUsageError("Missing required flag '--run-id' for 'aor review run'.");
     }
+    const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
 
     const reviewResult = materializeReviewReport({
       cwd,
@@ -343,6 +344,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
 
     outputState.resolvedProjectRef = reviewResult.projectRoot;
@@ -369,6 +371,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
     outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
     outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
@@ -390,6 +393,7 @@ export function handleQualityCommand(context) {
     if (decision !== "approve" && decision !== "hold" && decision !== "request-repair") {
       throw new CliUsageError("Flag '--decision' must be approve, hold, or request-repair.");
     }
+    const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
 
     const reviewResult = materializeReviewReport({
       cwd,
@@ -397,6 +401,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
     const runtimeHarness = materializeRuntimeHarnessReport({
       cwd,
@@ -404,6 +409,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
     const qualityArtifacts = listQualityArtifacts({
       cwd,
@@ -425,6 +431,13 @@ export function handleQualityCommand(context) {
       runtimeLayout: reviewResult.runtimeLayout,
       runId,
     }).map((entry) => entry.artifact_ref);
+    const repairContextFile = resolveOptionalRefOrPathFlag({
+      cwd,
+      projectRoot: reviewResult.projectRoot,
+      flagValue: resolveOptionalStringFlag("repair-context-file", flags["repair-context-file"]),
+      flagName: "repair-context-file",
+    });
+    const repairContext = repairContextFile ? readJson(repairContextFile) : null;
     const decisionResult = materializeReviewDecision({
       projectId: reviewResult.projectId,
       projectRoot: reviewResult.projectRoot,
@@ -440,6 +453,7 @@ export function handleQualityCommand(context) {
       deliveryManifestRefs,
       learningHandoffRefs,
       evidenceRefs: priorDecisionRefs,
+      repairContext,
     });
 
     outputState.resolvedProjectRef = reviewResult.projectRoot;
@@ -462,6 +476,7 @@ export function handleQualityCommand(context) {
         ? /** @type {{ status?: string }} */ (decisionResult.decision.delivery_gate).status ?? null
         : null;
     outputState.reviewDecisionReason = decisionResult.decision.reason;
+    outputState.reviewDecisionRepairContext = decisionResult.decision.repair_context;
     outputState.reviewDecisionEvidenceRefs = decisionResult.decision.evidence_refs;
     outputState.readOnly = false;
     outputState.futureControlHooks = [

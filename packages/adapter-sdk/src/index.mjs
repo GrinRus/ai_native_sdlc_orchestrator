@@ -325,6 +325,18 @@ function recordProviderProgress(record) {
   });
 }
 
+function latestProviderProgressPatch() {
+  const latestProgress = providerProgressEvents.at(-1);
+  if (!latestProgress) return {};
+  return {
+    last_progress_at: latestProgress.observed_at,
+    last_progress_kind: latestProgress.kind,
+    last_progress_label: latestProgress.label,
+    progress_event_count: providerProgressEventCount,
+    output_mode: outputMode,
+  };
+}
+
 function processStdoutProgressChunk(chunk) {
   if (outputMode !== "stream-json") return;
   stdoutLineBuffer += chunk;
@@ -397,6 +409,7 @@ heartbeatTimer = setInterval(() => {
     if (!interrupted) {
       interrupted = true;
       writeProviderStepStatus({
+        ...latestProviderProgressPatch(),
         status: "interrupted",
         interruption_owner: "operator",
         interruption_reason: "External runtime was interrupted by public run-control cancel.",
@@ -462,6 +475,7 @@ child.on("close", (status, signal) => {
     interruptKillTimer = null;
   }
   writeProviderStepStatus({
+    ...latestProviderProgressPatch(),
     status: interrupted ? "interrupted" : status === 0 && !timedOut ? "completed" : "failed",
     interruption_owner: interrupted ? "operator" : null,
     interruption_reason: interrupted ? "External runtime was interrupted by public run-control cancel." : null,

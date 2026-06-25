@@ -22,6 +22,12 @@ required_matrix_cells:
     feature_mission_id: nextjs-shared-package-release
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: nextjs.release.large.anthropic
+    scenario_family: release
+    feature_size: large
+    feature_mission_id: nextjs-shared-package-release
+    provider_variant_id: anthropic-primary
+    coverage_tier: extended
   - cell_id: nextjs.repair.medium.anthropic
     scenario_family: repair
     feature_size: medium
@@ -64,8 +70,8 @@ manual_matrix_cells:
 feature_missions:
   - mission_id: nextjs-shared-util-regression
     title: Preserve one narrow shared-package regression
-    brief: Fix one narrowly scoped shared-package regression with the smallest app
-      or package touch needed to keep the monorepo green.
+    brief: Fix one narrowly scoped shared-package regression with the smallest app or package touch
+      needed to keep the monorepo green.
     feature_size: small
     expected_evidence: &a1
       - verify-summary
@@ -80,23 +86,63 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 8
-      max_added_lines: 260
-    size_rationale: Small monorepo missions should stay inside one package or one
-      consumer boundary with limited diff size.
+      max_changed_files: 16
+      max_added_lines: 900
+    size_rationale: Small monorepo missions should stay inside one package or one consumer boundary with
+      limited diff size.
     change_budget:
-      max_changed_files: 8
-      max_added_lines: 260
+      max_changed_files: 16
+      max_added_lines: 900
     quality_evidence: *a1
+    mission_class: flow-regression
+    agent_visible_request:
+      user_problem: Fix one narrowly scoped shared-package regression with the smallest app or package
+        touch needed to keep the monorepo green.
+      desired_outcome: Fix one narrowly scoped shared-package regression with the smallest app or package
+        touch needed to keep the monorepo green.
+      constraints:
+        - Use this mission only as a live E2E canary that proves the public flow still works.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change inside one shared package or one consuming app boundary
+        - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+      non_goals:
+        - Do not expand this small canary into a product-quality acceptance mission.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: flow-health
+      step_quality_required: false
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted public step decision refs for the canary flow.
+        - verify-summary
+        - routed-step-result
+        - review-report
+    final_code_rubric:
+      quality_gate: flow-health
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - flow_completion
+        - public_artifact_materialization
+        - canary_verification
   - mission_id: nextjs-workspace-repair-shared-config
     title: Repair one bounded workspace configuration or shared package seam
-    brief: Fix one bounded monorepo breakage across a shared package and one
-      consuming app or config boundary, with strong delivery and audit lineage.
+    brief: Fix one bounded monorepo breakage across a shared package and one consuming app or config
+      boundary, with strong delivery and audit lineage.
     feature_size: medium
     goals:
       - Repair one bounded workspace configuration or shared package seam.
-      - Preserve monorepo lint, typecheck, and shared-package unit-smoke
-        evidence.
+      - Preserve monorepo lint, typecheck, and shared-package unit-smoke evidence.
     kpis:
       - kpi_id: nextjs-medium-repair-green
         name: Medium monorepo repair gate
@@ -111,8 +157,7 @@ feature_missions:
       - review-report
       - delivery-manifest
     acceptance_checks:
-      - keep the change inside monorepo apps, packages, and bounded tooling
-        surfaces
+      - keep the change inside monorepo apps, packages, and bounded tooling surfaces
       - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
       - keep delivery evidence anchored to the target checkout
     post_run_quality:
@@ -130,28 +175,80 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 12
-      max_added_lines: 360
-    size_rationale: Medium monorepo missions may cross one package-to-app or
-      package-to-tooling boundary, but should remain explicitly bounded.
+      max_changed_files: 32
+      max_added_lines: 2200
+    size_rationale: Medium monorepo missions may cross one package-to-app or package-to-tooling
+      boundary, but should remain explicitly bounded.
     change_budget:
-      max_changed_files: 12
-      max_added_lines: 360
+      max_changed_files: 32
+      max_added_lines: 2200
     quality_evidence: *a2
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Fix one bounded monorepo breakage across a shared package and one consuming app or
+        config boundary, with strong delivery and audit lineage.
+      desired_outcome: The change stays inside bounded apps, packages, and tooling surfaces. Delivery and
+        review evidence are anchored to the target checkout.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep the change inside monorepo apps, packages, and bounded tooling surfaces
+        - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+        - keep delivery evidence anchored to the target checkout
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - verify-summary
+        - routed-step-result
+        - review-report
+        - delivery-manifest
+        - "Primary verification command: yarn g:lint"
+        - "Primary verification command: yarn g:typecheck"
+        - "Primary verification command: yarn workspace @your-org/ts-utils test-unit"
+        - "Diagnostic evidence command: yarn workspace @your-org/core-lib test-unit"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: nextjs-shared-package-release
     title: Prepare one shared-package release-shaped change
-    brief: Update one shared package and one consuming app with bounded release
-      evidence and no upstream write-back.
+    brief: Update one shared package and one consuming app with bounded release evidence and no upstream
+      write-back.
     feature_size: large
     goals:
-      - Prepare one shared-package release-shaped change across a bounded
-        package/app boundary.
+      - Prepare one shared-package release-shaped change across a bounded package/app boundary.
       - Preserve release lineage without upstream write-back.
     kpis:
       - kpi_id: nextjs-release-lineage
         name: Monorepo release lineage
-        target: delivery-manifest, release-packet, and review-report are materialized
-          from the same target checkout
+        target: delivery-manifest, release-packet, and review-report are materialized from the same target
+          checkout
         measurement: live E2E summary and delivery artifacts
       - kpi_id: nextjs-release-quality
         name: Monorepo release quality gate
@@ -184,43 +281,91 @@ feature_missions:
       - anthropic-primary
       - open-code-primary
     size_budget:
-      max_changed_files: 14
-      max_added_lines: 420
-    size_rationale: Large monorepo release missions may cross multiple packages and
-      one consuming app, but must remain bounded to apps/packages and strict
-      release evidence.
+      max_changed_files: 64
+      max_added_lines: 4500
+    size_rationale: Large monorepo release missions may cross multiple packages and one consuming app,
+      but must remain bounded to apps/packages and strict release evidence.
     change_budget:
-      max_changed_files: 14
-      max_added_lines: 420
+      max_changed_files: 64
+      max_added_lines: 4500
     quality_evidence: *a3
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Update one shared package and one consuming app with bounded release evidence and no
+        upstream write-back.
+      desired_outcome: Bounded monorepo quality gates pass. Delivery and release packet evidence are
+        anchored to the target checkout. No upstream write-back is attempted.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep changes inside apps and packages only
+        - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - delivery-manifest
+        - release-packet
+        - review-report
+        - "Primary verification command: yarn g:lint"
+        - "Primary verification command: yarn g:typecheck"
+        - "Primary verification command: yarn workspace @your-org/ts-utils test-unit"
+        - "Primary verification command: yarn workspace @your-org/core-lib test-unit"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability
   - mission_id: nextjs-cross-package-release-orchestration
     title: Orchestrate a cross-package app release rehearsal
-    brief: Manually rehearse a broad release-shaped change that updates multiple
-      shared package surfaces and at least one consuming app path with bounded
-      release, review, QA, and learning evidence.
+    brief: Manually rehearse a broad release-shaped change that updates multiple shared package surfaces
+      and at least one consuming app path with bounded release, review, QA, and learning evidence.
     feature_size: xlarge
     execution_policy: manual-only
     goals:
-      - Change at least two shared package or package-to-app boundaries with
-        one coherent release intent.
-      - Prove that the consuming app uses the changed shared package behavior in
-        runtime code, not only in package metadata.
+      - Change at least two shared package or package-to-app boundaries with one coherent release
+        intent.
+      - Prove that the consuming app uses the changed shared package behavior in runtime code, not
+        only in package metadata.
       - Preserve release lineage without upstream write-back.
     kpis:
       - kpi_id: nextjs-xlarge-release-depth
         name: Cross-package release depth
-        target: source, tests, package metadata, changelog or changeset, and app
-          integration all trace to one release intent
+        target: source, tests, package metadata, changelog or changeset, and app integration all trace to
+          one release intent
         measurement: target diff review plus post-run primary verification
       - kpi_id: nextjs-xlarge-release-lineage
         name: Xlarge release lineage
-        target: delivery-manifest, release-packet, review-report, QA evidence,
-          and learning handoff are materialized from the same target checkout
+        target: delivery-manifest, release-packet, review-report, QA evidence, and learning handoff are
+          materialized from the same target checkout
         measurement: live E2E summary and delivery artifacts
     definition_of_done:
       - Bounded monorepo quality gates pass.
-      - The target diff includes runtime source, tests, and release notes or
-        changeset evidence.
+      - The target diff includes runtime source, tests, and release notes or changeset evidence.
       - At least one consuming app path exercises the changed shared package API.
       - Delivery and release packet evidence are anchored to the target checkout.
       - No upstream write-back is attempted.
@@ -249,16 +394,73 @@ feature_missions:
       - openai-primary
       - anthropic-primary
     size_budget:
-      max_changed_files: 24
-      max_added_lines: 1100
-    size_rationale: Xlarge monorepo release missions are manual-only because they
-      may cross several package/app boundaries and require operator judgement on
-      release coherence, product value, and merge risk.
+      max_changed_files: 100
+      max_added_lines: 10000
+    size_rationale: Xlarge monorepo release missions are manual-only because they may cross several
+      package/app boundaries and require operator judgement on release coherence, product value, and
+      merge risk.
     change_budget:
-      max_changed_files: 24
-      max_added_lines: 1100
+      max_changed_files: 100
+      max_added_lines: 10000
     quality_evidence:
       - delivery-manifest
       - release-packet
       - review-report
       - learning-loop-handoff
+    mission_class: product-change
+    agent_visible_request:
+      user_problem: Manually rehearse a broad release-shaped change that updates multiple shared package
+        surfaces and at least one consuming app path with bounded release, review, QA, and learning
+        evidence.
+      desired_outcome: Bounded monorepo quality gates pass. The target diff includes runtime source,
+        tests, and release notes or changeset evidence. At least one consuming app path exercises
+        the changed shared package API. Delivery and release packet evidence are anchored to the
+        target checkout. No upstream write-back is attempted.
+      constraints:
+        - Deliver a real product change through the full public AOR flow, not a catalog-only or
+          no-op patch.
+        - Use the target repository conventions and existing test style.
+        - Keep upstream writes disabled; materialize delivery evidence only through the configured
+          no-write or patch/fork mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+        - keep changes inside apps and packages only
+        - require source, tests, release notes or changeset, and consuming app usage
+        - reject native-wrapper-only utilities as insufficient for xlarge
+        - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+      non_goals:
+        - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
+          unless the requested product behavior explicitly requires it.
+        - Do not write provider-local state, editor artifacts, temporary runtime files, or unrelated
+          root files into the target diff.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - delivery-manifest
+        - release-packet
+        - review-report
+        - learning-loop-handoff
+        - "Primary verification command: yarn g:lint"
+        - "Primary verification command: yarn g:typecheck"
+        - "Primary verification command: yarn workspace @your-org/ts-utils test-unit"
+        - "Primary verification command: yarn workspace @your-org/core-lib test-unit"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces: []
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

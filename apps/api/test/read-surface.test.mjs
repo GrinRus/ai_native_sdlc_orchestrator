@@ -211,6 +211,19 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
           runtime_harness_overall_decision: "pass",
           blocking_findings: [],
         },
+        repair_context: {
+          source_phase: "none",
+          cycle_iteration: 0,
+          unresolved_findings: [],
+          meaningful_changed_paths: [],
+	          verification_status: "pass",
+	          verification_refs: [],
+	          previous_repair_decision_refs: [],
+	          context_fingerprint: "none",
+	          new_context_since_previous: [],
+	          stop_reason: "none",
+	          requested_next_step: "none",
+	        },
         delivery_gate: {
           status: "pass",
           blocks_downstream: false,
@@ -1053,7 +1066,16 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
           review_recommendation: recommendation,
           feature_traceability: {},
           discovery_quality: {},
-          artifact_quality: {},
+          artifact_quality: {
+            verification_coverage: {
+              changed_test_paths: [],
+              covered_test_paths: [],
+              uncovered_test_paths: [],
+              covering_commands: [],
+              recorded_test_commands: [],
+              coverage_reason: "no-changed-test-paths",
+            },
+          },
           code_quality: {},
           feature_size_fit: {},
           provider_traceability: {},
@@ -1103,6 +1125,8 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
     };
 
     const writeReviewDecision = (runId, decision, gateStatus) => {
+      const reviewRef = `evidence://reports/review-report-${runId}.json`;
+      const harnessRef = `evidence://reports/runtime-harness-report-${runId}.json`;
       writeContractFile({
         family: "review-decision",
         filePath: path.join(reportsRoot, `review-decision-${runId}.json`),
@@ -1113,11 +1137,39 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
           decision,
           decider_ref: "operator://planner-metrics-test",
           reason: `Fixture ${decision} decision.`,
-          review_report_ref: `evidence://reports/review-report-${runId}.json`,
-          runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+          review_report_ref: reviewRef,
+          runtime_harness_report_ref: harnessRef,
           delivery_manifest_refs: [],
           learning_handoff_refs: [],
           decision_basis: {},
+          repair_context:
+            decision === "request-repair"
+              ? {
+                  source_phase: "review",
+                  cycle_iteration: 1,
+                  unresolved_findings: ["Planner metrics fixture repair decision blocks clean close."],
+                  meaningful_changed_paths: [],
+	                  verification_status: "not_pass",
+	                  verification_refs: [reviewRef, harnessRef],
+	                  previous_repair_decision_refs: [],
+	                  context_fingerprint: "sha256:planner-metrics-fixture-repair",
+	                  new_context_since_previous: ["first-repair-decision"],
+	                  stop_reason: "Fixture repair decision requested another execution iteration.",
+	                  requested_next_step: "execution",
+	                }
+              : {
+                  source_phase: "none",
+                  cycle_iteration: 0,
+                  unresolved_findings: [],
+                  meaningful_changed_paths: [],
+	                  verification_status: gateStatus === "pass" ? "pass" : "not_pass",
+	                  verification_refs: [],
+	                  previous_repair_decision_refs: [],
+	                  context_fingerprint: "none",
+	                  new_context_since_previous: [],
+	                  stop_reason: "none",
+	                  requested_next_step: "none",
+	                },
           delivery_gate: {
             status: gateStatus,
             blocks_downstream: gateStatus !== "pass",

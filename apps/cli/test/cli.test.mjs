@@ -958,6 +958,19 @@ test("guided mission create writes intake evidence and next resolves mission sta
         runtime_harness_overall_decision: "pass",
         blocking_findings: [],
       },
+      repair_context: {
+        source_phase: "none",
+        cycle_iteration: 0,
+        unresolved_findings: [],
+        meaningful_changed_paths: [],
+	        verification_status: "pass",
+	        verification_refs: [],
+	        previous_repair_decision_refs: [],
+	        context_fingerprint: "none",
+	        new_context_since_previous: [],
+	        stop_reason: "none",
+	        requested_next_step: "none",
+	      },
       delivery_gate: {
         status: "pass",
         blocks_downstream: false,
@@ -4731,6 +4744,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "project.aor.yaml",
         "--run-id",
         runId,
+        "--execution-root",
+        projectRoot,
       ]);
       assert.equal(reviewRun.exitCode, 0, reviewRun.stderr);
       const reviewPayload = JSON.parse(reviewRun.stdout);
@@ -4756,6 +4771,13 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       assert.equal(reviewReport.feature_traceability.provider_variant_id, "openai-primary");
       assert.equal(reviewReport.feature_traceability.feature_size, "small");
       assert.equal(reviewReport.code_quality.status, "pass");
+      assert.equal(path.resolve(reviewReport.code_quality.target_checkout_root), path.resolve(projectRoot));
+      assert.equal(reviewReport.code_quality.changed_path_diagnostics.git_status_root, projectRoot);
+      assert.ok(reviewReport.code_quality.changed_paths.includes("source/mission.js"));
+      assert.ok(
+        runtimeHarnessReport.step_decisions[0].mission_semantics.meaningful_changed_paths.includes("source/mission.js"),
+      );
+      assert.equal(runtimeHarnessReport.step_decisions[0].mission_semantics.git_status_root, projectRoot);
       assert.equal(reviewReport.discovery_quality.status, "pass");
       assert.equal(reviewReport.feature_size_fit.status, "pass");
       assert.equal(reviewReport.provider_traceability.status, "pass");
@@ -5201,8 +5223,18 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
       const repairDecisionPayload = JSON.parse(repairDecision.stdout);
       assert.equal(repairDecisionPayload.review_decision, "request-repair");
       assert.equal(repairDecisionPayload.review_decision_gate, "blocked");
-      const repairDecisionDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.review_decision_file, "utf8"));
-      assert.equal(repairDecisionDocument.delivery_gate.blocks_downstream, true);
+	      assert.equal(repairDecisionPayload.review_decision_repair_context.source_phase, "review");
+	      assert.equal(repairDecisionPayload.review_decision_repair_context.cycle_iteration, 1);
+	      assert.equal(repairDecisionPayload.review_decision_repair_context.requested_next_step, "execution");
+	      assert.match(repairDecisionPayload.review_decision_repair_context.context_fingerprint, /^sha256:/u);
+	      const repairDecisionDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.review_decision_file, "utf8"));
+	      assert.equal(repairDecisionDocument.delivery_gate.blocks_downstream, true);
+	      assert.equal(repairDecisionDocument.repair_context.source_phase, "review");
+	      assert.equal(repairDecisionDocument.repair_context.requested_next_step, "execution");
+	      assert.equal(repairDecisionDocument.repair_context.unresolved_findings.length > 0, true);
+	      assert.equal(repairDecisionDocument.repair_context.verification_refs.length > 0, true);
+	      assert.match(repairDecisionDocument.repair_context.context_fingerprint, /^sha256:/u);
+	      assert.deepEqual(repairDecisionDocument.repair_context.new_context_since_previous, ["first-repair-decision"]);
       assert.equal(
         validateContractDocument({
           family: "review-decision",

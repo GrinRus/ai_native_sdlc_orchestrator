@@ -13,10 +13,77 @@ import {
   readJson,
   resolveOptionalStringFlag,
 } from "./lib/common.mjs";
+import { prepareOperatorDecisionArtifact } from "./lib/decision-helper.mjs";
+import { writeStepQualityAssessmentReports as writeStepQualityAssessmentReportsForEntries } from "./lib/step-quality-assessment.mjs";
 
-const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const CURRENT_FILE = fileURLToPath(import.meta.url);
+const SCRIPT_DIR = path.dirname(CURRENT_FILE);
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
 const REQUIRED_PHASES = Object.freeze(["plan", "execute", "inspect", "classify", "decide", "persist"]);
+
+/**
+ * @param {string} status
+ * @returns {"pass" | "warn" | "not_pass" | "blocked" | "interaction_required" | "resumed"}
+ */
+function normalizeObservationStatus(status) {
+  const normalized = asNonEmptyString(status).toLowerCase();
+  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
+  if (normalized === "warn" || normalized === "warning" || normalized === "skipped") return "warn";
+  if (normalized === "blocked" || normalized === "block") return "blocked";
+  if (normalized === "interaction_required" || normalized === "interactive" || normalized === "requested") {
+    return "interaction_required";
+  }
+  if (normalized === "resumed") return "resumed";
+  return "not_pass";
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {Record<string, unknown>}
+ */
+function findPendingOperatorDecisionEntry(report) {
+  const stepJournal = Array.isArray(report.step_journal) ? report.step_journal.map((entry) => asRecord(entry)) : [];
+  return (
+    stepJournal
+      .filter(
+        (entry) =>
+          asNonEmptyString(entry.operator_decision_status) === "missing" &&
+          Boolean(asNonEmptyString(entry.agent_decision_request_ref)),
+      )
+      .sort((left, right) => (Number(right.sequence) || 0) - (Number(left.sequence) || 0))[0] ?? {}
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {Record<string, unknown> | null}
+ */
+export function preparePendingOperatorDecision(report) {
+  const entry = findPendingOperatorDecisionEntry(report);
+  const requestFile = asNonEmptyString(entry.agent_decision_request_ref);
+  if (!requestFile) return null;
+  const stepId = asNonEmptyString(entry.step_id) || "step";
+  const deterministicStatus = normalizeObservationStatus(asNonEmptyString(asRecord(entry.deterministic_analysis).status));
+  const canContinue = ["pass", "warn", "resumed"].includes(deterministicStatus);
+  return prepareOperatorDecisionArtifact({
+    requestFile,
+    action: canContinue ? "continue" : "block",
+    semanticStatus: canContinue ? deterministicStatus : "blocked",
+    findings: canContinue
+      ? [`${stepId} public evidence passed deterministic inspection before continuation.`]
+      : [
+          `${stepId} deterministic evidence produced status '${deterministicStatus}'.`,
+          "Step evaluator blocked continuation through the public operator decision artifact boundary.",
+        ],
+    operatorNote: canContinue
+      ? "Step evaluator accepted the public step evidence through the operator decision artifact boundary."
+      : "Step evaluator preserved the non-pass public evidence as a terminal classified blocker.",
+    reason: canContinue
+      ? null
+      : `Step evaluator blocked '${stepId}' after deterministic status '${deterministicStatus}'.`,
+    write: true,
+  });
+}
 
 /**
  * @param {Record<string, unknown>} report
@@ -107,6 +174,65 @@ function validateControllerEvidence(report, state) {
 }
 
 /**
+ * @param {{
+ *   runProfileOutput: Record<string, unknown>,
+ *   report: Record<string, unknown>,
+ *   state?: Record<string, unknown>,
+ *   summary: Record<string, unknown>,
+ *   outputDir: string,
+ * }} options
+ * @returns {string[]}
+ */
+function writeStepQualityAssessmentReports(options) {
+  const stepJournal = Array.isArray(options.report.step_journal)
+    ? options.report.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const pendingStepQuality = asRecord(options.state?.pending_step_quality_assessment);
+  const pendingStepInstanceId = asNonEmptyString(pendingStepQuality.step_instance_id);
+  const pendingEntries = pendingStepInstanceId
+    ? stepJournal.filter((entry) => asNonEmptyString(entry.step_instance_id) === pendingStepInstanceId)
+    : stepJournal;
+  const runId = asNonEmptyString(options.summary.run_id) || asNonEmptyString(options.runProfileOutput.run_id) || "live-e2e-run";
+  return writeStepQualityAssessmentReportsForEntries({
+    runId,
+    summary: options.summary,
+    entries: pendingEntries,
+    outputDir: options.outputDir,
+  });
+}
+
+/**
+ * @param {Record<string, unknown>} state
+ * @returns {boolean}
+ */
+function hasPendingStepQualityAssessment(state) {
+  return asNonEmptyString(asRecord(state.pending_step_quality_assessment).status) === "awaiting-assessment";
+}
+
+/**
+ * @param {Record<string, unknown>} state
+ * @returns {boolean}
+ */
+export function hasPendingIncludedControllerStep(state) {
+  const currentStep = asNonEmptyString(state.current_step);
+  if (!currentStep) return false;
+  const includedSteps = asStringArray(state.included_steps);
+  if (includedSteps.length === 0 || !includedSteps.includes(currentStep)) return false;
+  return !asStringArray(state.completed_steps).includes(currentStep);
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @param {Record<string, unknown>} state
+ * @returns {boolean}
+ */
+export function shouldAwaitFirstControllerObservation(report, state) {
+  const stepJournal = Array.isArray(report.step_journal) ? report.step_journal : [];
+  return hasPendingIncludedControllerStep(state) && stepJournal.length === 0;
+}
+
+
+/**
  * @param {string[]} rawArgs
  */
 function runCli(rawArgs) {
@@ -132,26 +258,87 @@ function runCli(rawArgs) {
     throw new UsageError("step-evaluator owns --controller-mode; omit it from evaluator invocations.");
   }
 
-  const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...rawArgs, "--controller-mode", "evaluator"], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-  });
-  if (child.stderr) process.stderr.write(child.stderr);
-  if (child.status !== 0) {
-    if (child.stdout) process.stdout.write(child.stdout);
-    return child.status ?? 1;
+  /** @type {Record<string, unknown>} */
+  let runProfileOutput = {};
+  /** @type {Record<string, unknown>} */
+  let report = {};
+  /** @type {Record<string, unknown>} */
+  let state = {};
+  /** @type {Record<string, unknown>} */
+  let summary = {};
+  let observationReportFile = "";
+  let controllerStateFile = "";
+  let runSummaryFile = "";
+  let stepQualityAssessmentReportFiles = [];
+  let operatorDecisionFiles = [];
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...rawArgs, "--controller-mode", "evaluator"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    if (child.stderr) process.stderr.write(child.stderr);
+    if (child.status !== 0) {
+      if (child.stdout) process.stdout.write(child.stdout);
+      return child.status ?? 1;
+    }
+
+    runProfileOutput = JSON.parse(child.stdout);
+    observationReportFile = asNonEmptyString(runProfileOutput.live_e2e_observation_report_file);
+    controllerStateFile = asNonEmptyString(runProfileOutput.live_e2e_controller_state_file);
+    runSummaryFile = asNonEmptyString(runProfileOutput.live_e2e_run_summary_file);
+    report = observationReportFile ? readJson(observationReportFile) : {};
+    state = controllerStateFile ? readJson(controllerStateFile) : {};
+    summary = runSummaryFile ? readJson(runSummaryFile) : {};
+    const pendingIncludedControllerStep = hasPendingIncludedControllerStep(state);
+    const preparedOperatorDecision = preparePendingOperatorDecision(report);
+    if (preparedOperatorDecision) {
+      if (asNonEmptyString(preparedOperatorDecision.status) === "rejected") {
+        process.stderr.write(
+          `Step evaluator failed closed: operator decision draft was rejected for ${asNonEmptyString(preparedOperatorDecision.request_ref) || "request"}.\n`,
+        );
+        return 1;
+      }
+      operatorDecisionFiles = [
+        ...operatorDecisionFiles,
+        asNonEmptyString(preparedOperatorDecision.output_ref),
+      ].filter(Boolean);
+      continue;
+    }
+    if (shouldAwaitFirstControllerObservation(report, state)) {
+      continue;
+    }
+    const issues = validateControllerEvidence(report, state);
+    if (issues.length > 0) {
+      process.stderr.write(`Step evaluator failed closed: ${issues.join("; ")}\n`);
+      return 1;
+    }
+    if (!hasPendingStepQualityAssessment(state)) {
+      stepQualityAssessmentReportFiles = asStringArray(runProfileOutput.live_e2e_step_quality_assessment_report_files);
+      if (pendingIncludedControllerStep) {
+        continue;
+      }
+      break;
+    }
+    const writtenReports = writeStepQualityAssessmentReports({
+      runProfileOutput,
+      report,
+      state,
+      summary,
+      outputDir: observationReportFile ? path.dirname(observationReportFile) : process.cwd(),
+    });
+    stepQualityAssessmentReportFiles = [...stepQualityAssessmentReportFiles, ...writtenReports];
   }
 
-  const runProfileOutput = JSON.parse(child.stdout);
-  const observationReportFile = asNonEmptyString(runProfileOutput.live_e2e_observation_report_file);
-  const controllerStateFile = asNonEmptyString(runProfileOutput.live_e2e_controller_state_file);
-  const report = observationReportFile ? readJson(observationReportFile) : {};
-  const state = controllerStateFile ? readJson(controllerStateFile) : {};
-  const issues = validateControllerEvidence(report, state);
-  if (issues.length > 0) {
-    process.stderr.write(`Step evaluator failed closed: ${issues.join("; ")}\n`);
+  if (hasPendingStepQualityAssessment(state)) {
+    process.stderr.write("Step evaluator failed closed: pending step-quality assessment did not resolve after 20 attempts.\n");
     return 1;
   }
+  stepQualityAssessmentReportFiles = [
+    ...new Set([
+      ...stepQualityAssessmentReportFiles,
+      ...asStringArray(runProfileOutput.live_e2e_step_quality_assessment_report_files),
+    ]),
+  ];
 
   const pendingDecision = asRecord(state.pending_decision);
   const action = asNonEmptyString(pendingDecision.action) || "unknown";
@@ -170,6 +357,11 @@ function runCli(rawArgs) {
         aor_installation_proof_file: asNonEmptyString(runProfileOutput.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: controllerStateFile || null,
         live_e2e_observation_report_file: observationReportFile || null,
+        live_e2e_operator_decision_files: operatorDecisionFiles,
+        live_e2e_step_quality_assessment_request_files: asStringArray(
+          runProfileOutput.live_e2e_step_quality_assessment_request_files,
+        ),
+        live_e2e_step_quality_assessment_report_files: stepQualityAssessmentReportFiles,
         live_e2e_step_observation_files: Array.isArray(runProfileOutput.live_e2e_step_observation_files)
           ? runProfileOutput.live_e2e_step_observation_files
           : [],
@@ -181,15 +373,17 @@ function runCli(rawArgs) {
   return unresolvedAction || terminalFailure ? 1 : 0;
 }
 
-try {
-  process.exitCode = runCli(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof UsageError) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  } else {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
+if (process.argv[1] && path.resolve(process.argv[1]) === CURRENT_FILE) {
+  try {
+    process.exitCode = runCli(process.argv.slice(2));
+  } catch (error) {
+    if (error instanceof UsageError) {
+      process.stderr.write(`${error.message}\n`);
+      process.exitCode = 1;
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`${message}\n`);
+      process.exitCode = 1;
+    }
   }
 }
