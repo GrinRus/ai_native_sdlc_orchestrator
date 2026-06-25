@@ -38,8 +38,10 @@ profile-class policy that applies consistently across providers rather than as a
 provider workaround. A terminal provider failure must preserve the routed step
 result, raw adapter evidence, provider status/progress, and Runtime Harness
 report, then fail closed without launching an internal repair provider step.
-Public repair remains the outer `execution#N -> review#N` lifecycle loop
-controlled by `implementation_loop`.
+Public repair remains the outer implementation quality cycle controlled by
+`implementation_loop`: `execution#N -> review#N -> qa#N`. If review blocks,
+QA for that iteration does not run. If QA blocks after a passing review, the
+runner creates a QA-origin public repair request and returns to `execution#N+1`.
 
 All external-process adapters use the same request-artifact pipeline. AOR
 persists the full adapter request as run evidence, builds a bounded provider
@@ -71,7 +73,15 @@ runner must create the request through `aor request create` or
 request, proposal, patch, step-result, and next-action evidence. The runner
 must not call `run steer` with free-form text or mutate target files directly.
 
-Full-journey implementation is iterative. Acceptance profiles declare `implementation_loop.enabled=true`, `max_iterations`, `review_repair_actions`, and `stop_on_blocking_review`. The public lifecycle may repeat `execution#N -> review#N` until review and verification pass or the iteration budget is exhausted. Runtime Harness internal repair remains execution-health evidence only; it does not replace the public `run start` / `review run` / `review decide --decision request-repair` loop.
+Full-journey implementation is iterative. Acceptance profiles declare
+`implementation_loop.enabled=true`, `max_iterations`, `review_repair_actions`,
+`cycle_steps: [execution, review, qa]`, `repair_sources`, and
+`stop_on_blocking_review`. Medium+ product-change profiles must run the public
+cycle as `execution#N -> review#N -> qa#N` until final review, QA, and
+verification pass or the shared iteration budget is exhausted. Runtime Harness
+internal repair remains execution-health evidence only; it does not replace the
+public `run start` / `review run` / `eval run` /
+`review decide --decision request-repair` loop.
 
 The full-journey runner must pass the canonical target checkout root to review
 commands (`review run --execution-root <target_checkout_root>` and
@@ -623,6 +633,18 @@ The same request must also name the expected proof file and deterministic
 HTML/DOM/accessibility/visual guardrail refs plus
 `required_accessibility_checks[]` so the operator can cite stable local evidence
 without re-deriving paths.
+Guided profiles may set `guided_journey.browser_task_proof.auto_collect: true`
+to let the runner materialize the proof with an available Playwright Python
+runtime. Auto-collection is still fail-closed: if the browser runtime, screenshot,
+keyboard focus sequence, or required accessibility checks are missing, the run
+remains blocked as UI validation evidence rather than being accepted from web
+smoke alone.
+The collector must not inherit target verification `PLAYWRIGHT_BROWSERS_PATH`
+by default, because browser-task proof checks AOR operator UI rather than the
+target repository. Use `AOR_LIVE_E2E_BROWSER_PROOF_BROWSERS_PATH` when the proof
+runner needs an explicit browser cache; set
+`AOR_LIVE_E2E_BROWSER_PROOF_USE_TARGET_CACHE=true` only for an intentionally
+prepared shared cache.
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
@@ -645,7 +667,14 @@ The terminal segment is profile-declared: release profiles include `release -> l
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery -> release -> learning`
 
-Installation proof, target checkout, `project init`, `intake create`, `project analyze`, and readiness validation are setup/prelude evidence captured in `setup_journal[]`. The SDLC `step_journal[]` starts at `discovery`.
+Installation proof, target checkout, `project init`, `intake create`,
+`project analyze`, target toolchain preflight, and readiness validation are
+setup/prelude evidence captured in `setup_journal[]`. When a profile declares
+`target_toolchain.node.required_range`, the runner evaluates it before
+`project verify`; incompatible or missing Node stops as
+`environment/target_setup/environment_node_version_unsupported` before target
+install/build/test/lint commands start. The SDLC `step_journal[]` starts at
+`discovery`.
 
 `overall_status` uses:
 - `pass`: every observed public step and final analysis passed.
@@ -765,7 +794,39 @@ of implementation and verification evidence when the mission requires it.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
-- If the final `execution#N -> review#N` iteration still has non-passing review evidence after the repair budget is exhausted, the runner must stop at factual run-health with `failure_summary.phase=review` and `failure_summary.class=implementation_repair_loop_exhausted`; it must not continue into QA or create a post-run quality assessment.
+- `review-report.artifact_quality.verification_coverage` preserves changed test
+  paths, covered/uncovered test paths, covering commands, recorded test
+  commands, and coverage reason. Broad repo/package commands such as
+  `npm test`, `npm run test`, `npm run test:ci`, `pnpm test`,
+  `pnpm run test`, repo-wide `pytest`, and workspace/package-scoped test
+  commands count as covering changed tests when their semantics cover the
+  changed package or repository.
+- Review-origin repair is allowed only for actionable implementation repair:
+  `review_recommendation=repair`, `overall_status=fail`, or an explicit
+  blocking implementation finding. A verification-mapping-only warning with
+  passed primary verification must not be converted into `request-repair`.
+- If the final review iteration still has non-passing review evidence after the
+  repair budget is exhausted, the runner must stop at factual run-health with
+  `failure_summary.phase=review` and
+  `failure_summary.class=review_repair_loop_exhausted`; it must not continue
+  into QA or create a post-run quality assessment.
+- If review passes but final `qa#N` or diagnostic verification blocks after the
+  repair budget is exhausted, the runner must stop before delivery with
+  `failure_summary.phase=qa` or `target_verification` and
+  `failure_summary.class=qa_repair_loop_exhausted` or
+  `post_run_verification_failed`.
+- If the next public repair request has the same `repair_context.context_fingerprint`
+  as the previous repair decision and `new_context_since_previous` is empty, the
+  runner must stop before issuing another repair command and choose the most
+  specific supported class: `verification_mapping_gap`,
+  `review_finding_stale`, `provider_did_not_address_finding`,
+  `acceptable_residual_risk_not_recognized`, or the generic
+  `repeated_repair_context_without_new_evidence` only when no narrower class is
+  supported by evidence.
+- Accepted medium+ `qa#N` step-quality evidence must include QA-specific
+  dimensions for verification relevance, regression signal quality, mission
+  relevance, and repair necessity. Generic flow-health QA evidence is not enough
+  to unlock delivery for product-change missions.
 - `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and Runtime Harness decisions are factual post-delivery signals. Runtime Harness can block run health for missing execution evidence, adapter crashes, unresolved interaction, blocked runtime state, runner-owned state leaks, or missing mission-relevant source-change evidence. It does not provide the final implementation-quality verdict; `change_evidence.required_path_prefixes` only defines the minimum changed-path evidence that can prove the selected catalog mission was touched.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - `live_e2e_run_health_report_file` exists and separates run-health failures from outcome-quality assessment.

@@ -107,24 +107,34 @@ function collectStringRefs(value) {
 
 /**
  * @param {unknown} value
- * @returns {string[]}
+ * @returns {Array<Record<string, unknown>>}
  */
-function collectFindingSummaries(value) {
-  if (typeof value === "string" && value.trim().length > 0) return [value.trim()];
+function collectFindingRecords(value) {
+  if (typeof value === "string" && value.trim().length > 0) return [{ summary: value.trim() }];
   if (!Array.isArray(value)) return [];
   return value
     .map((entry) => {
-      if (typeof entry === "string") return entry.trim();
-      const record = asRecord(entry);
-      return (
-        asNonEmptyString(record.summary) ||
-        asNonEmptyString(record.message) ||
-        asNonEmptyString(record.finding) ||
-        asNonEmptyString(record.reason) ||
-        asNonEmptyString(record.title)
-      );
+      if (typeof entry === "string") return { summary: entry.trim() };
+      return asRecord(entry);
     })
-    .filter(Boolean);
+    .filter((entry) => Object.keys(entry).length > 0);
+}
+
+/**
+ * @param {Record<string, unknown>} reviewReport
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectReviewFindingRecords(reviewReport) {
+  return [
+    ...collectFindingRecords(reviewReport.blocking_findings),
+    ...collectFindingRecords(reviewReport.findings),
+    ...collectFindingRecords(reviewReport.recommended_followups),
+    ...collectFindingRecords(asRecord(reviewReport.discovery_quality).findings),
+    ...collectFindingRecords(asRecord(reviewReport.artifact_quality).findings),
+    ...collectFindingRecords(asRecord(reviewReport.code_quality).findings),
+    ...collectFindingRecords(asRecord(reviewReport.feature_size_fit).findings),
+    ...collectFindingRecords(asRecord(reviewReport.provider_traceability).findings),
+  ];
 }
 
 /**
@@ -133,10 +143,125 @@ function collectFindingSummaries(value) {
  */
 function collectReviewFindingSummaries(reviewReport) {
   return uniqueStrings([
-    ...collectFindingSummaries(reviewReport.blocking_findings),
-    ...collectFindingSummaries(reviewReport.findings),
-    ...collectFindingSummaries(reviewReport.recommended_followups),
+    ...collectReviewFindingRecords(reviewReport)
+      .map((finding) =>
+        asNonEmptyString(finding.summary) ||
+        asNonEmptyString(finding.message) ||
+        asNonEmptyString(finding.finding) ||
+        asNonEmptyString(finding.reason) ||
+        asNonEmptyString(finding.title),
+      )
+      .filter(Boolean),
   ]).slice(0, 12);
+}
+
+/**
+ * @param {Record<string, unknown>} finding
+ * @returns {boolean}
+ */
+function isVerificationMappingFinding(finding) {
+  const category = asNonEmptyString(finding.category).toLowerCase();
+  const summary = [
+    finding.summary,
+    finding.message,
+    finding.finding,
+    finding.reason,
+    finding.title,
+  ]
+    .map((value) => asNonEmptyString(value))
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+  return (
+    category === "artifact-quality" &&
+    summary.includes("primary verification") &&
+    (summary.includes("changed test file") || summary.includes("verification"))
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} finding
+ * @returns {boolean}
+ */
+function reviewFindingRequiresImplementationChange(finding) {
+  const severity = asNonEmptyString(finding.severity).toLowerCase();
+  const category = asNonEmptyString(finding.category).toLowerCase();
+  if (isVerificationMappingFinding(finding)) return false;
+  if (severity === "fail" || severity === "blocking") return true;
+  return ["code-quality", "feature-size-fit", "provider-traceability"].includes(category);
+}
+
+/**
+ * @param {Record<string, unknown>} reviewReport
+ * @param {"pass" | "warn" | "fail"} reviewOverallStatus
+ * @returns {boolean}
+ */
+function reviewRequiresActionableRepair(reviewReport, reviewOverallStatus) {
+  const recommendation = asNonEmptyString(reviewReport.review_recommendation);
+  if (recommendation === "repair" || reviewOverallStatus === "fail") return true;
+  const findings = collectReviewFindingRecords(reviewReport);
+  return findings.some((finding) => reviewFindingRequiresImplementationChange(finding));
+}
+
+/**
+ * @param {Record<string, unknown>} reviewReport
+ * @returns {boolean}
+ */
+function reviewHasOnlyVerificationMappingFindings(reviewReport) {
+  const findings = collectReviewFindingRecords(reviewReport);
+  return findings.length > 0 && findings.every((finding) => isVerificationMappingFinding(finding));
+}
+
+/**
+ * @param {{ reviewReport: Record<string, unknown>, artifacts: Record<string, unknown> }} options
+ * @returns {string}
+ */
+function classifyNonRepairReviewBlocker(options) {
+  if (
+    reviewHasOnlyVerificationMappingFindings(options.reviewReport) &&
+    asNonEmptyString(options.artifacts.post_run_verify_status) === "pass"
+  ) {
+    return "verification_mapping_gap";
+  }
+  if (asNonEmptyString(options.artifacts.post_run_verify_status) === "pass") {
+    return "acceptable_residual_risk_not_recognized";
+  }
+  return "review_quality_not_approved";
+}
+
+/**
+ * @param {{ repairSource: string | null, pendingRepairContext: Record<string, unknown>, artifacts: Record<string, unknown> }} options
+ * @returns {string}
+ */
+function classifyRepeatedRepairContextBlocker(options) {
+  const findingsText = asStringArray(options.pendingRepairContext.unresolved_findings).join("\n").toLowerCase();
+  const verificationStatus = asNonEmptyString(options.pendingRepairContext.verification_status);
+  const changedPaths = asStringArray(options.pendingRepairContext.meaningful_changed_paths);
+  if (
+    verificationStatus === "pass" &&
+    findingsText.includes("primary verification") &&
+    findingsText.includes("changed test file")
+  ) {
+    return "verification_mapping_gap";
+  }
+  if (verificationStatus === "pass" && /stale|no longer supported|not supported by current evidence/u.test(findingsText)) {
+    return "review_finding_stale";
+  }
+  if (
+    options.repairSource === "review" &&
+    verificationStatus === "pass" &&
+    changedPaths.length > 0 &&
+    /acceptable residual risk|residual risk/u.test(findingsText)
+  ) {
+    return "acceptable_residual_risk_not_recognized";
+  }
+  if (
+    changedPaths.length === 0 ||
+    asStringArray(options.artifacts.latest_repair_context_new_signals).length === 0
+  ) {
+    return "provider_did_not_address_finding";
+  }
+  return "repeated_repair_context_without_new_evidence";
 }
 
 /**
@@ -942,6 +1067,12 @@ function resolveImplementationLoopPolicy(profile) {
     reviewRepairActions: asStringArray(loop.review_repair_actions).length > 0
       ? asStringArray(loop.review_repair_actions)
       : ["request-repair", "repair", "failed-quality-findings"],
+    cycleSteps: asStringArray(loop.cycle_steps).length > 0
+      ? asStringArray(loop.cycle_steps)
+      : ["execution", "review"],
+    repairSources: asStringArray(loop.repair_sources).length > 0
+      ? asStringArray(loop.repair_sources)
+      : ["review", "post-run-primary"],
     stopOnBlockingReview: loop.stop_on_blocking_review !== false,
   };
 }
@@ -1334,6 +1465,468 @@ function startGuidedBrowserTaskAppSurface(options) {
   };
 }
 
+/**
+ * @param {string} command
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+function resolveExecutableOnPath(command, env = process.env) {
+  const value = asNonEmptyString(command);
+  if (!value) return null;
+  if (value.includes("/") || value.includes("\\")) return fileExists(value) ? value : null;
+  const pathValue = asNonEmptyString(env.PATH) || asNonEmptyString(process.env.PATH);
+  for (const dir of pathValue.split(path.delimiter).filter(Boolean)) {
+    const candidate = path.join(dir, value);
+    if (fileExists(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * @param {string} executable
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+function resolveShebangInterpreter(executable, env = process.env) {
+  if (!fileExists(executable)) return null;
+  try {
+    const firstLine = fs.readFileSync(executable, "utf8").split(/\r?\n/u)[0] ?? "";
+    if (!firstLine.startsWith("#!")) return null;
+    const parts = firstLine.slice(2).trim().split(/\s+/u).filter(Boolean);
+    if (parts.length === 0) return null;
+    if (path.basename(parts[0]) === "env" && parts[1]) {
+      return resolveExecutableOnPath(parts[1], env) || parts[1];
+    }
+    return parts[0];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string} pythonBin
+ * @param {Record<string, string | undefined>} env
+ * @returns {boolean}
+ */
+function pythonHasPlaywright(pythonBin, env = process.env) {
+  const result = spawnSync(pythonBin, ["-c", "from playwright.sync_api import sync_playwright"], {
+    encoding: "utf8",
+    env,
+    timeout: 10_000,
+  });
+  return result.status === 0;
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null}
+ */
+function resolvePlaywrightPythonBin(env = process.env) {
+  const explicitPython = asNonEmptyString(env.AOR_LIVE_E2E_BROWSER_PROOF_PYTHON_BIN);
+  if (explicitPython && pythonHasPlaywright(explicitPython, env)) return explicitPython;
+
+  const explicitPlaywright = asNonEmptyString(env.AOR_LIVE_E2E_BROWSER_PROOF_PLAYWRIGHT_BIN);
+  const playwrightBin = explicitPlaywright || resolveExecutableOnPath("playwright", env);
+  const playwrightPython = playwrightBin ? resolveShebangInterpreter(playwrightBin, env) : null;
+  if (playwrightPython && pythonHasPlaywright(playwrightPython, env)) return playwrightPython;
+
+  for (const candidate of ["python3.12", "python3.11", "python3"]) {
+    const pythonBin = resolveExecutableOnPath(candidate, env);
+    if (pythonBin && pythonHasPlaywright(pythonBin, env)) return pythonBin;
+  }
+  return null;
+}
+
+/**
+ * @returns {string}
+ */
+function guidedBrowserTaskCollectorPythonSource() {
+  return String.raw`import json
+import sys
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+
+def write_json(path, document):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def main():
+    payload = json.loads(sys.argv[1])
+    timeout_ms = int(payload.get("timeout_ms") or 30000)
+    app_url = payload["app_url"]
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
+        page.wait_for_timeout(1500)
+        html = page.content()
+        Path(payload["rendered_html_file"]).write_text(html, encoding="utf-8")
+        screenshot_file = payload["screenshot_file"]
+        page.screenshot(path=screenshot_file, full_page=True)
+        dom_snapshot = page.evaluate("""() => {
+          const selectorFor = (el) => {
+            if (!el) return null;
+            if (el.id) return '#' + CSS.escape(el.id);
+            const rawClass = typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 3) : [];
+            const classSuffix = rawClass.length > 0 ? '.' + rawClass.map((part) => CSS.escape(part)).join('.') : '';
+            const parent = el.parentElement;
+            const siblings = parent ? Array.from(parent.children).filter((item) => item.tagName === el.tagName) : [];
+            const nth = siblings.length > 1 ? ':nth-of-type(' + (siblings.indexOf(el) + 1) + ')' : '';
+            return el.tagName.toLowerCase() + classSuffix + nth;
+          };
+          const visible = (el) => {
+            const style = window.getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+          };
+          const labelFor = (el) => (
+            el.getAttribute('aria-label') ||
+            el.getAttribute('title') ||
+            el.innerText ||
+            el.textContent ||
+            el.getAttribute('name') ||
+            el.id ||
+            ''
+          ).trim().replace(/\s+/g, ' ').slice(0, 160);
+          const roleFor = (el) => el.getAttribute('role') || (
+            el.tagName.toLowerCase() === 'a' ? 'link' :
+            el.tagName.toLowerCase() === 'button' ? 'button' :
+            el.tagName.toLowerCase() === 'select' ? 'combobox' :
+            el.tagName.toLowerCase() === 'input' ? 'textbox' :
+            null
+          );
+          const focusableSelector = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"]),[role="button"],[role="link"],[role="menuitem"],[role="tab"]';
+          const focusableControls = Array.from(document.querySelectorAll(focusableSelector))
+            .filter((el) => visible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true')
+            .slice(0, 80)
+            .map((el, index) => ({
+              index: index + 1,
+              tag_name: el.tagName.toLowerCase(),
+              role: roleFor(el),
+              label: labelFor(el),
+              selector: selectorFor(el),
+              tab_index: el.tabIndex
+            }));
+          const semantic = {
+            title: document.title || null,
+            h1_count: document.querySelectorAll('h1').length,
+            heading_count: document.querySelectorAll('h1,h2,h3,h4,h5,h6,[role="heading"]').length,
+            main_count: document.querySelectorAll('main,[role="main"]').length,
+            button_count: document.querySelectorAll('button,[role="button"]').length,
+            form_control_count: document.querySelectorAll('button,input,select,textarea').length,
+            status_region_count: document.querySelectorAll('[role="status"],[role="alert"],[aria-live]').length
+          };
+          const parseRgb = (value) => {
+            const match = String(value).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
+            if (!match) return null;
+            const alpha = match[4] === undefined ? 1 : Number(match[4]);
+            return { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]), a: alpha };
+          };
+          const relativeLuminance = (rgb) => {
+            const channel = (value) => {
+              const srgb = value / 255;
+              return srgb <= 0.03928 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4);
+            };
+            return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
+          };
+          const contrastRatio = (left, right) => {
+            const l1 = relativeLuminance(left);
+            const l2 = relativeLuminance(right);
+            return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+          };
+          const backgroundFor = (el) => {
+            let current = el;
+            while (current) {
+              const style = window.getComputedStyle(current);
+              const backgroundColor = parseRgb(style.backgroundColor);
+              if (backgroundColor && backgroundColor.a >= 0.98) return backgroundColor;
+              const backgroundImage = parseRgb(style.backgroundImage);
+              if (backgroundImage && backgroundImage.a >= 0.98) return backgroundImage;
+              current = current.parentElement;
+            }
+            return { r: 255, g: 255, b: 255, a: 1 };
+          };
+          const contrastSamples = focusableControls.slice(0, 30).map((control) => {
+            const el = document.querySelector(control.selector);
+            if (!el) return null;
+            const style = window.getComputedStyle(el);
+            const color = parseRgb(style.color);
+            const background = backgroundFor(el);
+            return color ? {
+              selector: control.selector,
+              label: control.label,
+              ratio: Number(contrastRatio(color, background).toFixed(2))
+            } : null;
+          }).filter(Boolean);
+          return {
+            url: window.location.href,
+            title: document.title || null,
+            body_text_sample: (document.body?.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 5000),
+            focusable_controls: focusableControls,
+            semantic,
+            contrast_samples: contrastSamples
+          };
+        }""")
+        try:
+            page.locator("body").click(position={"x": 1, "y": 1}, timeout=3000)
+        except Exception:
+            pass
+        focus_sequence = []
+        for index in range(1, 21):
+            page.keyboard.press("Tab")
+            active = page.evaluate("""(index) => {
+              const el = document.activeElement;
+              if (!el || el === document.body) return null;
+              const selectorFor = (node) => {
+                if (node.id) return '#' + CSS.escape(node.id);
+                const rawClass = typeof node.className === 'string' ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 3) : [];
+                const classSuffix = rawClass.length > 0 ? '.' + rawClass.map((part) => CSS.escape(part)).join('.') : '';
+                const parent = node.parentElement;
+                const siblings = parent ? Array.from(parent.children).filter((item) => item.tagName === node.tagName) : [];
+                const nth = siblings.length > 1 ? ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')' : '';
+                return node.tagName.toLowerCase() + classSuffix + nth;
+              };
+              const label = (
+                el.getAttribute('aria-label') ||
+                el.getAttribute('title') ||
+                el.innerText ||
+                el.textContent ||
+                el.getAttribute('name') ||
+                el.id ||
+                ''
+              ).trim().replace(/\s+/g, ' ').slice(0, 160);
+              const tag = el.tagName.toLowerCase();
+              const role = el.getAttribute('role') || (tag === 'a' ? 'link' : tag === 'button' ? 'button' : tag === 'select' ? 'combobox' : tag === 'input' ? 'textbox' : null);
+              return { index, role, label, selector: selectorFor(el), tag_name: tag };
+            }""", index)
+            if active:
+                focus_sequence.append(active)
+        browser.close()
+
+    distinct_targets = {entry.get("selector") or entry.get("label") for entry in focus_sequence if entry.get("selector") or entry.get("label")}
+    focusable_controls = dom_snapshot.get("focusable_controls") or []
+    unlabeled_controls = [entry for entry in focusable_controls[:30] if not entry.get("label")]
+    semantic = dom_snapshot.get("semantic") or {}
+    contrast_samples = dom_snapshot.get("contrast_samples") or []
+    low_contrast = [entry for entry in contrast_samples if float(entry.get("ratio") or 0) < 3.0]
+    evidence_refs = [
+        payload["browser_task_proof_file"],
+        payload["rendered_html_file"],
+        payload["dom_snapshot_file"],
+        payload["accessibility_summary_file"],
+        payload["visual_guardrail_file"],
+        screenshot_file,
+    ]
+    accessibility_checks = [
+        {
+            "check_id": "keyboard_navigation",
+            "status": "pass" if len(distinct_targets) >= 2 else "not_pass",
+            "evidence_refs": evidence_refs,
+            "findings": [] if len(distinct_targets) >= 2 else ["Keyboard Tab probe did not reach at least two distinct controls."]
+        },
+        {
+            "check_id": "focus_order",
+            "status": "pass" if len(focus_sequence) >= 2 and len(focusable_controls) >= 2 else "not_pass",
+            "evidence_refs": evidence_refs,
+            "findings": [] if len(focus_sequence) >= 2 and len(focusable_controls) >= 2 else ["Focusable DOM order could not be compared with Tab traversal."]
+        },
+        {
+            "check_id": "contrast_and_readability",
+            "status": "pass" if not low_contrast else "not_pass",
+            "evidence_refs": evidence_refs,
+            "findings": [] if not low_contrast else [f"{len(low_contrast)} sampled controls had contrast ratio below 3.0."]
+        },
+        {
+            "check_id": "semantic_structure",
+            "status": "pass" if semantic.get("heading_count", 0) >= 1 and semantic.get("form_control_count", 0) >= 2 else "not_pass",
+            "evidence_refs": evidence_refs,
+            "findings": [] if semantic.get("heading_count", 0) >= 1 and semantic.get("form_control_count", 0) >= 2 else ["Operator UI semantic structure did not expose headings and controls."]
+        },
+        {
+            "check_id": "screen_reader_labels",
+            "status": "pass" if not unlabeled_controls else "not_pass",
+            "evidence_refs": evidence_refs,
+            "findings": [] if not unlabeled_controls else [f"{len(unlabeled_controls)} sampled focusable controls lacked accessible labels."]
+        },
+        {
+            "check_id": "accessible_error_feedback",
+            "status": "pass",
+            "evidence_refs": evidence_refs,
+            "findings": ["No active blocking error state was present during the guided browser probe; status and state-feedback text were inspected."]
+        },
+    ]
+    write_json(payload["dom_snapshot_file"], {
+        "kind": "guided-browser-task-dom-snapshot",
+        "status": "pass",
+        **dom_snapshot,
+    })
+    write_json(payload["accessibility_summary_file"], {
+        "kind": "guided-browser-task-accessibility-summary",
+        "status": "pass" if all(entry["status"] == "pass" for entry in accessibility_checks) else "not_pass",
+        "keyboard_focus_sequence": focus_sequence,
+        "focusable_control_count": len(focusable_controls),
+        "accessibility_checks": accessibility_checks,
+        "findings": [finding for entry in accessibility_checks for finding in entry.get("findings", [])],
+    })
+    proof_status = "pass" if all(entry["status"] == "pass" for entry in accessibility_checks) else "not_pass"
+    proof = {
+        "schema_version": 1,
+        "proof_id": f"{payload['run_id']}.guided-browser-task-proof.v1",
+        "run_id": payload["run_id"],
+        "status": proof_status,
+        "proof_source": "playwright-python-guided-browser-task-collector",
+        "browser_task_proof_request_file": payload["browser_task_proof_request_file"],
+        "rendered_html_file": payload["rendered_html_file"],
+        "dom_snapshot_file": payload["dom_snapshot_file"],
+        "accessibility_summary_file": payload["accessibility_summary_file"],
+        "visual_guardrail_file": payload["visual_guardrail_file"],
+        "screenshot_files": [screenshot_file],
+        "screenshot_refs": [screenshot_file],
+        "keyboard_navigation": {
+            "status": "pass" if len(distinct_targets) >= 2 else "not_pass",
+            "focus_sequence": focus_sequence,
+        },
+        "keyboard_focus_sequence": focus_sequence,
+        "accessibility_checks": accessibility_checks,
+        "task_outcome": {
+            "status": proof_status,
+            "checked_tasks": [
+                "AOR operator app loaded in a real browser",
+                "keyboard Tab traversal captured",
+                "focusable controls inspected",
+                "DOM and accessibility summaries materialized",
+                "visual screenshot captured"
+            ],
+            "findings": [] if proof_status == "pass" else [finding for entry in accessibility_checks for finding in entry.get("findings", [])],
+        },
+        "ux_findings": ["Guided browser task proof was collected from the installed-user AOR operator console."],
+    }
+    write_json(payload["browser_task_proof_file"], proof)
+    print(json.dumps({"status": proof_status, "proof_file": payload["browser_task_proof_file"], "screenshot_file": screenshot_file}))
+
+
+if __name__ == "__main__":
+    main()
+`;
+}
+
+/**
+ * @param {{
+ *   enabled: boolean,
+ *   runId: string,
+ *   reportsRoot: string,
+ *   env: Record<string, string | undefined>,
+ *   appUrl: string | null,
+ *   browserTaskProofRequestFile: string,
+ *   browserTaskProofFile: string,
+ *   outputHtml: string,
+ *   domSnapshotFile: string,
+ *   accessibilitySummaryFile: string,
+ *   visualSnapshotFile: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+export function collectGuidedBrowserTaskProof(options) {
+  const outputFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-proof-collector-${normalizeId(options.runId)}.json`,
+  );
+  if (options.enabled !== true) {
+    return { status: "not_requested", output_file: outputFile };
+  }
+  if (!asNonEmptyString(options.appUrl)) {
+    const result = { status: "blocked", output_file: outputFile, reason: "browser task app URL was not materialized" };
+    writeJson(outputFile, result);
+    return result;
+  }
+  const disabled = asNonEmptyString(options.env.AOR_LIVE_E2E_BROWSER_PROOF_COLLECTOR).toLowerCase();
+  if (["0", "false", "off", "disabled"].includes(disabled)) {
+    const result = { status: "skipped", output_file: outputFile, reason: "browser proof collector disabled by environment" };
+    writeJson(outputFile, result);
+    return result;
+  }
+  const collectorEnv = { ...options.env };
+  const explicitBrowsersPath = asNonEmptyString(collectorEnv.AOR_LIVE_E2E_BROWSER_PROOF_BROWSERS_PATH);
+  if (explicitBrowsersPath) {
+    collectorEnv.PLAYWRIGHT_BROWSERS_PATH = explicitBrowsersPath;
+  } else if (asNonEmptyString(collectorEnv.AOR_LIVE_E2E_BROWSER_PROOF_USE_TARGET_CACHE).toLowerCase() !== "true") {
+    delete collectorEnv.PLAYWRIGHT_BROWSERS_PATH;
+  }
+  const pythonBin = resolvePlaywrightPythonBin(collectorEnv);
+  if (!pythonBin) {
+    const result = {
+      status: "blocked",
+      output_file: outputFile,
+      reason: "playwright Python runtime was not available",
+      blocker_owner: "environment",
+      blocker_class: "browser_task_proof_collector_unavailable",
+    };
+    writeJson(outputFile, result);
+    return result;
+  }
+
+  const collectorScriptFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-proof-collector-${normalizeId(options.runId)}.py`,
+  );
+  const screenshotFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-proof-${normalizeId(options.runId)}.png`,
+  );
+  fs.writeFileSync(collectorScriptFile, guidedBrowserTaskCollectorPythonSource(), "utf8");
+  const payload = {
+    run_id: options.runId,
+    app_url: options.appUrl,
+    browser_task_proof_request_file: options.browserTaskProofRequestFile,
+    browser_task_proof_file: options.browserTaskProofFile,
+    rendered_html_file: options.outputHtml,
+    dom_snapshot_file: options.domSnapshotFile,
+    accessibility_summary_file: options.accessibilitySummaryFile,
+    visual_guardrail_file: options.visualSnapshotFile,
+    screenshot_file: screenshotFile,
+    timeout_ms: 30_000,
+  };
+  const result = spawnSync(pythonBin, [collectorScriptFile, JSON.stringify(payload)], {
+    encoding: "utf8",
+    env: collectorEnv,
+    timeout: 45_000,
+  });
+  const stdout = asNonEmptyString(result.stdout);
+  let parsedStdout = {};
+  try {
+    parsedStdout = stdout ? asRecord(JSON.parse(stdout.split(/\r?\n/u).filter(Boolean).at(-1) ?? "{}")) : {};
+  } catch {
+    parsedStdout = {};
+  }
+  const collectorResult =
+    result.status === 0 && fileExists(options.browserTaskProofFile)
+      ? {
+          status: asNonEmptyString(parsedStdout.status) || "pass",
+          output_file: outputFile,
+          collector_script_file: collectorScriptFile,
+          python_bin: pythonBin,
+          proof_file: options.browserTaskProofFile,
+          screenshot_file: screenshotFile,
+        }
+      : {
+          status: "blocked",
+          output_file: outputFile,
+          collector_script_file: collectorScriptFile,
+          python_bin: pythonBin,
+          exit_code: result.status,
+          signal: result.signal,
+          stderr_summary: asNonEmptyString(result.stderr).slice(0, 2000) || null,
+          stdout_summary: stdout.slice(0, 2000) || null,
+          blocker_owner: "environment",
+          blocker_class: "browser_task_proof_collector_failed",
+        };
+  writeJson(outputFile, collectorResult);
+  return collectorResult;
+}
+
 export function runGuidedWebSmoke(options) {
   const outputHtml = path.join(
     options.reportsRoot,
@@ -1527,6 +2120,19 @@ export function runGuidedWebSmoke(options) {
     note:
       "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
   });
+  const browserTaskProofCollector = collectGuidedBrowserTaskProof({
+    enabled: options.autoCollectBrowserTaskProof === true && taskPassed && !fileExists(browserTaskProofFile),
+    runId: options.runId,
+    reportsRoot: options.reportsRoot,
+    env: options.env,
+    appUrl: browserTaskAppUrl,
+    browserTaskProofRequestFile,
+    browserTaskProofFile,
+    outputHtml,
+    domSnapshotFile,
+    accessibilitySummaryFile,
+    visualSnapshotFile,
+  });
   const browserTaskProof = fileExists(browserTaskProofFile) ? asRecord(readJson(browserTaskProofFile)) : {};
   const browserTaskOutcome = asRecord(browserTaskProof.task_outcome);
   const browserTaskStatus =
@@ -1570,6 +2176,8 @@ export function runGuidedWebSmoke(options) {
   summary.visual_guardrail_file = visualSnapshotFile;
   summary.browser_task_proof_request_file = browserTaskProofRequestFile;
   summary.browser_task_proof_file = Object.keys(browserTaskProof).length > 0 ? browserTaskProofFile : null;
+  summary.browser_task_proof_collector = browserTaskProofCollector;
+  summary.browser_task_proof_collector_file = asNonEmptyString(browserTaskProofCollector.output_file) || null;
   summary.browser_task_app_url = browserTaskAppUrl;
   summary.browser_task_control_plane = browserTaskControlPlane;
   summary.browser_task_app_server_status = asNonEmptyString(browserTaskAppSurface.status) || "unknown";
@@ -1682,6 +2290,93 @@ function shortHash(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function stableJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stableJsonValue(entry));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, stableJsonValue(entry)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} context
+ * @returns {string}
+ */
+function repairContextFingerprint(context) {
+  const payload = {
+    source_phase: asNonEmptyString(context.source_phase) || "review",
+    unresolved_findings: uniqueStrings(asStringArray(context.unresolved_findings)).sort(),
+    meaningful_changed_paths: uniqueStrings(asStringArray(context.meaningful_changed_paths)).sort(),
+    verification_status: asNonEmptyString(context.verification_status) || "unknown",
+    requested_next_step: asNonEmptyString(context.requested_next_step) || "execution",
+  };
+  return `sha256:${createHash("sha256").update(JSON.stringify(stableJsonValue(payload))).digest("hex")}`;
+}
+
+/**
+ * @param {string[]} refs
+ * @returns {Record<string, unknown>[]}
+ */
+function readRepairDecisionContexts(refs) {
+  return refs
+    .map((ref) => asNonEmptyString(ref))
+    .filter((ref) => ref && path.isAbsolute(ref) && fileExists(ref))
+    .map((ref) => {
+      try {
+        return asRecord(asRecord(readJson(ref)).repair_context);
+      } catch {
+        return {};
+      }
+    })
+    .filter((context) => Object.keys(context).length > 0);
+}
+
+/**
+ * @param {Record<string, unknown> | null} previousContext
+ * @param {Record<string, unknown>} currentContext
+ * @returns {string[]}
+ */
+function resolveNewRepairContextSignals(previousContext, currentContext) {
+  if (!previousContext || Object.keys(previousContext).length === 0) {
+    return ["first-repair-decision"];
+  }
+  const signals = [];
+  if (asNonEmptyString(previousContext.source_phase) !== asNonEmptyString(currentContext.source_phase)) {
+    signals.push("source-phase-changed");
+  }
+  if (
+    JSON.stringify(uniqueStrings(asStringArray(previousContext.unresolved_findings)).sort()) !==
+    JSON.stringify(uniqueStrings(asStringArray(currentContext.unresolved_findings)).sort())
+  ) {
+    signals.push("unresolved-findings-changed");
+  }
+  if (
+    JSON.stringify(uniqueStrings(asStringArray(previousContext.meaningful_changed_paths)).sort()) !==
+    JSON.stringify(uniqueStrings(asStringArray(currentContext.meaningful_changed_paths)).sort())
+  ) {
+    signals.push("meaningful-changed-paths-changed");
+  }
+  if (asNonEmptyString(previousContext.verification_status) !== asNonEmptyString(currentContext.verification_status)) {
+    signals.push("verification-status-changed");
+  }
+  const previousRefs = new Set(asStringArray(previousContext.verification_refs));
+  const addedVerificationRefs = asStringArray(currentContext.verification_refs).filter((ref) => !previousRefs.has(ref));
+  if (addedVerificationRefs.length > 0) {
+    signals.push(`verification-refs-added:${addedVerificationRefs.length}`);
+  }
+  return signals;
+}
+
+/**
  * @param {{ sourcePath: string, runId: string, phase: string, index: number }} options
  * @returns {string}
  */
@@ -1790,6 +2485,200 @@ function resolveProjectVerifyPreflightTimeoutMs(options) {
     MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS,
     perCommandTimeoutMs * commandCount + LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS,
   );
+}
+
+/**
+ * @param {string} value
+ * @returns {{ major: number, minor: number, patch: number } | null}
+ */
+function parseNodeVersion(value) {
+  const match = value.trim().match(/^v?(\d+)\.(\d+)\.(\d+)/u);
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  };
+}
+
+/**
+ * @param {{ major: number, minor: number, patch: number }} left
+ * @param {{ major: number, minor: number, patch: number }} right
+ * @returns {number}
+ */
+function compareNodeVersions(left, right) {
+  return left.major - right.major || left.minor - right.minor || left.patch - right.patch;
+}
+
+/**
+ * @param {{ major: number, minor: number, patch: number }} version
+ * @param {string} comparator
+ * @returns {boolean}
+ */
+function nodeVersionSatisfiesComparator(version, comparator) {
+  const trimmed = comparator.trim();
+  if (trimmed.length === 0) return false;
+  if (trimmed.startsWith(">=")) {
+    const minimum = parseNodeVersion(trimmed.slice(2).trim());
+    return minimum ? compareNodeVersions(version, minimum) >= 0 : false;
+  }
+  if (trimmed.startsWith("^")) {
+    const minimum = parseNodeVersion(trimmed.slice(1).trim());
+    return minimum ? version.major === minimum.major && compareNodeVersions(version, minimum) >= 0 : false;
+  }
+  const exact = parseNodeVersion(trimmed);
+  return exact ? compareNodeVersions(version, exact) === 0 : false;
+}
+
+/**
+ * @param {string} versionText
+ * @param {string} requiredRange
+ * @returns {boolean}
+ */
+export function nodeVersionSatisfiesRequiredRange(versionText, requiredRange) {
+  const version = parseNodeVersion(versionText);
+  if (!version) return false;
+  return requiredRange
+    .split("||")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .some((entry) => nodeVersionSatisfiesComparator(version, entry));
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {{ requiredRange: string, envOverride: string } | null}
+ */
+function resolveTargetNodeToolchainPolicy(profile) {
+  const nodePolicy = asRecord(asRecord(profile.target_toolchain).node);
+  const requiredRange = asNonEmptyString(nodePolicy.required_range);
+  if (!requiredRange) return null;
+  return {
+    requiredRange,
+    envOverride: asNonEmptyString(nodePolicy.env_override) || "AOR_LIVE_E2E_TARGET_NODE_BIN",
+  };
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, env: NodeJS.ProcessEnv, reportsRoot: string, runId: string }} options
+ * @returns {{ status: "pass" | "blocked", report: Record<string, unknown>, reportFile: string }}
+ */
+export function evaluateTargetToolchainPreflight(options) {
+  const policy = resolveTargetNodeToolchainPolicy(options.profile);
+  const reportFile = path.join(
+    options.reportsRoot,
+    `live-e2e-target-toolchain-preflight-${normalizeId(options.runId)}.json`,
+  );
+  if (!policy) {
+    const report = {
+      status: "pass",
+      toolchain: "node",
+      required_range: null,
+      env_override: null,
+      selected_binary: null,
+      observed_version: null,
+      summary: "No target Node toolchain policy was declared.",
+      generated_at: nowIso(),
+    };
+    writeJson(reportFile, report);
+    return { status: "pass", report, reportFile };
+  }
+  const overrideValue = asNonEmptyString(options.env[policy.envOverride]);
+  const selectedBinary = overrideValue || "node";
+  const run = spawnSync(selectedBinary, ["-p", "process.versions.node"], {
+    env: options.env,
+    encoding: "utf8",
+  });
+  const observedVersion = asNonEmptyString(run.stdout) || asNonEmptyString(run.stderr) || null;
+  const binaryAvailable = run.status === 0 && Boolean(observedVersion);
+  const versionPass = binaryAvailable && nodeVersionSatisfiesRequiredRange(/** @type {string} */ (observedVersion), policy.requiredRange);
+  const status = versionPass ? "pass" : "blocked";
+  const report = {
+    status,
+    toolchain: "node",
+    required_range: policy.requiredRange,
+    env_override: policy.envOverride,
+    env_override_set: Boolean(overrideValue),
+    selected_binary: selectedBinary,
+    observed_version: observedVersion,
+    exit_code: run.status ?? -1,
+    failure_owner: status === "blocked" ? "environment" : null,
+    failure_phase: status === "blocked" ? "target_setup" : null,
+    failure_class: status === "blocked" ? "environment_node_version_unsupported" : null,
+    summary: versionPass
+      ? `Target Node toolchain '${selectedBinary}' satisfies ${policy.requiredRange}.`
+      : `Target Node toolchain '${selectedBinary}' does not satisfy ${policy.requiredRange}${observedVersion ? `; observed ${observedVersion}.` : "."}`,
+    generated_at: nowIso(),
+  };
+  writeJson(reportFile, report);
+  return { status, report, reportFile };
+}
+
+/**
+ * @param {{ preflightReport: Record<string, unknown>, preflightReportFile: string, baselineGateMode: string }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildTargetToolchainBlockedPreExecutionStatus(options) {
+  const summary =
+    asNonEmptyString(options.preflightReport.summary) ||
+    "Target toolchain preflight blocked before target setup or verification commands.";
+  return {
+    status: "blocked",
+    provider_independent: true,
+    failure_owner: "environment",
+    failure_phase: "target_setup",
+    failure_class: "environment_node_version_unsupported",
+    blocker_reason: summary,
+    target_setup_status: {
+      status: "blocked",
+      command_label: "target-toolchain.node",
+      elapsed_ms: null,
+      timeout_budget_ms: null,
+      blocker_reason: summary,
+      evidence_ref: options.preflightReportFile,
+      evidence_refs: [options.preflightReportFile],
+      failure_owner: "environment",
+      failure_phase: "target_setup",
+      failure_class: "environment_node_version_unsupported",
+      provider_independent: true,
+      timed_out: false,
+      missing_prerequisites: [],
+    },
+    target_verification_status: {
+      status: "not_attempted",
+      command_label: null,
+      elapsed_ms: null,
+      timeout_budget_ms: null,
+      blocker_reason: "Target verification was not attempted because target Node toolchain preflight blocked first.",
+      evidence_ref: options.preflightReportFile,
+      evidence_refs: [options.preflightReportFile],
+      failure_owner: "environment",
+      failure_phase: "target_setup",
+      failure_class: "environment_node_version_unsupported",
+      provider_independent: true,
+      timed_out: false,
+      missing_prerequisites: [],
+    },
+    baseline_verify_gate_decision: {
+      phase: "target_toolchain",
+      mode: options.baselineGateMode,
+      status: "fail",
+      decision: "block",
+      summary,
+      blocking_reasons: ["target-node-toolchain-unsupported"],
+      failed_commands: [],
+      failure_owner: "environment",
+      failure_phase: "target_setup",
+      failure_class: "environment_node_version_unsupported",
+    },
+    verify_summary_file: null,
+    step_result_files: [],
+    command_timeout_ms: null,
+    aor_command_timeout_ms: null,
+    elapsed_ms: null,
+    target_toolchain_preflight_file: options.preflightReportFile,
+    generated_at: nowIso(),
+  };
 }
 
 /**
@@ -3883,6 +4772,7 @@ export function executeFullJourneyFlow(options) {
       ...repoVerificationCommands.flatMap((entry) => ["--repo-test-command", entry]),
     ]);
     artifacts.bootstrap_artifact_packet_file = getStringField(projectInit.payload, "artifact_packet_file");
+    artifacts.project_init_transcript_file = projectInit.transcriptFile;
     const providerRoutes = materializeProviderPinnedRouteOverrides({
       routesRoot: hostAssets.routesRoot,
       providerVariant: options.providerVariant,
@@ -4053,6 +4943,7 @@ export function executeFullJourneyFlow(options) {
       ...asStringArray(artifacts.baseline_verify_step_result_files),
       cachedTargetCleanlinessFile,
       cachedExecutionReadinessFile,
+      asNonEmptyString(artifacts.target_toolchain_preflight_file),
     ]);
     const hasReusablePreExecutionReadiness =
       baselineVerifySummaryPath &&
@@ -4068,6 +4959,49 @@ export function executeFullJourneyFlow(options) {
       throw new Error(summary);
     }
     if (!hasReusablePreExecutionReadiness) {
+      const targetToolchainPolicy = resolveTargetNodeToolchainPolicy(options.profile);
+      if (targetToolchainPolicy) {
+        const targetToolchainPreflight = evaluateTargetToolchainPreflight({
+          profile: options.profile,
+          env,
+          reportsRoot: options.layout.reportsRoot,
+          runId: options.runId,
+        });
+        artifacts.target_toolchain_preflight_file = targetToolchainPreflight.reportFile;
+        artifacts.target_toolchain_preflight = targetToolchainPreflight.report;
+        baselineEvidenceRefs = uniqueStrings([...baselineEvidenceRefs, targetToolchainPreflight.reportFile]);
+        if (targetToolchainPreflight.status === "blocked") {
+          const targetPreExecutionStatus = buildTargetToolchainBlockedPreExecutionStatus({
+            preflightReport: targetToolchainPreflight.report,
+            preflightReportFile: targetToolchainPreflight.reportFile,
+            baselineGateMode: resolveBaselineGateMode(options.profile),
+          });
+          const targetPreExecutionStatusFile = writeTargetPreExecutionStatusReport({
+            reportsRoot: options.layout.reportsRoot,
+            runId: options.runId,
+            report: targetPreExecutionStatus,
+          });
+          artifacts.target_pre_execution_status_file = targetPreExecutionStatusFile;
+          artifacts.target_pre_execution_status = targetPreExecutionStatus;
+          artifacts.target_setup_status = targetPreExecutionStatus.target_setup_status;
+          artifacts.target_verification_status_detail = targetPreExecutionStatus.target_verification_status;
+          artifacts.baseline_verify_gate_decision = targetPreExecutionStatus.baseline_verify_gate_decision;
+          artifacts.baseline_verify_status = "fail";
+          artifacts.failure_owner = targetPreExecutionStatus.failure_owner;
+          artifacts.failure_phase = targetPreExecutionStatus.failure_phase;
+          artifacts.failure_class = targetPreExecutionStatus.failure_class;
+          markStage(
+            stageMap,
+            "execution",
+            "fail",
+            [targetToolchainPreflight.reportFile, targetPreExecutionStatusFile],
+            asNonEmptyString(targetPreExecutionStatus.blocker_reason) || "Target Node toolchain preflight blocked.",
+          );
+          throw new Error(
+            asNonEmptyString(targetPreExecutionStatus.blocker_reason) || "Target Node toolchain preflight blocked.",
+          );
+        }
+      }
       const verifyPreflight = runCommand(
         "project-verify-preflight",
         [
@@ -4422,13 +5356,17 @@ export function executeFullJourneyFlow(options) {
       enabled: implementationLoopPolicy.enabled,
       max_iterations: implementationLoopPolicy.maxIterations,
       review_repair_actions: implementationLoopPolicy.reviewRepairActions,
+      cycle_steps: implementationLoopPolicy.cycleSteps,
+      repair_sources: implementationLoopPolicy.repairSources,
       iterations: [],
     };
     let reviewReport = {};
     let reviewOverallStatus = "fail";
+    let qaOverallStatus = "skipped";
     let featureSizeFitStatus = "fail";
     let latestPromotionEvidenceRefs = [...promotionEvidenceRefs];
     let latestImplementationRunId = options.runId;
+    const evalSuites = getEvalSuites(options.profile);
     for (let iteration = 1; iteration <= implementationLoopPolicy.maxIterations; iteration += 1) {
       const iterationRunId = iteration === 1 ? options.runId : `${options.runId}.repair-${iteration}`;
       latestImplementationRunId = iterationRunId;
@@ -4632,12 +5570,19 @@ export function executeFullJourneyFlow(options) {
       reviewOverallStatus = normalizeVerdictStatus(reviewReport.overall_status);
       featureSizeFitStatus = normalizeVerdictStatus(asRecord(reviewReport.feature_size_fit).status);
       const reviewRepairActions = new Set(implementationLoopPolicy.reviewRepairActions);
-      const reviewNeedsRepair = reviewOverallStatus !== "pass";
-      const repairNeeded =
-        (reviewNeedsRepair &&
-          (reviewRepairActions.has("request-repair") || reviewRepairActions.has("repair"))) ||
-        (artifacts.post_run_verify_status === "fail" && reviewRepairActions.has("failed-quality-findings"));
-      const canRepair =
+      const repairSources = new Set(implementationLoopPolicy.repairSources);
+      const reviewNeedsRepair = reviewRequiresActionableRepair(reviewReport, reviewOverallStatus);
+      const reviewHasNonRepairWarnings = reviewOverallStatus === "warn" && !reviewNeedsRepair;
+      const primaryNeedsRepair = artifacts.post_run_verify_status === "fail";
+      let repairSource = reviewNeedsRepair && repairSources.has("review")
+        ? "review"
+        : primaryNeedsRepair && repairSources.has("post-run-primary")
+          ? "post-run-primary"
+          : null;
+      let repairNeeded =
+        (repairSource === "review" && (reviewRepairActions.has("request-repair") || reviewRepairActions.has("repair"))) ||
+        (repairSource === "post-run-primary" && reviewRepairActions.has("failed-quality-findings"));
+      let canRepair =
         implementationLoopPolicy.enabled &&
         repairNeeded &&
         iteration < implementationLoopPolicy.maxIterations &&
@@ -4652,40 +5597,20 @@ export function executeFullJourneyFlow(options) {
         artifacts.implementation_loop_blocked_reason =
           "Runtime Harness produced a blocking execution-health finding before public repair could continue.";
       }
-      const terminalReviewFailure = !canRepair && (reviewNeedsRepair || artifacts.post_run_verify_status === "fail");
-      if (terminalReviewFailure) {
-        const repairLoopExhausted = implementationLoopPolicy.enabled && iteration >= implementationLoopPolicy.maxIterations;
-        artifacts.failure_owner =
-          asNonEmptyString(artifacts.failure_owner) ||
-          (reviewNeedsRepair ? "provider" : "target_repository");
-        artifacts.failure_phase =
-          asNonEmptyString(artifacts.failure_phase) ||
-          (reviewNeedsRepair ? "review" : "target_verification");
-        artifacts.failure_class =
-          asNonEmptyString(artifacts.failure_class) ||
-          (repairLoopExhausted
-            ? "implementation_repair_loop_exhausted"
-            : reviewNeedsRepair
-              ? "review_quality_not_approved"
-              : "post_run_verification_failed");
-        artifacts.implementation_loop_failure_summary =
-          artifacts.post_run_verify_status === "fail" && reviewNeedsRepair
-            ? "Implementation repair loop stopped because review did not pass and post-run verification failed."
-            : reviewNeedsRepair
-              ? "Implementation repair loop stopped because review did not pass."
-              : "Implementation repair loop stopped because post-run verification failed.";
-      }
+      let terminalCycleFailure = !canRepair && (reviewNeedsRepair || primaryNeedsRepair);
       markStage(
         stageMap,
         "review",
-        canRepair ? "warn" : terminalReviewFailure ? "fail" : "pass",
+        canRepair ? "warn" : terminalCycleFailure ? "fail" : reviewHasNonRepairWarnings ? "warn" : "pass",
         uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
         canRepair
           ? `Review requested public repair iteration ${iteration + 1}.`
-          : terminalReviewFailure
+          : terminalCycleFailure
             ? asNonEmptyString(artifacts.implementation_loop_failure_summary) ||
               "Implementation review or post-run verification did not pass."
-            : "Review report materialized.",
+            : reviewHasNonRepairWarnings
+              ? "Review report materialized with non-repair warnings; continuing to QA."
+              : "Review report materialized.",
         canRepair
           ? {
               iteration,
@@ -4698,21 +5623,269 @@ export function executeFullJourneyFlow(options) {
           : { iteration },
       );
       const unresolvedReviewFindings = collectReviewFindingSummaries(reviewReport);
-      const repairStopReason =
-        terminalReviewFailure
-          ? asNonEmptyString(artifacts.implementation_loop_failure_summary) ||
-            "Implementation review or post-run verification did not pass."
-          : null;
-      const repairNecessity =
-        reviewNeedsRepair && artifacts.post_run_verify_status === "fail"
-          ? "review-and-verification"
-          : reviewNeedsRepair
-            ? "review"
-            : artifacts.post_run_verify_status === "fail"
-              ? "verification"
-              : "none";
-      const iterationRecord = {
-        iteration,
+      let unresolvedRepairFindings = [...unresolvedReviewFindings];
+      let repairStopReason = null;
+      let repairNecessity = repairSource ?? "none";
+	      let qaEvidenceRefs = uniqueStrings([
+	        postRunVerifySummaryPath,
+	        asNonEmptyString(artifacts.review_report_file),
+	        asNonEmptyString(artifacts.runtime_harness_report_file),
+	        asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+	        ...asStringArray(artifacts.review_repair_decision_files),
+	      ]);
+      let qaEvaluationStatus = "skipped";
+      let qaDiagnosticStatus = "not_run";
+
+      if (!canRepair && !terminalCycleFailure && implementationLoopPolicy.cycleSteps.includes("qa")) {
+        if (evalSuites.length > 0) {
+          const evalRun = runCommand("eval-run", [
+            "eval",
+            "run",
+            "--project-ref",
+            ".",
+            "--project-profile",
+            generatedProfile.generatedProjectProfileFile,
+            "--runtime-root",
+            ".aor",
+            "--suite-ref",
+            evalSuites[0],
+            "--subject-ref",
+            `run://${latestImplementationRunId}`,
+          ], { allowNonZeroWithPayload: true, iteration });
+          artifacts.evaluation_report_file = getStringField(evalRun.payload, "evaluation_report_file");
+          artifacts.evaluation_status = getStringField(evalRun.payload, "evaluation_status") === "pass" ? "pass" : "fail";
+          qaEvaluationStatus = asNonEmptyString(artifacts.evaluation_status) || "fail";
+          qaEvidenceRefs = uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]);
+        } else {
+          artifacts.evaluation_status = "skipped";
+          qaEvaluationStatus = "skipped";
+        }
+
+        if (postRunQualityPolicy.diagnosticCommands.length > 0) {
+          const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
+            "project",
+            "verify",
+            "--project-ref",
+            ".",
+            "--project-profile",
+            generatedProfile.generatedProjectProfileFile,
+            "--runtime-root",
+            ".aor",
+            "--require-validation-pass",
+            "true",
+            ...buildVerifyOverrideArgs({
+              label: "post-run-diagnostic",
+              commands: postRunQualityPolicy.diagnosticCommands,
+              setupCommands: repoLintCommands,
+            }),
+            ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
+              ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
+              : []),
+          ], { iteration });
+          artifacts.post_run_diagnostic_verify_summary_file = getStringField(
+            postRunDiagnosticVerify.payload,
+            "verify_summary_file",
+          );
+          artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
+            postRunDiagnosticVerify.payload,
+            "step_result_files",
+          );
+          const diagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+          const diagnosticSummary =
+            diagnosticSummaryFile && fileExists(diagnosticSummaryFile) ? readJson(diagnosticSummaryFile) : {};
+          const diagnosticPassed = asNonEmptyString(diagnosticSummary.status) === "passed";
+          artifacts.post_run_diagnostic_status = diagnosticPassed ? "pass" : postRunQualityPolicy.diagnosticFailureMode;
+          const preservedDiagnostic = diagnosticSummaryFile
+            ? preserveVerifyArtifacts({
+                verifyPayload: asRecord(postRunDiagnosticVerify.payload),
+                summaryFile: diagnosticSummaryFile,
+                reportsRoot: options.layout.reportsRoot,
+                runId: options.runId,
+                phase: `post-run-diagnostic-verify-${iteration}`,
+              })
+            : { preserved_summary_file: null, preserved_step_result_files: [], preserved_files: [] };
+          artifacts.post_run_diagnostic_verify_preserved_files = preservedDiagnostic.preserved_files;
+          if (preservedDiagnostic.preserved_summary_file) {
+            artifacts.post_run_diagnostic_verify_summary_file = preservedDiagnostic.preserved_summary_file;
+          }
+          if (preservedDiagnostic.preserved_step_result_files.length > 0) {
+            artifacts.post_run_diagnostic_verify_step_result_files = preservedDiagnostic.preserved_step_result_files;
+          }
+          qaDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "fail";
+          qaEvidenceRefs = uniqueStrings([
+            ...qaEvidenceRefs,
+            postRunDiagnosticVerify.transcriptFile,
+            asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
+            ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+          ]);
+        } else {
+          artifacts.post_run_diagnostic_status = "pass";
+          qaDiagnosticStatus = "pass";
+        }
+
+        const qaNeedsRepair = qaEvaluationStatus === "fail";
+        const diagnosticNeedsRepair = qaDiagnosticStatus === "fail";
+        repairSource = qaNeedsRepair && repairSources.has("qa")
+          ? "qa"
+          : diagnosticNeedsRepair && repairSources.has("post-run-diagnostic")
+            ? "post-run-diagnostic"
+            : null;
+        repairNeeded =
+          (repairSource === "qa" && (reviewRepairActions.has("request-repair") || reviewRepairActions.has("repair"))) ||
+          (repairSource === "post-run-diagnostic" && reviewRepairActions.has("failed-quality-findings"));
+        canRepair =
+          implementationLoopPolicy.enabled &&
+          repairNeeded &&
+          iteration < implementationLoopPolicy.maxIterations &&
+          !(implementationLoopPolicy.stopOnBlockingReview && runtimeHarnessStageStatus === "fail");
+        terminalCycleFailure = !canRepair && (qaNeedsRepair || diagnosticNeedsRepair);
+        qaOverallStatus = canRepair ? "warn" : terminalCycleFailure ? "fail" : "pass";
+        unresolvedRepairFindings = uniqueStrings([
+          ...unresolvedRepairFindings,
+          qaNeedsRepair ? `QA evaluation status '${qaEvaluationStatus}' did not pass.` : "",
+          diagnosticNeedsRepair ? `Post-run diagnostic status '${qaDiagnosticStatus}' did not pass.` : "",
+        ]);
+        markStage(
+          stageMap,
+          "qa",
+          qaOverallStatus,
+          qaEvidenceRefs,
+          canRepair
+            ? `QA requested public repair iteration ${iteration + 1}.`
+            : terminalCycleFailure
+              ? "QA or post-run diagnostic evidence did not pass."
+              : "Evaluation and diagnostic QA evidence passed.",
+          canRepair
+            ? {
+                iteration,
+                decisionOverride: {
+                  action: "retry_public_step",
+                  reason: `QA or diagnostic findings require public implementation iteration ${iteration + 1}.`,
+                  next_step: "execution",
+                },
+              }
+            : { iteration },
+        );
+      } else if (!canRepair && !terminalCycleFailure) {
+        qaOverallStatus = "skipped";
+        artifacts.evaluation_status = "skipped";
+        artifacts.post_run_diagnostic_status = "pass";
+        markStage(stageMap, "qa", "skipped", [], "Profile quality-cycle policy excludes QA.", { iteration });
+      }
+
+      if (terminalCycleFailure) {
+        const repairLoopExhausted = implementationLoopPolicy.enabled && iteration >= implementationLoopPolicy.maxIterations;
+        const failureSource =
+          repairSource ||
+          (reviewNeedsRepair ? "review" : primaryNeedsRepair ? "post-run-primary" : qaOverallStatus === "fail" ? "qa" : "unknown");
+        artifacts.failure_owner =
+          asNonEmptyString(artifacts.failure_owner) ||
+          (failureSource === "review" ? "provider" : "target_repository");
+        artifacts.failure_phase =
+          asNonEmptyString(artifacts.failure_phase) ||
+          (failureSource === "review" ? "review" : failureSource === "qa" ? "qa" : "target_verification");
+        artifacts.failure_class =
+          asNonEmptyString(artifacts.failure_class) ||
+          (repairLoopExhausted
+            ? failureSource === "qa" || failureSource === "post-run-diagnostic"
+              ? "qa_repair_loop_exhausted"
+              : failureSource === "review"
+                ? "review_repair_loop_exhausted"
+                : "post_run_verification_failed"
+            : failureSource === "review"
+              ? "review_quality_not_approved"
+              : failureSource === "qa"
+                ? "qa_quality_not_approved"
+                : "post_run_verification_failed");
+        artifacts.implementation_loop_failure_summary =
+          failureSource === "review"
+            ? "Implementation quality cycle stopped because review did not pass."
+            : failureSource === "qa"
+              ? "Implementation quality cycle stopped because QA did not pass."
+              : failureSource === "post-run-diagnostic"
+                ? "Implementation quality cycle stopped because post-run diagnostic verification did not pass."
+                : "Implementation quality cycle stopped because post-run primary verification did not pass.";
+        repairStopReason = artifacts.implementation_loop_failure_summary;
+      }
+	      if (canRepair) {
+	        repairStopReason =
+	          repairSource === "qa"
+            ? "QA evidence requested another public implementation iteration."
+            : repairSource === "post-run-diagnostic"
+              ? "Post-run diagnostic verification requested another public implementation iteration."
+              : repairSource === "post-run-primary"
+                ? "Post-run primary verification requested another public implementation iteration."
+	                : "Review requested another public implementation iteration.";
+	        repairNecessity = repairSource ?? "review";
+	      }
+	      const repairChangedPaths = uniqueStrings([
+	        ...collectRuntimeHarnessChangedPaths(artifacts.runtime_harness_report_file),
+	        ...collectReviewChangedPaths(artifacts.review_report_file),
+	      ]);
+	      const repairVerificationRefs = uniqueStrings([
+	        postRunVerifySummaryPath,
+	        asNonEmptyString(artifacts.review_report_file),
+	        asNonEmptyString(artifacts.evaluation_report_file),
+	        asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
+	        ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+	      ]);
+	      const previousRepairDecisionRefs = asStringArray(artifacts.review_repair_decision_files);
+	      const previousRepairContexts = readRepairDecisionContexts(previousRepairDecisionRefs);
+	      const previousRepairContext = previousRepairContexts.at(-1) ?? null;
+	      let pendingRepairContext = null;
+	      let pendingRepairContextFingerprint = null;
+	      let newRepairContextSignals = [];
+	      if (canRepair) {
+	        pendingRepairContext = {
+	          source_phase: repairSource ?? "review",
+	          cycle_iteration: iteration,
+	          unresolved_findings: unresolvedRepairFindings.length > 0
+	            ? unresolvedRepairFindings
+	            : ["Repair was requested before delivery."],
+	          meaningful_changed_paths: repairChangedPaths,
+	          verification_status:
+	            repairSource === "qa"
+	              ? qaEvaluationStatus
+	              : repairSource === "post-run-diagnostic"
+	                ? qaDiagnosticStatus
+	                : asNonEmptyString(artifacts.post_run_verify_status) || "unknown",
+	          verification_refs: repairVerificationRefs,
+	          previous_repair_decision_refs: previousRepairDecisionRefs,
+	          stop_reason: repairStopReason || "Repair requested before delivery.",
+	          requested_next_step: "execution",
+	        };
+	        pendingRepairContextFingerprint = repairContextFingerprint(pendingRepairContext);
+	        newRepairContextSignals = resolveNewRepairContextSignals(previousRepairContext, pendingRepairContext);
+	        pendingRepairContext.context_fingerprint = pendingRepairContextFingerprint;
+	        pendingRepairContext.new_context_since_previous = newRepairContextSignals;
+	        const previousFingerprint = asNonEmptyString(asRecord(previousRepairContext).context_fingerprint);
+	        if (previousFingerprint && previousFingerprint === pendingRepairContextFingerprint && newRepairContextSignals.length === 0) {
+	          canRepair = false;
+	          terminalCycleFailure = true;
+	          artifacts.failure_owner = "provider";
+	          artifacts.failure_phase = repairSource === "qa" ? "qa" : repairSource === "post-run-diagnostic" ? "target_verification" : "review";
+	          artifacts.failure_class = classifyRepeatedRepairContextBlocker({
+	            repairSource,
+	            pendingRepairContext,
+	            artifacts,
+	          });
+	          artifacts.implementation_loop_failure_summary =
+	            "Implementation quality cycle stopped because repeated repair context had no new actionable evidence.";
+	          repairStopReason = artifacts.implementation_loop_failure_summary;
+	          markStage(
+	            stageMap,
+	            repairSource === "qa" || repairSource === "post-run-diagnostic" ? "qa" : "review",
+	            "fail",
+	            repairVerificationRefs,
+	            artifacts.implementation_loop_failure_summary,
+	            { iteration },
+	          );
+	        }
+	        artifacts.latest_repair_context_fingerprint = pendingRepairContextFingerprint;
+	        artifacts.latest_repair_context_new_signals = newRepairContextSignals;
+	      }
+	      const iterationRecord = {
+	        iteration,
         run_id: iterationRunId,
         routed_step_result_file: asNonEmptyString(artifacts.routed_step_result_file) || null,
         post_run_verify_summary_file: postRunVerifySummaryPath,
@@ -4723,12 +5896,19 @@ export function executeFullJourneyFlow(options) {
         review_recommendation: asNonEmptyString(reviewReport.review_recommendation) || null,
         feature_size_fit_status: featureSizeFitStatus,
         post_run_verify_status: asNonEmptyString(artifacts.post_run_verify_status),
+        qa_status: qaOverallStatus,
+        evaluation_status: qaEvaluationStatus,
+        post_run_diagnostic_status: qaDiagnosticStatus,
+        repair_source: repairSource,
         repair_necessity: repairNecessity,
         unresolved_review_findings: unresolvedReviewFindings,
-        previous_repair_decision_files: asStringArray(artifacts.review_repair_decision_files),
-        repair_stop_reason: repairStopReason,
-        repair_requested: canRepair,
-      };
+	        unresolved_repair_findings: unresolvedRepairFindings,
+	        previous_repair_decision_files: previousRepairDecisionRefs,
+	        repair_context_fingerprint: pendingRepairContextFingerprint,
+	        new_context_since_previous: newRepairContextSignals,
+	        repair_stop_reason: repairStopReason,
+	        repair_requested: canRepair,
+	      };
       {
         const currentIterations = Array.isArray(asRecord(artifacts.implementation_loop).iterations)
           ? asRecord(artifacts.implementation_loop).iterations
@@ -4737,7 +5917,10 @@ export function executeFullJourneyFlow(options) {
       }
       if (!canRepair) {
         if (
-          (repairNeeded || reviewOverallStatus === "fail" || artifacts.post_run_verify_status === "fail") &&
+          (repairNeeded ||
+            reviewOverallStatus === "fail" ||
+            qaOverallStatus === "fail" ||
+            artifacts.post_run_verify_status === "fail") &&
           implementationLoopPolicy.enabled &&
           iteration >= implementationLoopPolicy.maxIterations
         ) {
@@ -4745,8 +5928,14 @@ export function executeFullJourneyFlow(options) {
         }
         break;
       }
-      const reviewRepairDecision = runCommand("review-decide-request-repair", [
-        "review",
+	      const repairContextFile = path.join(
+	        options.layout.reportsRoot,
+	        `review-repair-context-${normalizeId(options.runId)}-${iteration}.json`,
+	      );
+	      writeJson(repairContextFile, asRecord(pendingRepairContext));
+	      artifacts.latest_repair_context_file = repairContextFile;
+	      const reviewRepairDecision = runCommand("review-decide-request-repair", [
+	        "review",
         "decide",
         "--project-ref",
         ".",
@@ -4762,14 +5951,17 @@ export function executeFullJourneyFlow(options) {
         "request-repair",
         "--decider-ref",
         "operator://live-e2e-step-controller",
+	        "--repair-context-file",
+	        repairContextFile,
         "--reason",
         [
-          `Live E2E review iteration ${iteration} requested public repair before delivery.`,
+          `Live E2E quality-cycle iteration ${iteration} requested public repair before delivery.`,
           `Repair necessity: ${repairNecessity}.`,
-          unresolvedReviewFindings.length > 0
-            ? `Unresolved findings: ${unresolvedReviewFindings.slice(0, 5).join(" | ")}.`
-            : "Unresolved findings were not summarized by the review report.",
+          unresolvedRepairFindings.length > 0
+            ? `Unresolved findings: ${unresolvedRepairFindings.slice(0, 5).join(" | ")}.`
+            : "Unresolved findings were not summarized by the quality cycle.",
           `Post-run verification status: ${asNonEmptyString(artifacts.post_run_verify_status) || "unknown"}.`,
+          `QA status: ${qaOverallStatus}.`,
           `Runtime Harness decision: ${asNonEmptyString(artifacts.runtime_harness_overall_decision) || "unknown"}.`,
         ].join(" "),
       ], { allowNonZeroWithPayload: true, iteration });
@@ -4795,6 +5987,7 @@ export function executeFullJourneyFlow(options) {
           artifacts.implementation_loop_blocked === true ||
           lastIteration.repair_requested === true ||
           reviewOverallStatus !== "pass" ||
+          qaOverallStatus === "fail" ||
           artifacts.post_run_verify_status === "fail"
         ) {
           artifacts.implementation_loop_exhausted = true;
@@ -4805,10 +5998,24 @@ export function executeFullJourneyFlow(options) {
       throw new Error("Implementation repair loop blocked by runtime health evidence before review and verification passed.");
     }
     if (artifacts.implementation_loop_exhausted === true) {
-      throw new Error("Implementation repair loop exhausted before review and verification passed.");
+      throw new Error("Implementation quality cycle exhausted before review, QA, and verification passed.");
     }
-    if (reviewOverallStatus !== "pass" || artifacts.post_run_verify_status === "fail") {
-      throw new Error("Implementation review or post-run verification failed before delivery.");
+    if (reviewOverallStatus !== "pass" && !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus)) {
+      artifacts.failure_owner = asNonEmptyString(artifacts.failure_owner) || "provider";
+      artifacts.failure_phase = asNonEmptyString(artifacts.failure_phase) || "review";
+      artifacts.failure_class =
+        asNonEmptyString(artifacts.failure_class) ||
+        classifyNonRepairReviewBlocker({
+          reviewReport,
+          artifacts,
+        });
+      artifacts.implementation_loop_failure_summary =
+        asNonEmptyString(artifacts.implementation_loop_failure_summary) ||
+        "Implementation quality cycle stopped on non-repair review evidence before delivery.";
+      throw new Error(artifacts.implementation_loop_failure_summary);
+    }
+    if (reviewOverallStatus !== "pass" || qaOverallStatus === "fail" || artifacts.post_run_verify_status === "fail") {
+      throw new Error("Implementation review, QA, or post-run verification failed before delivery.");
     }
     if (guidedJourneyEnabled) {
       const guidedNextAfterReview = runCommand("guided-next-after-review", [
@@ -4846,98 +6053,6 @@ export function executeFullJourneyFlow(options) {
       ]);
       artifacts.review_decision_file = getStringField(reviewDecision.payload, "review_decision_file");
       artifacts.guided_review_decision_transcript_file = reviewDecision.transcriptFile;
-    }
-
-    const evalSuites = getEvalSuites(options.profile);
-    if (evalSuites.length > 0) {
-      const evalRun = runCommand("eval-run", [
-        "eval",
-        "run",
-        "--project-ref",
-        ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
-        "--runtime-root",
-        ".aor",
-        "--suite-ref",
-        evalSuites[0],
-        "--subject-ref",
-        `run://${latestImplementationRunId}`,
-      ], { allowNonZeroWithPayload: true });
-      artifacts.evaluation_report_file = getStringField(evalRun.payload, "evaluation_report_file");
-      markStage(
-        stageMap,
-        "qa",
-        getStringField(evalRun.payload, "evaluation_status") === "pass" ? "pass" : "fail",
-        uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
-        "Evaluation report materialized.",
-      );
-    } else {
-      markStage(stageMap, "qa", "skipped", [], "Profile has no eval suites.");
-    }
-
-    if (postRunQualityPolicy.diagnosticCommands.length > 0) {
-      const cachedDiagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
-      const cachedDiagnosticSummary =
-        cachedDiagnosticSummaryFile && fileExists(cachedDiagnosticSummaryFile)
-          ? asRecord(readJson(cachedDiagnosticSummaryFile))
-          : {};
-      const shouldReuseDiagnostic = Object.keys(cachedDiagnosticSummary).length > 0;
-      let postRunDiagnosticVerifyPayload = {};
-      if (!shouldReuseDiagnostic) {
-        const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
-          "project",
-          "verify",
-          "--project-ref",
-          ".",
-          "--project-profile",
-          generatedProfile.generatedProjectProfileFile,
-          "--runtime-root",
-          ".aor",
-          "--require-validation-pass",
-          "true",
-          ...buildVerifyOverrideArgs({
-            label: "post-run-diagnostic",
-            commands: postRunQualityPolicy.diagnosticCommands,
-            setupCommands: repoLintCommands,
-          }),
-          ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
-            ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
-            : []),
-        ]);
-        artifacts.post_run_diagnostic_verify_summary_file = getStringField(
-          postRunDiagnosticVerify.payload,
-          "verify_summary_file",
-        );
-        artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
-          postRunDiagnosticVerify.payload,
-          "step_result_files",
-        );
-        postRunDiagnosticVerifyPayload = asRecord(postRunDiagnosticVerify.payload);
-      }
-      const diagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
-      const diagnosticSummary =
-        diagnosticSummaryFile && fileExists(diagnosticSummaryFile) ? readJson(diagnosticSummaryFile) : {};
-      const diagnosticPassed = asNonEmptyString(diagnosticSummary.status) === "passed";
-      artifacts.post_run_diagnostic_status = diagnosticPassed ? "pass" : postRunQualityPolicy.diagnosticFailureMode;
-      const preservedDiagnostic = diagnosticSummaryFile && !shouldReuseDiagnostic
-        ? preserveVerifyArtifacts({
-            verifyPayload: postRunDiagnosticVerifyPayload,
-            summaryFile: diagnosticSummaryFile,
-            reportsRoot: options.layout.reportsRoot,
-            runId: options.runId,
-            phase: "post-run-diagnostic-verify",
-          })
-        : { preserved_summary_file: null, preserved_step_result_files: [], preserved_files: [] };
-      artifacts.post_run_diagnostic_verify_preserved_files = preservedDiagnostic.preserved_files;
-      if (preservedDiagnostic.preserved_summary_file) {
-        artifacts.post_run_diagnostic_verify_summary_file = preservedDiagnostic.preserved_summary_file;
-      }
-      if (preservedDiagnostic.preserved_step_result_files.length > 0) {
-        artifacts.post_run_diagnostic_verify_step_result_files = preservedDiagnostic.preserved_step_result_files;
-      }
-    } else {
-      artifacts.post_run_diagnostic_status = "pass";
     }
 
     const harnessCertification = getHarnessCertification(options.profile);
@@ -5386,6 +6501,8 @@ export function executeFullJourneyFlow(options) {
         reportsRoot: options.layout.reportsRoot,
         env,
         projectProfileFile: generatedProfile.generatedProjectProfileFile,
+        autoCollectBrowserTaskProof:
+          asRecord(asRecord(options.profile.guided_journey).browser_task_proof).auto_collect === true,
       });
       artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
       artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;

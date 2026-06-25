@@ -370,6 +370,8 @@ const FEATURE_SIZE_BUDGETS = Object.freeze({
   large: { max_changed_files: 64, max_added_lines: 4500 },
   xlarge: { max_changed_files: 100, max_added_lines: 10000 },
 });
+const PRODUCT_QUALITY_CYCLE_STEPS = Object.freeze(["execution", "review", "qa"]);
+const PRODUCT_REPAIR_SOURCES = Object.freeze(["review", "qa", "post-run-primary", "post-run-diagnostic"]);
 
 /**
  * @param {Record<string, unknown>} mission
@@ -445,6 +447,35 @@ function assertFeatureMissionPolicy(options) {
     throw new UsageError(
       `Feature mission '${options.featureMissionId}' in catalog '${options.targetCatalogId}' violates live E2E mission policy: ${problems.join("; ")}.`,
     );
+  }
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, mission: Record<string, unknown>, featureSize: string }} options
+ */
+function assertQualityCycleLoopPolicy(options) {
+  if (
+    asNonEmptyString(options.mission.mission_class) !== "product-change" ||
+    !["medium", "large", "xlarge"].includes(options.featureSize)
+  ) {
+    return;
+  }
+
+  const profileId = asNonEmptyString(options.profile.profile_id) || "full-journey-profile";
+  const implementationLoop = asRecord(options.profile.implementation_loop);
+  const cycleSteps = asStringArray(implementationLoop.cycle_steps);
+  const repairSources = asStringArray(implementationLoop.repair_sources);
+  const missingCycleSteps = PRODUCT_QUALITY_CYCLE_STEPS.filter((step) => !cycleSteps.includes(step));
+  const missingRepairSources = PRODUCT_REPAIR_SOURCES.filter((source) => !repairSources.includes(source));
+  const problems = [];
+  if (missingCycleSteps.length > 0) {
+    problems.push(`implementation_loop.cycle_steps must include ${missingCycleSteps.join(", ")}`);
+  }
+  if (missingRepairSources.length > 0) {
+    problems.push(`implementation_loop.repair_sources must include ${missingRepairSources.join(", ")}`);
+  }
+  if (problems.length > 0) {
+    throw new UsageError(`Product-change profile '${profileId}' is missing quality-cycle policy: ${problems.join("; ")}.`);
   }
 }
 
@@ -723,6 +754,11 @@ export function resolveFullJourneyProfile(options) {
   assertFeatureMissionPolicy({
     targetCatalogId,
     featureMissionId,
+    mission: asRecord(mission),
+    featureSize,
+  });
+  assertQualityCycleLoopPolicy({
+    profile: options.profile,
     mission: asRecord(mission),
     featureSize,
   });

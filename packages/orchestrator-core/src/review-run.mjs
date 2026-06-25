@@ -80,6 +80,15 @@ function isBroadTestCommand(command) {
   if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?:\s|$)/u.test(normalized)) {
     return true;
   }
+  if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+run\s+test:[^\s]+(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:python3?|uv\s+run\s+python)\s+-m\s+pytest(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:uv\s+run\s+)?pytest(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
   if (/(?:^|\s)(?:npx\s+)?ava(?:\s|$)/u.test(normalized) && !/(?:^|\s)(?:test|tests|spec|__tests__)\/[^\s]+/u.test(normalized)) {
     return true;
   }
@@ -159,44 +168,89 @@ function testCommandCoversChangedPackage(command, packageContext) {
  * @param {string} command
  * @param {string} changedPath
  * @param {string} projectRoot
- * @returns {boolean}
+ * @returns {string | null}
  */
-function testCommandCoversChangedPath(command, changedPath, projectRoot) {
+function describeTestCommandCoverage(command, changedPath, projectRoot) {
   if (isBroadTestCommand(command)) {
-    return true;
+    return "broad-repo-test-command";
   }
   const normalizedCommand = command.replace(/\\/g, "/");
   const normalizedPath = changedPath.replace(/\\/g, "/");
-  return (
-    normalizedCommand.includes(normalizedPath) ||
-    normalizedCommand.includes(`./${normalizedPath}`) ||
-    normalizedCommand.includes(path.posix.basename(normalizedPath)) ||
-    testCommandCoversChangedPackage(command, findNearestPackageContext(projectRoot, changedPath))
-  );
+  if (normalizedCommand.includes(normalizedPath) || normalizedCommand.includes(`./${normalizedPath}`)) {
+    return "explicit-test-path";
+  }
+  if (normalizedCommand.includes(path.posix.basename(normalizedPath))) {
+    return "explicit-test-file-name";
+  }
+  if (testCommandCoversChangedPackage(command, findNearestPackageContext(projectRoot, changedPath))) {
+    return "workspace-or-package-scoped-test-command";
+  }
+  return null;
 }
 
 /**
  * @param {Record<string, unknown> | null} verifySummary
  * @param {string[]} changedPaths
  * @param {string} projectRoot
- * @returns {{ changedTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[] }}
+ * @returns {{ changedTestPaths: string[], coveredTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[], coveringCommands: string[], coverageReason: string }}
  */
 function findChangedTestVerificationGaps(verifySummary, changedPaths, projectRoot) {
   const changedTestPaths = changedPaths.filter((candidate) => isTestSourcePath(candidate));
   const commandOverrides = asRecord(asRecord(verifySummary).command_overrides);
   const testCommands = asStringArray(commandOverrides.test_commands);
   if (changedTestPaths.length === 0) {
-    return { changedTestPaths, uncoveredTestPaths: [], testCommands };
+    return {
+      changedTestPaths,
+      coveredTestPaths: [],
+      uncoveredTestPaths: [],
+      testCommands,
+      coveringCommands: [],
+      coverageReason: "no-changed-test-paths",
+    };
   }
   if (testCommands.length === 0) {
-    return { changedTestPaths, uncoveredTestPaths: changedTestPaths, testCommands };
+    return {
+      changedTestPaths,
+      coveredTestPaths: [],
+      uncoveredTestPaths: changedTestPaths,
+      testCommands,
+      coveringCommands: [],
+      coverageReason: "no-primary-test-commands-recorded",
+    };
+  }
+  /** @type {string[]} */
+  const coveredTestPaths = [];
+  /** @type {string[]} */
+  const uncoveredTestPaths = [];
+  /** @type {string[]} */
+  const coveringCommands = [];
+  /** @type {string[]} */
+  const coverageReasons = [];
+  for (const changedPath of changedTestPaths) {
+    const covering = testCommands
+      .map((command) => ({
+        command,
+        reason: describeTestCommandCoverage(command, changedPath, projectRoot),
+      }))
+      .find((candidate) => candidate.reason !== null);
+    if (covering) {
+      coveredTestPaths.push(changedPath);
+      coveringCommands.push(covering.command);
+      coverageReasons.push(/** @type {string} */ (covering.reason));
+    } else {
+      uncoveredTestPaths.push(changedPath);
+    }
   }
   return {
     changedTestPaths,
-    uncoveredTestPaths: changedTestPaths.filter(
-      (changedPath) => !testCommands.some((command) => testCommandCoversChangedPath(command, changedPath, projectRoot)),
-    ),
+    coveredTestPaths,
+    uncoveredTestPaths,
     testCommands,
+    coveringCommands: uniqueStrings(coveringCommands),
+    coverageReason:
+      uncoveredTestPaths.length > 0
+        ? "some-changed-test-paths-not-covered"
+        : uniqueStrings(coverageReasons).join(",") || "covered",
   };
 }
 
@@ -1032,6 +1086,14 @@ export function materializeReviewReport(options) {
       execution_step_result_refs: executionStepResults.map((artifact) => artifact.artifact_ref),
       delivery_manifest_ref: deliveryManifest?.artifact_ref ?? null,
       release_packet_ref: releasePacket?.artifact_ref ?? null,
+      verification_coverage: {
+        changed_test_paths: changedTestVerification.changedTestPaths,
+        covered_test_paths: changedTestVerification.coveredTestPaths,
+        uncovered_test_paths: changedTestVerification.uncoveredTestPaths,
+        covering_commands: changedTestVerification.coveringCommands,
+        recorded_test_commands: changedTestVerification.testCommands,
+        coverage_reason: changedTestVerification.coverageReason,
+      },
       findings: artifactFindings,
     },
     code_quality: {

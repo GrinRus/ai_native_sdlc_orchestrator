@@ -265,6 +265,35 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
 }
 
 /**
+ * @param {string} command
+ * @returns {string}
+ */
+function wrapCommandWithTargetNodeEnv(command) {
+  return `[ -z "\${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; ${command}`;
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, verification: Record<string, unknown> }} options
+ * @returns {Record<string, unknown>}
+ */
+function applyTargetToolchainPolicy(options) {
+  const nodePolicy = asRecord(asRecord(options.profile.target_toolchain).node);
+  const requiredRange = asNonEmptyString(nodePolicy.required_range);
+  if (!requiredRange) return options.verification;
+  return {
+    ...options.verification,
+    target_toolchain: {
+      node: {
+        required_range: requiredRange,
+        env_override: asNonEmptyString(nodePolicy.env_override) || "AOR_LIVE_E2E_TARGET_NODE_BIN",
+      },
+    },
+    setup_commands: asStringArray(options.verification.setup_commands).map(wrapCommandWithTargetNodeEnv),
+    commands: asStringArray(options.verification.commands).map(wrapCommandWithTargetNodeEnv),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} mission
  * @returns {boolean}
  */
@@ -403,15 +432,19 @@ export function materializeGeneratedProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  hydrateRepoVerificationCommands(
-    selectedRepo,
-    resolveGeneratedProfileVerification({
+  const generatedVerification = applyTargetToolchainPolicy({
+    profile: options.profile,
+    verification: resolveGeneratedProfileVerification({
       catalogVerification: asRecord(asRecord(options.catalogEntry).verification),
       profileVerification: asRecord(options.profile.verification),
       mission: asRecord(options.mission),
     }),
-  );
+  });
+  hydrateRepoVerificationCommands(selectedRepo, generatedVerification);
   generatedProjectProfile.repos = [selectedRepo];
+  if (asRecord(generatedVerification.target_toolchain).node) {
+    generatedProjectProfile.target_toolchain = generatedVerification.target_toolchain;
+  }
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";

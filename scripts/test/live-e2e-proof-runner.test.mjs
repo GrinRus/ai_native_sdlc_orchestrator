@@ -30,10 +30,13 @@ import { applyProductionProofEvidence } from "../live-e2e/lib/production-proof.m
 import {
   archivedNextActionReportForMission,
   buildTargetPreExecutionStatusReport,
+  collectGuidedBrowserTaskProof,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
   evaluateBaselineVerifyGate,
+  evaluateTargetToolchainPreflight,
   nextActionReportClosesFlow,
+  nodeVersionSatisfiesRequiredRange,
   prepareAorInstallationProof,
   reconcileSummaryMeaningfulChangedPaths,
   runGuidedWebSmoke,
@@ -1177,14 +1180,32 @@ test("generated Vitest large profile isolates verification and checks hard-targe
 
     assert.equal(loaded.ok, true);
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
+    assert.equal(loaded.document.target_toolchain.node.required_range, "^22.12.0 || ^24.0.0 || >=26.0.0");
+    assert.equal(loaded.document.target_toolchain.node.env_override, "AOR_LIVE_E2E_TARGET_NODE_BIN");
     assert.equal(
       loaded.document.repos[0].lint_commands.some((command) =>
         command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
       ),
       true,
     );
-    assert.equal(loaded.document.repos[0].lint_commands.includes("pnpm build"), true);
-    assert.deepEqual(loaded.document.repos[0].test_commands, ["pnpm test", "pnpm lint"]);
+    assert.equal(
+      loaded.document.repos[0].lint_commands.some((command) =>
+        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm build"),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.document.repos[0].test_commands.some((command) =>
+        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm test"),
+      ),
+      true,
+    );
+    assert.equal(
+      loaded.document.repos[0].test_commands.some((command) =>
+        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm lint"),
+      ),
+      true,
+    );
   });
 });
 
@@ -1294,6 +1315,43 @@ test("target pre-execution status separates target setup, target verification, a
     assert.equal(aorReport.failure_owner, "aor");
     assert.equal(aorReport.failure_phase, "target_verification");
     assert.equal(aorReport.failure_class, "aor_failure");
+  });
+});
+
+test("target toolchain preflight blocks incompatible Node before target commands", () => {
+  withTempRoot((tempRoot) => {
+    assert.equal(nodeVersionSatisfiesRequiredRange("22.12.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);
+    assert.equal(nodeVersionSatisfiesRequiredRange("24.1.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);
+    assert.equal(nodeVersionSatisfiesRequiredRange("25.9.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), false);
+    assert.equal(nodeVersionSatisfiesRequiredRange("26.0.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);
+
+    const fakeNode = path.join(tempRoot, "fake-node");
+    fs.writeFileSync(fakeNode, "#!/bin/sh\necho 25.9.0\n", "utf8");
+    fs.chmodSync(fakeNode, 0o755);
+    const result = evaluateTargetToolchainPreflight({
+      profile: {
+        target_toolchain: {
+          node: {
+            required_range: "^22.12.0 || ^24.0.0 || >=26.0.0",
+            env_override: "AOR_LIVE_E2E_TARGET_NODE_BIN",
+          },
+        },
+      },
+      env: {
+        ...process.env,
+        AOR_LIVE_E2E_TARGET_NODE_BIN: fakeNode,
+      },
+      reportsRoot: tempRoot,
+      runId: "toolchain-preflight-node-block",
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.report.failure_owner, "environment");
+    assert.equal(result.report.failure_phase, "target_setup");
+    assert.equal(result.report.failure_class, "environment_node_version_unsupported");
+    assert.equal(result.report.selected_binary, fakeNode);
+    assert.equal(result.report.observed_version, "25.9.0");
+    assert.equal(fs.existsSync(result.reportFile), true);
   });
 });
 
@@ -2435,6 +2493,104 @@ test("guided browser-task proof request points at a live app surface, not the sh
   });
 });
 
+test("guided browser-task collector materializes proof through configured Python runtime", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const fakePython = path.join(tempRoot, "fake-python.cjs");
+    fs.writeFileSync(
+      fakePython,
+      [
+        "#!/usr/bin/env node",
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "if (process.argv[2] === '-c') process.exit(0);",
+        "const payload = JSON.parse(process.argv[3]);",
+        "const evidenceRefs = [",
+        "  payload.browser_task_proof_file,",
+        "  payload.rendered_html_file,",
+        "  payload.dom_snapshot_file,",
+        "  payload.accessibility_summary_file,",
+        "  payload.visual_guardrail_file,",
+        "  payload.screenshot_file,",
+        "];",
+        "for (const file of evidenceRefs) fs.mkdirSync(path.dirname(file), { recursive: true });",
+        "fs.writeFileSync(payload.rendered_html_file, '<main><button>New Flow</button><button>Ask AOR</button></main>\\n');",
+        "fs.writeFileSync(payload.dom_snapshot_file, JSON.stringify({ status: 'pass' }, null, 2) + '\\n');",
+        "fs.writeFileSync(payload.accessibility_summary_file, JSON.stringify({ status: 'pass' }, null, 2) + '\\n');",
+        "fs.writeFileSync(payload.visual_guardrail_file, JSON.stringify({ status: 'pass' }, null, 2) + '\\n');",
+        "fs.writeFileSync(payload.screenshot_file, 'png');",
+        "const checks = [",
+        "  'keyboard_navigation',",
+        "  'focus_order',",
+        "  'contrast_and_readability',",
+        "  'semantic_structure',",
+        "  'screen_reader_labels',",
+        "  'accessible_error_feedback',",
+        "].map((check_id) => ({ check_id, status: 'pass', evidence_refs: evidenceRefs, findings: [] }));",
+        "const proof = {",
+        "  status: 'pass',",
+        "  proof_source: 'fake-python-guided-browser-task-collector',",
+        "  env_playwright_browsers_path: process.env.PLAYWRIGHT_BROWSERS_PATH || null,",
+        "  browser_task_proof_request_file: payload.browser_task_proof_request_file,",
+        "  rendered_html_file: payload.rendered_html_file,",
+        "  dom_snapshot_file: payload.dom_snapshot_file,",
+        "  accessibility_summary_file: payload.accessibility_summary_file,",
+        "  visual_guardrail_file: payload.visual_guardrail_file,",
+        "  screenshot_files: [payload.screenshot_file],",
+        "  keyboard_focus_sequence: [",
+        "    { index: 1, role: 'button', label: 'New Flow', selector: 'button.new-flow-button' },",
+        "    { index: 2, role: 'button', label: 'Ask AOR', selector: 'button.topbar-ask-button' },",
+        "  ],",
+        "  accessibility_checks: checks,",
+        "  task_outcome: { status: 'pass', checked_tasks: ['browser-task evidence capture'], findings: [] },",
+        "};",
+        "fs.writeFileSync(payload.browser_task_proof_file, JSON.stringify(proof, null, 2) + '\\n');",
+        "console.log(JSON.stringify({ status: 'pass', proof_file: payload.browser_task_proof_file }));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.chmodSync(fakePython, 0o755);
+
+    const runId = "guided-collector";
+    const result = collectGuidedBrowserTaskProof({
+      enabled: true,
+      runId,
+      reportsRoot,
+      env: {
+        ...process.env,
+        AOR_LIVE_E2E_BROWSER_PROOF_PYTHON_BIN: fakePython,
+        PLAYWRIGHT_BROWSERS_PATH: path.join(tempRoot, "target-cache", "ms-playwright"),
+      },
+      appUrl: "http://127.0.0.1:61002/",
+      browserTaskProofRequestFile: path.join(
+        reportsRoot,
+        `installed-user-guided-browser-task-proof-request-${runId}.json`,
+      ),
+      browserTaskProofFile: path.join(reportsRoot, `installed-user-guided-browser-task-proof-${runId}.json`),
+      outputHtml: path.join(reportsRoot, `installed-user-guided-web-smoke-${runId}.html`),
+      domSnapshotFile: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${runId}.json`),
+      accessibilitySummaryFile: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-accessibility-${runId}.json`,
+      ),
+      visualSnapshotFile: path.join(reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${runId}.json`),
+    });
+
+    assert.equal(result.status, "pass");
+    assert.equal(fs.existsSync(result.proof_file), true);
+    assert.equal(fs.existsSync(result.screenshot_file), true);
+    const proof = JSON.parse(fs.readFileSync(result.proof_file, "utf8"));
+    assert.equal(proof.task_outcome.status, "pass");
+    assert.equal(proof.env_playwright_browsers_path, null);
+    assert.deepEqual(
+      proof.accessibility_checks.map((entry) => entry.check_id),
+      aorOperatorAccessibilityCheckIds,
+    );
+  });
+});
+
 test("guided flow loop prefers archived first-flow next-action evidence", () => {
   withTempRoot((tempRoot) => {
     const targetRoot = path.join(tempRoot, "target");
@@ -2796,6 +2952,35 @@ test("full-journey resolver rejects profiles without explicit catalog matrix cel
   );
 });
 
+test("medium product-change profiles must declare the full implementation quality cycle", () => {
+  const loaded = loadProofRunnerProfile({
+    hostRoot: repoRoot,
+    profileRef: "scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml",
+  });
+  const profile = structuredClone(loaded.profile);
+  profile.implementation_loop.cycle_steps = ["execution", "review"];
+
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /implementation_loop\.cycle_steps must include qa/u,
+  );
+
+  const missingRepairSources = structuredClone(loaded.profile);
+  missingRepairSources.implementation_loop.repair_sources = ["review"];
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile: missingRepairSources,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /implementation_loop\.repair_sources must include qa, post-run-primary, post-run-diagnostic/u,
+  );
+});
+
 test("run-profile rejects xlarge profiles outside manual controller mode", () => {
   const result = spawnSync(
     process.execPath,
@@ -2915,21 +3100,33 @@ test("source install proof force-refreshes dependencies and smokes intake CLI", 
   assert.match(flowsSource, /\["aor", "intake", "create", "--help"\]/u);
 });
 
-test("full journey review warnings request repair instead of passing into QA approval", () => {
+test("full journey requests repair only for actionable review or QA findings before delivery approval", () => {
   const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
 
-  assert.match(flowsSource, /const reviewNeedsRepair = reviewOverallStatus !== "pass"/u);
+  assert.match(flowsSource, /const reviewNeedsRepair = reviewRequiresActionableRepair\(reviewReport, reviewOverallStatus\)/u);
+  assert.match(flowsSource, /const reviewHasNonRepairWarnings = reviewOverallStatus === "warn" && !reviewNeedsRepair/u);
   assert.match(flowsSource, /reviewNeedsRepair[\s\S]*reviewRepairActions\.has\("request-repair"\)/u);
-  assert.match(flowsSource, /const terminalReviewFailure = !canRepair && \(reviewNeedsRepair \|\| artifacts\.post_run_verify_status === "fail"\)/u);
-  assert.match(flowsSource, /implementation_repair_loop_exhausted/u);
-  assert.match(flowsSource, /canRepair \? "warn" : terminalReviewFailure \? "fail" : "pass"/u);
-  assert.match(flowsSource, /reviewOverallStatus !== "pass" \|\| artifacts\.post_run_verify_status === "fail"/u);
-  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
-  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
-  assert.match(flowsSource, /previous_repair_decision_files: asStringArray\(artifacts\.review_repair_decision_files\)/u);
-  assert.match(flowsSource, /Unresolved findings:/u);
-  assert.match(flowsSource, /Runtime Harness decision:/u);
-});
+  assert.match(flowsSource, /reviewHasOnlyVerificationMappingFindings/u);
+  assert.match(flowsSource, /verification_mapping_gap/u);
+  assert.match(flowsSource, /acceptable_residual_risk_not_recognized/u);
+  assert.match(flowsSource, /provider_did_not_address_finding/u);
+  assert.match(flowsSource, /const qaNeedsRepair = qaEvaluationStatus === "fail"/u);
+  assert.match(flowsSource, /const diagnosticNeedsRepair = qaDiagnosticStatus === "fail"/u);
+  assert.match(flowsSource, /terminalCycleFailure = !canRepair && \(qaNeedsRepair \|\| diagnosticNeedsRepair\)/u);
+  assert.match(flowsSource, /qa_repair_loop_exhausted/u);
+  assert.match(flowsSource, /review_repair_loop_exhausted/u);
+  assert.match(flowsSource, /--repair-context-file/u);
+  assert.match(flowsSource, /source_phase: repairSource \?\? "review"/u);
+  assert.match(flowsSource, /qaOverallStatus === "fail"/u);
+	  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
+	  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
+	  assert.match(flowsSource, /previous_repair_decision_files: previousRepairDecisionRefs/u);
+	  assert.match(flowsSource, /repair_context_fingerprint: pendingRepairContextFingerprint/u);
+	  assert.match(flowsSource, /new_context_since_previous: newRepairContextSignals/u);
+	  assert.match(flowsSource, /repeated_repair_context_without_new_evidence/u);
+	  assert.match(flowsSource, /Unresolved findings:/u);
+	  assert.match(flowsSource, /Runtime Harness decision:/u);
+	});
 
 test("proof runner writes run-health reports for blocked live E2E reports", () => {
   withTempRoot((tempRoot) => {
@@ -3109,7 +3306,7 @@ test("proof runner writes run-health reports for blocked live E2E reports", () =
   });
 });
 
-test("proof runner preserves exhausted implementation repair loop as review run-health failure", () => {
+test("proof runner preserves exhausted review repair loop as review run-health failure", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
     const runtimeRoot = path.join(tempRoot, "runtime");
@@ -3290,7 +3487,7 @@ test("proof runner preserves exhausted implementation repair loop as review run-
           feature_size: "small",
           failure_owner: "provider",
           failure_phase: "review",
-          failure_class: "implementation_repair_loop_exhausted",
+          failure_class: "review_repair_loop_exhausted",
         },
       },
       aorLaunch: {
@@ -3303,10 +3500,10 @@ test("proof runner preserves exhausted implementation repair loop as review run-
     assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
     assert.equal(written.summary.failure_owner, "provider");
     assert.equal(written.summary.failure_phase, "review");
-    assert.equal(written.summary.failure_class, "implementation_repair_loop_exhausted");
+    assert.equal(written.summary.failure_class, "review_repair_loop_exhausted");
     assert.equal(written.runHealthReport.failure_summary.owner, "provider");
     assert.equal(written.runHealthReport.failure_summary.phase, "review");
-    assert.equal(written.runHealthReport.failure_summary.class, "implementation_repair_loop_exhausted");
+    assert.equal(written.runHealthReport.failure_summary.class, "review_repair_loop_exhausted");
   });
 });
 

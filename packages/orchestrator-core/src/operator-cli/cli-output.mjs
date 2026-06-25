@@ -318,6 +318,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["review_decision", "reviewDecision"],
   ["review_decision_gate", "reviewDecisionGate"],
   ["review_decision_reason", "reviewDecisionReason"],
+  ["review_decision_repair_context", "reviewDecisionRepairContext"],
   ["review_decision_evidence_refs", "reviewDecisionEvidenceRefs"],
   ["runtime_harness_report_id", "runtimeHarnessReportId"],
   ["runtime_harness_report_file", "runtimeHarnessReportFile"],

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -45,6 +46,39 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function stableJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stableJsonValue(entry));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, stableJsonValue(entry)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} context
+ * @returns {string}
+ */
+function fingerprintRepairContext(context) {
+  const payload = {
+    source_phase: asString(context.source_phase) ?? "review",
+    unresolved_findings: uniqueStrings(asStringArray(context.unresolved_findings)).sort(),
+    meaningful_changed_paths: uniqueStrings(asStringArray(context.meaningful_changed_paths)).sort(),
+    verification_status: asString(context.verification_status) ?? "unknown",
+    requested_next_step: asString(context.requested_next_step) ?? "execution",
+  };
+  return `sha256:${createHash("sha256").update(JSON.stringify(stableJsonValue(payload))).digest("hex")}`;
 }
 
 /**
@@ -142,6 +176,67 @@ function evaluateDecisionGate(options) {
 
 /**
  * @param {{
+ *   decision: "approve" | "hold" | "request-repair",
+ *   context?: Record<string, unknown> | null,
+ *   defaultVerificationStatus: string,
+ *   fallbackFindings?: string[],
+ *   fallbackVerificationRefs?: string[],
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function normalizeRepairContext(options) {
+  const context =
+    typeof options.context === "object" && options.context !== null && !Array.isArray(options.context)
+      ? options.context
+      : {};
+  if (options.decision !== "request-repair") {
+    return {
+      source_phase: "none",
+      cycle_iteration: 0,
+      unresolved_findings: [],
+      meaningful_changed_paths: [],
+      verification_status: options.defaultVerificationStatus || "pass",
+      verification_refs: [],
+      previous_repair_decision_refs: [],
+      context_fingerprint: "none",
+      new_context_since_previous: [],
+      stop_reason: "none",
+      requested_next_step: "none",
+    };
+  }
+
+  const normalized = {
+    source_phase: asString(context.source_phase) ?? "review",
+    cycle_iteration:
+      typeof context.cycle_iteration === "number" && Number.isInteger(context.cycle_iteration)
+        ? context.cycle_iteration
+        : 1,
+    unresolved_findings: asStringArray(context.unresolved_findings).length > 0
+      ? asStringArray(context.unresolved_findings)
+      : asStringArray(options.fallbackFindings),
+    meaningful_changed_paths: asStringArray(context.meaningful_changed_paths),
+    verification_status: asString(context.verification_status) ?? options.defaultVerificationStatus ?? "unknown",
+    verification_refs: asStringArray(context.verification_refs).length > 0
+      ? asStringArray(context.verification_refs)
+      : asStringArray(options.fallbackVerificationRefs),
+    previous_repair_decision_refs: asStringArray(context.previous_repair_decision_refs),
+    context_fingerprint: asString(context.context_fingerprint) ?? "",
+    new_context_since_previous: asStringArray(context.new_context_since_previous),
+    stop_reason: asString(context.stop_reason) ?? "Repair requested before delivery.",
+    requested_next_step: asString(context.requested_next_step) ?? "execution",
+  };
+  normalized.context_fingerprint = normalized.context_fingerprint || fingerprintRepairContext(normalized);
+  if (
+    normalized.previous_repair_decision_refs.length === 0 &&
+    normalized.new_context_since_previous.length === 0
+  ) {
+    normalized.new_context_since_previous = ["first-repair-decision"];
+  }
+  return normalized;
+}
+
+/**
+ * @param {{
  *   projectId: string,
  *   projectRoot: string,
  *   runtimeLayout: { reportsRoot?: string, reports_root?: string },
@@ -156,6 +251,7 @@ function evaluateDecisionGate(options) {
  *   deliveryManifestRefs?: string[],
  *   learningHandoffRefs?: string[],
  *   evidenceRefs?: string[],
+ *   repairContext?: Record<string, unknown> | null,
  *   timestamp?: string,
  * }} options
  */
@@ -202,6 +298,18 @@ export function materializeReviewDecision(options) {
     ...learningHandoffRefs,
     ...normalizeEvidenceRefs(options.projectRoot, asStringArray(options.evidenceRefs)),
   ]);
+  const repairContext = normalizeRepairContext({
+    decision: options.decision,
+    context: options.repairContext,
+    defaultVerificationStatus: runtimeDecision === "pass" && reviewStatus === "pass" ? "pass" : "not_pass",
+    fallbackFindings: uniqueStrings([
+      ...blockingFindings.map((finding) => asString(finding.summary) ?? "Blocking review finding."),
+      ...gate.findings,
+      asString(options.reason) ?? "",
+      "Operator requested public repair before delivery.",
+    ]),
+    fallbackVerificationRefs: evidenceRefs,
+  });
   const decisionId = `${options.runId}.review-decision.${options.decision}.${generatedAt.replace(/[:.]/g, "-")}`;
   const document = {
     decision_id: decisionId,
@@ -224,6 +332,7 @@ export function materializeReviewDecision(options) {
       runtime_harness_overall_decision: runtimeDecision,
       blocking_findings: blockingFindings,
     },
+    repair_context: repairContext,
     delivery_gate: {
       status: gate.status,
       blocks_downstream: gate.blocksDownstream,

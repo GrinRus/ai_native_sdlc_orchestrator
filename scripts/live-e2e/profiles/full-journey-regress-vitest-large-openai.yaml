@@ -20,6 +20,15 @@ implementation_loop:
   review_repair_actions:
     - request-repair
     - failed-quality-findings
+  cycle_steps:
+    - execution
+    - review
+    - qa
+  repair_sources:
+    - review
+    - qa
+    - post-run-primary
+    - post-run-diagnostic
   stop_on_blocking_review: true
 target_catalog_id: vitest
 feature_mission_id: vitest-runner-diagnostics-regression
@@ -31,6 +40,10 @@ runtime:
   target_verification_workspace_mode: workspace-clone
   runtime_root: .aor
   persist_workspace: false
+target_toolchain:
+  node:
+    required_range: ^22.12.0 || ^24.0.0 || >=26.0.0
+    env_override: AOR_LIVE_E2E_TARGET_NODE_BIN
 stages:
   - bootstrap
   - discovery

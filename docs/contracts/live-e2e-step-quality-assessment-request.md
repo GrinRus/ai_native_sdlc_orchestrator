@@ -37,6 +37,12 @@ request as lightweight flow-health evidence.
 - `expected_assessment_report_file`
 - `evidence_refs`
 
+Accepted medium+ product-change `qa` requests must also include
+`quality_cycle_context`, which preserves evaluation status/ref, diagnostic
+verification status/refs, primary verification status/ref, review/report or
+repair decision refs, mission-relevant changed paths, and the current repair
+necessity.
+
 ## Enums
 `requested_assessment_method` is one of:
 - `flow-health-automatic`

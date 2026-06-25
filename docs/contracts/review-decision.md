@@ -17,6 +17,7 @@ Durable approval decision for one reviewed run.
 - `delivery_manifest_refs`
 - `learning_handoff_refs`
 - `decision_basis`
+- `repair_context`
 - `delivery_gate`
 - `evidence_refs`
 - `decided_at`
@@ -32,12 +33,14 @@ Durable approval decision for one reviewed run.
 `hold` preserves a human stop without claiming repair has started.
 
 `request-repair` records that downstream work should repair the linked run before delivery/release approval.
-For public repair loops, `request-repair` reason/evidence should preserve the
-unresolved review findings, latest meaningful changed paths, verification
-status, previous repair decision refs, and the stop reason that made another
-public repair iteration necessary. It must still route repair through public AOR
-run/review lifecycle commands rather than providing a private patch or direct
-target mutation.
+For public repair loops, `request-repair` must preserve structured
+`repair_context` in addition to the operator-readable reason. The context
+	records `source_phase`, `cycle_iteration`, `unresolved_findings`,
+	`meaningful_changed_paths`, `verification_status`, `verification_refs`,
+	`previous_repair_decision_refs`, `context_fingerprint`,
+	`new_context_since_previous`, `stop_reason`, and `requested_next_step`.
+It must still route repair through public AOR run/review lifecycle commands
+rather than providing a private patch or direct target mutation.
 
 ## Decision basis
 `decision_basis` should preserve:
@@ -45,6 +48,18 @@ target mutation.
 - `review_recommendation`
 - `runtime_harness_overall_decision`
 - `blocking_findings`
+
+## Repair context
+`repair_context` is always present. For `approve` and `hold`, it records
+`source_phase=none`, `cycle_iteration=0`, and empty evidence arrays. For
+`request-repair`, it records the phase that requested repair (`review`, `qa`,
+`post-run-primary`, or `post-run-diagnostic`), the quality-cycle iteration,
+	unresolved findings, changed paths, verification status and refs, prior repair
+	decision refs, a deterministic context fingerprint, the new evidence/context
+	seen since the previous repair, the stop reason, and the requested next step.
+	`request-repair` is invalid when this context is empty, omits the fingerprint,
+	repeats prior repair lineage without new context, or points anywhere other than
+	`execution` as the next public repair step.
 
 ## Delivery gate
 `delivery_gate` should preserve:

@@ -271,6 +271,69 @@ test("review report treats package workspace test commands as covering changed p
 
     assert.equal(reviewReport.overall_status, "pass");
     assert.equal(reviewReport.review_recommendation, "proceed");
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.uncovered_test_paths, []);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.covered_test_paths, [
+      "packages/ts-utils/src/typeguards/__tests__/typeguards.test.ts",
+    ]);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.covering_commands, [
+      "yarn workspace @your-org/ts-utils test-unit",
+    ]);
+    assert.equal(
+      reviewReport.artifact_quality.verification_coverage.coverage_reason,
+      "workspace-or-package-scoped-test-command",
+    );
+    assert.ok(
+      reviewReport.artifact_quality.findings.every(
+        (finding) => !String(finding.summary).includes("Primary verification did not explicitly exercise changed test file"),
+      ),
+    );
+  });
+});
+
+test("review report treats broad npm test:ci command as covering changed test files", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-broad-test-ci-coverage";
+    fs.writeFileSync(
+      path.join(repoRoot, "test/schema-feature.test.js"),
+      [
+        "test('existing schema coverage', t => t.pass());",
+        "test('new schema feature coverage', t => t.pass());",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    writeJson(path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"), {
+      run_id: `${runId}.verify.post-run-primary.v1`,
+      verification_label: "post-run-primary",
+      status: "passed",
+      command_source: "cli-override",
+      command_overrides: {
+        build_commands: ["npm run build"],
+        lint_commands: [],
+        test_commands: ["npm run test:ci"],
+      },
+      step_result_refs: [],
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    assert.equal(reviewReport.overall_status, "pass");
+    assert.equal(reviewReport.review_recommendation, "proceed");
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.changed_test_paths, [
+      "test/schema-feature.test.js",
+    ]);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.covered_test_paths, [
+      "test/schema-feature.test.js",
+    ]);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.uncovered_test_paths, []);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.covering_commands, ["npm run test:ci"]);
+    assert.equal(reviewReport.artifact_quality.verification_coverage.coverage_reason, "broad-repo-test-command");
     assert.ok(
       reviewReport.artifact_quality.findings.every(
         (finding) => !String(finding.summary).includes("Primary verification did not explicitly exercise changed test file"),

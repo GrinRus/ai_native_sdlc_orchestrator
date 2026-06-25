@@ -13,6 +13,18 @@ decision_basis:
   review_recommendation: proceed
   runtime_harness_overall_decision: pass
   blocking_findings: []
+repair_context:
+  source_phase: none
+  cycle_iteration: 0
+  unresolved_findings: []
+  meaningful_changed_paths: []
+  verification_status: pass
+  verification_refs: []
+  previous_repair_decision_refs: []
+  context_fingerprint: none
+  new_context_since_previous: []
+  stop_reason: none
+  requested_next_step: none
 delivery_gate:
   status: pass
   blocks_downstream: false

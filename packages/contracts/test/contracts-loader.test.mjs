@@ -490,6 +490,19 @@ test("review decision example preserves explicit approval vocabulary", () => {
   assert.equal(loaded.ok, true, "expected review-decision example to load");
   assert.equal(loaded.document.decision, "approve");
   assert.equal(loaded.document.delivery_gate.status, "pass");
+  assert.deepEqual(loaded.document.repair_context, {
+    source_phase: "none",
+    cycle_iteration: 0,
+    unresolved_findings: [],
+    meaningful_changed_paths: [],
+	    verification_status: "pass",
+	    verification_refs: [],
+	    previous_repair_decision_refs: [],
+	    context_fingerprint: "none",
+	    new_context_since_previous: [],
+	    stop_reason: "none",
+	    requested_next_step: "none",
+	  });
 
   const invalid = structuredClone(loaded.document);
   invalid.decision = "proceed";
@@ -502,6 +515,93 @@ test("review decision example preserves explicit approval vocabulary", () => {
   assert.ok(
     validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "decision"),
     "expected invalid review decision value to be rejected",
+  );
+
+  const missingRepairContext = structuredClone(loaded.document);
+  delete missingRepairContext.repair_context;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-decision",
+      document: missingRepairContext,
+      source: "test://review-decision-missing-repair-context",
+    }),
+    "required_field_missing",
+    "repair_context",
+  );
+
+  const invalidRepair = structuredClone(loaded.document);
+  invalidRepair.decision = "request-repair";
+  invalidRepair.repair_context = {
+    source_phase: "none",
+    cycle_iteration: 0,
+    unresolved_findings: [],
+    meaningful_changed_paths: [],
+    verification_status: "not_pass",
+    verification_refs: [],
+    previous_repair_decision_refs: [],
+    context_fingerprint: "",
+    new_context_since_previous: [],
+    stop_reason: "",
+    requested_next_step: "none",
+  };
+  const invalidRepairValidation = validateContractDocument({
+    family: "review-decision",
+    document: invalidRepair,
+    source: "test://review-decision-invalid-repair-context",
+  });
+  assert.equal(invalidRepairValidation.ok, false);
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "repair_context.source_phase",
+    ),
+    "expected request-repair decisions to require a supported repair source phase",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.unresolved_findings",
+    ),
+    "expected request-repair decisions to preserve unresolved findings",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.context_fingerprint",
+    ),
+    "expected request-repair decisions to preserve a context fingerprint",
+  );
+
+  const validRepair = structuredClone(loaded.document);
+  validRepair.decision = "request-repair";
+  validRepair.repair_context = {
+    source_phase: "qa",
+    cycle_iteration: 2,
+    unresolved_findings: ["QA evaluation found a regression that requires another implementation iteration."],
+    meaningful_changed_paths: ["src/client.py", "tests/test_client.py"],
+    verification_status: "fail",
+    verification_refs: [loaded.document.review_report_ref],
+    previous_repair_decision_refs: [],
+    context_fingerprint: "sha256:valid-qa-repair-context",
+    new_context_since_previous: ["first-repair-decision"],
+    stop_reason: "QA failed after a passing review.",
+    requested_next_step: "execution",
+  };
+  const validRepairValidation = validateContractDocument({
+    family: "review-decision",
+    document: validRepair,
+    source: "test://review-decision-valid-qa-repair-context",
+  });
+  assert.equal(validRepairValidation.ok, true, JSON.stringify(validRepairValidation.issues, null, 2));
+
+  const repeatedRepair = structuredClone(validRepair);
+  repeatedRepair.repair_context.previous_repair_decision_refs = ["evidence://reports/review-decision-1.json"];
+  repeatedRepair.repair_context.new_context_since_previous = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-decision",
+      document: repeatedRepair,
+      source: "test://review-decision-repeated-repair-without-new-context",
+    }),
+    "required_field_missing",
+    "repair_context.new_context_since_previous",
   );
 });
 
@@ -1373,8 +1473,8 @@ test("live E2E run-health report separates run failures from outcome quality", (
   reviewLoopExhaustedCandidate.failure_summary = {
     owner: "provider",
     phase: "review",
-    class: "implementation_repair_loop_exhausted",
-    summary: "Implementation repair loop exhausted before review passed.",
+    class: "review_repair_loop_exhausted",
+    summary: "Implementation quality cycle exhausted before review passed.",
   };
 
   const reviewLoopExhaustedValidation = validateContractDocument({
@@ -1648,6 +1748,26 @@ test("live E2E step quality assessment report enforces accepted step shape", () 
     "source_operator_decision_file",
   );
 
+  const qaRequestMissingContext = structuredClone(loadedRequest.document);
+  qaRequestMissingContext.step_id = "qa";
+  qaRequestMissingContext.step_name = "qa";
+  qaRequestMissingContext.rubric.required_dimensions = [
+    ...qaRequestMissingContext.rubric.required_dimensions,
+    "verification_relevance",
+    "regression_signal_quality",
+    "mission_relevance",
+    "repair_necessity",
+  ];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-request",
+      document: qaRequestMissingContext,
+      source: "test://step-quality-qa-request-missing-quality-cycle-context",
+    }),
+    "required_field_missing",
+    "quality_cycle_context",
+  );
+
   const source = path.join(workspaceRoot, "examples/reports/live-e2e-step-quality-assessment-report.sample.yaml");
   const loaded = loadContractFile({ filePath: source, family: "live-e2e-step-quality-assessment-report" });
   assert.equal(loaded.ok, true, "expected live-e2e-step-quality-assessment-report sample to load");
@@ -1773,6 +1893,56 @@ test("live E2E step quality assessment report enforces accepted step shape", () 
     }),
     "required_field_missing",
     "dimensions.mission_relevance",
+  );
+
+  const qaAcceptedReport = structuredClone(loaded.document);
+  qaAcceptedReport.step_id = "qa";
+  qaAcceptedReport.step_name = "qa";
+  qaAcceptedReport.dimensions.verification_relevance = {
+    status: "pass",
+    evidence_strength: "strong",
+    summary: "QA verification evidence covers the final reviewed implementation behavior.",
+    inspected_evidence_refs: ["runtime://reports/evaluation-report-live-e2e.sample.run.json"],
+    findings: ["QA verification relevance is backed by evaluation and diagnostic verification evidence."],
+  };
+  qaAcceptedReport.dimensions.regression_signal_quality = {
+    status: "pass",
+    evidence_strength: "strong",
+    summary: "QA evidence includes a regression signal tied to the mission acceptance behavior.",
+    inspected_evidence_refs: ["runtime://reports/evaluation-report-live-e2e.sample.run.json"],
+    findings: ["QA regression signal quality is backed by public evaluation and verification artifacts."],
+  };
+  qaAcceptedReport.dimensions.mission_relevance = {
+    status: "pass",
+    evidence_strength: "medium",
+    summary: "QA evidence is relevant to the catalog mission and the final changed paths.",
+    inspected_evidence_refs: ["runtime://reports/review-report-live-e2e.sample.run.json"],
+    findings: ["QA mission relevance is supported by review, changed-path, and verification evidence."],
+  };
+  qaAcceptedReport.dimensions.repair_necessity = {
+    status: "pass",
+    evidence_strength: "medium",
+    summary: "QA evidence supports continuing to delivery without another public repair iteration.",
+    inspected_evidence_refs: ["runtime://reports/live-e2e-step-observation-live-e2e.sample.run-qa.json"],
+    findings: ["QA repair necessity was assessed before delivery from public step evidence."],
+  };
+  const qaAcceptedValidation = validateContractDocument({
+    family: "live-e2e-step-quality-assessment-report",
+    document: qaAcceptedReport,
+    source: "test://step-quality-qa-accepted-report",
+  });
+  assert.equal(qaAcceptedValidation.ok, true, JSON.stringify(qaAcceptedValidation.issues, null, 2));
+
+  const qaMissingRegressionSignal = structuredClone(qaAcceptedReport);
+  delete qaMissingRegressionSignal.dimensions.regression_signal_quality;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: qaMissingRegressionSignal,
+      source: "test://step-quality-qa-missing-regression-signal",
+    }),
+    "required_field_missing",
+    "dimensions.regression_signal_quality",
   );
 
   const requestRepairMissingLineage = structuredClone(loaded.document);
@@ -1916,6 +2086,17 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     }),
     "field_type_mismatch",
     "findings[0].evidence_refs",
+  );
+  const missingVerificationCoverageReport = structuredClone(reviewReport.document);
+  delete missingVerificationCoverageReport.artifact_quality.verification_coverage;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: missingVerificationCoverageReport,
+      source: "test://w50-review-report-missing-verification-coverage",
+    }),
+    "required_field_missing",
+    "artifact_quality.verification_coverage",
   );
   const invalidReviewTraceability = structuredClone(reviewReport.document);
   invalidReviewTraceability.feature_traceability.required_path_prefixes = ["source/", 42];

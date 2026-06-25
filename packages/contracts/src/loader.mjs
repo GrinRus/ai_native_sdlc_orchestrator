@@ -108,6 +108,12 @@ const LIVE_E2E_PRODUCT_EXECUTION_STEP_QUALITY_DIMENSION_KEYS = [
   "verification_relevance",
   "repair_necessity",
 ];
+const LIVE_E2E_PRODUCT_QA_STEP_QUALITY_DIMENSION_KEYS = [
+  "verification_relevance",
+  "regression_signal_quality",
+  "mission_relevance",
+  "repair_necessity",
+];
 const LIVE_E2E_STEP_QUALITY_MIN_RATIONALE_CHARS = 24;
 const LIVE_E2E_MISSION_SIZE_BUDGETS = {
   small: { max_changed_files: 16, max_added_lines: 900 },
@@ -338,6 +344,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "review-report") {
     issues.push(...validateReviewReport(document, source));
+  }
+
+  if (family === "review-decision") {
+    issues.push(...validateReviewDecision(document, source));
   }
 
   if (family === "live-run-event") {
@@ -1424,6 +1434,200 @@ function validateReviewReport(document, source) {
 }
 
 /**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateReviewDecision(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const repairContext = validateRequiredObjectField({
+    record: document,
+    source,
+    field: "repair_context",
+    issues,
+  });
+  if (!repairContext) return issues;
+
+  validateNestedStringField({
+    record: repairContext,
+    source,
+    field: "repair_context.source_phase",
+    issues,
+    required: true,
+  });
+  validateNestedNumberField({
+    record: repairContext,
+    source,
+    field: "repair_context.cycle_iteration",
+    issues,
+    required: true,
+  });
+	  for (const field of [
+	    "unresolved_findings",
+	    "meaningful_changed_paths",
+	    "verification_refs",
+	    "previous_repair_decision_refs",
+	    "new_context_since_previous",
+	  ]) {
+    validateNestedArrayField({
+      record: repairContext,
+      source,
+      field: `repair_context.${field}`,
+      issues,
+      required: true,
+    });
+    validateStringArrayItems({
+      values: repairContext[field],
+      source,
+      field: `repair_context.${field}`,
+      issues,
+    });
+  }
+	  validateNestedStringField({
+	    record: repairContext,
+	    source,
+	    field: "repair_context.context_fingerprint",
+	    issues,
+	    required: true,
+	  });
+	  validateNestedStringField({
+	    record: repairContext,
+	    source,
+	    field: "repair_context.verification_status",
+	    issues,
+	    required: true,
+  });
+  validateNestedStringField({
+    record: repairContext,
+    source,
+    field: "repair_context.stop_reason",
+    issues,
+    required: true,
+  });
+  validateNestedStringField({
+    record: repairContext,
+    source,
+    field: "repair_context.requested_next_step",
+    issues,
+    required: true,
+  });
+
+  if (document.decision !== "request-repair") return issues;
+
+  if (!["review", "qa", "post-run-primary", "post-run-diagnostic"].includes(String(repairContext.source_phase))) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "repair_context.source_phase",
+        expected: "review|qa|post-run-primary|post-run-diagnostic",
+        actual:
+          typeof repairContext.source_phase === "string"
+            ? repairContext.source_phase
+            : describeActualType(repairContext.source_phase),
+        message: "Review repair decisions must identify the source phase that requested repair.",
+      }),
+    );
+  }
+  if (
+    typeof repairContext.cycle_iteration !== "number" ||
+    !Number.isInteger(repairContext.cycle_iteration) ||
+    repairContext.cycle_iteration < 1
+  ) {
+    issues.push(
+      issue({
+        code: "field_type_mismatch",
+        source,
+        field: "repair_context.cycle_iteration",
+        expected: "positive integer",
+        actual: describeActualType(repairContext.cycle_iteration),
+        message: "Review repair decisions must identify a positive quality-cycle iteration.",
+      }),
+    );
+  }
+  if (!Array.isArray(repairContext.unresolved_findings) || repairContext.unresolved_findings.length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "repair_context.unresolved_findings",
+        expected: "non-empty array",
+        actual: "empty",
+        message: "Review repair decisions must preserve unresolved findings.",
+      }),
+    );
+  }
+	  if (!Array.isArray(repairContext.verification_refs) || repairContext.verification_refs.length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "repair_context.verification_refs",
+        expected: "non-empty array",
+        actual: "empty",
+        message: "Review repair decisions must preserve verification evidence refs.",
+      }),
+    );
+	  }
+	  if (typeof repairContext.context_fingerprint !== "string" || repairContext.context_fingerprint.trim().length === 0) {
+	    issues.push(
+	      issue({
+	        code: "required_field_missing",
+	        source,
+	        field: "repair_context.context_fingerprint",
+	        expected: "non-empty string",
+	        actual: describeActualType(repairContext.context_fingerprint),
+	        message: "Review repair decisions must preserve a deterministic repair-context fingerprint.",
+	      }),
+	    );
+	  }
+	  if (
+	    Array.isArray(repairContext.previous_repair_decision_refs) &&
+	    repairContext.previous_repair_decision_refs.length > 0 &&
+	    (!Array.isArray(repairContext.new_context_since_previous) ||
+	      repairContext.new_context_since_previous.length === 0)
+	  ) {
+	    issues.push(
+	      issue({
+	        code: "required_field_missing",
+	        source,
+	        field: "repair_context.new_context_since_previous",
+	        expected: "non-empty array when previous repair decisions exist",
+	        actual: Array.isArray(repairContext.new_context_since_previous) ? "empty" : describeActualType(repairContext.new_context_since_previous),
+	        message: "Repeated repair decisions must identify new actionable context since the previous repair.",
+	      }),
+	    );
+	  }
+	  if (typeof repairContext.stop_reason !== "string" || repairContext.stop_reason.trim().length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "repair_context.stop_reason",
+        expected: "non-empty string",
+        actual: describeActualType(repairContext.stop_reason),
+        message: "Review repair decisions must preserve the stop reason.",
+      }),
+    );
+  }
+  if (repairContext.requested_next_step !== "execution") {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "repair_context.requested_next_step",
+        expected: "execution",
+        actual: String(repairContext.requested_next_step),
+        message: "Public repair decisions must route back to execution.",
+      }),
+    );
+  }
+
+  return issues;
+}
+
+/**
  * @param {unknown} value
  * @param {string} source
  * @param {import("./index.d.ts").ContractValidationIssue[]} issues
@@ -1529,6 +1733,60 @@ function validateReviewArtifactQuality(value, source, issues) {
       required: false,
     });
   }
+  const verificationCoverage = validateOptionalObjectField({
+    record: value,
+    source,
+    field: "artifact_quality.verification_coverage",
+    issues,
+  });
+  if (!verificationCoverage) {
+    if (!Object.prototype.hasOwnProperty.call(value, "verification_coverage")) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: "artifact_quality.verification_coverage",
+          expected: "object",
+          actual: "missing",
+          message: "Field 'artifact_quality.verification_coverage' is required for review report verification mapping evidence.",
+        }),
+      );
+    }
+    return;
+  }
+  for (const field of [
+    "changed_test_paths",
+    "covered_test_paths",
+    "uncovered_test_paths",
+    "covering_commands",
+    "recorded_test_commands",
+  ]) {
+    if (!Object.prototype.hasOwnProperty.call(verificationCoverage, field)) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: `artifact_quality.verification_coverage.${field}`,
+          expected: "array",
+          actual: "missing",
+          message: `Field 'artifact_quality.verification_coverage.${field}' is required for review report verification mapping evidence.`,
+        }),
+      );
+    }
+    validateOptionalStringArrayField({
+      record: verificationCoverage,
+      source,
+      field: `artifact_quality.verification_coverage.${field}`,
+      issues,
+    });
+  }
+  validateNestedStringField({
+    record: verificationCoverage,
+    source,
+    field: "artifact_quality.verification_coverage.coverage_reason",
+    issues,
+    required: true,
+  });
 }
 
 /**
@@ -2596,16 +2854,63 @@ function validateLiveE2EStepQualityAssessmentRequest(document, source) {
     );
   }
 
-  const rubric = isPlainObject(document.rubric) ? document.rubric : {};
-  validateNestedArrayField({
-    record: rubric,
+	  const rubric = isPlainObject(document.rubric) ? document.rubric : {};
+	  validateNestedArrayField({
+	    record: rubric,
     source,
-    field: "rubric.required_dimensions",
-    issues,
-  });
-  validateStringArrayItems({
-    values: rubric.required_dimensions,
-    source,
+	    field: "rubric.required_dimensions",
+	    issues,
+	  });
+	  if (
+	    document.mission_class === "product-change" &&
+	    ["medium", "large", "xlarge"].includes(String(document.feature_size)) &&
+	    document.step_id === "qa"
+	  ) {
+	    const qualityCycleContext = validateRequiredObjectField({
+	      record: document,
+	      source,
+	      field: "quality_cycle_context",
+	      issues,
+	    });
+	    if (qualityCycleContext) {
+	      for (const field of [
+	        "evaluation_status",
+	        "diagnostic_verification_status",
+	        "primary_verification_status",
+	        "repair_necessity",
+	      ]) {
+	        validateNestedStringField({
+	          record: qualityCycleContext,
+	          source,
+	          field: `quality_cycle_context.${field}`,
+	          issues,
+	          required: true,
+	        });
+	      }
+	      for (const field of [
+	        "diagnostic_verification_refs",
+	        "review_decision_refs",
+	        "meaningful_changed_paths",
+	      ]) {
+	        validateNestedArrayField({
+	          record: qualityCycleContext,
+	          source,
+	          field: `quality_cycle_context.${field}`,
+	          issues,
+	          required: true,
+	        });
+	        validateStringArrayItems({
+	          values: qualityCycleContext[field],
+	          source,
+	          field: `quality_cycle_context.${field}`,
+	          issues,
+	        });
+	      }
+	    }
+	  }
+	  validateStringArrayItems({
+	    values: rubric.required_dimensions,
+	    source,
     field: "rubric.required_dimensions",
     issues,
   });
@@ -2857,14 +3162,23 @@ function validateLiveE2EStepQualityAssessmentReport(document, source) {
     }
   }
 
-  const dimensions = isPlainObject(document.dimensions) ? document.dimensions : {};
-  const requiredDimensionKeys =
-    isAcceptedProductChangeStep && ["execution", "review"].includes(String(document.step_id))
-      ? [
-          ...LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS,
-          ...LIVE_E2E_PRODUCT_EXECUTION_STEP_QUALITY_DIMENSION_KEYS,
-        ]
-      : LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS;
+	  const dimensions = isPlainObject(document.dimensions) ? document.dimensions : {};
+	  const requiredDimensionKeys = (() => {
+	    if (!isAcceptedProductChangeStep) return LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS;
+	    if (["execution", "review"].includes(String(document.step_id))) {
+	      return [
+	        ...LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS,
+	        ...LIVE_E2E_PRODUCT_EXECUTION_STEP_QUALITY_DIMENSION_KEYS,
+	      ];
+	    }
+	    if (document.step_id === "qa") {
+	      return [
+	        ...LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS,
+	        ...LIVE_E2E_PRODUCT_QA_STEP_QUALITY_DIMENSION_KEYS,
+	      ];
+	    }
+	    return LIVE_E2E_STEP_QUALITY_DIMENSION_KEYS;
+	  })();
   for (const dimensionKey of requiredDimensionKeys) {
     const dimension = dimensions[dimensionKey];
     const field = `dimensions.${dimensionKey}`;

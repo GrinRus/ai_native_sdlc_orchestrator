@@ -19,6 +19,15 @@ implementation_loop:
   review_repair_actions:
     - request-repair
     - failed-quality-findings
+  cycle_steps:
+    - execution
+    - review
+    - qa
+  repair_sources:
+    - review
+    - qa
+    - post-run-primary
+    - post-run-diagnostic
   stop_on_blocking_review: true
 target_catalog_id: nextjs-monorepo-example
 feature_mission_id: nextjs-shared-package-release

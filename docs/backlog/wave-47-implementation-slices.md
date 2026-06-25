@@ -7,7 +7,7 @@ product acceptance requires independent step-quality plus final all-pass quality
 
 ## W47-S01 — AOR operator keyboard accessibility and guided proof closure
 - **Epic:** EPIC-6 Operator surface; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Make the installed-user/operator web surface keyboard-provable so
   the guided AOR UI proof can pass every accessibility subdimension, especially
   `keyboard_navigation`.
@@ -39,7 +39,7 @@ product acceptance requires independent step-quality plus final all-pass quality
 
 ## W47-S02 — Live E2E target verification isolation and Vitest readiness
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prevent live E2E runtime state from contaminating hard-target
   verification and classify target setup/environment blockers before product
   execution.
@@ -73,7 +73,7 @@ product acceptance requires independent step-quality plus final all-pass quality
 
 ## W47-S03 — AOR repair/review convergence hardening
 - **Epic:** EPIC-4 Quality platform; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Make public repair iterations more actionable and diagnosable so
   Fastify repair proof can either converge or expose a precise provider/AOR
   quality blocker.
@@ -109,7 +109,7 @@ product acceptance requires independent step-quality plus final all-pass quality
 
 ## W47-S04 — Full proof rerun and product acceptance closure
 - **Epic:** EPIC-0 Foundation; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Re-run the required proof set after W47 fixes and claim product
   acceptance only for all-pass runs.
 - **Primary modules:** `scripts/live-e2e/**`, `docs/ops/**`, root checks

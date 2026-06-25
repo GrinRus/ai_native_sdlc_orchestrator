@@ -11,7 +11,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Never push to upstream public repositories by default.
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
-- Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N` repair loop.
+- Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N -> qa#N` implementation quality cycle.
 - Always materialize review, QA, and delivery artifacts for full-journey observation runs; release and learning become observed steps when the profile declares `live_e2e.flow_range_policy=full_lifecycle`.
 - Every mandatory full-journey run must resolve one curated matrix cell:
   - `repo`
@@ -20,6 +20,20 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `provider variant`
   - `feature size`
   - `run tier`
+- Medium+ product-change profiles must declare
+  `implementation_loop.cycle_steps: [execution, review, qa]` and
+  `implementation_loop.repair_sources: [review, qa, post-run-primary, post-run-diagnostic]`.
+- Medium+ QA steps must produce product-quality evaluator requests with
+  `quality_cycle_context` and accepted QA reports covering verification
+  relevance, regression signal quality, mission relevance, and repair necessity.
+- Repeated repair requests must carry `repair_context.context_fingerprint` and
+  `new_context_since_previous`; a repeated fingerprint without new context is a
+  terminal live proof blocker, not another retry opportunity.
+- Hard-target profiles may declare `target_toolchain.node.required_range` plus
+  `env_override: AOR_LIVE_E2E_TARGET_NODE_BIN`; when the override is set,
+  target setup and verification commands must run with that Node binary first
+  on `PATH`, otherwise incompatible host Node must block before product
+  execution as target setup/environment evidence.
 
 ## Target 1 — `sindresorhus/ky`
 - Catalog id: `ky`

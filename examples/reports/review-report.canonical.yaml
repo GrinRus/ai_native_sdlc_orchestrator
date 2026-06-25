@@ -52,6 +52,17 @@ artifact_quality:
     - evidence://contracts/w23-s01/step-result
   delivery_manifest_ref: delivery-manifest://canonical
   release_packet_ref: packet://release
+  verification_coverage:
+    changed_test_paths:
+      - packages/example/src/index.test.ts
+    covered_test_paths:
+      - packages/example/src/index.test.ts
+    uncovered_test_paths: []
+    covering_commands:
+      - npm run test:ci
+    recorded_test_commands:
+      - npm run test:ci
+    coverage_reason: broad-repo-test-command
   findings: []
 code_quality:
   status: pass

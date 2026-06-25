@@ -84,6 +84,13 @@ or `step_id=review`, `dimensions` must also contain:
 - `verification_relevance`
 - `repair_necessity`
 
+For accepted `mission_class=product-change` reports with `step_id=qa`,
+`dimensions` must also contain:
+- `verification_relevance`
+- `regression_signal_quality`
+- `mission_relevance`
+- `repair_necessity`
+
 Each dimension contains:
 - `status`
 - `evidence_strength`
@@ -103,7 +110,9 @@ report is otherwise structurally valid.
 The execution/review-specific dimensions must explicitly assess whether the
 observed target diff is relevant to the mission, whether verification evidence
 covers the changed behavior, and whether the next action should continue or
-request public AOR repair. They are still evaluator observations: they must not
+request public AOR repair. The QA-specific dimensions must explicitly assess
+verification relevance, regression signal quality, mission relevance, and repair
+necessity before delivery. They are still evaluator observations: they must not
 include private patches, direct target mutations, or hidden handoff rewrites.
 
 ## Repair Boundary

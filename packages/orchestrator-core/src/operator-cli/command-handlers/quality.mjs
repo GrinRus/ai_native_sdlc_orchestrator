@@ -431,6 +431,13 @@ export function handleQualityCommand(context) {
       runtimeLayout: reviewResult.runtimeLayout,
       runId,
     }).map((entry) => entry.artifact_ref);
+    const repairContextFile = resolveOptionalRefOrPathFlag({
+      cwd,
+      projectRoot: reviewResult.projectRoot,
+      flagValue: resolveOptionalStringFlag("repair-context-file", flags["repair-context-file"]),
+      flagName: "repair-context-file",
+    });
+    const repairContext = repairContextFile ? readJson(repairContextFile) : null;
     const decisionResult = materializeReviewDecision({
       projectId: reviewResult.projectId,
       projectRoot: reviewResult.projectRoot,
@@ -446,6 +453,7 @@ export function handleQualityCommand(context) {
       deliveryManifestRefs,
       learningHandoffRefs,
       evidenceRefs: priorDecisionRefs,
+      repairContext,
     });
 
     outputState.resolvedProjectRef = reviewResult.projectRoot;
@@ -468,6 +476,7 @@ export function handleQualityCommand(context) {
         ? /** @type {{ status?: string }} */ (decisionResult.decision.delivery_gate).status ?? null
         : null;
     outputState.reviewDecisionReason = decisionResult.decision.reason;
+    outputState.reviewDecisionRepairContext = decisionResult.decision.repair_context;
     outputState.reviewDecisionEvidenceRefs = decisionResult.decision.evidence_refs;
     outputState.readOnly = false;
     outputState.futureControlHooks = [

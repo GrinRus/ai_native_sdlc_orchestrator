@@ -12,7 +12,10 @@ import {
   isLiveE2eControllerStop,
 } from "../live-e2e/lib/step-controller.mjs";
 import { prepareOperatorDecisionArtifact } from "../live-e2e/lib/decision-helper.mjs";
-import { writeStepQualityAssessmentReport } from "../live-e2e/lib/step-quality-assessment.mjs";
+import {
+  writeStepQualityAssessmentReport,
+  writeStepQualityAssessmentRequest,
+} from "../live-e2e/lib/step-quality-assessment.mjs";
 import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
 
 function withTempRoot(callback) {
@@ -507,6 +510,93 @@ test("live E2E evaluator mode applies persisted operator decisions on resume", (
   });
 });
 
+test("live E2E step controller preserves QA lineage across implementation quality iterations", () => {
+  withTempRoot((reportsRoot) => {
+    const runId = "controller-quality-cycle-lineage";
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+        },
+      },
+      mode: "auto",
+    });
+    const observations = [
+      { stage: "execution", label: "run-start", iteration: 1 },
+      { stage: "review", label: "review-run", iteration: 1 },
+      { stage: "qa", label: "eval-run", iteration: 1 },
+      { stage: "execution", label: "run-start", iteration: 2 },
+      { stage: "review", label: "review-run", iteration: 2 },
+      { stage: "qa", label: "eval-run", iteration: 2 },
+    ];
+
+    for (const [index, observation] of observations.entries()) {
+      const stepInstanceId =
+        observation.iteration > 1 ? `${observation.stage}#${observation.iteration}` : observation.stage;
+      const planned = controller.planCommand({
+        label: observation.label,
+        commandSurface: `aor ${observation.stage}`,
+        iteration: observation.iteration,
+      });
+      const sequence = Number(planned.sequence);
+      const transcriptFile = path.join(
+        reportsRoot,
+        `${String(sequence).padStart(2, "0")}-${stepInstanceId.replace("#", "-")}.json`,
+      );
+      fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+      writeSkillAgentDecision(reportsRoot, runId, sequence, stepInstanceId, {
+        nextStep: observation.stage === "qa" ? "delivery" : observations[index + 1]?.stage ?? null,
+        inspectedEvidenceRefs: [transcriptFile],
+      });
+      const result = controller.observeStage({
+        stage: observation.stage,
+        iteration: observation.iteration,
+        stageResult: {
+          stage: observation.stage,
+          status: "pass",
+          evidence_refs: [transcriptFile],
+          summary: `${stepInstanceId} passed.`,
+        },
+        commandResults: [
+          {
+            label: observation.label,
+            command_surface: `aor ${observation.stage}`,
+            status: "pass",
+            transcript_file: transcriptFile,
+            artifact_refs: [transcriptFile],
+            exit_code: 0,
+            iteration: observation.iteration,
+          },
+        ],
+        artifacts: {},
+      });
+      assert.equal(result.action, "continue");
+    }
+
+    const journal = controller.getStepJournal();
+    assert.deepEqual(
+      journal.map((entry) => entry.step_instance_id),
+      ["execution", "review", "qa", "execution#2", "review#2", "qa#2"],
+    );
+    assert.deepEqual(
+      journal.map((entry) => entry.iteration),
+      [1, 1, 1, 2, 2, 2],
+    );
+    const firstQa = controller.getCachedCommandResult("eval-run", 1);
+    const secondQa = controller.getCachedCommandResult("eval-run", 2);
+    assert.match(firstQa.transcript_file, /qa\.json$/u);
+    assert.match(secondQa.transcript_file, /qa-2\.json$/u);
+    assert.notEqual(firstQa.transcript_file, secondQa.transcript_file);
+    const state = JSON.parse(fs.readFileSync(controller.stateFile, "utf8"));
+    assert.equal(state.completed_steps.includes("qa"), true);
+    assert.equal(state.completed_steps.includes("qa#2"), true);
+  });
+});
+
 test("live E2E product-change execution assessment includes result-quality dimensions", () => {
   withTempRoot((reportsRoot) => {
     const evidenceFile = path.join(reportsRoot, "execution-evidence.json");
@@ -547,6 +637,101 @@ test("live E2E product-change execution assessment includes result-quality dimen
     for (const dimension of ["mission_relevance", "verification_relevance", "repair_necessity"]) {
       assert.equal(report.dimensions[dimension].status, "pass");
       assert.equal(report.dimensions[dimension].inspected_evidence_refs.length, 1);
+    }
+    const validation = validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: report,
+      source: builtAssessment.reportFile,
+    });
+    assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
+  });
+});
+
+test("live E2E product-change QA assessment includes QA-specific dimensions and cycle context", () => {
+  withTempRoot((reportsRoot) => {
+    const evidenceFile = path.join(reportsRoot, "qa-evidence.json");
+    const requestFile = path.join(reportsRoot, "qa-step-quality-request.json");
+    const evalReportFile = path.join(reportsRoot, "evaluation-report.json");
+    const diagnosticSummaryFile = path.join(reportsRoot, "post-run-diagnostic-summary.json");
+    fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    fs.writeFileSync(requestFile, "{}\n", "utf8");
+    fs.writeFileSync(evalReportFile, "{}\n", "utf8");
+    fs.writeFileSync(diagnosticSummaryFile, "{}\n", "utf8");
+
+    const artifacts = {
+      target_catalog_id: "httpx",
+      feature_mission_id: "httpx-timeout-transport-regression",
+      feature_size: "medium",
+      mission_class: "product-change",
+      evaluation_status: "pass",
+      evaluation_report_file: evalReportFile,
+      post_run_diagnostic_status: "pass",
+      post_run_diagnostic_verify_summary_file: diagnosticSummaryFile,
+      post_run_verify_status: "pass",
+      post_run_verify_summary_file: path.join(reportsRoot, "post-run-primary-summary.json"),
+      review_report_file: path.join(reportsRoot, "review-report.json"),
+      review_repair_decision_files: [path.join(reportsRoot, "review-decision-request-repair.json")],
+      meaningful_changed_paths: ["httpx/_client.py", "tests/test_timeouts.py"],
+    };
+    const entry = {
+      step_id: "qa",
+      step_instance_id: "qa#2",
+      step_name: "qa",
+      sequence: 9,
+      iteration: 2,
+      agent_decision_request_ref: requestFile,
+      operator_decision_ref: evidenceFile,
+      inspected_evidence_refs: [evidenceFile, evalReportFile, diagnosticSummaryFile],
+      decision: { action: "continue" },
+    };
+
+    const builtRequest = writeStepQualityAssessmentRequest({
+      runId: "controller-product-qa-step-quality",
+      profile: {
+        profile_id: "live-e2e.test.product-qa-step-quality",
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+      },
+      artifacts,
+      entry,
+      outputDir: reportsRoot,
+    });
+    const request = JSON.parse(fs.readFileSync(builtRequest.requestFile, "utf8"));
+    assert.deepEqual(request.rubric.required_dimensions.slice(-4), [
+      "verification_relevance",
+      "regression_signal_quality",
+      "mission_relevance",
+      "repair_necessity",
+    ]);
+    assert.equal(request.quality_cycle_context.evaluation_report_ref, evalReportFile);
+    assert.deepEqual(request.quality_cycle_context.meaningful_changed_paths, [
+      "httpx/_client.py",
+      "tests/test_timeouts.py",
+    ]);
+
+    const builtAssessment = writeStepQualityAssessmentReport({
+      runId: "controller-product-qa-step-quality",
+      profile: {
+        profile_id: "live-e2e.test.product-qa-step-quality",
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+      },
+      artifacts,
+      entry,
+      outputDir: reportsRoot,
+      assessmentRequestFile: builtRequest.requestFile,
+      assessmentRequest: request,
+      assessmentMethod: "external-skill-agent",
+    });
+    const report = JSON.parse(fs.readFileSync(builtAssessment.reportFile, "utf8"));
+    for (const dimension of [
+      "verification_relevance",
+      "regression_signal_quality",
+      "mission_relevance",
+      "repair_necessity",
+    ]) {
+      assert.equal(report.dimensions[dimension].status, "pass");
+      assert.equal(report.dimensions[dimension].inspected_evidence_refs.length, 3);
     }
     const validation = validateContractDocument({
       family: "live-e2e-step-quality-assessment-report",

@@ -27,6 +27,12 @@ const PRODUCT_EXECUTION_STEP_QUALITY_DIMENSIONS = Object.freeze([
   "verification_relevance",
   "repair_necessity",
 ]);
+const PRODUCT_QA_STEP_QUALITY_DIMENSIONS = Object.freeze([
+  "verification_relevance",
+  "regression_signal_quality",
+  "mission_relevance",
+  "repair_necessity",
+]);
 
 /**
  * @param {string} action
@@ -69,9 +75,14 @@ export function requiresAcceptedProductStepQuality(options) {
  * @returns {string[]}
  */
 function requiredStepQualityDimensions(stepId, productQualityRequired) {
-  return productQualityRequired && ["execution", "review"].includes(stepId)
-    ? [...BASE_STEP_QUALITY_DIMENSIONS, ...PRODUCT_EXECUTION_STEP_QUALITY_DIMENSIONS]
-    : [...BASE_STEP_QUALITY_DIMENSIONS];
+  if (!productQualityRequired) return [...BASE_STEP_QUALITY_DIMENSIONS];
+  if (["execution", "review"].includes(stepId)) {
+    return [...BASE_STEP_QUALITY_DIMENSIONS, ...PRODUCT_EXECUTION_STEP_QUALITY_DIMENSIONS];
+  }
+  if (stepId === "qa") {
+    return [...BASE_STEP_QUALITY_DIMENSIONS, ...PRODUCT_QA_STEP_QUALITY_DIMENSIONS];
+  }
+  return [...BASE_STEP_QUALITY_DIMENSIONS];
 }
 
 /**
@@ -141,9 +152,68 @@ function buildStepQualityDimensions(options) {
       findings: [
         `${options.stepId} repair necessity was assessed through the public operator decision and review evidence.`,
       ],
-    };
-  }
-  return dimensions;
+	    };
+	  }
+	  if (options.productQualityRequired && options.stepId === "qa") {
+	    dimensions.verification_relevance = {
+	      ...dimension,
+	      summary: "QA verification evidence was checked against the final reviewed target change surface.",
+	      findings: [
+	        "qa verification relevance was assessed from evaluation, diagnostic verification, review, and changed-path evidence refs.",
+	      ],
+	    };
+	    dimensions.regression_signal_quality = {
+	      ...dimension,
+	      summary: "QA evidence was checked for a meaningful regression signal rather than command completion alone.",
+	      findings: [
+	        "qa regression signal quality was assessed from public evaluation and diagnostic verification artifacts.",
+	      ],
+	    };
+	    dimensions.mission_relevance = {
+	      ...dimension,
+	      summary: "QA evidence was checked for relevance to the catalog mission and final changed paths.",
+	      findings: [
+	        "qa mission relevance was assessed from mission, changed-path, review, and verification evidence.",
+	      ],
+	    };
+	    dimensions.repair_necessity = {
+	      ...dimension,
+	      summary: "QA findings were checked for continue versus public QA-origin repair routing.",
+	      findings: [
+	        "qa repair necessity was assessed before delivery using public evaluator and diagnostic evidence.",
+	      ],
+	    };
+	  }
+	  return dimensions;
+	}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
+ */
+function buildQualityCycleContext(artifacts) {
+  return {
+    evaluation_status: asNonEmptyString(artifacts.evaluation_status) || "unknown",
+    evaluation_report_ref: asNonEmptyString(artifacts.evaluation_report_file),
+    diagnostic_verification_status: asNonEmptyString(artifacts.post_run_diagnostic_status) || "unknown",
+    diagnostic_verification_refs: uniqueStrings([
+      asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
+      ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+    ]),
+    primary_verification_status: asNonEmptyString(artifacts.post_run_verify_status) || "unknown",
+    primary_verification_ref: asNonEmptyString(artifacts.post_run_verify_summary_file),
+    review_report_ref: asNonEmptyString(artifacts.review_report_file),
+    review_decision_refs: uniqueStrings([
+      asNonEmptyString(artifacts.review_decision_file),
+      ...asStringArray(artifacts.review_repair_decision_files),
+    ]),
+    meaningful_changed_paths: uniqueStrings(asStringArray(artifacts.meaningful_changed_paths)),
+    repair_necessity:
+      asNonEmptyString(artifacts.post_run_diagnostic_status) === "fail" ||
+      asNonEmptyString(artifacts.evaluation_status) === "fail"
+        ? "qa-origin-repair-required"
+        : "continue-when-review-and-qa-pass",
+  };
 }
 
 /**
@@ -243,7 +313,7 @@ export function buildStepQualityAssessmentRequest(options) {
   const evidenceRefs = collectStepQualityEvidenceRefs(entry);
   const evaluatorMode = productQualityRequired ? "product-step-quality" : "flow-health";
   const requestedAssessmentMethod = productQualityRequired ? "external-skill-agent" : "flow-health-automatic";
-  const request = {
+	  const request = {
     request_id: `${normalizeId(options.runId)}.${normalizeId(asNonEmptyString(entry.step_instance_id) || stepId)}.step-quality-request.v1`,
     run_id: options.runId,
     profile_id: context.profileId,
@@ -267,20 +337,23 @@ export function buildStepQualityAssessmentRequest(options) {
     source_operator_decision_file: asNonEmptyString(entry.operator_decision_ref),
     requested_assessment_method: requestedAssessmentMethod,
     rubric_version: STEP_QUALITY_RUBRIC_VERSION,
-    rubric: {
-      required_dimensions: requiredStepQualityDimensions(stepId, productQualityRequired),
+	    rubric: {
+	      required_dimensions: requiredStepQualityDimensions(stepId, productQualityRequired),
       continuation_rule: productQualityRequired
         ? "Continue only after a linked accepted evaluator-authored step-quality report."
         : "Continue after lightweight flow-health evidence is materialized.",
       repair_boundary:
         "Repair decisions must route through public AOR review/repair commands and must not mutate the target checkout directly.",
     },
-    evaluator_input_refs: evidenceRefs,
-    expected_assessment_report_file: files.reportFile,
-    evidence_refs: evidenceRefs,
-  };
-  return { request, requestFile: files.requestFile, reportFile: files.reportFile, context };
-}
+	    evaluator_input_refs: evidenceRefs,
+	    expected_assessment_report_file: files.reportFile,
+	    evidence_refs: evidenceRefs,
+	  };
+	  if (productQualityRequired && stepId === "qa") {
+	    request.quality_cycle_context = buildQualityCycleContext(asRecord(options.artifacts));
+	  }
+	  return { request, requestFile: files.requestFile, reportFile: files.reportFile, context };
+	}
 
 /**
  * @param {{
@@ -358,11 +431,16 @@ export function buildStepQualityAssessment(options) {
       ? `${stepId} product-change step quality was assessed from ${evaluatorInputRefs.length} public evaluator input refs.`
       : `${stepId} small canary flow-health evidence is present.`,
   ];
-  if (productQualityRequired && ["execution", "review"].includes(stepId)) {
-    topLevelFindings.push(
-      `${stepId} assessment covered mission relevance, verification relevance, and repair necessity before continuation.`,
-    );
-  }
+	  if (productQualityRequired && ["execution", "review"].includes(stepId)) {
+	    topLevelFindings.push(
+	      `${stepId} assessment covered mission relevance, verification relevance, and repair necessity before continuation.`,
+	    );
+	  }
+	  if (productQualityRequired && stepId === "qa") {
+	    topLevelFindings.push(
+	      "qa assessment covered verification relevance, regression signal quality, mission relevance, and repair necessity before delivery.",
+	    );
+	  }
 
   const assessment = {
     assessment_id: `${normalizeId(options.runId)}.${normalizeId(stepInstanceId)}.step-quality.v1`,

@@ -742,6 +742,7 @@ function buildScorecard(options) {
       options.flowResult.artifacts.target_pre_execution_status
         ? options.flowResult.artifacts.target_pre_execution_status
         : null,
+    target_toolchain_preflight_file: asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file) || null,
     failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
     failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
     failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
@@ -1120,15 +1121,22 @@ function buildSetupJournal(artifacts) {
     {
       sequence: 3,
       step_id: "project_bootstrap",
-      status: asNonEmptyString(artifacts.generated_project_profile_file) ? "pass" : "not_pass",
+      status:
+        asNonEmptyString(artifacts.project_init_transcript_file) ||
+        asNonEmptyString(artifacts.generated_project_profile_file)
+          ? "pass"
+          : "not_pass",
       public_surface: "aor project init or bundled profile materialization",
       evidence_refs: uniqueStrings([
+        asNonEmptyString(artifacts.project_init_transcript_file),
         asNonEmptyString(artifacts.generated_project_profile_file),
         asNonEmptyString(artifacts.bootstrap_artifact_packet_file),
         asNonEmptyString(artifacts.onboarding_report_file),
       ]),
-      summary: asNonEmptyString(artifacts.generated_project_profile_file)
-        ? "AOR project bootstrap evidence was materialized."
+      summary:
+        asNonEmptyString(artifacts.project_init_transcript_file) ||
+        asNonEmptyString(artifacts.generated_project_profile_file)
+        ? "AOR project bootstrap evidence was materialized through public project init."
         : "AOR project bootstrap evidence is missing.",
     },
     {
@@ -1163,6 +1171,7 @@ function buildSetupJournal(artifacts) {
         asNonEmptyString(artifacts.validation_report_file),
         asNonEmptyString(artifacts.baseline_verify_summary_file),
         asNonEmptyString(artifacts.verify_summary_file),
+        asNonEmptyString(artifacts.target_toolchain_preflight_file),
         asNonEmptyString(artifacts.target_pre_execution_status_file),
         asNonEmptyString(artifacts.execution_readiness_file),
         asNonEmptyString(artifacts.live_adapter_preflight_file),
@@ -1306,6 +1315,8 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "target_checkout_root",
     "target_pre_execution_status_file",
     "target_pre_execution_status",
+    "target_toolchain_preflight_file",
+    "target_toolchain_preflight",
     "target_setup_status",
     "target_verification_status_detail",
     "failure_owner",
@@ -1314,6 +1325,7 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "baseline_verify_status",
     "baseline_verify_summary_file",
     "baseline_verify_gate_decision",
+    "project_init_transcript_file",
     "execution_readiness_file",
     "target_cleanliness_before_execution_file",
     "target_cleanliness_before_execution",
@@ -1741,6 +1753,7 @@ function buildObservationReport(options) {
       options.flowResult.artifacts.target_verification_status_detail
         ? options.flowResult.artifacts.target_verification_status_detail
         : null,
+    target_toolchain_preflight_file: asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file) || null,
     provider_step_status:
       typeof options.flowResult.artifacts.provider_step_status === "object" && options.flowResult.artifacts.provider_step_status
         ? options.flowResult.artifacts.provider_step_status
@@ -1767,6 +1780,7 @@ function buildObservationReport(options) {
       asNonEmptyString(options.flowResult.artifacts.review_report_file),
       asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
       asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
+      asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file),
     ]),
   };
 }
@@ -2741,6 +2755,10 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.handoff_packet_file === "string"
         ? options.flowResult.artifacts.handoff_packet_file
         : null,
+    project_init_transcript_file:
+      typeof options.flowResult.artifacts.project_init_transcript_file === "string"
+        ? options.flowResult.artifacts.project_init_transcript_file
+        : null,
     execution_readiness_file:
       typeof options.flowResult.artifacts.execution_readiness_file === "string"
         ? options.flowResult.artifacts.execution_readiness_file
@@ -2771,6 +2789,15 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
       options.flowResult.artifacts.target_pre_execution_status
         ? options.flowResult.artifacts.target_pre_execution_status
+        : null,
+    target_toolchain_preflight_file:
+      typeof options.flowResult.artifacts.target_toolchain_preflight_file === "string"
+        ? options.flowResult.artifacts.target_toolchain_preflight_file
+        : null,
+    target_toolchain_preflight:
+      typeof options.flowResult.artifacts.target_toolchain_preflight === "object" &&
+      options.flowResult.artifacts.target_toolchain_preflight
+        ? options.flowResult.artifacts.target_toolchain_preflight
         : null,
     target_setup_status:
       typeof options.flowResult.artifacts.target_setup_status === "object" && options.flowResult.artifacts.target_setup_status

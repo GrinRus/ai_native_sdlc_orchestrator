@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-47-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-51-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -58,6 +58,10 @@ The authoritative planning model for implementation lives in:
 | W45 | Make review/QA repair cycles bounded, contract-first, operator-visible, and replayable from prompt/context lineage through proof evidence. | 6 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-45-implementation-slices.md` |
 | W46 | Rebuild live E2E as black-box product-change assessment with step-quality gates, larger mission budgets, catalog migration, and hard target expansion. | 6 | EPIC-0, EPIC-7 | `docs/backlog/wave-46-implementation-slices.md` |
 | W47 | Convert W46 classified blockers into strict product acceptance by closing AOR UI accessibility, hard-target verification isolation, repair convergence evidence, and proof reruns. | 4 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-47-implementation-slices.md` |
+| W48 | Extend medium+ product-change live E2E into a realistic implementation quality cycle with QA-origin repair, structured repair context, hard-target toolchain policy, and control proof rerun. | 5 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-48-implementation-slices.md` |
+| W49 | Close quality-cycle proof gaps with repair anti-loop enforcement, QA-specific step quality, findings hygiene, and mandatory Full Control live proof rerun. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-49-implementation-slices.md` |
+| W50 | Close W49 Fastify/Vitest blockers with review verification mapping, target toolchain fail-fast, control proof rerun, and findings sync. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-50-implementation-slices.md` |
+| W51 | Turn W50 proof into clean-commit closure, pursue Vitest large acceptance, automate final quality hydration, split target-readiness semantics, and add the next hard target only after large proof is stable. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-51-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -831,6 +835,86 @@ readiness, and repair/review convergence evidence.
   non-accepted.
 
 **Detailed slices:** `docs/backlog/wave-47-implementation-slices.md`
+
+## W48 - product quality-cycle implementation loop
+**Goal:** Extend medium+ product-change live E2E into the realistic
+`execution#N -> review#N -> qa#N` implementation cycle while preserving public
+repair boundaries and strict all-pass product acceptance policy.
+
+**Exit criteria:**
+- Medium+ profiles declare `cycle_steps: [execution, review, qa]` and all
+  supported repair sources.
+- Review blockers skip QA and return to public execution repair; QA blockers
+  create QA-origin public repair.
+- Repair decisions carry structured source phase, iteration, findings,
+  changed-path, verification, previous-decision, stop-reason, and next-step
+  context.
+- Vitest large has explicit target Node policy and fails before product
+  execution for incompatible toolchains.
+- Control proof rerun remains blocked until a provider/toolchain window exists;
+  blocked runs are not product acceptance.
+
+**Detailed slices:** `docs/backlog/wave-48-implementation-slices.md`
+
+## W49 - quality-cycle proof closure
+**Goal:** Remove the remaining W48 proof-quality gaps before claiming any new
+product acceptance: repeated repair must fail closed without new actionable
+context, QA must have dedicated product-quality dimensions, and the Full Control
+proof set must be rerun on one commit.
+
+**Exit criteria:**
+- Findings docs distinguish local regression validation from live proof
+  acceptance.
+- Repair decisions include deterministic fingerprints and new-context signals;
+  repeated repair without new evidence terminal-blocks.
+- Accepted medium+ `qa#N` step-quality reports include verification relevance,
+  regression signal quality, mission relevance, and repair necessity.
+- Same-commit Full Control proof runs guided UI, HTTPX medium, Fastify repair,
+  and Vitest large or records precise provider/environment blockers.
+- Product acceptance is claimed only after final `quality-assessment gate
+  --policy all-pass`.
+
+**Detailed slices:** `docs/backlog/wave-49-implementation-slices.md`
+
+## W50 - live E2E failure closure after W49 control run
+**Goal:** Remove the two real W49 blockers without weakening live E2E quality
+gates: Fastify repair should not loop on a broad verification mapping warning
+when code and verification pass, and Vitest should fail fast on incompatible
+Node before target setup or product execution.
+
+**Exit criteria:**
+- Review reports preserve `artifact_quality.verification_coverage` and treat
+  broad repo/package test commands as covering changed tests where appropriate.
+- Live E2E review-origin repair starts only for actionable implementation
+  repair, not verification-mapping-only warnings with passing verification.
+- Profiles with `target_toolchain.node.required_range` stop before target
+  install/build/test/lint commands when no compatible Node is available.
+- Setup journal preserves `project_bootstrap=pass` when public `project init`
+  passed, even if later target readiness blocks.
+- Control proof rerun records Fastify/Vitest terminal evidence, and product
+  acceptance remains limited to terminal pass plus final all-pass quality gate.
+
+**Detailed slices:** `docs/backlog/wave-50-implementation-slices.md`
+
+## W51 - proof-complete closure and hard-target acceptance
+**Goal:** Convert W50's strong implementation and control proof into stricter
+clean-commit evidence, obtain a real Vitest large product-acceptance attempt
+under a compatible Node toolchain, reduce manual final-quality report assembly,
+and make target-readiness blockers first-class.
+
+**Exit criteria:**
+- Guided AOR UI, HTTPX medium, and Fastify repair medium are rerun on a clean
+  committed SHA, and product acceptance is tied to final all-pass quality gates.
+- Vitest large runs with a compatible Node binary or records a new blocker that
+  occurs after W50 target-toolchain fail-fast behavior is proven.
+- Final quality report drafting is hydrated from public artifacts and cannot
+  produce empty all-pass evidence.
+- Target setup/toolchain blockers are reported as target-readiness failures
+  rather than product execution failures.
+- The next hard target is added only after the current large proof policy is
+  stable, and optional xlarge remains manual-only.
+
+**Detailed slices:** `docs/backlog/wave-51-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.
