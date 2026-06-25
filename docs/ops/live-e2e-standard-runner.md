@@ -475,6 +475,11 @@ Full-journey layer:
 - splits verification into `readiness`, `baseline_diagnostic`, and `post_run_quality` phases;
 - treats full-journey baseline target verification as diagnostic by default: failed target `verification.commands` are preserved as context, but setup failures, missing prerequisites, failed validation, missing or failed routed dry-run, provider readiness failure, and unsafe write-back policy still block before execution;
 - resolves mission post-run quality into a mission-blocking primary gate plus optional full diagnostic commands; a failed diagnostic command records findings without hiding a passing primary gate unless the mission declares `diagnostic_failure_mode=fail`;
+- for installed-user guided UI proof, missing browser-task proof, screenshot or
+  visual evidence, structured accessibility checks, or keyboard focus sequence
+  remains a `ui_validation` blocker; optional target diagnostics with
+  `diagnostic_failure_mode=warn` remain factual warning evidence and do not
+  replace required AOR operator UI proof refs;
 - has the runner prepare one structured feature request input under AOR run state;
 - requires small catalog missions to use `mission_class=flow-regression`; requires medium, large, and xlarge catalog missions to use `mission_class=product-change` with `agent_visible_request`, evaluator/final-code rubrics, widened budgets, goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands; xlarge remains manual observation evidence and cannot close required acceptance;
 - materializes provider-pinned route and policy overrides in host-side AOR run

@@ -1018,6 +1018,90 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
 }
 
 /**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   artifacts: Record<string, unknown>,
+ *   frontendInteractions?: Array<Record<string, unknown>>,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildGuidedUiEvidence(options) {
+  const required = expectsGuidedBrowserTaskProof(options.profile, options.artifacts);
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
+  const frontendInteractions = Array.isArray(options.frontendInteractions)
+    ? options.frontendInteractions.map((entry) => asRecord(entry))
+    : [];
+  const browserTaskProofFile =
+    asNonEmptyString(options.artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file);
+  const browserTaskProofRequestFile =
+    asNonEmptyString(options.artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const renderedHtmlFile =
+    asNonEmptyString(options.artifacts.guided_web_smoke_html_file) ||
+    asNonEmptyString(webSmoke.rendered_html_file) ||
+    asNonEmptyString(webSmoke.html_ref);
+  const domSnapshotFile =
+    asNonEmptyString(options.artifacts.guided_web_dom_snapshot_file) ||
+    asNonEmptyString(webSmoke.dom_snapshot_file) ||
+    asNonEmptyString(webSmoke.dom_snapshot_ref);
+  const accessibilitySummaryFile =
+    asNonEmptyString(options.artifacts.guided_web_accessibility_summary_file) ||
+    asNonEmptyString(webSmoke.accessibility_summary_file) ||
+    asNonEmptyString(webSmoke.accessibility_summary_ref);
+  const visualGuardrailFile =
+    asNonEmptyString(options.artifacts.guided_web_visual_guardrail_file) ||
+    asNonEmptyString(webSmoke.visual_guardrail_file);
+  const screenshotRefs = uniqueStrings([
+    ...asStringArray(options.artifacts.guided_web_screenshot_files),
+    ...asStringArray(webSmoke.screenshot_files),
+    ...asStringArray(webSmoke.screenshot_refs),
+  ]);
+  const evidenceRefs = uniqueStrings([
+    asNonEmptyString(options.artifacts.guided_web_smoke_summary_file),
+    renderedHtmlFile,
+    domSnapshotFile,
+    accessibilitySummaryFile,
+    visualGuardrailFile,
+    browserTaskProofRequestFile,
+    browserTaskProofFile,
+    ...screenshotRefs,
+    ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
+  ]);
+  const browserProofExists = Boolean(browserTaskProofFile && fileExists(browserTaskProofFile));
+  const proofGaps = required
+    ? buildGuidedUiEvidenceGaps({
+        profile: options.profile,
+        artifacts: options.artifacts,
+        observationReport: {
+          frontend_interactions: frontendInteractions,
+        },
+      })
+    : [];
+  return {
+    required,
+    status: required ? (proofGaps.length === 0 ? "pass" : "blocked") : evidenceRefs.length > 0 ? "pass" : "not_requested",
+    guided_web_smoke_summary_file: asNonEmptyString(options.artifacts.guided_web_smoke_summary_file) || null,
+    guided_web_smoke_html_file: renderedHtmlFile || null,
+    guided_web_dom_snapshot_file: domSnapshotFile || null,
+    guided_web_accessibility_summary_file: accessibilitySummaryFile || null,
+    guided_web_visual_guardrail_file: visualGuardrailFile || null,
+    guided_browser_task_proof_request_file: browserTaskProofRequestFile || null,
+    guided_browser_task_proof_file: browserTaskProofFile || null,
+    browser_task_proof_present: browserProofExists,
+    screenshot_refs: screenshotRefs,
+    keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
+    accessibility_checks: buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
+      accessibilitySummaryFile,
+      browserTaskProofFile,
+      ...screenshotRefs,
+    ]),
+    weak_evidence_refs: proofGaps,
+    evidence_refs: evidenceRefs,
+  };
+}
+
+/**
  * @param {Record<string, unknown>} profile
  * @param {Record<string, unknown>} artifacts
  * @returns {boolean}
@@ -1613,6 +1697,13 @@ function buildStepJournal(options) {
 function buildFinalAnalysis(options) {
   const journalEntries = getQualityRelevantStepJournal(options.stepJournal);
   const journalStageIds = new Set(journalEntries.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
+  const acceptedStepIds = new Set(
+    journalEntries
+      .filter((entry) => asNonEmptyString(entry.operator_decision_status) === "accepted")
+      .map((entry) => asNonEmptyString(entry.step_id))
+      .filter(Boolean),
+  );
+  const pendingIncludedSteps = asStringArray(options.includedSteps).filter((step) => !acceptedStepIds.has(step));
   const failingStages = options.stageResults
     .filter((entry) => {
       const stage = asNonEmptyString(entry.stage);
@@ -1649,9 +1740,13 @@ function buildFinalAnalysis(options) {
   if (failingStages.length > 0) {
     status = worstObservationStatus(status, "not_pass");
   }
+  if (pendingIncludedSteps.length > 0 && ["pass", "warn"].includes(status)) {
+    status = worstObservationStatus(status, "blocked");
+  }
   const findings = uniqueStrings([
     ...journalEntries.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
     ...failingStages.map((entry) => `Stage '${entry.stage}' failed: ${entry.summary}`),
+    ...pendingIncludedSteps.map((step) => `Declared live E2E step '${step}' was not observed with an accepted operator decision.`),
   ]);
   return {
     status,
@@ -1727,6 +1822,13 @@ function buildObservationReport(options) {
     stepJournal,
     stageResults: options.flowResult.stageResults,
     artifacts: options.flowResult.artifacts,
+    includedSteps,
+  });
+  const frontendInteractions = buildFrontendInteractions(options.flowResult.artifacts, stepJournal);
+  const guidedUiEvidence = buildGuidedUiEvidence({
+    profile: options.profile,
+    artifacts: options.flowResult.artifacts,
+    frontendInteractions,
   });
   return {
     report_id: `${options.runId}.live-e2e-observation.v2`,
@@ -1768,7 +1870,8 @@ function buildObservationReport(options) {
     step_journal: stepJournal,
     final_analysis: finalAnalysis,
     interactive_decisions: buildInteractiveDecisions(stepJournal),
-    frontend_interactions: buildFrontendInteractions(options.flowResult.artifacts, stepJournal),
+    frontend_interactions: frontendInteractions,
+    guided_ui_evidence: guidedUiEvidence,
     evidence_refs: uniqueStrings([
       options.summaryFile,
       asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file),
@@ -1781,6 +1884,7 @@ function buildObservationReport(options) {
       asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
       asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
       asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file),
+      ...asStringArray(guidedUiEvidence.evidence_refs),
     ]),
   };
 }
@@ -2423,6 +2527,13 @@ function buildRunHealthReport(options) {
   const providerHealth = buildProviderHealth(options.flowResult.artifacts);
   const targetEnvironmentHealth = buildTargetEnvironmentHealth(options.flowResult.artifacts);
   const diagnosticHealth = buildDiagnosticHealth(options.flowResult.artifacts);
+  const guidedUiEvidence = buildGuidedUiEvidence({
+    profile: options.profile,
+    artifacts: options.flowResult.artifacts,
+    frontendInteractions: Array.isArray(options.observationReport.frontend_interactions)
+      ? options.observationReport.frontend_interactions.map((entry) => asRecord(entry))
+      : [],
+  });
   const evidenceHealth = buildEvidenceHealth({
     profile: options.profile,
     artifacts: options.flowResult.artifacts,
@@ -2505,6 +2616,7 @@ function buildRunHealthReport(options) {
     provider_health: providerHealth,
     target_environment_health: targetEnvironmentHealth,
     diagnostic_health: diagnosticHealth,
+    guided_ui_evidence: guidedUiEvidence,
     evidence_health: evidenceHealth,
     failure_summary: failureSummary,
     resume_interaction_health: resumeInteractionHealth,
@@ -2523,6 +2635,7 @@ function buildRunHealthReport(options) {
       asNonEmptyString(options.observationReport.controller_state_ref),
       ...options.stepObservationFiles,
       ...asStringArray(diagnosticHealth.evidence_refs),
+      ...asStringArray(guidedUiEvidence.evidence_refs),
     ]),
   };
 }
@@ -2885,6 +2998,10 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.guided_browser_task_app_server_cleanup === "object" &&
       options.flowResult.artifacts.guided_browser_task_app_server_cleanup
         ? options.flowResult.artifacts.guided_browser_task_app_server_cleanup
+        : null,
+    guided_ui_evidence:
+      typeof observationReport.guided_ui_evidence === "object" && observationReport.guided_ui_evidence
+        ? observationReport.guided_ui_evidence
         : null,
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,

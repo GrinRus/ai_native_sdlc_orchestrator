@@ -141,6 +141,14 @@ the public evidence supports that classification.
 
 `evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
 
+`guided_ui_evidence` may mirror the observation report's guided UI/browser
+proof refs so run-health consumers can see whether AOR operator browser-task
+proof was required, present, and evidence-backed without interpreting outcome
+quality. It should preserve web-smoke refs, browser-task request/proof refs,
+screenshot refs, keyboard focus sequence, structured accessibility checks, weak
+evidence refs, and supporting evidence refs when the profile declares
+`browser-task-proof`.
+
 For guided installed-user profiles that declare `live_e2e.frontend_capability: browser-task-proof`,
 `guided_journey.browser_task_proof.required: true`, or `browser-task-proof` in proof requirements, missing or non-passing
 AOR operator browser-task evidence is a factual run-health blocker, not an outcome-quality verdict:

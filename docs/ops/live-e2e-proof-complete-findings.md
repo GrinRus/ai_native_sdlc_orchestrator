@@ -47,7 +47,7 @@ product-quality gates require an accepted same-commit guided AOR UI proof.
 
 | Proof | Profile | W51 run id | Terminal status | Owner | Phase | Class | Acceptance |
 |---|---|---|---|---|---|---|---|
-| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-2a4bd06c16d6` | run summary `pass`; run-health `blocked` | `target_repository` | `post_run_diagnostic` | `post_run_diagnostic_failed` | blocked, not accepted as paired UI proof |
+| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-2a4bd06c16d6` | run summary `pass`; run-health `blocked` | `operator` | `controller_decision` | `controller_incomplete` | blocked, not accepted as paired UI proof |
 | `httpx-medium` | `scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
 | `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
 
@@ -57,17 +57,26 @@ Accepted evidence:
   `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-run-summary-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6.json`.
 - Run-health report:
   `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-run-health-report-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6.json`.
+- Incomplete lifecycle evidence:
+  `delivery`, `release`, and `learning` remained pending, so the guided browser
+  proof collection tied to the learning step never materialized for this clean
+  commit run.
 - Blocking diagnostic evidence:
   `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-post-run-diagnostic-verify-1-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6-01-verify-summary-post-run-diagnostic-b0b102410ca0.json`.
 
 Finding:
 
-- `W51-F01`: The clean-commit guided proof is blocked by target-side
-  `npm test` failures in `sindresorhus/ky` retry timing tests. The failure is
-  not an AOR UI/accessibility acceptance failure, but W51-S01 cannot claim
-  paired UI proof while run-health is blocked. Next action: decide whether to
-  use a lighter guided UI target verification policy for installed-user UI
-  proof or choose a guided proof target without timing-sensitive target tests.
+- `W51-F01`: The clean-commit guided proof is blocked because the controller
+  lifecycle did not reach `delivery/release/learning`, so no fresh
+  `guided_browser_task_proof_file`, web-smoke/accessibility/DOM refs, screenshot
+  refs, or keyboard focus sequence were produced for commit `2a4bd06c16d6`.
+  The same run also recorded a target-side `npm test` diagnostic warning in
+  `sindresorhus/ky` retry timing tests, but that diagnostic is not the primary
+  blocker and is not an AOR UI/accessibility acceptance failure. Next action:
+  harden guided proof lifecycle/reporting so missing browser proof blocks as
+  `ui_validation/guided_browser_task_proof_missing`, diagnostic warnings remain
+  factual `warn` evidence, and a new clean-commit guided proof can be paired
+  with HTTPX and Fastify final quality gates.
 
 ## Guided AOR UI Proof
 

@@ -2370,8 +2370,12 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     const hydratedObservation = JSON.parse(fs.readFileSync(hydrated.summary.live_e2e_observation_report_file, "utf8"));
     const hydratedWebSmoke = JSON.parse(fs.readFileSync(webSmokeSummaryFile, "utf8"));
     assert.equal(hydrated.summary.guided_browser_task_proof_file, browserTaskProofFile);
+    assert.equal(hydrated.summary.guided_ui_evidence.status, "pass");
+    assert.equal(hydrated.summary.guided_ui_evidence.guided_browser_task_proof_file, browserTaskProofFile);
     assert.equal(hydratedObservation.frontend_interactions[0].task_outcome.status, "pass");
     assert.equal(hydratedObservation.frontend_interactions[0].browser_task_proof_ref, browserTaskProofFile);
+    assert.equal(hydratedObservation.guided_ui_evidence.status, "pass");
+    assert.equal(hydratedObservation.guided_ui_evidence.guided_browser_task_proof_file, browserTaskProofFile);
     assert.deepEqual(hydratedObservation.frontend_interactions[0].screenshot_refs, [screenshotFile]);
     assert.equal(hydratedObservation.frontend_interactions[0].keyboard_focus_sequence.length, 2);
     assert.equal(hydratedWebSmoke.keyboard_focus_sequence.length, 2);
@@ -2388,7 +2392,179 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
       ),
       false,
     );
+    assert.equal(hydrated.runHealthReport.guided_ui_evidence.status, "pass");
+    assert.equal(hydrated.runHealthReport.guided_ui_evidence.guided_browser_task_proof_file, browserTaskProofFile);
     assert.equal(hydrated.runHealthReport.overall_status, "pass");
+
+    const diagnosticStepResultFile = path.join(reportsRoot, "guided-post-run-diagnostic-step-result.json");
+    const diagnosticSummaryFile = path.join(reportsRoot, "guided-post-run-diagnostic-summary.json");
+    writeJsonFixture(diagnosticStepResultFile, {
+      status: "failed",
+      command: "npm test",
+      repo_scope: "sindresorhus/ky",
+      timed_out: false,
+      summary: "Timing-sensitive diagnostic command failed.",
+    });
+    writeJsonFixture(diagnosticSummaryFile, {
+      status: "failed",
+      step_result_refs: [diagnosticStepResultFile],
+    });
+    writeOptions.flowResult.artifacts.post_run_quality_policy = {
+      diagnostic_failure_mode: "warn",
+      diagnostic_commands: ["npm test"],
+    };
+    writeOptions.flowResult.artifacts.post_run_diagnostic_status = "warn";
+    writeOptions.flowResult.artifacts.post_run_diagnostic_verify_summary_file = diagnosticSummaryFile;
+    writeOptions.flowResult.artifacts.post_run_diagnostic_verify_step_result_files = [diagnosticStepResultFile];
+
+    const hydratedWithDiagnosticWarn = writeProofRunnerArtifacts(writeOptions);
+    assert.equal(hydratedWithDiagnosticWarn.runHealthReport.guided_ui_evidence.status, "pass");
+    assert.equal(hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.status, "warn");
+    assert.equal(hydratedWithDiagnosticWarn.runHealthReport.overall_status, "warn");
+    assert.equal(hydratedWithDiagnosticWarn.runHealthReport.failure_summary.class, "post_run_diagnostic_warning");
+  });
+});
+
+test("proof runner blocks incomplete declared full lifecycle before claiming observation pass", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const runId = "incomplete-full-lifecycle";
+    const observedSteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa"];
+    const allSteps = [...observedSteps, "delivery", "release", "learning"];
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "target-checkout.txt",
+        ...observedSteps.map((step) => `${step}-artifact.json`),
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) writeJsonFixture(file);
+
+    const stepJournal = observedSteps.map((step, index) => ({
+      sequence: index + 1,
+      step_id: step,
+      step_instance_id: step,
+      iteration: 1,
+      flow_stage: step,
+      plan: {
+        objective: `${step} objective`,
+        public_surface: `aor ${step}`,
+        command_labels: [`${step}-command`],
+        expected_artifacts: [`${step}-artifact`],
+        inspection_sources: ["command_transcript"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files[`${step}-artifact.json`],
+      public_surface: `aor ${step}`,
+      transcript_ref: files[`${step}-artifact.json`],
+      execution_ref: files[`${step}-artifact.json`],
+      inspection_ref: files[`${step}-artifact.json`],
+      classification_ref: files[`${step}-artifact.json`],
+      artifact_refs: [files[`${step}-artifact.json`]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: { status: "pass", exit_code: 0, failure_class: null, missing_evidence: [], recommendation: "continue" },
+      semantic_analysis: { status: "pass", judge_source: "skill-agent", findings: [] },
+      agent_decision_request_ref: files[`${step}-artifact.json`],
+      operator_decision_ref: files[`${step}-artifact.json`],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files[`${step}-artifact.json`]],
+      requested_interaction: null,
+      decision: { action: "continue", reason: "Accepted test evidence." },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "pass",
+    }));
+
+    writeJsonFixture(files["controller-state.json"], {
+      current_step: null,
+      completed_steps: observedSteps,
+      included_steps: allSteps,
+      pending_decision: null,
+      artifacts_snapshot: {
+        target_checkout_root: targetCheckoutRoot,
+        provider_execution_status: "completed",
+        feature_size: "small",
+      },
+    });
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.incomplete-full-lifecycle",
+        journey_mode: "full-journey",
+        run_tier: "acceptance",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-header-regression",
+        scenario_family: "regress",
+        provider_variant_id: "openai-primary",
+        stages: allSteps,
+        live_e2e: {
+          flow_range_policy: "full_lifecycle",
+          frontend_capability: "none",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "pass",
+        stageResults: observedSteps.map((step) => ({
+          stage: step,
+          status: "pass",
+          evidence_refs: [files[`${step}-artifact.json`]],
+          summary: `${step} passed.`,
+        })),
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: stepJournal,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    const observationReport = JSON.parse(fs.readFileSync(written.summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observationReport.report_status, "in_progress");
+    assert.equal(observationReport.overall_status, "blocked");
+    assert.deepEqual(written.runHealthReport.lifecycle_completion.pending_steps, ["delivery", "release", "learning"]);
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.failure_summary.class, "controller_incomplete");
   });
 });
 
