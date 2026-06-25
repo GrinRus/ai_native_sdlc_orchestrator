@@ -1,6 +1,6 @@
 # Live E2E Proof-Complete Findings
 
-Status date: 2026-06-25
+Status date: 2026-06-26
 
 This note records W47-W50 control proof evidence for black-box product live E2E. Runtime artifacts stay under `.aor/` or `/tmp/aor-*` and are intentionally not committed.
 
@@ -39,83 +39,71 @@ product-quality acceptance.
 
 ## W51 Clean-Commit Proof Rerun
 
-W51-S01 started from clean commit `2a4bd06c16d6` after the backlog repair commit.
-That first required proof, `guided-aor-ui`, did not produce accepted paired AOR
-UI proof because the run did not materialize browser-task proof refs and also
-recorded target-side `ky` timing-sensitive diagnostic warnings.
-
-The guided proof pipeline was hardened and committed in follow-up source commits
-`dfd6bf3473f5` and `c0945a744018`. A fresh clean run on `c0945a744018`
-confirmed that optional warn-mode target diagnostics no longer block before the
-browser-proof phase. The run still did not produce accepted paired UI proof,
-because the public implementation quality cycle blocked earlier in review/repair:
-the first implementation lowered `t.plan(4)` to `t.plan(3)` in
-`test/headers.ts`, review requested public repair, and the repair iteration did
-not restore that weakened coverage signal. Anti-loop enforcement correctly
-stopped the run as repeated repair context without new evidence.
-
-HTTPX and Fastify W51 clean reruns were not started from either batch because
-final product-quality gates require an accepted same-commit guided AOR UI proof.
+W51-S01 is closed on clean source commit `265b20961af5`. The successful batch
+uses one same-commit guided AOR UI proof paired into both medium product-change
+final quality gates. Runtime artifacts remain uncommitted under `.aor/` and
+`/tmp/aor-*`.
 
 | Proof | Profile | W51 run id | Terminal status | Owner | Phase | Class | Acceptance |
 |---|---|---|---|---|---|---|---|
-| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-2a4bd06c16d6` | run summary `pass`; run-health `blocked` | `operator` | `controller_decision` | `controller_incomplete` | blocked, not accepted as paired UI proof |
-| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260625-c0945a744018` | run summary `not_pass`; run-health `blocked` | `provider` | `review` | `repeated_repair_context_without_new_evidence` | blocked, not accepted as paired UI proof |
-| `httpx-medium` | `scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
-| `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | not run | skipped because paired guided UI proof was not accepted | n/a | n/a | n/a | not product-accepted |
+| `guided-aor-ui` | `scripts/live-e2e/profiles/installed-user-guided-journey.yaml` | `w51-clean-guided-aor-ui-20260626-265b20961af5` | run `pass`; UI evidence `pass`; run-health `warn` | none | none | none | accepted as paired AOR UI proof |
+| `httpx-medium` | `scripts/live-e2e/profiles/full-journey-regress-httpx-medium-openai.yaml` | `w51-clean-httpx-medium-20260626-265b20961af5` | run `pass`; final all-pass gate `pass` | none | none | none | product-accepted |
+| `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | `w51-clean-fastify-repair-medium-20260626-265b20961af5` | run `pass`; final all-pass gate `pass` | none | none | none | product-accepted |
+| `vitest-large` | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml` | not run for W51-S01 | out of W51-S01 scope | n/a | n/a | n/a | remains W51-S02 |
 
 Accepted evidence:
 
-- Run summary:
-  `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-run-summary-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6.json`.
-- Run-health report:
-  `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-run-health-report-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6.json`.
-- Incomplete lifecycle evidence:
-  `delivery`, `release`, and `learning` remained pending, so the guided browser
-  proof collection tied to the learning step never materialized for this clean
-  commit run.
-- Blocking diagnostic evidence:
-  `.aor/live-e2e-w51-clean-guided-ui-20260625-2a4bd06c16d6/projects/aor-core/reports/live-e2e-post-run-diagnostic-verify-1-w51-clean-guided-aor-ui-20260625-2a4bd06c16d6-01-verify-summary-post-run-diagnostic-b0b102410ca0.json`.
-- Hardened-guided run summary:
-  `.aor/live-e2e-w51-clean-guided-ui-20260625-c0945a744018/projects/aor-core/reports/live-e2e-run-summary-w51-clean-guided-aor-ui-20260625-c0945a744018.json`.
-- Hardened-guided run-health report:
-  `.aor/live-e2e-w51-clean-guided-ui-20260625-c0945a744018/projects/aor-core/reports/live-e2e-run-health-report-w51-clean-guided-aor-ui-20260625-c0945a744018.json`.
-- Public repair lineage:
-  `review-decision-w51-clean-guided-aor-ui-20260625-c0945a744018-request-repair-625162201831.json`
-  referenced unresolved finding `Test plan count was lowered in 'test/headers.ts'`.
-- Repair execution evidence:
-  `step-result-routed-w51-clean-guided-aor-ui-20260625-c0945a744018.repair-2.run.start.implement.implement.attempt.1.json`
-  passed, but the final target diff still lowered `test/headers.ts` from
-  `t.plan(4)` to `t.plan(3)`.
+- Guided run summary:
+  `.aor/live-e2e-w51-clean-guided-ui-20260626-265b20961af5/projects/aor-core/reports/live-e2e-run-summary-w51-clean-guided-aor-ui-20260626-265b20961af5.json`.
+- Guided browser-task proof:
+  `.aor/live-e2e-w51-clean-guided-ui-20260626-265b20961af5/projects/aor-core/reports/installed-user-guided-browser-task-proof-w51-clean-guided-aor-ui-20260626-265b20961af5.json`.
+- Guided UI evidence includes browser screenshot, DOM summary, accessibility
+  summary, visual guardrail evidence, `keyboard_navigation=pass`, and a
+  structured `keyboard_focus_sequence` with 20 focused controls. The run-health
+  `warn` is a small-canary target diagnostic and is non-blocking for paired
+  AOR UI/accessibility proof.
+- HTTPX run summary:
+  `.aor/live-e2e-w51-clean-httpx-20260626-265b20961af5/projects/aor-core/reports/live-e2e-run-summary-w51-clean-httpx-medium-20260626-265b20961af5.json`.
+- HTTPX final quality report:
+  `.aor/live-e2e-w51-clean-httpx-20260626-265b20961af5/projects/aor-core/reports/live-e2e-quality-assessment-report-w51-clean-httpx-medium-20260626-265b20961af5.yaml`.
+- HTTPX meaningful changed paths:
+  `httpx/_content.py`, `httpx/_transports/default.py`, and
+  `tests/test_timeouts.py`.
+- Fastify run summary:
+  `/tmp/aor-w51-clean-fastify-20260626-265b20961af5/projects/aor-core/reports/live-e2e-run-summary-w51-clean-fastify-repair-medium-20260626-265b20961af5.json`.
+- Fastify final quality report:
+  `/tmp/aor-w51-clean-fastify-20260626-265b20961af5/projects/aor-core/reports/live-e2e-quality-assessment-report-w51-clean-fastify-repair-medium-20260626-265b20961af5.yaml`.
+- Fastify meaningful changed paths:
+  `lib/schema-controller.js`,
+  `test/internals/schema-controller-perf.test.js`,
+  `test/types/schema.tst.ts`, and `types/schema.d.ts`.
+- HTTPX and Fastify both passed `quality-assessment validate` with zero
+  contract issues and `quality-assessment gate --policy all-pass` with zero gate
+  issues.
 
-Finding:
+Historical W51 blockers:
 
-- `W51-F01`: The clean-commit guided proof is blocked because the controller
-  lifecycle did not reach `delivery/release/learning`, so no fresh
-  `guided_browser_task_proof_file`, web-smoke/accessibility/DOM refs, screenshot
-  refs, or keyboard focus sequence were produced for commit `2a4bd06c16d6`.
-  The same run also recorded a target-side `npm test` diagnostic warning in
-  `sindresorhus/ky` retry timing tests, but that diagnostic is not the primary
-  blocker and is not an AOR UI/accessibility acceptance failure. Next action:
-  harden guided proof lifecycle/reporting so missing browser proof blocks as
-  `ui_validation/guided_browser_task_proof_missing`, diagnostic warnings remain
-  factual `warn` evidence, and a new clean-commit guided proof can be paired
-  with HTTPX and Fastify final quality gates.
-- `W51-F02`: The hardened clean-commit guided proof on `c0945a744018` is blocked
-  by AOR/provider repair convergence, not by target diagnostics. Review correctly
-  flagged the lowered `test/headers.ts` plan count as a coverage weakening,
-  public `request-repair` lineage was created, and repair execution completed,
-  but the repair did not restore the weakened assertion plan or otherwise produce
-  new evidence that resolved the finding. The repair packet carried the prior
-  review decision as evidence but did not make each unresolved finding a
-  first-class provider-visible closure requirement. Anti-loop enforcement also
-  reported the generic `repeated_repair_context_without_new_evidence` class
-  instead of the narrower `provider_did_not_address_finding` after fresh repair
-  evidence. Next action: harden repair instructions/context so provider repair
-  must explicitly address each unresolved review finding, especially
-  coverage-weakening findings, and ensure repeated-context classification uses
-  the current iteration's fresh review/verification signals before W51-S01 is
-  rerun and used as paired UI proof.
+- `w51-clean-guided-aor-ui-20260625-2a4bd06c16d6` remains a blocked attempt:
+  browser-task proof refs did not materialize and target-side `ky` diagnostics
+  warned. It is not accepted as paired UI proof.
+- `w51-clean-guided-aor-ui-20260625-c0945a744018` remains a blocked attempt:
+  review/repair stopped on unresolved `test/headers.ts` coverage weakening. It
+  is not accepted as paired UI proof.
+- `w51-clean-fastify-repair-medium-20260626-5a81beb5d510` remains a pre-final
+  implementation attempt: QA passed, but controller resume state did not
+  reconcile the persisted accepted QA report before the final fix. It is not
+  counted as product acceptance.
+
+Accepted findings:
+
+- `W51-F01` is closed: guided proof lifecycle now materializes browser proof,
+  accessibility evidence, DOM/visual refs, screenshots, and keyboard focus
+  evidence on a clean source commit.
+- `W51-F02` is closed: repair convergence hardening and controller
+  reconciliation now allow the quality cycle to continue through fresh review,
+  QA, and delivery instead of stopping on stale or unreconciled repair context.
+- `W51-S01` is done. `W51-S02` is the next live E2E slice, but it remains
+  blocked until a compatible target Node toolchain is provisioned or selected.
 
 ## Guided AOR UI Proof
 

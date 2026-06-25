@@ -438,7 +438,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W51 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W51-S01 | Clean-commit W50 proof rerun | EPIC-0, EPIC-7 | ready | `docs/ops/live-e2e-proof-complete-findings.md`, `scripts/live-e2e/**`, root checks, live proof artifacts | W50-S04 |
+| W51-S01 | Clean-commit W50 proof rerun | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `scripts/live-e2e/**`, root checks, live proof artifacts | W50-S04 |
 | W51-S02 | Vitest compatible Node large acceptance | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W51-S01 |
 | W51-S03 | Automated final quality report hydration | EPIC-4, EPIC-7 | blocked | `scripts/live-e2e/quality-assessment.mjs`, `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests | W51-S02 |
 | W51-S04 | Explicit target-readiness phase | EPIC-7 | blocked | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests | W51-S03 |

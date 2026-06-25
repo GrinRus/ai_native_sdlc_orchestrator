@@ -12,7 +12,7 @@ after the current required proof set is stable.
   clean committed AOR SHA so product-acceptance evidence is tied to immutable
   source instead of a dirty worktree label.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/ops/live-e2e-proof-complete-findings.md`,
   `scripts/live-e2e/**`, root checks, live proof artifacts
 - **Hard dependencies:** W50-S04
@@ -27,18 +27,30 @@ after the current required proof set is stable.
 4. Update proof findings with run ids, commit SHA, gate results, and artifact
    hygiene confirmation.
 
-### Current blocker
+### Closure evidence
 
-- `w51-clean-guided-aor-ui-20260625-c0945a744018` reached terminal evidence
-  before browser proof because review/repair anti-loop enforcement blocked on
-  `provider/review/repeated_repair_context_without_new_evidence`. The repair
-  iteration did not resolve a review finding that the implementation lowered
-  `test/headers.ts` assertion-plan coverage from `t.plan(4)` to `t.plan(3)`.
-  The repair packet must make each unresolved finding a structured
-  provider-visible closure requirement, and the runner must classify identical
-  fresh review findings as `provider_did_not_address_finding` before it would
-  issue another repair. W51-S01 stays `ready`; HTTPX/Fastify clean proof reruns
-  remain gated on a new accepted same-commit guided UI proof.
+- Clean source commit: `265b20961af5`.
+- Guided UI proof:
+  `w51-clean-guided-aor-ui-20260626-265b20961af5` completed the full installed
+  user flow with browser-task proof, accessibility evidence, DOM/visual refs,
+  screenshot evidence, and passing keyboard navigation. The run-health summary
+  retains a small-canary diagnostic `warn`, which is accepted as factual
+  non-blocking evidence for paired UI/accessibility proof.
+- HTTPX medium proof:
+  `w51-clean-httpx-medium-20260626-265b20961af5` completed with terminal
+  run-health `pass`, meaningful changed paths in `httpx/_content.py`,
+  `httpx/_transports/default.py`, and `tests/test_timeouts.py`, and final
+  `quality-assessment gate --policy all-pass` passing with the same-commit
+  guided UI proof.
+- Fastify repair medium proof:
+  `w51-clean-fastify-repair-medium-20260626-265b20961af5` completed with
+  terminal run-health `pass`, meaningful changed paths in
+  `lib/schema-controller.js`, `test/internals/schema-controller-perf.test.js`,
+  `test/types/schema.tst.ts`, and `types/schema.d.ts`, and final
+  `quality-assessment gate --policy all-pass` passing with the same-commit
+  guided UI proof.
+- Previous W51 attempts on `2a4bd06c16d6` and `c0945a744018` remain historical
+  blocked evidence and are not counted as product acceptance.
 
 ### Acceptance criteria
 1. Guided AOR UI run passes and includes browser-task/accessibility evidence.
@@ -67,6 +79,12 @@ after the current required proof set is stable.
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`,
   `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`
 - **Hard dependencies:** W51-S01
+
+### Readiness note
+
+W51-S01 clean-commit proof closure is complete. W51-S02 is the next live E2E
+slice, but it remains `blocked` until a Node binary satisfying the Vitest target
+toolchain range is provisioned or selected.
 
 ### Local tasks
 1. Provision or select Node satisfying `^22.12.0 || ^24.0.0 || >=26.0.0`.
