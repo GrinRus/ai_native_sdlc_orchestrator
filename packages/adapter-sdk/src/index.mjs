@@ -693,7 +693,7 @@ export function resolveExternalRuntimeNativeTimeoutArgs(options) {
 
 /**
  * Some external runners derive local state paths from the current working
- * directory. Long live E2E run roots can exceed those runner limits even when
+ * directory. Long run roots can exceed those runner limits even when
  * the target checkout itself is valid, so adapter profiles may opt into a
  * short symlink cwd while AOR keeps the canonical checkout as source of truth.
  *

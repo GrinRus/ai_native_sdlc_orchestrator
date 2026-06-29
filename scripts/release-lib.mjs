@@ -70,17 +70,41 @@ const REQUIRED_PACKED_FILES = [
   "docs/ops/self-hosted-environment-matrix.md",
 ];
 
+const privateHarnessToken = ["live", "e2e"].join("-");
+const privateHarnessUnderscoreToken = ["live", "e2e"].join("_");
+const manualPrivateHarnessToken = ["manual", privateHarnessToken].join("-");
+const proofHarnessToken = ["proof", "runner"].join("-");
+const proofHarnessSpaceToken = ["proof", "runner"].join(" ");
+const privateHarnessSpaceToken = ["live", "E2E"].join(" ");
+const FORBIDDEN_PACKED_SURFACE_TOKENS = Object.freeze([
+  privateHarnessToken,
+  privateHarnessUnderscoreToken,
+  manualPrivateHarnessToken,
+  proofHarnessToken,
+  proofHarnessSpaceToken,
+  privateHarnessSpaceToken,
+]);
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
 const FORBIDDEN_PACKED_PATHS = [
   /^\.aor(?:\/|$)/u,
   /^\.github(?:\/|$)/u,
   /^node_modules(?:\/|$)/u,
   /^scripts(?:\/|$)/u,
-  /^examples\/live-e2e(?:\/|$)/u,
+  new RegExp(`^examples/${escapeRegExp(privateHarnessToken)}(?:/|$)`, "u"),
   /(?:^|\/)target-checkouts(?:\/|$)/u,
   /(?:^|\/)\.env(?:\.|$)/u,
   /(?:^|\/)test(?:\/|$)/u,
   /(?:^|\/)__tests__(?:\/|$)/u,
 ];
+
+const FORBIDDEN_PACKED_SURFACE_PATTERNS = FORBIDDEN_PACKED_SURFACE_TOKENS.map((token) => ({
+  token,
+  pattern: new RegExp(escapeRegExp(token), "iu"),
+}));
 
 function readText(rootDir, file) {
   return fs.readFileSync(path.join(rootDir, file), "utf8");
@@ -262,7 +286,7 @@ export function packedFilesFromNpmPackJson(packJson) {
     .sort();
 }
 
-export function validatePackedFiles(files) {
+export function validatePackedFiles(files, options = {}) {
   const findings = [];
   const fileSet = new Set(files);
   for (const required of REQUIRED_PACKED_FILES) {
@@ -274,6 +298,30 @@ export function validatePackedFiles(files) {
     for (const pattern of FORBIDDEN_PACKED_PATHS) {
       if (pattern.test(file)) {
         findings.push(`Packed npm artifact must not include '${file}'.`);
+      }
+    }
+    for (const { token, pattern } of FORBIDDEN_PACKED_SURFACE_PATTERNS) {
+      if (pattern.test(file)) {
+        findings.push(`Packed npm artifact path '${file}' must not contain '${token}'.`);
+      }
+    }
+  }
+  if (options.rootDir) {
+    for (const file of files) {
+      const filePath = path.join(options.rootDir, file);
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        continue;
+      }
+      let content = "";
+      try {
+        content = fs.readFileSync(filePath, "utf8");
+      } catch {
+        continue;
+      }
+      for (const { token, pattern } of FORBIDDEN_PACKED_SURFACE_PATTERNS) {
+        if (pattern.test(content)) {
+          findings.push(`Packed npm artifact file '${file}' must not contain '${token}'.`);
+        }
       }
     }
   }

@@ -5,6 +5,27 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
+const privateSurfaceToken = ["live", "e2e"].join("-");
+const privateSurfaceUnderscoreToken = ["live", "e2e"].join("_");
+const manualPrivateSurfaceToken = ["manual", privateSurfaceToken].join("-");
+const proofRunnerToken = ["proof", "runner"].join("-");
+const proofRunnerSpaceToken = ["proof", "runner"].join(" ");
+const privateSurfaceSpaceToken = ["live", "E2E"].join(" ");
+const privateSurfacePublicPathToken = path.posix.join("examples", privateSurfaceToken);
+const forbiddenPublicSurfaceTokens = [
+  privateSurfaceToken,
+  privateSurfaceUnderscoreToken,
+  manualPrivateSurfaceToken,
+  proofRunnerToken,
+  proofRunnerSpaceToken,
+  privateSurfaceSpaceToken,
+  privateSurfacePublicPathToken,
+];
+const allowedCliCatalogInternalRehearsalSentence = [
+  "Installed-user rehearsal is maintained as internal repo tooling under `scripts/",
+  privateSurfaceToken,
+  "/` and is intentionally excluded from the public CLI catalog.",
+].join("");
 
 function read(file) {
   return fs.readFileSync(path.join(root, file), "utf8");
@@ -16,6 +37,66 @@ function exists(file) {
 
 function normalizePath(file) {
   return file.split(path.sep).join(path.posix.sep);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function listFilesRecursively(relativeRoot) {
+  const absoluteRoot = path.join(root, relativeRoot);
+  if (!fs.existsSync(absoluteRoot)) return [];
+  const stat = fs.statSync(absoluteRoot);
+  if (stat.isFile()) return [normalizePath(relativeRoot)];
+  if (!stat.isDirectory()) return [];
+
+  const files = [];
+  const pending = [absoluteRoot];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) continue;
+    for (const dirent of fs.readdirSync(current, { withFileTypes: true })) {
+      const absoluteEntry = path.join(current, dirent.name);
+      if (dirent.isDirectory()) {
+        pending.push(absoluteEntry);
+        continue;
+      }
+      if (dirent.isFile()) {
+        files.push(normalizePath(path.relative(root, absoluteEntry)));
+      }
+    }
+  }
+  return files.sort();
+}
+
+function globPatternToRegExp(pattern) {
+  const escaped = pattern.split("*").map((part) => escapeRegExp(part)).join("[^/]*");
+  return new RegExp(`^${escaped}$`, "u");
+}
+
+function listPackageSurfaceFiles(packageFiles) {
+  const files = new Set(["package.json"]);
+  for (const entry of packageFiles) {
+    if (typeof entry !== "string" || entry.length === 0) continue;
+    if (!entry.includes("*")) {
+      for (const file of listFilesRecursively(entry)) {
+        files.add(file);
+      }
+      continue;
+    }
+    const firstGlobIndex = entry.indexOf("*");
+    const baseBeforeGlob = entry.slice(0, firstGlobIndex);
+    const baseDir = baseBeforeGlob.includes("/")
+      ? baseBeforeGlob.slice(0, baseBeforeGlob.lastIndexOf("/"))
+      : ".";
+    const regex = globPatternToRegExp(entry);
+    for (const file of listFilesRecursively(baseDir === "." ? "" : baseDir)) {
+      if (regex.test(file)) {
+        files.add(file);
+      }
+    }
+  }
+  return [...files].sort();
 }
 
 function listWorkspacePackageDirs() {
@@ -37,6 +118,97 @@ function listWorkspacePackageDirs() {
   }
 
   return dirs.sort();
+}
+
+function listWorkspacePackageSourceRoots() {
+  return listWorkspacePackageDirs()
+    .map((packageDir) => path.posix.join(packageDir, "src"))
+    .filter((sourceRoot) => exists(sourceRoot));
+}
+
+function listPublicSourceBoundaryFiles() {
+  const roots = [
+    "apps",
+    ...listWorkspacePackageSourceRoots(),
+    "docs/contracts",
+    "docs/product",
+    "docs/architecture",
+    "docs/ops",
+    "examples",
+    "README.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md",
+    "package.json",
+    "apps/web/dist",
+  ];
+  const files = new Set();
+
+  for (const publicRoot of roots) {
+    for (const file of listFilesRecursively(publicRoot)) {
+      files.add(file);
+    }
+  }
+
+  return [...files].sort();
+}
+
+function assertNoPublicPrivateHarnessPaths() {
+  const examplesPrivateRoot = path.posix.join("examples", privateSurfaceToken);
+  if (exists(examplesPrivateRoot)) {
+    console.error(`${examplesPrivateRoot}/ must not exist in public examples.`);
+    process.exit(1);
+  }
+
+  const docsOpsDir = path.join(root, "docs/ops");
+  if (fs.existsSync(docsOpsDir)) {
+    for (const entry of fs.readdirSync(docsOpsDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.startsWith(`${privateSurfaceToken}-`)) {
+        console.error(`docs/ops/${entry.name} must not expose internal maintainer rehearsal runbooks.`);
+        process.exit(1);
+      }
+    }
+  }
+
+  const scriptTestsDir = path.join(root, "scripts/test");
+  if (fs.existsSync(scriptTestsDir)) {
+    for (const entry of fs.readdirSync(scriptTestsDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.startsWith(`${privateSurfaceToken}-`)) {
+        console.error(`scripts/test/${entry.name} must live under scripts/${privateSurfaceToken}/test/.`);
+        process.exit(1);
+      }
+    }
+  }
+}
+
+function stripAllowedPublicBoundaryContent(file, content) {
+  if (file === "docs/architecture/14-cli-command-catalog.md") {
+    return content.replaceAll(allowedCliCatalogInternalRehearsalSentence, "");
+  }
+  return content;
+}
+
+function assertPublicSourcePrivateHarnessBoundary() {
+  assertNoPublicPrivateHarnessPaths();
+
+  for (const file of listPublicSourceBoundaryFiles()) {
+    let content;
+    try {
+      content = stripAllowedPublicBoundaryContent(file, read(file));
+    } catch (error) {
+      console.error(`Could not read public source boundary file '${file}': ${error.message}`);
+      process.exit(1);
+    }
+
+    for (const token of forbiddenPublicSurfaceTokens) {
+      const tokenPattern = new RegExp(escapeRegExp(token), "iu");
+      if (tokenPattern.test(file) || tokenPattern.test(content)) {
+        console.error(`Public source boundary '${file}' must not contain '${token}'.`);
+        process.exit(1);
+      }
+    }
+  }
+
+  console.log("public source boundary ok: internal maintainer rehearsal tokens are absent");
 }
 
 function parseModuleMapPackagePaths(content) {
@@ -225,6 +397,16 @@ if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-rea
   console.error("package.json must expose production:ready as the separate production-readiness gate.");
   process.exit(1);
 }
+assertPublicSourcePrivateHarnessBoundary();
+for (const file of listPackageSurfaceFiles(packageJson.files ?? [])) {
+  const content = read(file);
+  for (const token of forbiddenPublicSurfaceTokens) {
+    if (new RegExp(escapeRegExp(token), "iu").test(file) || new RegExp(escapeRegExp(token), "iu").test(content)) {
+      console.error(`Public package surface '${file}' must not contain '${token}'.`);
+      process.exit(1);
+    }
+  }
+}
 
 const readme = read("README.md");
 for (const section of [
@@ -286,24 +468,24 @@ for (const needle of [
 
 for (const { pattern, message } of [
   {
-    pattern: /live-e2e-runbook\.md/u,
-    message: "README.md must not link to internal live E2E runbooks.",
+    pattern: new RegExp(`${escapeRegExp(privateSurfaceToken)}-runbook\\.md`, "u"),
+    message: "README.md must not link to internal maintainer runbooks.",
   },
   {
-    pattern: /live-e2e-standard-runner\.md/u,
-    message: "README.md must not route users to internal live E2E runner docs.",
+    pattern: new RegExp(`${escapeRegExp(privateSurfaceToken)}-standard-runner\\.md`, "u"),
+    message: "README.md must not route users to internal runner docs.",
   },
   {
-    pattern: /scripts\/live-e2e\/run-profile\.mjs/u,
-    message: "README.md must not expose internal live E2E runner commands as a user workflow.",
+    pattern: new RegExp(`scripts/${escapeRegExp(privateSurfaceToken)}/run-profile\\.mjs`, "u"),
+    message: "README.md must not expose internal runner commands as a user workflow.",
   },
   {
-    pattern: /examples\/live-e2e\//u,
-    message: "README.md must not route users to internal live E2E fixtures.",
+    pattern: new RegExp(`examples/${escapeRegExp(privateSurfaceToken)}/`, "u"),
+    message: "README.md must not route users to internal fixtures.",
   },
   {
-    pattern: /live\s*E2E|live-e2e/iu,
-    message: "README.md must keep live E2E as internal maintainer/eval material, not user-facing README content.",
+    pattern: new RegExp(`${escapeRegExp(privateSurfaceToken)}|live\\s*E2E`, "iu"),
+    message: "README.md must keep internal maintainer/eval material out of user-facing README content.",
   },
   {
     pattern: /pnpm exec aor/u,

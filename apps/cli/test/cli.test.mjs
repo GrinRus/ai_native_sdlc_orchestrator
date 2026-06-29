@@ -423,7 +423,7 @@ function configureCodexExternalRuntimeSuccess(options) {
         "status:'success',",
         "summary:'external runner ok',",
         "output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},",
-        "evidence_refs:['evidence://external-runner/live-e2e-success'],",
+        "evidence_refs:['evidence://external-runner/success'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
         "}));",
       ].join(""),
@@ -443,14 +443,14 @@ function createLocalTargetRepository(options) {
   fs.mkdirSync(targetRepoRoot, { recursive: true });
   fs.writeFileSync(
     path.join(targetRepoRoot, "README.md"),
-    "# Local target repository for live-e2e tests\n",
+    "# Local target repository for external-runner tests\n",
     "utf8",
   );
   fs.writeFileSync(
     path.join(targetRepoRoot, "package.json"),
     `${JSON.stringify(
       {
-        name: "local-live-e2e-target",
+        name: "local-external-runner-target",
         private: true,
         version: "0.0.0",
       },
@@ -3514,7 +3514,7 @@ test("project verify resolves runtime root and contract metadata", () => {
     assert.equal(verifySummary.reusable_by.bootstrap_rehearsal, true);
     assert.equal(verifySummary.reusable_by.quality_rehearsal, true);
     assert.equal(verifySummary.reusable_by.delivery_rehearsal, true);
-    assert.equal(verifySummary.reusable_by.source_runbook, "docs/ops/live-e2e-no-write-preflight.md");
+    assert.equal(verifySummary.reusable_by.source_runbook, "docs/architecture/14-cli-command-catalog.md");
 
     assert.deepEqual(parsed.contract_families, [
       {
@@ -4568,7 +4568,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         `${JSON.stringify(
           {
             allowed_paths: ["source/**", "test/**"],
-            forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/live-e2e/**"],
+            forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/internal-rehearsal/**"],
             expected_evidence: ["verify-summary", "routed-step-result", "review-report"],
             scenario_family: "regress",
             provider_variant_id: "openai-primary",
@@ -5033,7 +5033,7 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         `${JSON.stringify(
           {
             allowed_paths: ["source/**", "test/**"],
-            forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/live-e2e/**"],
+            forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/internal-rehearsal/**"],
             expected_evidence: ["verify-summary", "routed-step-result", "review-report"],
             scenario_family: "regress",
             provider_variant_id: "openai-primary",

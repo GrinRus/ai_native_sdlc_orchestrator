@@ -388,7 +388,7 @@ export function resolveOptionalRefOrPathFlag(options) {
 export const DEFAULT_LEARNING_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
-  "docs/ops/live-e2e-standard-runner.md",
+  "docs/ops/run-control-lifecycle.md",
 ]);
 
 /**

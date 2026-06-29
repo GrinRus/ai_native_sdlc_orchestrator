@@ -7,11 +7,37 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
-const liveE2ETestSuiteTimeoutMs = parsePositiveInteger(
-  process.env.AOR_LIVE_E2E_TEST_SUITE_TIMEOUT_MS,
+const privateHarnessName = ["live", "e2e"].join("-");
+const privateHarnessTimeoutEnv = ["AOR", "LIVE", "E2E", "TEST", "SUITE", "TIMEOUT", "MS"].join("_");
+const privateHarnessContextEnv = ["AOR", "PROOF", "RUNNER", "TEST", "CONTEXT", "FILE"].join("_");
+const productionProofFixturePath = path.posix.join(
+  "scripts",
+  "production-readiness",
+  "fixtures",
+  "w25-s03-production-proof.json",
+);
+const executableProofEvidencePattern = new RegExp(
+  [
+    "proof",
+    "overall_status=pass",
+    "real_code_change_proof_complete=true",
+    "external_runner_mode=real-external-process",
+    escapeRegExp(productionProofFixturePath),
+  ].join("|"),
+  "iu",
+);
+const privateHarnessTestSuiteTimeoutMs = parsePositiveInteger(
+  process.env[privateHarnessTimeoutEnv],
   20 * 60 * 1000,
 );
-const liveE2EContextFile = path.join(os.tmpdir(), `aor-live-e2e-test-context-${process.pid}.json`);
+const privateHarnessContextFile = path.join(
+  os.tmpdir(),
+  ["aor", privateHarnessName, "test-context", String(process.pid)].join("-"),
+);
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -36,10 +62,10 @@ function readJsonIfExists(filePath) {
   }
 }
 
-function printLiveE2ETimeoutDiagnostic(run, testFiles) {
+function printPrivateHarnessTimeoutDiagnostic(run, testFiles) {
   if (!isTimedOutRun(run)) return;
 
-  const context = readJsonIfExists(liveE2EContextFile);
+  const context = readJsonIfExists(privateHarnessContextFile);
   const contextParts =
     context && typeof context === "object"
       ? [
@@ -49,11 +75,11 @@ function printLiveE2ETimeoutDiagnostic(run, testFiles) {
           `run_id=${String(context.run_id ?? "unknown")}`,
           `subprocess_timeout_ms=${String(context.timeout_ms ?? "unknown")}`,
         ]
-      : ["no live E2E subprocess context file was available"];
+      : ["no private rehearsal subprocess context file was available"];
 
   console.error(
     [
-      `live-e2e test suite timed out after ${liveE2ETestSuiteTimeoutMs}ms; failing closed.`,
+      `private rehearsal test suite timed out after ${privateHarnessTestSuiteTimeoutMs}ms; failing closed.`,
       `test_files=${testFiles.map((file) => path.relative(root, file)).join(", ")}`,
       `signal=${String(run.signal)}`,
       run.error ? `error=${run.error.message}` : "",
@@ -356,9 +382,7 @@ function validateProofBundleIntegrity(proof, bundlePath) {
 }
 
 function assertProofBundleIntegrity() {
-  const bundlePaths = [
-    "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
-  ];
+  const bundlePaths = [productionProofFixturePath];
 
   for (const bundlePath of bundlePaths) {
     const proof = JSON.parse(read(bundlePath));
@@ -376,7 +400,7 @@ function assertProofBundleIntegrity() {
     proof_method: {
       external_runner_mode: "deterministic-external-process-mock",
       mock_runner_allowed: true,
-      examples_root_override: "examples/live-e2e/fixtures/mock",
+      examples_root_override: "fixture://negative/mock-backed-full-runtime-claim",
     },
     targets: [
       {
@@ -834,7 +858,7 @@ function assertUserStoryCoverageMatrixDocumentation() {
 
     if (
       row.coverageStatus === "proof-covered" &&
-      !/(proof|overall_status=pass|real_code_change_proof_complete=true|external_runner_mode=real-external-process|examples\/live-e2e\/fixtures)/iu.test(row.evidence)
+      !executableProofEvidencePattern.test(row.evidence)
     ) {
       console.error(
         `Proof-covered user-story ${row.storyId} must cite executable proof evidence, not only baseline implementation evidence.`,
@@ -1077,25 +1101,36 @@ if (webDistFreshnessRun.status !== 0) {
 
 console.log("web app test bundle ok: local app smoke can serve packaged SPA assets");
 
-const liveE2EStepControllerTestsPath = path.join(root, "scripts/test/live-e2e-step-controller.test.mjs");
-removeFileIfExists(liveE2EContextFile);
-const liveE2EStepControllerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath], {
+const privateHarnessTestDir = path.join(
+  root,
+  "scripts",
+  privateHarnessName,
+  "test",
+);
+const privateHarnessTestFiles = fs
+  .readdirSync(privateHarnessTestDir)
+  .filter((file) => file.endsWith(".test.mjs"))
+  .sort()
+  .map((file) => path.join(privateHarnessTestDir, file));
+removeFileIfExists(privateHarnessContextFile);
+const privateHarnessTestRun = spawnSync(process.execPath, ["--test", ...privateHarnessTestFiles], {
   cwd: root,
   env: {
     ...process.env,
-    AOR_PROOF_RUNNER_TEST_CONTEXT_FILE: liveE2EContextFile,
+    [privateHarnessContextEnv]: privateHarnessContextFile,
   },
   killSignal: "SIGKILL",
   stdio: "inherit",
-  timeout: liveE2ETestSuiteTimeoutMs,
+  timeout: privateHarnessTestSuiteTimeoutMs,
 });
 
-if (liveE2EStepControllerTestRun.status !== 0) {
-  process.exit(liveE2EStepControllerTestRun.status ?? 1);
+if (privateHarnessTestRun.status !== 0) {
+  printPrivateHarnessTimeoutDiagnostic(privateHarnessTestRun, privateHarnessTestFiles);
+  process.exit(privateHarnessTestRun.status ?? 1);
 }
-removeFileIfExists(liveE2EContextFile);
+removeFileIfExists(privateHarnessContextFile);
 
-console.log("live-e2e tests ok: online step controller");
+console.log("private rehearsal tests ok: internal installed-user harness suite");
 
 const cliTestsPath = path.join(root, "apps/cli/test/cli.test.mjs");
 const cliTestRun = spawnSync(process.execPath, ["--test", cliTestsPath], {

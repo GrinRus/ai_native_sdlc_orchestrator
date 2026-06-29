@@ -48,7 +48,7 @@ The app can submit the first Mission form through
 `next-action-report`. It does not own run-state transitions, answer
 continuation, review decisions, or delivery gates.
 
-Release and live E2E smoke for the web surface uses
+Release and internal maintainer smoke for the web surface uses
 `aor app --smoke true --open false --json`, which loads the real SPA,
 `/app-config.json`, local project index, control-plane state route, the
 first-run wizard / project switcher markers, and the flow selector / `New Flow`

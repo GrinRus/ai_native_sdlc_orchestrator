@@ -13,7 +13,7 @@ Capability matrix for a runner adapter such as repo write support, shell access,
 Routing should depend on declared capabilities rather than assumptions.
 Capability negotiation must happen before adapter invocation; missing required capabilities are deterministic pre-execution failures.
 `mock-runner` is the deterministic dry-run baseline profile for rehearsals and tests.
-Live adapter baselines can add optional execution metadata without changing required fields. `execution` remains optional for dry-run, candidate, and interactive-only adapters. When a live E2E required provider variant points at an adapter, that adapter must be live-runnable and declare:
+External-process adapter baselines can add optional execution metadata without changing required fields. `execution` remains optional for dry-run, candidate, and interactive-only adapters. When a required provider route points at an external-process adapter, that adapter must be runnable and declare:
 - `execution.live_baseline: true`
 - `execution.runtime_mode: external-process`
 - `execution.handler`
@@ -24,7 +24,7 @@ Live adapter baselines can add optional execution metadata without changing requ
 - `execution.external_runtime.request_transport: request-artifact`
 - `execution.external_runtime.timeout_ms`
 
-`execution.external_runtime.env` is optional and should only carry safe, non-secret runner overrides. Installed-user live E2E runs should inherit host CLI authentication by default instead of encoding auth paths or secrets in adapter profiles.
+`execution.external_runtime.env` is optional and should only carry safe, non-secret runner overrides. Installed-user rehearsals should inherit host CLI authentication by default instead of encoding auth paths or secrets in adapter profiles.
 
 `execution.external_runtime.env_from` is optional and maps target environment variable names to source host environment variable names. AOR applies each mapping only when the target variable is unset and the source variable exists, records only the variable names in evidence, and never records the secret value. Use this for runner-specific host auth aliases, for example `ANTHROPIC_API_KEY: ANTHROPIC_AUTH_TOKEN` when a local Qwen Code host setup stores the reusable credential under the Codex/Anthropic token name but Qwen requires the API-key variable name.
 
@@ -37,7 +37,7 @@ Live adapter baselines can add optional execution metadata without changing requ
 - `argv-json`: append the serialized JSON request envelope as one argv argument. This is for small local shims only.
 - `none`: invoke the runner without passing the request envelope.
 
-`request_via_stdin` is retained for existing profiles as a compatibility shorthand. New external-process adapters should use `request_transport`. Live baseline adapters must not rely on unrestricted `stdin-json`; if a profile uses `stdin-json`, it must declare `stdin_json_scope: test-only` or `stdin_json_scope: small-only` so the limitation is visible to routing and live E2E preflight.
+`request_via_stdin` is retained for existing profiles as a compatibility shorthand. New external-process adapters should use `request_transport`. Baseline adapters must not rely on unrestricted `stdin-json`; if a profile uses `stdin-json`, it must declare `stdin_json_scope: test-only` or `stdin_json_scope: small-only` so the limitation is visible to routing and runtime preflight.
 
 For `request-artifact`, `execution.external_runtime.request_file` declares only the mechanical CLI binding:
 - `argument`: optional runner-specific flag that accepts a local file path, such as `--file`.
@@ -55,7 +55,7 @@ For repair executions, `execution_contract.repair_closure_policy` is required. I
 
 Adapters may differ in the CLI flag used to pass the provider work packet, output format, timeout argument, or permission-mode args. They must not define provider-specific policies for how much AOR context is placed into the provider work packet.
 
-`execution.external_runtime.preflight_timeout_ms` is optional and controls live adapter preflight probes separately from full step execution. When omitted, live E2E derives a conservative probe timeout from `timeout_ms`. Preflight reports must record both the full `timeout_ms` and selected `preflight_timeout_ms` so slow readiness probes can be distinguished from full runtime execution limits.
+`execution.external_runtime.preflight_timeout_ms` is optional and controls external adapter preflight probes separately from full step execution. When omitted, AOR derives a conservative probe timeout from `timeout_ms`. Preflight reports must record both the full `timeout_ms` and selected `preflight_timeout_ms` so slow readiness probes can be distinguished from full runtime execution limits.
 
 Edit-readiness and permission-readiness probes may retry transient external-runner timeouts or generic runner failures once. Contract consumers must read `edit_readiness.attempts[]` and `permission_readiness.attempts[]` as the complete factual attempt history; final readiness still requires a successful marker write or a post-marker-timeout warning with matching marker contents.
 
@@ -87,11 +87,11 @@ normal product input.
 
 External-process adapters must enforce `execution.external_runtime.timeout_ms` and preflight probe timeouts as hard local subprocess bounds. A policy `resolved_bounds.budget.timeout_sec` may shorten a single request timeout, but it must not extend execution beyond the adapter profile's hard bound. A runner that exceeds the bound, including one that ignores graceful termination or launches a long-lived child process, must have its local process group terminated and return fail-closed timeout evidence with `failure_kind=external-runner-timeout` and `timed_out=true`; it must not leave the public lifecycle waiting indefinitely.
 
-`execution.external_runtime.permission_policy` is required for live E2E external-process adapters. It declares named non-interactive permission modes:
+`execution.external_runtime.permission_policy` is required for external-process adapters. It declares named non-interactive permission modes:
 - `default_mode` selects the adapter default when `AOR_RUNTIME_AGENT_PERMISSION_MODE` is not set.
 - `modes.<mode>.args` is the selected runtime invocation argument list.
 
-Live E2E defaults to `full-bypass` so installed-user acceptance runs do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. Codex uses `--ask-for-approval never` for the full-bypass mode and omits that approval bypass in restricted mode. Claude Code uses `--dangerously-skip-permissions` for full-bypass and `--permission-mode auto` for restricted mode. OpenCode candidate profiles may declare `opencode run --format json --dangerously-skip-permissions` for full-bypass and `opencode run --format json` for restricted mode, with `request_transport=request-artifact` and `request_file.argument=--file` so the provider work packet is passed through OpenCode's documented message/file CLI surface. Qwen candidate profiles use `--bare`, `--output-format stream-json`, `--include-partial-messages`, and `--exclude-tools skill` to avoid buffered final-output silence and runner-local `.qwen/` skill state in target checkouts; Runtime Harness still blocks such state if the runner creates it. W22-S03 keeps OpenCode out of required baseline status until future real-runner certification. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, or if an external-process adapter profile omits `permission_policy`, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Legacy `execution.external_runtime.args` is intentionally unsupported for permission selection.
+Installed-user acceptance runs may default to `full-bypass` so they do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. Codex uses `--ask-for-approval never` for the full-bypass mode and omits that approval bypass in restricted mode. Claude Code uses `--dangerously-skip-permissions` for full-bypass and `--permission-mode auto` for restricted mode. OpenCode candidate profiles may declare `opencode run --format json --dangerously-skip-permissions` for full-bypass and `opencode run --format json` for restricted mode, with `request_transport=request-artifact` and `request_file.argument=--file` so the provider work packet is passed through OpenCode's documented message/file CLI surface. Qwen candidate profiles use `--bare`, `--output-format stream-json`, `--include-partial-messages`, and `--exclude-tools skill` to avoid buffered final-output silence and runner-local `.qwen/` skill state in target checkouts; Runtime Harness still blocks such state if the runner creates it. W22-S03 keeps OpenCode out of required baseline status until future real-runner certification. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, or if an external-process adapter profile omits `permission_policy`, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Legacy `execution.external_runtime.args` is intentionally unsupported for permission selection.
 
 `approval_features` may additionally declare how runtime permission requests are mediated after the adapter normalizes provider output:
 - `continuation_strategy` is `reinvoke`, `session-resume`, or `none`. Current external-process baseline adapters use `reinvoke`.
@@ -108,7 +108,7 @@ In `orchestrator-mediated` mode the adapter still only reports the runtime reque
 In-process adapters without `execution.external_runtime`, such as `mock-runner`, may declare profile-level `permission_policy: not_applicable` as informational evidence that runtime-agent approval prompts do not apply.
 
 When live runtime prerequisites are missing (for example command not found on PATH), adapter execution should return explicit blocked semantics instead of synthetic success.
-Live E2E preflight must reject required provider variants whose primary adapter lacks the external-live metadata above. Extended provider variants may reference candidate adapters that are not yet live baselines.
+Internal maintainer preflight must reject required provider variants whose primary adapter lacks the external-live metadata above. Extended provider variants may reference candidate adapters that are not yet live baselines.
 
 ## Example
 See `examples/adapters/*.yaml`.

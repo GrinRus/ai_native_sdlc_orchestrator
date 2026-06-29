@@ -15,7 +15,7 @@ This is the master index for the implementation slices across all defined waves.
 | W0-S02 | Contracts package and schema loader baseline | EPIC-0 | done | `packages/contracts`, `docs/contracts/**`, `examples/**` | W0-S01 |
 | W0-S03 | Example and reference integrity checks | EPIC-0 | done | `packages/contracts`, `examples/**`, root validation scripts | W0-S02 |
 | W0-S04 | Agent guidance and backlog workflow baseline | EPIC-0 | done | root `AGENTS.md`, `docs/backlog/**`, `.agents/skills/**` | none |
-| W0-S05 | Live E2E profile registry and no-write preflight | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/orchestrator-core` | W0-S02, W0-S03 |
+| W0-S05 | Internal installed-user rehearsal profile registry and no-write preflight | EPIC-7 | done | `docs/ops/**`, `internal maintainer rehearsal fixtures`, `apps/cli`, `packages/orchestrator-core` | W0-S02, W0-S03 |
 | W0-S06 | Repository CI and acceptance gates | EPIC-0 | done | root CI config, validation scripts, `docs/**`, community health files | W0-S01, W0-S03, W0-S04, W0-S05 |
 
 ## W1 slices
@@ -28,7 +28,7 @@ This is the master index for the implementation slices across all defined waves.
 | W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
 | W1-S06 | Runtime store and artifact packet materialization | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
 | W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
-| W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | done | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
+| W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | done | `apps/cli`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
 
 ## W2 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -38,7 +38,7 @@ This is the master index for the implementation slices across all defined waves.
 | W2-S03 | Step policy resolution, budgets, and guardrails | EPIC-3 | done | `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W2-S01 |
 | W2-S04 | Adapter SDK and mock adapter baseline | EPIC-3 | done | `packages/adapter-sdk`, `packages/orchestrator-core`, `examples/adapters/**` | W2-S01 |
 | W2-S05 | Routed step execution engine and durable step results | EPIC-3 | done | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `packages/adapter-sdk` | W2-S02, W2-S03, W2-S04, W1-S06 |
-| W2-S06 | First routed execution rehearsal | EPIC-7 | done | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W2-S05, W1-S07, W0-S05 |
+| W2-S06 | First routed execution rehearsal | EPIC-7 | done | `apps/cli`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/observability` | W2-S05, W1-S07, W0-S05 |
 
 ## W3 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -48,7 +48,7 @@ This is the master index for the implementation slices across all defined waves.
 | W3-S03 | Eval runner and scorer interface | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli` | W3-S02, W2-S04, W2-S05 |
 | W3-S04 | Harness capture and replay runtime | EPIC-4 | done | `packages/harness`, `packages/observability`, `packages/orchestrator-core` | W3-S02, W2-S05 |
 | W3-S05 | Certification and promotion decision baseline | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli` | W3-S03, W3-S04 |
-| W3-S06 | Quality rehearsal on selected public targets | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `packages/harness`, `apps/cli` | W3-S05, W0-S05 |
+| W3-S06 | Quality rehearsal on selected public targets | EPIC-7 | done | `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/harness`, `apps/cli` | W3-S05, W0-S05 |
 
 ## W4 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -58,7 +58,7 @@ This is the master index for the implementation slices across all defined waves.
 | W4-S03 | Patch and local branch delivery driver | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W4-S02 |
 | W4-S04 | Fork-first GitHub PR delivery driver | EPIC-5 | done | `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`, `docs/ops/**` | W4-S02, W2-S04 |
 | W4-S05 | Delivery manifest and release packet materialization | EPIC-5 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**`, `apps/cli` | W4-S03, W4-S04, W3-S05 |
-| W4-S06 | Delivery rehearsal and recovery-safe operations | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability` | W4-S05, W0-S05 |
+| W4-S06 | Delivery rehearsal and recovery-safe operations | EPIC-7 | done | `docs/ops/**`, `internal maintainer rehearsal fixtures`, `apps/cli`, `packages/observability` | W4-S05, W0-S05 |
 
 ## W5 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -67,7 +67,7 @@ This is the master index for the implementation slices across all defined waves.
 | W5-S02 | Live run event stream | EPIC-6 | done | `apps/api`, `packages/observability`, `docs/contracts/**` | W5-S01, W2-S05 |
 | W5-S03 | CLI operator commands beyond bootstrap | EPIC-6 | done | `apps/cli`, `apps/api`, `docs/architecture/**` | W5-S01, W5-S02 |
 | W5-S04 | Detachable web UI baseline | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**` | W5-S01, W5-S02 |
-| W5-S05 | Standard live E2E orchestration runner | EPIC-7 | done | `apps/cli`, `apps/api`, `docs/ops/**`, `examples/live-e2e/**` | W5-S03, W4-S06, W3-S06 |
+| W5-S05 | Standard internal installed-user rehearsal orchestration runner | EPIC-7 | done | `apps/cli`, `apps/api`, `docs/ops/**`, `internal maintainer rehearsal fixtures` | W5-S03, W4-S06, W3-S06 |
 | W5-S06 | Scorecards, incident capture, and learning-loop handoff | EPIC-7 | done | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/backlog/**` | W5-S05, W3-S05 |
 
 ## W6 slices
@@ -87,7 +87,7 @@ This is the master index for the implementation slices across all defined waves.
 | W7-S02 | AI platform promotion/freeze maturity pack | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W3-S05 |
 | W7-S03 | Incident recertification and controlled re-enable flow | EPIC-7 | done | `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W7-S02, W6-S06 |
 | W7-S04 | Finance evidence and audit durability expansion | EPIC-7 | done | `packages/observability`, `apps/api`, `docs/contracts/**`, `docs/ops/**` | W6-S06 |
-| W7-S05 | MVP+ governance and learning-loop integration closure | EPIC-7 | done | `docs/backlog/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W7-S02, W7-S03, W7-S04 |
+| W7-S05 | MVP+ governance and learning-loop integration closure | EPIC-7 | done | `docs/backlog/**`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/observability` | W7-S02, W7-S03, W7-S04 |
 
 ## W8 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -121,52 +121,52 @@ This is the master index for the implementation slices across all defined waves.
 | W10-S02 | Networked fork-first delivery execution | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W4-S04, W6-S05 |
 | W10-S03 | Detached transport mutation command baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W9-S07, W6-S03, W6-S04 |
 | W10-S04 | Detached transport authn/authz hardening baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W10-S03 |
-| W10-S05 | Externally verified live E2E target-catalog proof | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02, W11-S05 |
+| W10-S05 | Externally verified internal installed-user rehearsal target-catalog proof | EPIC-7 | done | `docs/ops/**`, `internal maintainer rehearsal fixtures`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02, W11-S05 |
 
 ## W11 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W11-S01 | Source-of-truth reality repair | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | none |
-| W11-S02 | Target workspace materialization for live E2E | EPIC-7 | done | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S01 |
-| W11-S03 | Profile-driven preflight and routed live execution | EPIC-3 | done | `apps/cli`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S02 |
-| W11-S04 | Target-anchored delivery and release evidence | EPIC-5 | done | `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S03 |
-| W11-S05 | Fresh external proof bundle for catalog targets | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**` | W11-S04 |
+| W11-S02 | Target workspace materialization for internal installed-user rehearsal | EPIC-7 | done | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `internal maintainer rehearsal fixtures`, `docs/ops/**` | W11-S01 |
+| W11-S03 | Profile-driven preflight and routed live execution | EPIC-3 | done | `apps/cli`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `internal maintainer rehearsal fixtures`, `docs/ops/**` | W11-S02 |
+| W11-S04 | Target-anchored delivery and release evidence | EPIC-5 | done | `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `internal maintainer rehearsal fixtures`, `docs/ops/**` | W11-S03 |
+| W11-S05 | Fresh external proof bundle for catalog targets | EPIC-7 | done | `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/observability`, `docs/backlog/**` | W11-S04 |
 
 ## W12 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W12-S01 | Public surface realignment | EPIC-0 | done | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**`, `docs/backlog/**` | none |
-| W12-S02 | Live E2E Installed-User Proof Runner | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W12-S01 |
+| W12-S02 | Internal Installed-User Proof Harness | EPIC-7 | done | `internal maintainer rehearsal tooling`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/observability` | W12-S01 |
 | W12-S03 | Breaking CLI and contract removal | EPIC-6 | done | `apps/cli`, `docs/contracts/**`, `packages/contracts`, `examples/**` | W12-S02 |
-| W12-S04 | Proof refresh after surface cleanup | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**` | W12-S03 |
+| W12-S04 | Proof refresh after surface cleanup | EPIC-7 | done | `docs/ops/**`, `internal maintainer rehearsal fixtures`, `packages/observability`, `internal maintainer rehearsal tooling` | W12-S03 |
 
 ## W13 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W13-S01 | Backlog-first full-journey live E2E realignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**` | none |
-| W13-S02 | Curated target and feature mission catalog | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W13-S01 |
+| W13-S01 | Backlog-first full-journey internal installed-user rehearsal realignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**` | none |
+| W13-S02 | Curated target and feature mission catalog | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**`, `docs/backlog/**` | W13-S01 |
 | W13-S03 | Public bootstrap and feature-intent intake | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**`, `docs/product/**` | W13-S02 |
 | W13-S04 | Feature-driven discovery and execution lifecycle | EPIC-3 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W13-S03 |
 | W13-S05 | Public review and learning-loop closure surfaces | EPIC-4 | done | `apps/cli`, `packages/contracts`, `packages/observability`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W13-S04 |
-| W13-S06 | Full-journey proof runner and restored runner skill | EPIC-7 | done | `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/cli/test/**` | W13-S05 |
+| W13-S06 | Full-journey proof harness and restored runner skill | EPIC-7 | done | `internal maintainer rehearsal tooling`, `.agents/skills/**`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `apps/cli/test/**` | W13-S05 |
 
 ## W14 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W14-S01 | Backlog and source-of-truth realignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**` | none |
-| W14-S02 | Scenario and provider catalogs | EPIC-7 | done | `scripts/live-e2e/catalog/scenarios/**`, `scripts/live-e2e/catalog/providers/**`, `docs/contracts/**`, `docs/ops/**` | W14-S01 |
-| W14-S03 | Feature-size taxonomy and target mission expansion | EPIC-7 | done | `scripts/live-e2e/catalog/targets/**`, `docs/ops/**`, `docs/backlog/**` | W14-S02 |
-| W14-S04 | Provider-pinned full-journey profiles | EPIC-7 | done | `scripts/live-e2e/profiles/**`, `scripts/live-e2e/catalog/**`, `docs/ops/**` | W14-S03 |
-| W14-S05 | Proof runner and verdict expansion | EPIC-7 | done | `scripts/live-e2e/**`, `apps/cli`, `packages/orchestrator-core`, `docs/ops/**` | W14-S04 |
+| W14-S02 | Scenario and provider catalogs | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/contracts/**`, `docs/ops/**` | W14-S01 |
+| W14-S03 | Feature-size taxonomy and target mission expansion | EPIC-7 | done | `internal maintainer rehearsal tooling`, `docs/ops/**`, `docs/backlog/**` | W14-S02 |
+| W14-S04 | Provider-pinned full-journey profiles | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**` | W14-S03 |
+| W14-S05 | Proof harness and verdict expansion | EPIC-7 | done | `internal maintainer rehearsal tooling`, `apps/cli`, `packages/orchestrator-core`, `docs/ops/**` | W14-S04 |
 | W14-S06 | Review, audit, and closure alignment | EPIC-4 | done | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `docs/contracts/**`, `docs/architecture/**` | W14-S05 |
-| W14-S07 | Proof bundle and skill refresh | EPIC-7 | done | `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/test/**` | W14-S06 |
+| W14-S07 | Proof bundle and skill refresh | EPIC-7 | done | `.agents/skills/**`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `scripts/test/**` | W14-S06 |
 
 ## W15 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W15-S01 | Source-of-truth and readiness queue repair | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/ops/**` | none |
 | W15-S02 | Package/module workspace alignment | EPIC-0 | done | `apps/**/package.json`, `packages/**/package.json`, `docs/architecture/13-package-and-module-map.md`, `scripts/build.mjs` | W15-S01 |
-| W15-S03 | Proof verdict integrity gates | EPIC-7 | done | `scripts/test.mjs`, `examples/live-e2e/**`, `docs/ops/**`, `README.md` | W15-S01 |
+| W15-S03 | Proof verdict integrity gates | EPIC-7 | done | `scripts/test.mjs`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `README.md` | W15-S01 |
 
 ## W16 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -175,13 +175,13 @@ This is the master index for the implementation slices across all defined waves.
 | W16-S02 | CLI dispatcher decomposition | EPIC-6 | done | `apps/cli` | W16-S01 |
 | W16-S03 | API and read-surface decomposition | EPIC-6 | done | `apps/api` | W16-S01 |
 | W16-S04 | Orchestrator-core execution decomposition | EPIC-3 | done | `packages/orchestrator-core` | W16-S01 |
-| W16-S05 | Installed-user live E2E runner decomposition | EPIC-7 | done | `scripts/live-e2e/**`, `scripts/test/**` | W16-S01 |
+| W16-S05 | Installed-user rehearsal runner decomposition | EPIC-7 | done | `internal maintainer rehearsal tooling`, `scripts/test/**` | W16-S01 |
 | W16-S06 | Adapter permission legacy removal | EPIC-3 | done | `docs/contracts/**`, `examples/adapters/**`, `packages/adapter-sdk`, `packages/contracts` | W16-S01 |
 
 ## W17 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W17-S01 | Legacy surface cleanup after W16 | EPIC-0 | done | `docs/backlog/**`, `apps/cli`, `packages/orchestrator-core`, `scripts/live-e2e/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`, `examples/**`, tests | W16-S02, W16-S04, W16-S05, W16-S06 |
+| W17-S01 | Legacy surface cleanup after W16 | EPIC-0 | done | `docs/backlog/**`, `apps/cli`, `packages/orchestrator-core`, `internal maintainer rehearsal tooling`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`, `examples/**`, tests | W16-S02, W16-S04, W16-S05, W16-S06 |
 
 ## W18 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -219,14 +219,14 @@ This is the master index for the implementation slices across all defined waves.
 | W21-S04 | Guided mission intake and next-action resolver | EPIC-2 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests | W19-S02, W21-S03 |
 | W21-S05 | Guided web app full-flow console | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S03, W21-S04 |
 | W21-S06 | Review, delivery, release, and learning closure UX | EPIC-4 | done | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests | W19-S05, W21-S05 |
-| W21-S07 | Installed-user guided journey proof | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
+| W21-S07 | Installed-user guided journey proof | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `apps/cli`, `apps/web`, tests | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
 
 ## W22 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W22-S01 | Evidence-strength story coverage model | EPIC-0 | done | `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs` | none |
 | W22-S02 | Production readiness source-of-truth | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | W22-S01 |
-| W22-S03 | OpenCode maturity downgrade | EPIC-3 | done | `examples/adapters/**`, `scripts/live-e2e/catalog/**`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**`, contract tests | W22-S01 |
+| W22-S03 | OpenCode maturity downgrade | EPIC-3 | done | `examples/adapters/**`, `internal maintainer rehearsal tooling`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**`, contract tests | W22-S01 |
 
 ## W23 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -245,15 +245,15 @@ This is the master index for the implementation slices across all defined waves.
 ## W25 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W25-S01 | Real external-runner proof profile | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
-| W25-S02 | Code-changing full-journey pass | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**` | W25-S01, W24-S03 |
-| W25-S03 | Proof fixture and story upgrade | EPIC-7 | done | `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
+| W25-S01 | Real external-runner proof profile | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
+| W25-S02 | Code-changing full-journey pass | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**` | W25-S01, W24-S03 |
+| W25-S03 | Proof fixture and story upgrade | EPIC-7 | done | `internal maintainer rehearsal fixtures`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
 
 ## W26 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W26-S01 | Production readiness gate | EPIC-0 | done | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
-| W26-S02 | Maintainability stabilization | EPIC-0 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
+| W26-S01 | Production readiness gate | EPIC-0 | done | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `internal maintainer rehearsal fixtures` | W25-S03, W23-S01, W23-S02, W24-S01 |
+| W26-S02 | Maintainability stabilization | EPIC-0 | done | `internal maintainer rehearsal tooling`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
 | W26-S03 | Self-hosted release documentation | EPIC-7 | done | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
 
 ## W27 slices
@@ -261,16 +261,16 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W27-S01 | Step-journal observation contract | EPIC-7 | done | `docs/contracts/**`, `packages/contracts/**`, `examples/reports/**` | W26-S03 |
 | W27-S02 | Runtime interaction resume | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `apps/web/**`, tests | W27-S01 |
-| W27-S03 | Live E2E step controller output | EPIC-7 | done | `scripts/live-e2e/**`, `scripts/test/**` | W27-S01, W27-S02 |
-| W27-S04 | Profile and skill migration | EPIC-7 | done | `.agents/skills/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W27-S03 |
-| W27-S05 | Legacy cleanup and proof alignment | EPIC-7 | done | `examples/live-e2e/**`, `scripts/**`, `docs/product/**`, `docs/backlog/**` | W27-S04 |
+| W27-S03 | Internal installed-user rehearsal step controller output | EPIC-7 | done | `internal maintainer rehearsal tooling`, `scripts/test/**` | W27-S01, W27-S02 |
+| W27-S04 | Profile and skill migration | EPIC-7 | done | `.agents/skills/**`, `internal maintainer rehearsal tooling`, `docs/ops/**` | W27-S03 |
+| W27-S05 | Legacy cleanup and proof alignment | EPIC-7 | done | `internal maintainer rehearsal fixtures`, `scripts/**`, `docs/product/**`, `docs/backlog/**` | W27-S04 |
 
 ## W28 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W28-S01 | AOR install proof and setup journal | EPIC-7 | done | `docs/contracts/**`, `packages/contracts`, `scripts/live-e2e/**`, `examples/reports/**` | W27-S05 |
-| W28-S02 | Full-lifecycle and interaction gap closure | EPIC-7 | done | `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, tests | W28-S01 |
-| W28-S03 | Matrix target expansion | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W28-S01 |
+| W28-S01 | AOR install proof and setup journal | EPIC-7 | done | `docs/contracts/**`, `packages/contracts`, `internal maintainer rehearsal tooling`, `examples/reports/**` | W27-S05 |
+| W28-S02 | Full-lifecycle and interaction gap closure | EPIC-7 | done | `internal maintainer rehearsal tooling`, `.agents/skills/**`, `docs/ops/**`, tests | W28-S01 |
+| W28-S03 | Matrix target expansion | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**`, `docs/backlog/**` | W28-S01 |
 
 ## W29 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -300,12 +300,12 @@ This is the master index for the implementation slices across all defined waves.
 ## W33 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W33-S01 | Console flow source-of-truth and static snapshot removal | EPIC-0 | done | `docs/backlog/**`, `README.md`, `docs/architecture/**`, `docs/ops/**`, `docs/product/**`, `apps/web/**`, `scripts/live-e2e/**`, `examples/live-e2e/**` | W32-S01 |
-| W33-S02 | Reliable root gates and live E2E timeout bounds | EPIC-0 | done | `scripts/**`, `scripts/test/**`, `docs/backlog/**` | W33-S01 |
+| W33-S01 | Console flow source-of-truth and static snapshot removal | EPIC-0 | done | `docs/backlog/**`, `README.md`, `docs/architecture/**`, `docs/ops/**`, `docs/product/**`, `apps/web/**`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures` | W32-S01 |
+| W33-S02 | Reliable root gates and internal installed-user rehearsal timeout bounds | EPIC-0 | done | `scripts/**`, `scripts/test/**`, `docs/backlog/**` | W33-S01 |
 | W33-S03 | Failure-safe run start durable state | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/cli/**`, tests | W33-S02 |
 | W33-S04 | Guided runtime-root fidelity | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/cli/**`, tests, docs | W33-S02 |
 | W33-S05 | Control-plane launch and port guidance alignment | EPIC-6 | done | `apps/cli/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W33-S04 |
-| W33-S06 | App-smoke console boundary and static snapshot removal | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `scripts/live-e2e/**`, `docs/ops/**`, tests | W33-S02 |
+| W33-S06 | App-smoke console boundary and static snapshot removal | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `internal maintainer rehearsal tooling`, `docs/ops/**`, tests | W33-S02 |
 | W33-S07 | CLI operator output ergonomics | EPIC-6 | done | `apps/cli/**`, `packages/orchestrator-core/**`, `docs/architecture/**`, tests | W33-S04 |
 | W33-S08 | Control-plane OpenAPI payload schema depth | EPIC-6 | done | `docs/contracts/**`, `examples/control-plane-api/**`, `apps/api/**`, `scripts/**`, tests | W33-S02 |
 | W33-S09 | Runtime read-model scale and pagination baseline | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, tests | W33-S02 |
@@ -319,17 +319,17 @@ This is the master index for the implementation slices across all defined waves.
 | W34-S03 | Flow-first local web shell | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `docs/product/assets/w34-flow-centric-console/**`, tests | W34-S02 |
 | W34-S04 | Flow-scoped evidence, trace, and interaction workbench | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, tests | W34-S02 |
 | W34-S05 | Closure-to-new-flow UX | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/contracts/**`, tests | W34-S02 |
-| W34-S06 | Installed-user browser-task flow-loop proof | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests | W34-S03, W34-S04, W34-S05 |
+| W34-S06 | Installed-user browser-task flow-loop proof | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests | W34-S03, W34-S04, W34-S05 |
 | W34-S07 | Backlog, docs, and release-gate alignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**`, `scripts/**`, release tests | W34-S06 |
 
 ## W35 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W35-S01 | Provider heartbeat and long-running step status | EPIC-6 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `apps/web/**`, `scripts/live-e2e/**`, tests | W34-S07 |
+| W35-S01 | Provider heartbeat and long-running step status | EPIC-6 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `apps/web/**`, `internal maintainer rehearsal tooling`, tests | W34-S07 |
 | W35-S02 | User-facing artifact reference renderer | EPIC-6 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `examples/control-plane-api/**`, tests | W35-S01 |
-| W35-S03 | Operator decision helper and decision UX | EPIC-7 | done | `scripts/live-e2e/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W35-S02 |
-| W35-S04 | Execution evidence panel and interruption controls | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `apps/cli/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W35-S01, W35-S02, W35-S03 |
-| W35-S05 | Codex/Qwen live E2E UX proof and runbook closure | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/web/**`, `apps/cli/**`, tests | W35-S04 |
+| W35-S03 | Operator decision helper and decision UX | EPIC-7 | done | `internal maintainer rehearsal tooling`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W35-S02 |
+| W35-S04 | Execution evidence panel and interruption controls | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `apps/cli/**`, `packages/orchestrator-core/**`, `internal maintainer rehearsal tooling`, `docs/contracts/**`, tests | W35-S01, W35-S02, W35-S03 |
+| W35-S05 | Codex/Qwen internal installed-user rehearsal UX proof and runbook closure | EPIC-7 | done | `internal maintainer rehearsal tooling`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `apps/web/**`, `apps/cli/**`, tests | W35-S04 |
 
 ## W36 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -339,38 +339,38 @@ This is the master index for the implementation slices across all defined waves.
 | W36-S03 | First-run onboarding wizard | EPIC-6 | done | `apps/web/**`, `packages/orchestrator-core/**`, tests | W36-S02 |
 | W36-S04 | Local multi-project switcher UX | EPIC-6 | done | `apps/web/**`, `packages/orchestrator-core/**`, tests | W36-S03 |
 | W36-S05 | Docs, smoke, and proof | EPIC-7 | done | `README.md`, `docs/ops/**`, `apps/web/**`, `packages/orchestrator-core/**`, `scripts/**`, tests | W36-S04 |
-| W37-S01 | Live E2E target setup and verification closure | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, tests | W35-S04 |
-| W38-S01 | Qwen stream progress adapter closure | EPIC-6, EPIC-7 | done | `docs/contracts/**`, `examples/adapters/**`, `packages/adapter-sdk/**`, `packages/orchestrator-core/**`, `apps/web/**`, `scripts/live-e2e/**`, tests | W35-S05, W37-S01 |
-| W39-S01 | Live E2E provider parity policy | EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W38-S01 |
+| W37-S01 | Internal installed-user rehearsal target setup and verification closure | EPIC-7 | done | `internal maintainer rehearsal tooling`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, tests | W35-S04 |
+| W38-S01 | Qwen stream progress adapter closure | EPIC-6, EPIC-7 | done | `docs/contracts/**`, `examples/adapters/**`, `packages/adapter-sdk/**`, `packages/orchestrator-core/**`, `apps/web/**`, `internal maintainer rehearsal tooling`, tests | W35-S05, W37-S01 |
+| W39-S01 | Internal installed-user rehearsal provider parity policy | EPIC-7 | done | `internal maintainer rehearsal tooling`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W38-S01 |
 
 ## W40 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W40-S01 | Post-alpha.7 backlog and product baseline | EPIC-0 | done | `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | W39-S01, W36-S05 |
 | W40-S02 | Installed-user onboarding and release docs hardening | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W40-S01 |
-| W40-S03 | Active live E2E heartbeat surfacing | EPIC-6, EPIC-7 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W40-S01, W35-S01, W38-S01, W39-S01 |
-| W40-S04 | Optional provider qualification matrix | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests | W40-S03, W39-S01 |
+| W40-S03 | Active internal installed-user rehearsal heartbeat surfacing | EPIC-6, EPIC-7 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `internal maintainer rehearsal tooling`, `docs/contracts/**`, tests | W40-S01, W35-S01, W38-S01, W39-S01 |
+| W40-S04 | Optional provider qualification matrix | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `docs/product/**`, tests | W40-S03, W39-S01 |
 
 ## W41 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W41-S01 | Post-alpha.8 backlog and validation baseline | EPIC-0 | done | `docs/backlog/**`, `README.md` | W40-S04 |
 | W41-S02 | Alpha.8 installed-user onboarding smoke refresh | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W41-S01 |
-| W41-S03 | Alpha.8 provider qualification smoke refresh | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests | W41-S02, W40-S04 |
+| W41-S03 | Alpha.8 provider qualification smoke refresh | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `docs/product/**`, tests | W41-S02, W40-S04 |
 | W41-S04 | Alpha.8 findings closure and next-release decision | EPIC-0, EPIC-6 | done | `docs/backlog/**`, `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, tests | W41-S02, W41-S03 |
 
 ## W42 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W42-S01 | Alpha.9 release prep for W41 fixes | EPIC-5 | done | `package.json`, `README.md`, `CHANGELOG.md`, `docs/ops/**`, release tests | W41-S04 |
-| W42-S02 | Operator interruption owner classification cleanup | EPIC-6, EPIC-7 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `apps/web/**`, `docs/ops/**`, tests | W42-S01 |
+| W42-S02 | Operator interruption owner classification cleanup | EPIC-6, EPIC-7 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `internal maintainer rehearsal tooling`, `apps/web/**`, `docs/ops/**`, tests | W42-S01 |
 
 ## W43 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W43-S01 | Post-alpha.10 backlog and confidence baseline | EPIC-0 | done | `docs/backlog/**`, `README.md` | W42-S02 |
 | W43-S02 | Alpha.10 installed-user onboarding and evidence smoke | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W43-S01 |
-| W43-S03 | Alpha.10 live E2E interruption and provider smoke | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, tests | W43-S02 |
+| W43-S03 | Alpha.10 internal installed-user rehearsal interruption and provider smoke | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `apps/web/**`, tests | W43-S02 |
 | W43-S04 | Alpha.10 findings closure and next-release decision | EPIC-0, EPIC-6 | done | `docs/backlog/**`, `README.md`, `docs/ops/**`, tests | W43-S02, W43-S03 |
 
 ## W44 slices
@@ -380,7 +380,7 @@ This is the master index for the implementation slices across all defined waves.
 | W44-S02 | Discovery/research/spec prompt bundle split | EPIC-3 | blocked | `examples/prompts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, `packages/orchestrator-core/**`, tests | W44-S01 |
 | W44-S03 | Artifact readiness state machine and stale transitions | EPIC-1, EPIC-6 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests | W44-S01 |
 | W44-S04 | Context, skill, and policy overlays from evidence | EPIC-4, EPIC-3 | blocked | `examples/context/**`, `examples/skills/**`, `examples/policies/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `docs/architecture/**`, tests | W44-S02, W44-S03 |
-| W44-S05 | Post-implementation docs and live E2E validation | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, tests | W44-S04 |
+| W44-S05 | Post-implementation docs and internal installed-user rehearsal validation | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `internal maintainer rehearsal tooling`, tests | W44-S04 |
 
 ## W45 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -389,69 +389,69 @@ This is the master index for the implementation slices across all defined waves.
 | W45-S02 | Cross-stage repair state machine and next-action resolver | EPIC-4, EPIC-6 | blocked | `packages/orchestrator-core/**`, `packages/observability/**`, `packages/contracts/**`, tests | W45-S01 |
 | W45-S03 | CLI and control-plane quality repair surfaces | EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, `examples/control-plane-api/**`, tests | W45-S02 |
 | W45-S04 | Web repair-cycle observability | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, tests | W45-S03 |
-| W45-S05 | Repair-loop proof fixtures and live profile | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
-| W45-S06 | Documentation refresh and live E2E acceptance | EPIC-7, EPIC-0 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `scripts/live-e2e/**`, `examples/live-e2e/**`, tests | W45-S05 |
+| W45-S05 | Repair-loop proof fixtures and internal profile | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
+| W45-S06 | Documentation refresh and internal installed-user rehearsal acceptance | EPIC-7, EPIC-0 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, tests | W45-S05 |
 
 ## W46 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W46-S01 | Contract/docs breaking policy | EPIC-0, EPIC-7 | done | `docs/contracts/**`, `docs/ops/**`, `packages/contracts/**` | W43-S04 |
-| W46-S02 | Step evaluator report and runner behavior | EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `scripts/test/**` | W46-S01 |
-| W46-S03 | Catalog budget and small-canary migration | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S01 |
-| W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | done | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S03 |
-| W46-S05 | Hard target expansion | EPIC-7 | done | `scripts/live-e2e/catalog/targets/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W46-S04 |
-| W46-S06 | Proof-complete acceptance closure and findings intake | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
+| W46-S02 | Step evaluator report and runner behavior | EPIC-7 | done | `internal maintainer rehearsal tooling`, `packages/orchestrator-core/**`, `scripts/test/**` | W46-S01 |
+| W46-S03 | Catalog budget and small-canary migration | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**` | W46-S01 |
+| W46-S04 | Product-change mission rewrite for current targets | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**` | W46-S03 |
+| W46-S05 | Hard target expansion | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**` | W46-S04 |
+| W46-S06 | Proof-complete acceptance closure and findings intake | EPIC-0, EPIC-7 | done | `internal maintainer rehearsal tooling`, `docs/ops/**`, `docs/backlog/**`, root checks | W46-S05 |
 
 ## W47 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W47-S01 | AOR operator keyboard accessibility and guided proof closure | EPIC-6, EPIC-7 | done | `apps/web/**`, `scripts/live-e2e/**`, tests | W46-S06 |
-| W47-S02 | Live E2E target verification isolation and Vitest readiness | EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, target catalog/profile docs, tests | W47-S01 |
-| W47-S03 | AOR repair/review convergence hardening | EPIC-4, EPIC-7 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, review/repair docs, tests | W47-S02 |
-| W47-S04 | Full proof rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, root checks | W47-S03 |
+| W47-S01 | AOR operator keyboard accessibility and guided proof closure | EPIC-6, EPIC-7 | done | `apps/web/**`, `internal maintainer rehearsal tooling`, tests | W46-S06 |
+| W47-S02 | Internal installed-user rehearsal target verification isolation and Vitest readiness | EPIC-7 | done | `internal maintainer rehearsal tooling`, `packages/orchestrator-core/**`, target catalog/profile docs, tests | W47-S01 |
+| W47-S03 | AOR repair/review convergence hardening | EPIC-4, EPIC-7 | done | `internal maintainer rehearsal tooling`, `packages/orchestrator-core/**`, review/repair docs, tests | W47-S02 |
+| W47-S04 | Full proof rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `internal maintainer rehearsal tooling`, `docs/ops/**`, root checks | W47-S03 |
 
 ## W48 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W48-S01 | Quality-cycle contract and profile policy | EPIC-0, EPIC-7 | done | `docs/contracts/**`, `docs/ops/**`, `scripts/live-e2e/profiles/**`, `scripts/live-e2e/lib/profile-catalog.mjs`, tests | W47-S04 |
-| W48-S02 | Quality-cycle runner and controller implementation | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/test/**` | W48-S01 |
+| W48-S01 | Quality-cycle contract and profile policy | EPIC-0, EPIC-7 | done | `docs/contracts/**`, `docs/ops/**`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, tests | W47-S04 |
+| W48-S02 | Quality-cycle runner and controller implementation | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `scripts/test/**` | W48-S01 |
 | W48-S03 | Structured repair context and convergence classification | EPIC-4, EPIC-6, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `packages/orchestrator-core/**`, tests | W48-S02 |
-| W48-S04 | Vitest target toolchain policy | EPIC-7 | done | `scripts/live-e2e/lib/target-materialization.mjs`, `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, tests | W48-S03 |
-| W48-S05 | Control quality-cycle proof rerun and product acceptance closure | EPIC-0, EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W48-S04 |
+| W48-S04 | Vitest target toolchain policy | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, tests | W48-S03 |
+| W48-S05 | Control quality-cycle proof rerun and product acceptance closure | EPIC-0, EPIC-7 | blocked | `internal maintainer rehearsal tooling`, `internal maintainer runbook`, root checks, internal proof runs | W48-S04 |
 
 ## W49 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W49-S01 | Proof findings hygiene and evidence truthfulness | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `docs/backlog/**` | W48-S04 |
-| W49-S02 | Repeated repair anti-loop enforcement | EPIC-4, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `scripts/live-e2e/lib/flows.mjs`, tests | W49-S01 |
-| W49-S03 | QA-specific step-quality evaluator hardening | EPIC-4, EPIC-7 | done | `docs/contracts/live-e2e-step-quality-assessment-*.md`, `packages/contracts/**`, `scripts/live-e2e/lib/step-quality-assessment.mjs`, `scripts/live-e2e/lib/flows.mjs`, tests | W49-S02 |
-| W49-S04 | Full Control live E2E rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W49-S03 |
+| W49-S01 | Proof findings hygiene and evidence truthfulness | EPIC-0, EPIC-7 | done | `internal maintainer runbook`, `docs/backlog/**` | W48-S04 |
+| W49-S02 | Repeated repair anti-loop enforcement | EPIC-4, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `internal maintainer rehearsal tooling`, tests | W49-S01 |
+| W49-S03 | QA-specific step-quality evaluator hardening | EPIC-4, EPIC-7 | done | `internal maintainer contract doc`, `packages/contracts/**`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, tests | W49-S02 |
+| W49-S04 | Full Control internal installed-user rehearsal rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer runbook`, root checks, internal proof runs | W49-S03 |
 
 ## W50 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W50-S01 | Review verification mapping and residual-risk classification | EPIC-4, EPIC-7 | done | `docs/contracts/review-report.md`, `packages/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, tests | W49-S04 |
-| W50-S02 | Live E2E target toolchain fail-fast and setup-journal hygiene | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/run-profile.mjs`, runner tests | W50-S01 |
-| W50-S03 | Fastify/Vitest control rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs | W50-S02 |
-| W50-S04 | Findings/backlog state sync | EPIC-0, EPIC-7 | done | `docs/backlog/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W50-S03 |
+| W50-S02 | Internal installed-user rehearsal target toolchain fail-fast and setup-journal hygiene | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, runner tests | W50-S01 |
+| W50-S03 | Fastify/Vitest control rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer runbook`, root checks, internal proof runs | W50-S02 |
+| W50-S04 | Findings/backlog state sync | EPIC-0, EPIC-7 | done | `docs/backlog/**`, `internal maintainer runbook` | W50-S03 |
 
 ## W51 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W51-S01 | Clean-commit W50 proof rerun | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `scripts/live-e2e/**`, root checks, live proof artifacts | W50-S04 |
-| W51-S02 | Vitest compatible Node large acceptance | EPIC-7 | done | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W51-S01 |
-| W51-S03 | Automated final quality report hydration | EPIC-4, EPIC-7 | done | `scripts/live-e2e/quality-assessment.mjs`, `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests | W51-S02 |
-| W51-S04 | Explicit target-readiness phase | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests | W51-S03 |
-| W51-S05 | Next hard-target expansion after large acceptance | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W51-S04 |
+| W51-S01 | Clean-commit W50 proof rerun | EPIC-0, EPIC-7 | done | `internal maintainer runbook`, `internal maintainer rehearsal tooling`, root checks, live proof artifacts | W50-S04 |
+| W51-S02 | Vitest compatible Node large acceptance | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `internal maintainer runbook` | W51-S01 |
+| W51-S03 | Automated final quality report hydration | EPIC-4, EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `packages/contracts/**`, tests | W51-S02 |
+| W51-S04 | Explicit target-readiness phase | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, contracts/docs/tests | W51-S03 |
+| W51-S05 | Next hard-target expansion after large acceptance | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `docs/ops/**`, `docs/backlog/**` | W51-S04 |
 
 ## W52 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W52-S01 | Target-readiness owner propagation | EPIC-7 | ready | `scripts/live-e2e/run-profile.mjs`, `scripts/live-e2e/lib/**`, run-health examples/tests | W51-S05 |
-| W52-S02 | Diagnostic command hang and timeout hardening | EPIC-4, EPIC-7 | blocked | `packages/orchestrator-core/**`, `scripts/live-e2e/**`, verification tests | W52-S01 |
-| W52-S03 | Vitest large product acceptance closure | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, target catalog, proof findings | W52-S02 |
-| W52-S04 | SQLAlchemy large diagnostic policy and acceptance closure | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml`, target catalog, quality reports | W52-S02 |
-| W52-S05 | Hard-target proof rerun and findings sync | EPIC-0, EPIC-7 | blocked | `docs/ops/live-e2e-proof-complete-findings.md`, backlog docs, root checks, proof artifacts | W52-S03, W52-S04 |
+| W52-S01 | Target-readiness owner propagation | EPIC-7 | ready | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, run-health examples/tests | W51-S05 |
+| W52-S02 | Diagnostic command hang and timeout hardening | EPIC-4, EPIC-7 | blocked | `packages/orchestrator-core/**`, `internal maintainer rehearsal tooling`, verification tests | W52-S01 |
+| W52-S03 | Vitest large product acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, proof findings | W52-S02 |
+| W52-S04 | SQLAlchemy large diagnostic policy and acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, quality reports | W52-S02 |
+| W52-S05 | Hard-target proof rerun and findings sync | EPIC-0, EPIC-7 | blocked | `internal maintainer runbook`, backlog docs, root checks, proof artifacts | W52-S03, W52-S04 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

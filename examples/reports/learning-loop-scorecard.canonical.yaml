@@ -1,7 +1,7 @@
 scorecard_id: scorecard.canonical
 project_id: aor-example
 run_id: run.canonical
-source_kind: live-e2e
+source_kind: runtime-harness
 status: pass
 summary: Canonical learning-loop scorecard with matrix follow-up.
 evidence_refs:

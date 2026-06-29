@@ -46,7 +46,7 @@ AOR is an AI-native orchestrator for the full SDLC: bootstrap, discovery, specif
 - Harness by default: quality-sensitive flows must explain replay, evaluation, and certification.
 - Headless-first runtime: `apps/web` is optional and detachable.
 - Bounded execution: scope, commands, budgets, and write-back mode must stay explicit.
-- Public-repo safety first: no upstream writes by default in live E2E or delivery rehearsals.
+- Public-repo safety first: no upstream writes by default in installed-user or delivery rehearsals.
 
 ## Where changes usually belong
 
@@ -55,7 +55,8 @@ AOR is an AI-native orchestrator for the full SDLC: bootstrap, discovery, specif
 - Architecture and flows: `docs/architecture/**`
 - Contracts and schemas: `docs/contracts/**`
 - Roadmap, epics, slices, and local-task planning: `docs/backlog/**`
-- Runbooks and live E2E: `docs/ops/**` and `examples/live-e2e/**`
+- Runbooks: `docs/ops/**`
+- Internal maintainer rehearsal tooling: `scripts/**`
 - Project examples: `examples/**`
 - API, CLI, and web surfaces: `apps/**`
 - Shared runtime modules: `packages/**`
@@ -78,5 +79,4 @@ Use the root skills when they help:
 - `contract-first-change`
 - `backlog-workflow`
 - `story-traceability`
-- `live-e2e-preflight`
 - `npm-cli-alpha-release`

@@ -904,8 +904,7 @@ export function materializeReviewReport(options) {
   for (const changedPath of codeChangedPaths) {
     if (
       changedPath.startsWith("docs/backlog/") ||
-      changedPath.startsWith(".agents/") ||
-      changedPath.startsWith("scripts/live-e2e/")
+      changedPath.startsWith(".agents/")
     ) {
       pushFinding({
         findings: codeFindings,

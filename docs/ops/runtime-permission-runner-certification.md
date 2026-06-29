@@ -16,7 +16,7 @@ This lane is for post-merge certification after the runtime permission mediation
    - `claude --version`
    - `opencode --version`
    - `qwen --version`
-2. Run `runLiveAdapterPreflight` from `scripts/live-e2e/lib/preflight.mjs` against a temporary target checkout and `examples/adapters`.
+2. Run the internal adapter preflight helper from the maintainer harness against a temporary target checkout and `examples/adapters`.
 3. For each runner, test:
    - `runtime_agent_permission_mode=full-bypass` with `runtime_agent_interaction_policy=fail-closed`;
    - `runtime_agent_permission_mode=restricted` with `runtime_agent_interaction_policy=orchestrator-mediated` and `runtime_agent_auto_approval_profile=conservative`.
@@ -64,7 +64,7 @@ Follow-up acceptance proof on 2026-05-25 exercised the real OpenCode runner beyo
 
 | Field | Value |
 | --- | --- |
-| Profile | `scripts/live-e2e/profiles/full-journey-regress-ky-medium-open-code.yaml` |
+| Profile | Internal full-journey regression profile for OpenCode |
 | Run ID | `opencode-full-journey-ky-medium-20260525` |
 | Provider variant | `open-code-primary` |
 | Runner version | `opencode 1.14.30` |

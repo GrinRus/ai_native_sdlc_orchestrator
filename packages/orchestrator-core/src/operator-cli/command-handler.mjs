@@ -389,7 +389,7 @@ export function formatCommandHelp(definition) {
           "- --asset-mode bundled is the clean default and resolves bundled registry roots without copying examples/.",
           "- --asset-mode materialized requests explicit profile and bootstrap-asset materialization.",
           "- --materialize-project-profile writes project.aor.yaml from bundled bootstrap templates when the target repo is still clean.",
-          "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without proof-runner-side file injection.",
+          "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without out-of-band file injection.",
           "- --repo-build-command, --repo-lint-command, and --repo-test-command override detected verification commands during bootstrap materialization.",
           "- Re-running bootstrap materialization is idempotent and reports whether existing assets were reused.",
         ]

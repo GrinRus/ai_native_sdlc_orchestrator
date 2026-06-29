@@ -36,8 +36,6 @@ const ARTIFACT_BODY_REGEX = /^.+\.artifact\..+\.body\.json$/;
 const ONBOARDING_REPORT_REGEX = /^onboarding-report\.json$/;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
-const LIVE_E2E_ARTIFACT_REGEX = /^live-e2e-(agent-decision-request|operator-decision|step-observation|step-quality-assessment-request|step-quality-assessment-report|observation-report|run-summary|run-health-report|quality-assessment-request|quality-assessment-report|controller-state|baseline-verify).*\.json$/;
-const LIVE_E2E_COMMAND_TRACE_DIR_REGEX = /^live-e2e-command-traces-/;
 
 /**
  * @param {unknown} value
@@ -287,199 +285,6 @@ function listRunControlStateFiles(init) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
- * @returns {string[]}
- */
-function listLiveE2eArtifactFiles(init) {
-  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot)
-    .filter((filePath) => LIVE_E2E_ARTIFACT_REGEX.test(path.basename(filePath)));
-  const commandTraceFiles = fs.existsSync(init.runtimeLayout.reportsRoot)
-    ? fs.readdirSync(init.runtimeLayout.reportsRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && LIVE_E2E_COMMAND_TRACE_DIR_REGEX.test(entry.name))
-      .flatMap((entry) => listJsonFiles(path.join(init.runtimeLayout.reportsRoot, entry.name), { limit: 20 }))
-    : [];
-  return sortFilesByFreshness([...reportFiles, ...commandTraceFiles]);
-}
-
-/**
- * @param {Record<string, unknown>} document
- * @returns {string}
- */
-function liveE2eAgentDecisionRequestStatus(document) {
-  const expectedDecisionRef = asString(document.operator_decision_expected_ref);
-  if (!expectedDecisionRef || !fs.existsSync(expectedDecisionRef)) {
-    return "pending";
-  }
-  try {
-    const decision = asRecord(JSON.parse(fs.readFileSync(expectedDecisionRef, "utf8")));
-    return asString(decision.status) ?? "submitted";
-  } catch {
-    return "submitted";
-  }
-}
-
-/**
- * @param {string} filePath
- * @param {Record<string, unknown>} document
- * @returns {string}
- */
-function liveE2eBaselineVerifyLabel(filePath, document) {
-  const basename = path.basename(filePath);
-  const command = asString(document.command);
-  if (command) {
-    const commandLabel = command.split(/\s+/u).slice(0, 4).join(" ");
-    return `Baseline check: ${commandLabel}`;
-  }
-  if (basename.includes("-verify-summary-")) return "Baseline verification summary";
-  if (basename.includes("-step-result-routed-")) return "Baseline routed step result";
-  if (basename.includes("-step-result-")) return "Baseline command result";
-  if (basename.includes("-delivery-plan-")) return "Baseline delivery plan";
-  if (basename.includes("-compiled-context-")) return "Baseline compiled context";
-  return "Baseline verification artifact";
-}
-
-/**
- * @param {string} filePath
- * @param {Record<string, unknown>} document
- * @returns {{ type: string, stage: string, status: string, label: string, description: string }}
- */
-function liveE2eSummaryParts(filePath, document) {
-  const basename = path.basename(filePath);
-  const stepId = asString(document.step_id);
-  if (/live-e2e-agent-decision-request-/u.test(basename)) {
-    return {
-      type: "operator-decision-request",
-      stage: "execution",
-      status: liveE2eAgentDecisionRequestStatus(document),
-      label: `${stepId ?? "live E2E"} decision request`,
-      description: "Skill-agent operator decision request prepared from public live E2E evidence.",
-    };
-  }
-  if (/live-e2e-operator-decision-/u.test(basename)) {
-    return {
-      type: "operator-decision",
-      stage: "execution",
-      status: asString(document.status) ?? "submitted",
-      label: `${stepId ?? "live E2E"} operator decision`,
-      description: asString(document.reason) ?? "Prepared skill-agent operator decision artifact.",
-    };
-  }
-  if (/live-e2e-step-observation-/u.test(basename)) {
-    const deterministic = asRecord(document.deterministic_analysis);
-    const operatorDecisionStatus = asString(document.operator_decision_status);
-    const status = operatorDecisionStatus === "missing"
-      ? "awaiting-decision"
-      : operatorDecisionStatus ?? asString(document.final_step_verdict) ?? asString(deterministic.status) ?? "observed";
-    return {
-      type: "step-observation",
-      stage: asString(document.flow_stage) ?? "execution",
-      status,
-      label: `${stepId ?? "live E2E"} step observation`,
-      description: operatorDecisionStatus === "missing"
-        ? "Live E2E step observation is present; operator decision is still required."
-        : asString(document.summary) ?? "Live E2E public step observation with deterministic analysis and evidence refs.",
-    };
-  }
-  if (/live-e2e-observation-report-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: "execution",
-      status: asString(document.report_status) ?? "in_progress",
-      label: "Live E2E observation report",
-      description: "Live E2E observation report for public-step progress and operator decisions.",
-    };
-  }
-  if (/live-e2e-run-summary-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: "execution",
-      status: asString(document.status) ?? asString(document.report_status) ?? "ready",
-      label: "Live E2E run summary",
-      description: "Live E2E run summary with pass, blocked, or fail-closed outcome evidence.",
-    };
-  }
-  if (/live-e2e-controller-state-/u.test(basename)) {
-    return {
-      type: "live-e2e-controller",
-      stage: "execution",
-      status: asString(document.status) ?? asString(document.current_step) ?? "running",
-      label: "Live E2E controller state",
-      description: `Live E2E controller state${asString(document.current_step) ? ` at ${asString(document.current_step)}` : ""}.`,
-    };
-  }
-  if (/live-e2e-baseline-verify-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: "verification",
-      status: asString(document.status) ?? asString(document.report_status) ?? "ready",
-      label: liveE2eBaselineVerifyLabel(filePath, document),
-      description: asString(document.summary) ?? "Baseline verification evidence captured before live E2E execution.",
-    };
-  }
-  if (/live-e2e-run-health-report-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: "execution",
-      status: asString(document.overall_status) ?? asString(document.status) ?? "ready",
-      label: "Live E2E run-health report",
-      description: asString(document.summary) ?? "Run-health report for live E2E lifecycle, command, controller, provider, target, environment, and evidence gaps.",
-    };
-  }
-  if (/live-e2e-quality-assessment-request-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: "delivery",
-      status: "ready",
-      label: "Live E2E quality assessment request",
-      description: "Post-run request for the launching SWE agent to assess outcome quality separately from run health.",
-    };
-  }
-  if (/live-e2e-step-quality-assessment-request-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: asString(document.step_name) ?? asString(document.step_id) ?? "execution",
-      status: "awaiting-assessment",
-      label: "Live E2E step quality assessment request",
-      description: "Per-step request for an external skill-agent evaluator to assess public live E2E evidence before continuation.",
-    };
-  }
-  if (/live-e2e-step-quality-assessment-report-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: asString(document.step_name) ?? asString(document.step_id) ?? "execution",
-      status: asString(document.status) ?? "ready",
-      label: "Live E2E step quality assessment report",
-      description: asString(document.summary) ?? "Per-step black-box evaluator assessment based on public live E2E artifacts and operator decision evidence.",
-    };
-  }
-  if (/live-e2e-quality-assessment-report-/u.test(basename)) {
-    return {
-      type: "live-e2e-report",
-      stage: "delivery",
-      status: asString(document.overall_status) ?? asString(document.status) ?? "ready",
-      label: "Live E2E quality assessment report",
-      description: asString(document.summary) ?? "Post-run SWE-agent outcome quality assessment for artifacts, code, verification, delivery safety, UI/UX, accessibility, and traceability.",
-    };
-  }
-  if (/live-e2e-command-traces-/u.test(filePath)) {
-    return {
-      type: "command-trace",
-      stage: "execution",
-      status: asString(document.status) ?? (typeof document.exit_code === "number" ? `exit-${document.exit_code}` : "ready"),
-      label: path.basename(filePath, ".json").replace(/^\d+-/u, ""),
-      description: "Live E2E command trace captured through public command execution.",
-    };
-  }
-  return {
-    type: "live-e2e-report",
-    stage: "execution",
-    status: asString(document.status) ?? asString(document.report_status) ?? "ready",
-    label: path.basename(filePath, ".json"),
-    description: "Live E2E evidence artifact.",
-  };
-}
-
-/**
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   files: string[],
@@ -564,35 +369,6 @@ function listReadableEvidenceSidecarSummaries(options = {}) {
 }
 
 /**
- * @param {{
- *   cwd?: string,
- *   projectRef?: string,
- *   projectProfile?: string,
- *   runtimeRoot?: string,
- *   limit?: number,
- * }} options
- * @returns {Record<string, unknown>[]}
- */
-function listLiveE2eArtifactDisplaySummaries(options = {}) {
-  const init = initializeProjectRuntime(options);
-  return applyReadModelLimit(listLiveE2eArtifactFiles(init).flatMap((filePath) => {
-    try {
-      const document = asRecord(JSON.parse(fs.readFileSync(filePath, "utf8")));
-      const parts = liveE2eSummaryParts(filePath, document);
-      return [buildArtifactDisplaySummary({
-        rawRef: filePath,
-        sourceRef: toEvidenceRef(init, filePath),
-        file: filePath,
-        document,
-        ...parts,
-      })];
-    } catch {
-      return [];
-    }
-  }), options.limit);
-}
-
-/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {Record<string, unknown> | null}
  */
@@ -607,27 +383,8 @@ function readLatestProviderStepStatus(init) {
         return [];
       }
     });
-  const liveE2eStatuses = listLiveE2eArtifactFiles(init)
-    .filter((filePath) => /live-e2e-(observation-report|step-observation|controller-state)-/u.test(path.basename(filePath)))
-    .flatMap((filePath) => {
-      try {
-        const document = asRecord(JSON.parse(fs.readFileSync(filePath, "utf8")));
-        const directStatus = normalizeProviderStepStatus(asRecord(document.provider_step_status));
-        const stepStatuses = Array.isArray(document.step_journal)
-          ? document.step_journal.flatMap((entry) => {
-            const normalized = normalizeProviderStepStatus(asRecord(asRecord(entry).provider_step_status));
-            return normalized ? [normalized] : [];
-          })
-          : [];
-        return [directStatus, ...stepStatuses]
-          .filter(Boolean)
-          .map((status) => ({ status, updatedMs: fs.statSync(filePath).mtimeMs }));
-      } catch {
-        return [];
-      }
-    });
 
-  const statuses = [...runControlStatuses, ...liveE2eStatuses]
+  const statuses = runControlStatuses
     .sort((left, right) => {
       const leftUpdated = Date.parse(String(left.status.updated_at ?? "")) || left.updatedMs;
       const rightUpdated = Date.parse(String(right.status.updated_at ?? "")) || right.updatedMs;
@@ -963,7 +720,6 @@ export function listArtifactDisplaySummaries(options = {}) {
     ...listStepResults(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listQualityArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listOperatorRequests(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
-    ...listLiveE2eArtifactDisplaySummaries(options),
     ...(nextActionReport?.artifact_display_summaries ?? []),
   ];
   return applyReadModelLimit(uniqueArtifactDisplaySummaries(summaries), options.limit);

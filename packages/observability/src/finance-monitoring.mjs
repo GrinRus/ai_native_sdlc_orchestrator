@@ -171,7 +171,7 @@ function classifyMonitoringEvent(event) {
   if (scope === "offline-certification" || scope === "offline_certification" || scope === "certification") {
     return "offline_certification";
   }
-  if (scope === "rehearsal" || scope === "live-e2e-rehearsal" || scope === "live_e2e_rehearsal") {
+  if (scope === "rehearsal") {
     return "rehearsal";
   }
   return null;
@@ -218,9 +218,7 @@ function buildEvidenceClassSummary(runSummaries, liveRunEvents) {
       classes.offline_certification.run_ids.push(runId);
       classes.offline_certification.evidence_refs.push(...offlineRefs);
     }
-    const rehearsalRefs = finance.evidenceRefs.filter(
-      (ref) => ref.includes("live-e2e") || ref.includes("rehearsal") || ref.includes("proof-runner"),
-    );
+    const rehearsalRefs = finance.evidenceRefs.filter((ref) => ref.includes("rehearsal"));
     if (rehearsalRefs.length > 0) {
       classes.rehearsal.run_ids.push(runId);
       classes.rehearsal.evidence_refs.push(...rehearsalRefs);

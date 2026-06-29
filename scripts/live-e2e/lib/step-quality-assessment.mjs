@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { validateContractDocument } from "./contracts/index.mjs";
 import {
   UsageError,
   asNonEmptyString,

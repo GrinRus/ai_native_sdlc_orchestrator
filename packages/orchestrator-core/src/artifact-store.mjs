@@ -389,7 +389,7 @@ export function materializeIntakeArtifactPacket(options) {
     : "Catalog-backed feature mission request";
   const requestBrief = typeof options.requestBrief === "string" && options.requestBrief.trim().length > 0
     ? options.requestBrief.trim()
-    : "Prepare one bounded feature mission request for full-journey live E2E.";
+    : "Prepare one bounded feature mission request for full-journey execution.";
   const missionId =
     typeof options.missionId === "string" && options.missionId.trim().length > 0 ? options.missionId.trim() : null;
   const requestConstraints = Array.isArray(options.requestConstraints)

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
+import { validateContractDocument } from "./lib/contracts/index.mjs";
 import {
   UsageError,
   asNonEmptyString,

@@ -8,7 +8,7 @@ const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/
 const DEFAULT_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
-  "docs/ops/live-e2e-standard-runner.md",
+  "docs/ops/run-control-lifecycle.md",
 ]);
 
 /**

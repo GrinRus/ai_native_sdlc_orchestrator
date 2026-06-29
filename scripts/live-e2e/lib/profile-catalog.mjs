@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
+import { loadContractFile } from "./contracts/index.mjs";
 
 import {
   UsageError,
@@ -20,7 +20,7 @@ import { getProfileStages } from "./stages.mjs";
 export const DEFAULT_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
-  "docs/ops/live-e2e-standard-runner.md",
+  "scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md",
 ]);
 
 

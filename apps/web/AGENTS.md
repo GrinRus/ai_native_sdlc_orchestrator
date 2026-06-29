@@ -6,7 +6,7 @@ Web is the optional operator console for a running AOR system.
 - project, wave, packet, and run views
 - live timeline and logs
 - quality, promotion, and incident views
-- live E2E dashboards
+- run status and report dashboards
 
 ## Rules
 - Write module-facing docs, examples, and comments in English.

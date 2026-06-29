@@ -22,11 +22,6 @@
 - `review-report.md`
 - `review-decision.md`
 - `runtime-harness-report.md`
-- `live-e2e-observation-report.md`
-- `live-e2e-run-health-report.md`
-- `live-e2e-quality-assessment-report.md`
-- `live-e2e-step-quality-assessment-request.md`
-- `live-e2e-step-quality-assessment-report.md`
 - `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`
 - `dataset.md`
@@ -35,7 +30,7 @@
 - `compiled-context-artifact.md`
 - `operator-request.md`
 
-Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; per-step product quality starts with `live-e2e-step-quality-assessment-request`, is accepted or blocked by `live-e2e-step-quality-assessment-report`, and final outcome quality remains in `live-e2e-quality-assessment-report`. For medium+ product-change missions, accepted linked step-quality reports and all-pass final quality are mandatory for product acceptance, while provider qualification remains a separate policy.
+Compiled-context and external-runner contracts include context-budget evidence for routed steps. Runtime Harness reports consume those facts as deterministic run-quality signals, while product quality remains owned by validation, review, evaluation, delivery, and learning-loop artifacts.
 
 ## Platform assets
 - `provider-route-profile.md`
@@ -56,9 +51,6 @@ Compiled-context and external-runner contracts include context-budget evidence f
 - `compiler-revision-status.md`
 - `learning-loop-scorecard.md`
 - `learning-loop-handoff.md`
-- `live-e2e-provider-variant.md`
-- `live-e2e-scenario-policy.md`
-- `live-e2e-target-catalog.md`
 - `control-plane-api.md`
 - `control-plane-api.openapi.json`
 

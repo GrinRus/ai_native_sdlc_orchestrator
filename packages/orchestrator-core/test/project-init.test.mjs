@@ -163,7 +163,7 @@ test("initializeProjectRuntime materializes profile and assets only when materia
 test("initializeProjectRuntime preserves external explicit profile refs as absolute paths", () => {
   withTempRepo((tempRoot) => {
     const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-profile-root-"));
-    const externalProfile = path.join(externalRoot, "project-live-e2e.aor.yaml");
+    const externalProfile = path.join(externalRoot, "project-external-runner.aor.yaml");
     fs.copyFileSync(path.join(tempRoot, "examples/project.aor.yaml"), externalProfile);
 
     try {

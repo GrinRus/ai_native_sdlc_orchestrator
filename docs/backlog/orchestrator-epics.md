@@ -9,7 +9,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W9:** `W9-S02` Current-state documentation drift repair
 - **W11:** `W11-S01` Source-of-truth reality repair
 - **W12:** `W12-S01` Public surface realignment
-- **W13:** `W13-S01` Backlog-first full-journey live E2E realignment
+- **W13:** `W13-S01` Backlog-first full-journey internal installed-user rehearsal realignment
 - **W14:** `W14-S01` Backlog and source-of-truth realignment
 - **W15:** `W15-S01` Source-of-truth and readiness queue repair; `W15-S02` Package/module workspace alignment
 - **W16:** `W16-S01` Complexity baseline and shared helper extraction
@@ -18,17 +18,17 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W22:** `W22-S01` Evidence-strength story coverage model; `W22-S02` Production readiness source-of-truth
 - **W26:** `W26-S01` Production readiness gate; `W26-S02` Maintainability stabilization
 - **W30:** `W30-S01` Post-W29 alpha-hardening planning source of truth; `W30-S02` Alpha architecture decision records; `W30-S05` Alpha readiness gate expansion
-- **W33:** `W33-S01` Console flow source-of-truth and static snapshot removal; `W33-S02` Reliable root gates and live E2E timeout bounds
+- **W33:** `W33-S01` Console flow source-of-truth and static snapshot removal; `W33-S02` Reliable root gates and internal installed-user rehearsal timeout bounds
 - **W34:** `W34-S07` Backlog, docs, and release-gate alignment
 - **W40:** `W40-S01` Post-alpha.7 backlog and product baseline
 - **W41:** `W41-S01` Post-alpha.8 backlog and validation baseline; `W41-S04` Alpha.8 findings closure and next-release decision
 - **W43:** `W43-S01` Post-alpha.10 backlog and confidence baseline; `W43-S04` Alpha.10 findings closure and next-release decision
-- **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S05` Post-implementation docs and live E2E validation
-- **W45:** `W45-S06` Documentation refresh and live E2E acceptance
+- **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S05` Post-implementation docs and internal installed-user rehearsal validation
+- **W45:** `W45-S06` Documentation refresh and internal installed-user rehearsal acceptance
 - **W46:** `W46-S01` Contract/docs breaking policy; `W46-S06` Proof-complete acceptance closure and findings intake
 - **W47:** `W47-S04` Full proof rerun and product acceptance closure
 - **W48:** `W48-S01` Quality-cycle contract and profile policy; `W48-S05` Control quality-cycle proof rerun and product acceptance closure
-- **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S04` Full Control live E2E rerun and product acceptance closure
+- **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S04` Full Control internal installed-user rehearsal rerun and product acceptance closure
 - **W50:** `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
 - **W51:** `W51-S01` Clean-commit W50 proof rerun
 - **W52:** `W52-S05` Hard-target proof rerun and findings sync
@@ -138,7 +138,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W34:** `W34-S01` Flow product and contract baseline; `W34-S02` Runtime and control-plane flow projections; `W34-S03` Flow-first local web shell; `W34-S04` Flow-scoped evidence, trace, and interaction workbench; `W34-S05` Closure-to-new-flow UX
 - **W35:** `W35-S01` Provider heartbeat and long-running step status; `W35-S02` User-facing artifact reference renderer; `W35-S04` Execution evidence panel and interruption controls
 - **W36:** `W36-S02` App workspace and project registry; `W36-S03` First-run onboarding wizard; `W36-S04` Local multi-project switcher UX
-- **W40:** `W40-S02` Installed-user onboarding and release docs hardening; `W40-S03` Active live E2E heartbeat surfacing
+- **W40:** `W40-S02` Installed-user onboarding and release docs hardening; `W40-S03` Active internal installed-user rehearsal heartbeat surfacing
 - **W41:** `W41-S02` Alpha.8 installed-user onboarding smoke refresh; `W41-S04` Alpha.8 findings closure and next-release decision
 - **W42:** `W42-S02` Operator interruption owner classification cleanup
 - **W43:** `W43-S02` Alpha.10 installed-user onboarding and evidence smoke; `W43-S04` Alpha.10 findings closure and next-release decision
@@ -147,49 +147,49 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure
 - **W48:** `W48-S03` Structured repair context and convergence classification
 
-## EPIC-7 Live E2E and rehearsal
-Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
+## EPIC-7 Internal installed-user rehearsal
+Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
 
 **Slices by wave:**
-- **W0:** `W0-S05` Live E2E profile registry and no-write preflight
+- **W0:** `W0-S05` Internal installed-user rehearsal profile registry and no-write preflight
 - **W1:** `W1-S08` Bootstrap end-to-end rehearsal
 - **W2:** `W2-S06` First routed execution rehearsal
 - **W3:** `W3-S06` Quality rehearsal on selected public targets
 - **W4:** `W4-S06` Delivery rehearsal and recovery-safe operations
-- **W5:** `W5-S05` Standard live E2E orchestration runner; `W5-S06` Scorecards, incident capture, and learning-loop handoff
+- **W5:** `W5-S05` Standard internal installed-user rehearsal orchestration runner; `W5-S06` Scorecards, incident capture, and learning-loop handoff
 - **W6:** `W6-S06` Incident and audit command pack
 - **W7:** `W7-S03` Incident recertification and controlled re-enable flow; `W7-S04` Finance evidence and audit durability expansion; `W7-S05` MVP+ governance and learning-loop integration closure
 - **W8:** `W8-S06` Later incident and platform recertification maturity
-- **W10:** `W10-S05` Externally verified live E2E target-catalog proof
-- **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets
-- **W12:** `W12-S02` Live E2E Installed-User Proof Runner; `W12-S04` Proof refresh after surface cleanup
-- **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey proof runner and restored runner skill
-- **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Proof runner and verdict expansion; `W14-S07` Proof bundle and skill refresh
+- **W10:** `W10-S05` Externally verified internal installed-user rehearsal target-catalog proof
+- **W11:** `W11-S02` Target workspace materialization for internal installed-user rehearsal; `W11-S05` Fresh external proof bundle for catalog targets
+- **W12:** `W12-S02` Internal Installed-User Proof Harness; `W12-S04` Proof refresh after surface cleanup
+- **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey proof harness and restored runner skill
+- **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Proof harness and verdict expansion; `W14-S07` Proof bundle and skill refresh
 - **W15:** `W15-S03` Proof verdict integrity gates
-- **W16:** `W16-S05` Installed-user live E2E runner decomposition
+- **W16:** `W16-S05` Installed-user rehearsal runner decomposition
 - **W20:** `W20-S05` Finance analytics and production monitoring loop
 - **W21:** `W21-S07` Installed-user guided journey proof
 - **W25:** `W25-S01` Real external-runner proof profile; `W25-S02` Code-changing full-journey pass; `W25-S03` Proof fixture and story upgrade
 - **W26:** `W26-S03` Self-hosted release documentation
-- **W27:** `W27-S01` Step-journal observation contract; `W27-S03` Live E2E step controller output; `W27-S04` Profile and skill migration; `W27-S05` Legacy cleanup and proof alignment
+- **W27:** `W27-S01` Step-journal observation contract; `W27-S03` Internal installed-user rehearsal step controller output; `W27-S04` Profile and skill migration; `W27-S05` Legacy cleanup and proof alignment
 - **W28:** `W28-S01` AOR install proof and setup journal; `W28-S02` Full-lifecycle and interaction gap closure; `W28-S03` Matrix target expansion
 - **W30:** `W30-S04` Self-hosted operations hardening docs
 - **W34:** `W34-S06` Installed-user browser-task flow-loop proof
-- **W35:** `W35-S03` Operator decision helper and decision UX; `W35-S05` Codex/Qwen live E2E UX proof and runbook closure
+- **W35:** `W35-S03` Operator decision helper and decision UX; `W35-S05` Codex/Qwen internal installed-user rehearsal UX proof and runbook closure
 - **W36:** `W36-S05` Docs, smoke, and proof
-- **W37:** `W37-S01` Live E2E target setup and verification closure
+- **W37:** `W37-S01` Internal installed-user rehearsal target setup and verification closure
 - **W38:** `W38-S01` Qwen stream progress adapter closure
-- **W39:** `W39-S01` Live E2E provider parity policy
-- **W40:** `W40-S03` Active live E2E heartbeat surfacing; `W40-S04` Optional provider qualification matrix
+- **W39:** `W39-S01` Internal installed-user rehearsal provider parity policy
+- **W40:** `W40-S03` Active internal installed-user rehearsal heartbeat surfacing; `W40-S04` Optional provider qualification matrix
 - **W41:** `W41-S03` Alpha.8 provider qualification smoke refresh
 - **W42:** `W42-S02` Operator interruption owner classification cleanup
-- **W43:** `W43-S03` Alpha.10 live E2E interruption and provider smoke
-- **W44:** `W44-S05` Post-implementation docs and live E2E validation
-- **W45:** `W45-S05` Repair-loop proof fixtures and live profile; `W45-S06` Documentation refresh and live E2E acceptance
+- **W43:** `W43-S03` Alpha.10 internal installed-user rehearsal interruption and provider smoke
+- **W44:** `W44-S05` Post-implementation docs and internal installed-user rehearsal validation
+- **W45:** `W45-S05` Repair-loop proof fixtures and internal profile; `W45-S06` Documentation refresh and internal installed-user rehearsal acceptance
 - **W46:** `W46-S01` Contract/docs breaking policy; `W46-S02` Step evaluator report and runner behavior; `W46-S03` Catalog budget and small-canary migration; `W46-S04` Product-change mission rewrite for current targets; `W46-S05` Hard target expansion; `W46-S06` Proof-complete acceptance closure and findings intake
-- **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure; `W47-S02` Live E2E target verification isolation and Vitest readiness; `W47-S03` AOR repair/review convergence hardening; `W47-S04` Full proof rerun and product acceptance closure
+- **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure; `W47-S02` Internal installed-user rehearsal target verification isolation and Vitest readiness; `W47-S03` AOR repair/review convergence hardening; `W47-S04` Full proof rerun and product acceptance closure
 - **W48:** `W48-S01` Quality-cycle contract and profile policy; `W48-S02` Quality-cycle runner and controller implementation; `W48-S03` Structured repair context and convergence classification; `W48-S04` Vitest target toolchain policy; `W48-S05` Control quality-cycle proof rerun and product acceptance closure
-- **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S02` Repeated repair anti-loop enforcement; `W49-S03` QA-specific step-quality evaluator hardening; `W49-S04` Full Control live E2E rerun and product acceptance closure
-- **W50:** `W50-S01` Review verification mapping and residual-risk classification; `W50-S02` Live E2E target toolchain fail-fast and setup-journal hygiene; `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
+- **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S02` Repeated repair anti-loop enforcement; `W49-S03` QA-specific step-quality evaluator hardening; `W49-S04` Full Control internal installed-user rehearsal rerun and product acceptance closure
+- **W50:** `W50-S01` Review verification mapping and residual-risk classification; `W50-S02` Internal installed-user rehearsal target toolchain fail-fast and setup-journal hygiene; `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
 - **W51:** `W51-S01` Clean-commit W50 proof rerun; `W51-S02` Vitest compatible Node large acceptance; `W51-S03` Automated final quality report hydration; `W51-S04` Explicit target-readiness phase; `W51-S05` Next hard-target expansion after large acceptance
 - **W52:** `W52-S01` Target-readiness owner propagation; `W52-S02` Diagnostic command hang and timeout hardening; `W52-S03` Vitest large product acceptance closure; `W52-S04` SQLAlchemy large diagnostic policy and acceptance closure; `W52-S05` Hard-target proof rerun and findings sync

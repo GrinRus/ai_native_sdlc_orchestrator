@@ -6,7 +6,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { stringify as stringifyYaml } from "yaml";
-import { loadContractFile, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "./contracts/index.mjs";
 
 import {
   asNonEmptyString,

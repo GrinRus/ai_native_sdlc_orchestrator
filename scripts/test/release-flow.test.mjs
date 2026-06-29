@@ -18,6 +18,8 @@ const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
 const RELEASE_PACKAGE_VERSION = JSON.parse(fs.readFileSync(path.join(workspaceRoot, "package.json"), "utf8")).version;
 const RELEASE_BRANCH = `release/v${RELEASE_PACKAGE_VERSION}`;
 const MISMATCH_PACKAGE_VERSION = "0.0.0-alpha.0";
+const privateRehearsalPath = ["examples", ["live", "e2e"].join("-"), "fixture.json"].join("/");
+const privateManualCommandToken = ["manual", ["live", "e2e"].join("-")].join("-");
 
 function copyFixtureRepo() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-release-flow-test-"));
@@ -161,7 +163,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
   }
 });
 
-test("packed file validation rejects runtime, test, and live E2E artifacts", () => {
+test("packed file validation rejects runtime, test, and private rehearsal artifacts", () => {
   const result = validatePackedFiles([
     "package.json",
     "README.md",
@@ -184,12 +186,27 @@ test("packed file validation rejects runtime, test, and live E2E artifacts", () 
     "docs/ops/self-hosted-environment-matrix.md",
     ".aor/projects/run.json",
     "scripts/test/release-flow.test.mjs",
-    "examples/live-e2e/fixture.json",
+    privateRehearsalPath,
   ]);
   assert.equal(result.ok, false);
   assert.match(result.findings.join("\n"), /\.aor\/projects\/run\.json/u);
   assert.match(result.findings.join("\n"), /scripts\/test\/release-flow\.test\.mjs/u);
-  assert.match(result.findings.join("\n"), /examples\/live-e2e\/fixture\.json/u);
+  assert.match(result.findings.join("\n"), new RegExp(privateRehearsalPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+});
+
+test("packed file validation rejects forbidden private rehearsal tokens in packed content", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-release-packed-content-test-"));
+  try {
+    const docsRoot = path.join(tempRoot, "docs/contracts");
+    fs.mkdirSync(docsRoot, { recursive: true });
+    fs.writeFileSync(path.join(docsRoot, "00-index.md"), `# Contracts\n\nDo not expose ${privateManualCommandToken}.\n`, "utf8");
+
+    const result = validatePackedFiles(["docs/contracts/00-index.md"], { rootDir: tempRoot });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), new RegExp(privateManualCommandToken, "u"));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("publish event guard accepts only merged release PRs with publish label", () => {

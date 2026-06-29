@@ -75,7 +75,4 @@ On delivery failure:
 - API intent evidence (`fork_request`, `push_request`, `pr_request`)
 - For networked execution (`W10-S02`): commit SHA, fork verification/creation status, and created PR identifier/URL.
 
-Fixture sample:
-- `examples/live-e2e/fixtures/w4-s04/fork-first-intent.sample.json`
-- `examples/live-e2e/fixtures/w4-s06/public-target-delivery-rehearsal.sample.md`
-- `examples/live-e2e/fixtures/w10-s02/fork-first-networked-transcript.json`
+Internal maintainer fixture samples cover fork-first intent, public-target delivery rehearsal, and networked transcript evidence.

@@ -87,10 +87,10 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Watch live run state in CLI or web.
 - Tail logs, view live events, and inspect policy plus compile decisions.
 - Approve risky actions and replay failures through harness.
-- Review installed-user black-box proof evidence produced by Live E2E on real repositories.
+- Review installed-user black-box proof evidence produced by internal maintainer rehearsal on real repositories.
 - Run full-journey live acceptance only on curated repositories and curated feature missions.
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
-- Track which required matrix cells are still uncovered after each live E2E run.
+- Track which required matrix cells are still uncovered after each installed-user proof run.
 - Read optional provider qualification by provider, adapter, coverage tier, owner, phase, evidence, and release-blocking status without opening raw provider logs.
 - Ask AOR to analyze or change bounded project artifacts from any flow stage through runtime-owned request evidence.
 

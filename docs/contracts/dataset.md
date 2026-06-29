@@ -12,7 +12,7 @@ Versioned collection of cases for one subject type such as run, wrapper, route, 
 
 ## Notes
 Datasets should carry provenance, splits or tags, and flake policy.
-Governance live E2E datasets should stay scoped to run-level governance evidence such as policy gates,
+Governance rehearsal datasets should stay scoped to run-level governance evidence such as policy gates,
 no-upstream-write delivery posture, and delivery manifest completeness.
 Naming and scoping guidance:
 - `dataset_id` should be stable, kebab-case, and scoped by domain intent (for example `run-regression`, `wrapper-certification`).

@@ -52,7 +52,7 @@ function resolveAdapterFailureNextStep(failureKind) {
     return "Authenticate the selected external runner CLI in the current runner auth mode, then retry live execution.";
   }
   if (failureKind === "permission-mode-blocked") {
-    return "Adjust external runner permission mode or live E2E policy, then retry live execution.";
+    return "Adjust external runner permission mode or run policy, then retry live execution.";
   }
   return "Inspect adapter response evidence/tool traces, fix external runner execution, then retry live execution.";
 }

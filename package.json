@@ -60,7 +60,6 @@
     "build": "node ./scripts/build.mjs",
     "web:build": "vite build --config apps/web/vite.config.mjs && node ./scripts/web-dist-freshness.mjs write",
     "test": "node ./scripts/test.mjs",
-    "live-e2e:test": "node --test --test-timeout=120000 ./scripts/test/live-e2e-step-controller.test.mjs ./scripts/test/live-e2e-proof-runner.test.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",

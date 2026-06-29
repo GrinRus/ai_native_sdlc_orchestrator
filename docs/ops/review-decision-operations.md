@@ -33,7 +33,7 @@ aor review decide \
 ```
 
 Use `request-repair` when review, QA, Runtime Harness, or post-run
-verification findings must be repaired before delivery. Live E2E runners pass
+verification findings must be repaired before delivery. Internal rehearsal runners pass
 structured context with the operator-readable reason:
 
 ```bash

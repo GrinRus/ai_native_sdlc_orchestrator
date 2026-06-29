@@ -9,7 +9,7 @@ versioned AOR snapshots.
 
 ## [0.1.0-alpha.12] - 2026-06-22
 
-- Added outcome-oriented live E2E quality assessment with factual-only
+- Added outcome-oriented internal rehearsal quality assessment with factual-only
   observation reports, separate run-health reports, post-run quality
   assessment reports, and an all-pass advisory gate.
 - Added `diagnostic_health` run-health evidence so diagnostic warnings and
@@ -26,7 +26,7 @@ versioned AOR snapshots.
 
 ## [0.1.0-alpha.11] - 2026-06-11
 
-- Added live E2E quality gates for mission-scoped verification, delivery path
+- Added internal rehearsal quality gates for mission-scoped verification, delivery path
   integrity, run-health evidence, post-run quality assessment, and artifact
   completeness.
 - Hardened Runtime Harness, review, delivery, and handoff artifacts so
@@ -40,13 +40,13 @@ versioned AOR snapshots.
 
 ## [0.1.0-alpha.10] - 2026-06-04
 
-- Added operator-owned provider interruption classification so public live E2E
+- Added operator-owned provider interruption classification so public run
   status, execution evidence, reports, and qualification summaries distinguish
   operator stops from provider failures.
 - Added optional public `provider_step_status` interruption owner, status, and
   reason fields while preserving fail-closed `interrupted` provider execution
   semantics.
-- Updated the web execution evidence panel and live E2E examples so operator
+- Updated the web execution evidence panel and internal rehearsal examples so operator
   stops render with owner/phase context and provider, target repository,
   environment, and AOR failures remain separately classified.
 
@@ -69,10 +69,10 @@ versioned AOR snapshots.
 - Hardened W40 installed-user onboarding and release docs so registry package
   smoke, clean `aor app` launch, first-run guidance, no-surprise writes, and
   advanced headless paths remain aligned.
-- Added active live E2E provider heartbeat surfacing through public run event
+- Added active provider heartbeat surfacing through public run event
   history, SSE/read surfaces, and local console auto-refresh while preserving
   provider-neutral lifecycle semantics.
-- Added the optional live E2E provider qualification matrix for Codex, Claude,
+- Added the optional internal provider qualification matrix for Codex, Claude,
   OpenCode, and Qwen with owner/phase evidence and explicit release-blocking
   separation.
 - Kept Qwen, OpenCode, and Claude optional unless a future release policy
@@ -80,9 +80,9 @@ versioned AOR snapshots.
 
 ## [0.1.0-alpha.7] - 2026-06-03
 
-- Added W37 target setup and verification closure evidence so live E2E reports
+- Added W37 target setup and verification closure evidence so internal rehearsal reports
   separate provider-independent target setup blockers from provider quality.
-- Closed W35 live E2E UX proof coverage with Codex proof evidence and Qwen
+- Closed W35 internal UX proof coverage with Codex proof evidence and Qwen
   fail-closed/operator evidence while preserving no-upstream-write semantics.
 - Added W38 Qwen `stream-json` progress handling so long candidate runs expose
   non-silent provider status without depending on private Qwen logs.
@@ -98,7 +98,7 @@ versioned AOR snapshots.
   remains clickable beside the flow selector in the packaged no-settings UI.
 - Preserved the W36 onboarding and local multi-project behavior while adding
   regression coverage for the project switcher/topbar click path.
-- Added W37 target setup closure planning so W35-S05 live proof retries can
+- Added W37 target setup closure planning so W35-S05 proof retries can
   bound target setup, expose setup elapsed/budget/status evidence, and separate
   provider-independent setup blockers from Codex/Qwen provider quality.
 - Documented that W35-S05 remains blocked until clean Codex/Qwen proof or
@@ -122,13 +122,13 @@ versioned AOR snapshots.
 - Added the W34 flow-centric operator console baseline, including active and
   completed flow selection, scoped evidence workbench views, and follow-up flow
   creation from learning handoff evidence.
-- Added W35 live E2E operator UX hardening for provider heartbeat/status
+- Added W35 internal operator UX hardening for provider heartbeat/status
   visibility, readable artifact summaries, decision-helper UX, execution
   evidence panels, and interruption/retry control surfaces.
 - Updated packaged SPA release smoke coverage for the flow-centric console so
   installed npm users keep the flow selector and `New Flow` launch path.
-- Documented that the Codex/Qwen live E2E UX proof slice remains blocked until
-  clean live proof closes or a replanning slice explicitly updates the target.
+- Documented that the Codex/Qwen internal UX proof slice remains blocked until
+  clean proof closes or a replanning slice explicitly updates the target.
 
 ## [0.1.0-alpha.3] - 2026-05-24
 

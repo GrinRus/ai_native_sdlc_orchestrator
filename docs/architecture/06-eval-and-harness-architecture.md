@@ -6,7 +6,7 @@
 Objective checks such as schema validity, repo-scope enforcement, required evidence, build, lint, and tests.
 
 Deterministic validation is a hard gate before eval or harness:
-- validate reference existence and family type across project, route, wrapper, prompt, policy, adapter, dataset, suite, and live-E2E assets;
+- validate reference existence and family type across project, route, wrapper, prompt, policy, adapter, dataset, suite, and internal maintainer rehearsal assets;
 - validate compatibility edges (for example route class vs wrapper step class, suite subject type vs dataset subject type, adapter capability requirements);
 - fail fast with machine-readable `validation-report` output that CI and runtime flows can consume directly.
 
@@ -48,8 +48,8 @@ Decision layer that moves an asset or route from candidate to stable or frozen.
 
 Certification baseline stores a durable `promotion-decision` artifact with `pass|hold|fail` semantics and an explicit evidence set (`evaluation-report`, `harness-capture`, `harness-replay` refs).
 
-### Live E2E installed-user proof
-Live E2E is a black-box proof runner. It simulates a user who installed AOR, runs the public SDLC flow through CLI/API surfaces, and produces a per-step summary with command status, duration, transcripts, artifacts, failure classes, missing evidence, and recommendations. Live E2E verifies Runtime Harness evidence; it does not implement private repair semantics.
+### Internal installed-user rehearsal
+Installed-user black-box rehearsal simulates a user who installed AOR, runs the public SDLC flow through CLI/API surfaces, and produces a per-step summary with command status, duration, transcripts, artifacts, failure classes, missing evidence, and recommendations. It verifies Runtime Harness evidence; it does not implement private repair semantics or become a public AOR runtime layer.
 
 ## Datasets and suites
 A dataset stores cases for a specific subject type. A suite defines how those cases are graded and how pass/fail is decided.
@@ -65,7 +65,7 @@ AOR needs suites for:
 - wrapper certification,
 - adapter certification,
 - reviewed incident backfill proposals,
-- live E2E rehearshal.
+- internal installed-user rehearsal.
 
 ## Asset certification workflows
 - packet replay

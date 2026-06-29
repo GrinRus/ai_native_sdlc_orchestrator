@@ -53,7 +53,7 @@ The accepted flow-centric console design reference is
 `docs/product/03-flow-centric-console-design.md`. W34 promotes and implements
 that direction as the local app target: flow selector, active/completed flow
 boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped evidence
-views, flow-targeted Ask AOR, and browser-task live E2E proof coverage with
+views, flow-targeted Ask AOR, and browser-task installed-user proof coverage with
 post-run UI/UX quality assessment when UI/UX quality is claimed.
 
 A flow is a runtime/control-plane projection over mission/intake, next-action,
@@ -70,7 +70,7 @@ primary no-settings UI onboarding path:
 - `/` serves the SPA, `/app-config.json` returns `project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
 - `GET /api/projects` returns explicit local project summaries without scanning the filesystem or initializing `.aor/`;
 - `/api/projects/:projectId/**` remains the control-plane route family used by CLI/API/headless flows;
-- `aor app --smoke true --open false --json` validates the real SPA, config, project index, state routes, first-run wizard marker, project switcher marker, flow selector marker, and `New Flow` marker for release and live E2E guardrail evidence;
+- `aor app --smoke true --open false --json` validates the real SPA, config, project index, state routes, first-run wizard marker, project switcher marker, flow selector marker, and `New Flow` marker for release and internal maintainer guardrail evidence;
 - if onboarding has not run yet, the wizard shows Project Context, Runtime Readiness, First Flow, and Next Action steps instead of silently creating mission evidence.
 
 The optional web console keeps the seven guided stages, but W34 scopes them to
@@ -133,7 +133,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Operator intervention | `operator-request`, `compiled-context-artifact`, `step-result` | W32-S01 adds runtime-owned Ask AOR/request flow across CLI, API, and web without creating a chat-only bypass; W34-S04 scopes requests to selected flow evidence and `target_flow_id`. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
 | Flow projection | `control-plane-api`, `intake-request-body`, `next-action-report`, `operator-request`, closure artifacts | W34-S01 defines active/completed flow semantics; W34-S02 implements runtime/control-plane flow list/detail/selected reads, `New Flow` evidence preservation, and completed-flow read-only request guards without adding UI-owned state; W34-S05 links learning closure to follow-up flow creation. |
-| Proof | Live E2E profiles, observation reports, run-health reports, and quality assessment reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions; W34-S06 extends it with browser-task proof, first-flow completion, second-flow creation, flow-targeted operator requests, accepted skill-agent decisions, and post-run quality assessment refs. |
+| Proof | Internal installed-user proof artifacts and quality assessment reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions; W34-S06 extends it with browser-task proof, first-flow completion, second-flow creation, flow-targeted operator requests, accepted skill-agent decisions, and post-run quality assessment refs. |
 
 ## Out of scope for the guided journey contract
 - implementing `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, or `aor app`;

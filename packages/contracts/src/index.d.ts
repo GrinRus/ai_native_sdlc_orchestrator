@@ -18,11 +18,6 @@ export type ContractFamily =
   | "review-report"
   | "review-decision"
   | "runtime-harness-report"
-  | "live-e2e-observation-report"
-  | "live-e2e-run-health-report"
-  | "live-e2e-quality-assessment-report"
-  | "live-e2e-step-quality-assessment-request"
-  | "live-e2e-step-quality-assessment-report"
   | "multirepo-coordination-status"
   | "planner-metrics-snapshot"
   | "finance-monitoring-snapshot"
@@ -46,10 +41,7 @@ export type ContractFamily =
   | "learning-loop-scorecard"
   | "learning-loop-handoff"
   | "incident-backfill-proposal"
-  | "control-plane-api"
-  | "live-e2e-provider-variant"
-  | "live-e2e-scenario-policy"
-  | "live-e2e-target-catalog";
+  | "control-plane-api";
 
 export type ContractFieldType = "string" | "number" | "boolean" | "array" | "object";
 
@@ -115,12 +107,6 @@ export interface LoadExampleContractsOptions {
   examplesRoot?: string;
 }
 
-export interface ValidateLiveE2eCatalogReferencesOptions {
-  workspaceRoot?: string;
-  examplesRoot?: string;
-  catalogRoot?: string;
-}
-
 export interface LoadedExampleContracts {
   ok: boolean;
   workspaceRoot: string;
@@ -167,7 +153,3 @@ export function loadContractFile(options: LoadContractFileOptions): LoadedContra
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
 
 export function validateExampleReferences(options?: LoadExampleContractsOptions): ReferenceValidationResult;
-
-export function validateLiveE2eCatalogReferences(
-  options?: ValidateLiveE2eCatalogReferencesOptions,
-): ReferenceValidationResult;

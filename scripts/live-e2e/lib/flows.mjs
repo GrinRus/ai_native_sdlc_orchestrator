@@ -38,7 +38,7 @@ import {
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
-import { collectMissionChangeEvidence } from "../../../packages/orchestrator-core/src/shared/mission-scope.mjs";
+import { collectMissionChangeEvidence } from "./mission-scope.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;

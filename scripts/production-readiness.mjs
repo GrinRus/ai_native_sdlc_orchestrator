@@ -7,7 +7,12 @@ import { fileURLToPath } from "node:url";
 import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/control-plane/http/http-router.mjs";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultProofFixturePath = "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json";
+const defaultProofFixturePath = path.posix.join(
+  "scripts",
+  "production-readiness",
+  "fixtures",
+  "w25-s03-production-proof.json",
+);
 const defaultOpenApiPath = "docs/contracts/control-plane-api.openapi.json";
 const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
 
@@ -293,7 +298,7 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
     }
     const evidence = row.evidence;
     for (const requiredEvidence of [
-      "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
+      defaultProofFixturePath,
       "proof_scope=full_code_changing_runtime",
       "real_code_change_proof_complete=true",
       "external_runner_mode=real-external-process",
@@ -353,16 +358,16 @@ function checkSourceOfTruth(rootDir) {
   if (!readiness.includes("pnpm production:ready")) {
     findings.push("self-hosted production readiness doc must document the production gate command.");
   }
-  if (!readiness.includes(defaultProofFixturePath)) {
-    findings.push("self-hosted production readiness doc must cite the W25-S03 production proof fixture.");
+  if (!/sanitized production proof fixture/u.test(readiness)) {
+    findings.push("self-hosted production readiness doc must cite the sanitized production proof fixture.");
   }
-  if (!opsRunbook.includes("pnpm production:ready") || !opsRunbook.includes(defaultProofFixturePath)) {
+  if (!opsRunbook.includes("pnpm production:ready") || !/sanitized (?:production )?proof fixture/u.test(opsRunbook)) {
     findings.push("production-readiness runbook must document command usage and proof evidence.");
   }
   for (const required of [
     "self-hosted CLI/API production candidate",
     "pnpm production:ready",
-    defaultProofFixturePath,
+    "sanitized production proof fixture",
     "hosted SaaS",
     "enterprise identity",
     "no-upstream-write",

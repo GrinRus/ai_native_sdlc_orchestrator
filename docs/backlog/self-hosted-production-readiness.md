@@ -12,7 +12,7 @@ Baseline readiness means:
 - root checks (`pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`) pass for repository integrity;
 - docs, contracts, examples, backlog, and implemented baseline surfaces stay aligned;
 - supported stories may be `baseline-covered` without implying production proof;
-- live E2E fixtures may prove coverage with findings when they do not materialize real code changes.
+- installed-user proof fixtures may prove coverage with findings when they do not materialize real code changes.
 
 Production readiness requires:
 - production-hardened auth scopes that fail closed without explicit permissions;
@@ -39,14 +39,14 @@ Production readiness requires:
 | Interactive continuation has audited answer/resume/block semantics without raw-answer streaming. | `W24-S02`, `W27-S02` | `run answer`, API, SSE, and web tests prove answer audit refs, `state_history[]`, resumable `continue_run` evidence, deterministic blocked evidence for unsupported boundaries, and no raw answer text in command/read/stream surfaces. |
 | Strict delivery has a consolidated code-changing gate. | `W24-S03` | Delivery tests cover no-op, out-of-scope, missing harness, missing handoff, missing promotion, and valid patch-only pass. |
 | Real external-runner full-journey proof passed with no upstream write. | `W25-S02` | Promoted run evidence records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, all required target verdicts `pass`, and no upstream write. |
-| Sanitized production proof fixture is committed and story upgrades are evidence-backed. | `W25-S03` | `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` is the committed fixture; proof integrity rejects mock-backed production claims; only fixture-backed stories are `proof-covered`. |
+| Sanitized production proof fixture is committed and story upgrades are evidence-backed. | `W25-S03` | The gate-configured sanitized production proof fixture is committed; proof integrity rejects mock-backed production claims; only fixture-backed stories are `proof-covered`. |
 | Production readiness has a separate gate. | `W26-S01` | `pnpm production:ready` rejects missing or mock-backed W25 proof and verifies story honesty, auth, nested contracts, run-level harness, source-of-truth alignment, and proof fixture integrity. |
-| Production-touched hotspots were stabilized without redesign. | `W26-S02` | Production proof evidence assessment was extracted from the live E2E runner into `scripts/live-e2e/lib/production-proof.mjs`; live E2E proof runner tests and slice gates passed. |
+| Production-touched hotspots were stabilized without redesign. | `W26-S02` | Production proof evidence assessment was extracted into the internal maintainer harness; internal rehearsal tests and slice gates passed. |
 | Self-hosted release documentation is final for the bounded mode. | `W26-S03` | `docs/ops/self-hosted-release.md` documents supported mode, release gate, rollback, auth config, no-write/write-back policy, proof evidence, and non-goals. |
 | Alpha hardening has reviewable ADR, API, ops, readiness, and release evidence. | `W30-S01` through `W30-S06` | ADR index, `docs/contracts/control-plane-api.openapi.json`, self-hosted operations runbooks, W30 production-readiness checks, and installed-package smoke coverage keep the alpha boundary explicit without target-stack migration. |
 | Installed-user local app launch is packaged and smoke-tested. | `W31-S01` | ADR 0004, `aor app --smoke --open false --json`, packaged `apps/web/dist`, API app-route tests, web SPA tests, and release smoke evidence keep the UI optional while making first mission intake discoverable. |
-| Operator-request runtime intervention is bounded and query-safe. | `W32-S01` | ADR 0005, `operator-request` contract/example coverage, request CLI/API/runtime tests, web Ask AOR coverage, proposal/patch evidence, sanitized read payloads, and live E2E fixture docs keep operator-initiated work runtime-owned. |
-| Console proof uses the real local app, not generated static HTML. | `W33-S01` | `aor app --smoke true --open false --json`, app-smoke guided proof fields, updated live E2E fixtures, and web tests keep the product console path aligned with W31 without adding security or hosted scope. |
+| Operator-request runtime intervention is bounded and query-safe. | `W32-S01` | ADR 0005, `operator-request` contract/example coverage, request CLI/API/runtime tests, web Ask AOR coverage, proposal/patch evidence, sanitized read payloads, and installed-user fixture docs keep operator-initiated work runtime-owned. |
+| Console proof uses the real local app, not generated static HTML. | `W33-S01` | `aor app --smoke true --open false --json`, app-smoke guided proof fields, updated installed-user fixtures, and web tests keep the product console path aligned with W31 without adding security or hosted scope. |
 | Flow-centric console path is aligned with release smoke and proof evidence. | `W34-S01` through `W34-S07` | Flow projection contracts, runtime/control-plane flow reads, packaged flow-first SPA tests, closure-to-follow-up controls, browser-task guided proof fields, app-smoke flow selector and `New Flow` markers, and root gates keep the installed-user UI reviewable while preserving the headless boundary. |
 
 ## Story status policy
@@ -57,9 +57,9 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-As of W34-S06, the matrix records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. W34 strengthens installed-user UI and live E2E evidence but does not change evidence strength counts. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+As of W34-S06, the matrix records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. W34 strengthens installed-user UI and proof evidence but does not change evidence strength counts. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
 
-The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
+The current sanitized production proof fixture is configured by `pnpm production:ready`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
 ## OpenCode status
 

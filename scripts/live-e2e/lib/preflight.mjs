@@ -9,8 +9,8 @@ import {
   runExternalRuntimeProcessSync,
   resolveExternalRuntimeExecutionRoot,
   resolveExternalRuntimePermissionPolicy,
-} from "../../../packages/adapter-sdk/src/index.mjs";
-import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
+} from "./external-runtime.mjs";
+import { loadContractFile } from "./contracts/index.mjs";
 
 import {
   asNonEmptyString,
@@ -344,7 +344,8 @@ export function runLiveAdapterPreflight(options) {
   const permissionProbeRoot = path.join(
     executionRootBinding.executionRoot,
     ".aor",
-    "live-e2e-preflight",
+    "preflight",
+    "live-e2e",
     normalizeId(options.runId),
   );
   const editNonceFile = path.join(permissionProbeRoot, "edit-nonce.txt");
