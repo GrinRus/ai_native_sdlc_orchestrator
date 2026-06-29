@@ -444,5 +444,14 @@ This is the master index for the implementation slices across all defined waves.
 | W51-S04 | Explicit target-readiness phase | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests | W51-S03 |
 | W51-S05 | Next hard-target expansion after large acceptance | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W51-S04 |
 
+## W52 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W52-S01 | Target-readiness owner propagation | EPIC-7 | ready | `scripts/live-e2e/run-profile.mjs`, `scripts/live-e2e/lib/**`, run-health examples/tests | W51-S05 |
+| W52-S02 | Diagnostic command hang and timeout hardening | EPIC-4, EPIC-7 | blocked | `packages/orchestrator-core/**`, `scripts/live-e2e/**`, verification tests | W52-S01 |
+| W52-S03 | Vitest large product acceptance closure | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, target catalog, proof findings | W52-S02 |
+| W52-S04 | SQLAlchemy large diagnostic policy and acceptance closure | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml`, target catalog, quality reports | W52-S02 |
+| W52-S05 | Hard-target proof rerun and findings sync | EPIC-0, EPIC-7 | blocked | `docs/ops/live-e2e-proof-complete-findings.md`, backlog docs, root checks, proof artifacts | W52-S03, W52-S04 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

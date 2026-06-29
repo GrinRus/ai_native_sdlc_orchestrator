@@ -28,7 +28,7 @@ assessment.
 
 PR #90 delivered W46-S01 through W46-S05 as part of the black-box product live
 E2E implementation. W44/W45 remain an open prompt/readiness and repair-loop
-planning track, but they are not hard blockers for W46-W51 live E2E proof
+planning track, but they are not hard blockers for W46-W52 live E2E proof
 closure.
 
 ---

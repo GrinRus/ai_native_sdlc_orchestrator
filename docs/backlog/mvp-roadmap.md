@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-51-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-52-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -62,6 +62,7 @@ The authoritative planning model for implementation lives in:
 | W49 | Close quality-cycle proof gaps with repair anti-loop enforcement, QA-specific step quality, findings hygiene, and mandatory Full Control live proof rerun. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-49-implementation-slices.md` |
 | W50 | Close W49 Fastify/Vitest blockers with review verification mapping, target toolchain fail-fast, control proof rerun, and findings sync. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-50-implementation-slices.md` |
 | W51 | Turn W50 proof into clean-commit closure, pursue Vitest large acceptance, automate final quality hydration, split target-readiness semantics, and add the next hard target only after large proof is stable. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-51-implementation-slices.md` |
+| W52 | Convert the remaining Vitest and SQLAlchemy hard-target live E2E evidence into product acceptance or precise non-acceptance blockers. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -915,6 +916,26 @@ and make target-readiness blockers first-class.
   stable, and optional xlarge remains manual-only.
 
 **Detailed slices:** `docs/backlog/wave-51-implementation-slices.md`
+
+## W52 - remaining hard-target live E2E acceptance closure
+**Goal:** Turn W51's terminal Vitest and SQLAlchemy hard-target evidence into
+strict product acceptance where possible, without weakening final all-pass
+quality gates or hiding target/environment blockers.
+
+**Exit criteria:**
+- Top-level run-health reports preserve target-readiness owner, phase, and
+  class when target readiness blocks before product execution.
+- Warning-mode diagnostics have bounded timeout and pipe-hang handling so
+  terminal command evidence cannot leave live E2E proof runners stuck.
+- Vitest large either reaches terminal product flow plus final all-pass quality
+  gate, or records a new blocker that is not a W50/W51 setup regression.
+- SQLAlchemy large has an explicit full-suite diagnostic policy and either
+  reaches final all-pass product acceptance or records a precise target
+  diagnostic blocker.
+- Findings and backlog distinguish terminal classified evidence from product
+  acceptance, and runtime artifacts stay out of git.
+
+**Detailed slices:** `docs/backlog/wave-52-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

@@ -169,6 +169,15 @@ Follow-up tickets:
   hard-target acceptance or should remain an explicit warning alongside the
   passing primary verification scope.
 
+Backlog mapping:
+
+- `W52-S01` owns W52-F01.
+- `W52-S02` owns W52-F02.
+- `W52-S03` owns the remaining Vitest large product-acceptance run.
+- `W52-S04` owns W52-F03 and the remaining SQLAlchemy large
+  product-acceptance run.
+- `W52-S05` records the combined proof rerun and findings sync.
+
 Artifact hygiene:
 
 - Runtime artifacts remain under `.aor/` or `/tmp/aor-*` and are not committed.
