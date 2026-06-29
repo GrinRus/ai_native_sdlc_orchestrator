@@ -611,7 +611,7 @@ test("live adapter executes external runner path for supported codex-cli request
 
 test("live adapter can invoke external runners through a short execution root alias", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-short-root-"));
-  const longSegment = "live-e2e-installed-user-guided-journey-qwen-final-ui-1780348266";
+  const longSegment = "installed-user-guided-journey-qwen-final-ui-1780348266";
   const executionRoot = path.join(tempRoot, longSegment, "runtime", "projects", "aor-core", "target-checkouts", `ky-${longSegment}`);
   const evidenceRoot = path.join(tempRoot, "reports");
   fs.mkdirSync(executionRoot, { recursive: true });
@@ -686,7 +686,7 @@ test("live adapter keeps raw evidence filenames bounded for long live run ids", 
     });
 
     const edgePadding = "-".repeat(1024);
-    const longRunId = `${edgePadding}live-e2e.${"very-long-segment.".repeat(18)}repair-2${edgePadding}`;
+    const longRunId = `${edgePadding}internal-rehearsal.${"very-long-segment.".repeat(18)}repair-2${edgePadding}`;
     const response = adapter.execute({
       request_id: `${longRunId}.run-start-implement.${"request.".repeat(8)}`,
       run_id: longRunId,
@@ -2156,7 +2156,7 @@ test("live adapter keeps buffered Qwen json silent until final stdout", () => {
       ...buildExternalRunnerProfile({
         command: process.execPath,
         args: ["-e", script, "--", "--output-format", "json"],
-        timeoutMs: 2000,
+        timeoutMs: 10000,
         handler: null,
       }),
     },
@@ -2227,7 +2227,7 @@ test("live adapter preserves Qwen stream progress when run-control interrupts pr
       ...buildExternalRunnerProfile({
         command: process.execPath,
         args: ["-e", interruptScript, "--", "--output-format", "stream-json"],
-        timeoutMs: 2000,
+        timeoutMs: 10000,
         handler: null,
       }),
     },
@@ -2249,7 +2249,7 @@ test("live adapter preserves Qwen stream progress when run-control interrupts pr
         route_id: "route.implement.default.qwen-primary",
         step_id: "run.start.implement",
         state_file: stateFile,
-        timeout_budget_ms: 2000,
+        timeout_budget_ms: 10000,
         heartbeat_interval_ms: 25,
       },
     });

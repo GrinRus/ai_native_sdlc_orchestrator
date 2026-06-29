@@ -21,7 +21,6 @@ const requiredAgents = [
   "examples/adapters/AGENTS.md",
   "examples/eval/AGENTS.md",
   "examples/packets/AGENTS.md",
-  "examples/live-e2e/AGENTS.md",
   "examples/prompts/AGENTS.md",
   "apps/AGENTS.md",
   "apps/api/AGENTS.md",

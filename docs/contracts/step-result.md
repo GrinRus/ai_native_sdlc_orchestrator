@@ -36,7 +36,7 @@ Runtime Harness controllers may add optional decision metadata:
 
 These fields describe AOR runtime control decisions. They do not replace review, eval, delivery, learning, or promotion artifacts.
 `external_runner` is a routed live-execution evidence summary copied from the adapter response when an external runtime was invoked. It should preserve the selected runtime-agent permission mode, permission mode source, command surface, execution root, exit metadata, raw evidence ref, request artifact refs, provider work packet refs, and context-budget status when available.
-If an external runtime returns a provider work-packet echo or packet summary instead of an implementation report, the adapter should classify the response with `failure_kind=provider_work_packet_not_executed`. The step result should preserve that failure class so Runtime Harness and live E2E run-health can distinguish prompt/packet execution failures from target repository failures.
+If an external runtime returns a provider work-packet echo or packet summary instead of an implementation report, the adapter should classify the response with `failure_kind=provider_work_packet_not_executed`. The step result should preserve that failure class so Runtime Harness can distinguish prompt/packet execution failures from target repository failures.
 `requested_interaction` is the operator-continuation surface for runner-requested input. It is optional and may be `null` when no operator input is required.
 
 When present, `requested_interaction` must stay query-safe and should carry:

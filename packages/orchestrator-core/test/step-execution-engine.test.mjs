@@ -66,7 +66,7 @@ test("changed path parsing ignores AOR runtime before bootstrap-owned filtering"
       repoRoot,
       ".aor/cache/ms-playwright/chromium/Google Chrome for Testing.app/Contents/Info.plist",
     );
-    const quotedCachePath = path.join(repoRoot, ".aor/live-e2e-venv/lib/python3.10/launcher manifest.xml");
+    const quotedCachePath = path.join(repoRoot, ".aor/rehearsal-venv/lib/python3.10/launcher manifest.xml");
     const sourcePath = path.join(repoRoot, "src/feature with space.txt");
     fs.mkdirSync(path.dirname(cachePath), { recursive: true });
     fs.mkdirSync(path.dirname(quotedCachePath), { recursive: true });
@@ -983,11 +983,11 @@ test("materializeRuntimeHarnessReport marks strict code-changing live no-op as r
   });
 });
 
-test("live E2E zero repair policy preserves terminal evidence without executing internal repair", () => {
+test("external-runner zero repair policy preserves terminal evidence without executing internal repair", () => {
   withTempRepo((repoRoot) => {
-    const policyId = "policy.step.runner.live-e2e.no-internal-repair";
+    const policyId = "policy.step.runner.no-internal-repair";
     fs.writeFileSync(
-      path.join(repoRoot, "examples/policies/step-runner-live-e2e-no-internal-repair.yaml"),
+      path.join(repoRoot, "examples/policies/step-runner-no-internal-repair.yaml"),
       [
         `policy_id: ${policyId}`,
         "step_class: runner",
@@ -1049,10 +1049,10 @@ test("live E2E zero repair policy preserves terminal evidence without executing 
       cwd: repoRoot,
       stepClass: "implement",
       dryRun: false,
-      runId: "live-e2e-no-internal-repair",
+      runId: "external-runner-no-internal-repair",
       stepId: "run.start.implement",
-      approvedHandoffRef: "evidence://handoff/live-e2e-no-internal-repair",
-      promotionEvidenceRefs: ["evidence://promotion/live-e2e-no-internal-repair"],
+      approvedHandoffRef: "evidence://handoff/external-runner-no-internal-repair",
+      promotionEvidenceRefs: ["evidence://promotion/external-runner-no-internal-repair"],
       executionRoot: repoRoot,
       policyOverrides: {
         implement: policyId,

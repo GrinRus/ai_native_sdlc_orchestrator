@@ -426,7 +426,6 @@ function createBootstrapProjectProfile(options) {
     options.assetMode === "bundled"
       ? registryRootsFromBase(bundledExamplesRoot)
       : { ...DEFAULT_REGISTRY_ROOTS };
-  delete profile.live_e2e_defaults;
 
   const repos = Array.isArray(profile.repos) && profile.repos.length > 0
     ? /** @type {Array<Record<string, unknown>>} */ (JSON.parse(JSON.stringify(profile.repos)))

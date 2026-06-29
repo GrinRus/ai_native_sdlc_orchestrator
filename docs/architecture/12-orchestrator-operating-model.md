@@ -17,7 +17,7 @@ AOR is the durable SDLC control plane that coordinates:
 Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to AOR development workflow only. Runtime AOR flows consume only AOR-owned versioned assets, packets, and project-profile references.
 
 ## Runtime Harness boundary
-The AOR Runtime Harness is the mandatory internal controller for normal AOR runtime. It is not Live E2E and it is not the `aor harness certify` command.
+The AOR Runtime Harness is the mandatory internal controller for normal AOR runtime. It is not installed-user rehearsal and it is not the `aor harness certify` command.
 
 For every routed adapter-backed step, the Runtime Harness owns:
 `prepare -> execute step -> classify outcome -> validate mission semantics -> decide -> retry/repair/escalate if needed -> verify -> close/block`.
@@ -29,7 +29,7 @@ As of W24-S01, normal `run start` execution uses a run-level Runtime Harness con
 Quality boundaries are explicit:
 - feature result quality is owned by review, eval, delivery, and release evidence;
 - AOR runtime quality is owned by Runtime Harness decisions and `runtime-harness-report`;
-- installed-user black-box proof is owned by Live E2E summaries;
+- installed-user black-box proof is owned by internal maintainer rehearsal summaries;
 - learning-loop quality is owned by learning scorecard and handoff artifacts;
 - asset lifecycle quality is owned by certification evidence and `promotion-decision`.
 
@@ -124,7 +124,7 @@ When a run fails or a release causes trouble:
 4. update or create suites only after proposal review accepts the change;
 5. recertify the impacted platform asset before restoring it to stable use.
 
-For full-journey live E2E, the same loop must also leave behind:
+For internal full-journey installed-user rehearsal, the same loop must also leave behind:
 - a feature-linked review verdict;
 - a learning-loop scorecard;
 - a learning-loop handoff that points backlog follow-up back to the curated mission and target repo;

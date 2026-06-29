@@ -25,7 +25,7 @@ import {
   writeJson,
 } from "./lib/common.mjs";
 import { summarizeStageCounts } from "./lib/stages.mjs";
-import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
+import { validateContractDocument } from "./lib/contracts/index.mjs";
 import {
   discoverHostProjectId,
   ensureRuntimeLayout,
@@ -289,6 +289,7 @@ function writeExistingProofRunnerOutput(options) {
         live_e2e_run_health_status: asNonEmptyString(runHealthReport.overall_status) || null,
         live_e2e_run_summary_file: asNonEmptyString(options.existing.summaryFile) || null,
         live_e2e_run_health_report_file: asNonEmptyString(options.existing.runHealthReportFile) || null,
+        run_control_state_file: asNonEmptyString(summary.run_control_state_file) || null,
         live_e2e_observation_report_file:
           asNonEmptyString(summary.live_e2e_observation_report_file) ||
           asNonEmptyString(options.existing.observationReportFile) ||
@@ -2748,6 +2749,77 @@ function writeStepObservationFiles(options) {
 }
 
 /**
+ * @param {Record<string, unknown>} summary
+ * @returns {string}
+ */
+function resolveRunControlStatus(summary) {
+  const providerStatus = asNonEmptyString(asRecord(summary.provider_step_status).status);
+  if (["starting", "running", "silent-running", "artifact-updated", "timeout-risk"].includes(providerStatus)) {
+    return "running";
+  }
+  const status = asNonEmptyString(summary.status);
+  if (status === "pass") return "completed";
+  if (status === "not_pass") return "failed";
+  return status || "failed";
+}
+
+/**
+ * @param {{
+ *   layout: ReturnType<typeof ensureRuntimeLayout> | { reportsRoot: string, stateRoot?: string },
+ *   runId: string,
+ *   summary: Record<string, unknown>,
+ * }} options
+ * @returns {string}
+ */
+function writeAorRunControlState(options) {
+  const stateRoot =
+    asNonEmptyString(options.layout.stateRoot) ||
+    path.join(path.dirname(options.layout.reportsRoot), "state");
+  const controllerStateFile = asNonEmptyString(options.summary.live_e2e_controller_state_file);
+  const controllerState = controllerStateFile && fileExists(controllerStateFile)
+    ? asRecord(readJson(controllerStateFile))
+    : {};
+  const stateFile = path.join(
+    stateRoot,
+    `run-control-state-${normalizeId(options.runId)}.json`,
+  );
+  const evidenceRefs = uniqueStrings([
+    asNonEmptyString(options.summary.live_e2e_run_summary_file),
+    asNonEmptyString(options.summary.live_e2e_observation_report_file),
+    asNonEmptyString(options.summary.live_e2e_run_health_report_file),
+    asNonEmptyString(options.summary.live_e2e_controller_state_file),
+    ...asStringArray(options.summary.live_e2e_step_observation_files),
+    ...asStringArray(options.summary.scorecard_files),
+  ]);
+  const state = {
+    schema_version: 1,
+    run_id: options.runId,
+    status: resolveRunControlStatus(options.summary),
+    current_step:
+      asNonEmptyString(controllerState.current_step) ||
+      asNonEmptyString(options.summary.blocked_step_id) ||
+      null,
+    last_action: "external-runner-status",
+    started_at: asNonEmptyString(options.summary.started_at) || null,
+    updated_at:
+      asNonEmptyString(options.summary.finished_at) ||
+      asNonEmptyString(options.summary.started_at) ||
+      nowIso(),
+    action_sequence: 0,
+    approval_refs: [],
+    audit_refs: [],
+    evidence_refs: evidenceRefs,
+    evidence_root: options.layout.reportsRoot,
+    provider_step_status:
+      Object.keys(asRecord(options.summary.provider_step_status)).length > 0
+        ? asRecord(options.summary.provider_step_status)
+        : null,
+  };
+  writeJson(stateFile, state);
+  return stateFile;
+}
+
+/**
  * @param {{
  *   hostRoot: string,
  *   hostProjectId: string,
@@ -3171,6 +3243,14 @@ export function writeProofRunnerArtifacts(options) {
   writeJson(runHealthReportFile, runHealthReport);
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
+  summary.live_e2e_run_summary_file = summaryFile;
+  const runControlStateFile = writeAorRunControlState({
+    layout: options.layout,
+    runId: options.runId,
+    summary,
+  });
+  summary.run_control_state_file = runControlStateFile;
+  writeJson(summaryFile, summary);
 
   let learningLoop = null;
   const publicLearningScorecard = asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file);
@@ -3185,6 +3265,11 @@ export function writeProofRunnerArtifacts(options) {
     summary.learning_loop_scorecard_file = publicLearningScorecard;
     summary.learning_loop_handoff_file = publicLearningHandoff;
     summary.incident_report_file = publicIncidentFile || null;
+    writeAorRunControlState({
+      layout: options.layout,
+      runId: options.runId,
+      summary,
+    });
     writeJson(summaryFile, summary);
   }
 
@@ -3197,6 +3282,7 @@ export function writeProofRunnerArtifacts(options) {
     observationReportFile,
     runHealthReport,
     runHealthReportFile,
+    runControlStateFile,
     learningLoop,
   };
 }
@@ -3541,6 +3627,7 @@ function runCli(rawArgs) {
         live_e2e_run_health_status: written.runHealthReport.overall_status,
         live_e2e_run_summary_file: written.summaryFile,
         live_e2e_run_health_report_file: written.runHealthReportFile,
+        run_control_state_file: written.runControlStateFile,
         live_e2e_observation_report_file: written.summary.live_e2e_observation_report_file,
         aor_installation_proof_file: written.summary.aor_installation_proof_file,
         live_e2e_controller_state_file: written.summary.live_e2e_controller_state_file,

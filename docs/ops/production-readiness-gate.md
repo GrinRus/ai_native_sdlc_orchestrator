@@ -21,14 +21,12 @@ pnpm production:ready --json
 To verify another sanitized proof fixture:
 
 ```bash
-pnpm production:ready --proof-fixture examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json
+pnpm production:ready --proof-fixture <sanitized-proof-fixture.json>
 ```
 
 ## Evidence checked
 
-The default W25 production proof evidence is:
-
-- `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
+The default W25 production proof evidence is the sanitized fixture configured by the gate.
 
 The gate verifies:
 

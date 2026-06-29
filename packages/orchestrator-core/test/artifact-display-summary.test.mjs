@@ -59,7 +59,7 @@ test("artifact display summary classifies refs without making raw refs the label
   assert.ok(summary.actions.some((action) => action.action_id === "copy_raw_ref"));
 
   const successfulCommand = buildArtifactDisplaySummary({
-    rawRef: "/runtime/reports/live-e2e-command-traces-run/01-project-init.json",
+    rawRef: "/runtime/reports/rehearsal-command-traces-run/01-project-init.json",
     status: "exit-0",
   });
   assert.equal(successfulCommand.severity, "success");
@@ -119,12 +119,12 @@ test("control-plane read surfaces expose artifact display summaries for packet a
   });
 });
 
-test("project state exposes live E2E summaries and nested provider heartbeat", () => {
+test("project state ignores runner-specific sidecars and exposes generic nested provider heartbeat", () => {
   withCleanRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
-    const requestFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-agent-decision-request-ui-proof-02-spec.json");
-    const decisionFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-operator-decision-ui-proof-02-spec.json");
-    const observationFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-step-observation-ui-proof-02-spec.json");
+    const requestFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-agent-decision-request-ui-proof-02-spec.json");
+    const decisionFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-operator-decision-ui-proof-02-spec.json");
+    const observationFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-step-observation-ui-proof-02-spec.json");
     writeJson(requestFile, {
       request_id: "ui-proof.spec.operator-decision-request",
       run_id: "ui-proof",
@@ -145,19 +145,19 @@ test("project state exposes live E2E summaries and nested provider heartbeat", (
       deterministic_analysis: { status: "pass" },
       created_at: "2026-06-02T00:01:00.000Z",
     });
-    const runSummaryFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-run-summary-ui-proof.json");
+    const runSummaryFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-run-summary-ui-proof.json");
     writeJson(runSummaryFile, {
       run_id: "ui-proof",
       status: "blocked",
       created_at: "2026-06-02T00:02:00.000Z",
     });
-    const baselineSummaryFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-baseline-verify-ui-proof-01-verify-summary-baseline-diagnostic-abc123.json");
+    const baselineSummaryFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-baseline-verify-ui-proof-01-verify-summary-baseline-diagnostic-abc123.json");
     writeJson(baselineSummaryFile, {
       run_id: "github-sandbox.run.ui-proof.verify.baseline-diagnostic.v1",
       status: "passed",
       created_at: "2026-06-02T00:03:00.000Z",
     });
-    const baselineCommandFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-baseline-verify-ui-proof-02-step-result-baseline-diagnostic-1-def456.json");
+    const baselineCommandFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-baseline-verify-ui-proof-02-step-result-baseline-diagnostic-1-def456.json");
     writeJson(baselineCommandFile, {
       run_id: "github-sandbox.run.ui-proof.verify.baseline-diagnostic.v1",
       step_id: "verify.baseline-diagnostic.command.1",
@@ -165,7 +165,7 @@ test("project state exposes live E2E summaries and nested provider heartbeat", (
       command: "npm install --prefer-offline --no-audit --no-fund",
       created_at: "2026-06-02T00:04:00.000Z",
     });
-    const assessmentRequestFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-quality-assessment-request-ui-proof.json");
+    const assessmentRequestFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-quality-assessment-request-ui-proof.json");
     writeJson(assessmentRequestFile, {
       run_id: "ui-proof",
       status: "ready",
@@ -205,33 +205,12 @@ test("project state exposes live E2E summaries and nested provider heartbeat", (
     const state = readProjectState({ cwd: repoRoot, projectRef: repoRoot });
     assert.equal(state.provider_step_status?.status, "silent-running");
     assert.equal(state.provider_step_status?.provider, "codex");
-    assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.type === "operator-decision-request" &&
-      entry.status === "pending" &&
-      entry.raw_ref === requestFile,
-    ));
-    assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.type === "step-observation" &&
-      entry.status === "awaiting-decision" &&
-      entry.severity === "warning" &&
-      entry.raw_ref === observationFile,
-    ));
-    assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.raw_ref === runSummaryFile &&
-      entry.label === "Live E2E run summary",
-    ));
-    assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.raw_ref === baselineSummaryFile &&
-      entry.label === "Baseline verification summary",
-    ));
-    assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.raw_ref === baselineCommandFile &&
-      entry.label === "Baseline check: npm install --prefer-offline --no-audit",
-    ));
-    assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.raw_ref === assessmentRequestFile &&
-      entry.label === "Live E2E quality assessment request",
-    ));
+    assert.equal(state.artifact_display_summaries.some((entry) => entry.raw_ref === requestFile), false);
+    assert.equal(state.artifact_display_summaries.some((entry) => entry.raw_ref === observationFile), false);
+    assert.equal(state.artifact_display_summaries.some((entry) => entry.raw_ref === runSummaryFile), false);
+    assert.equal(state.artifact_display_summaries.some((entry) => entry.raw_ref === baselineSummaryFile), false);
+    assert.equal(state.artifact_display_summaries.some((entry) => entry.raw_ref === baselineCommandFile), false);
+    assert.equal(state.artifact_display_summaries.some((entry) => entry.raw_ref === assessmentRequestFile), false);
   });
 });
 

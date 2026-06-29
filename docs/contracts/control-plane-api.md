@@ -104,13 +104,13 @@ The control plane remains the orchestration owner:
 
 Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
-- `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without proof-runner-side profile generation.
+- `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated target profiles can preserve required setup and verification commands without private profile generation.
 - `project verify` accepts `verification_label` plus repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs. Labels separate baseline diagnostics, primary post-run gates, and diagnostic full-suite evidence while preserving command source in the verify summary.
 - `project verify` enforces a bounded per-command timeout derived from the project profile and records command evidence through `command_timeout_ms`, `timed_out`, `started_at`, `finished_at`, `duration_ms`, `exit_code`, `signal`, `error_code`, bounded output excerpts, transcripts, and `timed_out_commands`.
 - `project verify` treats high-signal warning output in stderr as a failed command even when the process exits 0. Step results record bounded `output_quality_findings[]`, and verify summaries aggregate `output_quality_failed_commands[]` plus the active `output_quality_warning_patterns[]`.
 - `project verify` accepts repeatable `output_quality_baseline` inputs that point to previous verify summaries. Matching warning classes remain in `output_quality_findings[]` with `baseline_status=pre_existing` and are aggregated under `output_quality_baseline_matches[]`, but only non-baseline warning findings fail the current verify.
 - `project verify` disables inherited Node compile-cache state for target commands so AOR runtime/session caches cannot contaminate package-manager, lint, test, or build execution in target checkouts.
-- Live E2E run summaries include source metadata (`commit_sha`, `branch_name`) so qualification accounting can reject stale or cross-branch evidence before counting a run.
+- Run summaries include source metadata (`commit_sha`, `branch_name`) so qualification accounting can reject stale or cross-branch evidence before counting a run.
 
 ## Query families
 - projects
@@ -219,7 +219,7 @@ sanitized summaries such as `api_response`, `tool_call:read_file`, or
 `assistant message`, not raw provider payloads. Raw provider evidence remains
 available only through explicit debug/evidence refs.
 
-Active live E2E heartbeat surfacing extends the same public model to
+Active provider heartbeat surfacing extends the same public model to
 `GET /api/projects/:projectId/runs/:runId/events/history` and the matching
 SSE stream. Provider heartbeat events may include additive
 `provider_step_status` snapshots so web/CLI operators can see active
@@ -230,7 +230,7 @@ remain out of the event payload.
 
 ## Execution evidence summaries (W35-S04)
 
-Run summaries expose additive `execution_evidence` for operator-facing live E2E
+Run summaries expose additive `execution_evidence` for operator-facing
 debugging without terminal/process inspection. The field is returned by
 `GET /api/projects/:projectId/runs` and is derived only from public runtime
 artifacts, run-control state, Runtime Harness reports, review reports, delivery
@@ -258,18 +258,16 @@ operators do not mistake runtime evidence for target implementation changes.
 Execution actions are descriptive public surfaces, not private process control:
 - `stop_provider` maps to `aor run cancel`;
 - `save_partial_evidence` maps to `aor run status --json`;
-- `diagnose_current_step` maps to
-  `manual-live-e2e --prepare-decision --action diagnose`;
-- `retry_public_step` maps to
-  `manual-live-e2e --prepare-decision --action retry_public_step`.
+- `diagnose_current_step` maps to `aor run status --json`;
+- `retry_public_step` maps to `aor run steer --target-step <step_class>`.
 
 Stopping a running provider must write durable interrupted/operator-stopped
 evidence in run-control audit/state. Public provider status must include
 `interruption_owner=operator`, `interruption_status=operator-stopped`, and a
-sanitized reason, and live E2E summaries must classify the failure context as
+sanitized reason, and run summaries must classify the failure context as
 `failure_owner=operator` with `failure_phase=provider_execution`. The
 interrupted run is not a pass and must preserve partial evidence for diagnosis
-or retry through public manual live E2E surfaces.
+or retry through public run-control surfaces.
 
 ## Artifact display summaries (W35-S02)
 
@@ -292,8 +290,8 @@ Each artifact display summary includes:
 
 Missing or unreadable refs are represented as summaries with
 `status=missing` and `severity=critical` rather than disappearing from the
-read model. Existing live E2E step-observation artifacts that are waiting for
-the skill-agent operator decision use `status=awaiting-decision` and
+read model. Existing step-observation artifacts that are waiting for
+operator decision evidence use `status=awaiting-decision` and
 `severity=warning`; they must not be rendered as missing evidence. Web renderers
 group summaries by flow/stage and may filter them by `Failed`, `Warnings`,
 `Provider`, `Runtime Harness`, `Verification`, `Diff`, `Delivery`, and
@@ -409,8 +407,8 @@ Full-journey execution baseline (W13):
 - `run start` is the canonical public execution entrypoint for full-journey live runs;
 - successful execution emits one run-linked `step-result` plus terminal `live-run-event` lineage;
 - `run status` resolves that execution lineage without requiring harness-private execution state.
-- `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so live E2E can apply provider-pinned matrix-cell routing deterministically through the public CLI surface.
-- Full-journey live E2E may continue after a degraded `run start` only when public routed step, Runtime Harness, and adapter raw evidence were materialized. Missing execution evidence remains a hard blocker.
+- `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so provider-pinned routing can be applied deterministically through the public CLI surface.
+- Full-journey runs may continue after a degraded `run start` only when public routed step, Runtime Harness, and adapter raw evidence were materialized. Missing execution evidence remains a hard blocker.
 
 Interactive continuation target (W18-S01):
 - when a routed step requests operator input, the run should preserve a query-safe `requested_interaction` payload in the run-linked step result;
@@ -507,7 +505,7 @@ Learning handoff baseline:
 - `learning handoff` writes one public `learning-loop-scorecard` and one public `learning-loop-handoff`;
 - existing public `incident-report` linkage is preserved instead of replaced when incident open/recertify already ran;
 - closure artifacts are derived from public run, review, eval, audit, and incident evidence, not from harness-private observability shortcuts;
-- closure artifacts preserve matrix-cell and coverage-follow-up metadata so the next required live E2E cell remains machine-readable.
+- closure artifacts preserve matrix-cell and coverage-follow-up metadata so the next required coverage cell remains machine-readable.
 
 Context lifecycle read baseline (W8-S09):
 - run-level read surfaces expose context lifecycle details when context promotions are present;
@@ -647,5 +645,5 @@ Deferred beyond this baseline:
 - keep the control-plane surface usable without the web UI;
 - keep ids and references visible in responses;
 - expose explicit approval and dry-run paths for risky actions;
-- expose verdict and closure artifacts through public module surfaces before relying on proof-runner-side aggregation;
+- expose verdict and closure artifacts through public module surfaces before relying on private aggregation;
 - keep operation and query shapes aligned with contract docs and CLI catalog.

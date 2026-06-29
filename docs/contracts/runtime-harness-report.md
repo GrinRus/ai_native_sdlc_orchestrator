@@ -3,7 +3,7 @@
 ## Purpose
 Completed-run diagnosis artifact for the AOR Runtime Harness.
 
-The report records how AOR controlled the run, not the feature result by itself. It aggregates routed step decisions, failure classes, changed-path semantics, repair attempts, verification status, unresolved gaps, and follow-up recommendations. Feature quality remains owned by `review-report`, suite quality remains owned by `evaluation-report`, delivery lineage remains owned by delivery/release artifacts, learning closure remains owned by learning-loop artifacts, live E2E result quality remains owned by the skill-agent operator assessment, and platform asset lifecycle decisions remain owned by `promotion-decision`.
+The report records how AOR controlled the run, not the feature result by itself. It aggregates routed step decisions, failure classes, changed-path semantics, repair attempts, verification status, unresolved gaps, and follow-up recommendations. Feature quality remains owned by `review-report`, suite quality remains owned by `evaluation-report`, delivery lineage remains owned by delivery/release artifacts, learning closure remains owned by learning-loop artifacts, and platform asset lifecycle decisions remain owned by `promotion-decision`.
 
 ## Required fields
 - `report_id`
@@ -121,10 +121,10 @@ When runtime-agent permission mediation is enabled, `permission-mode-blocked` an
 - `ask_user` becomes `block` with `requested_interaction.interaction_type=permission_request`;
 - `auto_deny` becomes `block` with the policy rule and audit evidence.
 
-When the interaction policy is `fail-closed`, existing diagnostic behavior is preserved and permission readiness failures may remain repair/fail evidence for live E2E proof runs.
+When the interaction policy is `fail-closed`, existing diagnostic behavior is preserved and permission readiness failures may remain repair/fail evidence for external-runner proof runs.
 
-`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `git_status_root`, `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, `runner_owned_state_paths`, ignored request input files, `strict_code_changing_noop_detection_applied`, and `strict_code_changing_noop` as the detected no-op result. For live E2E product-change proof, `git_status_root` must be the canonical target checkout root, not the AOR source checkout, runtime root, or wrapper workspace. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
-`runner_owned_state_paths[]` is a safety gate for local runner state created inside the target checkout, including `.codex/`, `.claude/`, `.qwen/`, and `.opencode/`. Live runner execution must fail closed with `failure_class=runner-owned-state-leak` and `runtime_harness_decision=block` when these paths are present, because delivery proof must not include runner-local auth, config, skill, or session state as upstream patch content.
+`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `git_status_root`, `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, `runner_owned_state_paths`, ignored request input files, `strict_code_changing_noop_detection_applied`, and `strict_code_changing_noop` as the detected no-op result. For strict product-change proof, `git_status_root` must be the canonical target checkout root, not the AOR source checkout, runtime root, or wrapper workspace. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
+`runner_owned_state_paths[]` is a safety gate for local runner state created inside the target checkout, including `.codex/`, `.claude/`, `.qwen/`, and `.opencode/`. External runner execution must fail closed with `failure_class=runner-owned-state-leak` and `runtime_harness_decision=block` when these paths are present, because delivery proof must not include runner-local auth, config, skill, or session state as upstream patch content.
 
 ## Boundary rules
 - Runtime Harness reports diagnose AOR runtime behavior and may recommend recertification, but they do not promote or freeze assets.
@@ -135,4 +135,3 @@ When the interaction policy is `fail-closed`, existing diagnostic behavior is pr
 - Strict delivery and release gates require top-level `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, and non-empty meaningful changed-path evidence when the mission requires code changes.
 - Learning handoff may link a Runtime Harness report and carry next actions, but it does not replace this report.
 - Asset certification commands may link a run for provenance, but certification evidence remains fresh and separate from run diagnosis.
-- Live E2E summaries should reference this report when proving the installed-user journey.

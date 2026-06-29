@@ -103,15 +103,6 @@ function resolveRunControlStateFile(init, runId) {
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
- * @returns {string}
- */
-function resolveLiveE2ESummaryFile(init, runId) {
-  return path.join(init.runtimeLayout.reportsRoot, `live-e2e-run-summary-${normalizeId(runId)}.json`);
-}
-
-/**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
- * @param {string} runId
  * @param {number} sequence
  * @returns {string}
  */
@@ -321,7 +312,7 @@ function evaluateGuardrails(profile, action, approvalRef, targetStep) {
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
- * @returns {{ state: Record<string, unknown> | null, stateFile: string, source: "state-file" | "live-e2e-summary" | "none" }}
+ * @returns {{ state: Record<string, unknown> | null, stateFile: string, source: "state-file" | "none" }}
  */
 function readExistingRunState(init, runId) {
   const stateFile = resolveRunControlStateFile(init, runId);
@@ -330,28 +321,6 @@ function readExistingRunState(init, runId) {
       state: readJson(stateFile),
       stateFile,
       source: "state-file",
-    };
-  }
-
-  const summaryFile = resolveLiveE2ESummaryFile(init, runId);
-  if (fs.existsSync(summaryFile)) {
-    const summary = readJson(summaryFile);
-    return {
-      state: {
-        schema_version: 1,
-        run_id: runId,
-        status: normalizeStatus(asString(summary.status) ?? "running") ?? "running",
-        current_step: null,
-        last_action: "live-e2e.import",
-        started_at: asString(summary.started_at),
-        updated_at: asString(summary.finished_at) ?? asString(summary.started_at) ?? nowIso(),
-        action_sequence: 0,
-        approval_refs: [],
-        audit_refs: [],
-        evidence_root: init.runtimeLayout.reportsRoot,
-      },
-      stateFile,
-      source: "live-e2e-summary",
     };
   }
 

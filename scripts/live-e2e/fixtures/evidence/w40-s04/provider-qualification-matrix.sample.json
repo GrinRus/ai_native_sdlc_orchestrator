@@ -1,0 +1,121 @@
+{
+  "fixture_id": "w40-s04.provider-qualification-matrix.sample",
+  "slice_id": "W40-S04",
+  "matrix": {
+    "matrix_id": "live-e2e.provider-qualification-matrix.v1",
+    "scope": "optional-provider-qualification",
+    "statuses": [
+      "qualified",
+      "candidate",
+      "blocked",
+      "not-run"
+    ],
+    "failure_owners": [
+      "aor",
+      "target_repository",
+      "provider",
+      "environment",
+      "operator"
+    ],
+    "failure_phases": [
+      "aor_install",
+      "target_checkout",
+      "target_setup",
+      "target_verification",
+      "provider_execution",
+      "controller_decision",
+      "ui_validation"
+    ],
+    "provider_cells": [
+      {
+        "provider_variant_id": "openai-primary",
+        "provider": "openai",
+        "adapter": "codex-cli",
+        "coverage_tier": "required",
+        "qualification_status": "qualified",
+        "release_blocking": false,
+        "required_pass_count": 0,
+        "passing_run_count": 1,
+        "latest_run_id": "w35-s05-codex-small-proof-20260603094440",
+        "latest_attempt_status": "passed",
+        "failure_owner": null,
+        "failure_phase": null,
+        "failure_class": null,
+        "blocker_reason": null,
+        "evidence_refs": [
+          "scripts/live-e2e/fixtures/evidence/w35-s05/live-attempts-summary.sample.json#w35-s05-codex-small-proof-20260603094440"
+        ]
+      },
+      {
+        "provider_variant_id": "anthropic-primary",
+        "provider": "anthropic",
+        "adapter": "claude-code",
+        "coverage_tier": "required",
+        "qualification_status": "candidate",
+        "release_blocking": false,
+        "required_pass_count": 0,
+        "passing_run_count": 0,
+        "latest_run_id": "w40-s04-claude-candidate-docs-only",
+        "latest_attempt_status": "candidate",
+        "failure_owner": null,
+        "failure_phase": null,
+        "failure_class": null,
+        "blocker_reason": "Claude Code is represented in the optional matrix but has no W40 fresh short live E2E pass evidence in this branch.",
+        "evidence_refs": [
+          "scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md#provider-permission-mode-analogues"
+        ]
+      },
+      {
+        "provider_variant_id": "open-code-primary",
+        "provider": "open-code",
+        "adapter": "open-code",
+        "coverage_tier": "extended",
+        "qualification_status": "blocked",
+        "release_blocking": false,
+        "required_pass_count": 0,
+        "passing_run_count": 0,
+        "latest_run_id": "w40-s04-open-code-provider-timeout",
+        "latest_attempt_status": "blocked",
+        "failure_owner": "provider",
+        "failure_phase": "provider_execution",
+        "failure_class": "provider_blocked",
+        "blocker_reason": "Historical OpenCode candidate attempt reached real provider execution and failed closed on provider timeout; this is not an AOR product pass or release blocker.",
+        "evidence_refs": [
+          "scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md#provider-comparison-rule"
+        ]
+      },
+      {
+        "provider_variant_id": "qwen-primary",
+        "provider": "qwen",
+        "adapter": "qwen-code",
+        "coverage_tier": "extended",
+        "qualification_status": "blocked",
+        "release_blocking": false,
+        "required_pass_count": 0,
+        "passing_run_count": 0,
+        "latest_run_id": "w41-s03-qwen-small-20260604",
+        "latest_attempt_status": "blocked",
+        "failure_owner": "operator",
+        "failure_phase": "provider_execution",
+        "failure_class": "operator_stopped",
+        "blocker_reason": "Qwen reached provider execution after bounded target setup passed, emitted stream-json provider progress through the public provider_step_status surface, then stopped fail-closed through public run-control with interruption_owner=operator and Runtime Harness repair_status=not_required.",
+        "evidence_refs": [
+          "scripts/live-e2e/docs/runbooks/live-e2e-provider-qualification.md#w41-s03-alpha8-smoke-refresh",
+          "scripts/live-e2e/fixtures/evidence/w35-s05/live-attempts-summary.sample.json#w35-s05-qwen-interrupt-proof-20260603102247",
+          "scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md#qwen-candidate-profiles"
+        ]
+      }
+    ],
+    "release_blocking_provider_ids": [],
+    "release_blocking_failures": [],
+    "release_blocking_status": "pass",
+    "generated_at": "2026-06-04T09:00:00.000Z"
+  },
+  "notes": [
+    "This fixture is an optional provider qualification matrix, not a release readiness certificate.",
+    "Coverage tier is preserved from the provider catalog, but release_blocking is false for every W40 optional provider cell.",
+    "Target repository and environment blockers must stay separate from AOR product failures and provider quality findings.",
+    "W41-S03 refreshed the alpha.8 smoke evidence through normal live E2E profile runs for Codex and Qwen; short interrupted smoke runs are documented as fail-closed evidence and do not claim a new provider quality pass.",
+    "W43-S03 refreshed alpha.10 Codex interruption evidence through normal live E2E lifecycle. That short smoke is documented in scripts/live-e2e/docs/runbooks/live-e2e-provider-qualification.md as non-release-blocking operator-stopped evidence and does not replace the historical W35 clean pass cell."
+  ]
+}

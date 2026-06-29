@@ -19,7 +19,7 @@ Materialized bootstrap output describing the target repository: topology, comman
 - `status`
 
 ## Notes
-The analysis report should be repeatable and durable. It feeds validate/verify, live E2E preflight, and onboarding guidance recommendations.
+The analysis report should be repeatable and durable. It feeds validate/verify, runtime preflight, and onboarding guidance recommendations.
 `route_resolution` must expose deterministic default-route and override application for every supported step class.
 `asset_resolution` must expose the wrapper and prompt-bundle provenance attached to each resolved route.
 `policy_resolution` must expose deterministic policy merge precedence and resolved bounds before any adapter invocation.

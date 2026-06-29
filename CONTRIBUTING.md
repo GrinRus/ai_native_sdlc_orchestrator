@@ -11,7 +11,7 @@ The public distribution channels are GitHub source and the npm CLI alpha package
 You can help by:
 
 - reporting gaps or contradictions in the product, architecture, or contract docs;
-- improving examples, runbooks, and live E2E profiles;
+- improving examples, runbooks, and operator workflows;
 - refining the roadmap, epic map, or dependency graph;
 - implementing one bounded backlog slice at a time;
 - strengthening repository-integrity checks, CI, or contributor guidance.
@@ -28,7 +28,7 @@ Read these in order:
 
 If the change is implementation work, find the owning slice first. Do not start by writing broad code without a slice boundary.
 
-For live E2E dependency requirements, use `docs/ops/live-e2e-dependency-matrix.md` as the source of truth.
+For internal maintainer rehearsal dependency requirements, use the maintainer runbooks under `docs/ops/` as the source of truth.
 
 ## Development workflow
 
@@ -119,7 +119,7 @@ If the repository-integrity workflow fails, the failing step maps directly to on
 - Do not commit `.aor/`, generated target checkouts, `.env` files, secrets, personal access tokens, credentials, or machine-local scratch notes.
 - Do not paste secrets, exploit details, private repository data, or credential-bearing runner transcripts into public issues, PRs, logs, or comments.
 - Public-repo rehearsals must stay no-write by default unless the selected slice explicitly expands the write-back boundary.
-- If a flow changes, update the matching runbook or live E2E profile in the same PR.
+- If a flow changes, update the matching public runbook or operator-facing guidance in the same PR.
 
 ## Picking work
 
@@ -154,7 +154,7 @@ A strong bug report should include:
 - exact steps to reproduce;
 - the relevant command, profile, route, wrapper, or target repo;
 - logs, transcripts, or artifact paths when relevant;
-- whether the issue affects a specific wave, slice, or live E2E scenario.
+- whether the issue affects a specific wave, slice, or operator scenario.
 
 Never paste secrets, tokens, or private repository credentials into an issue.
 

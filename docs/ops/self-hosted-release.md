@@ -42,9 +42,7 @@ The production gate verifies the W25 proof fixture, story-status honesty, source
 pnpm production:ready --json
 ```
 
-The default production proof fixture is:
-
-- `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
+The default production proof fixture is the sanitized fixture configured by `pnpm production:ready`.
 
 ## Operator setup
 
@@ -105,7 +103,7 @@ No hosted rollback, tenant migration rollback, or enterprise identity rollback p
 
 Production-candidate proof is reviewable through:
 
-- `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
+- the sanitized production proof fixture configured by `pnpm production:ready`
 - `docs/ops/production-readiness-gate.md`
 - `docs/backlog/self-hosted-production-readiness.md`
 - `docs/product/user-story-coverage-matrix.md`
@@ -114,7 +112,7 @@ Production-candidate proof is reviewable through:
 - `docs/ops/self-hosted-environment-matrix.md`
 - `docs/architecture/adr/0004-alpha-packaged-local-web-console.md`
 - `docs/architecture/adr/0005-operator-requests-runtime-interventions.md`
-- `examples/live-e2e/fixtures/w32-s01/operator-request-interactive-flow.sample.json`
+- the sanitized operator-request proof fixture configured by the release gate
 
 The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_status=pass`, and no-upstream-write.
 

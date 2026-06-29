@@ -505,7 +505,7 @@ function executionStatusRows(evidence) {
   return rows;
 }
 
-function executionActionCommand(action, evidence, decisionRequests) {
+function executionActionCommand(action, evidence) {
   const runId = evidence?.run_id ?? "<run-id>";
   if (action.action_id === "stop_provider") {
     return `aor run cancel --run-id ${runId} --approval-ref approval://operator/${runId}/stop`;
@@ -514,10 +514,10 @@ function executionActionCommand(action, evidence, decisionRequests) {
     return `aor run status --run-id ${runId} --json`;
   }
   if (action.action_id === "diagnose_current_step") {
-    return decisionHelperCommand(decisionRequests[0]?.ref, "diagnose");
+    return `aor run status --run-id ${runId} --json`;
   }
   if (action.action_id === "retry_public_step") {
-    return decisionHelperCommand(decisionRequests[0]?.ref, "retry_public_step");
+    return `aor run steer --run-id ${runId} --target-step <step>`;
   }
   return action.command_surface ?? "public control-plane action";
 }
@@ -727,10 +727,10 @@ function latestRequestForFlow(operatorRequests, selectedFlow, { draft = false } 
 
 function latestDecisionRequestFromEvidence(evidenceRows) {
   const requestRow = (Array.isArray(evidenceRows) ? evidenceRows : [])
-    .find((row) => isAgentDecisionRequestRef(row.rawRef ?? row.sourceRef ?? row.ref));
+    .find((row) => isOperatorDecisionRequestRow(row));
   if (!requestRow) return null;
   return {
-    request_summary: requestRow.label ?? "Live E2E operator decision request",
+    request_summary: requestRow.label ?? "Operator decision request",
     status: requestRow.status ?? "pending",
   };
 }
@@ -765,8 +765,9 @@ function flowScopedInteractions(stepResults, selectedFlow, runtimeTrace, { draft
     });
 }
 
-function isAgentDecisionRequestRef(ref) {
-  return comparableEvidenceRef(ref).toLowerCase().includes("live-e2e-agent-decision-request");
+function isOperatorDecisionRequestRow(row) {
+  const type = String(row?.kind ?? row?.type ?? row?.displaySummary?.type ?? "").toLowerCase();
+  return type === "operator-decision-request";
 }
 
 function supportedDecisionActionsFromRecord(record) {
@@ -797,7 +798,7 @@ function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRow
     }));
   });
   const evidenceRefs = evidenceRows
-    .filter((row) => isAgentDecisionRequestRef(row.rawRef ?? row.sourceRef ?? row.ref))
+    .filter((row) => isOperatorDecisionRequestRow(row))
     .map((row) => ({
       ref: row.rawRef ?? row.sourceRef ?? row.ref,
       label: row.label ?? "Agent decision request",
@@ -807,28 +808,13 @@ function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRow
     }));
   const seen = new Set();
   return [...traceRefs, ...evidenceRefs]
-    .filter((entry) => isAgentDecisionRequestRef(entry.ref))
+    .filter((entry) => entry.ref)
     .filter((entry) => {
       const key = comparableEvidenceRef(entry.ref).toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-}
-
-function shellArg(value) {
-  const text = String(value ?? "");
-  if (/^[A-Za-z0-9_./:@=-]+$/u.test(text)) return text;
-  return `'${text.replace(/'/gu, "'\\''")}'`;
-}
-
-function decisionHelperCommand(requestRef, action) {
-  return [
-    "node ./scripts/live-e2e/manual-live-e2e.mjs",
-    "--prepare-decision",
-    `--request ${requestRef ? shellArg(requestRef) : "<agent_decision_request_ref>"}`,
-    `--action ${shellArg(action)}`,
-  ].join(" ");
 }
 
 function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false }) {
@@ -1975,14 +1961,13 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy }) {
   const selectedRequest = decisionRequests[0] ?? null;
   const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
-  const helperCommand = decisionHelperCommand(selectedRequest?.ref, selectedAction);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   return (
     <section className="work-card operator-decision-drawer">
       <div className="work-heading compact-heading">
         <div>
           <h3>Operator Decision</h3>
-          <p>Prepare the skill-agent decision draft from the live E2E request rubric.</p>
+          <p>Review the runtime decision request and choose the bounded operator action.</p>
         </div>
         <StatusPill state={selectedRequest ? selectedRequest.status : "no request"} />
       </div>
@@ -2032,12 +2017,8 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy }) {
               <strong>Preserved when required</strong>
             </div>
           </div>
-          <button className="primary drawer-submit" type="button" onClick={() => copyRef(helperCommand)} disabled={busy}>
-            Prepare corrected draft
-          </button>
           <details className="debug-ref-details decision-debug">
-            <summary>Debug command and raw request ref</summary>
-            <code>{helperCommand}</code>
+            <summary>Debug raw request ref</summary>
             <code>{selectedRequest.ref}</code>
           </details>
         </>
@@ -2048,7 +2029,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy }) {
   );
 }
 
-function ExecutionEvidencePanel({ evidence, providerEvidenceRows, decisionRequests, copyRef, busy }) {
+function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy }) {
   const statusRows = executionStatusRows(evidence);
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
@@ -2116,10 +2097,8 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, decisionReques
           </div>
           <div className="execution-action-grid" aria-label="Execution evidence actions">
             {actions.map((action) => {
-              const needsDecisionRequest = ["diagnose_current_step", "retry_public_step"].includes(action.action_id);
-              const hasDecisionRequest = decisionRequests.length > 0;
-              const enabled = action.enabled && (!needsDecisionRequest || hasDecisionRequest);
-              const command = executionActionCommand(action, evidence, decisionRequests);
+              const enabled = action.enabled;
+              const command = executionActionCommand(action, evidence);
               return (
                 <button
                   key={action.action_id}
@@ -2127,10 +2106,10 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, decisionReques
                   type="button"
                   onClick={() => copyRef(command)}
                   disabled={busy || !enabled}
-                  title={enabled ? command : (needsDecisionRequest && !hasDecisionRequest ? "No public agent decision request ref is visible." : action.reason)}
+                  title={enabled ? command : action.reason}
                 >
                   <strong>{action.label ?? EXECUTION_ACTION_LABELS[action.action_id] ?? "Execution action"}</strong>
-                  <span>{enabled ? action.command_surface : (needsDecisionRequest && !hasDecisionRequest ? "waiting for decision request" : action.reason)}</span>
+                  <span>{enabled ? command : action.reason}</span>
                 </button>
               );
             })}
@@ -2643,7 +2622,7 @@ function App() {
     const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, selectedFlowRuntimeTrace, { draft: draftSurface });
     if (flowExecutionEvidence || draftSurface || selectedFlow?.flow_id || !providerStepStatus) return flowExecutionEvidence;
     return {
-      run_id: providerStepStatus.route_id ?? providerStepStatus.step_id ?? "live-e2e",
+      run_id: providerStepStatus.route_id ?? providerStepStatus.step_id ?? "provider-step",
       status: providerStepStatus.status,
       provider_execution_status: providerStepStatus.status,
       runtime_harness_decision: "pending",
@@ -3393,7 +3372,6 @@ function App() {
         <ExecutionEvidencePanel
           evidence={executionEvidence}
           providerEvidenceRows={providerEvidenceRows}
-          decisionRequests={operatorDecisionRequests}
           copyRef={copyRef}
           busy={busy}
         />

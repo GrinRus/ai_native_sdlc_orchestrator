@@ -230,7 +230,7 @@ test("flow projections keep completed evidence read-only while new flow selectio
     const activeNext = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
     assert.equal(fs.existsSync(activeNext.nextActionReportArchiveFile), true);
 
-    const proofRunId = "live-e2e-proof";
+    const proofRunId = "rehearsal-proof";
     writeCompletedClosure(init, proofRunId);
     const completedNext = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
     assert.match(completedNext.nextActionReportArchiveFile, /next-action-report-checkout-risk\.json$/u);

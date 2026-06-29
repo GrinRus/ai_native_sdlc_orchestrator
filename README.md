@@ -469,7 +469,7 @@ The current alpha distribution is tracked through `W52` and focuses on:
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
 - Stronger runner-adapter coverage.
-- Provider-neutral internal proof-runner lifecycle semantics across supported
+- Provider-neutral internal rehearsal lifecycle semantics across supported
   provider variants.
 - Clearer review, QA, and delivery evidence.
 - Strict internal product-acceptance closure for W46 classified findings.
@@ -505,19 +505,19 @@ The current alpha distribution is tracked through `W52` and focuses on:
 - Internal operator-proof hardening for long-running provider heartbeat,
   decision helper automation, readable artifact refs, execution evidence,
   interruption controls, and Codex/Qwen qualification.
-- Internal proof-runner target setup closure so Codex/Qwen qualification retries
+- Internal rehearsal target setup closure so Codex/Qwen qualification retries
   do not block on unbounded Playwright or target verification setup before
   operator-visible decisions.
 - Qwen stream progress mapping so realtime `stream-json` activity appears as
   provider heartbeat/progress evidence instead of misleading silent-running UX.
 - Post-alpha.7 installed-user hardening for clean registry smoke commands,
-  no-settings onboarding polish, internal proof-runner heartbeat visibility, and
+  no-settings onboarding polish, internal rehearsal heartbeat visibility, and
   optional provider qualification planning.
 - Post-alpha.8 installed-user validation, provider qualification evidence
   refresh, and owner/phase-classified findings closure before deciding whether a
   follow-up fix or release is needed.
 - Alpha.10 release publication for operator-owned provider interruption
-  classification, followed by installed-user and maintainer-side proof-runner
+  classification, followed by installed-user and maintainer-side rehearsal
   confidence refresh before any next release decision.
 
 ## Contributing

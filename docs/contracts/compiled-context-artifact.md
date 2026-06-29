@@ -35,7 +35,7 @@ Compiled context is the prepare-phase artifact for routed adapter-backed steps. 
 - `budget_status` in `pass|warn|fail|not_configured`
 - `source_breakdown[]` with `source`, `bytes`, `chars`, and `estimated_tokens`
 
-The estimate is intentionally conservative and provider-agnostic. It is used for fail-fast live E2E context-budget checks and for explaining which context groups made a provider request too large.
+The estimate is intentionally conservative and provider-agnostic. It is used for fail-fast context-budget checks and for explaining which context groups made a provider request too large.
 
 `compaction_report` records how the runtime converted the full internal compiled context into a bounded provider work packet:
 - `strategy` such as `none` or `deterministic-ref-summary`

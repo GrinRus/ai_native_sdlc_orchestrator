@@ -72,4 +72,4 @@ learning_loop:
   backlog_refs:
     - docs/backlog/mvp-implementation-backlog.md
     - docs/backlog/mvp-roadmap.md
-    - docs/ops/live-e2e-standard-runner.md
+    - scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md

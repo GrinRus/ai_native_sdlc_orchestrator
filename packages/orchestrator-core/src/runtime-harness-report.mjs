@@ -316,7 +316,7 @@ function documentLinksRun(document, runId) {
 }
 
 /**
- * Routed live execution can mint nested run ids under the public live-e2e run,
+ * Routed execution can mint nested run ids under the public run,
  * for example `project.run.<outer-run>.routed-execution.v1`.
  *
  * @param {string} value

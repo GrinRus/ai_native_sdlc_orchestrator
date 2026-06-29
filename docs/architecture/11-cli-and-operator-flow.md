@@ -51,11 +51,11 @@ Operator request command semantics:
 - risky actions should expose approval or dry-run modes;
 - the CLI must surface run ids, packet ids, and evidence locations clearly.
 
-`aor project verify --routed-dry-run-step <step_class>` remains the baseline smoke path for routed no-write execution and durable step-result emission. The full-journey live path additionally uses public `review run` and `learning handoff` surfaces after real execution.
+`aor project verify --routed-dry-run-step <step_class>` remains the baseline smoke path for routed no-write execution and durable step-result emission. Internal full-journey rehearsal additionally uses public `review run` and `learning handoff` surfaces after real execution.
 
-Installed-user proof for AOR itself runs through the internal `scripts/live-e2e/*` proof runner and is not part of the public CLI command surface.
+Installed-user proof for AOR itself is internal repo tooling and is not part of the public CLI command surface.
 
-Guided installed-user proof is separate from the internal proof runner. The proof runner can rehearse the guided vocabulary, but public guided commands still have to delegate to stable CLI/runtime paths and preserve no-upstream-write defaults.
+Guided installed-user proof can rehearse the guided vocabulary, but public guided commands still have to delegate to stable CLI/runtime paths and preserve no-upstream-write defaults.
 
 ## Interactive continuation rule
 Runner-requested questions are operator interventions, not a separate UI workflow. CLI, API, and web surfaces all read the same `step-result.requested_interaction` evidence and submit answers through the control plane so answer audit refs and run-state transitions stay durable. Resumable checkpoints move to `interaction_status=resumed` with `continuation.next_action=continue_run`; non-resumable boundaries remain blocked with explicit evidence.

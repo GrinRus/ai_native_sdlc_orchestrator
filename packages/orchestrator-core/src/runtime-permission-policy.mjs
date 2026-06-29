@@ -132,7 +132,7 @@ function isUriTarget(target) {
  * @returns {boolean}
  */
 function isPreflightProbeTarget(target) {
-  return typeof target === "string" && target.includes(".aor/live-e2e-preflight/");
+  return typeof target === "string" && target.includes(".aor/preflight/");
 }
 
 /**
@@ -375,7 +375,7 @@ export function evaluateRuntimePermissionRequest(options) {
       decision: "auto_approve",
       rule_id: "runtime-permission.auto-approve.preflight-probe",
       approval_scope: grantScope,
-      reason: "Preflight probe read/write is scoped to the live E2E probe directory.",
+      reason: "Preflight probe read/write is scoped to the preflight probe directory.",
       profile: autoApprovalProfile,
       interaction_policy: interactionPolicy,
       approval_resume_mode: approvalResumeMode,

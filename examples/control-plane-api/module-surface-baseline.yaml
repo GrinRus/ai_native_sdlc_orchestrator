@@ -562,7 +562,7 @@ execution_evidence_summary_contract:
     contract: docs/contracts/control-plane-api.md
     openapi: docs/contracts/control-plane-api.openapi.json
     product: docs/product/03-flow-centric-console-design.md
-    runbook: docs/ops/live-e2e-standard-runner.md
+    runbook: docs/ops/run-control-lifecycle.md
   read_payload_fields:
     - RunSummary.execution_evidence
   status_fields:
@@ -581,8 +581,8 @@ execution_evidence_summary_contract:
   public_action_surfaces:
     - aor run cancel
     - aor run status --json
-    - manual-live-e2e --prepare-decision --action diagnose
-    - manual-live-e2e --prepare-decision --action retry_public_step
+    - aor run status --json
+    - aor run steer --target-step <step_class>
   interruption_semantics:
     stop_status: operator-stopped
     provider_step_status: interrupted

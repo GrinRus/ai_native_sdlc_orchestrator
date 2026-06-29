@@ -7,7 +7,7 @@ for the next AOR local console iteration. W34-S01 defines the runtime-owned flow
 semantics; W34-S02 implements the control-plane/runtime flow projections; W34-S03
 renders the packaged flow-first local web shell; W34-S04 adds flow-scoped
 evidence graph, runtime trace, interaction, and Ask AOR targeting behavior
-while later W34 slices add live E2E proof.
+while later W34 slices add browser-task installed-user proof.
 
 The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns
@@ -116,7 +116,7 @@ The packaged SPA now treats the flow as the primary object:
   stay available only through copy/debug actions.
 - The Operator Decision drawer is action-first: `Continue`, `Diagnose`,
   `Block`, `Retry public step`, `Answer`, and `Frontend interact` prepare the
-  same manual live E2E decision-helper path from `agent_decision_request_ref`.
+  same manual installed-user decision-helper path from `agent_decision_request_ref`.
   Rejection reasons are shown as readable copy, while raw request refs and
   helper command text remain behind copy/debug actions.
 - The Execution Evidence panel renders `RunSummary.execution_evidence` for the
@@ -169,10 +169,10 @@ Learning closure now provides an explicit safe transition into the next flow:
   command mutation, create fresh mission/intake packets, run `next`, and keep
   `upstream_writes_default=false`.
 
-## Live E2E implications
+## Installed-User Proof Implications
 
 The installed-user guided proof should be refreshed through the current
-skill-agent-only live E2E model so it proves the full flow-centric loop:
+skill-agent-only installed-user model so it proves the full flow-centric loop:
 
 1. Launch `aor app` and validate the browser-task frontend proof path.
 2. Create and complete the first flow through durable evidence.
@@ -192,10 +192,9 @@ skill-agent-only live E2E model so it proves the full flow-centric loop:
 The installed-user guided profile now makes the flow loop part of the proof
 contract:
 
-- `installed-user-guided-journey.yaml` keeps
-  `live_e2e.frontend_capability=browser-task-proof` and declares browser-task,
-  flow-loop, flow-targeted request, quality-assessment, and no-upstream-write
-  requirements.
+- The installed-user guided profile declares browser-task, flow-loop,
+  flow-targeted request, quality-assessment, and no-upstream-write
+  requirements without expanding the public CLI/runtime surface.
 - Guided proof generation records the first completed flow, completed-flow
   read-only state, a distinct follow-up flow, the learning handoff lineage,
   the second-flow intake/next-action files, and

@@ -15,16 +15,16 @@ The authoritative planning model for implementation lives in:
 | W2 | Introduce the first real routed execution path across routes, wrappers, prompt bundles, policies, and adapters. | 6 | EPIC-3, EPIC-7 | `docs/backlog/wave-2-implementation-slices.md` |
 | W3 | Build the validation, eval, harness, certification, and promotion stack that makes AOR quality-native by default. | 6 | EPIC-4, EPIC-7 | `docs/backlog/wave-3-implementation-slices.md` |
 | W4 | Add safe write-back modes, manifests, and release artifacts so AOR can move from rehearsal to controlled delivery. | 6 | EPIC-5, EPIC-7 | `docs/backlog/wave-4-implementation-slices.md` |
-| W5 | Expose operator-grade APIs, live views, and standardized live E2E orchestration for the full control plane. | 6 | EPIC-6, EPIC-7 | `docs/backlog/wave-5-implementation-slices.md` |
+| W5 | Expose operator-grade APIs, live views, and standardized internal installed-user rehearsal orchestration for the full control plane. | 6 | EPIC-6, EPIC-7 | `docs/backlog/wave-5-implementation-slices.md` |
 | W6 | Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release prep, and incident/audit flows. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-6-implementation-slices.md` |
 | W7 | Close MVP+ governance and quality stories for certification, finance evidence, and learning-loop integration. | 5 | EPIC-4, EPIC-7 | `docs/backlog/wave-7-implementation-slices.md` |
 | W8 | Close later-maturity stories for strategic operator visibility, governance hardening, context lifecycle maturity, and multi-repo delivery maturity. | 9 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
 | W9 | Stabilize post-audit findings across routed evidence durability, source-of-truth docs, public quality surfaces, detached transport, and live execution foundations. | 8 | EPIC-0, EPIC-3, EPIC-4, EPIC-6 | `docs/backlog/wave-9-implementation-slices.md` |
 | W10 | Reopen production-facing gaps left after the baseline audit across external runner execution, networked fork-first delivery, detached mutation transport, and live target-catalog proof. | 5 | EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-10-implementation-slices.md` |
-| W11 | Close the remaining target-backed live E2E proof gap through source-of-truth repair, target-checkout execution, target-anchored delivery evidence, and refreshed external proof. | 5 | EPIC-0, EPIC-3, EPIC-5, EPIC-7 | `docs/backlog/wave-11-implementation-slices.md` |
-| W12 | Remove public live-E2E product surfaces, move rehearsal to an internal installed-user black-box proof runner, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
-| W13 | Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
-| W14 | Expand live E2E into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
+| W11 | Close the remaining target-backed internal installed-user rehearsal proof gap through source-of-truth repair, target-checkout execution, target-anchored delivery evidence, and refreshed external proof. | 5 | EPIC-0, EPIC-3, EPIC-5, EPIC-7 | `docs/backlog/wave-11-implementation-slices.md` |
+| W12 | Remove public installed-user rehearsal product surfaces, move rehearsal to an internal black-box proof harness, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
+| W13 | Add a full user-journey internal installed-user rehearsal layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
+| W14 | Expand internal installed-user rehearsal into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
 | W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and making coverage proof claims machine-checkable. | 3 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
 | W16 | Reduce implementation complexity through behavior-preserving decomposition, shared helper extraction, and contract-first adapter permission cleanup. | 6 | EPIC-0, EPIC-3, EPIC-6, EPIC-7 | `docs/backlog/wave-16-implementation-slices.md` |
 | W17 | Remove post-W16 legacy public aliases and stale compatibility documentation. | 1 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-17-implementation-slices.md` |
@@ -37,32 +37,32 @@ The authoritative planning model for implementation lives in:
 | W24 | Move from step-level harness strength to run-level Runtime Harness ownership for production-grade orchestration decisions. | 3 | EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-24-implementation-slices.md` |
 | W25 | Produce the first real non-mock full-journey production proof with code-changing evidence and no upstream writes. | 3 | EPIC-7 | `docs/backlog/wave-25-implementation-slices.md` |
 | W26 | Make self-hosted production readiness repeatable, reviewable, and documented as a CLI/API production candidate with optional web. | 3 | EPIC-0, EPIC-7 | `docs/backlog/wave-26-implementation-slices.md` |
-| W27 | Replace legacy live E2E matrices with a black-box step journal and resumable interaction answers. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-27-implementation-slices.md` |
-| W28 | Close installed-user live E2E gaps with install proof, evaluator naming cleanup, and expanded target coverage. | 3 | EPIC-7 | `docs/backlog/wave-28-implementation-slices.md` |
+| W27 | Replace legacy internal installed-user rehearsal matrices with a black-box step journal and resumable interaction answers. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-27-implementation-slices.md` |
+| W28 | Close installed-user rehearsal gaps with install proof, evaluator naming cleanup, and expanded target coverage. | 3 | EPIC-7 | `docs/backlog/wave-28-implementation-slices.md` |
 | W29 | Open the npm CLI alpha release channel with guarded release branch automation. | 1 | EPIC-5 | `docs/backlog/wave-29-implementation-slices.md` |
 | W30 | Harden the self-hosted CLI/API alpha with ADRs, OpenAPI drift checks, operations runbooks, readiness evidence, and installed-user release smoke coverage. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-30-implementation-slices.md` |
 | W31 | Launch the packaged local app for installed users and make first Mission intake understandable through the UI. | 1 | EPIC-6 | `docs/backlog/wave-31-implementation-slices.md` |
 | W32 | Add runtime-owned interactive operator requests across CLI, API, and the local app for bounded artifact analysis and change proposals. | 1 | EPIC-6 | `docs/backlog/wave-32-implementation-slices.md` |
 | W33 | Align the post-rebase console source of truth around `aor app`, remove the static snapshot surface, and preserve local-alpha stabilization fixes without adding security/hosted scope. | 10 | EPIC-0, EPIC-6 | `docs/backlog/wave-33-implementation-slices.md` |
-| W34 | Refactor the local console around runtime-owned flows and prove the flow loop through browser-task live E2E evidence. | 7 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-34-implementation-slices.md` |
-| W35 | Harden live E2E operator UX for long-running providers, decision helper automation, readable artifacts, execution evidence, and Codex/Qwen proof. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-35-implementation-slices.md` |
+| W34 | Refactor the local console around runtime-owned flows and prove the flow loop through browser-task internal installed-user rehearsal evidence. | 7 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-34-implementation-slices.md` |
+| W35 | Harden internal installed-user rehearsal operator UX for long-running providers, decision helper automation, readable artifacts, execution evidence, and Codex/Qwen proof. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-35-implementation-slices.md` |
 | W36 | Make the local app self-guided from a no-settings launch and support explicitly added local projects without mixing runtime state. | 5 | EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-36-implementation-slices.md` |
 | W37 | Replan W35-S05 around bounded target setup and verification closure so Codex/Qwen proof attempts do not block before operator-visible decisions. | 1 | EPIC-7 | `docs/backlog/wave-37-implementation-slices.md` |
-| W38 | Make Qwen candidate live E2E progress observable through official stream-json output instead of treating buffered JSON stdout as provider silence. | 1 | EPIC-6, EPIC-7 | `docs/backlog/wave-38-implementation-slices.md` |
-| W39 | Standardize live E2E provider lifecycle semantics across Codex, Claude, OpenCode, and Qwen while keeping adapter-specific launch/progress behavior at the adapter boundary. | 1 | EPIC-7 | `docs/backlog/wave-39-implementation-slices.md` |
-| W40 | Turn alpha.7 installed-user findings into the next hardening wave for onboarding UX, active live E2E heartbeat visibility, release docs, and optional provider qualification. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-40-implementation-slices.md` |
+| W38 | Make Qwen candidate internal installed-user rehearsal progress observable through official stream-json output instead of treating buffered JSON stdout as provider silence. | 1 | EPIC-6, EPIC-7 | `docs/backlog/wave-38-implementation-slices.md` |
+| W39 | Standardize internal installed-user rehearsal provider lifecycle semantics across Codex, Claude, OpenCode, and Qwen while keeping adapter-specific launch/progress behavior at the adapter boundary. | 1 | EPIC-7 | `docs/backlog/wave-39-implementation-slices.md` |
+| W40 | Turn alpha.7 installed-user findings into the next hardening wave for onboarding UX, active internal installed-user rehearsal heartbeat visibility, release docs, and optional provider qualification. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-40-implementation-slices.md` |
 | W41 | Validate the published alpha.8 installed-user path, refresh provider qualification evidence, and turn findings into scoped fixes or follow-up backlog. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-41-implementation-slices.md` |
-| W42 | Publish the post-alpha.8 user-facing fix as alpha.9 and then clean up operator-initiated live E2E interruption ownership semantics. | 2 | EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-42-implementation-slices.md` |
-| W43 | Validate the published alpha.10 package and refresh installed-user/live E2E confidence evidence after the operator interruption classification release. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-43-implementation-slices.md` |
+| W42 | Publish the post-alpha.8 user-facing fix as alpha.9 and then clean up operator-initiated internal installed-user rehearsal interruption ownership semantics. | 2 | EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-42-implementation-slices.md` |
+| W43 | Validate the published alpha.10 package and refresh installed-user/internal installed-user rehearsal confidence evidence after the operator interruption classification release. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-43-implementation-slices.md` |
 | W44 | Split discovery/research/spec prompt assets and define readiness transitions while preserving artifact execution compatibility. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-44-implementation-slices.md` |
 | W45 | Make review/QA repair cycles bounded, contract-first, operator-visible, and replayable from prompt/context lineage through proof evidence. | 6 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-45-implementation-slices.md` |
-| W46 | Rebuild live E2E as black-box product-change assessment with step-quality gates, larger mission budgets, catalog migration, and hard target expansion. | 6 | EPIC-0, EPIC-7 | `docs/backlog/wave-46-implementation-slices.md` |
+| W46 | Rebuild internal installed-user rehearsal as black-box product-change assessment with step-quality gates, larger mission budgets, catalog migration, and hard target expansion. | 6 | EPIC-0, EPIC-7 | `docs/backlog/wave-46-implementation-slices.md` |
 | W47 | Convert W46 classified blockers into strict product acceptance by closing AOR UI accessibility, hard-target verification isolation, repair convergence evidence, and proof reruns. | 4 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-47-implementation-slices.md` |
-| W48 | Extend medium+ product-change live E2E into a realistic implementation quality cycle with QA-origin repair, structured repair context, hard-target toolchain policy, and control proof rerun. | 5 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-48-implementation-slices.md` |
+| W48 | Extend medium+ product-change rehearsal into a realistic implementation quality cycle with QA-origin repair, structured repair context, hard-target toolchain policy, and control proof rerun. | 5 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-48-implementation-slices.md` |
 | W49 | Close quality-cycle proof gaps with repair anti-loop enforcement, QA-specific step quality, findings hygiene, and mandatory Full Control live proof rerun. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-49-implementation-slices.md` |
 | W50 | Close W49 Fastify/Vitest blockers with review verification mapping, target toolchain fail-fast, control proof rerun, and findings sync. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-50-implementation-slices.md` |
 | W51 | Turn W50 proof into clean-commit closure, pursue Vitest large acceptance, automate final quality hydration, split target-readiness semantics, and add the next hard target only after large proof is stable. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-51-implementation-slices.md` |
-| W52 | Convert the remaining Vitest and SQLAlchemy hard-target live E2E evidence into product acceptance or precise non-acceptance blockers. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
+| W52 | Convert the remaining Vitest and SQLAlchemy hard-target installed-user rehearsal evidence into product acceptance or precise non-acceptance blockers. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -106,7 +106,7 @@ The authoritative planning model for implementation lives in:
 | W11-S04 | productionization gap closure: target-anchored delivery evidence (no direct story closure) |
 | W11-S05 | productionization gap closure: refreshed target-catalog proof bundle (no direct story closure) |
 | W12-S01 | public surface realignment and breaking removal planning (no direct story closure) |
-| W12-S02 | Live E2E Installed-User Proof Runner (no direct story closure) |
+| W12-S02 | Internal Installed-User Proof Harness (no direct story closure) |
 | W12-S03 | breaking CLI and contract removal (no direct story closure) |
 | W12-S04 | proof refresh after surface cleanup (no direct story closure) |
 | W15-S01 | readiness hardening: source-of-truth queue repair (no direct story closure) |
@@ -191,12 +191,12 @@ The authoritative planning model for implementation lives in:
 | W36-S03 | first-run wizard target: PBO-01, PBO-02, PBO-03, PBO-09 |
 | W36-S04 | local multi-project switcher target: PBO-09, OPS-01, OPS-10 |
 | W36-S05 | no-settings UI proof target: OPS-06, OPS-10, PBO-09 |
-| W37-S01 | live E2E target setup closure target: OPS-06, OPS-07, OPS-11 |
+| W37-S01 | internal installed-user rehearsal target setup closure target: OPS-06, OPS-07, OPS-11 |
 | W38-S01 | Qwen stream progress adapter target: OPS-01, OPS-06, OPS-07, OPS-11 |
-| W39-S01 | provider-neutral live E2E lifecycle target: OPS-01, OPS-06, OPS-07, OPS-11 |
+| W39-S01 | provider-neutral internal installed-user rehearsal lifecycle target: OPS-01, OPS-06, OPS-07, OPS-11 |
 | W40-S01 | post-alpha.7 backlog baseline and release smoke traceability (no direct story closure) |
 | W40-S02 | installed-user onboarding hardening target: PBO-09, OPS-01, OPS-06, OPS-10 |
-| W40-S03 | active live E2E heartbeat surfacing target: OPS-01, OPS-06, OPS-07, OPS-11 |
+| W40-S03 | active internal installed-user rehearsal heartbeat surfacing target: OPS-01, OPS-06, OPS-07, OPS-11 |
 | W40-S04 | optional provider qualification matrix target: DEV-04, AIP-12, OPS-06, OPS-07 |
 | W41-S01 | post-alpha.8 backlog baseline and validation traceability (no direct story closure) |
 | W41-S02 | alpha.8 installed-user onboarding smoke target: PBO-01, PBO-02, PBO-09, OPS-01, OPS-06, OPS-10 |
@@ -206,19 +206,19 @@ The authoritative planning model for implementation lives in:
 | W42-S02 | operator-initiated interruption owner classification target: OPS-01, OPS-06, OPS-11 |
 | W43-S01 | post-alpha.10 backlog baseline and traceability (no direct story closure) |
 | W43-S02 | alpha.10 installed-user smoke target: PBO-09, OPS-01, OPS-06, OPS-10 |
-| W43-S03 | alpha.10 live E2E interruption/provider smoke target: DEV-04, AIP-12, OPS-06, OPS-07, OPS-11 |
+| W43-S03 | alpha.10 internal installed-user rehearsal interruption/provider smoke target: DEV-04, AIP-12, OPS-06, OPS-07, OPS-11 |
 | W43-S04 | alpha.10 findings closure target: OPS-01, OPS-06, OPS-10, OPS-11 |
 | W44-S01 | artifact workflow taxonomy and transition invariant target: DIS-03, DIS-07, DIS-08, ARC-08, OPS-10 |
 | W44-S02 | discovery/research/spec prompt asset granularity target: DIS-03, DIS-07, DIS-08, ARC-08 |
 | W44-S03 | artifact readiness and stale transition target: DIS-07, DIS-08, ARC-08, PBO-07, OPS-10 |
 | W44-S04 | context/skill/policy overlay governance target: DIS-08, ARC-08, RQA-06, AIP-11, OPS-10 |
-| W44-S05 | post-implementation docs and live E2E proof target: DIS-08, ARC-08, DEV-04, OPS-06, OPS-10, OPS-11 |
+| W44-S05 | post-implementation docs and internal installed-user rehearsal proof target: DIS-08, ARC-08, DEV-04, OPS-06, OPS-10, OPS-11 |
 | W45-S01 | quality repair contract target: DEV-05, DEV-07, RQA-02, RQA-06, OPS-04 |
 | W45-S02 | bounded repair state-machine target: DEV-05, EMP-07, RQA-05, RQA-06, OPS-01 |
 | W45-S03 | quality repair CLI/API target: DEV-05, RQA-02, OPS-04, OPS-10 |
 | W45-S04 | repair-cycle console visibility target: OPS-01, OPS-02, OPS-04, OPS-11, RQA-02 |
 | W45-S05 | repair-loop proof/profile target: DEV-05, RQA-05, OPS-06, OPS-07, FIN-03 |
-| W45-S06 | post-implementation docs/live E2E acceptance target: DEV-05, DEV-07, RQA-02, RQA-05, RQA-06, OPS-04, OPS-06, OPS-07, FIN-03 |
+| W45-S06 | post-implementation docs/internal installed-user rehearsal acceptance target: DEV-05, DEV-07, RQA-02, RQA-05, RQA-06, OPS-04, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -227,7 +227,7 @@ The authoritative planning model for implementation lives in:
 - the workspace has honest root commands and a stable scaffold for future packages and apps
 - contracts and examples are loaded and checked through shared validation paths
 - the backlog model is wave → epic → slice → local task and is usable by agents without guesswork
-- live E2E profiles support a no-write preflight path before any delivery automation exists
+- internal installed-user rehearsal profiles support a no-write preflight path before any delivery automation exists
 - CI gates prevent contract, example, and roadmap drift
 
 **Detailed slices:** `docs/backlog/wave-0-implementation-slices.md`
@@ -260,7 +260,7 @@ The authoritative planning model for implementation lives in:
 **Goal:** Build the validation, eval, harness, certification, and promotion stack that makes AOR quality-native by default.
 
 **Exit criteria:**
-- asset-graph validation covers routes, wrappers, prompt bundles, step policies, datasets, suites, and live E2E profiles
+- asset-graph validation covers routes, wrappers, prompt bundles, step policies, datasets, suites, and internal installed-user rehearsal profiles
 - datasets and evaluation suites are registry-backed and executable through one eval runtime
 - harness capture and replay produce normalized evidence that can be compared across changes
 - wrapper and route changes can be certified through reusable eval and harness workflows
@@ -280,14 +280,14 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-4-implementation-slices.md`
 
-## W5 — operator and live E2E foundation
-**Goal:** Expose operator-grade APIs, live views, and standardized live E2E orchestration for the full control plane.
+## W5 — operator and internal installed-user rehearsal foundation
+**Goal:** Expose operator-grade APIs, live views, and standardized internal installed-user rehearsal orchestration for the full control plane.
 
 **Exit criteria:**
 - the control plane exposes read APIs for project state, packets, runs, and quality evidence
 - live run events stream through a stable event model usable by CLI and web surfaces
 - CLI and detachable web UI can inspect runs and perform bounded interventions
-- standard live E2E profiles execute through the same control plane used by product features
+- standard internal installed-user rehearsal profiles execute through the same control plane used by product features
 - scorecards, incident capture, and learning-loop outputs are durable artifacts
 
 **Detailed slices:** `docs/backlog/wave-5-implementation-slices.md`
@@ -350,16 +350,16 @@ The authoritative planning model for implementation lives in:
 - detached transport supports bounded authenticated mutation commands for connected operator clients
 - at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
 
-**Current status note:** `W10-S05` is a historical closure row. Its old short-profile proof bundles were removed when live E2E moved to skill-agent-only proof, so they must not be used as current acceptance evidence. Current closure evidence for live E2E starts with catalog-backed full journeys, `installed-user-guided-journey`, and the W25 production-proof fixture.
+**Current status note:** `W10-S05` is a historical closure row. Its old short-profile proof bundles were removed when internal installed-user rehearsal moved to skill-agent-only proof, so they must not be used as current acceptance evidence. Current closure evidence for internal installed-user rehearsal starts with catalog-backed full journeys, `installed-user-guided-journey`, and the W25 production-proof fixture.
 
 **Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
 
-## W11 — target-backed live E2E proof closure
-**Goal:** Make standard live E2E truly target-backed, profile-driven, and honest enough to serve as production-facing proof.
+## W11 — target-backed internal installed-user rehearsal proof closure
+**Goal:** Make standard internal installed-user rehearsal truly target-backed, profile-driven, and honest enough to serve as production-facing proof.
 
 **Exit criteria:**
-- standard `live-e2e` executes against a cloned target checkout rather than the AOR workspace
-- preflight executes machine-readable setup and verification commands from the live E2E profile
+- standard internal rehearsal executes against a cloned target checkout rather than the AOR workspace
+- preflight executes machine-readable setup and verification commands from the internal installed-user rehearsal profile
 - routed live execution invokes the supported external adapter path from the target checkout root
 - delivery manifests and release packets anchor repo root and changed paths to the target checkout
 - historical target-backed short-profile bundles were removed from current proof evidence; new closure claims must use catalog-backed full journeys with skill-agent decisions
@@ -367,52 +367,52 @@ The authoritative planning model for implementation lives in:
 **Detailed slices:** `docs/backlog/wave-11-implementation-slices.md`
 
 ## W12 — public-surface removal and installed-user proof conversion
-**Goal:** Remove public `live-e2e` CLI and contract surfaces, move rehearsal to repo-maintainer-only tooling, and prove the same target scenarios through an internal installed-user black-box proof runner.
+**Goal:** Remove public installed-user rehearsal CLI and contract surfaces, move rehearsal to repo-maintainer-only tooling, and prove the same target scenarios through an internal black-box proof harness.
 
 **Exit criteria:**
-- public CLI/help/catalog/contracts no longer expose `live-e2e` command or profile surfaces
-- public project-profile examples no longer advertise `live_e2e_defaults`
+- public CLI/help/catalog/contracts no longer expose internal rehearsal command or profile surfaces
+- public project-profile examples no longer advertise internal rehearsal defaults
 - internal rehearsal runs execute installed-user style through external `aor` subprocesses rather than direct runtime imports
-- refreshed proof bundles and runbooks use the installed-user black-box proof runner and no longer depend on removed `aor live-e2e *` commands
+- refreshed proof bundles and runbooks use the installed-user black-box proof harness and no longer depend on removed rehearsal commands
 
 **Closure evidence:**
-- installed-user proof runner: `scripts/live-e2e/run-profile.mjs`
-- black-box coverage: `scripts/test/live-e2e-proof-runner.test.mjs`
-- refreshed operator runbooks: `docs/ops/live-e2e-standard-runner.md`, `docs/ops/live-e2e-learning-loop.md`, `docs/ops/live-e2e-no-write-preflight.md`
-- current proof fixtures: `examples/live-e2e/fixtures/w21-s07/*.json` for guided installed-user samples and `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` for the sanitized production-proof fixture
+- installed-user proof harness: internal maintainer runner
+- black-box coverage: internal maintainer runner tests
+- refreshed operator runbooks: internal maintainer runbooks
+- current proof fixtures: internal guided installed-user samples plus `scripts/production-readiness/fixtures/w25-s03-production-proof.json` for the sanitized production-proof fixture
 
 **Detailed slices:** `docs/backlog/wave-12-implementation-slices.md`
 
-## W13 — catalog-backed full-journey live E2E and quality verdict expansion
-**Goal:** Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime success plus discovery, artifact, code, delivery, and learning-loop quality through public surfaces.
+## W13 — catalog-backed full-journey internal installed-user rehearsal and quality verdict expansion
+**Goal:** Add a full user-journey internal installed-user rehearsal layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime success plus discovery, artifact, code, delivery, and learning-loop quality through public surfaces.
 
 **Exit criteria:**
-- machine-readable target and mission catalog exists under `scripts/live-e2e/catalog/` and stays aligned with `docs/ops/live-e2e-target-catalog.md`
-- `aor project init` can bootstrap a clean target repo without proof-runner-side asset injection
+- machine-readable target and mission catalog exists under internal maintainer tooling and stays aligned with the internal target-catalog runbook
+- `aor project init` can bootstrap a clean target repo without private-tooling-side asset injection
 - `aor intake create` and `aor discovery run` can materialize and trace feature-specific mission input
 - `aor run start` launches real execution runs rather than control-state-only transitions
 - public `review run` and `learning handoff` surfaces produce durable `review-report`, `learning-loop-scorecard`, and `learning-loop-handoff` artifacts
-- internal live E2E proof runner supports a mandatory full-journey layer that runs only on curated repos and curated missions
-- restored `live-e2e-runner` skill can prepare the feature request, run the public flow, and return a multi-axis verdict matrix
+- internal installed-user proof harness supports a mandatory full-journey layer that runs only on curated repos and curated missions
+- restored internal runner skill can prepare the feature request, run the public flow, and return a multi-axis verdict matrix
 
 **Detailed slices:** `docs/backlog/wave-13-implementation-slices.md`
 
-## W14 — live E2E scenario/provider/feature-size matrix
-**Goal:** Turn curated full-journey live E2E into a matrix across scenario family, pinned provider variant, and size-classed feature missions while keeping the matrix curated rather than Cartesian-complete.
+## W14 — internal installed-user rehearsal scenario/provider/feature-size matrix
+**Goal:** Turn curated full-journey internal installed-user rehearsal into a matrix across scenario family, pinned provider variant, and size-classed feature missions while keeping the matrix curated rather than Cartesian-complete.
 
 **Exit criteria:**
-- curated live E2E catalogs define scenario policies, provider variants, and target missions with explicit `small`, `medium`, and `large` size classes
+- curated internal installed-user rehearsal catalogs define scenario policies, provider variants, and target missions with explicit `small`, `medium`, and `large` size classes
 - full-journey profiles pin `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id`
-- the installed-user proof runner rejects invalid matrix cells and materializes deterministic provider-pinned route overrides for accepted cells
+- the installed-user proof harness rejects invalid matrix cells and materializes deterministic provider-pinned route overrides for accepted cells
 - review, audit, summary, and learning-loop artifacts preserve matrix-cell metadata plus feature-size/provider execution verdicts
-- operator docs, runner skill guidance, tests, and proof bundles describe live E2E as a curated matrix with required repo-specific coverage cells
+- operator docs, runner skill guidance, tests, and proof bundles describe internal installed-user rehearsal as a curated matrix with required repo-specific coverage cells
 
 **Detailed slices:** `docs/backlog/wave-14-implementation-slices.md`
 
-**Current status note:** `W14-S07` is historical matrix-coverage planning context. Its mock-backed `coverage_with_findings` fixture bundle was removed after the live E2E skill-agent-only migration and must not be used as current acceptance evidence.
+**Current status note:** `W14-S07` is historical matrix-coverage planning context. Its mock-backed `coverage_with_findings` fixture bundle was removed after the internal installed-user rehearsal skill-agent-only migration and must not be used as current acceptance evidence.
 
 ## W15 — readiness hardening and proof integrity
-**Goal:** Remove false readiness signals after W14 by making source-of-truth drift, package/module map drift, and live E2E proof scope machine-checkable.
+**Goal:** Remove false readiness signals after W14 by making source-of-truth drift, package/module map drift, and internal installed-user rehearsal proof scope machine-checkable.
 
 **Exit criteria:**
 - W15 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
@@ -427,7 +427,7 @@ The authoritative planning model for implementation lives in:
 **Exit criteria:**
 - W16 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - repeated helper logic has package-local shared implementations where behavior is duplicated across runtime modules
-- CLI, API, core, contracts, and installed-user proof runner decomposition preserves public command, route, contract, and proof output shapes
+- CLI, API, core, contracts, and installed-user proof harness decomposition preserves public command, route, contract, and proof output shapes
 - adapter permission legacy fallback fails through explicit permission-policy validation rather than a runtime args fallback
 
 **Detailed slices:** `docs/backlog/wave-16-implementation-slices.md`
@@ -440,7 +440,7 @@ The authoritative planning model for implementation lives in:
 - CLI incident outputs expose only the canonical incident report path field
 - delivery mode inputs accept only canonical `no-write`, `patch-only`, `local-branch`, and `fork-first-pr` values
 - adapter permission legacy wording remains only where documenting or testing unsupported `external_runtime.args`
-- docs, examples, live E2E profiles, and proof fixtures no longer advertise public legacy aliases
+- docs, examples, internal installed-user rehearsal profiles, and proof fixtures no longer advertise public legacy aliases
 
 **Detailed slices:** `docs/backlog/wave-17-implementation-slices.md`
 
@@ -543,11 +543,11 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-26-implementation-slices.md`
 
-## W27 — black-box live E2E step journal
-**Goal:** Replace legacy live E2E post-run matrices with a black-box step journal, resumable interaction answers, explicit profile policies, and updated runner skills.
+## W27 — black-box internal installed-user rehearsal step journal
+**Goal:** Replace legacy internal installed-user rehearsal post-run matrices with a black-box step journal, resumable interaction answers, explicit profile policies, and updated runner skills.
 
 **Exit criteria:**
-- Live E2E observation reports use ordered `step_journal` entries and reject legacy matrix fields.
+- Internal installed-user rehearsal observation reports use ordered `step_journal` entries and reject legacy matrix fields.
 - `run answer`, API, and web paths resume recorded interaction boundaries when possible.
 - Profiles declare flow range, interaction, frontend, and safety policy.
 - Runner summaries link factual run-health reports; outcome quality moves to separate post-run assessment reports.
@@ -555,11 +555,11 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-27-implementation-slices.md`
 
-## W28 — installed-user live E2E gap closure and matrix expansion
+## W28 — installed-user rehearsal gap closure and matrix expansion
 **Goal:** Add explicit AOR install proof, setup/prelude evidence, full-lifecycle bounded execution, deterministic interaction answer support, evaluator naming cleanup, and expanded curated target coverage.
 
 **Exit criteria:**
-- Live E2E reports include `aor_installation_proof_file` and `setup_journal[]`.
+- Internal installed-user rehearsal reports include `aor_installation_proof_file` and `setup_journal[]`.
 - Full-lifecycle profiles execute release and learning rather than skipping them.
 - Step evaluator terminology is separated from Runtime Harness certification.
 - Commander.js and pluggy are required matrix targets; Cobra and date-fns were retired from the active matrix by W46 instead of remaining catalog-only candidates.
@@ -616,7 +616,7 @@ boundaries.
 - CLI, API, and web can create and run operator requests with `delivery_mode=no-write` by default and explicit `patch-only` scope when patches are requested.
 - Request runs route through compiled context, produce routed step results, proposal/patch evidence, and refresh `next-action-report`.
 - Read/live/web surfaces show sanitized summaries and refs, while raw request text remains only in durable request artifacts.
-- Live E2E docs and fixtures cover no-write analysis, patch-only document proposal, and separation from runtime-initiated interaction answers.
+- Internal installed-user rehearsal docs and fixtures cover no-write analysis, patch-only document proposal, and separation from runtime-initiated interaction answers.
 
 **Detailed slices:** `docs/backlog/wave-32-implementation-slices.md`
 
@@ -627,14 +627,14 @@ boundaries.
 - W33 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
 - `aor app` is documented as the packaged React/Vite local SPA served by a foreground loopback process with same-origin control-plane routes.
 - `aor ui attach` and `aor ui detach` remain lifecycle commands, not the main console launch path.
-- Live E2E guided proof captures app-smoke evidence from `aor app --smoke true --open false --json`; generated HTML snapshots are not a proof or console path.
+- Internal installed-user rehearsal guided proof captures app-smoke evidence from `aor app --smoke true --open false --json`; generated HTML snapshots are not a proof or console path.
 - The local-alpha repair fixes for root gates, runtime-root fidelity, launch guidance, CLI ergonomics, OpenAPI payload depth, runtime read bounds, and web maintainability are mapped to W33 rather than W31/W32 semantics.
 - Security, CORS/preflight, hosted deployment, SSO, and production contour hardening remain out of scope.
 
 **Detailed slices:** `docs/backlog/wave-33-implementation-slices.md`
 
 ## W34 - flow-centric console refactor and browser-task proof
-**Goal:** Refactor the installed-user local console around runtime-owned flow selection, active/completed flow boundaries, closure-to-new-flow behavior, and flow-scoped evidence views, then prove the loop through the current skill-agent-only browser-task live E2E path.
+**Goal:** Refactor the installed-user local console around runtime-owned flow selection, active/completed flow boundaries, closure-to-new-flow behavior, and flow-scoped evidence views, then prove the loop through the current skill-agent-only browser-task internal installed-user rehearsal path.
 
 **Exit criteria:**
 - W34 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
@@ -643,13 +643,13 @@ boundaries.
 - The packaged local SPA implements the accepted W34 design references for flow selector, active cockpit, advanced views, and learning closure.
 - Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery, release, and learning surfaces preserve selected-flow boundaries.
 - Release smoke for `aor app --smoke --open false --json` proves the packaged flow-centric bundle still exposes the flow selector and `New Flow` markers.
-- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted operator decisions, AOR operator UI evidence refs, no-upstream-write assertions, first-flow completion evidence, a distinct follow-up flow, flow-targeted operator-request proof, and separate post-run quality assessment when outcome quality is evaluated.
+- Internal installed-user rehearsal uses a guided journey profile with browser-task frontend capability, accepted operator decisions, AOR operator UI evidence refs, no-upstream-write assertions, first-flow completion evidence, a distinct follow-up flow, flow-targeted operator-request proof, and separate post-run quality assessment when outcome quality is evaluated.
 - Deleted bounded profiles and mock-backed proof bundles remain out of the current proof path.
 
 **Detailed slices:** `docs/backlog/wave-34-implementation-slices.md`
 
-## W35 - live E2E operator UX hardening
-**Goal:** Make real Codex/Qwen live E2E operation understandable from the console and operator reports by showing long-running provider heartbeat, automating skill-agent decision artifacts, rendering evidence refs in user-facing form, and proving safe interruption/retry behavior.
+## W35 - internal installed-user rehearsal operator UX hardening
+**Goal:** Make real Codex/Qwen internal installed-user rehearsal operation understandable from the console and operator reports by showing long-running provider heartbeat, automating skill-agent decision artifacts, rendering evidence refs in user-facing form, and proving safe interruption/retry behavior.
 
 **Exit criteria:**
 - W35 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
@@ -660,7 +660,7 @@ boundaries.
 - Artifact refs render as concise evidence summaries grouped by flow stage and status, with raw refs available for copy/debug.
 - Execution evidence distinguishes mission-relevant changed paths, runtime-owned artifacts, runner-owned state leaks, scratch files, Runtime Harness status, verification status, and no-upstream-write state.
 - Stop, diagnose, and retry controls use public control-plane surfaces and preserve partial evidence.
-- Codex/Qwen live E2E UX proof uses current skill-agent-only profiles and does not reintroduce removed bounded or mock-backed proof paths.
+- Codex/Qwen internal installed-user rehearsal UX proof uses current skill-agent-only profiles and does not reintroduce removed bounded or mock-backed proof paths.
 - W35-S05 proof closure includes the silent-provider UX fixture, a clean Codex small proof, and a fail-closed Qwen provider blocker with target setup/verification shown separately from provider execution.
 
 **Detailed slices:** `docs/backlog/wave-35-implementation-slices.md`
@@ -678,70 +678,70 @@ boundaries.
 
 **Detailed slices:** `docs/backlog/wave-36-implementation-slices.md`
 
-## W37 - live E2E target setup closure
+## W37 - internal installed-user rehearsal target setup closure
 **Goal:** Turn the W35-S05 Codex/Qwen blocker into bounded target setup and verification behavior before retrying provider proof, so long-running Playwright or full-suite target checks are visible, budgeted, and fail-closed before any provider-quality conclusion is made.
 
 **Exit criteria:**
 - W37 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
-- The `ky` live E2E target setup path has bounded Playwright/browser dependency handling and does not run unbounded `npm exec playwright install` during baseline diagnostic.
+- The `ky` internal installed-user rehearsal target setup path has bounded Playwright/browser dependency handling and does not run unbounded `npm exec playwright install` during baseline diagnostic.
 - Target verification separates provider-independent setup blockers from Codex/Qwen provider quality evidence.
-- Live E2E summaries separate AOR runner/controller failures from target repository setup/test/build failures with `failure_owner` and `failure_phase` evidence.
+- Internal installed-user rehearsal summaries separate AOR runner/controller failures from target repository setup/test/build failures with `failure_owner` and `failure_phase` evidence.
 - W37-S01 closure evidence is cited by W35-S05: Codex now closes cleanly and Qwen non-pass is recorded as provider-owned blocker evidence after bounded target setup and verification pass.
 
 **Detailed slices:** `docs/backlog/wave-37-implementation-slices.md`
 
 ## W38 - Qwen stream progress adapter closure
-**Goal:** Replace Qwen candidate buffered JSON stdout with official stream-json progress so live E2E operator surfaces can show provider activity before final output.
+**Goal:** Replace Qwen candidate buffered JSON stdout with official stream-json progress so internal installed-user rehearsal operator surfaces can show provider activity before final output.
 
 **Exit criteria:**
 - W38 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
 - Qwen candidate adapter profiles use `--output-format stream-json --include-partial-messages` while preserving existing safety, auth, timeout, and request transport behavior.
 - Provider heartbeat exposes sanitized Qwen stream progress fields without depending on private `~/.qwen/**` logs.
-- Live E2E summaries and UI distinguish stream-observed provider progress from true `silent-running`.
+- Internal installed-user rehearsal summaries and UI distinguish stream-observed provider progress from true `silent-running`.
 - Regression tests prove stream JSONL progress prevents false silent-provider UX, malformed lines fail safely, and interrupted runs preserve progress evidence.
 
 **Detailed slices:** `docs/backlog/wave-38-implementation-slices.md`
 
-## W39 - live E2E provider parity standardization
-**Goal:** Make live E2E provider execution semantics provider-neutral across Codex, Claude, OpenCode, and Qwen while keeping command/auth/progress differences at the adapter boundary.
+## W39 - internal installed-user rehearsal provider parity standardization
+**Goal:** Make internal installed-user rehearsal provider execution semantics provider-neutral across Codex, Claude, OpenCode, and Qwen while keeping command/auth/progress differences at the adapter boundary.
 
 **Exit criteria:**
 - W39 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
-- Live E2E runbooks define provider parity for public lifecycle, target classification, evidence, Runtime Harness retry/repair, operator decisions, and pass/blocker semantics.
-- Provider-pinned policy materialization defaults missing attempt maps to `retry=0` and `repair=0` for provider-backed live E2E steps.
+- Internal installed-user rehearsal runbooks define provider parity for public lifecycle, target classification, evidence, Runtime Harness retry/repair, operator decisions, and pass/blocker semantics.
+- Provider-pinned policy materialization defaults missing attempt maps to `retry=0` and `repair=0` for provider-backed internal installed-user rehearsal steps.
 - Qwen profiles no longer carry provider-only retry/repair lifecycle maps.
 - Regression tests prove terminal provider failure preserves evidence without starting internal repair by default.
 
 **Detailed slices:** `docs/backlog/wave-39-implementation-slices.md`
 
 ## W40 - post-alpha.7 installed-user and provider qualification hardening
-**Goal:** Convert the `0.1.0-alpha.7` release and installed-user smoke findings into the next deterministic backlog wave for onboarding polish, live E2E in-flight observability, and optional provider qualification without expanding into stable, hosted, Docker/GHCR, or SDK release scope.
+**Goal:** Convert the `0.1.0-alpha.7` release and installed-user smoke findings into the next deterministic backlog wave for onboarding polish, internal installed-user rehearsal in-flight observability, and optional provider qualification without expanding into stable, hosted, Docker/GHCR, or SDK release scope.
 
 **Exit criteria:**
 - W40 is represented across the roadmap, master backlog, dependency graph, epic map, and owning wave doc.
 - Installed-user docs and smoke guidance distinguish registry package execution from local checkout context so `npm exec --package @grinrus/aor@<version>` remains a reliable proof path.
 - The no-settings `aor app` onboarding path has targeted UX hardening for first-run, runtime initialization, first flow, project switching, and readable failure guidance.
-- Live E2E UI/report surfaces show active provider heartbeat/progress while a provider step is still running, not only after terminal evidence lands.
+- Internal installed-user rehearsal UI/report surfaces show active provider heartbeat/progress while a provider step is still running, not only after terminal evidence lands.
 - Release and onboarding docs explain the alpha channel, clean UI launch, no surprise writes, and advanced headless paths in one coherent installed-user story.
 - Optional provider qualification tracks Qwen, OpenCode, Claude, and Codex through a matrix that separates coverage tier, auth/environment blockers, target repository blockers, and AOR product failures.
 
 **Detailed slices:** `docs/backlog/wave-40-implementation-slices.md`
 
 ## W41 - post-alpha.8 installed-user validation and qualification refresh
-**Goal:** Validate the published `0.1.0-alpha.8` package from an installed-user perspective, refresh provider qualification evidence through the standardized live E2E lifecycle, and convert findings into scoped fixes or backlog follow-up.
+**Goal:** Validate the published `0.1.0-alpha.8` package from an installed-user perspective, refresh provider qualification evidence through the standardized internal installed-user rehearsal lifecycle, and convert findings into scoped fixes or backlog follow-up.
 
 **Exit criteria:**
 - W41 is represented across the roadmap, master backlog, dependency graph, epic map, and owning wave doc.
 - Installed-user smoke starts from the npm registry package in a neutral temp runner and proves help, app smoke, first-run wizard, project switcher, flow selector, `New Flow`, and no implicit runtime creation.
 - Browser/UI validation covers clean first-run onboarding, existing-runtime resume, local multi-project switching, readable error states, and first-flow handoff without hosted/SaaS scope.
-- Live E2E qualification refresh uses W39 provider parity and W40 qualification semantics to separate AOR product failures, target repository blockers, provider failures, environment blockers, and operator decisions.
+- Internal installed-user rehearsal qualification refresh uses W39 provider parity and W40 qualification semantics to separate AOR product failures, target repository blockers, provider failures, environment blockers, and operator decisions.
 - Findings are either fixed in a scoped slice with tests and evidence or split into new backlog entries with owner, phase, acceptance criteria, and done evidence.
 - W41 does not claim stable readiness, another npm release, Docker/GHCR, hosted/SaaS, SDK release, or mandatory Qwen/OpenCode/Claude qualification.
 
 **Detailed slices:** `docs/backlog/wave-41-implementation-slices.md`
 
 ## W42 - alpha.9 release and operator interruption classification follow-up
-**Goal:** Release the W41 post-alpha.8 user-facing evidence-rendering fix through the npm alpha channel, then address the remaining live E2E owner/phase clarity finding for operator-initiated provider interruptions.
+**Goal:** Release the W41 post-alpha.8 user-facing evidence-rendering fix through the npm alpha channel, then address the remaining internal installed-user rehearsal owner/phase clarity finding for operator-initiated provider interruptions.
 
 **Exit criteria:**
 - Alpha.9 release prep is queued after W41-S04 and includes only already-merged W41 fixes/docs, without stable/Docker/GHCR/SDK claims.
@@ -750,9 +750,9 @@ boundaries.
 
 **Detailed slices:** `docs/backlog/wave-42-implementation-slices.md`
 
-## W43 - post-alpha.10 installed-user and live E2E confidence refresh
+## W43 - post-alpha.10 installed-user and internal installed-user rehearsal confidence refresh
 **Goal:** Validate the published `0.1.0-alpha.10` package from installed-user
-and live E2E perspectives, then convert any confidence or readability findings
+and internal installed-user rehearsal perspectives, then convert any confidence or readability findings
 into scoped follow-up work without mixing release validation with new feature
 development.
 
@@ -760,7 +760,7 @@ development.
 - W43 is represented across the roadmap, master backlog, dependency graph, epic map, README pointer, and owning wave doc.
 - Installed-user smoke starts from the npm registry package in a neutral temp runner and proves help, app smoke, first-run wizard, project switcher, flow selector, `New Flow`, and no implicit runtime creation.
 - Browser/UI validation covers clean first-run onboarding, existing-runtime resume, local multi-project switching, readable evidence/error states, and first-flow handoff.
-- Live E2E smoke verifies that operator-owned provider interruption evidence remains readable in reports/UI and does not hide provider, target repository, environment, or AOR failures.
+- Internal installed-user rehearsal smoke verifies that operator-owned provider interruption evidence remains readable in reports/UI and does not hide provider, target repository, environment, or AOR failures.
 - Optional Qwen/OpenCode/Claude provider coverage remains non-release-blocking unless a future release policy explicitly changes it.
 - Findings are either fixed in a scoped slice with tests and evidence or split into backlog entries with owner, phase, acceptance criteria, and done evidence.
 
@@ -786,7 +786,7 @@ upstream artifacts.
 - Context, skill, and policy overlays are added only after prompt/readiness
   evidence proves that a split is needed.
 - W44 closure requires updated README, architecture, contract, ops, and example
-  docs plus live E2E evidence that the implemented flow still works or has
+  docs plus internal installed-user rehearsal evidence that the implemented flow still works or has
   classified follow-up findings.
 
 **Detailed slices:** `docs/backlog/wave-44-implementation-slices.md`
@@ -809,17 +809,17 @@ operator-visible next actions, and replayable proof.
   compiled prompt/context lineage.
 - CLI/API/web surfaces expose open repair requests, attempts used/remaining,
   blocker state, and the single next safe action.
-- Proof fixtures and a required post-implementation live E2E acceptance run
+- Proof fixtures and a required post-implementation internal installed-user rehearsal acceptance run
   cover review-origin repair, QA-origin repair, and budget exhaustion.
 - Source-of-truth docs are refreshed after implementation and W45 cannot close
-  as all-ok without passing live E2E run refs.
+  as all-ok without passing internal installed-user rehearsal run refs.
 
 **Detailed slices:** `docs/backlog/wave-45-implementation-slices.md`
 
-## W47 - product live E2E acceptance closure
+## W47 - product internal installed-user rehearsal acceptance closure
 **Goal:** Keep the W46 black-box product-quality policy intact while removing
 the concrete blockers that prevented all-pass product acceptance: AOR operator
-keyboard accessibility, live E2E target verification contamination, Vitest setup
+keyboard accessibility, internal installed-user rehearsal target verification contamination, Vitest setup
 readiness, and repair/review convergence evidence.
 
 **Exit criteria:**
@@ -838,7 +838,7 @@ readiness, and repair/review convergence evidence.
 **Detailed slices:** `docs/backlog/wave-47-implementation-slices.md`
 
 ## W48 - product quality-cycle implementation loop
-**Goal:** Extend medium+ product-change live E2E into the realistic
+**Goal:** Extend medium+ product-change rehearsal into the realistic
 `execution#N -> review#N -> qa#N` implementation cycle while preserving public
 repair boundaries and strict all-pass product acceptance policy.
 
@@ -877,8 +877,8 @@ proof set must be rerun on one commit.
 
 **Detailed slices:** `docs/backlog/wave-49-implementation-slices.md`
 
-## W50 - live E2E failure closure after W49 control run
-**Goal:** Remove the two real W49 blockers without weakening live E2E quality
+## W50 - internal installed-user rehearsal failure closure after W49 control run
+**Goal:** Remove the two real W49 blockers without weakening internal installed-user rehearsal quality
 gates: Fastify repair should not loop on a broad verification mapping warning
 when code and verification pass, and Vitest should fail fast on incompatible
 Node before target setup or product execution.
@@ -886,7 +886,7 @@ Node before target setup or product execution.
 **Exit criteria:**
 - Review reports preserve `artifact_quality.verification_coverage` and treat
   broad repo/package test commands as covering changed tests where appropriate.
-- Live E2E review-origin repair starts only for actionable implementation
+- Internal installed-user rehearsal review-origin repair starts only for actionable implementation
   repair, not verification-mapping-only warnings with passing verification.
 - Profiles with `target_toolchain.node.required_range` stop before target
   install/build/test/lint commands when no compatible Node is available.
@@ -917,7 +917,7 @@ and make target-readiness blockers first-class.
 
 **Detailed slices:** `docs/backlog/wave-51-implementation-slices.md`
 
-## W52 - remaining hard-target live E2E acceptance closure
+## W52 - remaining hard-target internal installed-user rehearsal acceptance closure
 **Goal:** Turn W51's terminal Vitest and SQLAlchemy hard-target evidence into
 strict product acceptance where possible, without weakening final all-pass
 quality gates or hiding target/environment blockers.
@@ -926,7 +926,7 @@ quality gates or hiding target/environment blockers.
 - Top-level run-health reports preserve target-readiness owner, phase, and
   class when target readiness blocks before product execution.
 - Warning-mode diagnostics have bounded timeout and pipe-hang handling so
-  terminal command evidence cannot leave live E2E proof runners stuck.
+  terminal command evidence cannot leave internal installed-user rehearsal proof harnesses stuck.
 - Vitest large either reaches terminal product flow plus final all-pass quality
   gate, or records a new blocker that is not a W50/W51 setup regression.
 - SQLAlchemy large has an explicit full-suite diagnostic policy and either

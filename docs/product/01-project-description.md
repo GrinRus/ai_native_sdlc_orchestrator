@@ -133,14 +133,14 @@ The research report has two deterministic states:
 
 `spec build` carries this research gate into its routed `step-result`. The gate does not perform autonomous web research and does not block all specification work by itself, but it makes missing ADR evidence explicit before handoff.
 
-## Live E2E posture
-AOR ships with four standard rehearsal classes:
+## Installed-User Rehearsal Posture
+AOR maintainers keep four standard internal rehearsal classes:
 - regress short
 - regress long
 - release short
 - release long
 
-These profiles are designed to run on real public repositories through `no-write`, `patch-only`, or `fork-first-pr` delivery defaults.
+These internal profiles are designed to run on real public repositories through `no-write`, `patch-only`, or `fork-first-pr` delivery defaults.
 
 The W13 full-journey layer adds:
 - curated repository selection instead of arbitrary live targets;

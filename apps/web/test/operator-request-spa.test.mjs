@@ -81,8 +81,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Operator Decision/u);
   assert.match(source, /operatorDecisionRequestsForFlow/u);
   assert.match(source, /supportedDecisionActionsFromRecord/u);
-  assert.match(source, /decisionHelperCommand/u);
-  assert.match(source, /Prepare corrected draft/u);
+  assert.match(source, /isOperatorDecisionRequestRow/u);
+  assert.doesNotMatch(source, new RegExp(["manual", "live", "e2e"].join("-"), "u"));
   assert.match(source, /Execution Evidence/u);
   assert.match(source, /executionEvidenceForFlow/u);
   assert.match(source, /execution_evidence/u);

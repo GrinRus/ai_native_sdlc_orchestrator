@@ -7,7 +7,12 @@ import test from "node:test";
 import { runProductionReadinessGate } from "../production-readiness.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
-const proofFixturePath = "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json";
+const proofFixturePath = path.posix.join(
+  "scripts",
+  "production-readiness",
+  "fixtures",
+  "w25-s03-production-proof.json",
+);
 
 test("production readiness gate passes with the committed W25 proof fixture", () => {
   const result = runProductionReadinessGate({ rootDir: root });
@@ -25,7 +30,12 @@ test("production readiness gate passes with the committed W25 proof fixture", ()
 test("production readiness gate fails closed without W25 proof evidence", () => {
   const result = runProductionReadinessGate({
     rootDir: root,
-    proofFixturePath: "examples/live-e2e/fixtures/w25-s03/missing-production-proof.json",
+    proofFixturePath: path.posix.join(
+      "scripts",
+      "production-readiness",
+      "fixtures",
+      "missing-production-proof.json",
+    ),
   });
   assert.equal(result.status, "fail");
   const proofCheck = result.checks.find((check) => check.id === "w25-real-proof-fixture");

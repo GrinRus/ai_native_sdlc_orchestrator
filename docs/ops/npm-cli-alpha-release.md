@@ -61,8 +61,8 @@ runtime work without changing target files outside `.aor/`.
 W34 extends the app smoke expectation so `aor app --smoke --open false --json`
 must also prove the packaged flow-centric bundle still contains the flow
 selector and `New Flow` markers. This remains a deterministic release guardrail;
-installed-user live E2E acceptance still comes from
-`installed-user-guided-journey.yaml` with `browser-task-proof`, flow-loop
+installed-user rehearsal acceptance still comes from
+the configured guided-journey fixture with `browser-task-proof`, flow-loop
 fields, accepted skill-agent decisions, run-health evidence, post-run quality
 assessment evidence when outcome quality is claimed, and no-upstream-write
 assertions.

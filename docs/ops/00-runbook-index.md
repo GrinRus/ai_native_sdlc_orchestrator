@@ -1,14 +1,9 @@
 # Runbook index
 
-## Installed-user rehearsal profiles
-- `live-e2e-target-catalog.md` — canonical target repositories, setup commands, and scenario briefs.
-- `live-e2e-dependency-matrix.md` — canonical dependencies for setup and verification across all live E2E profiles.
-- `live-e2e-standard-runner.md` — installed-user black-box step-controller runner, manual workflow, step evaluator, qualification loop, and artifact map for catalog profiles.
-- `live-e2e-provider-qualification.md` — optional provider qualification matrix, owner/phase blocker taxonomy, and release-blocking separation for Codex, Claude, OpenCode, and Qwen.
+## Installed-user rehearsal
+- Installed-user rehearsal is internal maintainer repo tooling and is not a public AOR user workflow.
 - `runtime-permission-runner-certification.md` — post-merge real-runner smoke lane for runtime permission mode mappings and restricted-mode interaction evidence.
 - `installed-user-first-run.md` — public guided install, no-settings local `aor app` wizard, local multi-project workspace, Mission form, `aor next`, and advanced `doctor`/`onboard` shortcuts.
-- `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
-- Historical bounded rehearsal docs remain archived under `docs/ops/`, but they are not current live E2E proof runbooks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
@@ -29,10 +24,3 @@
 
 ## UI lifecycle
 - `ui-attach-detach.md` — how to launch the local web UI and attach or detach lower-level UI lifecycle state from a running AOR system.
-
-## Profile selection rule of thumb
-- Need a fast smoke signal: `regress short`
-- Need a stronger regression signal: `regress long`
-- Need a quick release-shaped rehearsal: `release short`
-- Need a production-like monorepo rehearsal: `release long`
-- Need integrated W7 governance closure evidence: `w7 governance integration`

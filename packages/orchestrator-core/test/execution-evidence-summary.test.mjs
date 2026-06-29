@@ -146,6 +146,6 @@ test("execution evidence exposes interrupted provider actions through public sur
   assert.match(summary.blockers.join("\n"), /stopped or interrupted/);
   assert.equal(summary.actions.find((entry) => entry.action_id === "stop_provider").enabled, false);
   assert.equal(summary.actions.find((entry) => entry.action_id === "save_partial_evidence").enabled, true);
-  assert.equal(summary.actions.find((entry) => entry.action_id === "diagnose_current_step").command_surface, "manual-live-e2e --prepare-decision --action diagnose");
+  assert.equal(summary.actions.find((entry) => entry.action_id === "diagnose_current_step").command_surface, "aor run status --json");
   assert.equal(summary.actions.find((entry) => entry.action_id === "retry_public_step").enabled, true);
 });

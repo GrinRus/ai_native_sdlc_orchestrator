@@ -924,7 +924,7 @@ export function verifyProjectRuntime(options = {}) {
       bootstrap_rehearsal: true,
       quality_rehearsal: true,
       delivery_rehearsal: true,
-      source_runbook: "docs/ops/live-e2e-no-write-preflight.md",
+      source_runbook: "docs/architecture/14-cli-command-catalog.md",
     },
     blocked_next_step:
       summaryStatus === "failed"

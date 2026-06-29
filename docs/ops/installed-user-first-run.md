@@ -229,12 +229,7 @@ The CLI test fixture `apps/cli/test/fixtures/installed-user-first-run-transcript
 No upstream writes are part of this first-run shortcut layer.
 
 ## Guided journey proof
-The `installed-user-guided-journey.yaml` proof profile rehearses the installed-user sequence on a clean catalog target; W34-S06 hardens that profile with browser-task and flow-loop evidence:
-```sh
-node ./scripts/live-e2e/run-profile.mjs \
-  --project-ref . \
-  --profile ./scripts/live-e2e/profiles/installed-user-guided-journey.yaml
-```
+The internal installed-user guided journey profile rehearses the installed-user sequence on a clean catalog target; W34-S06 hardens that profile with browser-task and flow-loop evidence.
 
 The proof starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; captures `aor mission create`; then follows execution, review decision, delivery, release, and learning closure through public CLI subprocesses. After learning closure it creates a follow-up mission with `--follow-up-source-handoff-ref`, refreshes `next` for the second flow, and creates a flow-targeted `request create --target-flow-id` record. It also runs `aor app --smoke true --open false --json` as a release/render guardrail that must include the flow selector and `New Flow` markers, but outcome quality still requires browser-task AOR operator UI evidence refs and a post-run quality assessment when UI/UX quality is being claimed.
 
