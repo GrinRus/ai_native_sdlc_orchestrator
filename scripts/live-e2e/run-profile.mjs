@@ -737,6 +737,7 @@ function buildScorecard(options) {
         ? options.flowResult.artifacts.provider_step_status
         : null,
     baseline_verify_status: asNonEmptyString(options.flowResult.artifacts.baseline_verify_status) || null,
+    target_readiness: buildTargetReadiness(options.flowResult.artifacts),
     target_pre_execution_status:
       typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
       options.flowResult.artifacts.target_pre_execution_status
@@ -1830,6 +1831,7 @@ function buildObservationReport(options) {
     artifacts: options.flowResult.artifacts,
     frontendInteractions,
   });
+  const targetReadiness = buildTargetReadiness(options.flowResult.artifacts);
   return {
     report_id: `${options.runId}.live-e2e-observation.v2`,
     run_id: options.runId,
@@ -1846,6 +1848,7 @@ function buildObservationReport(options) {
     },
     flow_range_policy: flowRangePolicy,
     overall_status: asNonEmptyString(finalAnalysis.status) || "not_pass",
+    target_readiness: targetReadiness,
     target_setup_status:
       typeof options.flowResult.artifacts.target_setup_status === "object" && options.flowResult.artifacts.target_setup_status
         ? options.flowResult.artifacts.target_setup_status
@@ -1884,6 +1887,7 @@ function buildObservationReport(options) {
       asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
       asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
       asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file),
+      ...asStringArray(targetReadiness.evidence_refs),
       ...asStringArray(guidedUiEvidence.evidence_refs),
     ]),
   };
@@ -2112,6 +2116,82 @@ function buildTargetEnvironmentHealth(artifacts) {
       asNonEmptyString(artifacts.failure_class) ||
       asNonEmptyString(blockingTargetStatus.failure_class) ||
       inferredFailureClass,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
+ */
+function buildTargetReadiness(artifacts) {
+  const targetPreExecutionStatus = asRecord(artifacts.target_pre_execution_status);
+  const targetSetupStatus = asRecord(artifacts.target_setup_status);
+  const targetVerificationStatus = asRecord(artifacts.target_verification_status_detail);
+  const targetToolchainPreflight = asRecord(artifacts.target_toolchain_preflight);
+  const baselineGateDecision = asRecord(artifacts.baseline_verify_gate_decision);
+  const toolchainStatus = asNonEmptyString(targetToolchainPreflight.status) || "not_applicable";
+  const setupStatus = asNonEmptyString(targetSetupStatus.status) || "not_attempted";
+  const verificationStatus = asNonEmptyString(targetVerificationStatus.status) || "not_attempted";
+  const preExecutionStatus =
+    asNonEmptyString(targetPreExecutionStatus.status) ||
+    asNonEmptyString(baselineGateDecision.status) ||
+    (asNonEmptyString(artifacts.execution_readiness_file) ? "pass" : "not_attempted");
+  const status =
+    [preExecutionStatus, toolchainStatus, setupStatus, verificationStatus].includes("blocked")
+      ? "blocked"
+      : [preExecutionStatus, toolchainStatus, setupStatus, verificationStatus].includes("fail")
+        ? "fail"
+        : preExecutionStatus === "pass" ||
+            asNonEmptyString(artifacts.execution_readiness_file) ||
+            asNonEmptyString(artifacts.baseline_verify_summary_file)
+          ? "pass"
+          : "not_attempted";
+  const blockingStatus =
+    status === "blocked" || status === "fail"
+      ? [targetPreExecutionStatus, targetSetupStatus, targetVerificationStatus, baselineGateDecision].find((entry) =>
+          asNonEmptyString(asRecord(entry).failure_owner) ||
+          asNonEmptyString(asRecord(entry).failure_phase) ||
+          asNonEmptyString(asRecord(entry).failure_class),
+        )
+      : {};
+  const evidenceRefs = uniqueStrings([
+    asNonEmptyString(artifacts.target_toolchain_preflight_file),
+    asNonEmptyString(artifacts.target_pre_execution_status_file),
+    asNonEmptyString(artifacts.baseline_verify_summary_file),
+    asNonEmptyString(artifacts.verify_summary_file),
+    asNonEmptyString(artifacts.execution_readiness_file),
+    ...asStringArray(artifacts.baseline_verify_preserved_files),
+    ...asStringArray(artifacts.baseline_verify_step_result_files),
+  ]);
+  return {
+    phase: "target_readiness",
+    status,
+    target_toolchain_status: toolchainStatus,
+    target_setup_status: setupStatus,
+    target_verification_status: verificationStatus,
+    target_toolchain_preflight_file: asNonEmptyString(artifacts.target_toolchain_preflight_file) || null,
+    target_pre_execution_status_file: asNonEmptyString(artifacts.target_pre_execution_status_file) || null,
+    baseline_verify_summary_file: asNonEmptyString(artifacts.baseline_verify_summary_file) || null,
+    execution_readiness_file: asNonEmptyString(artifacts.execution_readiness_file) || null,
+    failure_owner:
+      asNonEmptyString(artifacts.failure_owner) || asNonEmptyString(asRecord(blockingStatus).failure_owner) || null,
+    failure_phase:
+      asNonEmptyString(artifacts.failure_phase) || asNonEmptyString(asRecord(blockingStatus).failure_phase) || null,
+    failure_class:
+      asNonEmptyString(artifacts.failure_class) || asNonEmptyString(asRecord(blockingStatus).failure_class) || null,
+    product_execution_started:
+      asNonEmptyString(artifacts.provider_execution_status) !== "" ||
+      asNonEmptyString(artifacts.routed_step_result_file) !== "" ||
+      asNonEmptyString(artifacts.run_start_runtime_harness_report_file) !== "",
+    evidence_refs: evidenceRefs,
+    summary:
+      status === "pass"
+        ? "Target readiness passed before product execution."
+        : status === "not_attempted"
+          ? "Target readiness evidence was not attempted or not materialized."
+          : asNonEmptyString(targetPreExecutionStatus.blocker_reason) ||
+            asNonEmptyString(baselineGateDecision.summary) ||
+            "Target readiness blocked before product execution.",
   };
 }
 
@@ -2527,6 +2607,7 @@ function buildRunHealthReport(options) {
   const controllerHealth = buildControllerHealth({ observationReport: options.observationReport });
   const providerHealth = buildProviderHealth(options.flowResult.artifacts);
   const targetEnvironmentHealth = buildTargetEnvironmentHealth(options.flowResult.artifacts);
+  const targetReadiness = buildTargetReadiness(options.flowResult.artifacts);
   const diagnosticHealth = buildDiagnosticHealth(options.flowResult.artifacts);
   const guidedUiEvidence = buildGuidedUiEvidence({
     profile: options.profile,
@@ -2615,6 +2696,7 @@ function buildRunHealthReport(options) {
     command_health: commandHealth,
     controller_health: controllerHealth,
     provider_health: providerHealth,
+    target_readiness: targetReadiness,
     target_environment_health: targetEnvironmentHealth,
     diagnostic_health: diagnosticHealth,
     guided_ui_evidence: guidedUiEvidence,
@@ -2635,6 +2717,7 @@ function buildRunHealthReport(options) {
       options.observationReportFile,
       asNonEmptyString(options.observationReport.controller_state_ref),
       ...options.stepObservationFiles,
+      ...asStringArray(targetReadiness.evidence_refs),
       ...asStringArray(diagnosticHealth.evidence_refs),
       ...asStringArray(guidedUiEvidence.evidence_refs),
     ]),
@@ -2895,6 +2978,7 @@ export function writeProofRunnerArtifacts(options) {
       options.flowResult.artifacts.baseline_verify_gate_decision
         ? options.flowResult.artifacts.baseline_verify_gate_decision
         : null,
+    target_readiness: buildTargetReadiness(options.flowResult.artifacts),
     target_pre_execution_status_file:
       typeof options.flowResult.artifacts.target_pre_execution_status_file === "string"
         ? options.flowResult.artifacts.target_pre_execution_status_file
@@ -3109,6 +3193,8 @@ export function writeProofRunnerArtifacts(options) {
     summaryFile,
     scorecard,
     scorecardFile,
+    observationReport,
+    observationReportFile,
     runHealthReport,
     runHealthReportFile,
     learningLoop,

@@ -18,6 +18,10 @@ verification commands that run before provider execution. The runner must expose
 test, build, browser dependency, or timeout blocker is not a Codex/Qwen quality
 signal. Conversely, AOR runner/controller/API/UI failures must be classified as
 `failure_owner=aor`, not hidden behind target repository blocker wording.
+Run summaries, observation reports, and run-health reports must also expose a
+first-class `target_readiness` block that links target toolchain preflight,
+pre-execution status, baseline verification, execution-readiness refs, and any
+pre-product-execution blocker classification.
 Installed-user guided profiles may set
 `live_e2e.guided_warn_diagnostic_timeout_sec` for non-blocking post-guided-proof
 diagnostics; this timeout only applies when the mission diagnostic failure mode
@@ -759,6 +763,12 @@ After the full flow, the launching SWE agent prepares an assessment request:
 node ./scripts/live-e2e/quality-assessment.mjs prepare \
   --run-summary-file <live_e2e_run_summary_file>
 ```
+
+Use `--write-draft-report` when the runner should also materialize a contract
+valid draft report from public artifacts. Draft reports are convenience
+scaffolds: they must preserve weak/missing evidence gaps and are expected to
+fail `gate --policy all-pass` until the SWE evaluator replaces draft
+judgements.
 
 The SWE agent then freely inspects linked evidence and writes `live-e2e-quality-assessment-report`. Validate it without changing run or qualification status:
 

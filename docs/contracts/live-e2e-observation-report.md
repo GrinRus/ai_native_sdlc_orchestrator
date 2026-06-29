@@ -80,6 +80,17 @@ Readiness entries may include target setup and target verification details. Thes
 - `failure_phase`
 - `failure_class`
 
+Observation reports may also expose a top-level `target_readiness` block so
+consumers do not have to reconstruct pre-execution state from setup-journal
+entries. This block is factual run evidence only. It should preserve:
+- `phase: target_readiness`
+- `status`
+- target toolchain, setup, and verification statuses
+- target toolchain preflight, pre-execution status, baseline verification, and
+  execution-readiness refs
+- failure owner/phase/class when readiness blocks before product execution
+- whether product execution had started
+
 `step_journal[]` preserves the public-step controller evidence:
 - plan and `plan_ref`
 - public surface and command transcript refs

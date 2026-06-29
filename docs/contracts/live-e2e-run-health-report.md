@@ -80,6 +80,12 @@ When the external runtime completes but only echoes or summarizes the provider w
 
 When Runtime Harness detects a strict code-changing no-op after provider execution, run-health should preserve `failure_summary.class: no-op` with `phase: provider_execution` unless a more specific provider failure such as `provider_work_packet_not_executed` is available.
 
+`target_readiness` should summarize pre-execution target facts as a first-class
+block: target toolchain preflight, target setup status, target verification
+status, pre-execution status refs, execution-readiness refs, failure
+owner/phase/class, and whether product execution had started. It is still
+factual run evidence and must not judge product quality.
+
 `target_environment_health` should include target setup and target verification facts, without converting target repository failures into provider or AOR product failures.
 
 `diagnostic_health` should include optional post-run diagnostic verification

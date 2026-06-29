@@ -5080,6 +5080,13 @@ test("proof runner preserves environment owner from target setup status in run-h
     assert.equal(written.runHealthReport.target_environment_health.status, "blocked");
     assert.equal(written.runHealthReport.target_environment_health.failure_owner, "environment");
     assert.equal(written.runHealthReport.target_environment_health.failure_class, "environment_disk_space_exhausted");
+    assert.equal(written.runHealthReport.target_readiness.status, "blocked");
+    assert.equal(written.runHealthReport.target_readiness.failure_owner, "environment");
+    assert.equal(written.runHealthReport.target_readiness.failure_phase, "target_setup");
+    assert.equal(written.runHealthReport.target_readiness.product_execution_started, false);
+    assert.equal(written.observationReport.target_readiness.status, "blocked");
+    assert.equal(written.summary.target_readiness.status, "blocked");
+    assert.equal(written.summary.target_readiness.failure_class, "environment_disk_space_exhausted");
     assert.equal(written.runHealthReport.failure_summary.owner, "environment");
     assert.equal(written.runHealthReport.failure_summary.phase, "target_setup");
     assert.equal(written.runHealthReport.failure_summary.class, "environment_disk_space_exhausted");
