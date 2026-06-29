@@ -439,10 +439,10 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W51-S01 | Clean-commit W50 proof rerun | EPIC-0, EPIC-7 | done | `docs/ops/live-e2e-proof-complete-findings.md`, `scripts/live-e2e/**`, root checks, live proof artifacts | W50-S04 |
-| W51-S02 | Vitest compatible Node large acceptance | EPIC-7 | blocked | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W51-S01 |
-| W51-S03 | Automated final quality report hydration | EPIC-4, EPIC-7 | blocked | `scripts/live-e2e/quality-assessment.mjs`, `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests | W51-S02 |
-| W51-S04 | Explicit target-readiness phase | EPIC-7 | blocked | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests | W51-S03 |
-| W51-S05 | Next hard-target expansion after large acceptance | EPIC-7 | blocked | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W51-S04 |
+| W51-S02 | Vitest compatible Node large acceptance | EPIC-7 | done | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`, `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md` | W51-S01 |
+| W51-S03 | Automated final quality report hydration | EPIC-4, EPIC-7 | done | `scripts/live-e2e/quality-assessment.mjs`, `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests | W51-S02 |
+| W51-S04 | Explicit target-readiness phase | EPIC-7 | done | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/lib/step-controller.mjs`, `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests | W51-S03 |
+| W51-S05 | Next hard-target expansion after large acceptance | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W51-S04 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

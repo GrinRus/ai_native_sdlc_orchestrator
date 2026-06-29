@@ -102,8 +102,77 @@ Accepted findings:
 - `W51-F02` is closed: repair convergence hardening and controller
   reconciliation now allow the quality cycle to continue through fresh review,
   QA, and delivery instead of stopping on stale or unreconciled repair context.
-- `W51-S01` is done. `W51-S02` is the next live E2E slice, but it remains
-  blocked until a compatible target Node toolchain is provisioned or selected.
+- `W51-S01` is done. Later W51 hard-target closure evidence is recorded below.
+
+## W51 Hard-Target Closure
+
+W51-S02 through W51-S05 are closed as terminal hard-target evidence, not as new
+product acceptance. Product acceptance remains claimed only for the W51 HTTPX
+and Fastify runs whose final `quality-assessment gate --policy all-pass`
+passed.
+
+| Slice | Proof | Source commit | Run id | Terminal status | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|---|---|---|---|
+| W51-S02 | Vitest large with compatible Node `v24.14.0` | `557d0ca58611` | `w51-s02-vitest-large-20260629-557d0ca58611` | run-health `blocked` before product execution | `target_repository` | `target_verification` | `target_verification_blocked` | not product-accepted |
+| W51-S03 | final quality draft hydration | `557d0ca58611` | n/a | local implementation complete | n/a | n/a | n/a | tool implemented; no product acceptance claim |
+| W51-S04 | first-class target-readiness reporting | `557d0ca58611` | Vitest and SQLAlchemy runs above/below | implemented and proof-observed | n/a | `target_readiness` | n/a | evidence separation accepted |
+| W51-S05 | SQLAlchemy large hard target | `b1addcdd3bba` | `w51-s05-sqlalchemy-large-20260629-b1addcdd3bba` | step-evaluator `pass`; run-health `warn` | `target_repository` | `post_run_diagnostic` | `sqlalchemy_full_suite_diagnostic_failed_or_hung` | not product-accepted |
+
+Accepted evidence:
+
+- Guided UI pairing proof for the W51-S02 same-commit batch passed on
+  `557d0ca58611`: `w51-s02-guided-aor-ui-20260629-557d0ca58611`.
+- Vitest used
+  `/Users/griogrii_riabov/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node`
+  and the target-toolchain preflight passed with Node `v24.14.0`.
+- Vitest setup reached install/build/lint successfully and then blocked during
+  baseline `pnpm test` in target readiness. This is a new target verification
+  blocker, not the old W50 incompatible-Node, missing CLI artifact, or `.aor`
+  scan failure.
+- `quality-assessment prepare --write-draft-report` now writes a structured
+  draft report from public run artifacts. Drafts hydrate run-health,
+  target-readiness, step-quality lineage, meaningful changed paths,
+  verification refs, review/QA/delivery refs, and paired AOR UI refs while
+  leaving weak or missing evidence as explicit non-pass gaps.
+- Run summaries, observation reports, run-health reports, and scorecards now
+  carry first-class `target_readiness` evidence. Vitest demonstrates blocked
+  readiness before product execution; SQLAlchemy demonstrates readiness pass
+  before the product flow.
+- SQLAlchemy was selected as the next hard target. The final profile setup
+  installs editable SQLAlchemy plus explicit `pytest` and `pytest-xdist`
+  dependencies; earlier `.[test]` and `.[tests]` attempts failed because the
+  repository uses dependency groups rather than install extras for tests.
+- SQLAlchemy run `w51-s05-sqlalchemy-large-20260629-b1addcdd3bba` completed
+  discovery, spec, planning, handoff, execution, review, QA, and delivery with
+  meaningful changed paths:
+  `doc/build/core/custom_types.rst`,
+  `lib/sqlalchemy/sql/operators.py`, and
+  `test/sql/test_operators.py`.
+- SQLAlchemy target readiness and primary verification passed, including
+  `.aor/live-e2e-venv/bin/python -m pytest test/sql test/orm` with
+  `17295 passed, 644 skipped`.
+- SQLAlchemy post-run diagnostic `pytest test` remained warning-level evidence:
+  the full suite reported `24050 passed, 1246 skipped, 1 warning, 68 errors`,
+  then left a sleeping subprocess waiting on a pipe after writing the terminal
+  pytest summary. The subprocess was terminated after evidence capture so the
+  live E2E run could exit. This is recorded as a hard-target diagnostic
+  blocker, and no SQLAlchemy product acceptance is claimed.
+
+Follow-up tickets:
+
+- W52-F01: normalize top-level run-health owner/phase/class from
+  `target_readiness` when readiness blocks before product execution.
+- W52-F02: add diagnostic-command timeout/pipe-hang handling so warning-mode
+  post-run diagnostics cannot hold the proof runner after terminal command
+  output has been produced.
+- W52-F03: decide whether SQLAlchemy full-suite diagnostic is required for
+  hard-target acceptance or should remain an explicit warning alongside the
+  passing primary verification scope.
+
+Artifact hygiene:
+
+- Runtime artifacts remain under `.aor/` or `/tmp/aor-*` and are not committed.
+- Blocked or warning proof runs are never labeled product acceptance.
 
 ## Guided AOR UI Proof
 

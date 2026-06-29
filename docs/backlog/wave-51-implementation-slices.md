@@ -73,18 +73,19 @@ after the current required proof set is stable.
   reach final all-pass product acceptance or record a new non-W50 blocker after
   target setup genuinely proceeds.
 - **Epic:** EPIC-7
-- **State:** blocked
-- **External blocker:** compatible Node binary for
-  `AOR_LIVE_E2E_TARGET_NODE_BIN` or compatible host Node is required.
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`,
   `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`
 - **Hard dependencies:** W51-S01
 
 ### Readiness note
 
-W51-S01 clean-commit proof closure is complete. W51-S02 is the next live E2E
-slice, but it remains `blocked` until a Node binary satisfying the Vitest target
-toolchain range is provisioned or selected.
+W51-S02 used the compatible bundled Node `v24.14.0` via
+`AOR_LIVE_E2E_TARGET_NODE_BIN`. The run did not reach product execution because
+target readiness blocked on Vitest's baseline `pnpm test`, but the old W50
+setup defects did not recur: Node preflight passed, setup completed, `.aor`
+artifacts were not scanned as product source, and the CLI build artifact was
+available before verification.
 
 ### Local tasks
 1. Provision or select Node satisfying `^22.12.0 || ^24.0.0 || >=26.0.0`.
@@ -103,7 +104,8 @@ toolchain range is provisioned or selected.
 ### Done evidence
 - Vitest large run summary
 - target toolchain/preflight evidence
-- final quality report or classified blocker record
+- classified blocker record in
+  `docs/ops/live-e2e-proof-complete-findings.md`
 
 ### Out of scope
 - making Vitest optional required coverage
@@ -116,7 +118,7 @@ toolchain range is provisioned or selected.
   step-quality reports, changed paths, review/QA/delivery evidence, and paired
   AOR UI proof.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/quality-assessment.mjs`,
   `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests
 - **Hard dependencies:** W51-S02
@@ -141,7 +143,8 @@ toolchain range is provisioned or selected.
 
 ### Done evidence
 - quality-assessment hydration tests
-- sample hydrated report fixture
+- `quality-assessment prepare --write-draft-report`
+- hydrated draft contract tests
 - updated quality-assessment runbook
 
 ### Out of scope
@@ -153,7 +156,7 @@ toolchain range is provisioned or selected.
 - **Outcome:** Separate target setup/toolchain blockers from product execution
   in run summaries, observation reports, and step-quality lineage.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/lib/flows.mjs`,
   `scripts/live-e2e/lib/step-controller.mjs`,
   `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests
@@ -177,7 +180,8 @@ toolchain range is provisioned or selected.
 ### Done evidence
 - contract/runner tests for target-readiness
 - updated runbook and findings examples
-- control proof rerun or classified blocker after phase split
+- Vitest target-readiness classified blocker after phase split
+- SQLAlchemy target-readiness pass evidence before product execution
 
 ### Out of scope
 - changing AOR product lifecycle step names outside live E2E reporting
@@ -188,7 +192,7 @@ toolchain range is provisioned or selected.
 - **Outcome:** Add one additional required hard-target proof candidate only
   after Vitest large has terminal all-pass or a new accepted blocker policy.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/catalog/**`,
   `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**`
 - **Hard dependencies:** W51-S04
@@ -210,6 +214,10 @@ toolchain range is provisioned or selected.
 - catalog/profile diff
 - profile validation tests
 - proof findings update
+- SQLAlchemy large proof reached all SDLC steps with target-readiness and
+  primary verification pass, while product acceptance remains unclaimed because
+  post-run diagnostic health was `warn` and no same-commit final all-pass gate
+  was prepared.
 
 ### Out of scope
 - adding Django as required coverage
