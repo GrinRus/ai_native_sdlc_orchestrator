@@ -24,16 +24,23 @@ assessment.
 - Current target catalog cells are migrated or removed, and hard targets are
   introduced with runnable profiles.
 
+## Backlog reconciliation note
+
+PR #90 delivered W46-S01 through W46-S05 as part of the black-box product live
+E2E implementation. W44/W45 remain an open prompt/readiness and repair-loop
+planning track, but they are not hard blockers for W46-W52 live E2E proof
+closure.
+
 ---
 
 ## W46-S01 — Contract/docs breaking policy
 - **Epic:** EPIC-0 Foundation; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Define the breaking live E2E policy for mission class, size
   budgets, public-only black-box boundaries, and final product acceptance.
 - **Primary modules:** `docs/contracts/**`, `docs/ops/**`,
   `packages/contracts/**`
-- **Hard dependencies:** W45-S06
+- **Hard dependencies:** W43-S04
 
 ### Local tasks
 1. Update `live-e2e-target-catalog` with `mission_class`,
@@ -66,7 +73,7 @@ assessment.
 
 ## W46-S02 — Step evaluator report and runner behavior
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Make per-step external assessment a first-class live E2E artifact
   and continuation gate for product-change missions.
 - **Primary modules:** `scripts/live-e2e/**`, `packages/orchestrator-core/**`,
@@ -101,7 +108,7 @@ assessment.
 
 ## W46-S03 — Catalog budget and small-canary migration
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Keep small missions as canaries and widen all mission budgets.
 - **Primary modules:** `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`,
   `docs/ops/**`
@@ -133,7 +140,7 @@ assessment.
 
 ## W46-S04 — Product-change mission rewrite for current targets
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Rewrite current medium/large/xlarge targets as real product-change
   missions with evaluator and final-code rubrics.
 - **Primary modules:** `scripts/live-e2e/catalog/targets/**`,
@@ -165,7 +172,7 @@ assessment.
 
 ## W46-S05 — Hard target expansion
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Add initial hard targets for more complex product-quality
   evaluation.
 - **Primary modules:** `scripts/live-e2e/catalog/targets/**`,

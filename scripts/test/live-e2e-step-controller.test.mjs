@@ -10,6 +10,7 @@ import {
   findLiveE2eCommandByPreferredLabel,
   isLiveE2eControllerStopInProgress,
   isLiveE2eControllerStop,
+  resolveStepArtifactGateFailures,
 } from "../live-e2e/lib/step-controller.mjs";
 import { prepareOperatorDecisionArtifact } from "../live-e2e/lib/decision-helper.mjs";
 import {
@@ -138,6 +139,34 @@ test("live E2E step controller persists observation and state before next step",
     assert.equal(fs.existsSync(entry.observation_ref), true);
     assert.equal(entry.plan.public_surface, "aor discovery run");
   });
+});
+
+test("live E2E QA artifact gate allows guided warn diagnostic deferral only", () => {
+  assert.deepEqual(
+    resolveStepArtifactGateFailures("qa", {
+      evaluation_status: "pass",
+      post_run_verify_status: "pass",
+      post_run_diagnostic_status: "deferred",
+      post_run_diagnostic_deferred_until_guided_proof: true,
+      post_run_quality_policy: {
+        diagnostic_failure_mode: "warn",
+      },
+    }),
+    [],
+  );
+
+  assert.deepEqual(
+    resolveStepArtifactGateFailures("qa", {
+      evaluation_status: "pass",
+      post_run_verify_status: "pass",
+      post_run_diagnostic_status: "deferred",
+      post_run_diagnostic_deferred_until_guided_proof: true,
+      post_run_quality_policy: {
+        diagnostic_failure_mode: "fail",
+      },
+    }),
+    ["post-run diagnostic verification reported 'deferred'."],
+  );
 });
 
 test("live E2E step controller repairs stale pending decisions from persisted journal on resume", () => {
@@ -351,6 +380,100 @@ test("live E2E product-change steps wait for evaluator-authored step-quality rep
     assert.deepEqual(state.step_quality_assessment_refs, [reportFile]);
     assert.ok(state.evidence_refs.includes(reportFile));
     assert.equal(state.pending_step_quality_assessment, null);
+  });
+});
+
+test("live E2E product-change step-quality report is reconciled on controller resume", () => {
+  withTempRoot((reportsRoot) => {
+    const runId = "controller-product-step-quality-resume";
+    const transcriptFile = path.join(reportsRoot, "13-qa.json");
+    const evalReportFile = path.join(reportsRoot, "evaluation-report.json");
+    const diagnosticSummaryFile = path.join(reportsRoot, "post-run-diagnostic-summary.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(evalReportFile, "{}\n", "utf8");
+    fs.writeFileSync(diagnosticSummaryFile, "{}\n", "utf8");
+    const profile = {
+      profile_id: "live-e2e.test.product-step-quality-resume",
+      target_catalog_id: "httpx",
+      feature_mission_id: "httpx-timeout-transport-regression",
+      live_e2e: { flow_range_policy: "delivery_default" },
+    };
+    const artifacts = {
+      target_catalog_id: "httpx",
+      feature_mission_id: "httpx-timeout-transport-regression",
+      feature_size: "medium",
+      mission_class: "product-change",
+      evaluation_status: "pass",
+      evaluation_report_file: evalReportFile,
+      post_run_verify_status: "pass",
+      post_run_diagnostic_status: "pass",
+      post_run_diagnostic_verify_summary_file: diagnosticSummaryFile,
+      meaningful_changed_paths: ["httpx/_client.py", "tests/test_timeouts.py"],
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "evaluator",
+    });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "qa", {
+      nextStep: "delivery",
+      inspectedEvidenceRefs: [transcriptFile, evalReportFile, diagnosticSummaryFile],
+    });
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "qa",
+          stageResult: {
+            stage: "qa",
+            status: "pass",
+            evidence_refs: [transcriptFile, evalReportFile, diagnosticSummaryFile],
+            summary: "QA passed.",
+          },
+          commandResults: [
+            {
+              label: "eval-run",
+              command_surface: "aor eval run",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: [transcriptFile, evalReportFile, diagnosticSummaryFile],
+              exit_code: 0,
+            },
+          ],
+          artifacts,
+        }),
+      LiveE2eControllerStop,
+    );
+    const [pendingEntry] = controller.getStepJournal();
+    assert.equal(pendingEntry.step_quality_assessment_status, "awaiting-assessment");
+    const builtAssessment = writeStepQualityAssessmentReport({
+      runId,
+      profile,
+      artifacts,
+      entry: pendingEntry,
+      outputDir: reportsRoot,
+      assessmentRequestFile: pendingEntry.step_quality_assessment_request_ref,
+      assessmentMethod: "external-skill-agent",
+      evaluatorOutputRef: pendingEntry.step_quality_assessment_request_ref,
+    });
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "evaluator",
+    });
+    const [acceptedEntry] = resumed.getStepJournal();
+    assert.equal(acceptedEntry.step_quality_assessment_status, "accepted");
+    assert.equal(acceptedEntry.step_quality_assessment_ref, builtAssessment.reportFile);
+    assert.equal(acceptedEntry.decision.action, "continue");
+    assert.equal(acceptedEntry.final_step_verdict, "pass");
+    const state = resumed.getState();
+    assert.equal(state.pending_step_quality_assessment, null);
+    assert.equal(state.pending_decision.action, "continue");
+    assert.ok(state.step_quality_assessment_refs.includes(builtAssessment.reportFile));
+    assert.ok(state.evidence_refs.includes(builtAssessment.reportFile));
   });
 });
 

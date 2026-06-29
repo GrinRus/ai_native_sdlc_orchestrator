@@ -1628,6 +1628,95 @@ function collectDeliveryPlanRefs(value, output, projectRoot) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {Array<{ role: string, evidence_ref: string, local_path: string, required: boolean, kind: string }>} output
+ * @param {string | null} projectRoot
+ */
+function collectReviewRepairRefs(value, output, projectRoot) {
+  if (typeof value === "string" && /review-(decision|report)/iu.test(value)) {
+    const localPath = localPathFromRef(projectRoot, value) ?? (path.isAbsolute(value) ? value : null);
+    if (localPath) {
+      const isDecision = /review-decision/iu.test(value);
+      output.push({
+        role: isDecision ? "review_decision" : "review_report",
+        evidence_ref: value,
+        local_path: localPath,
+        required: true,
+        kind: isDecision ? "review-decision" : "review-report",
+      });
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const entry of value) collectReviewRepairRefs(entry, output, projectRoot);
+    return;
+  }
+  for (const entry of Object.values(value)) {
+    collectReviewRepairRefs(entry, output, projectRoot);
+  }
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readJsonRecord(filePath) {
+  try {
+    return asRecord(JSON.parse(fs.readFileSync(filePath, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} envelope
+ * @param {{ projectRoot?: string | null }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function resolveRepairWorkContext(envelope, options = {}) {
+  const projectRoot = asOptionalString(options.projectRoot);
+  const refs = [];
+  collectReviewRepairRefs(envelope, refs, projectRoot);
+  const seen = new Set();
+  const uniqueRefs = refs.filter((entry) => {
+    const key = `${entry.role}\n${entry.evidence_ref}\n${entry.local_path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const repairDecisionRef = uniqueRefs
+    .filter((entry) => entry.role === "review_decision" && fs.existsSync(entry.local_path))
+    .map((entry) => ({ entry, document: readJsonRecord(entry.local_path) }))
+    .reverse()
+    .find((candidate) => candidate.document.decision === "request-repair" && Object.keys(asRecord(candidate.document.repair_context)).length > 0);
+  if (!repairDecisionRef) return null;
+  const decisionReviewReportRef = asOptionalString(repairDecisionRef.document.review_report_ref);
+  const decisionReviewReportFile = localPathFromRef(projectRoot, decisionReviewReportRef);
+  const reviewReportRefs = [
+    ...uniqueRefs.filter((entry) => entry.role === "review_report"),
+    ...(decisionReviewReportRef && decisionReviewReportFile
+      ? [
+          {
+            role: "review_report",
+            evidence_ref: decisionReviewReportRef,
+            local_path: decisionReviewReportFile,
+            required: true,
+            kind: "review-report",
+          },
+        ]
+      : []),
+  ];
+  return {
+    source_review_decision_ref: repairDecisionRef.entry.evidence_ref,
+    source_review_decision_file: repairDecisionRef.entry.local_path,
+    source_review_report_ref: decisionReviewReportRef || null,
+    source_review_report_files: reviewReportRefs.map((entry) => entry.local_path),
+    repair_context: asRecord(repairDecisionRef.document.repair_context),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} envelope
  * @param {{
  *   projectRoot?: string | null,
@@ -1705,21 +1794,41 @@ function buildResolvedLocalRefs(envelope, options) {
   collectDeliveryPlanRefs(envelope, deliveryRefs, projectRoot);
   for (const deliveryRef of deliveryRefs) addRef(deliveryRef);
 
+  const repairRefs = [];
+  collectReviewRepairRefs(envelope, repairRefs, projectRoot);
+  for (const repairRef of repairRefs) addRef(repairRef);
+  const repairWorkContext = resolveRepairWorkContext(envelope, options);
+  if (repairWorkContext) {
+    const reviewReportRef = asOptionalString(repairWorkContext.source_review_report_ref);
+    const reviewReportFile = localPathFromRef(projectRoot, reviewReportRef);
+    if (reviewReportRef && reviewReportFile) {
+      addRef({
+        role: "review_report",
+        evidence_ref: reviewReportRef,
+        local_path: reviewReportFile,
+        required: true,
+        kind: "review-report",
+      });
+    }
+  }
+
   return refs;
 }
 
 /**
  * @param {Record<string, unknown>} envelope
+ * @param {{ projectRoot?: string | null }} [options]
  * @returns {Record<string, unknown>}
  */
-function buildExecutionContract(envelope) {
+function buildExecutionContract(envelope, options = {}) {
   const allowedPathCandidates = [];
   collectAllowedPaths(envelope, allowedPathCandidates);
   const policyBundle = asRecord(envelope.policy_bundle);
   const resolvedBounds = asRecord(policyBundle.resolved_bounds);
   const commandConstraints = asRecord(resolvedBounds.command_constraints);
   const allowedCommands = asStringArray(commandConstraints.allowed_commands);
-  return {
+  const repairWorkContext = resolveRepairWorkContext(envelope, options);
+  const contract = {
     mode: "execute-implementation",
     must_open_required_local_refs: true,
     expected_meaningful_change: {
@@ -1757,6 +1866,24 @@ function buildExecutionContract(envelope) {
       required_fields: ["status", "reason", "evidence_refs"],
     },
   };
+  if (repairWorkContext) {
+    const repairContext = asRecord(repairWorkContext.repair_context);
+    contract.repair_closure_policy = {
+      required: true,
+      source_review_decision_ref: asOptionalString(repairWorkContext.source_review_decision_ref),
+      source_review_report_ref: asOptionalString(repairWorkContext.source_review_report_ref),
+      source_phase: asOptionalString(repairContext.source_phase),
+      cycle_iteration: repairContext.cycle_iteration,
+      must_address_each_unresolved_finding: true,
+      unresolved_finding_details: Array.isArray(repairContext.unresolved_finding_details)
+        ? repairContext.unresolved_finding_details
+        : [],
+      required_final_report_section: "repair-closure",
+      required_runner_action:
+        "Open the source review decision and review report, address every unresolved finding, and do not report repair success without explicit closure evidence for each finding.",
+    };
+  }
+  return contract;
 }
 
 /**
@@ -1783,6 +1910,7 @@ function buildProviderWorkPacket(envelope, options) {
     ...asStringArray(context.context_skill_refs),
     ...asStringArray(context.runtime_evidence_refs),
   ].filter(Boolean);
+  const repairWorkContext = resolveRepairWorkContext(envelope, options);
 
   return {
     packet_kind: "aor-provider-work-packet",
@@ -1813,7 +1941,20 @@ function buildProviderWorkPacket(envelope, options) {
     },
     input_packet_refs: asStringArray(envelope.input_packet_refs),
     resolved_local_refs: buildResolvedLocalRefs(envelope, options),
-    execution_contract: buildExecutionContract(envelope),
+    execution_contract: buildExecutionContract(envelope, options),
+    repair_context: repairWorkContext
+      ? {
+          source_review_decision_ref: asOptionalString(repairWorkContext.source_review_decision_ref),
+          source_review_decision_file: asOptionalString(repairWorkContext.source_review_decision_file),
+          source_review_report_ref: asOptionalString(repairWorkContext.source_review_report_ref),
+          source_review_report_files: Array.isArray(repairWorkContext.source_review_report_files)
+            ? repairWorkContext.source_review_report_files
+            : [],
+          context: asRecord(repairWorkContext.repair_context),
+          provider_instruction:
+            "This execution is a public repair iteration. Open the linked review decision/report, close each unresolved finding, and include explicit repair-closure evidence in the final report.",
+        }
+      : null,
     context: {
       compiled_context_ref: options.compiledContextRef,
       compiled_context_id: asOptionalString(context.compiled_context_id),
@@ -2656,7 +2797,7 @@ export function createLiveAdapter(options) {
         ];
       }
       const defaultRequestArtifactMessage =
-        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run the requested verification commands when feasible, and return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
+        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, follow execution_contract.output_quality_policy, execution_contract.repair_closure_policy when present, and all execution_contract constraints, do not write upstream, run the requested verification commands when feasible, and return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
       const requestMessage = renderRequestArtifactMessage(
         asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
         {

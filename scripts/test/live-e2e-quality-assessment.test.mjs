@@ -250,6 +250,80 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
   assert.ok(request.evidence_refs.acceptance_kpi_dod.includes(executionReadinessFile));
 });
 
+test("quality assessment prepare can write a hydrated draft report that fails all-pass until SWE review", () => {
+  const tempRoot = makeTempRoot();
+  const reportsRoot = path.join(tempRoot, "reports");
+  const observationFile = path.join(reportsRoot, "live-e2e-observation-report-live-e2e.test.run.json");
+  const runHealthFile = path.join(reportsRoot, "live-e2e-run-health-report-live-e2e.test.run.json");
+  const reviewFile = touch(path.join(reportsRoot, "review-report-live-e2e.test.run.json"));
+  const verifyFile = touch(path.join(reportsRoot, "post-run-verify-summary-live-e2e.test.run.json"));
+  const browserProofFile = touch(path.join(reportsRoot, "browser-task-proof-live-e2e.test.run.json"));
+  const featureRequestFile = touch(path.join(reportsRoot, "feature-request-live-e2e.test.run.json"));
+  const summaryFile = path.join(reportsRoot, "live-e2e-run-summary-live-e2e.test.run.json");
+  const targetCheckoutRoot = path.join(tempRoot, "target");
+  fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+  writeJson(observationFile, {
+    overall_status: "pass",
+    report_status: "final",
+    frontend_interactions: [
+      {
+        interaction_id: "guided-web-smoke",
+        evidence_refs: [browserProofFile],
+      },
+    ],
+  });
+  writeJson(runHealthFile, {
+    overall_status: "pass",
+    evidence_refs: [observationFile],
+  });
+  writeJson(summaryFile, {
+    run_id: "live-e2e.test.run",
+    profile_id: "live-e2e.full-journey.test",
+    target_catalog_id: "target.httpx",
+    feature_mission_id: "mission.timeout",
+    scenario_family: "regress",
+    provider_variant_id: "openai-primary",
+    feature_size: "medium",
+    mission_class: "product-change",
+    live_e2e_observation_report_file: observationFile,
+    live_e2e_observation_overall_status: "pass",
+    live_e2e_run_health_report_file: runHealthFile,
+    live_e2e_run_health_overall_status: "pass",
+    review_report_file: reviewFile,
+    post_run_verify_summary_file: verifyFile,
+    guided_browser_task_proof_file: browserProofFile,
+    feature_request_file: featureRequestFile,
+    meaningful_changed_paths: ["httpx/_content.py"],
+    target_checkout_root: targetCheckoutRoot,
+  });
+
+  const prepare = runQualityAssessment(["prepare", "--run-summary-file", summaryFile, "--write-draft-report"]);
+  assert.equal(prepare.status, 0, prepare.stderr || prepare.stdout);
+  const output = JSON.parse(prepare.stdout);
+  assert.equal(fs.existsSync(output.draft_assessment_report_file), true);
+  const draft = JSON.parse(fs.readFileSync(output.draft_assessment_report_file, "utf8"));
+  assert.equal(draft.overall_status, "warn");
+  assert.equal(draft.dimensions.verification_quality.evidence_strength, "weak");
+  assert.ok(draft.dimensions.verification_quality.inspected_evidence_refs.includes(verifyFile));
+  assert.ok(draft.dimensions.security_review.status === "not_evaluated");
+  assert.ok(draft.gap_report.weak_signal_dimensions.includes("verification_quality"));
+  assert.ok(draft.gap_report.not_evaluated_dimensions.includes("security_review"));
+
+  const validate = runQualityAssessment(["validate", "--assessment-report-file", output.draft_assessment_report_file]);
+  assert.equal(validate.status, 0, validate.stderr || validate.stdout);
+  const gate = runQualityAssessment([
+    "gate",
+    "--policy",
+    "all-pass",
+    "--assessment-report-file",
+    output.draft_assessment_report_file,
+  ]);
+  assert.equal(gate.status, 1, gate.stdout);
+  const gateOutput = JSON.parse(gate.stdout);
+  assert.ok(gateOutput.gate_issues.some((issue) => issue.code === "overall_status_not_pass"));
+  assert.ok(gateOutput.gate_issues.some((issue) => issue.code === "gap_report_not_empty"));
+});
+
 test("quality assessment prepare backfills acceptance evidence from nested summary refs", () => {
   const tempRoot = makeTempRoot();
   const reportsRoot = path.join(tempRoot, "reports");

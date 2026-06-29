@@ -74,6 +74,20 @@ function fingerprintRepairContext(context) {
   const payload = {
     source_phase: asString(context.source_phase) ?? "review",
     unresolved_findings: uniqueStrings(asStringArray(context.unresolved_findings)).sort(),
+    unresolved_finding_details: Array.isArray(context.unresolved_finding_details)
+      ? context.unresolved_finding_details
+          .map((entry) => {
+            const record = typeof entry === "object" && entry !== null ? entry : {};
+            return {
+              finding_id: asString(record.finding_id) ?? "",
+              category: asString(record.category) ?? "",
+              severity: asString(record.severity) ?? "",
+              summary: asString(record.summary) ?? "",
+              resolution_requirement: asString(record.resolution_requirement) ?? "",
+            };
+          })
+          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+      : [],
     meaningful_changed_paths: uniqueStrings(asStringArray(context.meaningful_changed_paths)).sort(),
     verification_status: asString(context.verification_status) ?? "unknown",
     requested_next_step: asString(context.requested_next_step) ?? "execution",
@@ -194,6 +208,7 @@ function normalizeRepairContext(options) {
       source_phase: "none",
       cycle_iteration: 0,
       unresolved_findings: [],
+      unresolved_finding_details: [],
       meaningful_changed_paths: [],
       verification_status: options.defaultVerificationStatus || "pass",
       verification_refs: [],
@@ -204,6 +219,11 @@ function normalizeRepairContext(options) {
       requested_next_step: "none",
     };
   }
+  const fallbackFindings = asStringArray(options.fallbackFindings);
+  const fallbackVerificationRefs = asStringArray(options.fallbackVerificationRefs);
+  const contextDetails = Array.isArray(context.unresolved_finding_details)
+    ? context.unresolved_finding_details
+    : [];
 
   const normalized = {
     source_phase: asString(context.source_phase) ?? "review",
@@ -213,12 +233,23 @@ function normalizeRepairContext(options) {
         : 1,
     unresolved_findings: asStringArray(context.unresolved_findings).length > 0
       ? asStringArray(context.unresolved_findings)
-      : asStringArray(options.fallbackFindings),
+      : fallbackFindings,
+    unresolved_finding_details: contextDetails.length > 0
+      ? contextDetails
+      : fallbackFindings.map((finding, index) => ({
+          finding_id: `fallback.${index + 1}`,
+          category: "review",
+          severity: "blocking",
+          summary: finding,
+          evidence_refs: fallbackVerificationRefs,
+          resolution_requirement:
+            "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
+        })),
     meaningful_changed_paths: asStringArray(context.meaningful_changed_paths),
     verification_status: asString(context.verification_status) ?? options.defaultVerificationStatus ?? "unknown",
     verification_refs: asStringArray(context.verification_refs).length > 0
       ? asStringArray(context.verification_refs)
-      : asStringArray(options.fallbackVerificationRefs),
+      : fallbackVerificationRefs,
     previous_repair_decision_refs: asStringArray(context.previous_repair_decision_refs),
     context_fingerprint: asString(context.context_fingerprint) ?? "",
     new_context_since_previous: asStringArray(context.new_context_since_previous),

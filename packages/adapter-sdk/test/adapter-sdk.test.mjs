@@ -1371,6 +1371,114 @@ test("live adapter request-artifact transport sends bounded provider work packet
   });
 });
 
+test("live adapter repair request-artifact packet includes repair closure policy", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
+    const reviewReportFile = path.join(evidenceRoot, "review-report-repair.json");
+    const reviewDecisionFile = path.join(evidenceRoot, "review-decision-request-repair.json");
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
+    fs.writeFileSync(reviewReportFile, JSON.stringify({ overall_status: "fail" }, null, 2), "utf8");
+    fs.writeFileSync(
+      reviewDecisionFile,
+      JSON.stringify(
+        {
+          decision: "request-repair",
+          review_report_ref: "evidence://.aor/projects/adapter-test/reports/review-report-repair.json",
+          repair_context: {
+            source_phase: "review",
+            cycle_iteration: 1,
+            unresolved_findings: ["test/headers.ts coverage was weakened."],
+            unresolved_finding_details: [
+              {
+                finding_id: "code-quality.headers-coverage",
+                category: "code-quality",
+                severity: "blocking",
+                summary: "test/headers.ts coverage was weakened.",
+                evidence_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
+                resolution_requirement: "Restore the weakened assertion coverage or provide equivalent stronger coverage.",
+              },
+            ],
+            meaningful_changed_paths: ["test/headers.ts"],
+            verification_status: "pass",
+            verification_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
+            previous_repair_decision_refs: [],
+            context_fingerprint: "sha256:adapter-repair-context",
+            new_context_since_previous: ["first-repair-decision"],
+            stop_reason: "Review requested repair.",
+            requested_next_step: "execution",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--work-packet');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'repair packet ok',",
+            "output:{roles:packet.resolved_local_refs.map(ref=>ref.role),repair_context:packet.repair_context,repair_policy:packet.execution_contract.repair_closure_policy},",
+            "evidence_refs:['evidence://adapter-live/claude-code/repair-packet']",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+          argument: "--work-packet",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-repair-packet",
+      run_id: "run-repair-packet",
+      step_id: "step-repair-packet",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        compiled_context_file: compiledContextFile,
+        runtime_evidence_refs: [
+          "evidence://.aor/projects/adapter-test/reports/review-decision-request-repair.json",
+        ],
+      },
+    });
+
+    assert.equal(response.status, "success");
+    assert.ok(response.output.runner_output.roles.includes("review_decision"));
+    assert.ok(response.output.runner_output.roles.includes("review_report"));
+    assert.equal(response.output.runner_output.repair_context.context.source_phase, "review");
+    assert.equal(response.output.runner_output.repair_policy.required, true);
+    assert.equal(response.output.runner_output.repair_policy.must_address_each_unresolved_finding, true);
+    assert.equal(
+      response.output.runner_output.repair_policy.unresolved_finding_details[0].finding_id,
+      "code-quality.headers-coverage",
+    );
+  });
+});
+
 test("live adapter classifies provider work-packet echo as non-executed", () => {
   withTempRepo((repoRoot) => {
     const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");

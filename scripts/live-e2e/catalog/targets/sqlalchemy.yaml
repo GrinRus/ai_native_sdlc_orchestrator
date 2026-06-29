@@ -8,7 +8,7 @@ verification:
   setup_commands:
     - python3 -m venv .aor/live-e2e-venv
     - .aor/live-e2e-venv/bin/python -m pip install -U pip
-    - .aor/live-e2e-venv/bin/python -m pip install -e .[test]
+    - .aor/live-e2e-venv/bin/python -m pip install -e . 'pytest>=7,<10' 'pytest-xdist!=3.3.0'
   commands:
     - .aor/live-e2e-venv/bin/python -m pytest test/sql test/orm
 safety_defaults:

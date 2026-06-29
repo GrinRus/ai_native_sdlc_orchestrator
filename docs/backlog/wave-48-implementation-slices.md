@@ -139,6 +139,9 @@ public repair both returning to the next execution iteration.
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
 - **State:** blocked
 - **External blocker:** Requires a fresh provider/toolchain proof window with compatible Vitest Node and OpenAI credentials.
+- **Backlog reconciliation:** This W48-specific proof rerun remains a
+  historical blocked/superseded gap. W49 and W50 provide stricter successor
+  proof evidence, and no W48-only product acceptance is claimed.
 - **Outcome:** Run the W48 control proof set on one commit and claim product
   acceptance only for final all-pass gates.
 - **Primary modules:** `scripts/live-e2e/**`,

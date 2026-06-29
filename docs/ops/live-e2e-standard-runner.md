@@ -18,6 +18,14 @@ verification commands that run before provider execution. The runner must expose
 test, build, browser dependency, or timeout blocker is not a Codex/Qwen quality
 signal. Conversely, AOR runner/controller/API/UI failures must be classified as
 `failure_owner=aor`, not hidden behind target repository blocker wording.
+Run summaries, observation reports, and run-health reports must also expose a
+first-class `target_readiness` block that links target toolchain preflight,
+pre-execution status, baseline verification, execution-readiness refs, and any
+pre-product-execution blocker classification.
+Installed-user guided profiles may set
+`live_e2e.guided_warn_diagnostic_timeout_sec` for non-blocking post-guided-proof
+diagnostics; this timeout only applies when the mission diagnostic failure mode
+is `warn`.
 
 Live E2E provider parity is required across Codex, Claude, OpenCode, and Qwen.
 Provider-specific behavior belongs only at the adapter boundary: command shape,
@@ -475,6 +483,15 @@ Full-journey layer:
 - splits verification into `readiness`, `baseline_diagnostic`, and `post_run_quality` phases;
 - treats full-journey baseline target verification as diagnostic by default: failed target `verification.commands` are preserved as context, but setup failures, missing prerequisites, failed validation, missing or failed routed dry-run, provider readiness failure, and unsafe write-back policy still block before execution;
 - resolves mission post-run quality into a mission-blocking primary gate plus optional full diagnostic commands; a failed diagnostic command records findings without hiding a passing primary gate unless the mission declares `diagnostic_failure_mode=fail`;
+- for installed-user guided UI proof, missing browser-task proof, screenshot or
+  visual evidence, structured accessibility checks, or keyboard focus sequence
+  remains a `ui_validation` blocker; optional target diagnostics with
+  `diagnostic_failure_mode=warn` remain factual warning evidence and do not
+  replace required AOR operator UI proof refs;
+- for installed-user guided UI proof, optional `warn` diagnostics are deferred
+  until after guided browser proof materializes and use
+  `live_e2e.guided_warn_diagnostic_timeout_sec` (default `120`) so target-side
+  timing-sensitive tests cannot prevent UI/accessibility evidence collection;
 - has the runner prepare one structured feature request input under AOR run state;
 - requires small catalog missions to use `mission_class=flow-regression`; requires medium, large, and xlarge catalog missions to use `mission_class=product-change` with `agent_visible_request`, evaluator/final-code rubrics, widened budgets, goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands; xlarge remains manual observation evidence and cannot close required acceptance;
 - materializes provider-pinned route and policy overrides in host-side AOR run
@@ -747,6 +764,12 @@ node ./scripts/live-e2e/quality-assessment.mjs prepare \
   --run-summary-file <live_e2e_run_summary_file>
 ```
 
+Use `--write-draft-report` when the runner should also materialize a contract
+valid draft report from public artifacts. Draft reports are convenience
+scaffolds: they must preserve weak/missing evidence gaps and are expected to
+fail `gate --policy all-pass` until the SWE evaluator replaces draft
+judgements.
+
 The SWE agent then freely inspects linked evidence and writes `live-e2e-quality-assessment-report`. Validate it without changing run or qualification status:
 
 ```bash
@@ -817,8 +840,10 @@ of implementation and verification evidence when the mission requires it.
   `post_run_verification_failed`.
 - If the next public repair request has the same `repair_context.context_fingerprint`
   as the previous repair decision and `new_context_since_previous` is empty, the
-  runner must stop before issuing another repair command and choose the most
-  specific supported class: `verification_mapping_gap`,
+  runner must stop before issuing another repair command, but only after the
+  repair execution has produced fresh primary verification and fresh
+  `review#N`/`qa#N` evidence for that iteration. The runner then chooses the
+  most specific supported class: `verification_mapping_gap`,
   `review_finding_stale`, `provider_did_not_address_finding`,
   `acceptable_residual_risk_not_recognized`, or the generic
   `repeated_repair_context_without_new_evidence` only when no narrower class is

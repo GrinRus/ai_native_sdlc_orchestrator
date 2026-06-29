@@ -12,7 +12,7 @@ after the current required proof set is stable.
   clean committed AOR SHA so product-acceptance evidence is tied to immutable
   source instead of a dirty worktree label.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/ops/live-e2e-proof-complete-findings.md`,
   `scripts/live-e2e/**`, root checks, live proof artifacts
 - **Hard dependencies:** W50-S04
@@ -26,6 +26,31 @@ after the current required proof set is stable.
    the same-commit guided UI/accessibility proof.
 4. Update proof findings with run ids, commit SHA, gate results, and artifact
    hygiene confirmation.
+
+### Closure evidence
+
+- Clean source commit: `265b20961af5`.
+- Guided UI proof:
+  `w51-clean-guided-aor-ui-20260626-265b20961af5` completed the full installed
+  user flow with browser-task proof, accessibility evidence, DOM/visual refs,
+  screenshot evidence, and passing keyboard navigation. The run-health summary
+  retains a small-canary diagnostic `warn`, which is accepted as factual
+  non-blocking evidence for paired UI/accessibility proof.
+- HTTPX medium proof:
+  `w51-clean-httpx-medium-20260626-265b20961af5` completed with terminal
+  run-health `pass`, meaningful changed paths in `httpx/_content.py`,
+  `httpx/_transports/default.py`, and `tests/test_timeouts.py`, and final
+  `quality-assessment gate --policy all-pass` passing with the same-commit
+  guided UI proof.
+- Fastify repair medium proof:
+  `w51-clean-fastify-repair-medium-20260626-265b20961af5` completed with
+  terminal run-health `pass`, meaningful changed paths in
+  `lib/schema-controller.js`, `test/internals/schema-controller-perf.test.js`,
+  `test/types/schema.tst.ts`, and `types/schema.d.ts`, and final
+  `quality-assessment gate --policy all-pass` passing with the same-commit
+  guided UI proof.
+- Previous W51 attempts on `2a4bd06c16d6` and `c0945a744018` remain historical
+  blocked evidence and are not counted as product acceptance.
 
 ### Acceptance criteria
 1. Guided AOR UI run passes and includes browser-task/accessibility evidence.
@@ -48,12 +73,19 @@ after the current required proof set is stable.
   reach final all-pass product acceptance or record a new non-W50 blocker after
   target setup genuinely proceeds.
 - **Epic:** EPIC-7
-- **State:** blocked
-- **External blocker:** compatible Node binary for
-  `AOR_LIVE_E2E_TARGET_NODE_BIN` or compatible host Node is required.
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`,
   `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`
 - **Hard dependencies:** W51-S01
+
+### Readiness note
+
+W51-S02 used the compatible bundled Node `v24.14.0` via
+`AOR_LIVE_E2E_TARGET_NODE_BIN`. The run did not reach product execution because
+target readiness blocked on Vitest's baseline `pnpm test`, but the old W50
+setup defects did not recur: Node preflight passed, setup completed, `.aor`
+artifacts were not scanned as product source, and the CLI build artifact was
+available before verification.
 
 ### Local tasks
 1. Provision or select Node satisfying `^22.12.0 || ^24.0.0 || >=26.0.0`.
@@ -72,7 +104,8 @@ after the current required proof set is stable.
 ### Done evidence
 - Vitest large run summary
 - target toolchain/preflight evidence
-- final quality report or classified blocker record
+- classified blocker record in
+  `docs/ops/live-e2e-proof-complete-findings.md`
 
 ### Out of scope
 - making Vitest optional required coverage
@@ -85,7 +118,7 @@ after the current required proof set is stable.
   step-quality reports, changed paths, review/QA/delivery evidence, and paired
   AOR UI proof.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/quality-assessment.mjs`,
   `scripts/live-e2e/lib/**`, `packages/contracts/**`, tests
 - **Hard dependencies:** W51-S02
@@ -110,7 +143,8 @@ after the current required proof set is stable.
 
 ### Done evidence
 - quality-assessment hydration tests
-- sample hydrated report fixture
+- `quality-assessment prepare --write-draft-report`
+- hydrated draft contract tests
 - updated quality-assessment runbook
 
 ### Out of scope
@@ -122,7 +156,7 @@ after the current required proof set is stable.
 - **Outcome:** Separate target setup/toolchain blockers from product execution
   in run summaries, observation reports, and step-quality lineage.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/lib/flows.mjs`,
   `scripts/live-e2e/lib/step-controller.mjs`,
   `scripts/live-e2e/run-profile.mjs`, contracts/docs/tests
@@ -146,7 +180,8 @@ after the current required proof set is stable.
 ### Done evidence
 - contract/runner tests for target-readiness
 - updated runbook and findings examples
-- control proof rerun or classified blocker after phase split
+- Vitest target-readiness classified blocker after phase split
+- SQLAlchemy target-readiness pass evidence before product execution
 
 ### Out of scope
 - changing AOR product lifecycle step names outside live E2E reporting
@@ -157,7 +192,7 @@ after the current required proof set is stable.
 - **Outcome:** Add one additional required hard-target proof candidate only
   after Vitest large has terminal all-pass or a new accepted blocker policy.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/catalog/**`,
   `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**`
 - **Hard dependencies:** W51-S04
@@ -179,6 +214,10 @@ after the current required proof set is stable.
 - catalog/profile diff
 - profile validation tests
 - proof findings update
+- SQLAlchemy large proof reached all SDLC steps with target-readiness and
+  primary verification pass, while product acceptance remains unclaimed because
+  post-run diagnostic health was `warn` and no same-commit final all-pass gate
+  was prepared.
 
 ### Out of scope
 - adding Django as required coverage

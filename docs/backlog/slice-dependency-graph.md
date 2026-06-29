@@ -244,6 +244,11 @@ graph TD
   W51S03[W51-S03 Automated final quality report hydration]
   W51S04[W51-S04 Explicit target-readiness phase]
   W51S05[W51-S05 Next hard-target expansion after large acceptance]
+  W52S01[W52-S01 Target-readiness owner propagation]
+  W52S02[W52-S02 Diagnostic command hang and timeout hardening]
+  W52S03[W52-S03 Vitest large product acceptance closure]
+  W52S04[W52-S04 SQLAlchemy large diagnostic policy and acceptance closure]
+  W52S05[W52-S05 Hard-target proof rerun and findings sync]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -567,7 +572,7 @@ graph TD
   W45S03 --> W45S05
   W45S04 --> W45S05
   W45S05 --> W45S06
-  W45S06 --> W46S01
+  W43S04 --> W46S01
   W46S01 --> W46S02
   W46S01 --> W46S03
   W46S03 --> W46S04
@@ -582,7 +587,7 @@ graph TD
   W48S02 --> W48S03
   W48S03 --> W48S04
   W48S04 --> W48S05
-  W48S05 --> W49S01
+  W48S04 --> W49S01
   W49S01 --> W49S02
   W49S02 --> W49S03
   W49S03 --> W49S04
@@ -595,6 +600,12 @@ graph TD
   W51S02 --> W51S03
   W51S03 --> W51S04
   W51S04 --> W51S05
+  W51S05 --> W52S01
+  W52S01 --> W52S02
+  W52S02 --> W52S03
+  W52S02 --> W52S04
+  W52S03 --> W52S05
+  W52S04 --> W52S05
 ```
 
 ## W0 hard dependencies
@@ -996,7 +1007,7 @@ graph TD
 ## W46 hard dependencies
 | Slice ID | Depends on |
 |---|---|
-| W46-S01 | W45-S06 |
+| W46-S01 | W43-S04 |
 | W46-S02 | W46-S01 |
 | W46-S03 | W46-S01 |
 | W46-S04 | W46-S03 |
@@ -1023,7 +1034,7 @@ graph TD
 ## W49 hard dependencies
 | Slice ID | Depends on |
 |---|---|
-| W49-S01 | W48-S05 |
+| W49-S01 | W48-S04 |
 | W49-S02 | W49-S01 |
 | W49-S03 | W49-S02 |
 | W49-S04 | W49-S03 |
@@ -1044,6 +1055,15 @@ graph TD
 | W51-S03 | W51-S02 |
 | W51-S04 | W51-S03 |
 | W51-S05 | W51-S04 |
+
+## W52 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W52-S01 | W51-S05 |
+| W52-S02 | W52-S01 |
+| W52-S03 | W52-S02 |
+| W52-S04 | W52-S02 |
+| W52-S05 | W52-S03, W52-S04 |
 
 ## Topological order
 1. W0-S01
@@ -1286,6 +1306,11 @@ graph TD
 238. W51-S03
 239. W51-S04
 240. W51-S05
+241. W52-S01
+242. W52-S02
+243. W52-S03
+244. W52-S04
+245. W52-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

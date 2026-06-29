@@ -80,6 +80,12 @@ When the external runtime completes but only echoes or summarizes the provider w
 
 When Runtime Harness detects a strict code-changing no-op after provider execution, run-health should preserve `failure_summary.class: no-op` with `phase: provider_execution` unless a more specific provider failure such as `provider_work_packet_not_executed` is available.
 
+`target_readiness` should summarize pre-execution target facts as a first-class
+block: target toolchain preflight, target setup status, target verification
+status, pre-execution status refs, execution-readiness refs, failure
+owner/phase/class, and whether product execution had started. It is still
+factual run evidence and must not judge product quality.
+
 `target_environment_health` should include target setup and target verification facts, without converting target repository failures into provider or AOR product failures.
 
 `diagnostic_health` should include optional post-run diagnostic verification
@@ -93,6 +99,9 @@ facts, separated from the primary post-run verification gate:
 - `timed_out_commands[]`
 - `failed_commands[]`
 - `evidence_refs[]`
+
+`evidence_refs[]` may include the public `project verify` transcript when a
+non-blocking diagnostic times out before a verify summary can be materialized.
 
 If a configured diagnostic command times out or fails with
 `diagnostic_failure_mode=warn`, run-health must use
@@ -140,6 +149,14 @@ More specific convergence blockers may use
 the public evidence supports that classification.
 
 `evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
+
+`guided_ui_evidence` may mirror the observation report's guided UI/browser
+proof refs so run-health consumers can see whether AOR operator browser-task
+proof was required, present, and evidence-backed without interpreting outcome
+quality. It should preserve web-smoke refs, browser-task request/proof refs,
+screenshot refs, keyboard focus sequence, structured accessibility checks, weak
+evidence refs, and supporting evidence refs when the profile declares
+`browser-task-proof`.
 
 For guided installed-user profiles that declare `live_e2e.frontend_capability: browser-task-proof`,
 `guided_journey.browser_task_proof.required: true`, or `browser-task-proof` in proof requirements, missing or non-passing

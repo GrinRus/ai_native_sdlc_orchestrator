@@ -7,13 +7,18 @@ when verification and code quality already pass. Vitest is treated as live E2E
 target setup hygiene: incompatible Node must fail fast before expensive target
 commands or product execution.
 
+Backlog reconciliation after PR #90: W50 is closed by the committed W50 control
+rerun findings. Product acceptance is claimed only for HTTPX medium and Fastify
+repair medium; Vitest large remains a non-accepted classified setup blocker
+until W51-S02.
+
 ## W50-S01 — Review verification mapping and residual-risk classification
 
 - **Outcome:** Review reports preserve changed-test verification coverage and
   classify broad verification mapping warnings as non-repair evidence when
   primary verification, code quality, and size fit pass.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/contracts/review-report.md`,
   `packages/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`,
   review tests
@@ -50,7 +55,7 @@ commands or product execution.
   `project verify` if no compatible Node is available, and setup evidence keeps
   public `project init` success distinct from later target setup blockers.
 - **Epic:** EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/lib/flows.mjs`,
   `scripts/live-e2e/run-profile.mjs`, profile docs, runner tests
 - **Hard dependencies:** W50-S01
@@ -87,7 +92,7 @@ commands or product execution.
 - **Outcome:** Re-run the control proof subset after W50 changes and claim
   product acceptance only for terminal pass plus final all-pass quality gate.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/**`,
   `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs
 - **Hard dependencies:** W50-S02
@@ -122,7 +127,7 @@ commands or product execution.
 - **Outcome:** Findings, backlog, roadmap, and dependency graph accurately
   distinguish W49 blockers from W50 fixes and W50 proof evidence.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/backlog/**`,
   `docs/ops/live-e2e-proof-complete-findings.md`
 - **Hard dependencies:** W50-S03

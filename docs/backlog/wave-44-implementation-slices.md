@@ -35,7 +35,8 @@ assets.
 
 ## W44-S01 — Artifact workflow taxonomy and transition invariants
 - **Epic:** EPIC-0 Repository development system; EPIC-3 Routed execution
-- **State:** ready
+- **State:** blocked
+- **External blocker:** Deferred open prompt/readiness taxonomy track; W51 live E2E proof-closure work is the current operating lane and does not depend on W44/W45 completion.
 - **Outcome:** Define the source-of-truth taxonomy and state-transition
   invariants for splitting discovery, research, and spec runtime assets.
 - **Primary modules:** `docs/architecture/**`, `docs/contracts/**`,

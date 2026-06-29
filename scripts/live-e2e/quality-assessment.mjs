@@ -14,6 +14,7 @@ import {
   parseFlags,
   readJson,
   readYamlDocument,
+  resolveOptionalBooleanFlag,
   resolveOptionalStringFlag,
   uniqueStrings,
   writeJson,
@@ -253,6 +254,38 @@ const AOR_OPERATOR_UI_REF_PATTERNS = Object.freeze([
   /screenshot/iu,
 ]);
 
+const DRAFT_DIMENSION_REF_GROUPS = Object.freeze({
+  artifact_content_quality: ["acceptance_kpi_dod", "review_eval_harness", "delivery_release_learning"],
+  implementation_correctness: ["review_eval_harness", "all_known_refs"],
+  implementation_completeness: ["acceptance_kpi_dod", "review_eval_harness", "delivery_release_learning"],
+  code_maintainability: ["review_eval_harness", "all_known_refs"],
+  test_adequacy: ["review_eval_harness"],
+  security_review: [],
+  performance_regression_risk: [],
+  verification_quality: ["review_eval_harness"],
+  delivery_safety: ["delivery_release_learning", "run_facts"],
+  aor_operator_ui_ux_quality: ["aor_operator_ui", "paired_aor_operator_ui"],
+  aor_operator_accessibility_quality: ["aor_operator_ui", "paired_aor_operator_ui"],
+  evidence_strength: ["run_facts", "review_eval_harness", "aor_operator_ui", "acceptance_kpi_dod"],
+  acceptance_criteria_traceability: ["acceptance_kpi_dod", "review_eval_harness"],
+});
+
+const DRAFT_DIMENSION_FINDING_CATEGORY = Object.freeze({
+  artifact_content_quality: "artifact-content",
+  implementation_correctness: "implementation-correctness",
+  implementation_completeness: "acceptance-traceability",
+  code_maintainability: "follow-up-needed",
+  test_adequacy: "test-adequacy",
+  security_review: "security",
+  performance_regression_risk: "performance",
+  verification_quality: "evidence-gap",
+  delivery_safety: "follow-up-needed",
+  aor_operator_ui_ux_quality: "ui-ux",
+  aor_operator_accessibility_quality: "accessibility",
+  evidence_strength: "evidence-gap",
+  acceptance_criteria_traceability: "acceptance-traceability",
+});
+
 /**
  * @param {string} filePath
  * @returns {Record<string, unknown>}
@@ -430,6 +463,193 @@ function attachPairedAorOperatorUiEvidence(request, pairedRunSummaryFile, baseDi
     source_observation_report_file: pairedObservationFile || null,
     source_run_health_report_file: pairedRunHealthFile || null,
     usage: "AOR operator UI/UX and accessibility evidence may be reused when it was produced for the same AOR commit because these dimensions assess the AOR operator experience, not the target repository UI.",
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @param {string[]} groups
+ * @returns {string[]}
+ */
+function collectDraftRefsForGroups(request, groups) {
+  const evidenceRefs = asRecord(request.evidence_refs);
+  return uniqueStrings(
+    groups.flatMap((group) => {
+      const refs = asStringArray(evidenceRefs[group]);
+      if (group === "all_known_refs") {
+        return refs.filter((ref) => !/README\.md$/u.test(ref)).slice(0, 18);
+      }
+      return refs;
+    }),
+  ).slice(0, 24);
+}
+
+/**
+ * @param {string} dimensionKey
+ * @param {string[]} refs
+ * @returns {Record<string, unknown>}
+ */
+function buildDraftDimension(dimensionKey, refs) {
+  const category = DRAFT_DIMENSION_FINDING_CATEGORY[dimensionKey] || "evidence-gap";
+  if (refs.length === 0) {
+    return {
+      status: "not_evaluated",
+      evidence_strength: "missing",
+      inspected_evidence_refs: [],
+      findings: [
+        {
+          category,
+          severity: "medium",
+          summary: `Draft hydration found no direct public evidence refs for ${dimensionKey}; SWE evaluator judgement is required before acceptance.`,
+          evidence_refs: [],
+        },
+      ],
+      recommended_followups: [`Inspect and attach public evidence for ${dimensionKey} before attempting all-pass closure.`],
+    };
+  }
+  return {
+    status: "warn",
+    evidence_strength: "weak",
+    inspected_evidence_refs: refs,
+    findings: [
+      {
+        category,
+        severity: "medium",
+        summary: `Draft hydration attached public evidence refs for ${dimensionKey}, but no SWE judgement has confirmed pass quality yet.`,
+        evidence_refs: refs,
+      },
+    ],
+    recommended_followups: [`Replace this draft judgement with explicit SWE assessment for ${dimensionKey}.`],
+  };
+}
+
+/**
+ * @param {string[]} keys
+ * @param {string[]} refs
+ * @param {"ui-ux" | "accessibility"} category
+ * @returns {Record<string, unknown>}
+ */
+function buildDraftSubdimensions(keys, refs, category) {
+  return Object.fromEntries(
+    keys.map((key) => {
+      if (refs.length === 0) {
+        return [
+          key,
+          {
+            status: "not_evaluated",
+            evidence_strength: "missing",
+            evidence_refs: [],
+            findings: [
+              {
+                category,
+                severity: "medium",
+                summary: `Draft hydration found no AOR operator evidence for ${key}; SWE evaluator judgement is required.`,
+                evidence_refs: [],
+              },
+            ],
+          },
+        ];
+      }
+      return [
+        key,
+        {
+          status: "warn",
+          evidence_strength: "weak",
+          evidence_refs: refs,
+          findings: [
+            {
+              category,
+              severity: "medium",
+              summary: `Draft hydration attached AOR operator evidence for ${key}, but pass quality is not yet evaluator-confirmed.`,
+              evidence_refs: refs,
+            },
+          ],
+        },
+      ];
+    }),
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @param {string} reportFile
+ * @returns {Record<string, unknown>}
+ */
+function buildDraftAssessmentReport(request, reportFile) {
+  const runIdentity = asRecord(request.run_identity);
+  const dimensions = Object.fromEntries(
+    REQUIRED_DIMENSIONS.map((dimensionKey) => {
+      const refs = collectDraftRefsForGroups(request, DRAFT_DIMENSION_REF_GROUPS[dimensionKey] || []);
+      const dimension = buildDraftDimension(dimensionKey, refs);
+      if (dimensionKey === "aor_operator_ui_ux_quality") {
+        dimension.subdimensions = buildDraftSubdimensions(AOR_OPERATOR_UI_UX_SUBDIMENSIONS, refs, "ui-ux");
+      }
+      if (dimensionKey === "aor_operator_accessibility_quality") {
+        dimension.subdimensions = buildDraftSubdimensions(AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSIONS, refs, "accessibility");
+      }
+      return [dimensionKey, dimension];
+    }),
+  );
+  const notEvaluatedDimensions = REQUIRED_DIMENSIONS.filter(
+    (dimensionKey) => asRecord(dimensions[dimensionKey]).status === "not_evaluated",
+  );
+  const weakSignalDimensions = REQUIRED_DIMENSIONS.filter(
+    (dimensionKey) => asRecord(dimensions[dimensionKey]).evidence_strength === "weak",
+  );
+  const assessmentRequestFile = asNonEmptyString(request.assessment_request_file);
+  const requestEvidenceRefs = uniqueStrings([
+    asNonEmptyString(request.source_run_summary_file),
+    asNonEmptyString(request.source_observation_report_file),
+    asNonEmptyString(request.source_run_health_report_file),
+    assessmentRequestFile,
+    ...asStringArray(asRecord(request.evidence_refs).run_facts),
+  ]);
+  return {
+    assessment_id: `${asNonEmptyString(request.run_id) || "live-e2e-run"}.quality-assessment.draft.v1`,
+    run_id: asNonEmptyString(request.run_id) || "live-e2e-run",
+    profile_id: asNonEmptyString(request.profile_id) || "unknown-profile",
+    generated_at: nowIso(),
+    evaluator: {
+      kind: "swe-agent",
+      ref: "skill://live-e2e-runner",
+      mode: "hydrated-draft",
+    },
+    source_run_summary_file: asNonEmptyString(request.source_run_summary_file),
+    source_observation_report_file: asNonEmptyString(request.source_observation_report_file),
+    source_run_health_report_file: asNonEmptyString(request.source_run_health_report_file),
+    assessment_request_file: assessmentRequestFile,
+    overall_status: "warn",
+    dimensions,
+    gap_report: {
+      not_evaluated_dimensions: notEvaluatedDimensions,
+      weak_signal_dimensions: weakSignalDimensions,
+      strong_evidence_dimensions: [],
+    },
+    findings: [
+      {
+        category: "evidence-gap",
+        severity: "medium",
+        summary:
+          "This is an automatically hydrated draft. It preserves public evidence refs and explicit gaps, but it is not product acceptance until a SWE evaluator replaces draft judgements and all-pass gate succeeds.",
+        evidence_refs: requestEvidenceRefs,
+      },
+    ],
+    recommended_followups: [
+      "Inspect linked evidence and replace draft warn/not_evaluated dimensions with evaluator-authored judgements.",
+      "Run quality-assessment validate and gate --policy all-pass only after completing SWE evaluator review.",
+    ],
+    evidence_refs: uniqueStrings([
+      ...requestEvidenceRefs,
+      ...asStringArray(asRecord(request.evidence_refs).review_eval_harness),
+      ...asStringArray(asRecord(request.evidence_refs).delivery_release_learning),
+      ...asStringArray(asRecord(request.evidence_refs).aor_operator_ui),
+      ...asStringArray(asRecord(request.evidence_refs).acceptance_kpi_dod),
+    ]),
+    draft_metadata: {
+      generated_from_request: true,
+      product_acceptance_required: runIdentity.product_acceptance_required === true,
+      all_pass_expected_to_fail_until_evaluator_review: true,
+    },
   };
 }
 
@@ -627,6 +847,7 @@ function prepareCli(rawArgs) {
     flags["paired-aor-operator-ui-run-summary-file"],
     "paired-aor-operator-ui-run-summary-file",
   );
+  const writeDraftReport = resolveOptionalBooleanFlag(flags["write-draft-report"], "write-draft-report");
   const runId = asNonEmptyString(runSummary.run_id) || "live-e2e-run";
   const profileId = asNonEmptyString(runSummary.profile_id) || null;
   const featureSize = asNonEmptyString(runSummary.feature_size) || null;
@@ -736,7 +957,23 @@ function prepareCli(rawArgs) {
     ],
   };
   attachPairedAorOperatorUiEvidence(request, pairedAorOperatorUiRunSummaryFile, path.dirname(runSummaryFile));
+  request.assessment_request_file = requestFile;
   writeJson(requestFile, request);
+  let draftAssessmentReportFile = null;
+  if (writeDraftReport) {
+    const draftReport = buildDraftAssessmentReport(request, expectedAssessmentReportFile);
+    const draftValidation = validateContractDocument({
+      family: "live-e2e-quality-assessment-report",
+      document: draftReport,
+      source: expectedAssessmentReportFile,
+    });
+    if (!draftValidation.ok) {
+      const issues = draftValidation.issues.map((issue) => issue.message).join("; ");
+      throw new Error(`Draft quality assessment report failed contract validation: ${issues}`);
+    }
+    writeJson(expectedAssessmentReportFile, draftReport);
+    draftAssessmentReportFile = expectedAssessmentReportFile;
+  }
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -745,6 +982,7 @@ function prepareCli(rawArgs) {
         run_id: runId,
         assessment_request_file: requestFile,
         expected_assessment_report_file: expectedAssessmentReportFile,
+        draft_assessment_report_file: draftAssessmentReportFile,
       },
       null,
       2,
@@ -1037,7 +1275,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h") || rawArgs.length === 0) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/quality-assessment.mjs prepare --run-summary-file <file>",
+        "Usage: node ./scripts/live-e2e/quality-assessment.mjs prepare --run-summary-file <file> [--write-draft-report]",
         "       node ./scripts/live-e2e/quality-assessment.mjs validate --assessment-report-file <file>",
         "       node ./scripts/live-e2e/quality-assessment.mjs gate --policy all-pass --assessment-report-file <file>",
         "",

@@ -80,6 +80,17 @@ Readiness entries may include target setup and target verification details. Thes
 - `failure_phase`
 - `failure_class`
 
+Observation reports may also expose a top-level `target_readiness` block so
+consumers do not have to reconstruct pre-execution state from setup-journal
+entries. This block is factual run evidence only. It should preserve:
+- `phase: target_readiness`
+- `status`
+- target toolchain, setup, and verification statuses
+- target toolchain preflight, pre-execution status, baseline verification, and
+  execution-readiness refs
+- failure owner/phase/class when readiness blocks before product execution
+- whether product execution had started
+
 `step_journal[]` preserves the public-step controller evidence:
 - plan and `plan_ref`
 - public surface and command transcript refs
@@ -113,6 +124,14 @@ report assembly should hydrate `frontend_interactions[]` from the proof file so
 the observation links the proof ref, screenshot refs, structured accessibility
 checks, and task outcome.
 
+`guided_ui_evidence` may summarize the same factual refs for consumers that do
+not want to traverse `frontend_interactions[]`. For browser-task guided
+profiles it should include whether proof is required, proof status, web-smoke
+refs, browser-task request/proof refs, screenshot refs, keyboard focus
+sequence, structured accessibility checks, weak evidence refs, and all
+supporting evidence refs. This section is still factual run evidence, not a UI
+or accessibility quality judgement.
+
 `frontend_interactions[].accessibility_checks[]` must include one entry for each
 AOR operator accessibility check:
 - `keyboard_navigation`
@@ -133,6 +152,12 @@ Each check is factual evidence only and must include `check_id`, `status`,
 - `delivery`
 - `release`
 - `learning`
+
+For a declared full lifecycle, `final_analysis.status` must not be `pass` while
+any included public step is missing an accepted operator decision. Missing
+included steps should be reported as blocked factual controller evidence so
+run-health can classify the incomplete lifecycle before product-quality
+assessment is attempted.
 
 `final_analysis` must not contain `code_quality`, `artifact_quality`, `quality_judgement`, or `runner_quality_summary`.
 

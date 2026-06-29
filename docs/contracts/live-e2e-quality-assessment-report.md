@@ -9,6 +9,14 @@ The assessment is free-form expert work over the linked evidence. It does not re
 
 `quality-assessment prepare` is valid only after a completed declared flow. The source run-health status must be `pass` or `warn`, and the source observation status must be `pass` or `warn`. Blocked or failed runs, including `compiled_context_budget_exceeded` and `provider_context_window_exceeded`, stop at factual run-health reporting and must not produce an outcome quality assessment request.
 
+`quality-assessment prepare --write-draft-report` may also materialize the
+expected report file as an evaluator draft. The draft must hydrate public
+evidence refs from the request, run summary, run-health, step-quality lineage,
+target readiness, changed paths, verification, review/QA/delivery, and paired
+AOR UI proof where available. Draft judgements must remain `warn` or
+`not_evaluated` with explicit gap findings until a SWE evaluator replaces them;
+an automatically hydrated draft must not pass the all-pass gate by itself.
+
 ## Required fields
 - `assessment_id`
 - `run_id`
