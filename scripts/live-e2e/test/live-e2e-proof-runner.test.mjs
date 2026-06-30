@@ -1209,6 +1209,13 @@ test("generated Vitest large profile isolates verification and checks hard-targe
   });
 });
 
+test("SQLAlchemy large profile uses a short physical target checkout root", () => {
+  const profileRef = "scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml";
+  const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+
+  assert.equal(loadedProfile.profile.live_e2e.target_checkout_root_mode, "short-physical");
+});
+
 test("target pre-execution status separates target setup, target verification, and AOR failures", () => {
   withTempRoot((tempRoot) => {
     const setupTranscript = writeJsonFixture(path.join(tempRoot, "setup-transcript.json"));
