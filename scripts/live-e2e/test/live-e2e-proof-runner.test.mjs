@@ -51,6 +51,7 @@ import {
 import {
   hasPendingIncludedControllerStep,
   preparePendingOperatorDecision,
+  resolveEvaluatorRunProfileArgs,
   shouldAwaitFirstControllerObservation,
 } from "../step-evaluator.mjs";
 import { writeProofRunnerArtifacts } from "../run-profile.mjs";
@@ -118,6 +119,27 @@ function writeProfile(tempRoot, liveOverrides, options = {}) {
   );
   return profilePath;
 }
+
+test("step evaluator pins a generated run id across continuation attempts", () => {
+  withTempRoot((tempRoot) => {
+    const profilePath = path.join(tempRoot, "profile.yaml");
+    fs.writeFileSync(profilePath, "profile_id: live-e2e.test.stable-evaluator\n", "utf8");
+
+    const args = ["--project-ref", ".", "--profile", profilePath];
+    const resolved = resolveEvaluatorRunProfileArgs(args);
+    const runIdIndex = resolved.indexOf("--run-id");
+
+    assert.notEqual(runIdIndex, -1);
+    assert.match(resolved[runIdIndex + 1], /^live-e2e\.test\.stable-evaluator\.run-\d{12}$/u);
+    assert.deepEqual(resolved.slice(0, args.length), args);
+  });
+});
+
+test("step evaluator preserves explicit run id", () => {
+  const args = ["--project-ref", ".", "--profile", "profile.yaml", "--run-id", "live-e2e.explicit.run"];
+
+  assert.deepEqual(resolveEvaluatorRunProfileArgs(args), args);
+});
 
 function writeJsonFixture(filePath, payload = {}) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
