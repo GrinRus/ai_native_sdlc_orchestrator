@@ -2068,12 +2068,13 @@ test("live E2E post-run verification reruns target setup commands inside isolate
   const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   assert.match(
     flowsSource,
-    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,/u,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,\s+profile: options\.profile,/u,
   );
   assert.match(
     flowsSource,
-    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,/u,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,\s+profile: options\.profile,/u,
   );
+  assert.match(flowsSource, /applyTargetToolchainPolicyToOverrideCommands/u);
 });
 
 test("guided journey proof requires flow-loop and browser-task evidence", () => {

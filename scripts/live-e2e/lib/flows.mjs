@@ -3409,14 +3409,42 @@ function buildIntakeCreateArgs(options) {
 }
 
 /**
- * @param {{ label: string, commands: string[], setupCommands?: string[] }} options
+ * @param {string} command
+ * @param {string} envOverride
+ * @returns {string}
+ */
+function wrapCommandWithTargetNodeEnvOverride(command, envOverride) {
+  const value = asNonEmptyString(command);
+  if (!value) return "";
+  const normalized = normalizeTargetCommandForComparison(value);
+  if (normalized && normalized !== value.replace(/\s+/gu, " ").trim()) return value;
+  return `[ -z "\${${envOverride}:-}" ] || export PATH="$(dirname "$${envOverride}"):$PATH"; ${value}`;
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {string[]} commands
+ * @returns {string[]}
+ */
+function applyTargetToolchainPolicyToOverrideCommands(profile, commands) {
+  const policy = resolveTargetNodeToolchainPolicy(profile);
+  if (!policy) return commands;
+  return commands.map((command) => wrapCommandWithTargetNodeEnvOverride(command, policy.envOverride)).filter(Boolean);
+}
+
+/**
+ * @param {{ label: string, commands: string[], setupCommands?: string[], profile?: Record<string, unknown> }} options
  * @returns {string[]}
  */
 function buildVerifyOverrideArgs(options) {
-  const setupCommands = asStringArray(options.setupCommands);
-  const lintCommands = options.commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
-  const buildCommands = options.commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
-  const testCommands = options.commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
+  const setupCommands = applyTargetToolchainPolicyToOverrideCommands(
+    asRecord(options.profile),
+    asStringArray(options.setupCommands),
+  );
+  const commands = applyTargetToolchainPolicyToOverrideCommands(asRecord(options.profile), options.commands);
+  const lintCommands = commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
+  const buildCommands = commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
+  const testCommands = commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
   return [
     "--verification-label",
     options.label,
@@ -4865,6 +4893,7 @@ export function executeFullJourneyFlow(options) {
           label: "post-run-diagnostic",
           commands: postRunQualityPolicy.diagnosticCommands,
           setupCommands: repoLintCommands,
+          profile: options.profile,
         }),
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
@@ -5710,6 +5739,7 @@ export function executeFullJourneyFlow(options) {
           label: "post-run-primary",
           commands: postRunQualityPolicy.primaryCommands,
           setupCommands: repoLintCommands,
+          profile: options.profile,
         }),
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
