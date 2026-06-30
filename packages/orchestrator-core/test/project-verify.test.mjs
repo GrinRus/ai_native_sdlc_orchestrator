@@ -234,6 +234,39 @@ test("verifyProjectRuntime runs commands in workspace-clone isolation and record
   });
 });
 
+test("verifyProjectRuntime workspace-clone omits copied Python virtual environments", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent
+      .replace("workspace_mode: ephemeral", "workspace_mode: workspace-clone")
+      .replace("- pnpm build", "- 'node -e \"process.exit(0)\"'")
+      .replace("- pnpm test", "- 'node -e \"process.exit(0)\"'")
+      .replace(
+        "- pnpm lint",
+        [
+          "- 'node -e \"",
+          "const fs = require(\\\"node:fs\\\");",
+          "if (fs.existsSync(\\\"venv/pyvenv.cfg\\\")) process.exit(7);",
+          "fs.mkdirSync(\\\"venv\\\", { recursive: true });",
+          "fs.writeFileSync(\\\"venv/created-in-clone.txt\\\", \\\"ok\\\");",
+          "\"'",
+        ].join(""),
+      );
+    fs.writeFileSync(profilePath, patched, "utf8");
+    fs.mkdirSync(path.join(repoRoot, "venv", "bin"), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, "venv", "pyvenv.cfg"), "home = /usr/bin\n", "utf8");
+    fs.writeFileSync(path.join(repoRoot, "venv", "bin", "python"), "#!/usr/bin/env python\n", "utf8");
+
+    const result = verifyProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+
+    assert.equal(result.verifySummary.status, "passed");
+    assert.equal(result.verifySummary.execution_isolation.mode, "workspace-clone");
+    assert.equal(fs.existsSync(path.join(repoRoot, "venv", "pyvenv.cfg")), true);
+    assert.equal(fs.existsSync(path.join(repoRoot, "venv", "created-in-clone.txt")), false);
+  });
+});
+
 test("verifyProjectRuntime supports worktree isolation mode and retains workspace on failure by default", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
