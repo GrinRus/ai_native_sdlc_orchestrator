@@ -454,6 +454,9 @@ This is the master index for the implementation slices across all defined waves.
 | W52-S03 | Vitest large product acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, proof findings | W52-S02, W52-S06, W52-S07 |
 | W52-S04 | SQLAlchemy large diagnostic policy and acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, quality reports | W52-S02, W52-S06, W52-S07 |
 | W52-S05 | Hard-target proof rerun and findings sync | EPIC-0, EPIC-7 | blocked | `internal maintainer runbook`, backlog docs, root checks, proof artifacts | W52-S03, W52-S04 |
+| W52-S08 | Manual step-quality assessment depth | EPIC-4, EPIC-7 | blocked | `scripts/live-e2e/lib/step-quality-assessment.mjs`, `scripts/live-e2e/manual-live-e2e.mjs`, step-quality contracts/tests | W52-S05 |
+| W52-S09 | Diagnostic command classification precision | EPIC-4, EPIC-7 | blocked | `scripts/live-e2e/lib/flows.mjs`, `scripts/live-e2e/run-profile.mjs`, run-health contracts/tests | W52-S05 |
+| W52-S10 | Acceptance evidence matrix and xlarge observation reporting | EPIC-0, EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`, backlog docs | W52-S08, W52-S09 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

@@ -62,7 +62,7 @@ The authoritative planning model for implementation lives in:
 | W49 | Close quality-cycle proof gaps with repair anti-loop enforcement, QA-specific step quality, findings hygiene, and mandatory Full Control live proof rerun. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-49-implementation-slices.md` |
 | W50 | Close W49 Fastify/Vitest blockers with review verification mapping, target toolchain fail-fast, control proof rerun, and findings sync. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-50-implementation-slices.md` |
 | W51 | Turn W50 proof into clean-commit closure, pursue Vitest large acceptance, automate final quality hydration, split target-readiness semantics, and add the next hard target only after large proof is stable. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-51-implementation-slices.md` |
-| W52 | Convert the remaining Vitest and SQLAlchemy hard-target installed-user rehearsal evidence into product acceptance or precise non-acceptance blockers. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
+| W52 | Convert the remaining Vitest and SQLAlchemy hard-target installed-user rehearsal evidence into product acceptance or precise non-acceptance blockers, then harden manual evidence depth and final acceptance reporting. | 10 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -934,6 +934,12 @@ quality gates or hiding target/environment blockers.
   diagnostic blocker.
 - Findings and backlog distinguish terminal classified evidence from product
   acceptance, and runtime artifacts stay out of git.
+- Manual xlarge step-quality reports carry review-grade per-dimension evidence
+  instead of generic accepted text.
+- Diagnostic command owner/phase/class comes from explicit command metadata, not
+  substring matching.
+- Final findings include an evidence matrix that separates large product
+  acceptance, paired guided UI proof, and manual xlarge observation evidence.
 
 **Detailed slices:** `docs/backlog/wave-52-implementation-slices.md`
 

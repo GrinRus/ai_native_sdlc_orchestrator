@@ -251,6 +251,9 @@ graph TD
   W52S03[W52-S03 Vitest large product acceptance closure]
   W52S04[W52-S04 SQLAlchemy large diagnostic policy and acceptance closure]
   W52S05[W52-S05 Hard-target proof rerun and findings sync]
+  W52S08[W52-S08 Manual step-quality assessment depth]
+  W52S09[W52-S09 Diagnostic command classification precision]
+  W52S10[W52-S10 Acceptance evidence matrix and xlarge observation reporting]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -614,6 +617,10 @@ graph TD
   W52S07 --> W52S04
   W52S03 --> W52S05
   W52S04 --> W52S05
+  W52S05 --> W52S08
+  W52S05 --> W52S09
+  W52S08 --> W52S10
+  W52S09 --> W52S10
 ```
 
 ## W0 hard dependencies
@@ -1074,6 +1081,9 @@ graph TD
 | W52-S03 | W52-S02, W52-S06, W52-S07 |
 | W52-S04 | W52-S02, W52-S06, W52-S07 |
 | W52-S05 | W52-S03, W52-S04 |
+| W52-S08 | W52-S05 |
+| W52-S09 | W52-S05 |
+| W52-S10 | W52-S08, W52-S09 |
 
 ## Topological order
 1. W0-S01
@@ -1323,6 +1333,9 @@ graph TD
 245. W52-S03
 246. W52-S04
 247. W52-S05
+248. W52-S08
+249. W52-S09
+250. W52-S10
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

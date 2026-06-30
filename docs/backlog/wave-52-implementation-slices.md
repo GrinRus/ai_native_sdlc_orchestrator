@@ -4,9 +4,11 @@ W52 turns W51's terminal hard-target evidence plus the latest large/xlarge live
 E2E evidence into the next closure plan for the remaining product-acceptance
 gaps. The wave closes target-readiness, diagnostic timeout, Codex provider
 tool-surface, and manual xlarge step-quality hardening before rerunning Vitest
-large and SQLAlchemy large. The wave must not weaken all-pass policy. A blocked
-hard-target run stays non-accepted product quality until terminal run-health pass
-and final `quality-assessment gate --policy all-pass` both pass.
+large and SQLAlchemy large. Follow-up slices then harden the quality of the
+manual evidence, diagnostic classification, and final acceptance/observation
+reporting. The wave must not weaken all-pass policy. A blocked hard-target run
+stays non-accepted product quality until terminal run-health pass and final
+`quality-assessment gate --policy all-pass` both pass.
 
 ## W52-S01 — Target-readiness owner propagation
 
@@ -259,3 +261,133 @@ and final `quality-assessment gate --policy all-pass` both pass.
 ### Out of scope
 - committing raw `.aor/` or `/tmp/aor-*` runtime state
 - claiming product acceptance for blocked or warning runs
+
+## W52-S08 — Manual step-quality assessment depth
+
+- **Outcome:** Make manual product-change step-quality reports review-grade
+  instead of merely contract-valid by requiring step-specific evidence summaries,
+  per-dimension inspected refs, and fail-closed validation for generic accepted
+  reports.
+- **Epic:** EPIC-4, EPIC-7
+- **State:** blocked
+- **Primary modules:** `scripts/live-e2e/lib/step-quality-assessment.mjs`,
+  `scripts/live-e2e/manual-live-e2e.mjs`,
+  `scripts/live-e2e/docs/contracts/live-e2e-step-quality-assessment-report.md`,
+  controller/manual tests
+- **Hard dependencies:** W52-S05
+
+### Local tasks
+1. Extend manual step-quality report validation so accepted product-change
+   reports require non-empty step-specific findings and inspected refs for every
+   required dimension.
+2. Have `manual-live-e2e.mjs --prepare-step-quality` preserve the convenience
+   helper path while producing richer per-dimension summaries from the linked
+   request and operator-decision evidence.
+3. Add negative fixtures for accepted reports that only contain generic pass
+   text or lack per-dimension public evidence refs.
+4. Update the live E2E runner runbook to describe the difference between
+   manual skill-agent assessment, automatic evaluator reports, and independent
+   product acceptance.
+
+### Acceptance criteria
+1. A manual xlarge report with generic accepted text but missing dimension-level
+   evidence fails validation before continuation.
+2. Valid manual reports cite public evidence refs per required dimension and
+   include step-specific findings for execution, review, QA, delivery, and
+   learning.
+3. Manual xlarge evidence remains observation evidence and cannot close product
+   acceptance without a separate accepted large all-pass gate.
+
+### Done evidence
+- report contract/validator tests
+- manual helper regression tests
+- updated live E2E runbook text
+
+### Out of scope
+- replacing manual xlarge review with `step-evaluator`
+- requiring a human-only external reviewer for internal maintainer rehearsals
+
+## W52-S09 — Diagnostic command classification precision
+
+- **Outcome:** Replace substring-based diagnostic command detection with explicit
+  command metadata so non-diagnostic labels cannot be misclassified as
+  diagnostic warnings or blockers.
+- **Epic:** EPIC-4, EPIC-7
+- **State:** blocked
+- **Primary modules:** `scripts/live-e2e/lib/flows.mjs`,
+  `scripts/live-e2e/run-profile.mjs`,
+  `scripts/live-e2e/docs/contracts/live-e2e-run-health-report.md`,
+  proof-runner tests
+- **Hard dependencies:** W52-S05
+
+### Local tasks
+1. Carry an explicit diagnostic intent field from post-run diagnostic command
+   construction into command diagnostics and run-health summaries.
+2. Remove reliance on `label.includes("diagnostic")` for owner/phase/class
+   selection while preserving existing diagnostic timeout evidence.
+3. Add fixtures for false-positive labels that contain the word `diagnostic`
+   but are not diagnostic commands.
+4. Update run-health contract/runbook examples to show explicit diagnostic
+   command metadata.
+
+### Acceptance criteria
+1. Only commands marked as diagnostic receive diagnostic timeout/warning
+   classification.
+2. Existing post-run diagnostic timeout fixtures still preserve stdout/stderr
+   transcript refs and bounded cleanup evidence.
+3. Primary verification failures are never downgraded because of a label string.
+
+### Done evidence
+- proof-runner classification tests
+- updated run-health contract/runbook example
+- root slice gate
+
+### Out of scope
+- changing diagnostic warning policy
+- weakening primary verification or all-pass quality gates
+
+## W52-S10 — Acceptance evidence matrix and xlarge observation reporting
+
+- **Outcome:** Produce a durable final evidence matrix that separates product
+  acceptance, paired guided UI proof, manual xlarge observation, delivery
+  safety, and learning handoff quality for reviewers.
+- **Epic:** EPIC-0, EPIC-7
+- **State:** blocked
+- **Primary modules:** `scripts/live-e2e/quality-assessment.mjs`,
+  `scripts/live-e2e/run-profile.mjs`,
+  `docs/ops/live-e2e-proof-complete-findings.md`, backlog docs
+- **Hard dependencies:** W52-S08, W52-S09
+
+### Local tasks
+1. Add a post-run evidence matrix artifact or findings section that records run
+   id, profile, terminal run-health, all-pass gate status, guided UI proof
+   status, xlarge observation status, delivery mode, no-upstream-write evidence,
+   and learning handoff refs.
+2. Hydrate delivery manifest summaries from `repo_deliveries[]` so reviewers see
+   changed paths, diff totals, patch-only status, and writeback result without
+   custom `jq` inspection.
+3. Hydrate learning handoff summaries with scorecard/evidence refs and next
+   actions while keeping compact report contracts valid.
+4. Update findings/backlog language so xlarge pass is never described as product
+   acceptance.
+
+### Acceptance criteria
+1. A final W52 findings update can distinguish `product-accepted`,
+   `manual-observation-pass`, `blocked`, and `not-product-accepted` states
+   without reading raw runtime directories.
+2. Delivery safety evidence includes patch-only/writeback status and changed
+   path totals for the target repo.
+3. Learning evidence includes scorecard refs and follow-up backlog refs.
+4. Product acceptance remains limited to terminal large run-health pass,
+   accepted step-quality, meaningful target change, paired UI proof when
+   required, and `quality-assessment gate --policy all-pass`.
+
+### Done evidence
+- generated/updated evidence matrix or findings section
+- tests or fixture validation for delivery and learning summary hydration
+- updated backlog/finding sync after W52 hard-target reruns
+
+### Out of scope
+- counting manual xlarge observation as provider qualification or product
+  acceptance
+- committing raw runtime artifacts
