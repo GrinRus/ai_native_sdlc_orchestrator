@@ -7,6 +7,21 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.13] - 2026-06-30
+
+- Hardened W52 installed-user hard-target rehearsals with target-readiness owner
+  propagation, bounded diagnostic timeout handling, and post-run target
+  verification isolation.
+- Hardened Codex provider execution by using clean config/rules flags while
+  preserving host auth and surfacing malformed OpenAI tool-call schema failures
+  as provider-owned evidence.
+- Added manual xlarge step-quality continuation support and follow-up backlog
+  slices for manual evidence depth, diagnostic classification precision, and
+  final acceptance/xlarge observation reporting.
+- Recorded HTTPie large product acceptance, paired guided UI proof, and HTTPie
+  xlarge manual observation evidence without counting xlarge observation as
+  product acceptance.
+
 ## [0.1.0-alpha.12] - 2026-06-22
 
 - Added outcome-oriented internal rehearsal quality assessment with factual-only
