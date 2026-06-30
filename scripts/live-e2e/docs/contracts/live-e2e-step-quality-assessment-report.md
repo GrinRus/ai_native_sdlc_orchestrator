@@ -12,6 +12,12 @@ have an accepted step-quality assessment linked to a
 next public step. For `mission_class=flow-regression`, the report may be
 lightweight flow-health evidence for small canary profiles.
 
+Xlarge profiles are manual-only observation evidence. Their accepted
+step-quality reports may be prepared by the public manual helper from the
+request and linked operator decision, must use `assessment_method=manual-skill-agent`,
+and must cite the required public evidence refs. This does not make xlarge
+evidence eligible for required qualification or product acceptance closure.
+
 ## Required fields
 - `assessment_id`
 - `run_id`

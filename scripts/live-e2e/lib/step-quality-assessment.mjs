@@ -263,6 +263,8 @@ export function resolveStepQualityContext(options = {}) {
  *   runId: string,
  *   entry: Record<string, unknown>,
  *   outputDir: string,
+ *   requestFile?: string,
+ *   reportFile?: string,
  * }} options
  */
 export function resolveStepQualityFiles(options) {
@@ -272,8 +274,12 @@ export function resolveStepQualityFiles(options) {
   const sequence = String(entry.sequence ?? 1).padStart(2, "0");
   const stem = `${normalizeId(options.runId)}-${sequence}-${normalizeId(stepInstanceId)}`;
   return {
-    requestFile: path.join(options.outputDir, `live-e2e-step-quality-assessment-request-${stem}.json`),
-    reportFile: path.join(options.outputDir, `live-e2e-step-quality-assessment-report-${stem}.json`),
+    requestFile:
+      asNonEmptyString(options.requestFile) ||
+      path.join(options.outputDir, `live-e2e-step-quality-assessment-request-${stem}.json`),
+    reportFile:
+      asNonEmptyString(options.reportFile) ||
+      path.join(options.outputDir, `live-e2e-step-quality-assessment-report-${stem}.json`),
   };
 }
 
@@ -530,6 +536,110 @@ export function writeStepQualityAssessmentReport(options) {
   }
   writeJson(built.reportFile, built.assessment);
   return built;
+}
+
+/**
+ * @param {{
+ *   requestFile: string,
+ *   decision: string,
+ *   write?: boolean,
+ * }} options
+ */
+export function prepareManualStepQualityAssessmentArtifact(options) {
+  const requestFile = asNonEmptyString(options.requestFile);
+  if (!requestFile || !fileExists(requestFile)) {
+    throw new UsageError(`Step-quality assessment request '${requestFile}' was not found.`);
+  }
+  const request = asRecord(readJson(requestFile));
+  const expectedReportFile = asNonEmptyString(request.expected_assessment_report_file);
+  if (!expectedReportFile) {
+    throw new UsageError(`Step-quality assessment request '${requestFile}' does not declare expected_assessment_report_file.`);
+  }
+  const operatorDecisionFile = asNonEmptyString(request.source_operator_decision_file);
+  if (!operatorDecisionFile || !fileExists(operatorDecisionFile)) {
+    throw new UsageError(
+      `Step-quality assessment request '${requestFile}' does not link a materialized source_operator_decision_file.`,
+    );
+  }
+  const operatorDecision = asRecord(readJson(operatorDecisionFile));
+  const inspectedEvidenceRefs = uniqueStrings([
+    ...asStringArray(operatorDecision.inspected_evidence_refs),
+    ...asStringArray(request.evaluator_input_refs),
+  ]);
+  if (inspectedEvidenceRefs.length === 0) {
+    throw new UsageError(`Step-quality assessment request '${requestFile}' has no public evidence refs to inspect.`);
+  }
+  const stepId = asNonEmptyString(request.step_id) || "step";
+  const stepIteration = typeof request.step_iteration === "number" ? request.step_iteration : 1;
+  const entry = {
+    sequence: stepIteration,
+    step_id: stepId,
+    step_instance_id: stepIteration > 1 ? `${stepId}#${stepIteration}` : stepId,
+    step_name: asNonEmptyString(request.step_name) || stepId,
+    iteration: stepIteration,
+    agent_decision_request_ref: asNonEmptyString(request.source_agent_decision_request_file),
+    operator_decision_ref: operatorDecisionFile,
+    inspected_evidence_refs: inspectedEvidenceRefs,
+    artifact_refs: asStringArray(request.evidence_refs),
+    decision: {
+      action: normalizeStepQualityDecision(options.decision),
+      reason:
+        asNonEmptyString(operatorDecision.reason) ||
+        "Manual skill-agent step-quality assessment prepared from public live E2E artifacts.",
+    },
+    step_quality_candidate_decision: {
+      action: normalizeStepQualityDecision(options.decision),
+    },
+    step_quality_assessment_request_ref: requestFile,
+  };
+  const profile = {
+    profile_id: asNonEmptyString(request.profile_id),
+    target_catalog_id: asNonEmptyString(request.target_catalog_id),
+    feature_mission_id: asNonEmptyString(request.feature_mission_id),
+    feature_size: asNonEmptyString(request.feature_size),
+    mission_class: asNonEmptyString(request.mission_class),
+  };
+  const artifacts = {
+    target_catalog_id: asNonEmptyString(request.target_catalog_id),
+    feature_mission_id: asNonEmptyString(request.feature_mission_id),
+    feature_size: asNonEmptyString(request.feature_size),
+    mission_class: asNonEmptyString(request.mission_class),
+  };
+  const built = buildStepQualityAssessment({
+    runId: asNonEmptyString(request.run_id),
+    profile,
+    artifacts,
+    entry,
+    outputDir: path.dirname(expectedReportFile),
+    assessmentRequestFile: requestFile,
+    assessmentRequest: request,
+    assessmentMethod: "manual-skill-agent",
+    evaluatorOutputRef: requestFile,
+    assessmentDecision: normalizeStepQualityDecision(options.decision),
+    reportFile: expectedReportFile,
+  });
+  const validation = validateContractDocument({
+    family: "live-e2e-step-quality-assessment-report",
+    document: built.assessment,
+    source: built.reportFile,
+  });
+  if (!validation.ok) {
+    const validationIssues = validation.issues.map((entry) => entry.message).join("; ");
+    throw new UsageError(`Step-quality assessment for '${stepId}' failed contract validation: ${validationIssues}`);
+  }
+  if (options.write !== false) {
+    writeJson(built.reportFile, built.assessment);
+  }
+  return {
+    status: options.write === false ? "preview" : "written",
+    request_file: requestFile,
+    report_file: built.reportFile,
+    decision: built.assessment.decision,
+    assessment_status: built.assessment.status,
+    assessment_method: built.assessment.assessment_method,
+    inspected_evidence_refs: inspectedEvidenceRefs,
+    evidence_refs: asStringArray(built.assessment.evidence_refs),
+  };
 }
 
 /**

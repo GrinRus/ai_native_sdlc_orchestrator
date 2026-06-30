@@ -9,7 +9,10 @@ import {
   asNonEmptyString,
   asRecord,
   asStringArray,
+  normalizeId,
+  nowIso,
   parseFlags,
+  readYamlDocument,
   readJson,
   resolveOptionalStringFlag,
 } from "./lib/common.mjs";
@@ -231,6 +234,40 @@ export function shouldAwaitFirstControllerObservation(report, state) {
   return hasPendingIncludedControllerStep(state) && stepJournal.length === 0;
 }
 
+/**
+ * @param {string} profileRef
+ * @returns {string}
+ */
+function resolveProfileIdForGeneratedRunId(profileRef) {
+  const resolvedProfileRef = asNonEmptyString(profileRef);
+  if (!resolvedProfileRef) return "live-e2e.step-evaluator";
+  try {
+    const profilePath = path.isAbsolute(resolvedProfileRef)
+      ? resolvedProfileRef
+      : path.resolve(process.cwd(), resolvedProfileRef);
+    return asNonEmptyString(readYamlDocument(profilePath).profile_id) || "live-e2e.step-evaluator";
+  } catch {
+    return normalizeId(path.basename(resolvedProfileRef, path.extname(resolvedProfileRef))) || "live-e2e.step-evaluator";
+  }
+}
+
+/**
+ * @param {string[]} rawArgs
+ * @returns {string[]}
+ */
+export function resolveEvaluatorRunProfileArgs(rawArgs) {
+  const flags = parseFlags(rawArgs);
+  resolveOptionalStringFlag(flags["run-id"], "run-id");
+  const profileRef = resolveOptionalStringFlag(flags.profile, "profile");
+  if (Object.prototype.hasOwnProperty.call(flags, "run-id")) {
+    return [...rawArgs];
+  }
+
+  const profileId = resolveProfileIdForGeneratedRunId(profileRef || "");
+  const generatedRunId = `${normalizeId(profileId)}.run-${nowIso().replace(/[^0-9]/g, "").slice(-12)}`;
+  return [...rawArgs, "--run-id", generatedRunId];
+}
+
 
 /**
  * @param {string[]} rawArgs
@@ -257,6 +294,7 @@ function runCli(rawArgs) {
   if (Object.prototype.hasOwnProperty.call(flags, "controller-mode")) {
     throw new UsageError("step-evaluator owns --controller-mode; omit it from evaluator invocations.");
   }
+  const runProfileArgs = resolveEvaluatorRunProfileArgs(rawArgs);
 
   /** @type {Record<string, unknown>} */
   let runProfileOutput = {};
@@ -272,7 +310,7 @@ function runCli(rawArgs) {
   let stepQualityAssessmentReportFiles = [];
   let operatorDecisionFiles = [];
   for (let attempt = 1; attempt <= 20; attempt += 1) {
-    const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...rawArgs, "--controller-mode", "evaluator"], {
+    const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...runProfileArgs, "--controller-mode", "evaluator"], {
       cwd: process.cwd(),
       encoding: "utf8",
     });

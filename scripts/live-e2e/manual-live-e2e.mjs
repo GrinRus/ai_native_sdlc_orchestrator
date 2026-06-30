@@ -17,6 +17,7 @@ import {
   resolveOptionalStringFlag,
 } from "./lib/common.mjs";
 import { prepareOperatorDecisionArtifact } from "./lib/decision-helper.mjs";
+import { prepareManualStepQualityAssessmentArtifact } from "./lib/step-quality-assessment.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
@@ -87,6 +88,41 @@ function isPendingDecisionRequestFile(requestFile) {
   try {
     const request = asRecord(readJson(requestFile));
     const expectedRef = asNonEmptyString(request.operator_decision_expected_ref);
+    return Boolean(expectedRef && !fs.existsSync(expectedRef));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} root
+ * @param {string} runId
+ * @returns {string[]}
+ */
+function findStepQualityRequestFiles(root, runId) {
+  if (!root || !fs.existsSync(root)) return [];
+  const results = [];
+  const stack = [root];
+  const prefix = `live-e2e-step-quality-assessment-request-${normalizeId(runId)}`;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const next = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(next);
+      } else if (entry.isFile() && entry.name.startsWith(prefix) && entry.name.endsWith(".json")) {
+        results.push(next);
+      }
+    }
+  }
+  return results.sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+}
+
+function isPendingStepQualityRequestFile(requestFile) {
+  try {
+    const request = asRecord(readJson(requestFile));
+    const expectedRef = asNonEmptyString(request.expected_assessment_report_file);
     return Boolean(expectedRef && !fs.existsSync(expectedRef));
   } catch {
     return false;
@@ -168,6 +204,30 @@ function resolveDecisionPrepareRequestFile(options) {
 }
 
 /**
+ * @param {{ projectRef: string | null, runtimeRoot: string | null, runId: string | null, requestRef: string | null }} options
+ * @returns {string}
+ */
+function resolveStepQualityPrepareRequestFile(options) {
+  if (options.requestRef) return path.resolve(options.requestRef);
+  if (!options.projectRef) {
+    throw new UsageError("Flag '--project-ref' is required when --prepare-step-quality omits --request.");
+  }
+  if (!options.runId) {
+    throw new UsageError("Flag '--run-id' is required when --prepare-step-quality omits --request.");
+  }
+  const runtimeCandidates = resolveRuntimeCandidates({
+    projectRef: options.projectRef,
+    runtimeRoot: options.runtimeRoot,
+    runId: options.runId,
+  });
+  for (const runtimeRoot of runtimeCandidates) {
+    const requestFile = findStepQualityRequestFiles(runtimeRoot, options.runId).find(isPendingStepQualityRequestFile);
+    if (requestFile) return requestFile;
+  }
+  throw new UsageError(`No pending live E2E step-quality assessment request was found for run '${options.runId}'.`);
+}
+
+/**
  * @param {Record<string, string | true>} flags
  * @returns {number}
  */
@@ -207,6 +267,35 @@ function prepareDecisionCli(flags) {
 }
 
 /**
+ * @param {Record<string, string | true>} flags
+ * @returns {number}
+ */
+function prepareStepQualityCli(flags) {
+  const decision = resolveOptionalStringFlag(flags.decision, "decision");
+  if (!decision) {
+    throw new UsageError("Flag '--decision' is required with --prepare-step-quality.");
+  }
+  const projectRef = resolveOptionalStringFlag(flags["project-ref"], "project-ref");
+  const runId = resolveOptionalStringFlag(flags["run-id"], "run-id");
+  const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
+  const requestRef = resolveOptionalStringFlag(flags.request, "request");
+  const dryRun = resolveOptionalBooleanFlag(flags["dry-run"], "dry-run");
+  const requestFile = resolveStepQualityPrepareRequestFile({
+    projectRef,
+    runtimeRoot,
+    runId,
+    requestRef,
+  });
+  const summary = prepareManualStepQualityAssessmentArtifact({
+    requestFile,
+    decision,
+    write: !dryRun,
+  });
+  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  return asNonEmptyString(summary.assessment_status) === "blocked" ? 1 : 0;
+}
+
+/**
  * @param {string[]} rawArgs
  */
 function runCli(rawArgs) {
@@ -217,6 +306,7 @@ function runCli(rawArgs) {
         "",
         "Runs exactly one pending live E2E controller step through installed public project flow surfaces.",
         "Use --prepare-decision --request <agent_decision_request_ref> --action <action> to generate a decision artifact from the request rubric.",
+        "Use --prepare-step-quality --request <step_quality_request_ref> --decision continue|request-repair|retry|block to generate the linked manual step-quality report.",
         "Use --operator-decision-file <path> after a stop to install the skill-agent decision artifact before resuming.",
       ].join("\n"),
     );
@@ -226,6 +316,9 @@ function runCli(rawArgs) {
   const flags = parseFlags(rawArgs);
   if (Object.prototype.hasOwnProperty.call(flags, "prepare-decision")) {
     return prepareDecisionCli(flags);
+  }
+  if (Object.prototype.hasOwnProperty.call(flags, "prepare-step-quality")) {
+    return prepareStepQualityCli(flags);
   }
   if (!resolveOptionalStringFlag(flags["project-ref"], "project-ref")) {
     throw new UsageError("Flag '--project-ref' is required.");

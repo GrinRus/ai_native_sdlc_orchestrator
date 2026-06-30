@@ -17,6 +17,7 @@ import {
   resolveAdapterMatrix,
   resolveExternalRuntimeNativeTimeoutArgs,
   resolveExternalRuntimePermissionPolicy,
+  summarizeProviderMalformedToolCallError,
 } from "../src/index.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
@@ -130,6 +131,22 @@ test("request-artifact adapter launcher prompts mention output quality policy", 
       assert.equal(typeof message, "string", `${adapterId} request_file.message must be present`);
       assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
       assert.doesNotMatch(message, /warning-producing stdout\/stderr/u, adapterId);
+    }
+  });
+});
+
+test("Codex live adapter args use clean config and rules while preserving host auth", () => {
+  withTempRepo((repoRoot) => {
+    const registry = buildAdapterRegistry({
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+    const codex = registry.get("codex-cli");
+    const modes = codex.profile.execution.external_runtime.permission_policy.modes;
+    for (const mode of ["full-bypass", "restricted"]) {
+      const args = modes[mode].args;
+      const execIndex = args.indexOf("exec");
+      assert.notEqual(execIndex, -1, `${mode} args must use codex exec`);
+      assert.deepEqual(args.slice(execIndex + 1, execIndex + 3), ["--ignore-user-config", "--ignore-rules"]);
     }
   });
 });
@@ -790,6 +807,71 @@ test("live adapter reports failed when external runner exits non-zero", () => {
   assert.equal(response.status, "failed");
   assert.equal(response.output.failure_kind, "external-runner-failed");
   assert.match(response.summary, /exited with code 17/i);
+});
+
+test("live adapter surfaces malformed Codex/OpenAI tool-call schema failures as provider raw summary", () => {
+  const rawError = JSON.stringify({
+    error: {
+      message: "Invalid property name in input[3].arguments",
+      type: "invalid_request_error",
+      code: "property_name_above_max_length",
+      param: "input[3].arguments",
+    },
+  });
+  const summary = summarizeProviderMalformedToolCallError("", rawError, null);
+  assert.match(summary, /Malformed Codex\/OpenAI tool-call schema failure/i);
+  assert.match(summary, /property_name_above_max_length/i);
+  assert.match(
+    summarizeProviderMalformedToolCallError("", "property_name_above_max_length", null),
+    /Malformed Codex\/OpenAI tool-call schema failure/i,
+  );
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-malformed-schema-"));
+  const stateFile = path.join(tempRoot, "provider-state.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify({ status: "running", provider_step_status: { status: "running" } }, null, 2)}\n`,
+    "utf8",
+  );
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      runtimeEvidenceRoot: path.join(tempRoot, "reports"),
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", `process.stderr.write(${JSON.stringify(rawError)} + "\\n"); process.exit(1);`],
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-live-malformed-schema",
+      run_id: "run-live-malformed-schema",
+      step_id: "step-live-malformed-schema",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "openai",
+        adapter: "codex-cli",
+        route_id: "route.implement.default",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 10000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "external-runner-failed");
+    assert.equal(response.output.external_runner.context_budget_failure_class, null);
+    assert.match(response.output.external_runner.raw_provider_error_summary, /property_name_above_max_length/i);
+    assert.match(state.provider_step_status.recommended_action, /Malformed Codex\/OpenAI tool-call schema failure/i);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("live adapter reports timeout distinctly from launch failures", () => {

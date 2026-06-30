@@ -98,7 +98,7 @@ Operational rules:
 - provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` and `qwen-primary` are extended candidate coverage until future real-runner proof promotes them.
 - `qwen-primary` remains extended candidate coverage; timeout or provider-progress evidence is an adapter finding, while target setup/verification, Runtime Harness retry/repair, and operator evidence semantics remain provider-neutral across Codex, Claude, OpenCode, and Qwen.
-- required matrix coverage closes only for `run_tier=acceptance` or `run_tier=production-proof` when `live-e2e-run-health-report.overall_status=pass`; medium+ product acceptance additionally requires linked accepted step-quality request/report pairs and final all-pass outcome quality.
+- required matrix coverage closes only for `run_tier=acceptance` or `run_tier=production-proof` when `live-e2e-run-health-report.overall_status=pass`; medium+ product acceptance additionally requires linked accepted step-quality request/report pairs and final all-pass outcome quality. Xlarge step-quality reports prepared through `manual-live-e2e.mjs --prepare-step-quality` remain manual observation evidence and do not close required qualification coverage.
 - `ky`, `commander-js`, and `pluggy` count as active required coverage only for their `small` flow-regression canary cells. Their medium+ product-change cells remain runnable extended candidates and do not close required product acceptance.
 
 ## Removed W14-S07 matrix fixture bundle (2026-04-24)

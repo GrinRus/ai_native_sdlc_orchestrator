@@ -930,18 +930,34 @@ function buildCommandDiagnostic(result) {
     timeout_budget_ms: result.timeoutMs,
     transcript_file: result.transcriptFile,
     artifact_refs: uniqueStrings(collectStringRefs(result.payload)),
-    failure_class: result.ok ? null : result.timedOut ? "aor-command-timeout" : "command-failed",
-    failure_owner: result.ok ? null : "aor",
+    failure_class: result.ok
+      ? null
+      : result.timedOut && isDiagnosticCommandLabel(result.label)
+        ? "diagnostic-command-timeout"
+        : result.timedOut
+          ? "aor-command-timeout"
+          : "command-failed",
+    failure_owner: result.ok ? null : isDiagnosticCommandLabel(result.label) ? "target_repository" : "aor",
     failure_phase: result.ok ? null : resolveFailurePhaseForCommandLabel(result.label),
     missing_evidence: [],
     recommendation: result.ok
       ? "continue"
-      : result.timedOut
+      : result.timedOut && isDiagnosticCommandLabel(result.label)
+        ? "bounded diagnostic cleanup completed; inspect transcript stdout/stderr and keep product acceptance gated"
+        : result.timedOut
         ? "inspect AOR command transcript and target setup status before judging provider quality"
         : "inspect transcript and command stderr",
     interactive_continuation: interactiveContinuation,
     provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
   };
+}
+
+/**
+ * @param {string} label
+ * @returns {boolean}
+ */
+function isDiagnosticCommandLabel(label) {
+  return label.includes("diagnostic");
 }
 
 /**
@@ -1020,6 +1036,46 @@ function controllerObservedStep(stepController, step, iteration = 1) {
   return journal.some(
     (entry) => asNonEmptyString(entry.step_id) === step && (Number(entry.iteration) || 1) === iteration,
   );
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {string} diagnosticFailureMode
+ * @returns {ReturnType<typeof buildCachedCommandResult> | null}
+ */
+function buildCachedPostRunDiagnosticVerifyResult(artifacts, diagnosticFailureMode) {
+  const summaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+  if (!summaryFile || !fileExists(summaryFile)) return null;
+
+  const summary = asRecord(readJson(summaryFile));
+  const transcriptFile = asNonEmptyString(artifacts.post_run_diagnostic_transcript_file) || summaryFile;
+  const stepResultFiles = uniqueStrings([
+    ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+    ...asStringArray(summary.step_result_files),
+    ...asStringArray(summary.step_result_refs),
+  ]);
+  const diagnosticPassed = asNonEmptyString(summary.status) === "passed";
+  artifacts.post_run_diagnostic_status =
+    asNonEmptyString(artifacts.post_run_diagnostic_status) ||
+    (diagnosticPassed ? "pass" : asNonEmptyString(diagnosticFailureMode) || "warn");
+  artifacts.post_run_diagnostic_verify_step_result_files = stepResultFiles;
+  artifacts.post_run_diagnostic_reused_after_resume = true;
+
+  return {
+    ok: true,
+    exitCode: 0,
+    stdout: "",
+    stderr: "",
+    payload: {
+      verify_summary_file: summaryFile,
+      step_result_files: stepResultFiles,
+    },
+    transcriptFile,
+    startedAt: nowIso(),
+    finishedAt: nowIso(),
+    durationSec: 0,
+    commandSurface: "cached post-run diagnostic verification",
+  };
 }
 
 /**
@@ -2807,12 +2863,36 @@ function buildTargetToolchainBlockedPreExecutionStatus(options) {
  * @returns {"target_setup" | "target_verification"}
  */
 function resolveTargetFailurePhase(stepResult, setupCommandSet, verificationCommandSet) {
-  const command = asNonEmptyString(stepResult.command);
+  const command = normalizeTargetCommandForComparison(stepResult.command);
   if (command && setupCommandSet.has(command)) return "target_setup";
   if (command && verificationCommandSet.has(command)) return "target_verification";
   const commandKind = asNonEmptyString(stepResult.command_kind);
   if (commandKind === "lint" || commandKind === "setup") return "target_setup";
   return "target_verification";
+}
+
+/**
+ * @param {unknown} command
+ * @returns {string}
+ */
+function normalizeTargetCommandForComparison(command) {
+  const value = asNonEmptyString(command);
+  if (!value) return "";
+  const collapsed = value.replace(/\s+/gu, " ").trim();
+  return collapsed
+    .replace(
+      /^\[ -z "\$\{[A-Z0-9_]+:-\}" \] \|\| export PATH="\$\(dirname "\$[A-Z0-9_]+"\):\$PATH";\s*/u,
+      "",
+    )
+    .trim();
+}
+
+/**
+ * @param {string[]} commands
+ * @returns {Set<string>}
+ */
+function normalizedTargetCommandSet(commands) {
+  return new Set(commands.map((command) => normalizeTargetCommandForComparison(command)).filter(Boolean));
 }
 
 /**
@@ -2929,8 +3009,8 @@ function describeTargetCommandFailure(options) {
  * }} options
  */
 export function buildTargetPreExecutionStatusReport(options) {
-  const setupCommandSet = new Set(options.setupCommands);
-  const verificationCommandSet = new Set(options.verificationCommands);
+  const setupCommandSet = normalizedTargetCommandSet(options.setupCommands);
+  const verificationCommandSet = normalizedTargetCommandSet(options.verificationCommands);
   const stepEntries = options.stepResultFiles
     .filter((filePath) => fileExists(filePath))
     .map((filePath) => ({ filePath, document: asRecord(readJson(filePath)) }));
@@ -3093,8 +3173,8 @@ export function evaluateBaselineVerifyGate(options) {
   const routedStepResult = routedStepResultFile && fileExists(routedStepResultFile)
     ? asRecord(readJson(routedStepResultFile))
     : {};
-  const setupCommandSet = new Set(options.setupCommands);
-  const verificationCommandSet = new Set(options.verificationCommands);
+  const setupCommandSet = normalizedTargetCommandSet(options.setupCommands);
+  const verificationCommandSet = normalizedTargetCommandSet(options.verificationCommands);
   const validationGateStatus = asNonEmptyString(options.verifySummary.validation_gate_status);
   /** @type {string[]} */
   const blockingReasons = [];
@@ -3123,13 +3203,14 @@ export function evaluateBaselineVerifyGate(options) {
       missing_prerequisites: missingPrerequisites,
       step_result_file: failedStep.filePath,
     });
+    const normalizedCommand = normalizeTargetCommandForComparison(command);
     if (environmentFailureClass) {
       blockingReasons.push(`${environmentFailureClass}:${command || "unknown"}`);
     } else if (missingPrerequisites.length > 0) {
       blockingReasons.push(`missing-prerequisite:${command || "unknown"}`);
-    } else if (command && setupCommandSet.has(command)) {
+    } else if (normalizedCommand && setupCommandSet.has(normalizedCommand)) {
       blockingReasons.push(`readiness-command-failed:${command}`);
-    } else if (!command || !verificationCommandSet.has(command)) {
+    } else if (!normalizedCommand || !verificationCommandSet.has(normalizedCommand)) {
       blockingReasons.push(`unknown-verification-failure:${command || "unknown"}`);
     } else {
       findings.push(summary);
@@ -3368,14 +3449,42 @@ function buildIntakeCreateArgs(options) {
 }
 
 /**
- * @param {{ label: string, commands: string[], setupCommands?: string[] }} options
+ * @param {string} command
+ * @param {string} envOverride
+ * @returns {string}
+ */
+function wrapCommandWithTargetNodeEnvOverride(command, envOverride) {
+  const value = asNonEmptyString(command);
+  if (!value) return "";
+  const normalized = normalizeTargetCommandForComparison(value);
+  if (normalized && normalized !== value.replace(/\s+/gu, " ").trim()) return value;
+  return `[ -z "\${${envOverride}:-}" ] || export PATH="$(dirname "$${envOverride}"):$PATH"; ${value}`;
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {string[]} commands
+ * @returns {string[]}
+ */
+function applyTargetToolchainPolicyToOverrideCommands(profile, commands) {
+  const policy = resolveTargetNodeToolchainPolicy(profile);
+  if (!policy) return commands;
+  return commands.map((command) => wrapCommandWithTargetNodeEnvOverride(command, policy.envOverride)).filter(Boolean);
+}
+
+/**
+ * @param {{ label: string, commands: string[], setupCommands?: string[], profile?: Record<string, unknown> }} options
  * @returns {string[]}
  */
 function buildVerifyOverrideArgs(options) {
-  const setupCommands = asStringArray(options.setupCommands);
-  const lintCommands = options.commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
-  const buildCommands = options.commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
-  const testCommands = options.commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
+  const setupCommands = applyTargetToolchainPolicyToOverrideCommands(
+    asRecord(options.profile),
+    asStringArray(options.setupCommands),
+  );
+  const commands = applyTargetToolchainPolicyToOverrideCommands(asRecord(options.profile), options.commands);
+  const lintCommands = commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
+  const buildCommands = commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
+  const testCommands = commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
   return [
     "--verification-label",
     options.label,
@@ -4809,6 +4918,15 @@ export function executeFullJourneyFlow(options) {
     };
     const runPostRunDiagnosticVerify = (runOptions = {}) => {
       const iteration = Number(runOptions.iteration) || 1;
+      const cachedPostRunDiagnosticVerify =
+        options.stepController?.hasPersistedProgress?.() === true
+          ? buildCachedPostRunDiagnosticVerifyResult(
+              artifacts,
+              asNonEmptyString(postRunQualityPolicy.diagnosticFailureMode),
+            )
+          : null;
+      if (cachedPostRunDiagnosticVerify) return cachedPostRunDiagnosticVerify;
+
       const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
         "project",
         "verify",
@@ -4824,6 +4942,7 @@ export function executeFullJourneyFlow(options) {
           label: "post-run-diagnostic",
           commands: postRunQualityPolicy.diagnosticCommands,
           setupCommands: repoLintCommands,
+          profile: options.profile,
         }),
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
@@ -5669,6 +5788,7 @@ export function executeFullJourneyFlow(options) {
           label: "post-run-primary",
           commands: postRunQualityPolicy.primaryCommands,
           setupCommands: repoLintCommands,
+          profile: options.profile,
         }),
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]

@@ -31,6 +31,8 @@ execution:
             - --ask-for-approval
             - never
             - exec
+            - --ignore-user-config
+            - --ignore-rules
             - --json
             - --ephemeral
             - --sandbox
@@ -38,6 +40,8 @@ execution:
         restricted:
           args:
             - exec
+            - --ignore-user-config
+            - --ignore-rules
             - --json
             - --ephemeral
             - --sandbox

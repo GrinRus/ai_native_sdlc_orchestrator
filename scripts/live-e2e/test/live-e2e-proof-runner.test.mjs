@@ -51,6 +51,7 @@ import {
 import {
   hasPendingIncludedControllerStep,
   preparePendingOperatorDecision,
+  resolveEvaluatorRunProfileArgs,
   shouldAwaitFirstControllerObservation,
 } from "../step-evaluator.mjs";
 import { writeProofRunnerArtifacts } from "../run-profile.mjs";
@@ -118,6 +119,27 @@ function writeProfile(tempRoot, liveOverrides, options = {}) {
   );
   return profilePath;
 }
+
+test("step evaluator pins a generated run id across continuation attempts", () => {
+  withTempRoot((tempRoot) => {
+    const profilePath = path.join(tempRoot, "profile.yaml");
+    fs.writeFileSync(profilePath, "profile_id: live-e2e.test.stable-evaluator\n", "utf8");
+
+    const args = ["--project-ref", ".", "--profile", profilePath];
+    const resolved = resolveEvaluatorRunProfileArgs(args);
+    const runIdIndex = resolved.indexOf("--run-id");
+
+    assert.notEqual(runIdIndex, -1);
+    assert.match(resolved[runIdIndex + 1], /^live-e2e\.test\.stable-evaluator\.run-\d{12}$/u);
+    assert.deepEqual(resolved.slice(0, args.length), args);
+  });
+});
+
+test("step evaluator preserves explicit run id", () => {
+  const args = ["--project-ref", ".", "--profile", "profile.yaml", "--run-id", "live-e2e.explicit.run"];
+
+  assert.deepEqual(resolveEvaluatorRunProfileArgs(args), args);
+});
 
 function writeJsonFixture(filePath, payload = {}) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -1209,6 +1231,13 @@ test("generated Vitest large profile isolates verification and checks hard-targe
   });
 });
 
+test("SQLAlchemy large profile uses a short physical target checkout root", () => {
+  const profileRef = "scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml";
+  const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+
+  assert.equal(loadedProfile.profile.live_e2e.target_checkout_root_mode, "short-physical");
+});
+
 test("target pre-execution status separates target setup, target verification, and AOR failures", () => {
   withTempRoot((tempRoot) => {
     const setupTranscript = writeJsonFixture(path.join(tempRoot, "setup-transcript.json"));
@@ -1315,6 +1344,58 @@ test("target pre-execution status separates target setup, target verification, a
     assert.equal(aorReport.failure_owner, "aor");
     assert.equal(aorReport.failure_phase, "target_verification");
     assert.equal(aorReport.failure_class, "aor_failure");
+  });
+});
+
+test("baseline diagnostic verification recognizes target Node wrapped commands as warnings", () => {
+  withTempRoot((tempRoot) => {
+    const routedDryRunFile = writeJsonFixture(path.join(tempRoot, "routed-dry-run.json"), {
+      status: "passed",
+    });
+    const verificationStepFile = writeJsonFixture(path.join(tempRoot, "wrapped-verify-step.json"), {
+      status: "failed",
+      command:
+        '[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test',
+      summary:
+        'Verification command \'[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test\' failed with exit code 1.',
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "wrapped-verify-transcript.json"))],
+      command_timeout_ms: 1800000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+
+    const gate = evaluateBaselineVerifyGate({
+      verifySummary: { status: "failed", command_timeout_ms: 1800000, validation_gate_status: "pass" },
+      verifyPayload: {
+        verify_summary_file: path.join(tempRoot, "verify-summary.json"),
+        routed_step_result_file: routedDryRunFile,
+      },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["pnpm install --frozen-lockfile", "pnpm build"],
+      verificationCommands: ["pnpm test", "pnpm lint"],
+      mode: "diagnostic",
+    });
+
+    assert.equal(gate.status, "warn");
+    assert.equal(gate.decision, "continue_with_warnings");
+    assert.deepEqual(gate.blocking_reasons, []);
+    assert.equal(gate.failed_commands.length, 1);
+
+    const report = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 1800000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["pnpm install --frozen-lockfile", "pnpm build"],
+      verificationCommands: ["pnpm test", "pnpm lint"],
+      baselineGateDecision: gate,
+      runResult: { durationSec: 33, timeoutMs: 9060000, transcriptFile: path.join(tempRoot, "project-verify.json") },
+    });
+
+    assert.equal(report.status, "warn");
+    assert.equal(report.failure_owner, null);
+    assert.equal(report.target_verification_status.status, "warn");
+    assert.equal(report.target_verification_status.failure_owner, null);
+    assert.equal(report.target_verification_status.warning_reason.includes("pnpm test"), true);
   });
 });
 
@@ -2016,12 +2097,13 @@ test("live E2E post-run verification reruns target setup commands inside isolate
   const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   assert.match(
     flowsSource,
-    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,/u,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,\s+profile: options\.profile,/u,
   );
   assert.match(
     flowsSource,
-    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,/u,
+    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,\s+profile: options\.profile,/u,
   );
+  assert.match(flowsSource, /applyTargetToolchainPolicyToOverrideCommands/u);
 });
 
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
@@ -2424,11 +2506,22 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     writeOptions.flowResult.artifacts.post_run_diagnostic_transcript_file = diagnosticTranscriptFile;
     writeOptions.flowResult.artifacts.post_run_diagnostic_verify_summary_file = diagnosticSummaryFile;
     writeOptions.flowResult.artifacts.post_run_diagnostic_verify_step_result_files = [diagnosticStepResultFile];
-    writeJsonFixture(diagnosticTranscriptFile, { status: "failed", timed_out: true });
+    writeJsonFixture(diagnosticTranscriptFile, {
+      label: "project-verify-post-run-diagnostic",
+      status: "failed",
+      timed_out: true,
+      stdout: "diagnostic terminal output before pipe wait",
+      stderr: "waiting on diagnostic pipe",
+    });
 
     const hydratedWithDiagnosticWarn = writeProofRunnerArtifacts(writeOptions);
     assert.equal(hydratedWithDiagnosticWarn.runHealthReport.guided_ui_evidence.status, "pass");
     assert.equal(hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.status, "warn");
+    assert.equal(hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_command_count, 1);
+    assert.equal(
+      hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_commands[0].step_result_ref,
+      diagnosticTranscriptFile,
+    );
     assert.equal(
       hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.evidence_refs.includes(diagnosticTranscriptFile),
       true,
@@ -2866,6 +2959,16 @@ test("proof runner preserves target setup and provider interruption evidence on 
   assert.match(runProfileSource, /source_observation_report_file/u);
   assert.match(flowSource, /shouldReuseLiveAdapterPreflight/u);
   assert.match(flowSource, /live_adapter_preflight_reused_after_resume/u);
+  assert.match(flowSource, /function buildCachedPostRunDiagnosticVerifyResult/u);
+  assert.match(flowSource, /post_run_diagnostic_reused_after_resume/u);
+  assert.match(flowSource, /cached post-run diagnostic verification/u);
+  const cachedDiagnosticIndex = flowSource.indexOf("const cachedPostRunDiagnosticVerify =");
+  const runDiagnosticIndex = flowSource.indexOf(
+    'const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic"',
+  );
+  assert.notEqual(cachedDiagnosticIndex, -1);
+  assert.notEqual(runDiagnosticIndex, -1);
+  assert.ok(cachedDiagnosticIndex < runDiagnosticIndex);
 });
 
 test("manual live E2E exposes operator decisions and leaves outcome assessment post-run", () => {
@@ -4372,6 +4475,11 @@ test("proof runner classifies provider context-window overflow as provider run-h
     assert.equal(written.runHealthReport.provider_health.context_budget_status, "pass");
     assert.equal(written.runHealthReport.provider_health.context_budget_failure_class, "provider_context_window_exceeded");
     assert.match(written.runHealthReport.provider_health.raw_provider_error_summary, /Prompt is too long/i);
+    assert.equal(written.runHealthReport.target_readiness.status, "pass");
+    assert.equal(written.runHealthReport.target_readiness.failure_owner, null);
+    assert.equal(written.summary.failure_owner, "provider");
+    assert.equal(written.observationReport.failure_owner, "provider");
+    assert.equal(written.scorecard.failure_owner, "provider");
     assert.equal(written.runHealthReport.failure_summary.owner, "provider");
     assert.equal(written.runHealthReport.failure_summary.phase, "provider_execution");
     assert.equal(written.runHealthReport.failure_summary.class, "provider_context_window_exceeded");
@@ -5093,9 +5201,117 @@ test("proof runner preserves environment owner from target setup status in run-h
     assert.equal(written.observationReport.target_readiness.status, "blocked");
     assert.equal(written.summary.target_readiness.status, "blocked");
     assert.equal(written.summary.target_readiness.failure_class, "environment_disk_space_exhausted");
+    assert.equal(written.summary.failure_owner, "environment");
+    assert.equal(written.summary.failure_phase, "target_setup");
+    assert.equal(written.summary.failure_class, "environment_disk_space_exhausted");
+    assert.equal(written.observationReport.failure_owner, "environment");
+    assert.equal(written.observationReport.failure_phase, "target_setup");
+    assert.equal(written.observationReport.failure_class, "environment_disk_space_exhausted");
+    assert.equal(written.scorecard.failure_owner, "environment");
+    assert.equal(written.scorecard.failure_phase, "target_setup");
+    assert.equal(written.scorecard.failure_class, "environment_disk_space_exhausted");
     assert.equal(written.runHealthReport.failure_summary.owner, "environment");
     assert.equal(written.runHealthReport.failure_summary.phase, "target_setup");
     assert.equal(written.runHealthReport.failure_summary.class, "environment_disk_space_exhausted");
+  });
+});
+
+test("proof runner raises target verification readiness blockers to top-level artifacts", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      writeJsonFixture(file);
+    }
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId: "target-verification-readiness-blocker",
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.target-verification-readiness-blocker",
+        journey_mode: "full-journey",
+        target_catalog_id: "vitest",
+        feature_mission_id: "vitest-large-regression",
+        provider_variant_id: "openai-primary",
+        stages: ["bootstrap", "execution"],
+        live_e2e: { flow_range_policy: "delivery_default" },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["baseline-verify-summary.json"]],
+            summary: "Target verification blocked before provider execution.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [],
+          aor_installation: {
+            status: "pass",
+            install_mode: "repo-local",
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "fail",
+          target_verification_status_detail: {
+            status: "blocked",
+            failure_owner: "target_repository",
+            failure_phase: "target_verification",
+            failure_class: "target_verification_blocked",
+          },
+          feature_mission_id: "vitest-large-regression",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.runHealthReport.target_readiness.status, "blocked");
+    assert.equal(written.runHealthReport.target_readiness.product_execution_started, false);
+    for (const artifact of [written.summary, written.observationReport, written.scorecard]) {
+      assert.equal(artifact.failure_owner, "target_repository");
+      assert.equal(artifact.failure_phase, "target_verification");
+      assert.equal(artifact.failure_class, "target_verification_blocked");
+    }
+    assert.equal(written.runHealthReport.failure_summary.owner, "target_repository");
+    assert.equal(written.runHealthReport.failure_summary.phase, "target_verification");
+    assert.equal(written.runHealthReport.failure_summary.class, "target_verification_blocked");
   });
 });
 

@@ -31,7 +31,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S04` Full Control internal installed-user rehearsal rerun and product acceptance closure
 - **W50:** `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
 - **W51:** `W51-S01` Clean-commit W50 proof rerun
-- **W52:** `W52-S05` Hard-target proof rerun and findings sync
+- **W52:** `W52-S05` Hard-target proof rerun and findings sync; `W52-S10` Acceptance evidence matrix and xlarge observation reporting
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -94,7 +94,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W49:** `W49-S02` Repeated repair anti-loop enforcement; `W49-S03` QA-specific step-quality evaluator hardening
 - **W50:** `W50-S01` Review verification mapping and residual-risk classification
 - **W51:** `W51-S03` Automated final quality report hydration
-- **W52:** `W52-S02` Diagnostic command hang and timeout hardening
+- **W52:** `W52-S02` Diagnostic command hang and timeout hardening; `W52-S08` Manual step-quality assessment depth; `W52-S09` Diagnostic command classification precision
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -192,4 +192,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S02` Repeated repair anti-loop enforcement; `W49-S03` QA-specific step-quality evaluator hardening; `W49-S04` Full Control internal installed-user rehearsal rerun and product acceptance closure
 - **W50:** `W50-S01` Review verification mapping and residual-risk classification; `W50-S02` Internal installed-user rehearsal target toolchain fail-fast and setup-journal hygiene; `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
 - **W51:** `W51-S01` Clean-commit W50 proof rerun; `W51-S02` Vitest compatible Node large acceptance; `W51-S03` Automated final quality report hydration; `W51-S04` Explicit target-readiness phase; `W51-S05` Next hard-target expansion after large acceptance
-- **W52:** `W52-S01` Target-readiness owner propagation; `W52-S02` Diagnostic command hang and timeout hardening; `W52-S03` Vitest large product acceptance closure; `W52-S04` SQLAlchemy large diagnostic policy and acceptance closure; `W52-S05` Hard-target proof rerun and findings sync
+- **W52:** `W52-S01` Target-readiness owner propagation; `W52-S02` Diagnostic command hang and timeout hardening; `W52-S06` Codex provider tool-surface hardening; `W52-S07` Manual xlarge step-quality continuation; `W52-S03` Vitest large product acceptance closure; `W52-S04` SQLAlchemy large diagnostic policy and acceptance closure; `W52-S05` Hard-target proof rerun and findings sync; `W52-S08` Manual step-quality assessment depth; `W52-S09` Diagnostic command classification precision; `W52-S10` Acceptance evidence matrix and xlarge observation reporting

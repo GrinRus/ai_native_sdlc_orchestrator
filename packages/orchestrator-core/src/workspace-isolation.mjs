@@ -93,6 +93,26 @@ function isPathInsideRoot(candidate, root) {
 }
 
 /**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function isPythonVirtualEnvironmentRoot(candidate) {
+  try {
+    const stats = fs.statSync(candidate);
+    if (!stats.isDirectory()) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  const hasVenvConfig = fs.existsSync(path.join(candidate, "pyvenv.cfg"));
+  const hasPosixPython = fs.existsSync(path.join(candidate, "bin", "python"));
+  const hasWindowsPython = fs.existsSync(path.join(candidate, "Scripts", "python.exe"));
+  return hasVenvConfig && (hasPosixPython || hasWindowsPython);
+}
+
+/**
  * @param {{ sourceRoot: string, targetRoot: string, runtimeRoot: string }} options
  */
 function cloneWorkspaceTree(options) {
@@ -104,10 +124,14 @@ function cloneWorkspaceTree(options) {
     if (isPathInsideRoot(sourceEntry, options.runtimeRoot)) {
       continue;
     }
+    if (isPythonVirtualEnvironmentRoot(sourceEntry)) {
+      continue;
+    }
 
     fs.cpSync(sourceEntry, path.join(options.targetRoot, entry), {
       recursive: true,
-      filter: (sourcePath) => !isPathInsideRoot(sourcePath, options.runtimeRoot),
+      filter: (sourcePath) =>
+        !isPathInsideRoot(sourcePath, options.runtimeRoot) && !isPythonVirtualEnvironmentRoot(sourcePath),
     });
   }
 }
