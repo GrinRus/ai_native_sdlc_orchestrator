@@ -1318,6 +1318,58 @@ test("target pre-execution status separates target setup, target verification, a
   });
 });
 
+test("baseline diagnostic verification recognizes target Node wrapped commands as warnings", () => {
+  withTempRoot((tempRoot) => {
+    const routedDryRunFile = writeJsonFixture(path.join(tempRoot, "routed-dry-run.json"), {
+      status: "passed",
+    });
+    const verificationStepFile = writeJsonFixture(path.join(tempRoot, "wrapped-verify-step.json"), {
+      status: "failed",
+      command:
+        '[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test',
+      summary:
+        'Verification command \'[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test\' failed with exit code 1.',
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "wrapped-verify-transcript.json"))],
+      command_timeout_ms: 1800000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+
+    const gate = evaluateBaselineVerifyGate({
+      verifySummary: { status: "failed", command_timeout_ms: 1800000, validation_gate_status: "pass" },
+      verifyPayload: {
+        verify_summary_file: path.join(tempRoot, "verify-summary.json"),
+        routed_step_result_file: routedDryRunFile,
+      },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["pnpm install --frozen-lockfile", "pnpm build"],
+      verificationCommands: ["pnpm test", "pnpm lint"],
+      mode: "diagnostic",
+    });
+
+    assert.equal(gate.status, "warn");
+    assert.equal(gate.decision, "continue_with_warnings");
+    assert.deepEqual(gate.blocking_reasons, []);
+    assert.equal(gate.failed_commands.length, 1);
+
+    const report = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 1800000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["pnpm install --frozen-lockfile", "pnpm build"],
+      verificationCommands: ["pnpm test", "pnpm lint"],
+      baselineGateDecision: gate,
+      runResult: { durationSec: 33, timeoutMs: 9060000, transcriptFile: path.join(tempRoot, "project-verify.json") },
+    });
+
+    assert.equal(report.status, "warn");
+    assert.equal(report.failure_owner, null);
+    assert.equal(report.target_verification_status.status, "warn");
+    assert.equal(report.target_verification_status.failure_owner, null);
+    assert.equal(report.target_verification_status.warning_reason.includes("pnpm test"), true);
+  });
+});
+
 test("target toolchain preflight blocks incompatible Node before target commands", () => {
   withTempRoot((tempRoot) => {
     assert.equal(nodeVersionSatisfiesRequiredRange("22.12.0", "^22.12.0 || ^24.0.0 || >=26.0.0"), true);

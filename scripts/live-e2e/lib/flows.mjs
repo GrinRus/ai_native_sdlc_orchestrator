@@ -2823,12 +2823,36 @@ function buildTargetToolchainBlockedPreExecutionStatus(options) {
  * @returns {"target_setup" | "target_verification"}
  */
 function resolveTargetFailurePhase(stepResult, setupCommandSet, verificationCommandSet) {
-  const command = asNonEmptyString(stepResult.command);
+  const command = normalizeTargetCommandForComparison(stepResult.command);
   if (command && setupCommandSet.has(command)) return "target_setup";
   if (command && verificationCommandSet.has(command)) return "target_verification";
   const commandKind = asNonEmptyString(stepResult.command_kind);
   if (commandKind === "lint" || commandKind === "setup") return "target_setup";
   return "target_verification";
+}
+
+/**
+ * @param {unknown} command
+ * @returns {string}
+ */
+function normalizeTargetCommandForComparison(command) {
+  const value = asNonEmptyString(command);
+  if (!value) return "";
+  const collapsed = value.replace(/\s+/gu, " ").trim();
+  return collapsed
+    .replace(
+      /^\[ -z "\$\{[A-Z0-9_]+:-\}" \] \|\| export PATH="\$\(dirname "\$[A-Z0-9_]+"\):\$PATH";\s*/u,
+      "",
+    )
+    .trim();
+}
+
+/**
+ * @param {string[]} commands
+ * @returns {Set<string>}
+ */
+function normalizedTargetCommandSet(commands) {
+  return new Set(commands.map((command) => normalizeTargetCommandForComparison(command)).filter(Boolean));
 }
 
 /**
@@ -2945,8 +2969,8 @@ function describeTargetCommandFailure(options) {
  * }} options
  */
 export function buildTargetPreExecutionStatusReport(options) {
-  const setupCommandSet = new Set(options.setupCommands);
-  const verificationCommandSet = new Set(options.verificationCommands);
+  const setupCommandSet = normalizedTargetCommandSet(options.setupCommands);
+  const verificationCommandSet = normalizedTargetCommandSet(options.verificationCommands);
   const stepEntries = options.stepResultFiles
     .filter((filePath) => fileExists(filePath))
     .map((filePath) => ({ filePath, document: asRecord(readJson(filePath)) }));
@@ -3109,8 +3133,8 @@ export function evaluateBaselineVerifyGate(options) {
   const routedStepResult = routedStepResultFile && fileExists(routedStepResultFile)
     ? asRecord(readJson(routedStepResultFile))
     : {};
-  const setupCommandSet = new Set(options.setupCommands);
-  const verificationCommandSet = new Set(options.verificationCommands);
+  const setupCommandSet = normalizedTargetCommandSet(options.setupCommands);
+  const verificationCommandSet = normalizedTargetCommandSet(options.verificationCommands);
   const validationGateStatus = asNonEmptyString(options.verifySummary.validation_gate_status);
   /** @type {string[]} */
   const blockingReasons = [];
@@ -3139,13 +3163,14 @@ export function evaluateBaselineVerifyGate(options) {
       missing_prerequisites: missingPrerequisites,
       step_result_file: failedStep.filePath,
     });
+    const normalizedCommand = normalizeTargetCommandForComparison(command);
     if (environmentFailureClass) {
       blockingReasons.push(`${environmentFailureClass}:${command || "unknown"}`);
     } else if (missingPrerequisites.length > 0) {
       blockingReasons.push(`missing-prerequisite:${command || "unknown"}`);
-    } else if (command && setupCommandSet.has(command)) {
+    } else if (normalizedCommand && setupCommandSet.has(normalizedCommand)) {
       blockingReasons.push(`readiness-command-failed:${command}`);
-    } else if (!command || !verificationCommandSet.has(command)) {
+    } else if (!normalizedCommand || !verificationCommandSet.has(normalizedCommand)) {
       blockingReasons.push(`unknown-verification-failure:${command || "unknown"}`);
     } else {
       findings.push(summary);
