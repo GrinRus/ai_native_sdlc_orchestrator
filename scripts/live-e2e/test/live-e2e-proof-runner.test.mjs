@@ -2937,6 +2937,16 @@ test("proof runner preserves target setup and provider interruption evidence on 
   assert.match(runProfileSource, /source_observation_report_file/u);
   assert.match(flowSource, /shouldReuseLiveAdapterPreflight/u);
   assert.match(flowSource, /live_adapter_preflight_reused_after_resume/u);
+  assert.match(flowSource, /function buildCachedPostRunDiagnosticVerifyResult/u);
+  assert.match(flowSource, /post_run_diagnostic_reused_after_resume/u);
+  assert.match(flowSource, /cached post-run diagnostic verification/u);
+  const cachedDiagnosticIndex = flowSource.indexOf("const cachedPostRunDiagnosticVerify =");
+  const runDiagnosticIndex = flowSource.indexOf(
+    'const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic"',
+  );
+  assert.notEqual(cachedDiagnosticIndex, -1);
+  assert.notEqual(runDiagnosticIndex, -1);
+  assert.ok(cachedDiagnosticIndex < runDiagnosticIndex);
 });
 
 test("manual live E2E exposes operator decisions and leaves outcome assessment post-run", () => {

@@ -1039,6 +1039,46 @@ function controllerObservedStep(stepController, step, iteration = 1) {
 }
 
 /**
+ * @param {Record<string, unknown>} artifacts
+ * @param {string} diagnosticFailureMode
+ * @returns {ReturnType<typeof buildCachedCommandResult> | null}
+ */
+function buildCachedPostRunDiagnosticVerifyResult(artifacts, diagnosticFailureMode) {
+  const summaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+  if (!summaryFile || !fileExists(summaryFile)) return null;
+
+  const summary = asRecord(readJson(summaryFile));
+  const transcriptFile = asNonEmptyString(artifacts.post_run_diagnostic_transcript_file) || summaryFile;
+  const stepResultFiles = uniqueStrings([
+    ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+    ...asStringArray(summary.step_result_files),
+    ...asStringArray(summary.step_result_refs),
+  ]);
+  const diagnosticPassed = asNonEmptyString(summary.status) === "passed";
+  artifacts.post_run_diagnostic_status =
+    asNonEmptyString(artifacts.post_run_diagnostic_status) ||
+    (diagnosticPassed ? "pass" : asNonEmptyString(diagnosticFailureMode) || "warn");
+  artifacts.post_run_diagnostic_verify_step_result_files = stepResultFiles;
+  artifacts.post_run_diagnostic_reused_after_resume = true;
+
+  return {
+    ok: true,
+    exitCode: 0,
+    stdout: "",
+    stderr: "",
+    payload: {
+      verify_summary_file: summaryFile,
+      step_result_files: stepResultFiles,
+    },
+    transcriptFile,
+    startedAt: nowIso(),
+    finishedAt: nowIso(),
+    durationSec: 0,
+    commandSurface: "cached post-run diagnostic verification",
+  };
+}
+
+/**
  * @param {Record<string, unknown>} diagnostic
  * @returns {boolean}
  */
@@ -4878,6 +4918,15 @@ export function executeFullJourneyFlow(options) {
     };
     const runPostRunDiagnosticVerify = (runOptions = {}) => {
       const iteration = Number(runOptions.iteration) || 1;
+      const cachedPostRunDiagnosticVerify =
+        options.stepController?.hasPersistedProgress?.() === true
+          ? buildCachedPostRunDiagnosticVerifyResult(
+              artifacts,
+              asNonEmptyString(postRunQualityPolicy.diagnosticFailureMode),
+            )
+          : null;
+      if (cachedPostRunDiagnosticVerify) return cachedPostRunDiagnosticVerify;
+
       const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
         "project",
         "verify",
