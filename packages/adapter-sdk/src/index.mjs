@@ -624,6 +624,31 @@ function markProviderRunControlInterrupted(providerStepStatus) {
 }
 
 /**
+ * @param {Record<string, unknown>} providerStepStatus
+ * @param {string} recommendedAction
+ */
+function markProviderRunControlRecommendedAction(providerStepStatus, recommendedAction) {
+  const stateFile = asOptionalString(providerStepStatus.state_file);
+  if (!stateFile) {
+    return;
+  }
+  const nowIso = new Date().toISOString();
+  const state = readProviderRunControlState(providerStepStatus);
+  const previous = asRecord(state.provider_step_status);
+  state.provider_step_status = {
+    ...previous,
+    status: asOptionalString(previous.status) || "failed",
+    recommended_action: recommendedAction,
+    updated_at: nowIso,
+    finished_at: asOptionalString(previous.finished_at) || nowIso,
+  };
+  state.updated_at = nowIso;
+  try {
+    fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  } catch {}
+}
+
+/**
  * @param {unknown} value
  * @param {number} fallback
  * @returns {number}
@@ -2103,6 +2128,58 @@ function summarizeProviderPromptOverflow(stdout, stderr, errorMessage) {
 }
 
 /**
+ * @param {string} combined
+ * @returns {string}
+ */
+function extractProviderErrorSnippet(combined) {
+  const indicators = [
+    "property_name_above_max_length",
+    "invalid_request_error",
+    "invalid property name",
+    "input[",
+    "tool-call",
+    "tool call",
+    "schema",
+  ];
+  const lines = combined
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const matchedLine = lines.find((line) => {
+    const lower = line.toLowerCase();
+    return indicators.some((indicator) => lower.includes(indicator));
+  });
+  return sanitizeSummary(matchedLine || combined);
+}
+
+/**
+ * @param {string} stdout
+ * @param {string} stderr
+ * @param {string | null | undefined} errorMessage
+ * @returns {string | null}
+ */
+export function summarizeProviderMalformedToolCallError(stdout, stderr, errorMessage) {
+  const combined = `${stdout}\n${stderr}\n${errorMessage ?? ""}`;
+  const lower = combined.toLowerCase();
+  const hasOpenAiApiError =
+    lower.includes("invalid_request_error") ||
+    lower.includes("property_name_above_max_length") ||
+    lower.includes("invalid property name");
+  const hasPropertyNameAboveMax = lower.includes("property_name_above_max_length");
+  const hasToolSchemaContext =
+    lower.includes("tool-call") ||
+    lower.includes("tool call") ||
+    lower.includes("function call") ||
+    lower.includes("schema") ||
+    /\binput\[\d+\]\.arguments\b/u.test(lower);
+  if (!hasPropertyNameAboveMax && (!hasOpenAiApiError || !hasToolSchemaContext)) {
+    return null;
+  }
+  const snippet = extractProviderErrorSnippet(combined);
+  return `Malformed Codex/OpenAI tool-call schema failure: ${snippet}`;
+}
+
+/**
  * @param {string} value
  * @returns {Record<string, unknown> | null}
  */
@@ -3000,11 +3077,23 @@ export function createLiveAdapter(options) {
       const providerProgressEvents = Array.isArray(invocation.providerProgressEvents)
         ? invocation.providerProgressEvents.map((event) => asRecord(event))
         : [];
-      const rawProviderErrorSummary = summarizeProviderPromptOverflow(
+      const malformedProviderToolCallSummary = summarizeProviderMalformedToolCallError(
         stdout,
         stderr,
         invocationError?.message ?? null,
       );
+      const providerPromptOverflowSummary = summarizeProviderPromptOverflow(
+        stdout,
+        stderr,
+        invocationError?.message ?? null,
+      );
+      const rawProviderErrorSummary = malformedProviderToolCallSummary || providerPromptOverflowSummary;
+      if (malformedProviderToolCallSummary && invocationFailed) {
+        markProviderRunControlRecommendedAction(
+          asRecord(envelope.provider_step_status),
+          "Malformed Codex/OpenAI tool-call schema failure; inspect raw provider JSONL/stdout/stderr and retry with the clean Codex tool surface.",
+        );
+      }
 
       const rawEvidenceRecord = {
         adapter_id: adapterId,
@@ -3091,7 +3180,7 @@ export function createLiveAdapter(options) {
           context_budget_failure_class:
             contextBudgetReports.budget_report.budget_status === "fail"
               ? "compiled_context_budget_exceeded"
-              : rawProviderErrorSummary
+              : providerPromptOverflowSummary
                 ? "provider_context_window_exceeded"
                 : null,
           top_context_size_sources: contextBudgetReports.top_context_size_sources,

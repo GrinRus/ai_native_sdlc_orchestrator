@@ -449,8 +449,10 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W52-S01 | Target-readiness owner propagation | EPIC-7 | ready | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, run-health examples/tests | W51-S05 |
 | W52-S02 | Diagnostic command hang and timeout hardening | EPIC-4, EPIC-7 | blocked | `packages/orchestrator-core/**`, `internal maintainer rehearsal tooling`, verification tests | W52-S01 |
-| W52-S03 | Vitest large product acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, proof findings | W52-S02 |
-| W52-S04 | SQLAlchemy large diagnostic policy and acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, quality reports | W52-S02 |
+| W52-S06 | Codex provider tool-surface hardening | EPIC-7 | blocked | `examples/adapters/codex-cli.yaml`, `packages/adapter-sdk/**`, live adapter/run-health tests | W52-S02 |
+| W52-S07 | Manual xlarge step-quality continuation | EPIC-7 | blocked | `scripts/live-e2e/manual-live-e2e.mjs`, step-quality contracts, controller tests | W52-S02 |
+| W52-S03 | Vitest large product acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, proof findings | W52-S02, W52-S06, W52-S07 |
+| W52-S04 | SQLAlchemy large diagnostic policy and acceptance closure | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, target catalog, quality reports | W52-S02, W52-S06, W52-S07 |
 | W52-S05 | Hard-target proof rerun and findings sync | EPIC-0, EPIC-7 | blocked | `internal maintainer runbook`, backlog docs, root checks, proof artifacts | W52-S03, W52-S04 |
 
 ## Planning note

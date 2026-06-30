@@ -703,6 +703,8 @@ function collectRuntimePermissionEvidence(reportFiles) {
  */
 function buildScorecard(options) {
   const targetRepo = asRecord(options.profile.target_repo);
+  const targetReadiness = buildTargetReadiness(options.flowResult.artifacts);
+  const failureFields = resolveTopLevelFailureFields(options.flowResult.artifacts, targetReadiness);
   return {
     scorecard_id: `${options.runId}.scorecard.${asNonEmptyString(targetRepo.repo_id) || "target"}`,
     run_id: options.runId,
@@ -738,16 +740,16 @@ function buildScorecard(options) {
         ? options.flowResult.artifacts.provider_step_status
         : null,
     baseline_verify_status: asNonEmptyString(options.flowResult.artifacts.baseline_verify_status) || null,
-    target_readiness: buildTargetReadiness(options.flowResult.artifacts),
+    target_readiness: targetReadiness,
     target_pre_execution_status:
       typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
       options.flowResult.artifacts.target_pre_execution_status
         ? options.flowResult.artifacts.target_pre_execution_status
         : null,
     target_toolchain_preflight_file: asNonEmptyString(options.flowResult.artifacts.target_toolchain_preflight_file) || null,
-    failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
-    failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
-    failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
+    failure_owner: failureFields.owner,
+    failure_phase: failureFields.phase,
+    failure_class: failureFields.class,
     post_run_verify_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || null,
     post_run_diagnostic_status: asNonEmptyString(options.flowResult.artifacts.post_run_diagnostic_status) || null,
     summary_ref: options.summaryFile,
@@ -1833,6 +1835,7 @@ function buildObservationReport(options) {
     frontendInteractions,
   });
   const targetReadiness = buildTargetReadiness(options.flowResult.artifacts);
+  const failureFields = resolveTopLevelFailureFields(options.flowResult.artifacts, targetReadiness);
   return {
     report_id: `${options.runId}.live-e2e-observation.v2`,
     run_id: options.runId,
@@ -1865,9 +1868,9 @@ function buildObservationReport(options) {
         ? options.flowResult.artifacts.provider_step_status
         : null,
     provider_execution_status: asNonEmptyString(options.flowResult.artifacts.provider_execution_status) || null,
-    failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
-    failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
-    failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
+    failure_owner: failureFields.owner,
+    failure_phase: failureFields.phase,
+    failure_class: failureFields.class,
     aor_installation: asRecord(options.flowResult.artifacts.aor_installation),
     aor_installation_proof_file: asNonEmptyString(options.flowResult.artifacts.aor_installation_proof_file),
     setup_journal: setupJournal,
@@ -2103,20 +2106,132 @@ function buildTargetEnvironmentHealth(artifacts) {
       : verificationStatus === "fail" || verificationStatus === "blocked"
         ? targetVerificationStatus
         : {};
+  const scopedDeclaredFailure =
+    status === "pass" ? {} : targetScopedDeclaredFailureFromArtifacts(artifacts);
   return {
     status,
     target_setup_status: setupStatus,
     target_verification_status: verificationStatus,
     failure_owner:
-      asNonEmptyString(artifacts.failure_owner) || asNonEmptyString(blockingTargetStatus.failure_owner) || null,
+      asNonEmptyString(blockingTargetStatus.failure_owner) ||
+      asNonEmptyString(scopedDeclaredFailure.owner) ||
+      (status === "pass" ? null : "target_repository"),
     failure_phase:
-      asNonEmptyString(artifacts.failure_phase) ||
       asNonEmptyString(blockingTargetStatus.failure_phase) ||
+      asNonEmptyString(scopedDeclaredFailure.phase) ||
       inferredFailurePhase,
     failure_class:
-      asNonEmptyString(artifacts.failure_class) ||
       asNonEmptyString(blockingTargetStatus.failure_class) ||
+      asNonEmptyString(scopedDeclaredFailure.class) ||
       inferredFailureClass,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {{ owner: string | null, phase: string | null, class: string | null }}
+ */
+function targetScopedDeclaredFailureFromArtifacts(artifacts) {
+  const owner = asNonEmptyString(artifacts.failure_owner);
+  const phase = asNonEmptyString(artifacts.failure_phase);
+  const failureClass = asNonEmptyString(artifacts.failure_class);
+  const targetScoped =
+    owner === "target_repository" ||
+    owner === "environment" ||
+    phase === "target_readiness" ||
+    phase === "target_setup" ||
+    phase === "target_verification" ||
+    failureClass.startsWith("target_") ||
+    failureClass.startsWith("environment_");
+  if (!targetScoped) {
+    return { owner: null, phase: null, class: null };
+  }
+  return {
+    owner: owner || null,
+    phase: phase || null,
+    class: failureClass || null,
+  };
+}
+
+/**
+ * @param {string} status
+ * @param {string} setupStatus
+ * @param {string} verificationStatus
+ * @param {string} preExecutionStatus
+ * @returns {{ owner: string, phase: string, class: string }}
+ */
+function inferTargetReadinessFailure(status, setupStatus, verificationStatus, preExecutionStatus) {
+  const blocked = status === "blocked";
+  if (setupStatus === "fail" || setupStatus === "blocked") {
+    return {
+      owner: setupStatus === "blocked" ? "environment" : "target_repository",
+      phase: "target_setup",
+      class: blocked ? "target_setup_blocked" : "target_setup_failed",
+    };
+  }
+  if (verificationStatus === "fail" || verificationStatus === "blocked") {
+    return {
+      owner: "target_repository",
+      phase: "target_verification",
+      class: blocked ? "target_verification_blocked" : "target_verification_failed",
+    };
+  }
+  if (preExecutionStatus === "fail" || preExecutionStatus === "blocked") {
+    return {
+      owner: "target_repository",
+      phase: "target_verification",
+      class: blocked ? "target_verification_blocked" : "target_verification_failed",
+    };
+  }
+  return {
+    owner: "target_repository",
+    phase: "target_readiness",
+    class: blocked ? "target_readiness_blocked" : "target_readiness_failed",
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} targetReadiness
+ * @returns {{ owner: string, phase: string, class: string, summary: string } | null}
+ */
+function targetReadinessPreExecutionFailure(targetReadiness) {
+  const status = asNonEmptyString(targetReadiness.status);
+  if (!["blocked", "fail"].includes(status) || targetReadiness.product_execution_started === true) {
+    return null;
+  }
+  const owner = asNonEmptyString(targetReadiness.failure_owner) || "target_repository";
+  const phase = asNonEmptyString(targetReadiness.failure_phase) || "target_readiness";
+  const failureClass =
+    asNonEmptyString(targetReadiness.failure_class) ||
+    (status === "blocked" ? "target_readiness_blocked" : "target_readiness_failed");
+  return {
+    owner,
+    phase,
+    class: failureClass,
+    summary:
+      asNonEmptyString(targetReadiness.summary) ||
+      "Target readiness blocked before product execution.",
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} targetReadiness
+ * @returns {{ owner: string | null, phase: string | null, class: string | null }}
+ */
+function resolveTopLevelFailureFields(artifacts, targetReadiness) {
+  const readinessFailure = targetReadinessPreExecutionFailure(targetReadiness);
+  if (readinessFailure) {
+    return {
+      owner: readinessFailure.owner,
+      phase: readinessFailure.phase,
+      class: readinessFailure.class,
+    };
+  }
+  return {
+    owner: asNonEmptyString(artifacts.failure_owner) || null,
+    phase: asNonEmptyString(artifacts.failure_phase) || null,
+    class: asNonEmptyString(artifacts.failure_class) || null,
   };
 }
 
@@ -2155,6 +2270,16 @@ function buildTargetReadiness(artifacts) {
           asNonEmptyString(asRecord(entry).failure_class),
         )
       : {};
+  const productExecutionStarted =
+    asNonEmptyString(artifacts.provider_execution_status) !== "" ||
+    asNonEmptyString(artifacts.routed_step_result_file) !== "" ||
+    asNonEmptyString(artifacts.run_start_runtime_harness_report_file) !== "";
+  const scopedDeclaredFailure =
+    status === "blocked" || status === "fail" ? targetScopedDeclaredFailureFromArtifacts(artifacts) : {};
+  const inferredFailure =
+    status === "blocked" || status === "fail"
+      ? inferTargetReadinessFailure(status, setupStatus, verificationStatus, preExecutionStatus)
+      : { owner: null, phase: null, class: null };
   const evidenceRefs = uniqueStrings([
     asNonEmptyString(artifacts.target_toolchain_preflight_file),
     asNonEmptyString(artifacts.target_pre_execution_status_file),
@@ -2175,15 +2300,21 @@ function buildTargetReadiness(artifacts) {
     baseline_verify_summary_file: asNonEmptyString(artifacts.baseline_verify_summary_file) || null,
     execution_readiness_file: asNonEmptyString(artifacts.execution_readiness_file) || null,
     failure_owner:
-      asNonEmptyString(artifacts.failure_owner) || asNonEmptyString(asRecord(blockingStatus).failure_owner) || null,
+      asNonEmptyString(asRecord(blockingStatus).failure_owner) ||
+      asNonEmptyString(scopedDeclaredFailure.owner) ||
+      asNonEmptyString(inferredFailure.owner) ||
+      null,
     failure_phase:
-      asNonEmptyString(artifacts.failure_phase) || asNonEmptyString(asRecord(blockingStatus).failure_phase) || null,
+      asNonEmptyString(asRecord(blockingStatus).failure_phase) ||
+      asNonEmptyString(scopedDeclaredFailure.phase) ||
+      asNonEmptyString(inferredFailure.phase) ||
+      null,
     failure_class:
-      asNonEmptyString(artifacts.failure_class) || asNonEmptyString(asRecord(blockingStatus).failure_class) || null,
-    product_execution_started:
-      asNonEmptyString(artifacts.provider_execution_status) !== "" ||
-      asNonEmptyString(artifacts.routed_step_result_file) !== "" ||
-      asNonEmptyString(artifacts.run_start_runtime_harness_report_file) !== "",
+      asNonEmptyString(asRecord(blockingStatus).failure_class) ||
+      asNonEmptyString(scopedDeclaredFailure.class) ||
+      asNonEmptyString(inferredFailure.class) ||
+      null,
+    product_execution_started: productExecutionStarted,
     evidence_refs: evidenceRefs,
     summary:
       status === "pass"
@@ -2251,6 +2382,8 @@ function buildDiagnosticHealth(artifacts) {
     asNonEmptyString(policy.diagnostic_failure_mode) ||
     null;
   const summaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+  const transcriptFile = asNonEmptyString(artifacts.post_run_diagnostic_transcript_file);
+  const transcript = readJsonIfPresent(transcriptFile);
   const summary = readJsonIfPresent(summaryFile);
   const summaryStatus = toRunHealthStatusOrNull(summary.status);
   const artifactStatus = toRunHealthStatusOrNull(artifacts.post_run_diagnostic_status);
@@ -2275,9 +2408,25 @@ function buildDiagnosticHealth(artifacts) {
   const failedCommandsFromStepResults = stepResultEntries
     .filter(({ stepResult }) => asNonEmptyString(stepResult.status) === "failed")
     .map(({ ref, stepResult }) => summarizeDiagnosticCommand(stepResult, ref));
-  const timedOutCommands = Array.isArray(summary.timed_out_commands)
+  const transcriptTimeoutCommands =
+    transcript.timed_out === true
+      ? [
+          {
+            repo_scope: null,
+            command: asNonEmptyString(transcript.label) || asNonEmptyString(transcript.command) || "post-run diagnostic",
+            status: "failed",
+            timed_out: true,
+            step_result_ref: transcriptFile || null,
+            summary: "Diagnostic command timed out after bounded cleanup; stdout/stderr are preserved in the transcript.",
+          },
+        ]
+      : [];
+  const timedOutCommands = uniqueDiagnosticCommands([
+    ...(Array.isArray(summary.timed_out_commands)
     ? summary.timed_out_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
-    : failedCommandsFromStepResults.filter((entry) => entry.timed_out === true);
+      : failedCommandsFromStepResults.filter((entry) => entry.timed_out === true)),
+    ...transcriptTimeoutCommands,
+  ]);
   const outputQualityFailedCommands = Array.isArray(summary.output_quality_failed_commands)
     ? summary.output_quality_failed_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
     : [];
@@ -2288,7 +2437,7 @@ function buildDiagnosticHealth(artifacts) {
   ]);
   const evidenceRefs = uniqueStrings([
     summaryFile,
-    asNonEmptyString(artifacts.post_run_diagnostic_transcript_file),
+    transcriptFile,
     ...stepResultRefs,
     ...timedOutCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
     ...failedCommands.map((entry) => asNonEmptyString(entry.step_result_ref)),
@@ -2409,6 +2558,7 @@ function buildResumeInteractionHealth(observationReport) {
  *   commandHealth: Record<string, unknown>,
  *   controllerHealth: Record<string, unknown>,
  *   providerHealth: Record<string, unknown>,
+ *   targetReadiness: Record<string, unknown>,
  *   targetEnvironmentHealth: Record<string, unknown>,
  *   diagnosticHealth: Record<string, unknown>,
  *   evidenceHealth: Record<string, unknown>,
@@ -2419,6 +2569,10 @@ function buildResumeInteractionHealth(observationReport) {
  * @returns {Record<string, unknown>}
  */
 function resolveRunHealthFailure(options) {
+  const readinessFailure = targetReadinessPreExecutionFailure(options.targetReadiness);
+  if (readinessFailure) {
+    return readinessFailure;
+  }
   const rawDeclaredClass = asNonEmptyString(options.artifacts.failure_class);
   const declaredClassIsNonFailure = ["none", "pass", "passed", "completed", "succeeded"].includes(rawDeclaredClass);
   const declaredOwner = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_owner);
@@ -2631,6 +2785,7 @@ function buildRunHealthReport(options) {
     observationStatus === "interaction_required" ||
     asNonEmptyString(controllerHealth.status) === "blocked" ||
     asNonEmptyString(providerHealth.status) === "blocked" ||
+    asNonEmptyString(targetReadiness.status) === "blocked" ||
     asNonEmptyString(targetEnvironmentHealth.status) === "blocked" ||
     asNonEmptyString(diagnosticHealth.status) === "blocked" ||
     asNonEmptyString(evidenceHealth.status) === "blocked" ||
@@ -2639,6 +2794,7 @@ function buildRunHealthReport(options) {
     observationStatus === "not_pass" ||
     asNonEmptyString(commandHealth.status) === "fail" ||
     asNonEmptyString(providerHealth.status) === "fail" ||
+    asNonEmptyString(targetReadiness.status) === "fail" ||
     asNonEmptyString(targetEnvironmentHealth.status) === "fail" ||
     asNonEmptyString(diagnosticHealth.status) === "fail";
   const overallStatus = hasBlockingRunControl
@@ -2660,6 +2816,7 @@ function buildRunHealthReport(options) {
           commandHealth,
           controllerHealth,
           providerHealth,
+          targetReadiness,
           targetEnvironmentHealth,
           diagnosticHealth,
           evidenceHealth,
@@ -2956,6 +3113,8 @@ export function writeProofRunnerArtifacts(options) {
     asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_report_file),
   ]);
   const lifecycleCompleteness = buildLifecycleCompletenessSummary(observationReport);
+  const summaryTargetReadiness = buildTargetReadiness(options.flowResult.artifacts);
+  const summaryFailureFields = resolveTopLevelFailureFields(options.flowResult.artifacts, summaryTargetReadiness);
 
   const summary = {
     run_id: options.runId,
@@ -3050,7 +3209,7 @@ export function writeProofRunnerArtifacts(options) {
       options.flowResult.artifacts.baseline_verify_gate_decision
         ? options.flowResult.artifacts.baseline_verify_gate_decision
         : null,
-    target_readiness: buildTargetReadiness(options.flowResult.artifacts),
+    target_readiness: summaryTargetReadiness,
     target_pre_execution_status_file:
       typeof options.flowResult.artifacts.target_pre_execution_status_file === "string"
         ? options.flowResult.artifacts.target_pre_execution_status_file
@@ -3078,9 +3237,9 @@ export function writeProofRunnerArtifacts(options) {
       options.flowResult.artifacts.target_verification_status_detail
         ? options.flowResult.artifacts.target_verification_status_detail
         : null,
-    failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
-    failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
-    failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
+    failure_owner: summaryFailureFields.owner,
+    failure_phase: summaryFailureFields.phase,
+    failure_class: summaryFailureFields.class,
     post_run_verify_summary_file:
       typeof options.flowResult.artifacts.post_run_verify_summary_file === "string"
         ? options.flowResult.artifacts.post_run_verify_summary_file

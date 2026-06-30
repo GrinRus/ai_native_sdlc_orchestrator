@@ -14,6 +14,7 @@ import {
 } from "../lib/step-controller.mjs";
 import { prepareOperatorDecisionArtifact } from "../lib/decision-helper.mjs";
 import {
+  prepareManualStepQualityAssessmentArtifact,
   writeStepQualityAssessmentReport,
   writeStepQualityAssessmentRequest,
 } from "../lib/step-quality-assessment.mjs";
@@ -474,6 +475,81 @@ test("live E2E product-change step-quality report is reconciled on controller re
     assert.equal(state.pending_decision.action, "continue");
     assert.ok(state.step_quality_assessment_refs.includes(builtAssessment.reportFile));
     assert.ok(state.evidence_refs.includes(builtAssessment.reportFile));
+  });
+});
+
+test("live E2E xlarge manual step-quality report allows continuation after discovery", () => {
+  withTempRoot((reportsRoot) => {
+    const runId = "controller-xlarge-manual-step-quality";
+    const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const profile = {
+      profile_id: "live-e2e.test.xlarge-manual-step-quality",
+      target_catalog_id: "ky",
+      feature_mission_id: "ky-governance-release-notes",
+      live_e2e: { flow_range_policy: "delivery_default" },
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile],
+    });
+
+    const artifacts = {
+      feature_mission_id: "ky-governance-release-notes",
+      feature_size: "xlarge",
+      mission_class: "product-change",
+    };
+    const observeInput = {
+      stage: "discovery",
+      stageResult: {
+        stage: "discovery",
+        status: "pass",
+        evidence_refs: [transcriptFile],
+        summary: "Discovery passed.",
+      },
+      commandResults: [
+        {
+          label: "discovery-run",
+          command_surface: "aor discovery run",
+          status: "pass",
+          transcript_file: transcriptFile,
+          artifact_refs: [transcriptFile],
+          exit_code: 0,
+        },
+      ],
+      artifacts,
+    };
+
+    assert.throws(() => controller.observeStage(observeInput), LiveE2eControllerStop);
+    const [pendingEntry] = controller.getStepJournal();
+    assert.equal(pendingEntry.step_quality_assessment_status, "awaiting-assessment");
+    const prepared = prepareManualStepQualityAssessmentArtifact({
+      requestFile: pendingEntry.step_quality_assessment_request_ref,
+      decision: "continue",
+    });
+    assert.equal(prepared.assessment_method, "manual-skill-agent");
+    assert.equal(prepared.assessment_status, "accepted");
+    assert.equal(prepared.report_file, pendingEntry.step_quality_assessment_expected_report_ref);
+    const report = JSON.parse(fs.readFileSync(prepared.report_file, "utf8"));
+    assert.equal(report.feature_size, "xlarge");
+    assert.equal(report.assessment_method, "manual-skill-agent");
+    assert.equal(report.decision, "continue");
+
+    const result = controller.observeStage(observeInput);
+    assert.equal(result.action, "continue");
+    const [acceptedEntry] = controller.getStepJournal();
+    assert.equal(acceptedEntry.step_quality_assessment_status, "accepted");
+    assert.equal(acceptedEntry.step_quality_assessment_ref, prepared.report_file);
+    const state = controller.getState();
+    assert.equal(state.current_step, "spec");
+    assert.equal(state.pending_step_quality_assessment, null);
+    assert.ok(state.step_quality_assessment_refs.includes(prepared.report_file));
   });
 });
 

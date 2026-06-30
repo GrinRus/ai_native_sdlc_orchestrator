@@ -246,6 +246,8 @@ graph TD
   W51S05[W51-S05 Next hard-target expansion after large acceptance]
   W52S01[W52-S01 Target-readiness owner propagation]
   W52S02[W52-S02 Diagnostic command hang and timeout hardening]
+  W52S06[W52-S06 Codex provider tool-surface hardening]
+  W52S07[W52-S07 Manual xlarge step-quality continuation]
   W52S03[W52-S03 Vitest large product acceptance closure]
   W52S04[W52-S04 SQLAlchemy large diagnostic policy and acceptance closure]
   W52S05[W52-S05 Hard-target proof rerun and findings sync]
@@ -602,8 +604,14 @@ graph TD
   W51S04 --> W51S05
   W51S05 --> W52S01
   W52S01 --> W52S02
+  W52S02 --> W52S06
+  W52S02 --> W52S07
   W52S02 --> W52S03
   W52S02 --> W52S04
+  W52S06 --> W52S03
+  W52S07 --> W52S03
+  W52S06 --> W52S04
+  W52S07 --> W52S04
   W52S03 --> W52S05
   W52S04 --> W52S05
 ```
@@ -1061,8 +1069,10 @@ graph TD
 |---|---|
 | W52-S01 | W51-S05 |
 | W52-S02 | W52-S01 |
-| W52-S03 | W52-S02 |
-| W52-S04 | W52-S02 |
+| W52-S06 | W52-S02 |
+| W52-S07 | W52-S02 |
+| W52-S03 | W52-S02, W52-S06, W52-S07 |
+| W52-S04 | W52-S02, W52-S06, W52-S07 |
 | W52-S05 | W52-S03, W52-S04 |
 
 ## Topological order
@@ -1308,9 +1318,11 @@ graph TD
 240. W51-S05
 241. W52-S01
 242. W52-S02
-243. W52-S03
-244. W52-S04
-245. W52-S05
+243. W52-S06
+244. W52-S07
+245. W52-S03
+246. W52-S04
+247. W52-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

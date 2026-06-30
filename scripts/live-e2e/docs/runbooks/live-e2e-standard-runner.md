@@ -208,7 +208,7 @@ node ./scripts/live-e2e/run-profile.mjs \
   --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml
 ```
 
-By default, live E2E uses `--runner-auth-mode host`: AOR runtime state remains isolated under the run workspace/runtime root, while external runners reuse the operator's local CLI authentication. This means `codex` uses the normal `~/.codex` or caller-provided `CODEX_HOME`, and `claude` uses the normal local Claude Code auth/config sources. Use `--runner-auth-mode isolated` only for CI, proof, or fixture runs that deliberately need a session-scoped runner home.
+By default, live E2E uses `--runner-auth-mode host`: AOR runtime state remains isolated under the run workspace/runtime root, while external runners reuse the operator's local CLI authentication. This means `codex` uses the normal `~/.codex` or caller-provided `CODEX_HOME`, and `claude` uses the normal local Claude Code auth/config sources. Codex live runs still invoke `codex exec --ignore-user-config --ignore-rules` so host auth is preserved but user config, project rules, plugins, and host tool-surface noise do not shape the hard-target proof. Use `--runner-auth-mode isolated` only for CI, proof, or fixture runs that deliberately need a session-scoped runner home.
 
 By default, live E2E also uses `--runtime-agent-permission-mode full-bypass` so non-interactive acceptance runs do not pause on runner-native tool approval prompts inside isolated checkouts. Use `--runtime-agent-permission-mode restricted` when diagnosing adapter-native permission behavior. The selected mode is passed to public `aor` subprocesses through `AOR_RUNTIME_AGENT_PERMISSION_MODE` and is recorded in live adapter preflight, raw adapter evidence, routed step results, and the run summary.
 
@@ -222,8 +222,8 @@ Run summaries copy the latest Runtime Harness `runtime_permission_summary` and `
 This is required for Claude Code because `--permission-mode auto` can ask the operator to approve tool reads or writes when the compiled context links handoff/spec artifacts under `.aor/`. AOR invokes Claude through `--print` in non-interactive live E2E, so there is no interactive approval channel to answer those prompts during the run.
 
 Provider permission-mode analogues:
-- Codex full-bypass: `--ask-for-approval never` with the configured workspace sandbox.
-- Codex restricted: configured non-interactive `codex exec` args without the approval bypass.
+- Codex full-bypass: `--ask-for-approval never` plus `codex exec --ignore-user-config --ignore-rules` with the configured workspace sandbox.
+- Codex restricted: `codex exec --ignore-user-config --ignore-rules` without the approval bypass.
 - Claude Code full-bypass: `--dangerously-skip-permissions`.
 - Claude Code restricted: `--permission-mode auto`.
 - OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions` with the AOR request attached through OpenCode's message/`--file` CLI surface.
@@ -394,6 +394,27 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
   --run-id <stable-run-id> \
   --operator-decision-file <decision.json>
 ```
+
+For medium, large, and manual-only xlarge product-change steps, an accepted
+operator decision with `action=continue` opens a step-quality gate before the
+controller can continue. For xlarge runs, do not use `step-evaluator`; prepare
+the linked manual report from the public step-quality request:
+
+```bash
+node ./scripts/live-e2e/manual-live-e2e.mjs \
+  --prepare-step-quality \
+  --request <step_quality_request_ref> \
+  --decision continue
+```
+
+If `--request` is omitted, pass the same `--project-ref`, `--runtime-root` when
+used, and `--run-id`; the helper finds the latest pending
+`live-e2e-step-quality-assessment-request-*`. It writes the expected
+`live-e2e-step-quality-assessment-report-*`, validates the report contract, uses
+`assessment_method=manual-skill-agent`, and cites public evidence refs from the
+request and linked operator decision. Re-run `manual-live-e2e.mjs` with the same
+run id after the report is written; the controller consumes the accepted report
+and clears `pending_step_quality_assessment`.
 
 If the controller reports `operator_decision_status=rejected`, read the
 `operator_decision_rejection_reason` from the latest step observation and run the

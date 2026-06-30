@@ -73,6 +73,15 @@ the measured provider work-packet status, while
 `adapter_raw_evidence_ref`; do not collapse this into a generic provider
 blocker or the pre-spawn `compiled_context_budget_exceeded` class.
 
+Malformed provider API/tool-call schema failures after invocation, including
+OpenAI `invalid_request_error` and `property_name_above_max_length`, remain
+provider execution failures. Run-health must keep
+`failure_summary.owner=provider`, `failure_summary.phase=provider_execution`,
+and the external runner failure class, while preserving a specific
+`provider_health.raw_provider_error_summary` that names the malformed
+Codex/OpenAI tool-call schema failure. These errors must not be reported as
+target readiness or target verification blockers.
+
 When the external runtime completes but only echoes or summarizes the provider work packet, run-health must preserve the execution failure as:
 - `failure_summary.owner: provider`
 - `failure_summary.phase: provider_execution`

@@ -930,18 +930,34 @@ function buildCommandDiagnostic(result) {
     timeout_budget_ms: result.timeoutMs,
     transcript_file: result.transcriptFile,
     artifact_refs: uniqueStrings(collectStringRefs(result.payload)),
-    failure_class: result.ok ? null : result.timedOut ? "aor-command-timeout" : "command-failed",
-    failure_owner: result.ok ? null : "aor",
+    failure_class: result.ok
+      ? null
+      : result.timedOut && isDiagnosticCommandLabel(result.label)
+        ? "diagnostic-command-timeout"
+        : result.timedOut
+          ? "aor-command-timeout"
+          : "command-failed",
+    failure_owner: result.ok ? null : isDiagnosticCommandLabel(result.label) ? "target_repository" : "aor",
     failure_phase: result.ok ? null : resolveFailurePhaseForCommandLabel(result.label),
     missing_evidence: [],
     recommendation: result.ok
       ? "continue"
-      : result.timedOut
+      : result.timedOut && isDiagnosticCommandLabel(result.label)
+        ? "bounded diagnostic cleanup completed; inspect transcript stdout/stderr and keep product acceptance gated"
+        : result.timedOut
         ? "inspect AOR command transcript and target setup status before judging provider quality"
         : "inspect transcript and command stderr",
     interactive_continuation: interactiveContinuation,
     provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
   };
+}
+
+/**
+ * @param {string} label
+ * @returns {boolean}
+ */
+function isDiagnosticCommandLabel(label) {
+  return label.includes("diagnostic");
 }
 
 /**

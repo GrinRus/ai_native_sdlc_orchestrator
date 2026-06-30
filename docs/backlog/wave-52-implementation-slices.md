@@ -1,10 +1,12 @@
 # W52 implementation slices
 
-W52 turns W51's terminal hard-target evidence into the next closure plan for the
-two remaining live E2E product-acceptance gaps: Vitest large and SQLAlchemy
-large. The wave must not weaken all-pass policy. A blocked hard-target run stays
-non-accepted product quality until terminal run-health pass and final
-`quality-assessment gate --policy all-pass` both pass.
+W52 turns W51's terminal hard-target evidence plus the latest large/xlarge live
+E2E evidence into the next closure plan for the remaining product-acceptance
+gaps. The wave closes target-readiness, diagnostic timeout, Codex provider
+tool-surface, and manual xlarge step-quality hardening before rerunning Vitest
+large and SQLAlchemy large. The wave must not weaken all-pass policy. A blocked
+hard-target run stays non-accepted product quality until terminal run-health pass
+and final `quality-assessment gate --policy all-pass` both pass.
 
 ## W52-S01 — Target-readiness owner propagation
 
@@ -75,15 +77,94 @@ non-accepted product quality until terminal run-health pass and final
 - treating warning diagnostics as product acceptance
 - relaxing primary verification or final all-pass quality gates
 
+## W52-S06 — Codex provider tool-surface hardening
+
+- **Outcome:** Keep Codex/OpenAI provider failures classified as provider
+  execution issues while removing host config/tool-surface noise from live E2E
+  runs.
+- **Epic:** EPIC-7
+- **State:** blocked
+- **Primary modules:** `examples/adapters/codex-cli.yaml`,
+  `packages/adapter-sdk/**`, live adapter/run-health tests
+- **Hard dependencies:** W52-S02
+
+### Local tasks
+1. Add `codex exec --ignore-user-config --ignore-rules` to Codex full-bypass
+   and restricted live adapter args while preserving host authentication through
+   the active `CODEX_HOME`.
+2. Keep `--runner-auth-mode host` as the default; leave isolated auth as an
+   explicit diagnostic/CI mode only.
+3. Parse raw provider JSONL/stdout/stderr for OpenAI API schema/tool-call
+   failures such as `invalid_request_error` and
+   `property_name_above_max_length`.
+4. Preserve classification as
+   `provider/provider_execution/external-runner-failed` while surfacing a
+   specific `raw_provider_error_summary` and provider-step recommended action.
+
+### Acceptance criteria
+1. Codex profile args include `--ignore-user-config --ignore-rules` immediately
+   after `exec` for both permission modes.
+2. Malformed Codex/OpenAI tool-call schema evidence is not classified as target
+   readiness or target verification failure.
+3. Raw evidence and `provider_step_status.recommended_action` name the malformed
+   Codex/OpenAI tool-call schema failure.
+
+### Done evidence
+- adapter profile tests
+- raw provider error fixture tests
+- updated runner contract/runbook notes
+
+### Out of scope
+- enabling `runner-auth-mode=isolated` by default
+- changing provider failures into target-repository blockers
+
+## W52-S07 — Manual xlarge step-quality continuation
+
+- **Outcome:** Allow manual-only xlarge live E2E runs to continue after an
+  accepted operator decision by preparing the linked step-quality report through
+  a public helper, without using the automatic step evaluator.
+- **Epic:** EPIC-7
+- **State:** blocked
+- **Primary modules:** `scripts/live-e2e/manual-live-e2e.mjs`,
+  `scripts/live-e2e/lib/step-quality-assessment.mjs`, controller tests
+- **Hard dependencies:** W52-S02
+
+### Local tasks
+1. Add `manual-live-e2e.mjs --prepare-step-quality --request
+   <step-quality-request> --decision continue|request-repair|retry|block`.
+2. Write the expected
+   `live-e2e-step-quality-assessment-report-*` file from the request, linked
+   operator decision, and required public evidence refs.
+3. Validate the report contract before writing and make ordinary
+   `manual-live-e2e` resume consume the accepted report.
+4. Keep xlarge outside `step-evaluator` and qualification-loop closure.
+
+### Acceptance criteria
+1. Xlarge discovery can stop on `pending_step_quality_assessment`, accept a
+   manual `continue` report, clear the pending gate, and continue to `spec`.
+2. Accepted manual reports use `assessment_method=manual-skill-agent` and cite
+   non-empty public evidence refs from the request/operator decision.
+3. Xlarge remains manual observation evidence and cannot close required
+   acceptance or qualification coverage.
+
+### Done evidence
+- controller/manual helper tests
+- updated live E2E runner runbook
+- contract validation for generated reports
+
+### Out of scope
+- automatic xlarge step evaluation
+- counting xlarge observation evidence as product acceptance
+
 ## W52-S03 — Vitest large product acceptance closure
 
-- **Outcome:** Rerun Vitest large after W52-S01/S02 and either reach final
-  all-pass product acceptance or record a precise non-W51 blocker.
+- **Outcome:** Rerun Vitest large after W52-S01/S02/S06/S07 and either reach
+  final all-pass product acceptance or record a precise non-W51 blocker.
 - **Epic:** EPIC-7
 - **State:** blocked
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`,
   target catalog, proof findings
-- **Hard dependencies:** W52-S02
+- **Hard dependencies:** W52-S02, W52-S06, W52-S07
 
 ### Local tasks
 1. Reuse the compatible Node binary through `AOR_LIVE_E2E_TARGET_NODE_BIN`.
@@ -119,7 +200,7 @@ non-accepted product quality until terminal run-health pass and final
 - **State:** blocked
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml`,
   target catalog, quality reports
-- **Hard dependencies:** W52-S02
+- **Hard dependencies:** W52-S02, W52-S06, W52-S07
 
 ### Local tasks
 1. Decide whether SQLAlchemy hard-target acceptance requires full `pytest test`
