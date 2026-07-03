@@ -42,6 +42,8 @@ test("prepareHandoffArtifacts materializes wave-ticket and pending handoff packe
     assert.equal(typeof result.handoffPacket.writeback_mode, "string");
     assert.equal(typeof result.handoffPacket.scope_constraints, "object");
     assert.ok(result.waveTicket.verification_expectations.primary_commands.length > 0);
+    assert.ok(result.waveTicket.verification_plan.command_groups.length > 0);
+    assert.ok(result.handoffPacket.verification_plan.command_groups.length > 0);
     assert.deepEqual(
       result.waveTicket.local_tasks.find((task) => task.task_id === "local-task.verification").verification_commands,
       result.handoffPacket.verification_plan.commands,
@@ -141,7 +143,24 @@ test("prepareHandoffArtifacts preserves mission planning content and narrow path
     assert.deepEqual(result.handoffPacket.goals, result.waveTicket.goals);
     assert.deepEqual(result.handoffPacket.definition_of_done, result.waveTicket.definition_of_done);
     assert.deepEqual(result.handoffPacket.verification_expectations, result.waveTicket.verification_expectations);
+    assert.deepEqual(result.handoffPacket.verification_plan.command_groups, result.waveTicket.verification_plan.command_groups);
     assert.deepEqual(result.handoffPacket.verification_plan.commands, primaryCommands);
+    assert.deepEqual(result.handoffPacket.verification_plan.command_groups[0], {
+      id: "post-change-primary",
+      role: "test",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: primaryCommands,
+    });
+    assert.deepEqual(result.handoffPacket.verification_plan.command_groups[1], {
+      id: "diagnostic-full-suite",
+      role: "full-suite",
+      phase: "diagnostic",
+      enforcement: "warn",
+      timeout_class: "full-suite",
+      commands: ["npm test"],
+    });
     assert.deepEqual(result.handoffPacket.verification_plan.diagnostic_commands, ["npm test"]);
     assert.equal(result.handoffPacket.verification_plan.diagnostic_failure_mode, "warn");
     assert.ok(result.handoffPacket.allowed_commands.includes("npx ava test/retry.ts --match='*shouldRetry*'"));

@@ -18,7 +18,6 @@ import {
   writeJson,
 } from "./common.mjs";
 
-const DEFAULT_GENERATED_PROFILE_VERIFICATION_TIMEOUT_SEC = 1800;
 const PRODUCT_CHANGE_FEATURE_SIZES = new Set(["medium", "large", "xlarge"]);
 
 const LIVE_E2E_STEP_POLICY_CLASSES = Object.freeze({
@@ -265,6 +264,74 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @param {string[]} commands
+ * @returns {string[]}
+ */
+function applyTargetToolchainPolicyToCommands(profile, commands) {
+  const nodePolicy = asRecord(asRecord(profile.target_toolchain).node);
+  const requiredRange = asNonEmptyString(nodePolicy.required_range);
+  return requiredRange ? commands.map(wrapCommandWithTargetNodeEnv) : commands;
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   verification: Record<string, unknown>,
+ *   mission: Record<string, unknown>,
+ * }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildGeneratedVerificationCommandGroups(options) {
+  const setupCommands = asStringArray(options.verification.setup_commands);
+  const baselineCommands = asStringArray(options.verification.commands);
+  const missionQuality = asRecord(options.mission.post_run_quality);
+  const primaryCommands = asStringArray(missionQuality.primary_commands);
+  const diagnosticCommands = applyTargetToolchainPolicyToCommands(
+    options.profile,
+    asStringArray(missionQuality.diagnostic_commands),
+  );
+  const diagnosticFailureMode = asNonEmptyString(missionQuality.diagnostic_failure_mode) === "fail" ? "fail" : "warn";
+  const primaryGateCommands = primaryCommands.length > 0
+    ? applyTargetToolchainPolicyToCommands(options.profile, primaryCommands)
+    : baselineCommands;
+  return [
+    {
+      id: "target-readiness-setup",
+      role: "setup",
+      phase: "readiness",
+      enforcement: "required",
+      timeout_class: "install",
+      commands: setupCommands,
+    },
+    {
+      id: "baseline-target-verification",
+      role: "test",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: baselineCommands,
+    },
+    {
+      id: "post-change-primary",
+      role: "test",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: primaryGateCommands,
+    },
+    {
+      id: "post-run-diagnostic",
+      role: "full-suite",
+      phase: "diagnostic",
+      enforcement: diagnosticFailureMode === "fail" ? "required" : "warn",
+      timeout_class: "full-suite",
+      commands: diagnosticCommands,
+    },
+  ].filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
+}
+
+/**
  * @param {string} command
  * @returns {string}
  */
@@ -349,9 +416,9 @@ function resolveGeneratedProfileVerification(options) {
 /**
  * @param {Record<string, unknown>} profile
  * @param {Record<string, unknown>} runtimeDefaults
- * @returns {number}
+ * @returns {number | null}
  */
-function resolveGeneratedProfileVerificationTimeoutSec(profile, runtimeDefaults) {
+function resolveExplicitGeneratedProfileVerificationTimeoutSec(profile, runtimeDefaults) {
   const livePolicy = asRecord(profile.live_e2e);
   const verification = asRecord(profile.verification);
   for (const candidate of [
@@ -364,7 +431,7 @@ function resolveGeneratedProfileVerificationTimeoutSec(profile, runtimeDefaults)
       return Math.floor(value);
     }
   }
-  return DEFAULT_GENERATED_PROFILE_VERIFICATION_TIMEOUT_SEC;
+  return null;
 }
 
 /**
@@ -442,6 +509,14 @@ export function materializeGeneratedProjectProfile(options) {
   });
   hydrateRepoVerificationCommands(selectedRepo, generatedVerification);
   generatedProjectProfile.repos = [selectedRepo];
+  generatedProjectProfile.verification = {
+    ...asRecord(generatedProjectProfile.verification),
+    command_groups: buildGeneratedVerificationCommandGroups({
+      profile: options.profile,
+      verification: generatedVerification,
+      mission: asRecord(options.mission),
+    }),
+  };
   if (asRecord(generatedVerification.target_toolchain).node) {
     generatedProjectProfile.target_toolchain = generatedVerification.target_toolchain;
   }
@@ -449,10 +524,15 @@ export function materializeGeneratedProjectProfile(options) {
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";
   runtimeDefaults.workspace_mode = resolveGeneratedWorkspaceMode(options.profile, asRecord(options.mission));
-  runtimeDefaults.verification_command_timeout_sec = resolveGeneratedProfileVerificationTimeoutSec(
+  const explicitVerificationTimeoutSec = resolveExplicitGeneratedProfileVerificationTimeoutSec(
     options.profile,
     runtimeDefaults,
   );
+  if (explicitVerificationTimeoutSec !== null) {
+    runtimeDefaults.verification_command_timeout_sec = explicitVerificationTimeoutSec;
+  } else {
+    delete runtimeDefaults.verification_command_timeout_sec;
+  }
   generatedProjectProfile.runtime_defaults = runtimeDefaults;
 
   const registryRoots = asRecord(generatedProjectProfile.registry_roots);

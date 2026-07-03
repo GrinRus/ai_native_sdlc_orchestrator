@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -14,11 +15,12 @@ import {
 } from "../lib/step-controller.mjs";
 import { prepareOperatorDecisionArtifact } from "../lib/decision-helper.mjs";
 import {
-  prepareManualStepQualityAssessmentArtifact,
   writeStepQualityAssessmentReport,
   writeStepQualityAssessmentRequest,
 } from "../lib/step-quality-assessment.mjs";
 import { validateContractDocument } from "../lib/contracts/index.mjs";
+
+const manualLiveE2eScript = path.resolve("scripts/live-e2e/manual-live-e2e.mjs");
 
 function withTempRoot(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-controller-"));
@@ -529,10 +531,20 @@ test("live E2E xlarge manual step-quality report allows continuation after disco
     assert.throws(() => controller.observeStage(observeInput), LiveE2eControllerStop);
     const [pendingEntry] = controller.getStepJournal();
     assert.equal(pendingEntry.step_quality_assessment_status, "awaiting-assessment");
-    const prepared = prepareManualStepQualityAssessmentArtifact({
-      requestFile: pendingEntry.step_quality_assessment_request_ref,
-      decision: "continue",
-    });
+    const helper = spawnSync(
+      process.execPath,
+      [
+        manualLiveE2eScript,
+        "--prepare-step-quality",
+        "--request",
+        pendingEntry.step_quality_assessment_request_ref,
+        "--decision",
+        "continue",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(helper.status, 0, helper.stderr);
+    const prepared = JSON.parse(helper.stdout);
     assert.equal(prepared.assessment_method, "manual-skill-agent");
     assert.equal(prepared.assessment_status, "accepted");
     assert.equal(prepared.report_file, pendingEntry.step_quality_assessment_expected_report_ref);
@@ -540,6 +552,15 @@ test("live E2E xlarge manual step-quality report allows continuation after disco
     assert.equal(report.feature_size, "xlarge");
     assert.equal(report.assessment_method, "manual-skill-agent");
     assert.equal(report.decision, "continue");
+    assert.equal(report.inspected_evidence_refs.length > 0, true);
+    assert.equal(report.evidence_refs.includes(pendingEntry.step_quality_assessment_request_ref), true);
+    assert.equal(report.evidence_refs.includes(pendingEntry.operator_decision_ref), true);
+    const validation = validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: report,
+      source: prepared.report_file,
+    });
+    assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
 
     const result = controller.observeStage(observeInput);
     assert.equal(result.action, "continue");
@@ -550,6 +571,66 @@ test("live E2E xlarge manual step-quality report allows continuation after disco
     assert.equal(state.current_step, "spec");
     assert.equal(state.pending_step_quality_assessment, null);
     assert.ok(state.step_quality_assessment_refs.includes(prepared.report_file));
+  });
+});
+
+test("manual step-quality helper validates generated reports before writing", () => {
+  withTempRoot((reportsRoot) => {
+    const evidenceFile = path.join(reportsRoot, "public-evidence.json");
+    const operatorDecisionFile = path.join(reportsRoot, "operator-decision.json");
+    const requestFile = path.join(reportsRoot, "step-quality-request.json");
+    const expectedReportFile = path.join(reportsRoot, "step-quality-report.json");
+    fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    fs.writeFileSync(
+      operatorDecisionFile,
+      `${JSON.stringify(
+        {
+          action: "continue",
+          reason: "Manual evidence accepted.",
+          inspected_evidence_refs: [evidenceFile],
+          evidence_refs: [evidenceFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          family: "live-e2e-step-quality-assessment-request",
+          request_id: "invalid-xlarge-request",
+          run_id: "invalid-xlarge-run",
+          profile_id: "live-e2e.test.invalid-xlarge-step-quality",
+          target_catalog_id: "ky",
+          feature_mission_id: "ky-governance-release-notes",
+          feature_size: "xlarge",
+          mission_class: "flow-regression",
+          step_id: "discovery",
+          step_name: "discovery",
+          step_iteration: 1,
+          source_agent_decision_request_file: path.join(reportsRoot, "agent-request.json"),
+          source_operator_decision_file: operatorDecisionFile,
+          expected_assessment_report_file: expectedReportFile,
+          evaluator_input_refs: [evidenceFile],
+          evidence_refs: [evidenceFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const helper = spawnSync(
+      process.execPath,
+      [manualLiveE2eScript, "--prepare-step-quality", "--request", requestFile, "--decision", "continue"],
+      { encoding: "utf8" },
+    );
+
+    assert.equal(helper.status, 1);
+    assert.match(helper.stderr, /failed contract validation/u);
+    assert.equal(fs.existsSync(expectedReportFile), false);
   });
 });
 
@@ -938,6 +1019,114 @@ test("live E2E product-change QA assessment includes QA-specific dimensions and 
       source: builtAssessment.reportFile,
     });
     assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
+  });
+});
+
+test("live E2E product-change step-quality rejects generic accepted findings", () => {
+  withTempRoot((reportsRoot) => {
+    const evidenceFile = path.join(reportsRoot, "review-evidence.json");
+    const requestFile = path.join(reportsRoot, "review-step-quality-request.json");
+    fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    fs.writeFileSync(requestFile, "{}\n", "utf8");
+
+    const builtAssessment = writeStepQualityAssessmentReport({
+      runId: "controller-product-review-generic-step-quality",
+      profile: {
+        profile_id: "live-e2e.test.product-review-generic-step-quality",
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+      },
+      artifacts: {
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+        feature_size: "large",
+        mission_class: "product-change",
+      },
+      entry: {
+        step_id: "review",
+        step_instance_id: "review#1",
+        step_name: "review",
+        sequence: 7,
+        iteration: 1,
+        agent_decision_request_ref: requestFile,
+        operator_decision_ref: evidenceFile,
+        inspected_evidence_refs: [evidenceFile],
+        decision: { action: "continue" },
+      },
+      outputDir: reportsRoot,
+      assessmentRequestFile: requestFile,
+      assessmentMethod: "manual-skill-agent",
+    });
+
+    const report = JSON.parse(fs.readFileSync(builtAssessment.reportFile, "utf8"));
+    report.findings = ["pass"];
+    for (const dimension of Object.values(report.dimensions)) {
+      dimension.summary = "pass";
+      dimension.findings = ["pass"];
+    }
+
+    const validation = validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: report,
+      source: builtAssessment.reportFile,
+    });
+    assert.equal(validation.ok, false);
+    const messages = validation.issues.map((entry) => entry.message).join("\n");
+    assert.match(messages, /Accepted product-change step quality findings must contain non-template rationale/u);
+    assert.match(messages, /Accepted product-change step quality dimension summaries must contain non-template rationale/u);
+    assert.match(messages, /Accepted product-change step quality dimension findings must contain non-template rationale/u);
+  });
+});
+
+test("live E2E product-change step-quality rejects accepted dimensions without inspected refs", () => {
+  withTempRoot((reportsRoot) => {
+    const evidenceFile = path.join(reportsRoot, "delivery-evidence.json");
+    const requestFile = path.join(reportsRoot, "delivery-step-quality-request.json");
+    fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    fs.writeFileSync(requestFile, "{}\n", "utf8");
+
+    const builtAssessment = writeStepQualityAssessmentReport({
+      runId: "controller-product-delivery-missing-dimension-refs",
+      profile: {
+        profile_id: "live-e2e.test.product-delivery-missing-dimension-refs",
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+      },
+      artifacts: {
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+        feature_size: "xlarge",
+        mission_class: "product-change",
+      },
+      entry: {
+        step_id: "delivery",
+        step_instance_id: "delivery#1",
+        step_name: "delivery",
+        sequence: 15,
+        iteration: 1,
+        agent_decision_request_ref: requestFile,
+        operator_decision_ref: evidenceFile,
+        inspected_evidence_refs: [evidenceFile],
+        decision: { action: "continue" },
+      },
+      outputDir: reportsRoot,
+      assessmentRequestFile: requestFile,
+      assessmentMethod: "manual-skill-agent",
+    });
+
+    const report = JSON.parse(fs.readFileSync(builtAssessment.reportFile, "utf8"));
+    report.dimensions.traceability.inspected_evidence_refs = [];
+
+    const validation = validateContractDocument({
+      family: "live-e2e-step-quality-assessment-report",
+      document: report,
+      source: builtAssessment.reportFile,
+    });
+    assert.equal(validation.ok, false);
+    assert.match(
+      validation.issues.map((entry) => entry.message).join("\n"),
+      /Accepted product-change step quality dimensions require inspected evidence refs/u,
+    );
   });
 });
 

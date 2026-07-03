@@ -19,6 +19,50 @@ repos:
     lint_commands:
       - ./scripts/lint.sh
 repo_graph: []
+verification:
+  command_groups:
+    - id: baseline-build
+      role: build
+      phase: baseline
+      enforcement: required
+      timeout_class: build
+      commands:
+        - ./scripts/build.sh
+    - id: baseline-lint
+      role: lint
+      phase: baseline
+      enforcement: required
+      timeout_class: quick
+      commands:
+        - ./scripts/lint.sh
+    - id: baseline-test
+      role: test
+      phase: baseline
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - ./scripts/test.sh
+    - id: post-change-build
+      role: build
+      phase: post-change
+      enforcement: required
+      timeout_class: build
+      commands:
+        - ./scripts/build.sh
+    - id: post-change-lint
+      role: lint
+      phase: post-change
+      enforcement: required
+      timeout_class: quick
+      commands:
+        - ./scripts/lint.sh
+    - id: post-change-test
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - ./scripts/test.sh
 allowed_providers:
   - openai
   - anthropic

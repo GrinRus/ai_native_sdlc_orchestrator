@@ -352,7 +352,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W52 in
+The current roadmap source of truth extends through W54 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -464,7 +464,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W52` and focuses on:
+The current alpha distribution is tracked through `W54` and focuses on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -480,6 +480,11 @@ The current alpha distribution is tracked through `W52` and focuses on:
 - Remaining maintainer hard-target closure for Vitest and SQLAlchemy, with
   strict product acceptance limited to terminal run-health pass plus final
   all-pass quality gates.
+- Generic project verification command groups for setup, build, lint, test,
+  typecheck, e2e, and full-suite checks without leaking internal proof harness
+  semantics into AOR core artifacts.
+- Verification-plan authoring, stack discovery, profile generation, and
+  operator-visible command-group status for arbitrary project shapes.
 - Maintainer-facing product-quality cycles with QA-origin public repair and
   hard-target toolchain policy.
 - Repair anti-loop evidence and QA-specific product-quality gates before

@@ -1234,8 +1234,31 @@ test("generated Vitest large profile isolates verification and checks hard-targe
 test("SQLAlchemy large profile uses a short physical target checkout root", () => {
   const profileRef = "scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml";
   const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+  const catalogRoot = resolveCatalogRoot({ hostRoot: repoRoot, catalogRootOverride: null });
+  const target = loadCatalogTarget({ catalogRoot, targetCatalogId: "sqlalchemy" });
+  const mission = target.entry.feature_missions.find(
+    (entry) => entry.mission_id === "sqlalchemy-query-typing-regression",
+  );
 
   assert.equal(loadedProfile.profile.live_e2e.target_checkout_root_mode, "short-physical");
+  assert.ok(mission);
+  assert.deepEqual(mission.post_run_quality.primary_commands, [
+    ".aor/live-e2e-venv/bin/python -m pytest test/sql test/orm",
+  ]);
+  assert.deepEqual(mission.post_run_quality.diagnostic_commands, [
+    ".aor/live-e2e-venv/bin/python -m pytest test",
+  ]);
+  assert.equal(mission.post_run_quality.diagnostic_failure_mode, "warn");
+  assert.ok(
+    mission.acceptance_checks.some((entry) =>
+      entry.includes("full-suite diagnostic pytest must pass before product acceptance"),
+    ),
+  );
+  assert.ok(
+    mission.evaluator_rubric.evidence_expectations.some((entry) =>
+      entry.includes("Diagnostic acceptance command") && entry.includes("warning evidence is not accepted closure"),
+    ),
+  );
 });
 
 test("target pre-execution status separates target setup, target verification, and AOR failures", () => {
@@ -1396,6 +1419,62 @@ test("baseline diagnostic verification recognizes target Node wrapped commands a
     assert.equal(report.target_verification_status.status, "warn");
     assert.equal(report.target_verification_status.failure_owner, null);
     assert.equal(report.target_verification_status.warning_reason.includes("pnpm test"), true);
+  });
+});
+
+test("baseline blocking verification keeps target Node wrapped command failures as blockers", () => {
+  withTempRoot((tempRoot) => {
+    const routedDryRunFile = writeJsonFixture(path.join(tempRoot, "routed-dry-run.json"), {
+      status: "passed",
+    });
+    const verificationStepFile = writeJsonFixture(path.join(tempRoot, "wrapped-verify-step.json"), {
+      status: "failed",
+      command:
+        '[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test',
+      summary:
+        'Verification command \'[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test\' failed with exit code 1.',
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "wrapped-verify-transcript.json"))],
+      command_timeout_ms: 1800000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+
+    const gate = evaluateBaselineVerifyGate({
+      verifySummary: { status: "failed", command_timeout_ms: 1800000, validation_gate_status: "pass" },
+      verifyPayload: {
+        verify_summary_file: path.join(tempRoot, "verify-summary.json"),
+        routed_step_result_file: routedDryRunFile,
+      },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["pnpm install --frozen-lockfile", "pnpm build"],
+      verificationCommands: ["pnpm test", "pnpm lint"],
+      mode: "blocking",
+    });
+
+    assert.equal(gate.status, "fail");
+    assert.equal(gate.decision, "block");
+    assert.equal(gate.failure_owner, "target_repository");
+    assert.equal(gate.failure_phase, "target_verification");
+    assert.equal(gate.failure_class, "target_verification_blocked");
+
+    const report = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 1800000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["pnpm install --frozen-lockfile", "pnpm build"],
+      verificationCommands: ["pnpm test", "pnpm lint"],
+      baselineGateDecision: gate,
+      runResult: { durationSec: 33, timeoutMs: 9060000, transcriptFile: path.join(tempRoot, "project-verify.json") },
+    });
+
+    assert.equal(report.status, "blocked");
+    assert.equal(report.failure_owner, "target_repository");
+    assert.equal(report.failure_phase, "target_verification");
+    assert.equal(report.failure_class, "target_verification_blocked");
+    assert.equal(report.target_verification_status.status, "blocked");
+    assert.equal(report.target_verification_status.failure_owner, "target_repository");
+    assert.equal(report.target_verification_status.failure_phase, "target_verification");
+    assert.equal(report.target_verification_status.failure_class, "target_verification_blocked");
   });
 });
 
@@ -2093,17 +2172,20 @@ test("live E2E generated project profile wiring preserves provider variants in e
   assert.match(flowsSource, /--policy-overrides/u);
 });
 
-test("live E2E post-run verification reruns target setup commands inside isolated clones", () => {
+test("live E2E post-run verification selects generic project-profile command groups", () => {
   const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   assert.match(
     flowsSource,
-    /buildVerifyOverrideArgs\(\{\s+label: "post-run-primary",\s+commands: postRunQualityPolicy\.primaryCommands,\s+setupCommands: repoLintCommands,\s+profile: options\.profile,/u,
+    /runCommand\("project-verify-post-run-primary", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--verification-label",\s+"post-run-primary"/u,
   );
   assert.match(
     flowsSource,
-    /buildVerifyOverrideArgs\(\{\s+label: "post-run-diagnostic",\s+commands: postRunQualityPolicy\.diagnosticCommands,\s+setupCommands: repoLintCommands,\s+profile: options\.profile,/u,
+    /runCommand\("project-verify-post-run-diagnostic", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--verification-label",\s+"post-run-diagnostic"/u,
   );
-  assert.match(flowsSource, /applyTargetToolchainPolicyToOverrideCommands/u);
+  assert.match(flowsSource, /diagnosticIntent: POST_RUN_DIAGNOSTIC_INTENT/u);
+  assert.doesNotMatch(flowsSource, /label\.includes\(["']diagnostic["']\)/u);
+  assert.doesNotMatch(flowsSource, /buildVerifyOverrideArgs/u);
+  assert.doesNotMatch(flowsSource, /applyTargetToolchainPolicyToOverrideCommands/u);
 });
 
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
@@ -2206,6 +2288,57 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
       ].map((name) => [name, path.join(reportsRoot, name)]),
     );
     for (const file of Object.values(files)) writeJsonFixture(file);
+    writeJsonFixture(files["delivery-manifest.json"], {
+      delivery_mode: "patch-only",
+      writeback_policy: {
+        allow_remote_push: false,
+      },
+      repo_deliveries: [
+        {
+          repo_id: "sindresorhus/ky",
+          role: "target",
+          changed_paths: ["source/core/Ky.ts", "test/retry.ts"],
+          writeback_result: "patch-materialized",
+          commit_refs: [],
+          patch_file: path.join(reportsRoot, "delivery.patch"),
+        },
+      ],
+    });
+    writeJsonFixture(files["learning-scorecard.json"], {
+      status: "pass",
+      evidence_refs: ["evidence://learning/scorecard"],
+      linked_backlog_refs: ["backlog://W52-S10"],
+      linked_eval_suite_refs: ["suite.live-e2e.w52"],
+      coverage_follow_up: {
+        current_cell_required: true,
+        next_required_matrix_cell: {
+          cell_id: "ky.regress.medium.openai",
+        },
+        remaining_required_matrix_cells: [
+          {
+            cell_id: "ky.regress.medium.openai",
+          },
+        ],
+      },
+    });
+    writeJsonFixture(files["learning-handoff.json"], {
+      run_status: "pass",
+      backlog_refs: ["backlog://W52-S10"],
+      quality_refs: ["quality://live-e2e/w52"],
+      evidence_refs: ["evidence://learning/handoff"],
+      next_actions: ["Keep W52 evidence matrix attached to the proof findings."],
+      coverage_follow_up: {
+        current_cell_required: true,
+        next_required_matrix_cell: {
+          cell_id: "ky.regress.medium.openai",
+        },
+        remaining_required_matrix_cells: [
+          {
+            cell_id: "ky.regress.medium.openai",
+          },
+        ],
+      },
+    });
     writeJsonFixture(files["browser-task-proof-request.json"], {
       expected_browser_task_proof_file: path.join(
         reportsRoot,
@@ -2483,6 +2616,20 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(hydrated.runHealthReport.guided_ui_evidence.status, "pass");
     assert.equal(hydrated.runHealthReport.guided_ui_evidence.guided_browser_task_proof_file, browserTaskProofFile);
     assert.equal(hydrated.runHealthReport.overall_status, "pass");
+    assert.equal(hydrated.summary.delivery_manifest_summary.delivery_mode, "patch-only");
+    assert.equal(hydrated.summary.delivery_manifest_summary.patch_only, true);
+    assert.equal(hydrated.summary.delivery_manifest_summary.write_back_to_remote, false);
+    assert.equal(hydrated.summary.delivery_manifest_summary.changed_path_count, 2);
+    assert.deepEqual(hydrated.summary.delivery_manifest_summary.writeback_results, ["patch-materialized"]);
+    assert.equal(hydrated.summary.delivery_manifest_summary.repo_deliveries[0].changed_path_count, 2);
+    assert.equal(hydrated.summary.delivery_manifest_summary.no_upstream_write_evidence.status, "pass");
+    assert.equal(hydrated.summary.learning_handoff_summary.scorecard_status, "pass");
+    assert.equal(hydrated.summary.learning_handoff_summary.handoff_run_status, "pass");
+    assert.deepEqual(hydrated.summary.learning_handoff_summary.backlog_refs, ["backlog://W52-S10"]);
+    assert.equal(hydrated.summary.learning_handoff_summary.next_actions.length, 1);
+    assert.equal(hydrated.summary.learning_handoff_summary.remaining_required_matrix_cell_count, 1);
+    assert.equal(hydratedObservation.final_analysis.delivery.changed_path_count, 2);
+    assert.deepEqual(hydratedObservation.final_analysis.learning.backlog_refs, ["backlog://W52-S10"]);
 
     const diagnosticStepResultFile = path.join(reportsRoot, "guided-post-run-diagnostic-step-result.json");
     const diagnosticSummaryFile = path.join(reportsRoot, "guided-post-run-diagnostic-summary.json");
@@ -2521,6 +2668,22 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(
       hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_commands[0].step_result_ref,
       diagnosticTranscriptFile,
+    );
+    assert.equal(
+      hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_commands[0].failure_owner,
+      "target_repository",
+    );
+    assert.equal(
+      hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_commands[0].diagnostic_intent,
+      "post-run-diagnostic",
+    );
+    assert.equal(
+      hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_commands[0].failure_phase,
+      "target_verification",
+    );
+    assert.equal(
+      hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.timed_out_commands[0].failure_class,
+      "post_run_diagnostic_timeout",
     );
     assert.equal(
       hydratedWithDiagnosticWarn.runHealthReport.diagnostic_health.evidence_refs.includes(diagnosticTranscriptFile),
@@ -4486,6 +4649,197 @@ test("proof runner classifies provider context-window overflow as provider run-h
   });
 });
 
+test("proof runner keeps malformed Codex schema failures under provider execution", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "execution-plan.json",
+        "execution-step-result.json",
+        "execution-inspection.json",
+        "execution-classification.json",
+        "execution-agent-request.json",
+        "execution-decision.json",
+        "adapter-request.json",
+        "provider-work-packet.json",
+        "adapter-raw-evidence.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const rawProviderErrorSummary =
+      "Malformed Codex/OpenAI tool-call schema failure: property_name_above_max_length in input[3].arguments";
+    const providerRecommendedAction =
+      "Malformed Codex/OpenAI tool-call schema failure; inspect raw provider JSONL/stdout/stderr and retry with the clean Codex tool surface.";
+    const runId = "malformed-codex-schema-provider-run-health";
+    const stepJournalEntry = {
+      sequence: 1,
+      step_id: "execution",
+      step_instance_id: "execution",
+      iteration: 1,
+      flow_stage: "execution",
+      plan: {
+        objective: "Observe routed live execution.",
+        public_surface: "aor run start",
+        command_labels: ["run-start"],
+        expected_artifacts: ["routed_step_result_file"],
+        inspection_sources: ["adapter_raw_evidence"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["execution-plan.json"],
+      public_surface: "aor run start",
+      execution_ref: files["execution-step-result.json"],
+      inspection_ref: files["execution-inspection.json"],
+      classification_ref: files["execution-classification.json"],
+      artifact_refs: [files["adapter-request.json"], files["provider-work-packet.json"], files["adapter-raw-evidence.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "fail",
+        exit_code: 1,
+        failure_class: "external-runner-failed",
+        missing_evidence: [],
+        recommendation: "block",
+      },
+      semantic_analysis: {
+        status: "fail",
+        judge_source: "skill-agent",
+        findings: [rawProviderErrorSummary],
+      },
+      agent_decision_request_ref: files["execution-agent-request.json"],
+      operator_decision_ref: files["execution-decision.json"],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files["adapter-raw-evidence.json"]],
+      requested_interaction: null,
+      decision: {
+        action: "block",
+        reason: "Provider emitted malformed Codex/OpenAI tool-call schema evidence.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "fail",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.malformed-codex-schema-provider",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        stages: ["bootstrap", "execution"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "failed",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["adapter-raw-evidence.json"]],
+            summary: rawProviderErrorSummary,
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [stepJournalEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          failure_owner: "provider",
+          failure_phase: "provider_execution",
+          failure_class: "external-runner-failed",
+          provider_execution_status: "failed",
+          provider_step_status: {
+            provider: "openai",
+            adapter: "codex-cli",
+            status: "failed",
+            recommended_action: providerRecommendedAction,
+          },
+          adapter_raw_evidence_ref: files["adapter-raw-evidence.json"],
+          request_artifact_ref: files["adapter-request.json"],
+          provider_work_packet_ref: files["provider-work-packet.json"],
+          context_budget_status: "pass",
+          context_budget_failure_class: null,
+          raw_provider_error_summary: rawProviderErrorSummary,
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "fail");
+    assert.equal(written.runHealthReport.overall_status, "fail");
+    assert.equal(written.runHealthReport.target_readiness.status, "pass");
+    assert.equal(written.runHealthReport.target_readiness.failure_owner, null);
+    assert.equal(written.runHealthReport.target_environment_health.failure_owner, null);
+    assert.equal(written.runHealthReport.provider_health.status, "fail");
+    assert.match(written.runHealthReport.provider_health.raw_provider_error_summary, /property_name_above_max_length/i);
+    assert.match(
+      written.runHealthReport.provider_health.provider_step_status.recommended_action,
+      /Malformed Codex\/OpenAI tool-call schema failure/i,
+    );
+    assert.equal(written.runHealthReport.failure_summary.owner, "provider");
+    assert.equal(written.runHealthReport.failure_summary.phase, "provider_execution");
+    assert.equal(written.runHealthReport.failure_summary.class, "external-runner-failed");
+    assert.equal(written.summary.failure_owner, "provider");
+    assert.equal(written.observationReport.failure_phase, "provider_execution");
+    assert.equal(written.scorecard.failure_class, "external-runner-failed");
+  });
+});
+
 test("proof runner propagates provider work-packet non-execution into run-health", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
@@ -4781,7 +5135,7 @@ test("proof runner writes run-health reports for failed live E2E reports", () =>
         ],
         commandResults: [
           {
-            label: "discovery-run",
+            label: "discovery-diagnostic-not-diagnostic",
             command_surface: "aor discovery run",
             status: "fail",
             exit_code: 1,
@@ -4832,6 +5186,8 @@ test("proof runner writes run-health reports for failed live E2E reports", () =>
     assert.equal(written.runHealthReport.failure_summary.phase, "unknown");
     assert.equal(written.runHealthReport.failure_summary.class, "public_command_failed");
     assert.equal(written.runHealthReport.command_health.failed_command_count, 1);
+    assert.equal(written.runHealthReport.command_health.failed_commands[0].diagnostic_intent, null);
+    assert.equal(written.runHealthReport.diagnostic_health.status, "pass");
     assert.equal(written.summary.quality_judgement, undefined);
   });
 });
@@ -5304,6 +5660,15 @@ test("proof runner raises target verification readiness blockers to top-level ar
 
     assert.equal(written.runHealthReport.target_readiness.status, "blocked");
     assert.equal(written.runHealthReport.target_readiness.product_execution_started, false);
+    assert.equal(written.runHealthReport.target_readiness.failure_owner, "target_repository");
+    assert.equal(written.runHealthReport.target_readiness.failure_phase, "target_verification");
+    assert.equal(written.runHealthReport.target_readiness.failure_class, "target_verification_blocked");
+    assert.equal(written.summary.target_readiness.failure_owner, "target_repository");
+    assert.equal(written.summary.target_readiness.failure_phase, "target_verification");
+    assert.equal(written.summary.target_readiness.failure_class, "target_verification_blocked");
+    assert.equal(written.observationReport.target_readiness.failure_owner, "target_repository");
+    assert.equal(written.observationReport.target_readiness.failure_phase, "target_verification");
+    assert.equal(written.observationReport.target_readiness.failure_class, "target_verification_blocked");
     for (const artifact of [written.summary, written.observationReport, written.scorecard]) {
       assert.equal(artifact.failure_owner, "target_repository");
       assert.equal(artifact.failure_phase, "target_verification");
@@ -5872,6 +6237,22 @@ test("proof runner run-health uses hydrated delivery, verification, and diagnost
     assert.equal(written.runHealthReport.diagnostic_health.status, "warn");
     assert.equal(written.runHealthReport.diagnostic_health.timed_out_command_count, 1);
     assert.equal(written.runHealthReport.diagnostic_health.failed_command_count, 1);
+    assert.equal(
+      written.runHealthReport.diagnostic_health.timed_out_commands[0].failure_owner,
+      "target_repository",
+    );
+    assert.equal(
+      written.runHealthReport.diagnostic_health.timed_out_commands[0].diagnostic_intent,
+      "post-run-diagnostic",
+    );
+    assert.equal(
+      written.runHealthReport.diagnostic_health.timed_out_commands[0].failure_phase,
+      "target_verification",
+    );
+    assert.equal(
+      written.runHealthReport.diagnostic_health.timed_out_commands[0].failure_class,
+      "post_run_diagnostic_timeout",
+    );
     assert.equal(written.runHealthReport.failure_summary.class, "post_run_diagnostic_warning");
     assert.equal(written.runHealthReport.provider_health.provider_execution_status, "completed");
     assert.equal(written.runHealthReport.provider_health.top_context_size_sources[0].source, "provider_work_packet.context");

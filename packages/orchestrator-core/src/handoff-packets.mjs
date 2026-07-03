@@ -176,6 +176,35 @@ function deriveVerificationExpectations(requestDocument) {
 }
 
 /**
+ * @param {{ primary_commands: string[], diagnostic_commands: string[], diagnostic_failure_mode: string | null }} expectations
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildVerificationCommandGroups(expectations) {
+  const groups = [];
+  if (expectations.primary_commands.length > 0) {
+    groups.push({
+      id: "post-change-primary",
+      role: "test",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: expectations.primary_commands,
+    });
+  }
+  if (expectations.diagnostic_commands.length > 0) {
+    groups.push({
+      id: "diagnostic-full-suite",
+      role: "full-suite",
+      phase: "diagnostic",
+      enforcement: expectations.diagnostic_failure_mode === "fail" ? "required" : "warn",
+      timeout_class: "full-suite",
+      commands: expectations.diagnostic_commands,
+    });
+  }
+  return groups;
+}
+
+/**
  * @param {unknown} value
  * @returns {Array<Record<string, string>>}
  */
@@ -231,6 +260,7 @@ function derivePlanningContent(options) {
     ...options.verificationExpectations,
     primary_commands: verificationCommands,
   };
+  const verificationCommandGroups = buildVerificationCommandGroups(verificationExpectations);
   const localTasks = [
     {
       task_id: "local-task.implementation",
@@ -262,6 +292,9 @@ function derivePlanningContent(options) {
     expected_evidence: expectedEvidence,
     kpis,
     verification_expectations: verificationExpectations,
+    verification_plan: {
+      command_groups: verificationCommandGroups,
+    },
     local_tasks: localTasks,
   };
 }
@@ -441,6 +474,7 @@ export function prepareHandoffArtifacts(options = {}) {
     acceptance_criteria: planningContent.acceptance_criteria,
     expected_evidence: planningContent.expected_evidence,
     verification_expectations: planningContent.verification_expectations,
+    verification_plan: planningContent.verification_plan,
     kpis: planningContent.kpis,
     approved_input_ref: `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`,
     source_refs: {
@@ -488,6 +522,7 @@ export function prepareHandoffArtifacts(options = {}) {
     verification_expectations: planningContent.verification_expectations,
     verification_plan: {
       validators: ["contract-shape", "approval-state", "repo-scope"],
+      command_groups: planningContent.verification_plan.command_groups,
       commands:
         planningContent.verification_expectations.primary_commands.length > 0
           ? planningContent.verification_expectations.primary_commands

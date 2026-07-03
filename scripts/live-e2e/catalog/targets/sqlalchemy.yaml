@@ -50,6 +50,7 @@ feature_missions:
     acceptance_checks:
       - keep the change inside SQLAlchemy runtime, typing, tests, or docs required by the behavior
       - preserve targeted SQL/ORM pytest evidence
+      - full-suite diagnostic pytest must pass before product acceptance; warning diagnostics remain not-product-accepted
       - avoid broad dialect churn unless the behavior explicitly requires it
       - avoid any upstream write-back
     change_evidence:
@@ -112,6 +113,7 @@ feature_missions:
         - Meaningful changed path under lib/sqlalchemy/
         - Meaningful changed path under test/
         - "Primary verification command: .aor/live-e2e-venv/bin/python -m pytest test/sql test/orm"
+        - "Diagnostic acceptance command: .aor/live-e2e-venv/bin/python -m pytest test must pass before product acceptance; warning evidence is not accepted closure"
     final_code_rubric:
       quality_gate: all-pass-product-quality
       required_changed_surfaces:

@@ -416,6 +416,14 @@ request and linked operator decision. Re-run `manual-live-e2e.mjs` with the same
 run id after the report is written; the controller consumes the accepted report
 and clears `pending_step_quality_assessment`.
 
+Manual reports are still review-grade step observations, not product acceptance.
+For accepted medium, large, or xlarge product-change reports, every required
+dimension must include step-specific rationale, findings, and inspected public
+refs; generic pass text or empty per-dimension refs fail contract validation.
+Automatic `step-evaluator` reports use the same report contract for medium/large
+runs, while final product acceptance remains a separate terminal run-health pass
+plus `quality-assessment gate --policy all-pass`.
+
 If the controller reports `operator_decision_status=rejected`, read the
 `operator_decision_rejection_reason` from the latest step observation and run the
 same `--prepare-decision` command again with the corrected action, semantic
@@ -522,7 +530,7 @@ Full-journey layer:
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - repeats public `run start` / `review run` iterations with iteration-specific run ids when review or primary verification requests repair, and records each repeated step as `execution#N` and `review#N` in the step journal.
-- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command unless the profile sets `live_e2e.target_command_timeout_sec`; Ky bounded full-journey profiles use mission-scoped primary verification commands so Playwright/browser setup and the full browser matrix cannot block before operator-visible decisions. Ky governance large profiles keep the 1800 second command budget for Playwright-backed diagnostic full-suite evidence, while narrower Ky profiles can use shorter explicit budgets. Ky diagnostic full-suite policy installs Playwright browsers immediately before `npm test`, preserving full-suite evidence without reintroducing browser setup into the primary gate. Timeout failures are preserved as failed step-result evidence with target setup/verification owner and phase fields.
+- bounds each target `project verify` command with the generic AOR command-group timeout policy and uses a hard local timeout signal for target commands. Generated live E2E project profiles set `runtime_defaults.verification_command_timeout_sec` only when the profile explicitly declares `live_e2e.target_command_timeout_sec`, `verification.command_timeout_sec`, or a template runtime default; otherwise AOR uses the command group's `timeout_class` default. Ky bounded full-journey profiles use mission-scoped primary verification command groups so Playwright/browser setup and the full browser matrix cannot block before operator-visible decisions. Ky diagnostic full-suite policy installs Playwright browsers immediately before `npm test`, preserving full-suite evidence without reintroducing browser setup into the primary gate. Timeout failures are preserved as failed step-result evidence with target setup/verification owner and phase fields.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - defaults medium+ product-change generated project profiles to an isolated
   target verification workspace (`workspace-clone`) unless the profile
@@ -561,6 +569,13 @@ profiles therefore override catalog setup with only
 `npm install --prefer-offline --no-audit --no-fund`; Playwright browser
 installation remains diagnostic evidence from the mission policy instead of a
 pre-execution readiness blocker.
+When a warning-mode diagnostic times out or hangs after writing terminal output,
+the transcript remains evidence and run-health records
+`diagnostic_intent=post-run-diagnostic`,
+`failure_owner=target_repository`, `failure_phase=target_verification`, and
+`failure_class=post_run_diagnostic_timeout` on the diagnostic command entry.
+Diagnostic classification is based on this explicit intent metadata, not on
+command labels containing the word `diagnostic`.
 
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 

@@ -83,6 +83,7 @@ const LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS = [
   "accessible_error_feedback",
 ];
 const LIVE_E2E_DIAGNOSTIC_FAILURE_MODE_VALUES = ["warn", "fail"];
+const LIVE_E2E_DIAGNOSTIC_INTENT_VALUES = ["post-run-diagnostic"];
 const LIVE_E2E_AOR_OPERATOR_UI_QUALITY_SUBDIMENSION_KEYS = {
   aor_operator_ui_ux_quality: LIVE_E2E_AOR_OPERATOR_UI_SUBDIMENSION_KEYS,
   aor_operator_accessibility_quality: LIVE_E2E_AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSION_KEYS,
@@ -4322,6 +4323,102 @@ function validateLiveE2EDiagnosticHealth(value, source, issues) {
     source,
     field: "diagnostic_health.evidence_refs",
     issues,
+  });
+  validateDiagnosticCommandEntries({
+    values: diagnosticHealth.timed_out_commands,
+    source,
+    field: "diagnostic_health.timed_out_commands",
+    issues,
+    requireTimedOut: true,
+  });
+  validateDiagnosticCommandEntries({
+    values: diagnosticHealth.failed_commands,
+    source,
+    field: "diagnostic_health.failed_commands",
+    issues,
+    requireTimedOut: false,
+  });
+}
+
+/**
+ * @param {{ values: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[], requireTimedOut: boolean }} options
+ */
+function validateDiagnosticCommandEntries(options) {
+  if (!Array.isArray(options.values)) return;
+  options.values.forEach((value, index) => {
+    const field = `${options.field}[${index}]`;
+    if (!isPlainObject(value)) {
+      options.issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source: options.source,
+          field,
+          expected: "object",
+          actual: describeActualType(value),
+          message: `Field '${field}' must be an object.`,
+        }),
+      );
+      return;
+    }
+
+    for (const entryField of ["status", "failure_class"]) {
+      validateNestedStringField({
+        record: value,
+        source: options.source,
+        field: `${field}.${entryField}`,
+        issues: options.issues,
+        required: true,
+      });
+    }
+    validateEnumString(
+      value.failure_owner,
+      options.source,
+      `${field}.failure_owner`,
+      LIVE_E2E_RUN_FAILURE_OWNER_VALUES,
+      options.issues,
+    );
+    validateEnumString(
+      value.failure_phase,
+      options.source,
+      `${field}.failure_phase`,
+      LIVE_E2E_RUN_FAILURE_PHASE_VALUES,
+      options.issues,
+    );
+    validateEnumString(
+      value.diagnostic_intent,
+      options.source,
+      `${field}.diagnostic_intent`,
+      LIVE_E2E_DIAGNOSTIC_INTENT_VALUES,
+      options.issues,
+    );
+    validateNestedBooleanField({
+      record: value,
+      source: options.source,
+      field: `${field}.timed_out`,
+      issues: options.issues,
+      required: true,
+    });
+    if (options.requireTimedOut && value.timed_out !== true) {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `${field}.timed_out`,
+          expected: "true",
+          actual: String(value.timed_out),
+          message: `Field '${field}.timed_out' must be true for diagnostic_health.timed_out_commands entries.`,
+        }),
+      );
+    }
+    for (const nullableField of ["repo_scope", "command", "step_result_ref", "summary"]) {
+      validateNestedNullableStringField({
+        record: value,
+        source: options.source,
+        field: `${field}.${nullableField}`,
+        issues: options.issues,
+        required: true,
+      });
+    }
   });
 }
 

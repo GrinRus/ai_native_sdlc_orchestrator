@@ -1,8 +1,8 @@
 # Live E2E Proof-Complete Findings
 
-Status date: 2026-06-26
+Status date: 2026-07-02
 
-This note records W47-W50 control proof evidence for black-box product live E2E. Runtime artifacts stay under `.aor/` or `/tmp/aor-*` and are intentionally not committed.
+This note records W47-W52 control proof evidence for black-box product live E2E. Runtime artifacts stay under `.aor/` or `/tmp/aor-*` and are intentionally not committed.
 
 ## Scope
 
@@ -182,6 +182,276 @@ Artifact hygiene:
 
 - Runtime artifacts remain under `.aor/` or `/tmp/aor-*` and are not committed.
 - Blocked or warning proof runs are never labeled product acceptance.
+
+## W52 Hard-Target Rerun And Findings Sync
+
+W52-S05 records the combined Vitest and SQLAlchemy hard-target outcomes from
+source SHA `32382e857d4651a152fe57cf25ff76eac46d85d1`. Neither run is
+product-accepted: both have factual terminal evidence, but neither reached
+terminal run-health `pass` plus final `quality-assessment gate --policy
+all-pass`.
+
+| Proof | Profile | Run id | Source SHA | Terminal status | Owner | Phase | Class | Final gate | Acceptance |
+|---|---|---|---|---|---|---|---|---|---|
+| `vitest-large` | `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml` | `w52-s03-vitest-large-20260702-32382e857d46-blocking` | `32382e857d4651a152fe57cf25ff76eac46d85d1` | run-health `blocked`; product execution not started | `target_repository` | `target_verification` | `target_verification_blocked` | not run; terminal run-health was not `pass` | not-product-accepted |
+| `sqlalchemy-large` | `scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml` | `w52-s04-sqlalchemy-large-20260702-32382e857d46` | `32382e857d4651a152fe57cf25ff76eac46d85d1` | run summary `not_pass`; run-health `blocked` after accepted QA block decision | `target_repository` | `target_verification` | `post_run_diagnostic_timeout` | not run; full-suite diagnostic timed out | not-product-accepted |
+
+Findings:
+
+- Vitest large no longer depends on the old incompatible-host-Node blocker. The
+  rerun used `AOR_LIVE_E2E_TARGET_NODE_BIN` with Node `22.22.3`, passed target
+  toolchain/setup, and blocked on clean baseline `pnpm test` target
+  verification before product execution.
+- SQLAlchemy large reached product execution and passed post-run primary
+  verification, but required full-suite `.aor/live-e2e-venv/bin/python -m
+  pytest test` timed out after `1800000ms` under diagnostic warning mode.
+- The SQLAlchemy accepted QA block decision explicitly records
+  `not_pass`/`not-product-accepted` instead of continuing to delivery or final
+  acceptance gates.
+- Final W52 hardening is reporting-only: `W52-S08` deepens manual step-quality
+  assessment, `W52-S09` removes diagnostic substring classification, and
+  `W52-S10` publishes the final evidence matrix plus compact delivery/learning
+  summaries.
+
+## W52 Final Evidence Matrix
+
+W52-S10 closes the proof-reporting gap. Reviewers can distinguish accepted
+product evidence, paired UI evidence, manual observation evidence, hard-target
+blockers, and explicit non-acceptance without treating warning or blocked
+evidence as product acceptance.
+
+| Evidence lane | Run/profile/evidence | Evidence state | Terminal run-health | Final all-pass gate | Delivery safety | Learning handoff | Acceptance meaning |
+|---|---|---|---|---|---|---|---|
+| product acceptance | `w51-clean-httpx-medium-20260626-265b20961af5` / `full-journey-regress-httpx-medium-openai.yaml` | `product-accepted` | `pass` | `pass` | patch-only/no-upstream-write evidence in run summary and delivery manifest | scorecard/handoff refs in run summary | accepted product evidence |
+| product acceptance | `w51-clean-fastify-repair-medium-20260626-265b20961af5` / `full-journey-repair-fastify-medium-openai.yaml` | `product-accepted` | `pass` | `pass` | patch-only/no-upstream-write evidence in run summary and delivery manifest | scorecard/handoff refs in run summary | accepted product evidence |
+| guided AOR UI proof | `w51-clean-guided-aor-ui-20260626-265b20961af5` / `installed-user-guided-journey.yaml` | `manual-observation-pass` | `warn`; target diagnostic warning only | not a product gate | not used as product delivery acceptance | learning refs are proof context only | paired UI/accessibility proof, not product acceptance |
+| xlarge manual observation | W52-S07 manual step-quality helper/controller fixtures | `manual-observation-pass` | fixture-level contract pass | not run | not applicable | linked request/report refs only | xlarge observation evidence, not product acceptance |
+| Vitest hard target | `w52-s03-vitest-large-20260702-32382e857d46-blocking` / `full-journey-regress-vitest-large-openai.yaml` | `blocked` | `blocked` | not run | not reached | not reached | classified target baseline blocker, not product-accepted |
+| SQLAlchemy hard target | `w52-s04-sqlalchemy-large-20260702-32382e857d46` / `full-journey-regress-sqlalchemy-large-openai.yaml` | `not-product-accepted` | `blocked` after QA block decision | not run | not reached | not reached | post-run full-suite diagnostic timeout, not product-accepted |
+
+S10 reporting surface:
+
+- Run summaries now include `delivery_manifest_summary` hydrated from
+  `repo_deliveries[]`: delivery mode, patch-only status, write-back-to-remote
+  status, per-repo changed path counts, aggregate changed path totals,
+  writeback results, commit refs, and no-upstream-write evidence.
+- Observation `final_analysis.delivery` carries the same compact delivery
+  summary so terminal reports remain readable without custom `jq` inspection.
+- Run summaries now include `learning_handoff_summary` hydrated from the public
+  scorecard and handoff: scorecard/handoff status, evidence refs, backlog refs,
+  quality refs, next actions, coverage follow-up, next required matrix cell,
+  and remaining required matrix cell count.
+- Observation `final_analysis.learning` carries the same compact learning
+  summary.
+- Done evidence is the `proof runner hydrates guided UI refs and blocks missing
+  browser-task proof` fixture in
+  `scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`, which asserts
+  patch-only/no-upstream-write delivery safety, changed path totals, learning
+  backlog refs, next actions, and remaining matrix-cell counts.
+
+## W52 Target-Readiness Classification Closure
+
+W52-S01 closes W52-F01 as source/runtime fixture evidence. When a Vitest-style
+target verification blocker stops a run before provider/product execution,
+`target_readiness.product_execution_started=false` and both nested readiness
+evidence plus top-level run artifacts report:
+
+| Surface | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|
+| `target_readiness` | `target_repository` | `target_verification` | `target_verification_blocked` | classified blocker, not product-accepted |
+| run summary | `target_repository` | `target_verification` | `target_verification_blocked` | classified blocker, not product-accepted |
+| observation report | `target_repository` | `target_verification` | `target_verification_blocked` | classified blocker, not product-accepted |
+| scorecard | `target_repository` | `target_verification` | `target_verification_blocked` | classified blocker, not product-accepted |
+| run-health failure summary | `target_repository` | `target_verification` | `target_verification_blocked` | classified blocker, not product-accepted |
+
+Done evidence is the `proof runner raises target verification readiness
+blockers to top-level artifacts` fixture in
+`scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`. The fixture also
+preserves passing readiness and post-execution behavior in the surrounding
+run-health coverage. This closure does not rerun Vitest or SQLAlchemy and does
+not relax the final all-pass product acceptance policy.
+
+## W52 Diagnostic Timeout Closure
+
+W52-S02 closes W52-F02 as source/runtime fixture evidence. Warning-mode
+diagnostic commands are bounded cleanup evidence only: terminal stdout/stderr
+are preserved in the transcript, run-health becomes `warn`, and product
+acceptance remains unavailable until terminal run-health and final all-pass
+quality gates both pass.
+
+| Surface | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|
+| timed-out diagnostic command | `target_repository` | `target_verification` | `post_run_diagnostic_timeout` | diagnostic warning, not product-accepted |
+| run-health failure summary | `target_repository` | `target_verification` | `post_run_diagnostic_warning` | diagnostic warning, not product-accepted |
+
+Done evidence is the `verifyProjectRuntime preserves output from commands that
+write then hang` verifier regression plus the live E2E diagnostic-health
+fixtures in `scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`. This
+closure does not rerun Vitest or SQLAlchemy and does not relax the final
+all-pass product acceptance policy.
+
+## W52 Codex Provider Surface Closure
+
+W52-S06 closes the Codex/OpenAI provider hardening prerequisite as source/runtime
+fixture evidence. Codex live adapter args preserve host auth but remove host
+tool-surface noise by invoking `codex exec --ignore-user-config --ignore-rules`
+for both full-bypass and restricted modes. Malformed OpenAI/Codex tool-call
+schema failures remain provider execution failures, with raw provider evidence
+and an actionable provider-step recommendation.
+
+| Surface | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|
+| Codex adapter args | `provider` | `provider_execution` | clean `codex exec` surface | prerequisite evidence, not product-accepted |
+| malformed tool-call schema run-health | `provider` | `provider_execution` | `external-runner-failed` | provider failure, not product-accepted |
+
+Done evidence is the `Codex live adapter args use clean config and rules while
+preserving host auth` adapter profile test, the `live adapter surfaces malformed
+Codex/OpenAI tool-call schema failures as provider raw summary` raw error
+fixture, and the `proof runner keeps malformed Codex schema failures under
+provider execution` run-health fixture. This closure does not rerun Vitest or
+SQLAlchemy and does not relax the final all-pass product acceptance policy.
+
+## W52 Manual Xlarge Step-Quality Closure
+
+W52-S07 closes the manual xlarge continuation prerequisite as source/runtime
+fixture evidence. Manual-only xlarge runs can stop on
+`pending_step_quality_assessment`, prepare the linked report through the public
+`manual-live-e2e.mjs --prepare-step-quality --request <file> --decision
+continue|request-repair|retry|block` helper, validate the generated report
+before write, and resume through the normal manual controller.
+
+| Surface | Method | Evidence | Acceptance |
+|---|---|---|---|
+| xlarge step-quality report | `manual-skill-agent` | linked request, operator decision, public inspected refs | manual observation evidence, not product-accepted |
+| invalid generated report | contract validation before write | no report file materialized | fail-closed helper behavior |
+
+Done evidence is the `live E2E xlarge manual step-quality report allows
+continuation after discovery` controller/helper fixture and the `manual
+step-quality helper validates generated reports before writing` regression in
+`scripts/live-e2e/test/live-e2e-step-controller.test.mjs`. Xlarge evidence
+remains manual observation only and cannot close required product acceptance or
+provider qualification coverage.
+
+## W52 Manual Step-Quality Depth Closure
+
+W52-S08 closes the manual step-quality depth gap. Accepted product-change
+step-quality reports now fail closed unless required dimensions include
+step-specific rationale, non-generic findings, and inspected public refs. This
+applies to manual `assessment_method=manual-skill-agent` reports as well as
+automatic evaluator-authored medium/large reports.
+
+| Fixture | Expected result | Acceptance impact |
+|---|---|---|
+| generic accepted findings such as `pass` | report validation fails | no continuation |
+| accepted dimension with empty `inspected_evidence_refs` | report validation fails | no continuation |
+| manual xlarge report prepared from linked request and operator decision | report validation passes | manual observation evidence only |
+
+Done evidence is in `scripts/live-e2e/test/live-e2e-step-controller.test.mjs`:
+`live E2E product-change step-quality rejects generic accepted findings`,
+`live E2E product-change step-quality rejects accepted dimensions without
+inspected refs`, and the existing manual xlarge helper regression. Manual xlarge
+evidence remains observation evidence and does not close product acceptance
+without a separate accepted large all-pass gate.
+
+## W52 Diagnostic Intent Classification Closure
+
+W52-S09 closes the diagnostic classification precision gap. Warning/failure
+classification for post-run diagnostics now requires explicit
+`diagnostic_intent=post-run-diagnostic` metadata; labels that merely contain the
+word `diagnostic` remain ordinary command labels unless this intent is present.
+
+| Fixture | Expected result | Acceptance impact |
+|---|---|---|
+| post-run diagnostic verify command with explicit intent | diagnostic timeout/warning classification allowed | factual diagnostic evidence only |
+| public command label containing `diagnostic` without intent | public command failure, not diagnostic health | not product-accepted |
+| diagnostic run-health command entries | contract requires `diagnostic_intent` | substring inference removed |
+
+Done evidence is in `scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`:
+the source guard rejects `label.includes("diagnostic")`, the post-run
+diagnostic command construction carries `diagnosticIntent:
+POST_RUN_DIAGNOSTIC_INTENT`, and the false-positive command-label fixture keeps
+`diagnostic_health.status=pass` while the public command failure remains under
+ordinary command health.
+
+## W52 Vitest Large Baseline Blocker
+
+W52-S03 reran Vitest large on source SHA `32382e857d4651a152fe57cf25ff76eac46d85d1`
+with `AOR_LIVE_E2E_TARGET_NODE_BIN=/opt/homebrew/Cellar/node@22/22.22.3/bin/node`.
+The hard-target profile now sets `verification.baseline_gate.mode=blocking`, so
+a clean compatible-Node baseline target verification failure blocks before
+provider/product execution instead of becoming warning-mode acceptance evidence.
+
+| Run id | Terminal status | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|---|
+| `w52-s03-vitest-large-20260702-32382e857d46-blocking` | `blocked` | `target_repository` | `target_verification` | `target_verification_blocked` | not product-accepted |
+
+Evidence:
+
+- Runtime root:
+  `/tmp/aor-w52-s03-vitest-20260702-32382e857d46-blocking`.
+- Run-health:
+  `live-e2e-run-health-report-w52-s03-vitest-large-20260702-32382e857d46-blocking.json`
+  reports `overall_status=blocked`.
+- Target readiness:
+  `target_toolchain_status=pass`, `target_setup_status=pass`,
+  `target_verification_status=blocked`, and
+  `target_readiness.product_execution_started=false`.
+- Baseline gate:
+  `baseline_verify_gate_decision.mode=blocking`,
+  `status=fail`, `decision=block`.
+- Failed target command:
+  `[ -z "${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; pnpm test`.
+- Failure detail:
+  15 failed Vitest thread test files, including
+  `test/mocking/destructured.test.ts` with the ESM non-configurable namespace
+  spy failure, plus snapshot/assertion failures in the target suite.
+
+No final `quality-assessment gate --policy all-pass` was run for W52-S03 because
+terminal run-health was not `pass` and product execution did not start.
+
+## W52 SQLAlchemy Large Diagnostic Non-Acceptance
+
+W52-S04 reran SQLAlchemy large on source SHA
+`32382e857d4651a152fe57cf25ff76eac46d85d1` after making the target catalog
+policy explicit: full-suite `.aor/live-e2e-venv/bin/python -m pytest test`
+must pass before product acceptance. Warning-mode diagnostic evidence remains
+factual evidence only and cannot satisfy the final all-pass acceptance policy.
+
+| Run id | Terminal status | Owner | Phase | Class | Acceptance |
+|---|---|---|---|---|---|
+| `w52-s04-sqlalchemy-large-20260702-32382e857d46` | `not_pass`; run-health `blocked` after accepted QA block decision | `target_repository` | `target_verification` | `post_run_diagnostic_timeout` | not product-accepted |
+
+Evidence:
+
+- Runtime root:
+  `/tmp/aor-w52-s04-sqlalchemy-20260702-32382e857d46`.
+- Run summary:
+  `live-e2e-run-summary-w52-s04-sqlalchemy-large-20260702-32382e857d46.json`
+  reports `status=not_pass`.
+- Run-health:
+  `live-e2e-run-health-report-w52-s04-sqlalchemy-large-20260702-32382e857d46.json`
+  reports `overall_status=blocked` and
+  `diagnostic_health.post_run_diagnostic_status=warn`.
+- Target readiness:
+  `target_setup_status=pass`, `target_verification_status=pass`, and
+  `target_readiness.product_execution_started=true`.
+- Provider execution:
+  `provider=openai`, `adapter=codex-cli`, `status=completed`,
+  `elapsed_ms=186314`, with meaningful target changes in
+  `lib/sqlalchemy/sql/operators.py` and `test/sql/test_operators.py`.
+- Post-run primary verification: `pass`.
+- Post-run diagnostic verification:
+  `.aor/live-e2e-venv/bin/python -m pytest test` timed out after
+  `1800000ms`; diagnostic health classifies the timed-out command as
+  `target_repository/target_verification/post_run_diagnostic_timeout`.
+- QA operator decision:
+  `live-e2e-operator-decision-w52-s04-sqlalchemy-large-20260702-32382e857d46-13-qa.json`
+  records `action=block`, semantic status `not_pass`, and the finding
+  `product acceptance is not met`.
+
+No final `quality-assessment gate --policy all-pass` was run for W52-S04 because
+terminal run-health was not `pass` and the required full-suite diagnostic did
+not pass.
 
 ## Guided AOR UI Proof
 

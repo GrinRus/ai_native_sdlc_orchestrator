@@ -76,6 +76,16 @@ Feature missions may add `post_run_quality`:
 - `diagnostic_commands` are additional evidence. A failing diagnostic command is reported with `diagnostic_failure_mode` (`warn` by default) and must not hide a passing primary gate.
 - If `post_run_quality` is omitted, `verification.commands` remain the primary post-run gate.
 
+The catalog command shape is live E2E authoring sugar only. Generated target
+project profiles must translate it into AOR
+`verification.command_groups[]`: setup commands become `role=setup`,
+`phase=readiness`; baseline commands become `phase=baseline`; mission primary
+commands become `phase=post-change`, `enforcement=required`; diagnostic
+commands become `phase=diagnostic`, with `enforcement=warn` or `required`
+derived from `diagnostic_failure_mode`. AOR core consumes only the generic
+command-group contract and must not depend on target-catalog, run-health, or
+step-quality fields.
+
 For strict quality closure, catalog missions should make warning-clean command
 output part of the Definition of Done when the target ecosystem can emit
 runtime warnings while returning exit code 0. The provider-facing execution

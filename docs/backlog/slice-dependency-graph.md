@@ -254,6 +254,19 @@ graph TD
   W52S08[W52-S08 Manual step-quality assessment depth]
   W52S09[W52-S09 Diagnostic command classification precision]
   W52S10[W52-S10 Acceptance evidence matrix and xlarge observation reporting]
+  W53S01[W53-S01 Generic verification command-group contract]
+  W53S02[W53-S02 AOR project verify command-group execution]
+  W53S03[W53-S03 Live E2E adapter boundary mapping]
+  W53S04[W53-S04 AOR/live E2E leak guards]
+  W53S05[W53-S05 Generic verification archetype fixtures]
+  W54S01[W54-S01 Verification group authoring contract]
+  W54S02[W54-S02 Stack discovery engine]
+  W54S03[W54-S03 Project init profile materialization]
+  W54S04[W54-S04 Verifier execution semantics hardening]
+  W54S05[W54-S05 CLI/API/UI verification plan surfaces]
+  W54S06[W54-S06 Migration and examples]
+  W54S07[W54-S07 Real archetype smoke matrix]
+  W54S08[W54-S08 Boundary regression expansion]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -621,6 +634,19 @@ graph TD
   W52S05 --> W52S09
   W52S08 --> W52S10
   W52S09 --> W52S10
+  W52S10 --> W53S01
+  W53S01 --> W53S02
+  W53S02 --> W53S03
+  W53S03 --> W53S04
+  W53S04 --> W53S05
+  W53S05 --> W54S01
+  W54S01 --> W54S02
+  W54S02 --> W54S03
+  W54S03 --> W54S04
+  W54S04 --> W54S05
+  W54S05 --> W54S06
+  W54S06 --> W54S07
+  W54S07 --> W54S08
 ```
 
 ## W0 hard dependencies
@@ -1085,6 +1111,27 @@ graph TD
 | W52-S09 | W52-S05 |
 | W52-S10 | W52-S08, W52-S09 |
 
+## W53 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W53-S01 | W52-S10 |
+| W53-S02 | W53-S01 |
+| W53-S03 | W53-S02 |
+| W53-S04 | W53-S03 |
+| W53-S05 | W53-S04 |
+
+## W54 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W54-S01 | W53-S05 |
+| W54-S02 | W54-S01 |
+| W54-S03 | W54-S02 |
+| W54-S04 | W54-S03 |
+| W54-S05 | W54-S04 |
+| W54-S06 | W54-S05 |
+| W54-S07 | W54-S06 |
+| W54-S08 | W54-S07 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1336,6 +1383,19 @@ graph TD
 248. W52-S08
 249. W52-S09
 250. W52-S10
+251. W53-S01
+252. W53-S02
+253. W53-S03
+254. W53-S04
+255. W53-S05
+256. W54-S01
+257. W54-S02
+258. W54-S03
+259. W54-S04
+260. W54-S05
+261. W54-S06
+262. W54-S07
+263. W54-S08
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

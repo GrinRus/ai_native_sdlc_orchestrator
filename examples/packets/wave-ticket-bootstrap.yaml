@@ -44,4 +44,13 @@ verification_expectations:
     - pnpm check
   diagnostic_commands: []
   diagnostic_failure_mode: null
+verification_plan:
+  command_groups:
+    - id: post-change-check
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - pnpm check
 approved_input_ref: evidence://bootstrap/artifact-packet/aor-core.artifact.bootstrap.v1

@@ -80,6 +80,21 @@ verification_plan:
     - contract-shape
     - repo-scope
     - evidence-complete
+  command_groups:
+    - id: post-change-test
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - pnpm test
+    - id: diagnostic-lint
+      role: lint
+      phase: diagnostic
+      enforcement: warn
+      timeout_class: quick
+      commands:
+        - pnpm lint
   commands:
     - pnpm test
 route_overrides:

@@ -359,6 +359,64 @@ function detectVerificationCommands(projectRoot, overrides = {}) {
 }
 
 /**
+ * @param {{ buildCommands: string[], lintCommands: string[], testCommands: string[] }} verification
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildDefaultVerificationCommandGroups(verification) {
+  const groups = [
+    {
+      id: "baseline-build",
+      role: "build",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "build",
+      commands: verification.buildCommands,
+    },
+    {
+      id: "baseline-lint",
+      role: "lint",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "quick",
+      commands: verification.lintCommands,
+    },
+    {
+      id: "baseline-test",
+      role: "test",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: verification.testCommands,
+    },
+    {
+      id: "post-change-build",
+      role: "build",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "build",
+      commands: verification.buildCommands,
+    },
+    {
+      id: "post-change-lint",
+      role: "lint",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "quick",
+      commands: verification.lintCommands,
+    },
+    {
+      id: "post-change-test",
+      role: "test",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: verification.testCommands,
+    },
+  ];
+  return groups.filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
+}
+
+/**
  * @param {{
  *   bootstrapTemplate?: string,
  *   cwd: string,
@@ -447,6 +505,10 @@ function createBootstrapProjectProfile(options) {
   primaryRepo.lint_commands = verification.lintCommands;
   primaryRepo.test_commands = verification.testCommands;
   profile.repos = [primaryRepo];
+  profile.verification = {
+    ...asRecord(profile.verification),
+    command_groups: buildDefaultVerificationCommandGroups(verification),
+  };
 
   const validation = validateContractDocument({
     family: "project-profile",

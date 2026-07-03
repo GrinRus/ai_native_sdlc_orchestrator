@@ -16,6 +16,7 @@ Normalized output of one step regardless of whether that step was an artifact, p
 Step results make routing, validation, and quality logic consistent across the lifecycle.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
 `project verify` runner step results may add command-level evidence so bounded verification is machine-readable in addition to the transcript evidence:
+- `command_group_id`, `command_group_role`, `command_group_phase`, `command_group_enforcement`, `command_group_timeout_class`, and `enforcement_result`;
 - `command_timeout_ms` and `timed_out`;
 - `started_at`, `finished_at`, and `duration_ms`;
 - `exit_code`, `signal`, and `error_code`;

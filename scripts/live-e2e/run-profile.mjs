@@ -201,6 +201,121 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {string | null} filePath
+ * @returns {Record<string, unknown>}
+ */
+function summarizeDeliveryManifest(filePath) {
+  const manifestFile = asNonEmptyString(filePath) || null;
+  const manifest = readJsonIfPresent(manifestFile);
+  const repoDeliveries = Array.isArray(manifest.repo_deliveries)
+    ? manifest.repo_deliveries.map((entry) => asRecord(entry))
+    : [];
+  const summarizedDeliveries = repoDeliveries.map((entry) => {
+    const changedPaths = asStringArray(entry.changed_paths);
+    const commitRefs = asStringArray(entry.commit_refs);
+    return {
+      repo_id: asNonEmptyString(entry.repo_id) || null,
+      role: asNonEmptyString(entry.role) || null,
+      delivery_mode: asNonEmptyString(entry.delivery_mode) || asNonEmptyString(manifest.delivery_mode) || null,
+      writeback_result: asNonEmptyString(entry.writeback_result) || null,
+      changed_path_count: changedPaths.length,
+      changed_paths: changedPaths,
+      commit_ref_count: commitRefs.length,
+      commit_refs: commitRefs,
+      pr_ref: asNonEmptyString(entry.pr_ref) || null,
+      patch_file: asNonEmptyString(entry.patch_file) || null,
+    };
+  });
+  const changedPaths = uniqueStrings(summarizedDeliveries.flatMap((entry) => asStringArray(entry.changed_paths)));
+  const writebackResults = uniqueStrings(summarizedDeliveries.map((entry) => asNonEmptyString(entry.writeback_result)));
+  const commitRefs = uniqueStrings(summarizedDeliveries.flatMap((entry) => asStringArray(entry.commit_refs)));
+  const writebackPolicy = asRecord(manifest.writeback_policy);
+  const deliveryMode = asNonEmptyString(manifest.delivery_mode) || null;
+  const writeBackToRemote =
+    typeof writebackPolicy.allow_remote_push === "boolean"
+      ? writebackPolicy.allow_remote_push
+      : deliveryMode === "patch-only"
+        ? false
+        : null;
+  const patchOnly =
+    deliveryMode === "patch-only" ||
+    (writebackResults.length > 0 && writebackResults.every((result) => result.startsWith("patch-")));
+  return {
+    delivery_manifest_file: manifestFile,
+    manifest_status: Object.keys(manifest).length > 0 ? "present" : "missing",
+    delivery_mode: deliveryMode,
+    patch_only: patchOnly,
+    write_back_to_remote: writeBackToRemote,
+    repo_count: summarizedDeliveries.length,
+    changed_path_count: changedPaths.length,
+    changed_paths: changedPaths,
+    writeback_results: writebackResults,
+    commit_ref_count: commitRefs.length,
+    commit_refs: commitRefs,
+    no_upstream_write_evidence: {
+      status: patchOnly && writeBackToRemote === false ? "pass" : "not_proven",
+      delivery_mode: deliveryMode,
+      write_back_to_remote: writeBackToRemote,
+      writeback_results: writebackResults,
+      commit_ref_count: commitRefs.length,
+    },
+    repo_deliveries: summarizedDeliveries,
+  };
+}
+
+/**
+ * @param {{ artifacts: Record<string, unknown>, scorecardFile: string | null, handoffFile: string | null }} options
+ * @returns {Record<string, unknown>}
+ */
+function summarizeLearningHandoff(options) {
+  const scorecardFile = asNonEmptyString(options.scorecardFile) || null;
+  const handoffFile = asNonEmptyString(options.handoffFile) || null;
+  const scorecard = readJsonIfPresent(scorecardFile);
+  const handoff = readJsonIfPresent(handoffFile);
+  const scorecardCoverageFollowUp = asRecord(scorecard.coverage_follow_up);
+  const handoffCoverageFollowUp = asRecord(handoff.coverage_follow_up);
+  const coverageFollowUp =
+    Object.keys(handoffCoverageFollowUp).length > 0
+      ? handoffCoverageFollowUp
+      : Object.keys(scorecardCoverageFollowUp).length > 0
+        ? scorecardCoverageFollowUp
+        : asRecord(options.artifacts.coverage_follow_up);
+  const remainingRequiredCells = Array.isArray(coverageFollowUp.remaining_required_matrix_cells)
+    ? coverageFollowUp.remaining_required_matrix_cells.map((entry) => asRecord(entry))
+    : [];
+  return {
+    scorecard_file: scorecardFile,
+    handoff_file: handoffFile,
+    scorecard_status: asNonEmptyString(scorecard.status) || null,
+    handoff_run_status: asNonEmptyString(handoff.run_status) || null,
+    evidence_refs: uniqueStrings([
+      scorecardFile,
+      handoffFile,
+      ...asStringArray(scorecard.evidence_refs),
+      ...asStringArray(handoff.evidence_refs),
+      asNonEmptyString(options.artifacts.new_flow_next_action_report_file),
+    ]),
+    backlog_refs: uniqueStrings([
+      ...asStringArray(scorecard.linked_backlog_refs),
+      ...asStringArray(handoff.backlog_refs),
+    ]),
+    quality_refs: uniqueStrings([
+      ...asStringArray(scorecard.linked_eval_suite_refs),
+      ...asStringArray(handoff.quality_refs),
+    ]),
+    next_actions: asStringArray(handoff.next_actions),
+    coverage_follow_up: Object.keys(coverageFollowUp).length > 0 ? coverageFollowUp : null,
+    next_required_matrix_cell:
+      typeof coverageFollowUp.next_required_matrix_cell === "object" && coverageFollowUp.next_required_matrix_cell
+        ? coverageFollowUp.next_required_matrix_cell
+        : null,
+    remaining_required_matrix_cell_count: remainingRequiredCells.length,
+    remaining_required_matrix_cells: remainingRequiredCells,
+    new_flow_next_action_report_file: asNonEmptyString(options.artifacts.new_flow_next_action_report_file) || null,
+  };
+}
+
+/**
  * @param {Record<string, unknown>} controllerState
  * @param {string[]} includedSteps
  * @returns {boolean}
@@ -1737,6 +1852,12 @@ function buildFinalAnalysis(options) {
     asNonEmptyString(options.artifacts.learning_loop_scorecard_file) && asNonEmptyString(options.artifacts.learning_loop_handoff_file)
       ? "pass"
       : "not_pass";
+  const deliveryManifestSummary = summarizeDeliveryManifest(asNonEmptyString(options.artifacts.delivery_manifest_file));
+  const learningHandoffSummary = summarizeLearningHandoff({
+    artifacts: options.artifacts,
+    scorecardFile: asNonEmptyString(options.artifacts.learning_loop_scorecard_file),
+    handoffFile: asNonEmptyString(options.artifacts.learning_loop_handoff_file),
+  });
   let status = "pass";
   for (const step of journalEntries) {
     status = worstObservationStatus(status, asNonEmptyString(step.final_step_verdict) || "not_pass");
@@ -1764,6 +1885,7 @@ function buildFinalAnalysis(options) {
     failed_stages: failingStages,
     delivery: {
       status: deliveryStatus,
+      ...deliveryManifestSummary,
       evidence_refs: uniqueStrings([asNonEmptyString(options.artifacts.delivery_manifest_file)]),
     },
     release: {
@@ -1772,9 +1894,11 @@ function buildFinalAnalysis(options) {
     },
     learning: {
       status: learningStatus,
+      ...learningHandoffSummary,
       evidence_refs: uniqueStrings([
         asNonEmptyString(options.artifacts.learning_loop_scorecard_file),
         asNonEmptyString(options.artifacts.learning_loop_handoff_file),
+        ...asStringArray(learningHandoffSummary.evidence_refs),
       ]),
     },
   };
@@ -1990,6 +2114,7 @@ function buildCommandHealth(options) {
     .filter((entry) => !commandCompletedForRunHealth(entry))
     .map((entry) => ({
       command_surface: asNonEmptyString(entry.command_surface) || asNonEmptyString(entry.command) || "unknown",
+      diagnostic_intent: asNonEmptyString(entry.diagnostic_intent) || null,
       status: asNonEmptyString(entry.status) || "unknown",
       exit_code: typeof entry.exit_code === "number" ? entry.exit_code : null,
       transcript_ref: asNonEmptyString(entry.transcript_ref) || null,
@@ -2340,17 +2465,48 @@ function toRunHealthStatusOrNull(value) {
   return null;
 }
 
+const DIAGNOSTIC_COMMAND_FAILURE_OWNER = "target_repository";
+const DIAGNOSTIC_COMMAND_FAILURE_PHASE = "target_verification";
+const DIAGNOSTIC_COMMAND_FAILURE_CLASS = "post_run_diagnostic_failed";
+const DIAGNOSTIC_COMMAND_TIMEOUT_CLASS = "post_run_diagnostic_timeout";
+const POST_RUN_DIAGNOSTIC_INTENT = "post-run-diagnostic";
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @returns {string}
+ */
+function resolveDiagnosticIntent(entry) {
+  return asNonEmptyString(entry.diagnostic_intent) || POST_RUN_DIAGNOSTIC_INTENT;
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @param {boolean} timedOut
+ * @returns {string}
+ */
+function diagnosticCommandFailureClass(entry, timedOut) {
+  return (
+    asNonEmptyString(entry.failure_class) ||
+    (timedOut ? DIAGNOSTIC_COMMAND_TIMEOUT_CLASS : DIAGNOSTIC_COMMAND_FAILURE_CLASS)
+  );
+}
+
 /**
  * @param {Record<string, unknown>} stepResult
  * @param {string | null} stepResultRef
  * @returns {Record<string, unknown>}
  */
 function summarizeDiagnosticCommand(stepResult, stepResultRef) {
+  const timedOut = stepResult.timed_out === true;
   return {
     repo_scope: asNonEmptyString(stepResult.repo_scope) || null,
     command: asNonEmptyString(stepResult.command) || null,
+    diagnostic_intent: resolveDiagnosticIntent(stepResult),
     status: asNonEmptyString(stepResult.status) || "unknown",
-    timed_out: stepResult.timed_out === true,
+    timed_out: timedOut,
+    failure_owner: asNonEmptyString(stepResult.failure_owner) || DIAGNOSTIC_COMMAND_FAILURE_OWNER,
+    failure_phase: asNonEmptyString(stepResult.failure_phase) || DIAGNOSTIC_COMMAND_FAILURE_PHASE,
+    failure_class: diagnosticCommandFailureClass(stepResult, timedOut),
     step_result_ref: stepResultRef,
     summary: asNonEmptyString(stepResult.summary) || null,
   };
@@ -2358,14 +2514,20 @@ function summarizeDiagnosticCommand(stepResult, stepResultRef) {
 
 /**
  * @param {Record<string, unknown>} entry
+ * @param {{ timedOut?: boolean }} [options]
  * @returns {Record<string, unknown>}
  */
-function summarizeDiagnosticSummaryCommand(entry) {
+function summarizeDiagnosticSummaryCommand(entry, options = {}) {
+  const timedOut = entry.timed_out === true || options.timedOut === true;
   return {
     repo_scope: asNonEmptyString(entry.repo_scope) || null,
     command: asNonEmptyString(entry.command) || null,
+    diagnostic_intent: resolveDiagnosticIntent(entry),
     status: asNonEmptyString(entry.status) || "failed",
-    timed_out: entry.timed_out === true,
+    timed_out: timedOut,
+    failure_owner: asNonEmptyString(entry.failure_owner) || DIAGNOSTIC_COMMAND_FAILURE_OWNER,
+    failure_phase: asNonEmptyString(entry.failure_phase) || DIAGNOSTIC_COMMAND_FAILURE_PHASE,
+    failure_class: diagnosticCommandFailureClass(entry, timedOut),
     step_result_ref: asNonEmptyString(entry.step_result_ref) || null,
     summary: asNonEmptyString(entry.summary) || null,
   };
@@ -2414,8 +2576,12 @@ function buildDiagnosticHealth(artifacts) {
           {
             repo_scope: null,
             command: asNonEmptyString(transcript.label) || asNonEmptyString(transcript.command) || "post-run diagnostic",
+            diagnostic_intent: resolveDiagnosticIntent(transcript),
             status: "failed",
             timed_out: true,
+            failure_owner: DIAGNOSTIC_COMMAND_FAILURE_OWNER,
+            failure_phase: DIAGNOSTIC_COMMAND_FAILURE_PHASE,
+            failure_class: DIAGNOSTIC_COMMAND_TIMEOUT_CLASS,
             step_result_ref: transcriptFile || null,
             summary: "Diagnostic command timed out after bounded cleanup; stdout/stderr are preserved in the transcript.",
           },
@@ -2423,7 +2589,7 @@ function buildDiagnosticHealth(artifacts) {
       : [];
   const timedOutCommands = uniqueDiagnosticCommands([
     ...(Array.isArray(summary.timed_out_commands)
-    ? summary.timed_out_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry)))
+      ? summary.timed_out_commands.map((entry) => summarizeDiagnosticSummaryCommand(asRecord(entry), { timedOut: true }))
       : failedCommandsFromStepResults.filter((entry) => entry.timed_out === true)),
     ...transcriptTimeoutCommands,
   ]);
@@ -3115,6 +3281,18 @@ export function writeProofRunnerArtifacts(options) {
   const lifecycleCompleteness = buildLifecycleCompletenessSummary(observationReport);
   const summaryTargetReadiness = buildTargetReadiness(options.flowResult.artifacts);
   const summaryFailureFields = resolveTopLevelFailureFields(options.flowResult.artifacts, summaryTargetReadiness);
+  const deliveryManifestFile =
+    asNonEmptyString(productionProof?.evidence_refs?.delivery_manifest_file) ||
+    asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file) ||
+    null;
+  const deliveryManifestSummary = summarizeDeliveryManifest(deliveryManifestFile);
+  const learningLoopScorecardFile = asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file) || null;
+  const learningLoopHandoffFile = asNonEmptyString(options.flowResult.artifacts.learning_loop_handoff_file) || null;
+  const learningHandoffSummary = summarizeLearningHandoff({
+    artifacts: options.flowResult.artifacts,
+    scorecardFile: learningLoopScorecardFile,
+    handoffFile: learningLoopHandoffFile,
+  });
 
   const summary = {
     run_id: options.runId,
@@ -3339,14 +3517,13 @@ export function writeProofRunnerArtifacts(options) {
     production_proof_evidence_status: productionProof?.evidence_status ?? null,
     production_proof_evidence_refs: productionProof?.evidence_refs ?? null,
     no_upstream_write_assertion: productionProof?.no_upstream_write_assertion ?? null,
-    delivery_manifest_file:
-      productionProof?.evidence_refs?.delivery_manifest_file ??
-      asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file) ??
-      null,
+    delivery_manifest_file: deliveryManifestFile,
+    delivery_manifest_summary: deliveryManifestSummary,
     delivery_plan_file: asNonEmptyString(options.flowResult.artifacts.delivery_plan_file) || null,
     release_packet_file: asNonEmptyString(options.flowResult.artifacts.release_packet_file) || null,
-    learning_loop_scorecard_file: asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file) || null,
-    learning_loop_handoff_file: asNonEmptyString(options.flowResult.artifacts.learning_loop_handoff_file) || null,
+    learning_loop_scorecard_file: learningLoopScorecardFile,
+    learning_loop_handoff_file: learningLoopHandoffFile,
+    learning_handoff_summary: learningHandoffSummary,
     review_report_file:
       productionProof?.evidence_refs?.review_report_file ??
       asNonEmptyString(options.flowResult.artifacts.review_report_file) ??

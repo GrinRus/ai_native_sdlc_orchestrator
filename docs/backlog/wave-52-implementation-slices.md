@@ -16,7 +16,7 @@ stays non-accepted product quality until terminal run-health pass and final
   surface target-readiness owner, phase, and class at the top level when a run
   blocks before product execution.
 - **Epic:** EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/run-profile.mjs`,
   `scripts/live-e2e/lib/**`, run-health examples/tests
 - **Hard dependencies:** W51-S05
@@ -49,7 +49,7 @@ stays non-accepted product quality until terminal run-health pass and final
 - **Outcome:** Bound warning-mode diagnostic commands so terminal command output
   cannot leave `project verify`, `run-profile`, or `step-evaluator` stuck.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `packages/orchestrator-core/**`,
   `scripts/live-e2e/**`, verification tests
 - **Hard dependencies:** W52-S01
@@ -85,7 +85,7 @@ stays non-accepted product quality until terminal run-health pass and final
   execution issues while removing host config/tool-surface noise from live E2E
   runs.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `examples/adapters/codex-cli.yaml`,
   `packages/adapter-sdk/**`, live adapter/run-health tests
 - **Hard dependencies:** W52-S02
@@ -126,7 +126,7 @@ stays non-accepted product quality until terminal run-health pass and final
   accepted operator decision by preparing the linked step-quality report through
   a public helper, without using the automatic step evaluator.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/manual-live-e2e.mjs`,
   `scripts/live-e2e/lib/step-quality-assessment.mjs`, controller tests
 - **Hard dependencies:** W52-S02
@@ -163,7 +163,7 @@ stays non-accepted product quality until terminal run-health pass and final
 - **Outcome:** Rerun Vitest large after W52-S01/S02/S06/S07 and either reach
   final all-pass product acceptance or record a precise non-W51 blocker.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`,
   target catalog, proof findings
 - **Hard dependencies:** W52-S02, W52-S06, W52-S07
@@ -199,7 +199,7 @@ stays non-accepted product quality until terminal run-health pass and final
 - **Outcome:** Resolve the SQLAlchemy full-suite diagnostic ambiguity and rerun
   SQLAlchemy large toward product acceptance or a precise diagnostic blocker.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-sqlalchemy-large-openai.yaml`,
   target catalog, quality reports
 - **Hard dependencies:** W52-S02, W52-S06, W52-S07
@@ -235,8 +235,8 @@ stays non-accepted product quality until terminal run-health pass and final
 - **Outcome:** Record the final W52 Vitest/SQLAlchemy outcomes and keep backlog
   state aligned with product acceptance truth.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** blocked
-- **Primary modules:** `docs/ops/live-e2e-proof-complete-findings.md`,
+- **State:** done
+- **Primary modules:** `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`,
   backlog docs, root checks, proof artifacts
 - **Hard dependencies:** W52-S03, W52-S04
 
@@ -269,7 +269,7 @@ stays non-accepted product quality until terminal run-health pass and final
   per-dimension inspected refs, and fail-closed validation for generic accepted
   reports.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/lib/step-quality-assessment.mjs`,
   `scripts/live-e2e/manual-live-e2e.mjs`,
   `scripts/live-e2e/docs/contracts/live-e2e-step-quality-assessment-report.md`,
@@ -313,7 +313,7 @@ stays non-accepted product quality until terminal run-health pass and final
   command metadata so non-diagnostic labels cannot be misclassified as
   diagnostic warnings or blockers.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/lib/flows.mjs`,
   `scripts/live-e2e/run-profile.mjs`,
   `scripts/live-e2e/docs/contracts/live-e2e-run-health-report.md`,
@@ -352,10 +352,10 @@ stays non-accepted product quality until terminal run-health pass and final
   acceptance, paired guided UI proof, manual xlarge observation, delivery
   safety, and learning handoff quality for reviewers.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/quality-assessment.mjs`,
   `scripts/live-e2e/run-profile.mjs`,
-  `docs/ops/live-e2e-proof-complete-findings.md`, backlog docs
+  `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`, backlog docs
 - **Hard dependencies:** W52-S08, W52-S09
 
 ### Local tasks

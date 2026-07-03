@@ -340,6 +340,36 @@ test("verifyProjectRuntime times out long-running verification commands", () => 
   });
 });
 
+test("verifyProjectRuntime preserves output from commands that write then hang", () => {
+  withTempRepo((repoRoot) => {
+    const command =
+      "node -e \"process.stdout.write('terminal stdout before pipe wait\\n'); process.stderr.write('terminal stderr before pipe wait\\n'); setInterval(() => {}, 10000)\"";
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationCommandTimeoutMs: 100,
+      repoTestCommands: [command],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.command_timeout_ms, 1000);
+    assert.equal(result.verifySummary.timed_out_commands.length, 1);
+
+    const failedStep = result.stepResults.find((step) => step.command === command);
+    assert.ok(failedStep);
+    assert.equal(failedStep.status, "failed");
+    assert.equal(failedStep.timed_out, true);
+    assert.equal(failedStep.command_timeout_ms, 1000);
+    assert.match(failedStep.output_excerpt.stdout_tail, /terminal stdout before pipe wait/u);
+    assert.match(failedStep.output_excerpt.stderr_tail, /terminal stderr before pipe wait/u);
+
+    const transcript = fs.readFileSync(failedStep.evidence_refs[0], "utf8");
+    assert.match(transcript, /timed_out: true/u);
+    assert.match(transcript, /terminal stdout before pipe wait/u);
+    assert.match(transcript, /terminal stderr before pipe wait/u);
+  });
+});
+
 test("verifyProjectRuntime uses a hard timeout signal for target commands", () => {
   withTempRepo((repoRoot) => {
     const command = 'node -e "process.on(\\"SIGTERM\\", () => {}); setTimeout(() => {}, 10000)"';
@@ -444,4 +474,236 @@ test("verifyProjectRuntime disables inherited Node compile cache for target comm
       }
     }
   });
+});
+
+test("verifyProjectRuntime executes project-profile command groups by verification label", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent.replace(
+      "repo_graph: []",
+      [
+        "repo_graph: []",
+        "verification:",
+        "  command_groups:",
+        "    - id: setup-readiness",
+        "      role: setup",
+        "      phase: readiness",
+        "      enforcement: required",
+        "      timeout_class: install",
+        "      commands:",
+        "        - 'node -e \"process.stdout.write(\\\"setup\\\")\"'",
+        "    - id: baseline-test",
+        "      role: test",
+        "      phase: baseline",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      commands:",
+        "        - 'node -e \"process.stdout.write(\\\"baseline\\\")\"'",
+        "    - id: post-change-only",
+        "      role: test",
+        "      phase: post-change",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      commands:",
+        "        - 'node -e \"process.exit(9)\"'",
+      ].join("\n"),
+    );
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "baseline-diagnostic",
+    });
+
+    assert.equal(result.verifySummary.status, "passed");
+    assert.deepEqual(
+      result.verifySummary.command_groups.map((group) => group.id),
+      ["setup-readiness", "baseline-test"],
+    );
+    assert.equal(result.stepResults.length, 2);
+    assert.ok(result.stepResults.every((step) => step.command_group_enforcement === "required"));
+    assert.ok(result.stepResults.every((step) => step.enforcement_result === "pass"));
+    assert.equal(result.stepResults.some((step) => step.command.includes("process.exit(9)")), false);
+  });
+});
+
+test("verifyProjectRuntime applies warn and observe command-group enforcement", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent.replace(
+      "repo_graph: []",
+      [
+        "repo_graph: []",
+        "verification:",
+        "  command_groups:",
+        "    - id: diagnostic-warn",
+        "      role: full-suite",
+        "      phase: diagnostic",
+        "      enforcement: warn",
+        "      timeout_class: full-suite",
+        "      commands:",
+        "        - 'node -e \"process.exit(7)\"'",
+        "    - id: diagnostic-observe",
+        "      role: custom",
+        "      phase: diagnostic",
+        "      enforcement: observe",
+        "      timeout_class: quick",
+        "      commands:",
+        "        - 'node -e \"process.exit(8)\"'",
+        "    - id: post-change-observe",
+        "      role: custom",
+        "      phase: post-change",
+        "      enforcement: observe",
+        "      timeout_class: quick",
+        "      commands:",
+        "        - 'node -e \"process.exit(8)\"'",
+      ].join("\n"),
+    );
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const diagnostic = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-diagnostic",
+    });
+
+    assert.equal(diagnostic.verifySummary.status, "warn");
+    assert.equal(diagnostic.verifySummary.enforcement_summary.required_failed_count, 0);
+    assert.equal(diagnostic.verifySummary.enforcement_summary.warn_failed_count, 1);
+    assert.equal(diagnostic.verifySummary.enforcement_summary.observe_failed_count, 1);
+    assert.equal(
+      diagnostic.stepResults.find((step) => step.command_group_id === "diagnostic-warn").enforcement_result,
+      "warn",
+    );
+    assert.equal(
+      diagnostic.stepResults.find((step) => step.command_group_id === "diagnostic-observe").enforcement_result,
+      "observe",
+    );
+
+    const observedOnly = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+    });
+    assert.equal(observedOnly.verifySummary.status, "passed");
+    assert.equal(observedOnly.verifySummary.enforcement_summary.observe_failed_count, 1);
+  });
+});
+
+test("verifyProjectRuntime uses timeout-class defaults when profile timeout is omitted", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent.replace(
+      "repo_graph: []",
+      [
+        "repo_graph: []",
+        "verification:",
+        "  command_groups:",
+        "    - id: diagnostic-full-suite",
+        "      role: full-suite",
+        "      phase: diagnostic",
+        "      enforcement: warn",
+        "      timeout_class: full-suite",
+        "      commands:",
+        "        - 'node -e \"process.exit(0)\"'",
+      ].join("\n"),
+    );
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-diagnostic",
+    });
+
+    assert.equal(result.verifySummary.status, "passed");
+    assert.equal(result.verifySummary.command_timeout_ms, 7200000);
+    assert.equal(result.stepResults[0].command_group_timeout_class, "full-suite");
+    assert.equal(result.stepResults[0].command_timeout_ms, 7200000);
+  });
+});
+
+test("verifyProjectRuntime handles generic project archetype command groups without live E2E fields", () => {
+  const scenarios = [
+    {
+      name: "node-package",
+      label: "baseline-diagnostic",
+      expectedStatus: "passed",
+      groups: [
+        ["node-build", "build", "baseline", "required", "build", 'node -e "process.exit(0)"'],
+        ["node-test", "test", "baseline", "required", "focused-test", 'node -e "process.exit(0)"'],
+      ],
+    },
+    {
+      name: "python-package",
+      label: "baseline-diagnostic",
+      expectedStatus: "passed",
+      groups: [
+        ["python-setup", "setup", "readiness", "required", "install", 'node -e "process.exit(0)"'],
+        ["python-tests", "test", "baseline", "required", "focused-test", 'node -e "process.exit(0)"'],
+      ],
+    },
+    {
+      name: "monorepo",
+      label: "post-run-primary",
+      expectedStatus: "passed",
+      groups: [
+        ["workspace-build", "build", "post-change", "required", "build", 'node -e "process.exit(0)"'],
+        ["workspace-test", "test", "post-change", "required", "focused-test", 'node -e "process.exit(0)"'],
+      ],
+    },
+    {
+      name: "no-tests",
+      label: "post-run-primary",
+      expectedStatus: "passed",
+      groups: [
+        ["no-tests-build", "build", "post-change", "required", "build", 'node -e "process.exit(0)"'],
+        ["no-tests-lint", "lint", "post-change", "required", "quick", 'node -e "process.exit(0)"'],
+      ],
+    },
+    {
+      name: "broken-baseline",
+      label: "baseline-diagnostic",
+      expectedStatus: "failed",
+      groups: [
+        ["broken-baseline-test", "test", "baseline", "required", "focused-test", 'node -e "process.exit(5)"'],
+      ],
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    withTempRepo((repoRoot) => {
+      const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+      const profileContent = fs.readFileSync(profilePath, "utf8");
+      const groupYaml = scenario.groups.flatMap(([id, role, phase, enforcement, timeoutClass, command]) => [
+        `    - id: ${id}`,
+        `      role: ${role}`,
+        `      phase: ${phase}`,
+        `      enforcement: ${enforcement}`,
+        `      timeout_class: ${timeoutClass}`,
+        "      commands:",
+        `        - '${command.replace(/'/gu, "''")}'`,
+      ]);
+      const patched = profileContent.replace(
+        "repo_graph: []",
+        ["repo_graph: []", "verification:", "  command_groups:", ...groupYaml].join("\n"),
+      );
+      fs.writeFileSync(profilePath, patched, "utf8");
+
+      const result = verifyProjectRuntime({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        verificationLabel: scenario.label,
+      });
+
+      assert.equal(result.verifySummary.status, scenario.expectedStatus, scenario.name);
+      assert.ok(result.verifySummary.command_groups.length > 0, scenario.name);
+      const serializedSummary = JSON.stringify(result.verifySummary);
+      assert.equal(/live_e2e|live-e2e|target_readiness|diagnostic_health|step_quality/u.test(serializedSummary), false);
+    });
+  }
 });
