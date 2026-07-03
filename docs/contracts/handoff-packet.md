@@ -27,7 +27,7 @@ A handoff packet is the formal approval boundary for implementation work.
 For medium+ implementation work, the packet should carry the same planning-grade content approved in the wave ticket:
 - `goals[]`, `definition_of_done[]`, `local_tasks[]`, `acceptance_criteria[]`, `expected_evidence[]`, and `kpis[]` from the approved intake/spec when present.
 - `verification_expectations` copied from the wave ticket so review and operator checks can inspect the mission verification contract directly.
-- `verification_plan.commands[]` populated with mission primary verification commands before falling back to generic profile commands.
+- `verification_plan.command_groups[]` populated with generic AOR command groups for setup, baseline, post-change, and diagnostic checks. Legacy `verification_plan.commands[]` may remain as a compatibility read model for older packets, but new packets should treat command groups as the executable verification contract.
 - `allowed_paths[]` narrowed from mission `change_evidence.required_path_prefixes[]` when available; broad `**` scope is acceptable only when the upstream artifact provides no narrower path hints.
 Runner prompts and review gates may use these optional fields as completeness evidence, but older handoff packets without them remain loadable.
 

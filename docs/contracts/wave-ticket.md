@@ -20,5 +20,8 @@ For medium+ implementation work, the ticket should preserve planning-grade conte
 - `goals[]` and `definition_of_done[]` at the top level when supplied by the intake/spec.
 - `local_tasks[]` with bounded objectives and task-level acceptance criteria.
 - `acceptance_criteria[]` and `expected_evidence[]` that make completeness reviewable before handoff.
-- `verification_expectations.primary_commands[]` when the source mission declares bounded primary verification.
+- `verification_plan.command_groups[]` when the source mission declares bounded
+  setup, baseline, post-change, or diagnostic verification. Legacy
+  `verification_expectations.primary_commands[]` may remain for compatibility,
+  but command groups are the generic executable contract.
 - `scope.allowed_paths[]` narrowed from mission path hints when available; use `**` only when no narrower source-of-truth scope exists.

@@ -57,7 +57,7 @@ For canonical setup and verification dependency details per profile, use `script
     - broader request lifecycle mission with stricter audit/learning closure
     - post-run primary gate uses `test/main.ts`, `test/hooks.ts`, and focused
       `test/retry.ts --match='*shouldRetry*'`; the full timing-heavy retry
-      suite remains diagnostic evidence with an 1800 second target command
+      suite remains diagnostic evidence with a 7200 second target command
       budget on governance large profiles
   - `ky-request-lifecycle-observability-xlarge`
     - `xlarge`, `governance|repair`, manual-only
@@ -327,7 +327,7 @@ For canonical setup and verification dependency details per profile, use `script
 - `prettier/prettier` (`prettier`): formatter snapshot target, extended medium TypeScript formatting regression cell, `yarn install --immutable`, typecheck, ESLint, and focused format tests.
 - `astral-sh/ruff` (`ruff`): Rust Python linter/formatter, extended large rule/autofix regression cell, `cargo fetch`, targeted crate tests.
 - `vitest-dev/vitest` (`vitest`): hard runner diagnostics target, extended large product-change cell, Node engine preflight, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm test`, `pnpm lint`, isolated verification workspace.
-- `sqlalchemy/sqlalchemy` (`sqlalchemy`): hard Python SQL/ORM target, extended large product-change cell, `.aor` venv editable install, targeted SQL/ORM pytest.
+- `sqlalchemy/sqlalchemy` (`sqlalchemy`): hard Python SQL/ORM target, extended large product-change cell, `.aor` venv editable install, targeted SQL/ORM pytest, and full-suite diagnostic pytest that must pass before product acceptance.
 - `biomejs/biome` (`biome`): hard Rust/TypeScript formatter and rule target, extended large product-change cell, `pnpm install --frozen-lockfile`, `pnpm test`, `pnpm lint`.
 
 ## Why these targets
@@ -490,6 +490,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory factual evidence for full-journey observation and contributes directly to the step journal, run-health, and post-run quality assessment.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory factual evidence for full-journey observation and contributes directly to the step journal, run-health, and post-run quality assessment. Hard-target acceptance profiles may override this default to `blocking`; the Vitest large profile does so because a clean compatible-Node baseline `pnpm test` failure is a target baseline blocker before product execution, not acceptance evidence.
 
 See `scripts/live-e2e/docs/runbooks/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

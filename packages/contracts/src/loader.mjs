@@ -35,6 +35,17 @@ const RUNTIME_HARNESS_RUN_TERMINAL_STATUS_VALUES = ["closed", "blocked", "failed
 const INCIDENT_RECERTIFICATION_DECISION_VALUES = ["recertify", "hold", "re-enable"];
 const PLATFORM_RECERTIFICATION_LINKAGE_VALUES = ["linked", "rollback", "unlinked"];
 const PLATFORM_ROLLOUT_ACTION_VALUES = ["promote", "hold", "reject", "freeze", "demote"];
+const VERIFICATION_COMMAND_GROUP_ROLE_VALUES = ["setup", "build", "lint", "test", "typecheck", "e2e", "full-suite", "custom"];
+const VERIFICATION_COMMAND_GROUP_PHASE_VALUES = ["readiness", "baseline", "post-change", "diagnostic"];
+const VERIFICATION_COMMAND_GROUP_ENFORCEMENT_VALUES = ["required", "warn", "observe"];
+const VERIFICATION_COMMAND_GROUP_TIMEOUT_CLASS_VALUES = [
+  "install",
+  "build",
+  "focused-test",
+  "full-suite",
+  "browser-e2e",
+  "quick",
+];
 
 /**
  * @returns {import("./index.d.ts").ContractFamilyIndexEntry[]}
@@ -179,6 +190,18 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateAdapterCapabilityProfile(document, source));
   }
 
+  if (family === "project-profile") {
+    issues.push(...validateProjectProfile(document, source));
+  }
+
+  if (family === "wave-ticket") {
+    issues.push(...validateWaveTicket(document, source));
+  }
+
+  if (family === "handoff-packet") {
+    issues.push(...validateHandoffPacket(document, source));
+  }
+
   if (family === "compiled-context-artifact") {
     issues.push(...validateCompiledContextArtifact(document, source));
   }
@@ -233,6 +256,172 @@ export function validateContractDocument({ family, document, source = "<in-memor
     source,
     issues,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateProjectProfile(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const verification = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "verification",
+    issues,
+  });
+  if (verification) {
+    validateVerificationCommandGroups(verification, source, "verification.command_groups", issues, false);
+  }
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateWaveTicket(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const verificationPlan = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "verification_plan",
+    issues,
+  });
+  if (verificationPlan) {
+    validateVerificationCommandGroups(verificationPlan, source, "verification_plan.command_groups", issues, false);
+  }
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateHandoffPacket(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const verificationPlan = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "verification_plan",
+    issues,
+  });
+  if (verificationPlan) {
+    validateVerificationCommandGroups(verificationPlan, source, "verification_plan.command_groups", issues, false);
+  }
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @param {string} source
+ * @param {string} field
+ * @param {import("./index.d.ts").ContractValidationIssue[]} issues
+ * @param {boolean} required
+ */
+function validateVerificationCommandGroups(record, source, field, issues, required) {
+  const commandGroups = validateOptionalArrayField({
+    record,
+    source,
+    field,
+  });
+  if (!commandGroups) {
+    if (required) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field,
+          expected: "present",
+          actual: "missing",
+          message: `Missing required field '${field}'.`,
+        }),
+      );
+    }
+    return;
+  }
+
+  commandGroups.forEach((entry, index) => {
+    const entryField = `${field}[${index}]`;
+    if (!isPlainObject(entry)) {
+      issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source,
+          field: entryField,
+          expected: "object",
+          actual: describeActualType(entry),
+          message: `Field '${entryField}' must be 'object'.`,
+        }),
+      );
+      return;
+    }
+
+    validateNestedStringField({ record: entry, source, field: `${entryField}.id`, issues, required: true });
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `${entryField}.role`,
+      allowedValues: VERIFICATION_COMMAND_GROUP_ROLE_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `${entryField}.phase`,
+      allowedValues: VERIFICATION_COMMAND_GROUP_PHASE_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `${entryField}.enforcement`,
+      allowedValues: VERIFICATION_COMMAND_GROUP_ENFORCEMENT_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedEnumStringField({
+      record: entry,
+      source,
+      field: `${entryField}.timeout_class`,
+      allowedValues: VERIFICATION_COMMAND_GROUP_TIMEOUT_CLASS_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedArrayField({
+      record: entry,
+      source,
+      field: `${entryField}.commands`,
+      issues,
+      required: true,
+    });
+    validateStringArrayItems({
+      values: entry.commands,
+      source,
+      field: `${entryField}.commands`,
+      issues,
+    });
+    if (Array.isArray(entry.commands) && entry.commands.length === 0) {
+      issues.push(
+        issue({
+          code: "required_field_missing",
+          source,
+          field: `${entryField}.commands`,
+          expected: "non-empty array",
+          actual: "empty",
+          message: `Field '${entryField}.commands' must contain at least one command.`,
+        }),
+      );
+    }
+  });
 }
 
 /**
@@ -1033,6 +1222,54 @@ function validateStepResult(document, source) {
       required: false,
     });
   }
+
+  validateNestedStringField({
+    record: document,
+    source,
+    field: "command_group_id",
+    issues,
+    required: false,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "command_group_role",
+    allowedValues: VERIFICATION_COMMAND_GROUP_ROLE_VALUES,
+    issues,
+    required: false,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "command_group_phase",
+    allowedValues: VERIFICATION_COMMAND_GROUP_PHASE_VALUES,
+    issues,
+    required: false,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "command_group_enforcement",
+    allowedValues: VERIFICATION_COMMAND_GROUP_ENFORCEMENT_VALUES,
+    issues,
+    required: false,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "command_group_timeout_class",
+    allowedValues: VERIFICATION_COMMAND_GROUP_TIMEOUT_CLASS_VALUES,
+    issues,
+    required: false,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "enforcement_result",
+    allowedValues: ["pass", "fail", "warn", "observe"],
+    issues,
+    required: false,
+  });
 
   const repairAttempts = validateOptionalArrayField({
     record: document,

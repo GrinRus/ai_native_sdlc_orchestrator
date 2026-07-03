@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-52-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-54-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -63,6 +63,8 @@ The authoritative planning model for implementation lives in:
 | W50 | Close W49 Fastify/Vitest blockers with review verification mapping, target toolchain fail-fast, control proof rerun, and findings sync. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-50-implementation-slices.md` |
 | W51 | Turn W50 proof into clean-commit closure, pursue Vitest large acceptance, automate final quality hydration, split target-readiness semantics, and add the next hard target only after large proof is stable. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-51-implementation-slices.md` |
 | W52 | Convert the remaining Vitest and SQLAlchemy hard-target installed-user rehearsal evidence into product acceptance or precise non-acceptance blockers, then harden manual evidence depth and final acceptance reporting. | 10 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
+| W53 | Generalize target verification into AOR command groups and enforce the boundary between AOR runtime artifacts and live E2E proof harness evidence. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-53-implementation-slices.md` |
+| W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -942,6 +944,56 @@ quality gates or hiding target/environment blockers.
   acceptance, paired guided UI proof, and manual xlarge observation evidence.
 
 **Detailed slices:** `docs/backlog/wave-52-implementation-slices.md`
+
+## W53 - generic verification core and live E2E boundary
+**Goal:** Replace target-specific verification fixes with generic AOR command
+groups while keeping live E2E target catalog, run-health, and step-quality
+semantics outside orchestrator core.
+
+**Exit criteria:**
+- Project profiles, wave tickets, and handoff packets can carry validated
+  `verification.command_groups[]` / `verification_plan.command_groups[]`.
+- `project verify` normalizes legacy commands into command groups and reports
+  required, warning, and observe enforcement separately.
+- Live E2E generated target profiles translate catalog verification sugar into
+  generic command groups and no longer pass post-run verification through regex
+  command bucketing.
+- Source guards prevent `packages/**` and `apps/**` production source from
+  importing live E2E tooling or emitting live E2E-only fields.
+- Generic verifier fixtures cover Node, Python-style setup, monorepo, no-tests,
+  and broken-baseline archetypes without depending on the live E2E target
+  matrix.
+
+**Detailed slices:** `docs/backlog/wave-53-implementation-slices.md`
+
+## W54 - generic verification authoring and discovery
+**Goal:** Make W53 command groups practical for arbitrary projects by adding
+authoring contracts, stack discovery, generated project profiles, multi-root
+execution semantics, operator-visible plan surfaces, migration examples, real
+archetype smoke coverage, and expanded public/private boundary guards.
+
+**Exit criteria:**
+- Command groups can describe working directories, dependencies, detection
+  source refs, package managers, tool requirements, skip policy, and generic
+  no-tests/missing-tool/not-applicable/broken-baseline outcomes.
+- Stack discovery proposes command groups for Node, Python, Go, Rust, frontend
+  browser, monorepo, no-tests, and unknown/custom project shapes without
+  target-specific logic.
+- `project init` can materialize valid default command groups while preserving
+  legacy repo command fields as compatibility read models.
+- `project verify` honors group working directories, dependency skips,
+  missing-tool evidence, timeout classes, hang cleanup, and baseline versus
+  post-change status separation.
+- CLI, API, and web surfaces expose verification plans and per-group status
+  without private proof-harness vocabulary.
+- Migration docs and examples teach command groups while proving legacy command
+  flags still normalize correctly.
+- Archetype smoke coverage proves generic discovery, planning, and verification
+  outside private target matrices.
+- Boundary guards cover production source, public docs/examples, and AOR
+  artifact shapes.
+
+**Detailed slices:** `docs/backlog/wave-54-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

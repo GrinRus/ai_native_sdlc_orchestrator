@@ -900,26 +900,43 @@ function resolveDurationSeconds(startedAt, finishedAt) {
   return Math.round(((finishedMs - startedMs) / 1000) * 1000) / 1000;
 }
 
+const POST_RUN_DIAGNOSTIC_INTENT = "post-run-diagnostic";
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeDiagnosticIntent(value) {
+  const normalized = asNonEmptyString(value).toLowerCase().replace(/_/gu, "-");
+  if (normalized === POST_RUN_DIAGNOSTIC_INTENT) return POST_RUN_DIAGNOSTIC_INTENT;
+  return null;
+}
+
 /**
  * @param {ReturnType<typeof runAorCommand>} result
+ * @param {{ diagnosticIntent?: unknown, diagnostic_intent?: unknown }} [options]
  * @returns {Record<string, unknown>}
  */
-function buildCommandDiagnostic(result) {
+function buildCommandDiagnostic(result, options = {}) {
   const payload = asRecord(result.payload);
   const lifecycleCommand = asRecord(payload.lifecycle_command);
   const commandOutput = asRecord(lifecycleCommand.command_output);
   const runControlState = asRecord(payload.run_control_state);
   const providerStepStatus = asRecord(runControlState.provider_step_status);
+  const diagnosticIntent =
+    normalizeDiagnosticIntent(options.diagnosticIntent) || normalizeDiagnosticIntent(options.diagnostic_intent);
+  const isDiagnosticCommand = Boolean(diagnosticIntent);
   const interactiveContinuation =
     asRecord(payload.interactive_continuation).requested === true
       ? asRecord(payload.interactive_continuation)
       : asRecord(lifecycleCommand.interactive_continuation).requested === true
         ? asRecord(lifecycleCommand.interactive_continuation)
-        : asRecord(commandOutput.interactive_continuation).requested === true
-          ? asRecord(commandOutput.interactive_continuation)
-          : null;
-  return {
+          : asRecord(commandOutput.interactive_continuation).requested === true
+            ? asRecord(commandOutput.interactive_continuation)
+            : null;
+  const diagnostic = {
     label: result.label,
+    diagnostic_intent: diagnosticIntent,
     command_surface: result.commandSurface,
     status: result.ok ? "pass" : "fail",
     exit_code: result.exitCode,
@@ -932,17 +949,17 @@ function buildCommandDiagnostic(result) {
     artifact_refs: uniqueStrings(collectStringRefs(result.payload)),
     failure_class: result.ok
       ? null
-      : result.timedOut && isDiagnosticCommandLabel(result.label)
+      : result.timedOut && isDiagnosticCommand
         ? "diagnostic-command-timeout"
         : result.timedOut
           ? "aor-command-timeout"
           : "command-failed",
-    failure_owner: result.ok ? null : isDiagnosticCommandLabel(result.label) ? "target_repository" : "aor",
+    failure_owner: result.ok ? null : isDiagnosticCommand ? "target_repository" : "aor",
     failure_phase: result.ok ? null : resolveFailurePhaseForCommandLabel(result.label),
     missing_evidence: [],
     recommendation: result.ok
       ? "continue"
-      : result.timedOut && isDiagnosticCommandLabel(result.label)
+      : result.timedOut && isDiagnosticCommand
         ? "bounded diagnostic cleanup completed; inspect transcript stdout/stderr and keep product acceptance gated"
         : result.timedOut
         ? "inspect AOR command transcript and target setup status before judging provider quality"
@@ -950,14 +967,8 @@ function buildCommandDiagnostic(result) {
     interactive_continuation: interactiveContinuation,
     provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
   };
-}
-
-/**
- * @param {string} label
- * @returns {boolean}
- */
-function isDiagnosticCommandLabel(label) {
-  return label.includes("diagnostic");
+  if (!diagnosticIntent) delete diagnostic.diagnostic_intent;
+  return diagnostic;
 }
 
 /**
@@ -3449,53 +3460,6 @@ function buildIntakeCreateArgs(options) {
 }
 
 /**
- * @param {string} command
- * @param {string} envOverride
- * @returns {string}
- */
-function wrapCommandWithTargetNodeEnvOverride(command, envOverride) {
-  const value = asNonEmptyString(command);
-  if (!value) return "";
-  const normalized = normalizeTargetCommandForComparison(value);
-  if (normalized && normalized !== value.replace(/\s+/gu, " ").trim()) return value;
-  return `[ -z "\${${envOverride}:-}" ] || export PATH="$(dirname "$${envOverride}"):$PATH"; ${value}`;
-}
-
-/**
- * @param {Record<string, unknown>} profile
- * @param {string[]} commands
- * @returns {string[]}
- */
-function applyTargetToolchainPolicyToOverrideCommands(profile, commands) {
-  const policy = resolveTargetNodeToolchainPolicy(profile);
-  if (!policy) return commands;
-  return commands.map((command) => wrapCommandWithTargetNodeEnvOverride(command, policy.envOverride)).filter(Boolean);
-}
-
-/**
- * @param {{ label: string, commands: string[], setupCommands?: string[], profile?: Record<string, unknown> }} options
- * @returns {string[]}
- */
-function buildVerifyOverrideArgs(options) {
-  const setupCommands = applyTargetToolchainPolicyToOverrideCommands(
-    asRecord(options.profile),
-    asStringArray(options.setupCommands),
-  );
-  const commands = applyTargetToolchainPolicyToOverrideCommands(asRecord(options.profile), options.commands);
-  const lintCommands = commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
-  const buildCommands = commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
-  const testCommands = commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
-  return [
-    "--verification-label",
-    options.label,
-    ...setupCommands.flatMap((entry) => ["--repo-lint-command", entry]),
-    ...buildCommands.flatMap((entry) => ["--repo-build-command", entry]),
-    ...lintCommands.flatMap((entry) => ["--repo-lint-command", entry]),
-    ...testCommands.flatMap((entry) => ["--repo-test-command", entry]),
-  ];
-}
-
-/**
  * @param {string} value
  * @returns {string}
  */
@@ -4190,7 +4154,7 @@ export function executeInstalledUserFlow(options) {
         index: commandIndex,
       });
       commandIndex += 1;
-      const diagnostic = buildCommandDiagnostic(result);
+      const diagnostic = buildCommandDiagnostic(result, runOptions);
       annotateCommandDiagnosticStep(diagnostic, label, iteration);
       if (!result.ok && runOptions.allowNonZeroWithPayload === true && result.payload) {
         diagnostic.accepted_nonzero_payload = true;
@@ -4898,7 +4862,7 @@ export function executeFullJourneyFlow(options) {
             : null,
       });
       commandIndex += 1;
-      const diagnostic = buildCommandDiagnostic(result);
+      const diagnostic = buildCommandDiagnostic(result, runOptions);
       annotateCommandDiagnosticStep(diagnostic, label, iteration);
       if (!result.ok && runOptions.allowNonZeroWithPayload === true && result.payload) {
         diagnostic.accepted_nonzero_payload = true;
@@ -4938,17 +4902,14 @@ export function executeFullJourneyFlow(options) {
         ".aor",
         "--require-validation-pass",
         "true",
-        ...buildVerifyOverrideArgs({
-          label: "post-run-diagnostic",
-          commands: postRunQualityPolicy.diagnosticCommands,
-          setupCommands: repoLintCommands,
-          profile: options.profile,
-        }),
+        "--verification-label",
+        "post-run-diagnostic",
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
           : []),
       ], {
         iteration,
+        diagnosticIntent: POST_RUN_DIAGNOSTIC_INTENT,
         timeoutMs:
           typeof runOptions.timeoutMs === "number" && Number.isFinite(runOptions.timeoutMs)
             ? Number(runOptions.timeoutMs)
@@ -5784,12 +5745,8 @@ export function executeFullJourneyFlow(options) {
         ".aor",
         "--require-validation-pass",
         "true",
-        ...buildVerifyOverrideArgs({
-          label: "post-run-primary",
-          commands: postRunQualityPolicy.primaryCommands,
-          setupCommands: repoLintCommands,
-          profile: options.profile,
-        }),
+        "--verification-label",
+        "post-run-primary",
         ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
           ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
           : []),

@@ -24,6 +24,25 @@ const OUTPUT_QUALITY_WARNING_PATTERNS = Object.freeze([
   },
 ]);
 const OUTPUT_QUALITY_BASELINE_STATUS_PRE_EXISTING = "pre_existing";
+const COMMAND_GROUP_ROLE_VALUES = Object.freeze(["setup", "build", "lint", "test", "typecheck", "e2e", "full-suite", "custom"]);
+const COMMAND_GROUP_PHASE_VALUES = Object.freeze(["readiness", "baseline", "post-change", "diagnostic"]);
+const COMMAND_GROUP_ENFORCEMENT_VALUES = Object.freeze(["required", "warn", "observe"]);
+const COMMAND_GROUP_TIMEOUT_CLASS_VALUES = Object.freeze([
+  "install",
+  "build",
+  "focused-test",
+  "full-suite",
+  "browser-e2e",
+  "quick",
+]);
+const COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS = Object.freeze({
+  install: 2 * 60 * 60 * 1000,
+  build: 60 * 60 * 1000,
+  "focused-test": 30 * 60 * 1000,
+  "full-suite": 2 * 60 * 60 * 1000,
+  "browser-e2e": 2 * 60 * 60 * 1000,
+  quick: 10 * 60 * 1000,
+});
 
 /**
  * @param {unknown} value
@@ -63,64 +82,251 @@ function normalizeFilePart(value) {
 }
 
 /**
- * @param {Record<string, unknown>} profile
- * @param {{ repoBuildCommands?: string[], repoLintCommands?: string[], repoTestCommands?: string[] }} [overrides]
- * @returns {Array<{ repoId: string, command: string, commandSource: "project-profile" | "cli-override", commandKind: "lint" | "test" | "build" }>}
+ * @param {string} verificationLabel
+ * @returns {"readiness" | "baseline" | "post-change" | "diagnostic"}
  */
-function collectVerifyCommands(profile, overrides = {}) {
+function phaseFromVerificationLabel(verificationLabel) {
+  const normalized = verificationLabel.toLowerCase();
+  if (normalized.includes("baseline")) return "baseline";
+  if (normalized.includes("diagnostic")) return "diagnostic";
+  if (normalized.includes("post-run") || normalized.includes("post-change")) return "post-change";
+  return "post-change";
+}
+
+/**
+ * @param {string} role
+ * @returns {"install" | "build" | "focused-test" | "full-suite" | "browser-e2e" | "quick"}
+ */
+function defaultTimeoutClassForRole(role) {
+  if (role === "setup") return "install";
+  if (role === "build" || role === "typecheck") return "build";
+  if (role === "lint") return "quick";
+  if (role === "e2e") return "browser-e2e";
+  if (role === "full-suite") return "full-suite";
+  return "focused-test";
+}
+
+/**
+ * @param {string} value
+ * @param {readonly string[]} allowed
+ * @param {string} fallback
+ * @returns {string}
+ */
+function normalizeEnum(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+/**
+ * @param {Record<string, unknown>} group
+ * @param {number} index
+ * @param {string} repoId
+ * @param {string} source
+ * @returns {{
+ *   groupId: string,
+ *   repoId: string,
+ *   role: string,
+ *   phase: string,
+ *   enforcement: string,
+ *   timeoutClass: string,
+ *   commandSource: string,
+ *   commands: string[],
+ * }}
+ */
+function normalizeProfileCommandGroup(group, index, repoId, source) {
+  const role = normalizeEnum(String(group.role ?? ""), COMMAND_GROUP_ROLE_VALUES, "custom");
+  const phase = normalizeEnum(String(group.phase ?? ""), COMMAND_GROUP_PHASE_VALUES, "post-change");
+  const enforcement = normalizeEnum(String(group.enforcement ?? ""), COMMAND_GROUP_ENFORCEMENT_VALUES, "required");
+  return {
+    groupId:
+      typeof group.id === "string" && group.id.trim().length > 0
+        ? group.id.trim()
+        : `${source}-command-group-${index + 1}`,
+    repoId:
+      typeof group.repo_id === "string" && group.repo_id.trim().length > 0
+        ? group.repo_id.trim()
+        : repoId,
+    role,
+    phase,
+    enforcement,
+    timeoutClass: normalizeEnum(
+      String(group.timeout_class ?? ""),
+      COMMAND_GROUP_TIMEOUT_CLASS_VALUES,
+      defaultTimeoutClassForRole(role),
+    ),
+    commandSource: source,
+    commands: asStringArray(group.commands),
+  };
+}
+
+/**
+ * @param {{
+ *   id: string,
+ *   repoId: string,
+ *   role: "build" | "lint" | "test",
+ *   phase: string,
+ *   commands: string[],
+ *   source: "project-profile" | "cli-override",
+ * }} options
+ * @returns {{
+ *   groupId: string,
+ *   repoId: string,
+ *   role: string,
+ *   phase: string,
+ *   enforcement: string,
+ *   timeoutClass: string,
+ *   commandSource: string,
+ *   commands: string[],
+ * }}
+ */
+function makeLegacyCommandGroup(options) {
+  return {
+    groupId: options.id,
+    repoId: options.repoId,
+    role: options.role,
+    phase: options.phase,
+    enforcement: "required",
+    timeoutClass: defaultTimeoutClassForRole(options.role),
+    commandSource: options.source,
+    commands: asStringArray(options.commands),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {{ repoBuildCommands?: string[], repoLintCommands?: string[], repoTestCommands?: string[], verificationLabel?: string }} [overrides]
+ * @returns {Array<{
+ *   groupId: string,
+ *   repoId: string,
+ *   role: string,
+ *   phase: string,
+ *   enforcement: string,
+ *   timeoutClass: string,
+ *   commandSource: string,
+ *   commands: string[],
+ * }>}
+ */
+function collectVerificationCommandGroups(profile, overrides = {}) {
+  const phase = phaseFromVerificationLabel(overrides.verificationLabel ?? "default");
   const overrideGroups = [
-    { kind: /** @type {"lint"} */ ("lint"), commands: asStringArray(overrides.repoLintCommands) },
-    { kind: /** @type {"test"} */ ("test"), commands: asStringArray(overrides.repoTestCommands) },
-    { kind: /** @type {"build"} */ ("build"), commands: asStringArray(overrides.repoBuildCommands) },
+    { id: "cli-build", role: /** @type {"build"} */ ("build"), commands: asStringArray(overrides.repoBuildCommands) },
+    { id: "cli-lint", role: /** @type {"lint"} */ ("lint"), commands: asStringArray(overrides.repoLintCommands) },
+    { id: "cli-test", role: /** @type {"test"} */ ("test"), commands: asStringArray(overrides.repoTestCommands) },
   ];
   if (overrideGroups.some((group) => group.commands.length > 0)) {
     const repoId = resolvePrimaryRepoId(profile);
-    return overrideGroups.flatMap((group) =>
-      group.commands.map((command) => ({
-        repoId,
-        command,
-        commandSource: /** @type {"cli-override"} */ ("cli-override"),
-        commandKind: group.kind,
-      })),
-    );
+    return overrideGroups
+      .filter((group) => group.commands.length > 0)
+      .map((group) =>
+        makeLegacyCommandGroup({
+          id: group.id,
+          repoId,
+          role: group.role,
+          phase,
+          commands: group.commands,
+          source: "cli-override",
+        }),
+      );
   }
 
-  /** @type {Array<{ repoId: string, command: string }>} */
-  const commands = [];
+  const verification = asRecord(profile.verification);
+  const profileGroups = Array.isArray(verification.command_groups)
+    ? verification.command_groups
+        .filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+        .map((entry, index) =>
+          normalizeProfileCommandGroup(
+            /** @type {Record<string, unknown>} */ (entry),
+            index,
+            resolvePrimaryRepoId(profile),
+            "project-profile",
+          ),
+        )
+        .filter((group) => group.commands.length > 0)
+    : [];
+  if (profileGroups.length > 0) {
+    return profileGroups.filter((group) => commandGroupAppliesToLabel(group, overrides.verificationLabel ?? "default"));
+  }
+
+  /** @type {Array<{ groupId: string, repoId: string, role: string, phase: string, enforcement: string, timeoutClass: string, commandSource: string, commands: string[] }>} */
+  const groups = [];
   const repos = Array.isArray(profile.repos) ? profile.repos : [];
 
   for (const repo of repos) {
     const repoRecord = /** @type {Record<string, unknown>} */ (repo);
     const repoId = typeof repoRecord.repo_id === "string" ? repoRecord.repo_id : "unknown";
-
-    for (const key of ["lint_commands", "test_commands", "build_commands"]) {
-      const candidateList = repoRecord[key];
-      if (!Array.isArray(candidateList)) continue;
-      for (const command of candidateList) {
-        if (typeof command === "string" && command.trim().length > 0) {
-          commands.push({
-            repoId,
-            command: command.trim(),
-            commandSource: /** @type {"project-profile"} */ ("project-profile"),
-            commandKind:
-              key === "lint_commands"
-                ? /** @type {"lint"} */ ("lint")
-                : key === "test_commands"
-                  ? /** @type {"test"} */ ("test")
-                  : /** @type {"build"} */ ("build"),
-          });
-        }
-      }
+    for (const descriptor of [
+      { field: "build_commands", role: /** @type {"build"} */ ("build") },
+      { field: "lint_commands", role: /** @type {"lint"} */ ("lint") },
+      { field: "test_commands", role: /** @type {"test"} */ ("test") },
+    ]) {
+      const commands = asStringArray(repoRecord[descriptor.field]);
+      if (commands.length === 0) continue;
+      groups.push(
+        makeLegacyCommandGroup({
+          id: `${repoId}-${descriptor.role}`,
+          repoId,
+          role: descriptor.role,
+          phase,
+          commands,
+          source: "project-profile",
+        }),
+      );
     }
   }
 
   const seen = new Set();
-  return commands.filter((item) => {
-    const marker = `${item.repoId}::${item.command}`;
-    if (seen.has(marker)) return false;
-    seen.add(marker);
-    return true;
-  });
+  return groups
+    .map((group) => ({
+      ...group,
+      commands: group.commands.filter((command) => {
+        const marker = `${group.repoId}::${group.groupId}::${command}`;
+        if (seen.has(marker)) return false;
+        seen.add(marker);
+        return true;
+      }),
+    }))
+    .filter((group) => group.commands.length > 0);
+}
+
+/**
+ * @param {{ phase: string }} group
+ * @param {string} verificationLabel
+ * @returns {boolean}
+ */
+function commandGroupAppliesToLabel(group, verificationLabel) {
+  if (group.phase === "readiness") return true;
+  const selectedPhase = phaseFromVerificationLabel(verificationLabel);
+  if (verificationLabel === "default") return true;
+  return group.phase === selectedPhase;
+}
+
+/**
+ * @param {ReturnType<typeof collectVerificationCommandGroups>} commandGroups
+ * @returns {Array<{
+ *   repoId: string,
+ *   command: string,
+ *   commandSource: string,
+ *   commandKind: string,
+ *   commandGroupId: string,
+ *   commandGroupRole: string,
+ *   commandGroupPhase: string,
+ *   commandGroupEnforcement: string,
+ *   commandGroupTimeoutClass: string,
+ * }>}
+ */
+function flattenCommandGroups(commandGroups) {
+  return commandGroups.flatMap((group) =>
+    group.commands.map((command) => ({
+      repoId: group.repoId,
+      command,
+      commandSource: group.commandSource,
+      commandKind: group.role,
+      commandGroupId: group.groupId,
+      commandGroupRole: group.role,
+      commandGroupPhase: group.phase,
+      commandGroupEnforcement: group.enforcement,
+      commandGroupTimeoutClass: group.timeoutClass,
+    })),
+  );
 }
 
 /**
@@ -400,9 +606,10 @@ function secondsToTimeoutMs(value) {
 /**
  * @param {Record<string, unknown>} profile
  * @param {number | null | undefined} overrideMs
+ * @param {string | null | undefined} timeoutClass
  * @returns {number}
  */
-function resolveVerificationCommandTimeoutMs(profile, overrideMs) {
+function resolveVerificationCommandTimeoutMs(profile, overrideMs, timeoutClass = null) {
   if (Number.isFinite(overrideMs) && Number(overrideMs) > 0) {
     return Math.max(Math.floor(Number(overrideMs)), MIN_VERIFICATION_COMMAND_TIMEOUT_MS);
   }
@@ -414,6 +621,16 @@ function resolveVerificationCommandTimeoutMs(profile, overrideMs) {
     secondsToTimeoutMs(budgetPolicy.verification_command_timeout_sec);
   if (explicitProfileTimeout !== null) {
     return explicitProfileTimeout;
+  }
+
+  if (
+    typeof timeoutClass === "string" &&
+    Object.prototype.hasOwnProperty.call(COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS, timeoutClass)
+  ) {
+    return Math.max(
+      COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS[/** @type {keyof typeof COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS} */ (timeoutClass)],
+      MIN_VERIFICATION_COMMAND_TIMEOUT_MS,
+    );
   }
 
   const budgetDefaultTimeout = secondsToTimeoutMs(budgetPolicy.default_timeout_sec);
@@ -466,6 +683,12 @@ function terminateTimedOutProcessGroup(pid) {
  *   commandOwner?: string,
  *   commandSource?: string,
  *   commandKind?: string,
+ *   commandGroupId?: string | null,
+ *   commandGroupRole?: string | null,
+ *   commandGroupPhase?: string | null,
+ *   commandGroupEnforcement?: string | null,
+ *   commandGroupTimeoutClass?: string | null,
+ *   enforcementResult?: string | null,
  *   verificationLabel?: string,
  *   missingPrerequisites?: string[],
  *   executionRoot?: string | null,
@@ -540,6 +763,18 @@ function materializeStepResult(options) {
   }
   if (Array.isArray(options.outputQualityFindings) && options.outputQualityFindings.length > 0) {
     stepResult.output_quality_findings = options.outputQualityFindings;
+  }
+  for (const [field, value] of [
+    ["command_group_id", options.commandGroupId],
+    ["command_group_role", options.commandGroupRole],
+    ["command_group_phase", options.commandGroupPhase],
+    ["command_group_enforcement", options.commandGroupEnforcement],
+    ["command_group_timeout_class", options.commandGroupTimeoutClass],
+    ["enforcement_result", options.enforcementResult],
+  ]) {
+    if (typeof value === "string" && value.length > 0) {
+      stepResult[field] = value;
+    }
   }
 
   const validation = validateContractDocument({
@@ -628,12 +863,18 @@ export function verifyProjectRuntime(options = {}) {
     runtimeDefaults: preflightSafety.runtimeDefaults,
     runId,
   });
-  const verifyCommands = collectVerifyCommands(profile, {
+  const commandGroups = collectVerificationCommandGroups(profile, {
     repoBuildCommands: options.repoBuildCommands,
     repoLintCommands: options.repoLintCommands,
     repoTestCommands: options.repoTestCommands,
+    verificationLabel,
   });
-  const commandTimeoutMs = resolveVerificationCommandTimeoutMs(profile, options.verificationCommandTimeoutMs);
+  const verifyCommands = flattenCommandGroups(commandGroups);
+  const commandTimeoutValues = verifyCommands.map((command) =>
+    resolveVerificationCommandTimeoutMs(profile, options.verificationCommandTimeoutMs, command.commandGroupTimeoutClass),
+  );
+  const summaryCommandTimeoutMs =
+    commandTimeoutValues.length > 0 ? Math.max(...commandTimeoutValues) : resolveVerificationCommandTimeoutMs(profile, options.verificationCommandTimeoutMs);
   const stepResultFiles = [];
   /** @type {Array<Record<string, unknown>>} */
   const stepResults = [];
@@ -667,6 +908,11 @@ export function verifyProjectRuntime(options = {}) {
     }
   } else {
     verifyCommands.forEach((item, index) => {
+      const commandTimeoutMs = resolveVerificationCommandTimeoutMs(
+        profile,
+        options.verificationCommandTimeoutMs,
+        item.commandGroupTimeoutClass,
+      );
       const stepId = `verify.${verificationLabel}.command.${index + 1}`;
       const transcriptPath = path.join(
         init.runtimeLayout.reportsRoot,
@@ -731,6 +977,14 @@ export function verifyProjectRuntime(options = {}) {
       fs.writeFileSync(transcriptPath, `${transcript}\n`, "utf8");
 
       const status = commandRun.status === 0 && !timedOut && !hasOutputQualityFailure ? "passed" : "failed";
+      const enforcementResult =
+        status === "passed"
+          ? "pass"
+          : item.commandGroupEnforcement === "observe"
+            ? "observe"
+            : item.commandGroupEnforcement === "warn"
+              ? "warn"
+              : "fail";
       const missingPrerequisites =
         status === "failed" && !timedOut && !hasOutputQualityFailure
           ? inferMissingPrerequisites(item.command, commandRun)
@@ -777,6 +1031,12 @@ export function verifyProjectRuntime(options = {}) {
         commandOwner: item.repoId,
         commandSource: item.commandSource,
         commandKind: item.commandKind,
+        commandGroupId: item.commandGroupId,
+        commandGroupRole: item.commandGroupRole,
+        commandGroupPhase: item.commandGroupPhase,
+        commandGroupEnforcement: item.commandGroupEnforcement,
+        commandGroupTimeoutClass: item.commandGroupTimeoutClass,
+        enforcementResult,
         verificationLabel,
         missingPrerequisites,
         executionRoot: workspaceIsolation.executionRoot,
@@ -826,8 +1086,43 @@ export function verifyProjectRuntime(options = {}) {
     stepResultFiles.push(stepResultPath);
   }
 
-  const summaryStatus = stepResults.some((result) => result.status === "failed") ? "failed" : "passed";
+  const requiredFailures = stepResults.filter(
+    (result) => result.status === "failed" && result.command_group_enforcement !== "warn" && result.command_group_enforcement !== "observe",
+  );
+  const warningFailures = stepResults.filter(
+    (result) => result.status === "failed" && result.command_group_enforcement === "warn",
+  );
+  const observedFailures = stepResults.filter(
+    (result) => result.status === "failed" && result.command_group_enforcement === "observe",
+  );
+  const summaryStatus = requiredFailures.length > 0 ? "failed" : warningFailures.length > 0 ? "warn" : "passed";
   const cleanupResult = workspaceIsolation.finalize(summaryStatus === "passed" ? "success" : "failure");
+  const commandGroupResults = commandGroups.map((group) => {
+    const groupSteps = stepResults.filter((result) => result.command_group_id === group.groupId);
+    const failedSteps = groupSteps.filter((result) => result.status === "failed");
+    const status =
+      failedSteps.length === 0
+        ? "passed"
+        : group.enforcement === "observe"
+          ? "observed"
+          : group.enforcement === "warn"
+            ? "warn"
+            : "failed";
+    return {
+      id: group.groupId,
+      repo_id: group.repoId,
+      role: group.role,
+      phase: group.phase,
+      enforcement: group.enforcement,
+      timeout_class: group.timeoutClass,
+      status,
+      command_count: group.commands.length,
+      failed_command_count: failedSteps.length,
+      step_result_refs: groupSteps
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+    };
+  });
   const verifySummary = {
     run_id: runId,
     verification_label: verificationLabel,
@@ -840,6 +1135,14 @@ export function verifyProjectRuntime(options = {}) {
       build_commands: asStringArray(options.repoBuildCommands),
       lint_commands: asStringArray(options.repoLintCommands),
       test_commands: asStringArray(options.repoTestCommands),
+    },
+    command_groups: commandGroupResults,
+    command_group_policy: {
+      roles: COMMAND_GROUP_ROLE_VALUES,
+      phases: COMMAND_GROUP_PHASE_VALUES,
+      enforcement: COMMAND_GROUP_ENFORCEMENT_VALUES,
+      timeout_classes: COMMAND_GROUP_TIMEOUT_CLASS_VALUES,
+      timeout_class_defaults_ms: COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS,
     },
     preflight_safety: {
       mode: "no-write",
@@ -865,7 +1168,7 @@ export function verifyProjectRuntime(options = {}) {
       cleanup: cleanupResult,
     },
     step_result_refs: stepResultFiles,
-    command_timeout_ms: commandTimeoutMs,
+    command_timeout_ms: summaryCommandTimeoutMs,
     timed_out_commands: stepResults
       .filter((result) => result.timed_out === true)
       .map((result) => ({
@@ -920,6 +1223,20 @@ export function verifyProjectRuntime(options = {}) {
           .filter((value) => value !== null),
       ),
     ),
+    enforcement_summary: {
+      required_failed_count: requiredFailures.length,
+      warn_failed_count: warningFailures.length,
+      observe_failed_count: observedFailures.length,
+      required_failed_step_result_refs: requiredFailures
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+      warn_step_result_refs: warningFailures
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+      observe_step_result_refs: observedFailures
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+    },
     reusable_by: {
       bootstrap_rehearsal: true,
       quality_rehearsal: true,

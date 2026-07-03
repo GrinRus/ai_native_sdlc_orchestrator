@@ -80,7 +80,27 @@ These fields declare deterministic defaults only. Actual context selection, expa
 
 Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
 
-`project verify` target commands are bounded per command. `runtime_defaults.verification_command_timeout_sec` may set an explicit per-command timeout for lint, test, build, and setup-derived verification commands. If it is omitted, `budget_policy.verification_command_timeout_sec` may provide the same bound. If both are omitted, AOR derives a bounded default from `budget_policy.default_timeout_sec` capped by the implementation default. The timeout is per target command, not a whole-lifecycle or provider-run budget.
+`verification.command_groups[]` is the generic AOR verification contract for
+target projects. Each group must carry:
+- `id`
+- `role`: `setup`, `build`, `lint`, `test`, `typecheck`, `e2e`, `full-suite`, or `custom`
+- `phase`: `readiness`, `baseline`, `post-change`, or `diagnostic`
+- `enforcement`: `required`, `warn`, or `observe`
+- `timeout_class`: `install`, `build`, `focused-test`, `full-suite`, `browser-e2e`, or `quick`
+- `commands[]`
+
+Legacy per-repo `build_commands`, `lint_commands`, and `test_commands` remain
+loadable and are normalized into required command groups by `project verify`
+when `verification.command_groups[]` is absent.
+
+`project verify` target commands are bounded per command.
+`runtime_defaults.verification_command_timeout_sec` may set an explicit
+per-command timeout for every command group. If it is omitted,
+`budget_policy.verification_command_timeout_sec` may provide the same bound. If
+both are omitted, AOR uses the command group's `timeout_class` default before
+falling back to the implementation default. The timeout is per target command,
+not a whole-lifecycle or provider-run budget. Long-running timeout budgets are
+separate from hang cleanup evidence.
 
 `writeback_policy.default_delivery_mode` should resolve to one of the delivery-plan modes:
 - `no-write`

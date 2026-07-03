@@ -241,6 +241,25 @@ test("project profile requires default prompt and context bundle defaults", () =
   );
 });
 
+test("project profile validates verification command group enums", () => {
+  const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.verification.command_groups[0].role = "live-e2e-diagnostic";
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "project-profile",
+      document: candidate,
+      source: "test://invalid-verification-command-group-role",
+    }),
+    "enum_value_invalid",
+    "verification.command_groups[0].role",
+  );
+});
+
 test("provider-route-profile rejects legacy wrapper ownership field", () => {
   const source = path.join(workspaceRoot, "examples/routes/implement-default.yaml");
   const loaded = loadContractFile({ filePath: source, family: "provider-route-profile" });

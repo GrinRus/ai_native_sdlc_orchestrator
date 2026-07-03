@@ -109,6 +109,17 @@ facts, separated from the primary post-run verification gate:
 - `failed_commands[]`
 - `evidence_refs[]`
 
+Each `timed_out_commands[]` and `failed_commands[]` entry must record the
+diagnostic command's `repo_scope`, `command`, `diagnostic_intent`, `status`,
+`timed_out`, `failure_owner`, `failure_phase`, `failure_class`,
+`step_result_ref`, and `summary`. `diagnostic_intent` is explicit metadata; do
+not infer diagnostic behavior from command labels or substring matches. Timeout
+or pipe-hang diagnostic entries use
+`failure_owner=target_repository`, `failure_phase=target_verification`, and
+`failure_class=post_run_diagnostic_timeout` so terminal output preservation and
+bounded cleanup are inspectable without turning warning evidence into product
+acceptance.
+
 `evidence_refs[]` may include the public `project verify` transcript when a
 non-blocking diagnostic times out before a verify summary can be materialized.
 
