@@ -165,7 +165,7 @@ assets.
 
 ## W44-S04 — Context, skill, and policy overlays from evidence
 - **Epic:** EPIC-4 Quality platform; EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Add only the context bundles, artifact skills, and policy
   overlays justified by W44 prompt/readiness evidence, then prove they remain
   traceable through compiled-context artifacts.
@@ -195,6 +195,15 @@ assets.
 - promotion or certification evidence when platform assets change materially
 - `pnpm check`
 
+### W44-S04 disposition evidence
+- Decision: no discovery/research/spec context, skill, or policy overlay split
+  in this slice.
+- Rationale: W44-S02 provides workflow-specific prompt bundles while W44-S03
+  readiness diagnostics carry ADR-ready and handoff-ready gates without a new
+  execution policy.
+- Required proof: compiled-context contract/runtime evidence persists selected
+  prompt refs, shared artifact context refs, and shared artifact `skill_refs`.
+
 ### Out of scope
 - Provider-specific prompt syntax.
 - Wrapper or adapter split.
@@ -204,7 +213,7 @@ assets.
 
 ## W44-S05 — Post-implementation docs and live E2E validation
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Update user-facing and maintainer documentation after W44
   implementation, then run a live E2E proof that discovery, research, spec, and
   planning readiness still work end to end.

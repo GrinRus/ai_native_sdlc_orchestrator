@@ -26,6 +26,11 @@ different `step` values and prompt bundle refs while continuing to use
 The split is therefore a prompt and readiness taxonomy change, not a new route
 class or adapter capability.
 
+W44-S04 keeps discovery, research, and spec on the shared artifact context
+bundle, artifact skill profile, and artifact step policy. Compiled context is
+the durable proof point: it records the workflow-specific prompt bundle
+alongside the shared artifact `context_*_refs` and `skill_refs`.
+
 `prompt_bundle.step_class` remains an execution-class field. A discovery,
 research, or spec prompt bundle should use `step_class: artifact` unless a later
 accepted slice introduces a new execution class. Project profiles select prompt

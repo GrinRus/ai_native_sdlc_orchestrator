@@ -540,6 +540,17 @@ test("compiled-context artifact requires budget and compaction reports", () => {
 
   assertValidationIssue(missingBudgetValidation, "required_field_missing", "budget_report");
 
+  const missingSkillRefs = structuredClone(loaded.document);
+  delete missingSkillRefs.skill_refs;
+
+  const missingSkillRefsValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: missingSkillRefs,
+    source: "test://compiled-context-missing-skill-refs",
+  });
+
+  assertValidationIssue(missingSkillRefsValidation, "required_field_missing", "skill_refs");
+
   const invalidSourceBreakdown = structuredClone(loaded.document);
   invalidSourceBreakdown.budget_report.source_breakdown = [{ source: "context" }];
 

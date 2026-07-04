@@ -10,6 +10,8 @@ context_rule_refs:
   - context-rule://context.rule.public-repo-safety@v1
 context_skill_refs:
   - context-skill://context.skill.runner-verification.default@v1
+skill_refs:
+  - skill.runner.implement@v1
 packet_refs:
   - packet://handoff/aor-core.wave-004
   - packet://spec/aor-core.wave-004

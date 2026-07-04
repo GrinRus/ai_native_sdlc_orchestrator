@@ -1358,6 +1358,7 @@ export function executeRoutedStep(options) {
         context_doc_refs: uniqueStrings(expandedRefs.context_doc_refs),
         context_rule_refs: uniqueStrings(expandedRefs.context_rule_refs),
         context_skill_refs: uniqueStrings(expandedRefs.context_skill_refs),
+        skill_refs: uniqueStrings(compiled.compiled_context.skill_refs),
         packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         hashes: {
           prompt_hash: `sha256:${sha256Hex(promptBundleRef)}`,
