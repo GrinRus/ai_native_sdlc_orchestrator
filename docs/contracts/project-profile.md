@@ -80,6 +80,15 @@ Bundled examples select `prompt-bundle://discovery-default@v1`,
 Profiles that still point all three keys at `prompt-bundle://artifact-default@v1`
 remain valid.
 
+`artifact_readiness_policy` is optional. When omitted, `aor next` uses strict
+artifact readiness: research must be `adr-ready` before spec can become ready,
+and stale discovery/research/spec evidence blocks downstream planning. A profile
+may set
+`artifact_readiness_policy.research.allow_incomplete_for_spec: true` with a
+human-readable `reason` to allow bounded spec drafting from incomplete research.
+That soft decision must remain visible in `next-action-report.artifact_readiness`
+and does not make stale evidence current.
+
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 

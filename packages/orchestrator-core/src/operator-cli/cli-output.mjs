@@ -301,6 +301,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["next_action_blockers", "nextActionBlockers"],
   ["next_action_evidence_refs", "nextActionEvidenceRefs"],
   ["next_action_mission_state", "nextActionMissionState"],
+  ["next_action_artifact_readiness", "nextActionArtifactReadiness"],
   ["next_action_closure_state", "nextActionClosureState"],
   ["next_action_bounded_execution", "nextActionBoundedExecution"],
   ["bootstrap_materialization_status", "bootstrapMaterializationStatus"],

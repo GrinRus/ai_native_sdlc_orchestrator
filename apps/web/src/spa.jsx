@@ -29,6 +29,14 @@ const PROJECT_STAGE_TO_UI_STAGE = {
   learning: "learning",
 };
 
+const ARTIFACT_READINESS_ROWS = [
+  { id: "mission", label: "Mission" },
+  { id: "discovery", label: "Discovery" },
+  { id: "research", label: "Research" },
+  { id: "spec", label: "Spec" },
+  { id: "planning", label: "Planning" },
+];
+
 const STAGE_TO_TARGET_STEP = {
   readiness: "discovery",
   mission: "discovery",
@@ -1148,7 +1156,7 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
   );
 }
 
-function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode }) {
+function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null }) {
   const closureState = flow?.closure_state ?? {};
   const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   if (completed || stage.id === "learning") {
@@ -1279,6 +1287,7 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows
   }
 
   if (stage.id === "discovery") {
+    const readinessStages = artifactReadiness?.stages ?? {};
     return (
       <div className="stage-specific-panel discovery-panel">
         <div className="panel-heading">
@@ -1293,6 +1302,22 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows
           <div><span>Mission artifacts</span><strong>{visibleEvidence.filter((row) => evidenceRefMatchesTokens(`${row.ref} ${row.kind} ${row.label}`, ["intake", "mission"])).length}</strong></div>
           <div><span>Scope policy</span><strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit paths required"}</strong></div>
         </div>
+        {artifactReadiness ? (
+          <div className="artifact-readiness-grid" aria-label="Artifact readiness">
+            {ARTIFACT_READINESS_ROWS.map((row) => {
+              const readiness = readinessStages[row.id] ?? {};
+              const status = readiness.status ?? "pending";
+              const reason = readiness.stale_reasons?.[0] ?? readiness.blocked_reasons?.[0] ?? readiness.reason ?? "Awaiting evidence";
+              return (
+                <div key={row.id} className={status}>
+                  <span>{row.label}</span>
+                  <strong>{status}</strong>
+                  <p>{reason}</p>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1450,6 +1475,7 @@ function FlowCockpit({
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
+  const artifactReadiness = nextAction?.artifact_readiness ?? null;
   const nextPrimary = completed
     ? nextAction?.primary_action?.action_id === "start-new-flow"
       ? nextAction.primary_action
@@ -1609,6 +1635,7 @@ function FlowCockpit({
         evidenceRows={evidenceRows}
         blockers={blockers}
         deliveryMode={deliveryMode}
+        artifactReadiness={artifactReadiness}
       />
 
       <div className="flow-snapshot-grid">
@@ -1721,6 +1748,8 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
+  const artifactReadiness = nextAction?.artifact_readiness ?? null;
+  const artifactReadinessStages = artifactReadiness?.stages ?? {};
   const latestRequest =
     latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft }) ??
     (!selectedFlow && !newFlowDraft ? latestDecisionRequestFromEvidence(evidenceRows) : null);
@@ -1741,6 +1770,17 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
           {blockers.length === 0 ? <li>None</li> : blockers.slice(0, 4).map((blocker, index) => <li key={`${blocker.code}-${index}`}>{blocker.summary ?? blocker.code}</li>)}
         </ul>
       </section>
+      {artifactReadiness ? (
+        <section className="rail-card artifact-readiness-card">
+          <h3>Artifact readiness <span>{artifactReadiness.policy?.mode ?? "strict"}</span></h3>
+          <ul>
+            {ARTIFACT_READINESS_ROWS.map((row) => {
+              const readiness = artifactReadinessStages[row.id] ?? {};
+              return <li key={row.id}><strong>{row.label}</strong><span>{readiness.status ?? "pending"}</span></li>;
+            })}
+          </ul>
+        </section>
+      ) : null}
       <section className="rail-card">
         <h3>Evidence artifacts <span>{visibleEvidence.length}</span></h3>
         <div className="artifact-chip-list">

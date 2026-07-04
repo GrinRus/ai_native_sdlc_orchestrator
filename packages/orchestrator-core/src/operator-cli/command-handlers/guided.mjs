@@ -473,6 +473,7 @@ export function handleGuidedCommand(context) {
     outputState.nextActionBlockers = report.blockers;
     outputState.nextActionEvidenceRefs = report.evidence_refs;
     outputState.nextActionMissionState = report.mission_state;
+    outputState.nextActionArtifactReadiness = report.artifact_readiness;
     outputState.nextActionClosureState = report.closure_state;
     outputState.nextActionBoundedExecution = report.bounded_execution;
     outputState.guidedCommand = "aor next";
@@ -484,6 +485,7 @@ export function handleGuidedCommand(context) {
       status: report.status,
       stage: report.project_state.stage,
       report_file: next.nextActionReportFile,
+      artifact_readiness: report.artifact_readiness,
     };
     outputState.guidedActionableBlockers = report.blockers;
     outputState.guidedRecommendedCommands = [primary.command];

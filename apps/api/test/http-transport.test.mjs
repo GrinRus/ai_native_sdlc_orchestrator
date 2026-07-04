@@ -745,6 +745,7 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const nextReportPayload = await nextReportResponse.json();
       assert.equal(nextReportPayload.family, "next-action-report");
       assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
+      assert.equal(nextReportPayload.document.artifact_readiness.stages.discovery.status, "pending");
       assert.equal(nextReportPayload.document.closure_state.run_id, null);
 
       const flowsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows`);

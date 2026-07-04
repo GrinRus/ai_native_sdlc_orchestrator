@@ -66,6 +66,21 @@ the incomplete reason and the primary action keeps that decision inspectable.
 Planning readiness is blocked whenever the current spec is missing, blocked, or
 stale.
 
+Runtime-generated reports include `artifact_readiness` as the public diagnostic
+object for these states. It contains:
+- `policy.mode`, either `strict` or `soft`;
+- `policy.allow_incomplete_research_for_spec`, which is `false` unless the
+  project profile explicitly permits soft continuation;
+- `policy.reason`, copied from the project profile when soft continuation is
+  configured;
+- `stages.mission`, `stages.discovery`, `stages.research`, `stages.spec`, and
+  `stages.planning`.
+
+Each stage record contains `status`, `evidence_ref`, `reason`,
+`blocked_reasons[]`, `stale_reasons[]`, `required_evidence_refs[]`, and optional
+`soft_decision`. CLI, API, and web surfaces must show blocked or stale reasons
+from this object without inventing a second next-action owner.
+
 ## Closure state
 `closure_state` is the durable final-stage model for review, delivery, release, and learning UX. It is always present, even before execution has started.
 

@@ -65,6 +65,93 @@ function writeRuntimeJson(filePath, document) {
 }
 
 /**
+ * @param {string} filePath
+ * @param {number} mtimeMs
+ */
+function setMtime(filePath, mtimeMs) {
+  const timestamp = new Date(mtimeMs);
+  fs.utimesSync(filePath, timestamp, timestamp);
+}
+
+/**
+ * @param {string} projectProfilePath
+ */
+function appendSoftReadinessPolicy(projectProfilePath) {
+  fs.appendFileSync(
+    projectProfilePath,
+    "\nartifact_readiness_policy:\n  research:\n    allow_incomplete_for_spec: true\n    reason: Soft test policy accepts incomplete research for bounded spec drafting.\n",
+    "utf8",
+  );
+  return projectProfilePath;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function writeAnalysisEvidence(init) {
+  const filePath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
+  writeRuntimeJson(filePath, {
+    report_id: `${init.projectId}.analysis.v1`,
+    project_id: init.projectId,
+    discovery_completeness: {
+      status: "pass",
+      blocking: false,
+      checks: [],
+    },
+    evidence_refs: [],
+  });
+  return filePath;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {"adr-ready" | "incomplete"} status
+ */
+function writeResearchEvidence(init, status) {
+  const filePath = path.join(init.runtimeLayout.reportsRoot, "discovery-research-report.json");
+  writeRuntimeJson(filePath, {
+    report_id: `${init.projectId}.discovery-research.v1`,
+    project_id: init.projectId,
+    status,
+    completeness: {
+      status,
+      blocking: status !== "adr-ready",
+    },
+    research_inputs: {
+      source_refs: ["evidence://reports/project-analysis-report.json"],
+    },
+    open_questions: status === "adr-ready" ? [] : ["Which local ADR should own the final spec decision?"],
+    evidence_refs: ["evidence://reports/project-analysis-report.json"],
+  });
+  return filePath;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function writeSpecEvidence(init) {
+  const filePath = path.join(init.runtimeLayout.reportsRoot, "step-result-spec-artifact.json");
+  writeRuntimeJson(filePath, {
+    step_result_id: `${init.projectId}.spec.pass.v1`,
+    project_id: init.projectId,
+    run_id: `${init.projectId}.spec-artifact`,
+    step_id: "artifact.spec",
+    step_class: "artifact",
+    status: "pass",
+    summary: "Spec artifact passed.",
+    evidence_refs: ["evidence://reports/discovery-research-report.json"],
+    routed_execution: {
+      architecture_traceability: {
+        selected_step: {
+          step_class: "spec",
+        },
+      },
+    },
+  });
+  return filePath;
+}
+
+/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
  */
@@ -280,9 +367,93 @@ test("resolveNextAction recommends discovery for complete guided mission intake"
     assert.equal(report.mission_state.completeness_status, "complete");
     assert.equal(report.mission_state.delivery_mode, "patch-only");
     assert.deepEqual(report.mission_state.allowed_paths, ["apps/web/**"]);
+    assert.equal(report.artifact_readiness.stages.mission.status, "complete");
+    assert.equal(report.artifact_readiness.stages.discovery.status, "pending");
+    assert.equal(report.artifact_readiness.stages.research.status, "pending");
+    assert.equal(report.artifact_readiness.stages.spec.status, "blocked");
     assert.equal(report.bounded_execution.upstream_writes_default, false);
     assert.equal(report.bounded_execution.requires_review_before_writeback, true);
     assert.equal(fs.existsSync(resolved.nextActionReportFile), true);
+  });
+});
+
+test("resolveNextAction blocks spec when strict research readiness is incomplete", () => {
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeAnalysisEvidence(init);
+    writeResearchEvidence(init, "incomplete");
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+
+    assert.equal(report.status, "blocked");
+    assert.equal(report.project_state.stage, "research");
+    assert.equal(report.primary_action.action_id, "discovery-run");
+    assert.equal(report.artifact_readiness.policy.mode, "strict");
+    assert.equal(report.artifact_readiness.stages.discovery.status, "complete");
+    assert.equal(report.artifact_readiness.stages.research.status, "blocked");
+    assert.equal(report.artifact_readiness.stages.spec.status, "blocked");
+    assert.equal(report.blockers[0].code, "research-adr-ready-required");
+  });
+});
+
+test("resolveNextAction allows spec from incomplete research only with soft readiness policy", () => {
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    const projectProfile = appendSoftReadinessPolicy(init.projectProfilePath);
+    writeMission(init);
+    writeAnalysisEvidence(init);
+    writeResearchEvidence(init, "incomplete");
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot, projectProfile }).nextActionReport;
+
+    assert.equal(report.status, "ready");
+    assert.equal(report.project_state.stage, "spec-build");
+    assert.equal(report.primary_action.action_id, "spec-build");
+    assert.equal(report.artifact_readiness.policy.mode, "soft");
+    assert.equal(report.artifact_readiness.stages.research.status, "incomplete");
+    assert.equal(report.artifact_readiness.stages.research.soft_decision.allowed, true);
+    assert.equal(report.artifact_readiness.stages.spec.status, "pending");
+  });
+});
+
+test("resolveNextAction marks spec stale when upstream research changes", () => {
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeAnalysisEvidence(init);
+    const researchFile = writeResearchEvidence(init, "adr-ready");
+    const specFile = writeSpecEvidence(init);
+    setMtime(researchFile, fs.statSync(specFile).mtimeMs + 2_000);
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+
+    assert.equal(report.status, "blocked");
+    assert.equal(report.project_state.stage, "spec-build");
+    assert.equal(report.primary_action.action_id, "spec-build");
+    assert.equal(report.artifact_readiness.stages.research.status, "adr-ready");
+    assert.equal(report.artifact_readiness.stages.spec.status, "stale");
+    assert.deepEqual(report.artifact_readiness.stages.spec.stale_reasons, ["research-changed-after-spec"]);
+    assert.equal(report.blockers[0].code, "spec-stale");
+  });
+});
+
+test("resolveNextAction routes ready spec evidence to planning instead of closure review", () => {
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeAnalysisEvidence(init);
+    writeResearchEvidence(init, "adr-ready");
+    writeSpecEvidence(init);
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+
+    assert.equal(report.status, "ready");
+    assert.equal(report.project_state.stage, "planning");
+    assert.equal(report.primary_action.action_id, "handoff-prepare");
+    assert.equal(report.artifact_readiness.stages.spec.status, "ready");
+    assert.equal(report.artifact_readiness.stages.planning.status, "pending");
+    assert.equal(report.closure_state.run_id, null);
   });
 });
 
