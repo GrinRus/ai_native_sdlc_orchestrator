@@ -417,7 +417,7 @@ This is the master index for the implementation slices across all defined waves.
 | W48-S02 | Quality-cycle runner and controller implementation | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, `scripts/test/**` | W48-S01 |
 | W48-S03 | Structured repair context and convergence classification | EPIC-4, EPIC-6, EPIC-7 | done | `docs/contracts/review-decision.md`, `packages/contracts/**`, `packages/observability/**`, `packages/orchestrator-core/**`, tests | W48-S02 |
 | W48-S04 | Vitest target toolchain policy | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal tooling`, tests | W48-S03 |
-| W48-S05 | Control quality-cycle proof rerun and product acceptance closure | EPIC-0, EPIC-7 | blocked | `internal maintainer rehearsal tooling`, `internal maintainer runbook`, root checks, internal proof runs | W48-S04 |
+| W48-S05 | Control quality-cycle proof rerun and product acceptance closure | EPIC-0, EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer runbook`, root checks, internal proof runs | W48-S04 |
 
 ## W49 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
