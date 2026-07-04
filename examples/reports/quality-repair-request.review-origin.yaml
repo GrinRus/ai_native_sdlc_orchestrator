@@ -1,0 +1,39 @@
+request_id: quality-repair-request.review-origin.001
+project_id: aor-core
+run_id: run.review-origin
+cycle_id: quality-cycle.review-origin.001
+source_stage: review
+source_ref: evidence://.aor/projects/aor-core/reports/review-report-run-review-origin.json
+finding_refs:
+  - review.finding.changed-test-not-covered
+repair_scope:
+  target_step: implement
+  requested_next_step: execution
+  allowed_paths:
+    - packages/contracts/**
+    - docs/contracts/**
+  verification_refs:
+    - evidence://.aor/projects/aor-core/reports/verify-summary-run-review-origin.json
+  required_evidence_refs:
+    - evidence://.aor/projects/aor-core/reports/review-report-run-review-origin.json
+    - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run-review-origin.json
+  compiled_context_refs: []
+  reason: Repair the review finding and refresh verification evidence.
+attempt_budget:
+  policy_ref: project-profile://aor-core#quality_repair_policy
+  max_attempts: 2
+  attempt_index: 1
+  remaining_attempts: 1
+status: requested
+blockers:
+  - delivery-blocked-until-post-repair-review
+evidence_refs:
+  - evidence://.aor/projects/aor-core/reports/review-report-run-review-origin.json
+  - evidence://.aor/projects/aor-core/reports/review-decision-run-review-origin.json
+status_history:
+  - status: requested
+    changed_at: "2026-07-04T13:20:00.000Z"
+    summary: Review decision requested a bounded repair cycle.
+    evidence_refs:
+      - evidence://.aor/projects/aor-core/reports/review-decision-run-review-origin.json
+created_at: "2026-07-04T13:20:00.000Z"

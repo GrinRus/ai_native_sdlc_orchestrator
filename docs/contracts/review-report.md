@@ -110,6 +110,18 @@ Each finding should keep:
 - `summary`
 - `evidence_refs`
 
+When a review or QA report participates in a W45 repair cycle, it may add
+optional `quality_repair_lineage` with:
+- `request_ref`
+- `cycle_id`
+- `source_stage` (`review|qa`)
+- `status`
+- `attempt_index`
+- `evidence_refs[]`
+
+This lineage is a read-model pointer to `quality-repair-request`; it does not
+replace the report's own findings or recommendation.
+
 ## Loader validation
 The shared contract loader validates the nested review report shape used by CLI/API/runtime readers:
 - section `status` fields must use `pass|warn|fail` when present; legacy read-model fixtures may keep empty section objects;

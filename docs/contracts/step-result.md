@@ -31,6 +31,7 @@ Runtime Harness controllers may add optional decision metadata:
 - `failure_class`
 - `runtime_harness_decision` (`pass|retry|repair|escalate|block|fail`)
 - `repair_attempts`
+- `quality_repair_lineage`
 - `repair_status`
 - `stage_timings`
 - `mission_semantics`
@@ -60,6 +61,11 @@ The field must not embed sensitive answer text. Operator answers belong in durab
 Permission requests may also be summarized at top level as `runtime_permission_request` and `runtime_permission_decision` so Runtime Harness reports and policy history can inspect auto decisions even when no user-facing `requested_interaction` was needed.
 `state_history[]` is the durable query-safe ledger for interactive continuation. Each entry should include `status`, `timestamp`, optional sanitized `summary`, `evidence_refs[]`, optional `answer_audit_refs[]`, and optional `continuation`. It may record `requested`, `answered`, `resumed`, `resume_failed`, and `blocked` states for one `interaction_id`; it must never include raw operator answer text.
 `repair_attempts` is the step-local Runtime Harness ledger. It should preserve the trigger, failure class, selected policy action, input evidence refs, repair route/compiled-context refs when executed, result, and budget exhaustion metadata. When repair executes, `input_evidence_refs` should include the generated repair input evidence that carries previous findings, failed step-result refs, diff status, adapter evidence, validator findings, and the current Runtime Harness report ref.
+`quality_repair_lineage` is optional public repair-cycle lineage for steps that
+prepare, execute, or close a W45 repair implementation. It points to the
+shared `quality-repair-request` and may copy cycle id, source stage, status,
+attempt index, and evidence refs. It is not the same as the private
+Runtime Harness `repair_attempts` ledger.
 `mission_semantics` records the semantic validation evidence used by the step controller, including changed paths, meaningful changed paths, runner-owned local state paths, ignored request input files, and strict no-op detection inputs when available. Runtime Harness no longer emits allowed/forbidden path gates, mission-scoped changed paths, or scope-violation paths as implementation-quality verdicts.
 `runner_owned_state_paths[]` and `runner_owned_state_paths_during_step[]` identify local runner configuration or skill state such as `.codex/`, `.claude/`, `.qwen/`, or `.opencode/` that appeared inside the target checkout. For live runner execution, these paths are not acceptable upstream patch material; Runtime Harness must classify them with `failure_class=runner-owned-state-leak` and `runtime_harness_decision=block`.
 
@@ -71,6 +77,8 @@ The shared contract loader validates nested step-result fields that carry runtim
 - `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|resume_failed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
 - `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref`, `request_artifact_ref`, `provider_work_packet_ref`, `context_budget_status`, `context_budget_failure_class`, and `raw_provider_error_summary` are validated as strings when available; `top_context_size_sources[]` entries must be objects with source labels and numeric size estimates; and `exit_code` is numeric when available or `null` for missing-command preflight failures.
 - `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.
+- `quality_repair_lineage`, when present, must include `request_ref`,
+  `cycle_id`, `source_stage`, and `status`; `source_stage` must be `review|qa`.
 - `mission_semantics` path arrays, including `runner_owned_state_paths[]` and `runner_owned_state_paths_during_step[]`, must contain strings when present. Legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, and `scope_violation_paths` must not be emitted.
 
 For `spec` routed steps, `routed_execution.discovery_research_gate` may carry the discovery research report status, ADR-ready flag, open questions, checks, and report refs from `aor discovery run`. This keeps ADR-readiness visible at specification handoff without making the spec step own research collection.

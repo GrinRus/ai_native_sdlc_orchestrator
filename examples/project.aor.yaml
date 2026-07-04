@@ -127,6 +127,15 @@ security_policy:
 eval_policy:
   required_for_release: true
   default_release_suite_ref: suite.release.core@v1
+quality_repair_policy:
+  policy_ref: project-profile://aor-core#quality_repair_policy
+  max_attempts_per_cycle: 2
+  requires_review_after_repair: true
+  requires_qa_after_passing_review: true
+  budget_exhausted_requires_operator_approval: true
+  blocks_delivery_while_open: true
+  qa_in_scope_stages:
+    - qa
 runtime_defaults:
   runtime_root: .aor
   workspace_mode: ephemeral

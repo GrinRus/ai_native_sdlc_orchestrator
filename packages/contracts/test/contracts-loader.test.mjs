@@ -784,6 +784,142 @@ test("review decision example preserves explicit approval vocabulary", () => {
   );
 });
 
+test("quality repair request examples share review and QA repair semantics", () => {
+  const examples = [
+    "quality-repair-request.review-origin.yaml",
+    "quality-repair-request.qa-origin.yaml",
+    "quality-repair-request.budget-exhausted.yaml",
+  ];
+
+  for (const example of examples) {
+    const loaded = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples/reports", example),
+      family: "quality-repair-request",
+    });
+    assert.equal(loaded.ok, true, `${example} should load as quality-repair-request`);
+  }
+
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/quality-repair-request.review-origin.yaml"),
+    family: "quality-repair-request",
+  });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+  assert.equal(loaded.document.source_stage, "review");
+  assert.equal(loaded.document.status, "requested");
+  assert.equal(loaded.document.attempt_budget.policy_ref, "project-profile://aor-core#quality_repair_policy");
+
+  const invalidSource = structuredClone(loaded.document);
+  invalidSource.source_stage = "post-run";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "quality-repair-request",
+      document: invalidSource,
+      source: "test://quality-repair-request-invalid-source-stage",
+    }),
+    "enum_value_invalid",
+    "source_stage",
+  );
+
+  const invalidStatus = structuredClone(loaded.document);
+  invalidStatus.status = "waiting";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "quality-repair-request",
+      document: invalidStatus,
+      source: "test://quality-repair-request-invalid-status",
+    }),
+    "enum_value_invalid",
+    "status",
+  );
+
+  const missingPolicy = structuredClone(loaded.document);
+  delete missingPolicy.attempt_budget.policy_ref;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "quality-repair-request",
+      document: missingPolicy,
+      source: "test://quality-repair-request-missing-policy-ref",
+    }),
+    "required_field_missing",
+    "attempt_budget.policy_ref",
+  );
+});
+
+test("W45 repair lineage is additive across downstream reports", () => {
+  const fixtures = [
+    [path.join(workspaceRoot, "examples/reports/review-report.canonical.yaml"), "review-report"],
+    [path.join(workspaceRoot, "examples/reports/review-decision.approve.yaml"), "review-decision"],
+    [path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"), "step-result"],
+    [path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"), "runtime-harness-report"],
+    [path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml"), "next-action-report"],
+  ];
+  const lineage = {
+    request_ref: "evidence://.aor/projects/aor-core/reports/quality-repair-request-review-origin.json",
+    cycle_id: "quality-cycle.review-origin.001",
+    source_stage: "review",
+    status: "review-required",
+    attempt_index: 1,
+    evidence_refs: ["evidence://.aor/projects/aor-core/reports/review-decision-run-review-origin.json"],
+  };
+
+  for (const [filePath, family] of fixtures) {
+    const loaded = loadContractFile({ filePath, family });
+    assert.equal(loaded.ok, true, `${family} fixture should load without quality repair lineage`);
+    assert.equal(Object.hasOwn(loaded.document, "quality_repair_lineage"), false);
+
+    const withLineage = structuredClone(loaded.document);
+    withLineage.quality_repair_lineage = lineage;
+    if (family === "review-decision") {
+      withLineage.quality_repair_request_ref = lineage.request_ref;
+    }
+    const validation = validateContractDocument({
+      family,
+      document: withLineage,
+      source: `test://${family}-with-quality-repair-lineage`,
+    });
+    assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
+  }
+
+  const invalid = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"),
+    family: "step-result",
+  });
+  assert.equal(invalid.ok, true);
+  const invalidLineage = structuredClone(invalid.document);
+  invalidLineage.quality_repair_lineage = { ...lineage, source_stage: "release" };
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidLineage,
+      source: "test://step-result-invalid-quality-repair-lineage",
+    }),
+    "enum_value_invalid",
+    "quality_repair_lineage.source_stage",
+  );
+});
+
+test("project profile carries policy-driven quality repair defaults", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(loaded.ok, true, "project profile should load with quality repair policy");
+  assert.equal(loaded.document.quality_repair_policy.max_attempts_per_cycle, 2);
+  assert.equal(loaded.document.quality_repair_policy.blocks_delivery_while_open, true);
+
+  const invalid = structuredClone(loaded.document);
+  invalid.quality_repair_policy.max_attempts_per_cycle = "two";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "project-profile",
+      document: invalid,
+      source: "test://project-profile-invalid-quality-repair-policy",
+    }),
+    "field_type_mismatch",
+    "quality_repair_policy.max_attempts_per_cycle",
+  );
+});
+
 test("planner metrics snapshot example preserves no-data capable metric vocabulary", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/planner-metrics-snapshot.sample.yaml"),

@@ -42,6 +42,8 @@ Quality boundaries are explicit:
   operator-request summaries.
 - **Run and step results** — normalized execution state.
 - **Operator request** — durable operator-initiated intervention intent that can be compiled into a routed step without becoming direct chat.
+- **Quality repair request** — durable review/QA repair intent with source
+  findings, repair scope, attempt budget, status, blockers, and evidence refs.
 - **Quality evidence** — validation, eval, harness, logs, traces, and diffs.
 - **Delivery plan** — pre-write policy decision and gate status.
 - **Delivery manifest** — actual delivery transaction.
@@ -53,6 +55,7 @@ Quality boundaries are explicit:
 - planning-only
 - execution-only from approved handoff
 - repair-only from a failed step
+- quality-repair from review or QA findings
 - evaluation-only
 - harness-only
 - full end-to-end rehearsal
@@ -91,6 +94,43 @@ may cite a learning handoff from the completed source flow.
 Operator requests are explicit runtime inputs, not free-form steering. The default `delivery_mode=no-write` produces analysis or proposal evidence only. `patch-only` requires explicit `allowed_paths` and produces patch evidence without silently mutating source files in v1. Higher delivery modes remain governed by the existing delivery plan, review, promotion, and writeback gates.
 
 Strictness is mission-type driven. Code-changing, live, and release missions use strict semantic gates. Docs-only, no-write rehearsal, and asset-certification flows may use softer profiles, but their softness must be explicit in runtime evidence.
+
+## Quality repair operating model
+
+W45 public repair cycles start from review or QA evidence and materialize one
+`quality-repair-request`. The request records the source stage, source report
+ref, finding refs, repair scope, cycle id, policy-derived attempt budget,
+current status, blockers, and evidence refs. The request is shared by review
+and QA so downstream gates do not need separate repair vocabularies.
+
+Allowed statuses are:
+- `requested` after review or QA asks for repair and before repair execution
+  starts;
+- `in-progress` while the repair implementation step is running or pending
+  completion;
+- `review-required` after any repair attempt completes;
+- `qa-required` after post-repair review passes when QA is in scope;
+- `budget-exhausted` when the policy-derived attempt budget is spent;
+- `closed` after review and required QA evidence prove closure.
+
+The allowed state machine is bounded:
+`implement -> review -> repair -> review -> qa -> repair -> review -> qa`.
+Every repair attempt must return through review. When QA is in scope, a passing
+post-repair review must be followed by QA before delivery can become ready.
+Cycle budgets come from project profile or selected runtime policy; reports
+copy the resolved budget but do not hardcode a default.
+
+Delivery and release remain blocked while a required repair request is
+`requested`, `in-progress`, `review-required`, `qa-required`, or
+`budget-exhausted`. `budget-exhausted` is a terminal blocker for the automatic
+loop and requires explicit operator approval evidence before downstream
+delivery/release can continue.
+
+Repair implementation uses normal routed execution. During prepare, the context
+compiler adds the materialized repair request as a packet/evidence ref in the
+compiled context. Prompt bundles receive the request ref, finding refs, required
+evidence refs, and attempt budget through provider-agnostic compiled context,
+not through ad hoc chat text or private harness vocabulary.
 
 When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a resumable `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime resumes from that boundary when `continuation.next_action=resume_from_boundary`; if validation, policy, or an unsupported boundary blocks continuation, the run remains blocked with the same interaction, `state_history[]`, and reason evidence.
 

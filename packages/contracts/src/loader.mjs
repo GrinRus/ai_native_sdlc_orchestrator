@@ -16,6 +16,15 @@ const EXTERNAL_REQUEST_TRANSPORT_VALUES = ["request-artifact", "stdin-json", "fi
 const STDIN_JSON_SCOPE_VALUES = ["test-only", "small-only"];
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const REVIEW_STATUS_VALUES = ["pass", "warn", "fail"];
+const QUALITY_REPAIR_SOURCE_STAGE_VALUES = ["review", "qa"];
+const QUALITY_REPAIR_STATUS_VALUES = [
+  "requested",
+  "in-progress",
+  "review-required",
+  "qa-required",
+  "budget-exhausted",
+  "closed",
+];
 const RUNTIME_HARNESS_DECISION_VALUES = ["pass", "retry", "repair", "escalate", "block", "fail"];
 const RUNTIME_HARNESS_RUN_CONTROLLER_STATUS_VALUES = ["running", "closed", "blocked", "failed"];
 const RUNTIME_HARNESS_RUN_TRANSITION_STAGE_VALUES = [
@@ -255,6 +264,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateReviewDecision(document, source));
   }
 
+  if (family === "quality-repair-request") {
+    issues.push(...validateQualityRepairRequest(document, source));
+  }
+
   if (family === "live-run-event") {
     issues.push(...validateLiveRunEvent(document, source));
   }
@@ -330,6 +343,48 @@ function validateProjectProfile(document, source) {
       });
     }
   }
+  const repairPolicy = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "quality_repair_policy",
+    issues,
+  });
+  if (repairPolicy) {
+    validateNestedStringField({
+      record: repairPolicy,
+      source,
+      field: "quality_repair_policy.policy_ref",
+      issues,
+      required: false,
+    });
+    validateNestedNumberField({
+      record: repairPolicy,
+      source,
+      field: "quality_repair_policy.max_attempts_per_cycle",
+      issues,
+      required: false,
+    });
+    for (const field of [
+      "requires_review_after_repair",
+      "requires_qa_after_passing_review",
+      "budget_exhausted_requires_operator_approval",
+      "blocks_delivery_while_open",
+    ]) {
+      validateNestedBooleanField({
+        record: repairPolicy,
+        source,
+        field: `quality_repair_policy.${field}`,
+        issues,
+        required: false,
+      });
+    }
+    validateOptionalStringArrayField({
+      record: repairPolicy,
+      source,
+      field: "quality_repair_policy.qa_in_scope_stages",
+      issues,
+    });
+  }
   return issues;
 }
 
@@ -341,6 +396,12 @@ function validateProjectProfile(document, source) {
 function validateNextActionReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  validateQualityRepairLineage({
+    record: document,
+    source,
+    field: "quality_repair_lineage",
+    issues,
+  });
   const readiness = validateOptionalObjectField({
     record: document,
     source,
@@ -691,6 +752,12 @@ function validateVerificationCommandGroups(record, source, field, issues, requir
 function validateRuntimeHarnessReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  validateQualityRepairLineage({
+    record: document,
+    source,
+    field: "quality_repair_lineage",
+    issues,
+  });
 
   const runController = validateOptionalObjectField({
     record: document,
@@ -1202,6 +1269,12 @@ function validateStepResult(document, source) {
   const issues = [];
 
   validateStringArrayItems({ values: document.evidence_refs, source, field: "evidence_refs", issues });
+  validateQualityRepairLineage({
+    record: document,
+    source,
+    field: "quality_repair_lineage",
+    issues,
+  });
   validateNestedEnumStringField({
     record: document,
     source,
@@ -1782,6 +1855,12 @@ function validateReviewReport(document, source) {
   const issues = [];
 
   validateStringArrayItems({ values: document.evidence_refs, source, field: "evidence_refs", issues });
+  validateQualityRepairLineage({
+    record: document,
+    source,
+    field: "quality_repair_lineage",
+    issues,
+  });
 
   validateFeatureTraceability(document.feature_traceability, source, issues);
   validateReviewQualitySection(document.discovery_quality, source, "discovery_quality", issues);
@@ -1894,6 +1973,19 @@ function validateRepairContextFindingDetails(options) {
 function validateReviewDecision(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  validateNestedStringField({
+    record: document,
+    source,
+    field: "quality_repair_request_ref",
+    issues,
+    required: false,
+  });
+  validateQualityRepairLineage({
+    record: document,
+    source,
+    field: "quality_repair_lineage",
+    issues,
+  });
   const repairContext = validateRequiredObjectField({
     record: document,
     source,
@@ -2084,6 +2176,193 @@ function validateReviewDecision(document, source) {
   }
 
   return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateQualityRepairRequest(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+
+  validateStringArrayItems({ values: document.finding_refs, source, field: "finding_refs", issues });
+  validateStringArrayItems({ values: document.blockers, source, field: "blockers", issues });
+  validateStringArrayItems({ values: document.evidence_refs, source, field: "evidence_refs", issues });
+
+  const repairScope = validateRequiredObjectField({
+    record: document,
+    source,
+    field: "repair_scope",
+    issues,
+  });
+  if (repairScope) {
+    for (const field of ["target_step", "requested_next_step", "reason"]) {
+      validateNestedStringField({
+        record: repairScope,
+        source,
+        field: `repair_scope.${field}`,
+        issues,
+        required: false,
+      });
+    }
+    for (const field of ["allowed_paths", "verification_refs", "required_evidence_refs", "compiled_context_refs"]) {
+      validateOptionalStringArrayField({
+        record: repairScope,
+        source,
+        field: `repair_scope.${field}`,
+        issues,
+      });
+    }
+  }
+
+  const attemptBudget = validateRequiredObjectField({
+    record: document,
+    source,
+    field: "attempt_budget",
+    issues,
+  });
+  if (attemptBudget) {
+    validateNestedStringField({
+      record: attemptBudget,
+      source,
+      field: "attempt_budget.policy_ref",
+      issues,
+      required: true,
+    });
+    for (const field of ["max_attempts", "attempt_index", "remaining_attempts"]) {
+      validateNestedNumberField({
+        record: attemptBudget,
+        source,
+        field: `attempt_budget.${field}`,
+        issues,
+        required: true,
+      });
+    }
+  }
+
+  const statusHistory = validateOptionalArrayField({
+    record: document,
+    source,
+    field: "status_history",
+    issues,
+  });
+  if (statusHistory) {
+    statusHistory.forEach((entry, index) => {
+      const entryField = `status_history[${index}]`;
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: entryField,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field '${entryField}' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+      validateNestedEnumStringField({
+        record: entry,
+        source,
+        field: `${entryField}.status`,
+        allowedValues: QUALITY_REPAIR_STATUS_VALUES,
+        issues,
+        required: true,
+      });
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${entryField}.changed_at`,
+        issues,
+        required: false,
+      });
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${entryField}.summary`,
+        issues,
+        required: false,
+      });
+      validateOptionalStringArrayField({
+        record: entry,
+        source,
+        field: `${entryField}.evidence_refs`,
+        issues,
+      });
+    });
+  }
+
+  for (const field of ["updated_at", "closed_at", "operator_override_ref"]) {
+    validateNestedNullableStringField({
+      record: document,
+      source,
+      field,
+      issues,
+      required: false,
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * @param {{ record: Record<string, unknown>, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateQualityRepairLineage(options) {
+  const lineage = validateOptionalObjectField({
+    record: options.record,
+    source: options.source,
+    field: options.field,
+    issues: options.issues,
+  });
+  if (!lineage) return;
+
+  validateNestedStringField({
+    record: lineage,
+    source: options.source,
+    field: `${options.field}.request_ref`,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedStringField({
+    record: lineage,
+    source: options.source,
+    field: `${options.field}.cycle_id`,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: lineage,
+    source: options.source,
+    field: `${options.field}.source_stage`,
+    allowedValues: QUALITY_REPAIR_SOURCE_STAGE_VALUES,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedEnumStringField({
+    record: lineage,
+    source: options.source,
+    field: `${options.field}.status`,
+    allowedValues: QUALITY_REPAIR_STATUS_VALUES,
+    issues: options.issues,
+    required: true,
+  });
+  validateNestedNumberField({
+    record: lineage,
+    source: options.source,
+    field: `${options.field}.attempt_index`,
+    issues: options.issues,
+    required: false,
+  });
+  validateOptionalStringArrayField({
+    record: lineage,
+    source: options.source,
+    field: `${options.field}.evidence_refs`,
+    issues: options.issues,
+  });
 }
 
 /**

@@ -43,6 +43,15 @@ records `source_phase`, `cycle_iteration`, `unresolved_findings`,
 It must still route repair through public AOR run/review lifecycle commands
 rather than providing a private patch or direct target mutation.
 
+W45 adds optional compatibility fields:
+- `quality_repair_request_ref`, the materialized shared repair request created
+  or accepted by this decision;
+- `quality_repair_lineage`, a read-model copy of request ref, cycle id, source
+  stage, status, attempt index, and evidence refs.
+
+These fields are additive. Existing `review-decision` examples and reports that
+only carry `repair_context` remain valid.
+
 ## Decision basis
 `decision_basis` should preserve:
 - `review_overall_status`

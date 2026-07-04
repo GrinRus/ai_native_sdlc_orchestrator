@@ -49,6 +49,12 @@ The full request envelope may remain available as AOR evidence, but the provider
 
 Packet refs may be abstract (`packet://handoff`) or concrete (`packet://handoff@evidence://...`). Concrete refs bind the required packet name to a materialized run artifact and should be preferred in adapter requests when the artifact is available, so non-interactive runners can open the intended handoff/spec evidence without broad repository discovery.
 
+For W45 repair implementation steps, `packet_refs[]` may include
+`packet://quality-repair-request@evidence://...`. That ref binds the routed
+repair step to the shared repair request, source findings, required evidence
+refs, and attempt budget through normal compiled context inputs. It must not
+introduce provider-specific behavior or a private repair channel.
+
 `provenance` may include `compiler_revision_ref` when the compiled context was produced by a tracked compiler revision. New artifacts should use `compiler-revision://<revision_id>@vN`; existing `compiler://<revision_id>@vN` refs remain readable and normalize into the compiler revision lifecycle surfaces.
 
 When compiler revision lifecycle evidence exists, `compiler-revision-status` links the revision back to compiled-context refs, certification evidence, evaluation refs, incident refs, and decision history. The compiled-context artifact remains step-scoped; the compiler revision status is the platform-asset lifecycle record.
