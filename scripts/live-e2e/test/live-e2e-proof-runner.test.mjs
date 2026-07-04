@@ -3638,6 +3638,131 @@ test("medium product-change profiles must declare the full implementation qualit
   );
 });
 
+test("W45 repair profiles declare replayable repair-loop proof expectations", () => {
+  const repairProfileRefs = [
+    "scripts/live-e2e/profiles/full-journey-repair-commander-js-medium-anthropic.yaml",
+    "scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml",
+    "scripts/live-e2e/profiles/full-journey-repair-httpie-medium-anthropic.yaml",
+    "scripts/live-e2e/profiles/full-journey-repair-nextjs-medium-anthropic.yaml",
+    "scripts/live-e2e/profiles/full-journey-repair-pluggy-medium-anthropic.yaml",
+  ];
+  const requiredFlags = [
+    "require_quality_repair_request_refs",
+    "require_implementation_repair_refs",
+    "require_review_rerun_refs",
+    "require_qa_rerun_refs",
+    "qa_origin_requires_post_repair_review",
+    "budget_exhaustion_operator_hold_required",
+    "no_upstream_write_evidence_required",
+  ];
+
+  for (const profileRef of repairProfileRefs) {
+    const loaded = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loaded.profile,
+      catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+    });
+    const proofExpectations = resolved.resolvedProfile.implementation_loop.proof_expectations;
+
+    assert.deepEqual(proofExpectations.required_repair_paths, [
+      "review-origin",
+      "qa-origin",
+      "budget-exhaustion",
+    ]);
+    for (const flag of requiredFlags) {
+      assert.equal(proofExpectations[flag], true, `${profileRef} must set ${flag}=true`);
+    }
+    assert.equal(resolved.resolvedProfile.output_policy.write_back_to_remote, false);
+    assert.ok(
+      ["patch-only", "fork-first-pr"].includes(resolved.resolvedProfile.output_policy.preferred_delivery_mode),
+      `${profileRef} must keep no-upstream-write delivery evidence bounded`,
+    );
+  }
+
+  const loaded = loadProofRunnerProfile({
+    hostRoot: repoRoot,
+    profileRef: "scripts/live-e2e/profiles/full-journey-repair-httpie-medium-anthropic.yaml",
+  });
+  const missingReviewRerunProof = structuredClone(loaded.profile);
+  missingReviewRerunProof.implementation_loop.proof_expectations.require_review_rerun_refs = false;
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile: missingReviewRerunProof,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /implementation_loop\.proof_expectations\.require_review_rerun_refs=true/u,
+  );
+
+  const unsafeQaRepairProof = structuredClone(loaded.profile);
+  unsafeQaRepairProof.implementation_loop.proof_expectations.qa_origin_requires_post_repair_review = false;
+  assert.throws(
+    () =>
+      resolveFullJourneyProfile({
+        profile: unsafeQaRepairProof,
+        catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+      }),
+    /implementation_loop\.proof_expectations\.qa_origin_requires_post_repair_review=true/u,
+  );
+});
+
+test("W45 repair-loop proof fixture covers review-origin, QA-origin, and exhausted budget paths", () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(repoRoot, "scripts/live-e2e/fixtures/evidence/w45-s05/repair-loop-proof.sample.json"),
+      "utf8",
+    ),
+  );
+  assert.equal(fixture.slice_id, "W45-S05");
+  assert.equal(fixture.proof_scope.deterministic_fixture_only, true);
+  assert.equal(fixture.proof_scope.live_acceptance_deferred_to, "W45-S06");
+  assert.equal(fixture.no_upstream_write.write_back_to_remote, false);
+
+  const paths = new Map(fixture.repair_paths.map((entry) => [entry.path_id, entry]));
+  assert.deepEqual([...paths.keys()].sort(), [
+    "budget-exhaustion-operator-hold",
+    "qa-origin-repair-closure",
+    "review-origin-repair-closure",
+  ]);
+
+  const reviewOrigin = paths.get("review-origin-repair-closure");
+  assert.equal(reviewOrigin.source_stage, "review");
+  assert.equal(reviewOrigin.final_status, "closed");
+  assert.match(reviewOrigin.quality_repair_request_ref, /quality-repair-request-review-origin/u);
+  assert.match(reviewOrigin.implementation_repair_ref, /repair#1/u);
+  assert.match(reviewOrigin.review_rerun_ref, /review-report-repair-rerun/u);
+  assert.match(reviewOrigin.qa_rerun_ref, /qa-report-repair-rerun/u);
+  assert.match(reviewOrigin.no_upstream_write_evidence_ref, /no-upstream-write/u);
+  assert.equal(reviewOrigin.delivery_release_blocked_until_closed, true);
+
+  const qaOrigin = paths.get("qa-origin-repair-closure");
+  assert.equal(qaOrigin.source_stage, "qa");
+  assert.equal(qaOrigin.final_status, "closed");
+  assert.equal(qaOrigin.qa_origin_post_repair_review_required, true);
+  assert.ok(
+    qaOrigin.stage_sequence.indexOf("repair#1") < qaOrigin.stage_sequence.indexOf("review#2"),
+    "QA-origin repair must return through review before QA closure",
+  );
+  assert.ok(
+    qaOrigin.stage_sequence.indexOf("review#2") < qaOrigin.stage_sequence.indexOf("qa#2"),
+    "QA-origin repair must rerun QA only after post-repair review",
+  );
+  assert.match(qaOrigin.quality_repair_request_ref, /quality-repair-request-qa-origin/u);
+  assert.match(qaOrigin.review_rerun_ref, /review-report-post-repair/u);
+  assert.match(qaOrigin.qa_rerun_ref, /qa-report-post-review/u);
+
+  const exhausted = paths.get("budget-exhaustion-operator-hold");
+  assert.equal(exhausted.final_status, "operator-hold");
+  assert.equal(exhausted.attempt_budget.attempt_index, exhausted.attempt_budget.max_attempts);
+  assert.equal(exhausted.attempt_budget.remaining_attempts, 0);
+  assert.equal(exhausted.requires_operator_override_for_delivery, true);
+  assert.equal(exhausted.delivery_release_blocked_until_closed, true);
+  assert.equal(exhausted.implementation_repair_refs.length, exhausted.attempt_budget.max_attempts);
+  assert.equal(exhausted.review_rerun_refs.length, exhausted.attempt_budget.max_attempts);
+  assert.deepEqual(exhausted.qa_rerun_refs, []);
+  assert.match(exhausted.operator_hold_ref, /next-action-budget-exhausted/u);
+});
+
 test("run-profile rejects xlarge profiles outside manual controller mode", () => {
   const result = spawnSync(
     process.execPath,

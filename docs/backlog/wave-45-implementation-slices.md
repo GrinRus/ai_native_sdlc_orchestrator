@@ -187,7 +187,7 @@ and delivery/release blocking semantics.
 
 ## W45-S05 — Repair-loop proof fixtures and live profile
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prepare replayable proof fixtures and a live E2E acceptance profile
   for bounded review/QA repair cycles.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`,
@@ -226,7 +226,7 @@ and delivery/release blocking semantics.
 
 ## W45-S06 — Documentation refresh and live E2E acceptance
 - **Epic:** EPIC-7 Live E2E and rehearsal; EPIC-0 Repository development system
-- **State:** blocked
+- **State:** ready
 - **Outcome:** After W45 implementation lands, update source-of-truth documentation
   and run live E2E acceptance proving the bounded review/QA repair loop is OK.
 - **Primary modules:** `docs/architecture/**`, `docs/contracts/**`,
