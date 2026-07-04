@@ -47,10 +47,19 @@ verification_expectations:
 verification_plan:
   command_groups:
     - id: post-change-check
+      repo_id: main
       role: test
       phase: post-change
       enforcement: required
       timeout_class: focused-test
+      working_dir: .
+      detected_from:
+        - package.json#scripts.check
+      package_manager: pnpm
+      tool_requirements:
+        - tool: pnpm
+          version_range: ">=10.12.4"
+          install_hint: Enable Corepack before running repository checks.
       commands:
         - pnpm check
 approved_input_ref: evidence://bootstrap/artifact-packet/aor-core.artifact.bootstrap.v1

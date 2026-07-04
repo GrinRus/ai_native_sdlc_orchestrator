@@ -35,6 +35,7 @@ import {
   analyzeProjectRuntime,
   initializeProjectRuntime,
   validateProjectRuntime,
+  planProjectVerification,
   verifyProjectRuntime,
   materializeIntakeArtifactPacket,
   materializeReviewReport,
@@ -329,12 +330,49 @@ export function handleBootstrapCommand(context) {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+    const planOnly = resolveOptionalBooleanFlag("plan", flags.plan);
 
     outputState.validationGateEnforced = resolveOptionalBooleanFlag(
       "require-validation-pass",
       flags["require-validation-pass"],
     );
     outputState.verificationLabel = resolveOptionalStringFlag("verification-label", flags["verification-label"]) ?? "default";
+    const routedDryRunStep = resolveOptionalStringFlag("routed-dry-run-step", flags["routed-dry-run-step"]);
+    const routedLiveStep = resolveOptionalStringFlag("routed-live-step", flags["routed-live-step"]);
+    if (routedDryRunStep && routedLiveStep) {
+      throw new CliUsageError(
+        "Flags '--routed-dry-run-step' and '--routed-live-step' are mutually exclusive.",
+      );
+    }
+    if (planOnly && (routedDryRunStep || routedLiveStep)) {
+      throw new CliUsageError("Flag '--plan' cannot be combined with routed step execution flags.");
+    }
+
+    if (planOnly) {
+      const planResult = planProjectVerification({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        requireValidationPass: outputState.validationGateEnforced,
+        verificationLabel: outputState.verificationLabel,
+        repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
+        repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
+        repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
+      });
+
+      outputState.resolvedProjectRef = planResult.projectRoot;
+      outputState.resolvedRuntimeRoot = planResult.runtimeRoot;
+      outputState.runtimeLayout = planResult.runtimeLayout;
+      outputState.runtimeStateFile = planResult.stateFile;
+      outputState.projectProfileRef = planResult.projectProfileRef;
+      outputState.validationGateStatus = planResult.validationGateStatus;
+      outputState.verificationPlanFile = planResult.verificationPlanPath;
+      outputState.verificationPlan = planResult.verificationPlan;
+      outputState.verificationPlanCommandGroups = planResult.verificationPlan.command_groups;
+      outputState.verificationPlanDiscoveredCommandGroups = planResult.verificationPlan.discovered_command_groups;
+      return true;
+    }
 
     const verifyResult = verifyProjectRuntime({
       cwd,
@@ -360,14 +398,6 @@ export function handleBootstrapCommand(context) {
     outputState.validationGateStatus = verifyResult.validationGateStatus;
     outputState.verifySummaryFile = verifyResult.verifySummaryPath;
     outputState.verifyStepResultFiles = verifyResult.stepResultFiles;
-
-    const routedDryRunStep = resolveOptionalStringFlag("routed-dry-run-step", flags["routed-dry-run-step"]);
-    const routedLiveStep = resolveOptionalStringFlag("routed-live-step", flags["routed-live-step"]);
-    if (routedDryRunStep && routedLiveStep) {
-      throw new CliUsageError(
-        "Flags '--routed-dry-run-step' and '--routed-live-step' are mutually exclusive.",
-      );
-    }
 
     const selectedRoutedStep = routedDryRunStep ?? routedLiveStep;
     if (selectedRoutedStep) {

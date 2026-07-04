@@ -17,6 +17,9 @@ Step results make routing, validation, and quality logic consistent across the l
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
 `project verify` runner step results may add command-level evidence so bounded verification is machine-readable in addition to the transcript evidence:
 - `command_group_id`, `command_group_role`, `command_group_phase`, `command_group_enforcement`, `command_group_timeout_class`, and `enforcement_result`;
+- `command_group_outcome` when generic verification needs to preserve
+  `no-tests`, `missing-tool`, `not-applicable`, or `broken-baseline` evidence;
+- `working_dir` for the repo-relative directory used by a command group;
 - `command_timeout_ms` and `timed_out`;
 - `started_at`, `finished_at`, and `duration_ms`;
 - `exit_code`, `signal`, and `error_code`;

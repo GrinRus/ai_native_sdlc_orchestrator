@@ -24,4 +24,8 @@ For medium+ implementation work, the ticket should preserve planning-grade conte
   setup, baseline, post-change, or diagnostic verification. Legacy
   `verification_expectations.primary_commands[]` may remain for compatibility,
   but command groups are the generic executable contract.
+- Command groups may include W54 authoring metadata (`repo_id`, `working_dir`,
+  `depends_on[]`, `detected_from[]`, `package_manager`,
+  `tool_requirements[]`, and `skip_policy`) but must remain generic AOR
+  verification evidence rather than private proof-harness profile data.
 - `scope.allowed_paths[]` narrowed from mission path hints when available; use `**` only when no narrower source-of-truth scope exists.

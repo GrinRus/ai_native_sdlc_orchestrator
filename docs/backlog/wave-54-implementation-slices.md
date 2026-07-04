@@ -10,20 +10,15 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** Extend the generic command-group contract so it can describe real
   multi-root and multi-stack projects without private proof-harness semantics.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`, examples
 - **Hard dependencies:** W53-S05
 
 ### Local tasks
-1. Document optional command-group authoring fields such as `repo_id`,
-   `working_dir`, `depends_on`, `detected_from`, `package_manager`,
-   `tool_requirements`, and `skip_policy`.
-2. Define command ordering and dependency rules for readiness, baseline,
-   post-change, and diagnostic phases.
-3. Represent `no-tests`, `missing-tool`, `not-applicable`, and
-   `broken-baseline` outcomes as generic AOR evidence.
-4. Update project-profile, handoff-packet, wave-ticket, and step-result contract
-   docs before implementation depends on the new fields.
+1. Document optional command-group authoring fields: `repo_id`, `working_dir`, `depends_on`, `detected_from`, `package_manager`, `tool_requirements`, and `skip_policy`.
+2. Define command ordering and dependency rules for readiness, baseline, post-change, and diagnostic phases.
+3. Represent `no-tests`, `missing-tool`, `not-applicable`, and `broken-baseline` outcomes as generic AOR evidence.
+4. Update project-profile, handoff-packet, wave-ticket, and step-result contract docs before implementation depends on the new fields.
 
 ### Acceptance criteria
 1. Existing W53 command groups remain valid without modification.
@@ -32,6 +27,7 @@ deferred backlog tracks and are not prerequisites for W54.
 
 ### Done evidence
 - contract-loader tests for optional authoring fields
+- contract-loader tests rejecting private proof-harness command-group fields
 - updated contract docs and examples
 
 ### Out of scope
@@ -42,19 +38,16 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** Discover verification command-group candidates from repository
   manifests instead of relying on target-specific matrices.
 - **Epic:** EPIC-1, EPIC-4
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `packages/orchestrator-core/**`, discovery fixtures,
   tests
 - **Hard dependencies:** W54-S01
 
 ### Local tasks
 1. Detect Node package managers, workspace manifests, and package scripts.
-2. Detect Python project metadata from `pyproject.toml`, `setup.cfg`, `tox.ini`,
-   `noxfile.py`, pytest, and unittest signals.
-3. Detect Go and Rust compiled-project manifests from `go.mod`, `Cargo.toml`,
-   and workspace metadata.
-4. Detect frontend browser test signals from Playwright, Cypress, Vitest, and
-   related config files.
+2. Detect Python project metadata from `pyproject.toml`, `setup.cfg`, `tox.ini`, `noxfile.py`, pytest, and unittest signals.
+3. Detect Go and Rust compiled-project manifests from `go.mod`, `Cargo.toml`, and workspace metadata.
+4. Detect frontend browser test signals from Playwright, Cypress, Vitest, and related config files.
 5. Discover monorepo package boundaries and package-level commands.
 6. Emit explicit no-tests evidence instead of inventing a passing test command.
 
@@ -65,6 +58,7 @@ deferred backlog tracks and are not prerequisites for W54.
 
 ### Done evidence
 - discovery-engine fixture tests for supported archetypes
+- project-analysis report emits stack discovery and command-group candidates
 
 ### Out of scope
 - Running discovered commands.
@@ -74,30 +68,25 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** `project init` can materialize safe default
   `verification.command_groups[]` for detected project shapes.
 - **Epic:** EPIC-1
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `packages/orchestrator-core/src/project-init.mjs`,
   examples, init tests
 - **Hard dependencies:** W54-S02
 
 ### Local tasks
-1. Materialize generated command groups from discovery results during project
-   initialization.
-2. Preserve legacy `repos[].build_commands`, `repos[].lint_commands`, and
-   `repos[].test_commands` as a compatibility read model.
-3. Generate only detected setup, build, lint, typecheck, test, e2e, and
-   full-suite groups.
-4. Keep init side-effect free for target commands: profile generation must not
-   install dependencies or run verification commands.
+1. Materialize generated command groups from discovery results during project initialization.
+2. Preserve legacy `repos[].build_commands`, `repos[].lint_commands`, and `repos[].test_commands` as a compatibility read model.
+3. Generate only detected setup, build, lint, typecheck, test, e2e, and full-suite groups.
+4. Keep init side-effect free for target commands: profile generation must not install dependencies or run verification commands.
 
 ### Acceptance criteria
-1. Clean Node, Python, Go, Rust, frontend, monorepo, and no-tests fixtures get
-   valid generated profiles.
+1. Clean Node, Python, Go, Rust, frontend, monorepo, and no-tests fixtures get valid generated profiles.
 2. Generated profiles validate through the shared project-profile contract.
 3. No private proof-harness vocabulary appears in generated profiles.
 
 ### Done evidence
-- project-init profile-generation tests
-- updated example generated profiles
+- project-init profile-generation tests for Node, Python, Go, Rust, frontend, monorepo, and no-tests archetypes
+- generated profiles validate through the shared project-profile contract
 
 ### Out of scope
 - Operator UI for editing the generated plan.
@@ -107,28 +96,26 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** `project verify` executes real multi-root command groups with
   dependency, skip, missing-tool, timeout, and baseline semantics.
 - **Epic:** EPIC-4
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `packages/orchestrator-core/src/project-verify.mjs`,
   verifier tests
 - **Hard dependencies:** W54-S03
 
 ### Local tasks
 1. Execute command groups from their configured `working_dir`.
-2. Honor `depends_on` and record skipped evidence for dependent groups after
-   required prerequisite failures.
+2. Honor `depends_on` and record skipped evidence for dependent groups after required prerequisite failures.
 3. Distinguish missing tools from command failures.
 4. Keep timeout-class limits separate from hang-detection cleanup.
 5. Keep baseline failures distinct from post-change failures in summaries.
 
 ### Acceptance criteria
-1. Required dependency failure blocks dependent required groups with clear
-   skipped evidence.
+1. Required dependency failure blocks dependent required groups with clear skipped evidence.
 2. Warn and observe groups never become acceptance evidence.
-3. Timeout and hang transcripts preserve stdout, stderr, exit classification, and
-   cleanup metadata.
+3. Timeout and hang transcripts preserve stdout, stderr, exit classification, and cleanup metadata.
 
 ### Done evidence
 - verifier dependency, missing-tool, timeout, and skip regression tests
+- verifier working-dir and baseline/post-change outcome regression tests
 
 ### Out of scope
 - Provider adapter execution changes.
@@ -138,7 +125,7 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** Operators can inspect discovered and generated verification plans
   before running expensive checks.
 - **Epic:** EPIC-6
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `apps/cli/**`, `apps/api/**`, `apps/web/**`,
   `packages/orchestrator-core/**`
 - **Hard dependencies:** W54-S04
@@ -159,7 +146,13 @@ deferred backlog tracks and are not prerequisites for W54.
 3. README and public docs avoid private proof-harness names.
 
 ### Done evidence
-- CLI/API/web tests for verification-plan inspection
+- CLI `project verify --plan` test proves JSON plan output includes command
+  groups, discovery confidence/source refs, and does not execute target
+  commands.
+- API read-surface test proves `project_state.verification_plan` carries
+  failed, warn, observed, skipped, and not-applicable group signals.
+- Web source smoke tests prove the operator console renders the compact
+  verification-plan panel without private proof-harness vocabulary.
 
 ### Out of scope
 - Editing command groups from the web UI.
@@ -169,7 +162,7 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** Public examples and docs teach command groups while preserving
   legacy command compatibility.
 - **Epic:** EPIC-4
-- **State:** blocked
+- **State:** done
 - **Primary modules:** `docs/contracts/**`, `docs/ops/**`, `examples/**`,
   CLI tests
 - **Hard dependencies:** W54-S05
@@ -189,8 +182,13 @@ deferred backlog tracks and are not prerequisites for W54.
 3. Docs state clearly that warn and observe evidence is not acceptance.
 
 ### Done evidence
-- updated examples and migration docs
-- contract-loader and CLI compatibility tests
+- `examples/project.verification-archetypes.aor.yaml` covers Node, Python,
+  monorepo, browser e2e, no-tests, and broken-baseline command-group authoring.
+- `docs/ops/verification-command-groups-migration.md` documents the legacy
+  command-list and CLI override migration path.
+- Contract-loader tests validate the archetype example and all public examples.
+- CLI tests prove legacy `--repo-build-command`, `--repo-lint-command`, and
+  `--repo-test-command` flags normalize into dry-run command groups.
 
 ### Out of scope
 - Removing legacy command fields.
@@ -201,7 +199,7 @@ deferred backlog tracks and are not prerequisites for W54.
   verification against representative project archetypes outside private target
   matrices.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** verifier fixtures, smoke tests, docs
 - **Hard dependencies:** W54-S06
 
@@ -219,7 +217,10 @@ deferred backlog tracks and are not prerequisites for W54.
 3. No archetype requires private target matrix membership.
 
 ### Done evidence
-- archetype smoke matrix tests
+- `packages/orchestrator-core/test/archetype-smoke.test.mjs` covers Node,
+  Python, compiled Go/Rust-style, frontend/browser, monorepo, no-tests, and
+  broken-baseline archetypes through discovery, project init, verification
+  plan, and targeted verify.
 
 ### Out of scope
 - Live hard-target product acceptance reruns.
@@ -229,7 +230,7 @@ deferred backlog tracks and are not prerequisites for W54.
 - **Outcome:** Extend W53 leak guards so public docs, examples, source, and AOR
   artifacts stay reusable outside the private proof harness.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Primary modules:** boundary tests, public docs/examples, artifact fixtures
 - **Hard dependencies:** W54-S07
 
@@ -250,8 +251,28 @@ deferred backlog tracks and are not prerequisites for W54.
 3. `pnpm slice:gate` passes and no `.aor/` runtime output is tracked.
 
 ### Done evidence
-- expanded boundary guard tests
-- final W54 evidence matrix
+- `scripts/build.mjs` rejects private harness vocabulary and private-shaped
+  fields across public package surfaces, `apps/**`, package `src/**`, public
+  docs, and public examples.
+- `packages/orchestrator-core/test/live-e2e-boundary.test.mjs` scans public
+  source/docs/examples, proves an artificial private leak fixture fails the
+  guard, and checks `project verify` summary/step-result artifacts for private
+  fields.
+- `CHANGELOG.md` uses generic public wording for internal rehearsal changes
+  instead of private-shaped artifact fields.
+
+Final W54 evidence matrix:
+
+| Slice | Durable evidence |
+| --- | --- |
+| W54-S01 | Contract-loader tests for additive command-group fields and rejection of private fields. |
+| W54-S02 | Stack-discovery fixture tests and project-analysis command-group candidate output. |
+| W54-S03 | Project-init generated-profile tests for Node, Python, Go, Rust, frontend, monorepo, and no-tests fixtures. |
+| W54-S04 | Verifier tests for working dirs, dependencies, skips, missing tools, timeout/hang handling, and baseline outcomes. |
+| W54-S05 | CLI/API/web tests for `project verify --plan`, JSON plan output, per-group read state, and UI rendering. |
+| W54-S06 | Public archetype example, migration guide, contract-loader validation, and legacy CLI flag normalization tests. |
+| W54-S07 | Public archetype smoke matrix across discovery, init, plan, and targeted verify. |
+| W54-S08 | Public/private boundary scan, artificial leak fixture, and verify artifact-shape tests. |
 
 ### Out of scope
 - Changing private proof-harness acceptance policy.

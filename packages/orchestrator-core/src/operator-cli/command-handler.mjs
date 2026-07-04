@@ -414,6 +414,7 @@ export function formatCommandHelp(definition) {
         ? [
             "- --project-ref must point to an existing directory.",
             "- --require-validation-pass enforces validation gate before verify can proceed.",
+            "- --plan writes a verification-plan report with command groups, discovery confidence, and source refs without running target commands.",
             "- --routed-dry-run-step executes one routed dry-run step and writes a durable step-result artifact.",
             "- --routed-live-step executes one routed live step when delivery guardrails and supported adapter baseline permit it.",
             "- --output-quality-baseline accepts prior verify summaries whose warning findings may be marked pre-existing instead of blocking the current verify.",

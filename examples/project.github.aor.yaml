@@ -22,24 +22,42 @@ repo_graph: []
 verification:
   command_groups:
     - id: baseline-build
+      repo_id: target
       role: build
       phase: baseline
       enforcement: required
       timeout_class: build
+      working_dir: .
+      detected_from:
+        - examples/project.github.aor.yaml#repos.target.build_commands
+      package_manager: custom
+      tool_requirements:
+        - tool: bash
+          install_hint: Required to run ./scripts/build.sh.
       commands:
         - ./scripts/build.sh
     - id: baseline-lint
+      repo_id: target
       role: lint
       phase: baseline
       enforcement: required
       timeout_class: quick
+      depends_on:
+        - baseline-build
       commands:
         - ./scripts/lint.sh
     - id: baseline-test
+      repo_id: target
       role: test
       phase: baseline
       enforcement: required
       timeout_class: focused-test
+      depends_on:
+        - baseline-build
+      skip_policy:
+        outcome: missing-tool
+        applies_when: ./scripts/test.sh is unavailable or not executable.
+        reason: Test execution requires the target repository script.
       commands:
         - ./scripts/test.sh
     - id: post-change-build

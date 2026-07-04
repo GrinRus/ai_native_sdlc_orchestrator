@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 import { isSupportedWorkspaceMode, prepareWorkspaceIsolation } from "./workspace-isolation.mjs";
 
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
@@ -43,6 +44,7 @@ const COMMAND_GROUP_TIMEOUT_CLASS_DEFAULT_MS = Object.freeze({
   "browser-e2e": 2 * 60 * 60 * 1000,
   quick: 10 * 60 * 1000,
 });
+const COMMAND_GROUP_OUTCOME_VALUES = Object.freeze(["no-tests", "missing-tool", "not-applicable", "broken-baseline"]);
 
 /**
  * @param {unknown} value
@@ -60,6 +62,29 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function asRecordArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)).map((entry) => asRecord(entry))
+    : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function normalizeToolRequirements(value) {
+  return asRecordArray(value)
+    .map((entry) => {
+      const tool = typeof entry.tool === "string" && entry.tool.trim().length > 0 ? entry.tool.trim() : null;
+      return tool ? { ...entry, tool } : null;
+    })
+    .filter((entry) => entry !== null);
 }
 
 /**
@@ -128,6 +153,12 @@ function normalizeEnum(value, allowed, fallback) {
  *   phase: string,
  *   enforcement: string,
  *   timeoutClass: string,
+ *   workingDir: string,
+ *   dependsOn: string[],
+ *   skipPolicy: Record<string, unknown>,
+ *   detectedFrom: string[],
+ *   packageManager: string | null,
+ *   toolRequirements: Array<Record<string, unknown>>,
  *   commandSource: string,
  *   commands: string[],
  * }}
@@ -153,6 +184,16 @@ function normalizeProfileCommandGroup(group, index, repoId, source) {
       COMMAND_GROUP_TIMEOUT_CLASS_VALUES,
       defaultTimeoutClassForRole(role),
     ),
+    workingDir:
+      typeof group.working_dir === "string" && group.working_dir.trim().length > 0 ? group.working_dir.trim() : ".",
+    dependsOn: asStringArray(group.depends_on),
+    skipPolicy: asRecord(group.skip_policy),
+    detectedFrom: asStringArray(group.detected_from),
+    packageManager:
+      typeof group.package_manager === "string" && group.package_manager.trim().length > 0
+        ? group.package_manager.trim()
+        : null,
+    toolRequirements: normalizeToolRequirements(group.tool_requirements),
     commandSource: source,
     commands: asStringArray(group.commands),
   };
@@ -174,6 +215,12 @@ function normalizeProfileCommandGroup(group, index, repoId, source) {
  *   phase: string,
  *   enforcement: string,
  *   timeoutClass: string,
+ *   workingDir: string,
+ *   dependsOn: string[],
+ *   skipPolicy: Record<string, unknown>,
+ *   detectedFrom: string[],
+ *   packageManager: string | null,
+ *   toolRequirements: Array<Record<string, unknown>>,
  *   commandSource: string,
  *   commands: string[],
  * }}
@@ -186,6 +233,12 @@ function makeLegacyCommandGroup(options) {
     phase: options.phase,
     enforcement: "required",
     timeoutClass: defaultTimeoutClassForRole(options.role),
+    workingDir: ".",
+    dependsOn: [],
+    skipPolicy: {},
+    detectedFrom: [],
+    packageManager: null,
+    toolRequirements: [],
     commandSource: options.source,
     commands: asStringArray(options.commands),
   };
@@ -288,6 +341,264 @@ function collectVerificationCommandGroups(profile, overrides = {}) {
 }
 
 /**
+ * @param {{ reportsRoot: string }} runtimeLayout
+ * @param {string} verificationLabel
+ * @returns {string}
+ */
+function verificationPlanFileName(runtimeLayout, verificationLabel) {
+  const verificationLabelFilePart = normalizeFilePart(verificationLabel);
+  const fileName =
+    verificationLabel === "default" ? "verification-plan.json" : `verification-plan-${verificationLabelFilePart}.json`;
+  return path.join(runtimeLayout.reportsRoot, fileName);
+}
+
+/**
+ * @param {{ reportsRoot: string }} runtimeLayout
+ * @param {string} verificationLabel
+ * @returns {string}
+ */
+function verifySummaryFileName(runtimeLayout, verificationLabel) {
+  const verificationLabelFilePart = normalizeFilePart(verificationLabel);
+  const fileName = verificationLabel === "default" ? "verify-summary.json" : `verify-summary-${verificationLabelFilePart}.json`;
+  return path.join(runtimeLayout.reportsRoot, fileName);
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Record<string, unknown> | null}
+ */
+function readJsonObject(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return asRecord(parsed);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {string} reportsRoot
+ * @param {RegExp} matcher
+ * @returns {string[]}
+ */
+function listReportJsonFiles(reportsRoot, matcher) {
+  if (!fs.existsSync(reportsRoot)) return [];
+  return fs
+    .readdirSync(reportsRoot)
+    .filter((entry) => matcher.test(entry))
+    .map((entry) => path.join(reportsRoot, entry))
+    .sort((left, right) => {
+      const leftStat = fs.statSync(left);
+      const rightStat = fs.statSync(right);
+      const mtimeDelta = rightStat.mtimeMs - leftStat.mtimeMs;
+      if (mtimeDelta !== 0) return mtimeDelta;
+      return path.basename(right).localeCompare(path.basename(left));
+    });
+}
+
+/**
+ * @param {{ reportsRoot: string }} runtimeLayout
+ * @param {string} verificationLabel
+ * @returns {{ summary: Record<string, unknown>, summaryPath: string } | null}
+ */
+function readLatestVerifySummary(runtimeLayout, verificationLabel) {
+  const preferredPath = verifySummaryFileName(runtimeLayout, verificationLabel);
+  const preferredSummary = readJsonObject(preferredPath);
+  if (preferredSummary) return { summary: preferredSummary, summaryPath: preferredPath };
+
+  for (const summaryPath of listReportJsonFiles(runtimeLayout.reportsRoot, /^verify-summary(?:-.+)?\.json$/u)) {
+    const summary = readJsonObject(summaryPath);
+    if (summary) return { summary, summaryPath };
+  }
+  return null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Map<string, Record<string, unknown>>}
+ */
+function commandGroupStatusIndex(value) {
+  const byId = new Map();
+  const summary = asRecord(value);
+  const groups = Array.isArray(summary.command_groups) ? summary.command_groups : [];
+  for (const entry of groups) {
+    const group = asRecord(entry);
+    const id = typeof group.id === "string" && group.id.trim().length > 0 ? group.id.trim() : null;
+    if (id) byId.set(id, group);
+  }
+  return byId;
+}
+
+/**
+ * @param {ReturnType<typeof collectVerificationCommandGroups>[number]} group
+ * @param {Record<string, unknown> | null} latestGroup
+ * @param {Record<string, unknown>} profile
+ * @param {number | null | undefined} commandTimeoutMs
+ * @returns {Record<string, unknown>}
+ */
+function commandGroupPlanRow(group, latestGroup, profile, commandTimeoutMs) {
+  const latestStatus =
+    latestGroup && typeof latestGroup.status === "string" && latestGroup.status.trim().length > 0
+      ? latestGroup.status.trim()
+      : null;
+  const skipOutcome =
+    typeof group.skipPolicy.outcome === "string" && group.skipPolicy.outcome.trim().length > 0
+      ? group.skipPolicy.outcome.trim()
+      : null;
+  return {
+    id: group.groupId,
+    repo_id: group.repoId,
+    role: group.role,
+    phase: group.phase,
+    enforcement: group.enforcement,
+    timeout_class: group.timeoutClass,
+    command_timeout_ms: resolveVerificationCommandTimeoutMs(profile, commandTimeoutMs, group.timeoutClass),
+    working_dir: group.workingDir,
+    depends_on: group.dependsOn,
+    command_source: group.commandSource,
+    command_count: group.commands.length,
+    commands: group.commands,
+    status: latestStatus ?? "planned",
+    last_result_status: latestStatus,
+    outcome: typeof latestGroup?.outcome === "string" ? latestGroup.outcome : skipOutcome,
+    step_result_refs: Array.isArray(latestGroup?.step_result_refs) ? latestGroup.step_result_refs : [],
+    ...(Object.keys(group.skipPolicy).length > 0 ? { skip_policy: group.skipPolicy } : {}),
+    ...(group.detectedFrom.length > 0 ? { detected_from: group.detectedFrom } : {}),
+    ...(group.packageManager ? { package_manager: group.packageManager } : {}),
+    ...(group.toolRequirements.length > 0 ? { tool_requirements: group.toolRequirements } : {}),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} candidate
+ * @returns {Record<string, unknown>}
+ */
+function discoveryCandidatePlanRow(candidate) {
+  const commandGroup = asRecord(candidate.command_group);
+  const commands = asStringArray(commandGroup.commands);
+  return {
+    candidate_id:
+      typeof candidate.candidate_id === "string" && candidate.candidate_id.trim().length > 0
+        ? candidate.candidate_id.trim()
+        : typeof commandGroup.id === "string"
+          ? commandGroup.id
+          : "command-group-candidate",
+    confidence: typeof candidate.confidence === "string" ? candidate.confidence : "low",
+    source_refs: asStringArray(candidate.source_refs),
+    command_group: {
+      id: typeof commandGroup.id === "string" ? commandGroup.id : null,
+      repo_id: typeof commandGroup.repo_id === "string" ? commandGroup.repo_id : null,
+      role: typeof commandGroup.role === "string" ? commandGroup.role : "custom",
+      phase: typeof commandGroup.phase === "string" ? commandGroup.phase : "post-change",
+      enforcement: typeof commandGroup.enforcement === "string" ? commandGroup.enforcement : "required",
+      timeout_class: typeof commandGroup.timeout_class === "string" ? commandGroup.timeout_class : "focused-test",
+      working_dir: typeof commandGroup.working_dir === "string" ? commandGroup.working_dir : ".",
+      command_count: commands.length,
+      commands,
+      detected_from: asStringArray(commandGroup.detected_from),
+      ...(typeof commandGroup.package_manager === "string" && commandGroup.package_manager.trim().length > 0
+        ? { package_manager: commandGroup.package_manager.trim() }
+        : {}),
+      ...(normalizeToolRequirements(commandGroup.tool_requirements).length > 0
+        ? { tool_requirements: normalizeToolRequirements(commandGroup.tool_requirements) }
+        : {}),
+    },
+  };
+}
+
+/**
+ * @param {{
+ *  cwd?: string,
+ *  projectRef?: string,
+ *  projectProfile?: string,
+ *  runtimeRoot?: string,
+ *  requireValidationPass?: boolean,
+ *  verificationLabel?: string,
+ *  repoBuildCommands?: string[],
+ *  repoLintCommands?: string[],
+ *  repoTestCommands?: string[],
+ *  verificationCommandTimeoutMs?: number,
+ * }} options
+ */
+export function planProjectVerification(options = {}) {
+  const init = initializeProjectRuntime(options);
+
+  const loadedProfile = loadContractFile({
+    filePath: init.projectProfilePath,
+    family: "project-profile",
+  });
+
+  if (!loadedProfile.ok) {
+    throw new Error(`Project profile '${init.projectProfilePath}' failed contract validation.`);
+  }
+
+  const profile = /** @type {Record<string, unknown>} */ (loadedProfile.document);
+  const verificationLabel =
+    typeof options.verificationLabel === "string" && options.verificationLabel.trim().length > 0
+      ? options.verificationLabel.trim()
+      : "default";
+  const validationGateStatus = options.requireValidationPass ? readValidationGateStatus(init.runtimeLayout) : null;
+  const commandGroups = collectVerificationCommandGroups(profile, {
+    repoBuildCommands: options.repoBuildCommands,
+    repoLintCommands: options.repoLintCommands,
+    repoTestCommands: options.repoTestCommands,
+    verificationLabel,
+  });
+  const verifyCommands = flattenCommandGroups(commandGroups);
+  const latestSummary = readLatestVerifySummary(init.runtimeLayout, verificationLabel);
+  const latestGroups = commandGroupStatusIndex(latestSummary?.summary);
+  const stackDiscovery = discoverVerificationCommandGroups({
+    projectRoot: init.projectRoot,
+    repoId: resolvePrimaryRepoId(profile),
+  });
+  const commandGroupRows = commandGroups.map((group) =>
+    commandGroupPlanRow(group, latestGroups.get(group.groupId) ?? null, profile, options.verificationCommandTimeoutMs),
+  );
+  const discoveryCandidates = stackDiscovery.command_group_candidates.map((candidate) =>
+    discoveryCandidatePlanRow(candidate),
+  );
+  const plan = {
+    report_id: `${init.projectId}.verification-plan.${verificationLabel}.v1`,
+    project_id: init.projectId,
+    version: 1,
+    generated_from: {
+      command: "aor project verify --plan",
+      project_root: init.projectRoot,
+      project_profile_ref: init.projectProfileRef,
+    },
+    verification_label: verificationLabel,
+    validation_gate_status: validationGateStatus,
+    command_source: verifyCommands.some((command) => command.commandSource === "cli-override")
+      ? "cli-override"
+      : "project-profile",
+    command_count: verifyCommands.length,
+    command_groups: commandGroupRows,
+    discovered_command_groups: discoveryCandidates,
+    discovery_outcomes: stackDiscovery.outcomes,
+    discovery_suggestions: stackDiscovery.suggestions,
+    package_boundaries: stackDiscovery.package_boundaries,
+    detections: stackDiscovery.detections,
+    latest_verify_summary_ref: latestSummary?.summaryPath ?? null,
+    latest_verify_status:
+      typeof latestSummary?.summary.status === "string" ? latestSummary.summary.status : null,
+    status: commandGroupRows.length > 0 ? "planned" : "no-tests",
+  };
+
+  const planPath = verificationPlanFileName(init.runtimeLayout, verificationLabel);
+  fs.writeFileSync(planPath, `${JSON.stringify(plan, null, 2)}\n`, "utf8");
+  fs.writeFileSync(path.join(init.runtimeLayout.reportsRoot, "verification-plan.json"), `${JSON.stringify(plan, null, 2)}\n`, "utf8");
+
+  return {
+    ...init,
+    verificationLabel,
+    verificationPlan: plan,
+    verificationPlanPath: planPath,
+    validationGateStatus,
+  };
+}
+
+/**
  * @param {{ phase: string }} group
  * @param {string} verificationLabel
  * @returns {boolean}
@@ -311,6 +622,7 @@ function commandGroupAppliesToLabel(group, verificationLabel) {
  *   commandGroupPhase: string,
  *   commandGroupEnforcement: string,
  *   commandGroupTimeoutClass: string,
+ *   commandGroupWorkingDir: string,
  * }>}
  */
 function flattenCommandGroups(commandGroups) {
@@ -325,8 +637,68 @@ function flattenCommandGroups(commandGroups) {
       commandGroupPhase: group.phase,
       commandGroupEnforcement: group.enforcement,
       commandGroupTimeoutClass: group.timeoutClass,
+      commandGroupWorkingDir: group.workingDir,
     })),
   );
+}
+
+/**
+ * @param {string} executionRoot
+ * @param {string} workingDir
+ * @returns {{ ok: true, cwd: string, workingDir: string } | { ok: false, cwd: string, workingDir: string, reason: string }}
+ */
+function resolveCommandWorkingDir(executionRoot, workingDir) {
+  const selectedWorkingDir = typeof workingDir === "string" && workingDir.trim().length > 0 ? workingDir.trim() : ".";
+  const cwd = path.resolve(executionRoot, selectedWorkingDir);
+  const relative = path.relative(executionRoot, cwd);
+  const insideExecutionRoot = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  if (!insideExecutionRoot) {
+    return {
+      ok: false,
+      cwd,
+      workingDir: selectedWorkingDir,
+      reason: `working_dir '${selectedWorkingDir}' resolves outside the execution root`,
+    };
+  }
+  if (!fs.existsSync(cwd)) {
+    return {
+      ok: false,
+      cwd,
+      workingDir: selectedWorkingDir,
+      reason: `working_dir '${selectedWorkingDir}' does not exist in the execution root`,
+    };
+  }
+  return { ok: true, cwd, workingDir: selectedWorkingDir };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {"no-tests" | "missing-tool" | "not-applicable" | "broken-baseline"}
+ */
+function normalizeCommandGroupOutcome(value) {
+  return typeof value === "string" && COMMAND_GROUP_OUTCOME_VALUES.includes(value)
+    ? /** @type {"no-tests" | "missing-tool" | "not-applicable" | "broken-baseline"} */ (value)
+    : "not-applicable";
+}
+
+/**
+ * @param {Record<string, unknown>} group
+ * @returns {"no-tests" | "missing-tool" | "not-applicable" | "broken-baseline"}
+ */
+function skippedOutcomeForGroup(group) {
+  return normalizeCommandGroupOutcome(asRecord(group.skipPolicy).outcome);
+}
+
+/**
+ * @param {string} phase
+ * @returns {string}
+ */
+function phaseFailureLabel(phase) {
+  if (phase === "baseline") return "Baseline";
+  if (phase === "post-change") return "Post-change";
+  if (phase === "readiness") return "Readiness";
+  if (phase === "diagnostic") return "Diagnostic";
+  return "Verification";
 }
 
 /**
@@ -688,10 +1060,12 @@ function terminateTimedOutProcessGroup(pid) {
  *   commandGroupPhase?: string | null,
  *   commandGroupEnforcement?: string | null,
  *   commandGroupTimeoutClass?: string | null,
+ *   commandGroupOutcome?: string | null,
  *   enforcementResult?: string | null,
  *   verificationLabel?: string,
  *   missingPrerequisites?: string[],
  *   executionRoot?: string | null,
+ *   workingDir?: string | null,
  *   isolationMode?: string | null,
  *   commandTimeoutMs?: number | null,
  *   timedOut?: boolean,
@@ -732,6 +1106,7 @@ function materializeStepResult(options) {
     missing_prerequisites: options.missingPrerequisites ?? [],
     blocked_next_step: options.blockedNextStep ?? null,
     execution_root: options.executionRoot ?? null,
+    working_dir: options.workingDir ?? null,
     execution_isolation_mode: options.isolationMode ?? null,
   };
   if (typeof options.commandTimeoutMs === "number") {
@@ -770,6 +1145,7 @@ function materializeStepResult(options) {
     ["command_group_phase", options.commandGroupPhase],
     ["command_group_enforcement", options.commandGroupEnforcement],
     ["command_group_timeout_class", options.commandGroupTimeoutClass],
+    ["command_group_outcome", options.commandGroupOutcome],
     ["enforcement_result", options.enforcementResult],
   ]) {
     if (typeof value === "string" && value.length > 0) {
@@ -907,21 +1283,190 @@ export function verifyProjectRuntime(options = {}) {
       stepResultFiles.push(stepResultPath);
     }
   } else {
-    verifyCommands.forEach((item, index) => {
+    let commandOrdinal = 0;
+    /** @type {Map<string, { blocking: boolean, status: string }>} */
+    const groupExecution = new Map();
+
+    for (const group of commandGroups) {
+      const failedDependencies = group.dependsOn.filter((dependencyId) => groupExecution.get(dependencyId)?.blocking === true);
+      if (failedDependencies.length > 0) {
+        commandOrdinal += 1;
+        const stepId = `verify.${verificationLabel}.command.${commandOrdinal}`;
+        const transcriptPath = path.join(
+          init.runtimeLayout.reportsRoot,
+          `verify-command-${verificationLabelFilePart}-${commandOrdinal}.log`,
+        );
+        const commandTimeoutMs = resolveVerificationCommandTimeoutMs(
+          profile,
+          options.verificationCommandTimeoutMs,
+          group.timeoutClass,
+        );
+        const outcome = skippedOutcomeForGroup(group);
+        const enforcementResult =
+          group.enforcement === "observe" ? "observe" : group.enforcement === "warn" ? "warn" : "fail";
+        const summary = `Skipped command group '${group.groupId}' because dependency group(s) failed: ${failedDependencies.join(", ")}.`;
+        const transcript = [
+          `command_group_id: ${group.groupId}`,
+          `command_source: ${group.commandSource}`,
+          `command_kind: ${group.role}`,
+          `verification_label: ${verificationLabel}`,
+          `repo_scope: ${group.repoId}`,
+          `working_dir: ${group.workingDir}`,
+          `execution_root: ${workspaceIsolation.executionRoot}`,
+          `execution_isolation_mode: ${workspaceIsolation.mode}`,
+          `timeout_ms: ${commandTimeoutMs}`,
+          "skipped: true",
+          `skipped_dependencies: ${failedDependencies.join(",")}`,
+          `command_group_outcome: ${outcome}`,
+        ].join("\n");
+        fs.writeFileSync(transcriptPath, `${transcript}\n`, "utf8");
+
+        const { stepResult, stepResultPath } = materializeStepResult({
+          runtimeLayout: init.runtimeLayout,
+          runId,
+          stepId,
+          stepResultId: `${runId}.step.${commandOrdinal}`,
+          status: "failed",
+          summary,
+          evidenceRefs: [transcriptPath],
+          stepResultFileName:
+            verificationLabel === "default"
+              ? `step-result-${commandOrdinal}.json`
+              : `step-result-${verificationLabelFilePart}-${commandOrdinal}.json`,
+          blockedNextStep: `Rerun verify after dependency group(s) pass: ${failedDependencies.join(", ")}.`,
+          repoScope: group.repoId,
+          command: null,
+          commandOwner: group.repoId,
+          commandSource: group.commandSource,
+          commandKind: group.role,
+          commandGroupId: group.groupId,
+          commandGroupRole: group.role,
+          commandGroupPhase: group.phase,
+          commandGroupEnforcement: group.enforcement,
+          commandGroupTimeoutClass: group.timeoutClass,
+          commandGroupOutcome: outcome,
+          enforcementResult,
+          verificationLabel,
+          missingPrerequisites: [`depends_on failed: ${failedDependencies.join(", ")}`],
+          executionRoot: workspaceIsolation.executionRoot,
+          workingDir: group.workingDir,
+          isolationMode: workspaceIsolation.mode,
+          commandTimeoutMs,
+        });
+        stepResults.push(stepResult);
+        stepResultFiles.push(stepResultPath);
+        groupExecution.set(group.groupId, {
+          blocking: group.enforcement === "required",
+          status: "skipped",
+        });
+        continue;
+      }
+
+      let groupBlockingFailure = false;
+      let groupFailed = false;
+
+      for (const command of group.commands) {
+        commandOrdinal += 1;
+        const item = {
+          repoId: group.repoId,
+          command,
+          commandSource: group.commandSource,
+          commandKind: group.role,
+          commandGroupId: group.groupId,
+          commandGroupRole: group.role,
+          commandGroupPhase: group.phase,
+          commandGroupEnforcement: group.enforcement,
+          commandGroupTimeoutClass: group.timeoutClass,
+          commandGroupWorkingDir: group.workingDir,
+        };
       const commandTimeoutMs = resolveVerificationCommandTimeoutMs(
         profile,
         options.verificationCommandTimeoutMs,
         item.commandGroupTimeoutClass,
       );
-      const stepId = `verify.${verificationLabel}.command.${index + 1}`;
+      const stepId = `verify.${verificationLabel}.command.${commandOrdinal}`;
       const transcriptPath = path.join(
         init.runtimeLayout.reportsRoot,
-        `verify-command-${verificationLabelFilePart}-${index + 1}.log`,
+        `verify-command-${verificationLabelFilePart}-${commandOrdinal}.log`,
       );
+      const workingDirResolution = resolveCommandWorkingDir(
+        workspaceIsolation.executionRoot,
+        item.commandGroupWorkingDir,
+      );
+      if (!workingDirResolution.ok) {
+        const transcript = [
+          `command: ${item.command}`,
+          `command_source: ${item.commandSource}`,
+          `command_kind: ${item.commandKind}`,
+          `verification_label: ${verificationLabel}`,
+          `repo_scope: ${item.repoId}`,
+          `working_dir: ${workingDirResolution.workingDir}`,
+          `command_cwd: ${workingDirResolution.cwd}`,
+          `execution_root: ${workspaceIsolation.executionRoot}`,
+          `execution_isolation_mode: ${workspaceIsolation.mode}`,
+          `timeout_ms: ${commandTimeoutMs}`,
+          `working_dir_error: ${workingDirResolution.reason}`,
+        ].join("\n");
+        fs.writeFileSync(transcriptPath, `${transcript}\n`, "utf8");
+        const { stepResult, stepResultPath } = materializeStepResult({
+          runtimeLayout: init.runtimeLayout,
+          runId,
+          stepId,
+          stepResultId: `${runId}.step.${commandOrdinal}`,
+          status: "failed",
+          summary: `Verification command '${item.command}' failed before execution: ${workingDirResolution.reason}.`,
+          evidenceRefs: [transcriptPath],
+          stepResultFileName:
+            verificationLabel === "default"
+              ? `step-result-${commandOrdinal}.json`
+              : `step-result-${verificationLabelFilePart}-${commandOrdinal}.json`,
+          blockedNextStep: "Fix command_group.working_dir so it resolves inside the execution root, then rerun verify.",
+          repoScope: item.repoId,
+          command: item.command,
+          commandOwner: item.repoId,
+          commandSource: item.commandSource,
+          commandKind: item.commandKind,
+          commandGroupId: item.commandGroupId,
+          commandGroupRole: item.commandGroupRole,
+          commandGroupPhase: item.commandGroupPhase,
+          commandGroupEnforcement: item.commandGroupEnforcement,
+          commandGroupTimeoutClass: item.commandGroupTimeoutClass,
+          enforcementResult:
+            item.commandGroupEnforcement === "observe"
+              ? "observe"
+              : item.commandGroupEnforcement === "warn"
+                ? "warn"
+                : "fail",
+          verificationLabel,
+          missingPrerequisites: [workingDirResolution.reason],
+          executionRoot: workspaceIsolation.executionRoot,
+          workingDir: workingDirResolution.workingDir,
+          isolationMode: workspaceIsolation.mode,
+          commandTimeoutMs,
+          timedOut: false,
+          startedAt: null,
+          finishedAt: null,
+          durationMs: null,
+          exitCode: null,
+          signal: null,
+          errorCode: null,
+          outputExcerpt: {
+            stdout_tail: "",
+            stderr_tail: workingDirResolution.reason,
+          },
+        });
+        stepResults.push(stepResult);
+        stepResultFiles.push(stepResultPath);
+        groupFailed = true;
+        if (item.commandGroupEnforcement === "required") {
+          groupBlockingFailure = true;
+        }
+        continue;
+      }
       const startedAtMs = Date.now();
       const startedAt = new Date(startedAtMs).toISOString();
       const commandRun = spawnSync(item.command, {
-        cwd: workspaceIsolation.executionRoot,
+        cwd: workingDirResolution.cwd,
         shell: true,
         encoding: "utf8",
         env: buildVerificationCommandEnv(),
@@ -958,6 +1503,8 @@ export function verifyProjectRuntime(options = {}) {
         `command_kind: ${item.commandKind}`,
         `verification_label: ${verificationLabel}`,
         `repo_scope: ${item.repoId}`,
+        `working_dir: ${workingDirResolution.workingDir}`,
+        `command_cwd: ${workingDirResolution.cwd}`,
         `execution_root: ${workspaceIsolation.executionRoot}`,
         `execution_isolation_mode: ${workspaceIsolation.mode}`,
         `timeout_ms: ${commandTimeoutMs}`,
@@ -989,6 +1536,12 @@ export function verifyProjectRuntime(options = {}) {
         status === "failed" && !timedOut && !hasOutputQualityFailure
           ? inferMissingPrerequisites(item.command, commandRun)
           : [];
+      const commandGroupOutcome =
+        status === "failed" && missingPrerequisites.length > 0
+          ? "missing-tool"
+          : status === "failed" && item.commandGroupPhase === "baseline" && item.commandGroupEnforcement === "required"
+            ? "broken-baseline"
+            : null;
       const blockedNextStep =
         status === "failed"
           ? timedOut
@@ -1011,20 +1564,20 @@ export function verifyProjectRuntime(options = {}) {
               ? `Verification command '${item.command}' exited 0 but emitted warning output on stderr.`
           : missingPrerequisites.length > 0
             ? `Verification command '${item.command}' failed: missing prerequisite(s) detected.`
-            : `Verification command '${item.command}' failed with exit code ${commandRun.status ?? -1}.`;
+            : `${phaseFailureLabel(item.commandGroupPhase)} verification command '${item.command}' failed with exit code ${commandRun.status ?? -1}.`;
 
       const { stepResult, stepResultPath } = materializeStepResult({
         runtimeLayout: init.runtimeLayout,
         runId,
         stepId,
-        stepResultId: `${runId}.step.${index + 1}`,
+        stepResultId: `${runId}.step.${commandOrdinal}`,
         status,
         summary,
         evidenceRefs: [transcriptPath],
         stepResultFileName:
           verificationLabel === "default"
-            ? `step-result-${index + 1}.json`
-            : `step-result-${verificationLabelFilePart}-${index + 1}.json`,
+            ? `step-result-${commandOrdinal}.json`
+            : `step-result-${verificationLabelFilePart}-${commandOrdinal}.json`,
         blockedNextStep,
         repoScope: item.repoId,
         command: item.command,
@@ -1036,10 +1589,12 @@ export function verifyProjectRuntime(options = {}) {
         commandGroupPhase: item.commandGroupPhase,
         commandGroupEnforcement: item.commandGroupEnforcement,
         commandGroupTimeoutClass: item.commandGroupTimeoutClass,
+        commandGroupOutcome,
         enforcementResult,
         verificationLabel,
         missingPrerequisites,
         executionRoot: workspaceIsolation.executionRoot,
+        workingDir: workingDirResolution.workingDir,
         isolationMode: workspaceIsolation.mode,
         commandTimeoutMs,
         timedOut,
@@ -1057,7 +1612,19 @@ export function verifyProjectRuntime(options = {}) {
       });
       stepResults.push(stepResult);
       stepResultFiles.push(stepResultPath);
-    });
+        if (status === "failed") {
+          groupFailed = true;
+          if (item.commandGroupEnforcement === "required") {
+            groupBlockingFailure = true;
+          }
+        }
+      }
+
+      groupExecution.set(group.groupId, {
+        blocking: groupBlockingFailure,
+        status: groupBlockingFailure ? "failed" : groupFailed ? "nonblocking-failure" : "passed",
+      });
+    }
   }
 
   if (stepResults.length === 0) {
@@ -1100,8 +1667,12 @@ export function verifyProjectRuntime(options = {}) {
   const commandGroupResults = commandGroups.map((group) => {
     const groupSteps = stepResults.filter((result) => result.command_group_id === group.groupId);
     const failedSteps = groupSteps.filter((result) => result.status === "failed");
+    const skippedSteps = groupSteps.filter((result) => result.command_group_outcome === "not-applicable");
+    const executableFailedSteps = failedSteps.filter((result) => result.command_group_outcome !== "not-applicable");
     const status =
-      failedSteps.length === 0
+      skippedSteps.length > 0 && executableFailedSteps.length === 0
+        ? "skipped"
+        : failedSteps.length === 0
         ? "passed"
         : group.enforcement === "observe"
           ? "observed"
@@ -1115,14 +1686,27 @@ export function verifyProjectRuntime(options = {}) {
       phase: group.phase,
       enforcement: group.enforcement,
       timeout_class: group.timeoutClass,
+      working_dir: group.workingDir,
+      depends_on: group.dependsOn,
       status,
       command_count: group.commands.length,
       failed_command_count: failedSteps.length,
+      skipped_command_count: skippedSteps.length,
+      outcome: typeof skippedSteps[0]?.command_group_outcome === "string" ? skippedSteps[0].command_group_outcome : null,
       step_result_refs: groupSteps
         .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
         .filter((entry) => typeof entry === "string" && entry.length > 0),
     };
   });
+  const missingToolSteps = stepResults.filter((result) => result.command_group_outcome === "missing-tool");
+  const skippedSteps = stepResults.filter((result) => result.command_group_outcome === "not-applicable");
+  const brokenBaselineSteps = stepResults.filter((result) => result.command_group_outcome === "broken-baseline");
+  const baselineFailures = stepResults.filter(
+    (result) => result.status === "failed" && result.command_group_phase === "baseline",
+  );
+  const postChangeFailures = stepResults.filter(
+    (result) => result.status === "failed" && result.command_group_phase === "post-change",
+  );
   const verifySummary = {
     run_id: runId,
     verification_label: verificationLabel,
@@ -1177,6 +1761,31 @@ export function verifyProjectRuntime(options = {}) {
         step_result_ref:
           stepResultFiles[stepResults.indexOf(result)] ?? null,
       })),
+    missing_tool_commands: missingToolSteps.map((result) => ({
+      repo_scope: result.repo_scope ?? null,
+      command: result.command ?? null,
+      command_group_id: result.command_group_id ?? null,
+      step_result_ref: stepResultFiles[stepResults.indexOf(result)] ?? null,
+      missing_prerequisites: Array.isArray(result.missing_prerequisites) ? result.missing_prerequisites : [],
+    })),
+    skipped_command_groups: skippedSteps.map((result) => ({
+      repo_scope: result.repo_scope ?? null,
+      command_group_id: result.command_group_id ?? null,
+      depends_on: commandGroups.find((group) => group.groupId === result.command_group_id)?.dependsOn ?? [],
+      step_result_ref: stepResultFiles[stepResults.indexOf(result)] ?? null,
+      reason: result.summary ?? null,
+    })),
+    phase_summary: {
+      baseline_failed_count: baselineFailures.length,
+      post_change_failed_count: postChangeFailures.length,
+      broken_baseline_count: brokenBaselineSteps.length,
+      baseline_failed_step_result_refs: baselineFailures
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+      post_change_failed_step_result_refs: postChangeFailures
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
+    },
     output_quality_failed_commands: stepResults
       .filter((result) =>
         Array.isArray(result.output_quality_findings) &&
@@ -1245,7 +1854,11 @@ export function verifyProjectRuntime(options = {}) {
     },
     blocked_next_step:
       summaryStatus === "failed"
-        ? "Inspect failed step-result files and fix missing prerequisites before rerunning verify."
+        ? brokenBaselineSteps.length > 0
+          ? "Resolve failing baseline command groups before comparing post-change verification evidence."
+          : postChangeFailures.length > 0
+            ? "Inspect failed post-change step-result files, fix target changes or command prerequisites, then rerun verify."
+            : "Inspect failed step-result files and fix missing prerequisites before rerunning verify."
         : null,
   };
 

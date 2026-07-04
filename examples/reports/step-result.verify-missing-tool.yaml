@@ -1,0 +1,23 @@
+step_result_id: step-result.verify.missing-tool
+run_id: run.verify.missing-tool
+step_id: step.verify.baseline
+step_class: runner
+status: blocked
+summary: Verification command group could not run because a required tool was missing.
+evidence_refs:
+  - evidence://contracts/w54-s01/missing-tool
+command_group_id: baseline-test
+command_group_role: test
+command_group_phase: baseline
+command_group_enforcement: required
+command_group_timeout_class: focused-test
+enforcement_result: fail
+command_group_outcome: missing-tool
+command_timeout_ms: 300000
+timed_out: false
+exit_code: null
+signal: null
+error_code: command_missing
+output_excerpt:
+  stdout_tail: ""
+  stderr_tail: "pnpm: command not found"

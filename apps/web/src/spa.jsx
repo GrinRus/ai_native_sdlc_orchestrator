@@ -1724,6 +1724,8 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   const latestRequest =
     latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft }) ??
     (!selectedFlow && !newFlowDraft ? latestDecisionRequestFromEvidence(evidenceRows) : null);
+  const verificationPlan = projectState?.verification_plan ?? null;
+  const verificationGroups = Array.isArray(verificationPlan?.command_groups) ? verificationPlan.command_groups : [];
 
   return (
     <aside className="right-rail">
@@ -1751,6 +1753,30 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
             </span>
           ))}
         </div>
+      </section>
+      <section className="rail-card verification-plan-card">
+        <h3>Verification plan <span>{verificationGroups.length}</span></h3>
+        {verificationGroups.length === 0 ? (
+          <p>No verification command groups planned yet.</p>
+        ) : (
+          <>
+            <div className="verification-plan-summary">
+              <StatusPill state={verificationPlan.latest_verify_status ?? verificationPlan.status ?? "planned"} />
+              <span>{verificationPlan.verification_label ?? "default"}</span>
+            </div>
+            <ul>
+              {verificationGroups.slice(0, 5).map((group) => (
+                <li key={group.id ?? `${group.role}-${group.phase}`}>
+                  <div>
+                    <strong>{group.role ?? "custom"}</strong>
+                    <span>{group.phase ?? "post-change"} / {group.enforcement ?? "required"}{group.outcome ? ` / ${group.outcome}` : ""}</span>
+                  </div>
+                  <StatusPill state={group.outcome ?? group.status ?? group.last_result_status ?? "planned"} />
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
       <section className="rail-card">
         <h3>Runtime root</h3>

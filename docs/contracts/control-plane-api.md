@@ -106,7 +106,9 @@ Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
 - `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated target profiles can preserve required setup and verification commands without private profile generation. Materialized profiles expose those commands through generic `verification.command_groups[]` while keeping legacy per-repo command lists for compatibility.
 - `project verify` accepts `verification_label` plus repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs. Labels separate baseline diagnostics, primary post-run gates, and diagnostic full-suite evidence while preserving command source in the verify summary. Legacy command inputs are normalized into generic command groups before execution.
+- `project verify --plan` writes `verification-plan.json` or `verification-plan-<label>.json` under the runtime reports root without executing target commands. CLI JSON returns `verification_plan_file`, `verification_plan`, generated command groups, discovery candidates, confidence, and source refs.
 - `project verify` summaries include per-group `role`, `phase`, `enforcement`, `timeout_class`, status, and step-result refs. `required` failures fail the verify summary, `warn` failures produce warning evidence, and `observe` failures remain non-blocking evidence.
+- `GET /api/projects/:projectId/state` exposes `verification_plan` when a plan or verify summary exists. The read model includes per-group role, phase, enforcement, timeout class, working directory, status, last result status, outcome, and step-result refs so the web console can distinguish failed, warn, observed, skipped, and not-applicable groups.
 - `project verify` enforces a bounded per-command timeout derived from the project profile and records command evidence through `command_timeout_ms`, `timed_out`, `started_at`, `finished_at`, `duration_ms`, `exit_code`, `signal`, `error_code`, bounded output excerpts, transcripts, and `timed_out_commands`.
 - `project verify` treats high-signal warning output in stderr as a failed command even when the process exits 0. Step results record bounded `output_quality_findings[]`, and verify summaries aggregate `output_quality_failed_commands[]` plus the active `output_quality_warning_patterns[]`.
 - `project verify` accepts repeatable `output_quality_baseline` inputs that point to previous verify summaries. Matching warning classes remain in `output_quality_findings[]` with `baseline_status=pre_existing` and are aggregated under `output_quality_baseline_matches[]`, but only non-baseline warning findings fail the current verify.
@@ -548,7 +550,7 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `GET /` for the packaged local SPA when the transport is started with an app static root;
 - `GET /app-config.json` for same-origin app configuration (`project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata);
 - `GET /api/projects` for local app-session project summaries;
-- `GET /api/projects/:projectId/state`
+- `GET /api/projects/:projectId/state` including `verification_plan` plan/status read-model data when available
 - `GET /api/projects/:projectId/strategic-snapshot`
 - `GET /api/projects/:projectId/planner-metrics`
 - `GET /api/projects/:projectId/finance-monitoring`

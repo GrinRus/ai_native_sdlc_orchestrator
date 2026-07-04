@@ -19,6 +19,8 @@ const RELEASE_PACKET_REGEX = /^release-packet-.*\.json$/;
 const PROMOTION_DECISION_REGEX = /^promotion-decision-.*\.json$/;
 const STEP_RESULT_REGEX = /^step-result-.*\.json$/;
 const VALIDATION_REPORT_REGEX = /^validation-report.*\.json$/;
+const VERIFICATION_PLAN_REGEX = /^verification-plan(?:-.+)?\.json$/;
+const VERIFY_SUMMARY_REGEX = /^verify-summary(?:-.+)?\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
@@ -364,6 +366,15 @@ function listReadableEvidenceSidecarSummaries(options = {}) {
       fallbackLabel: "Onboarding report",
       fallbackDescription: "Runtime onboarding report evidence.",
     }),
+    ...loadReadableEvidenceSidecarSummaries({
+      init,
+      files: listJsonFiles(init.runtimeLayout.reportsRoot),
+      matcher: VERIFICATION_PLAN_REGEX,
+      type: "verification",
+      stage: "verification",
+      fallbackLabel: "Verification plan",
+      fallbackDescription: "Verification command-group plan evidence.",
+    }),
   ];
   return applyReadModelLimit(summaries, options.limit);
 }
@@ -394,6 +405,140 @@ function readLatestProviderStepStatus(init) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {Record<string, unknown> | null}
+ */
+function readJsonObject(filePath) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return asRecord(parsed);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {RegExp} matcher
+ * @returns {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+function readLatestReportSidecar(init, matcher) {
+  const file = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [matcher], 1)[0] ?? null;
+  if (!file) return null;
+  const document = readJsonObject(file);
+  return document ? { file, artifact_ref: toEvidenceRef(init, file), document } : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Map<string, Record<string, unknown>>}
+ */
+function commandGroupIndex(value) {
+  const byId = new Map();
+  const groups = Array.isArray(value) ? value : [];
+  for (const entry of groups) {
+    const group = asRecord(entry);
+    const id = asString(group.id);
+    if (id) byId.set(id, group);
+  }
+  return byId;
+}
+
+/**
+ * @param {Record<string, unknown>} group
+ * @param {Record<string, unknown> | null} latestGroup
+ * @returns {Record<string, unknown>}
+ */
+function verificationPlanCommandGroupSurface(group, latestGroup) {
+  const latestStatus = asString(latestGroup?.status);
+  const status = latestStatus ?? asString(group.status) ?? "planned";
+  const skipPolicy = asRecord(group.skip_policy);
+  return {
+    id: asString(group.id) ?? "command-group",
+    repo_id: asString(group.repo_id) ?? "main",
+    role: asString(group.role) ?? "custom",
+    phase: asString(group.phase) ?? "post-change",
+    enforcement: asString(group.enforcement) ?? "required",
+    timeout_class: asString(group.timeout_class) ?? "focused-test",
+    working_dir: asString(group.working_dir) ?? ".",
+    depends_on: asStringArray(group.depends_on),
+    command_count: Number.isFinite(Number(group.command_count))
+      ? Number(group.command_count)
+      : asStringArray(group.commands).length,
+    status,
+    last_result_status: latestStatus,
+    outcome:
+      asString(latestGroup?.outcome) ??
+      asString(latestGroup?.command_group_outcome) ??
+      asString(group.outcome) ??
+      asString(group.command_group_outcome) ??
+      asString(skipPolicy.outcome),
+    command_source: asString(group.command_source),
+    step_result_refs:
+      Array.isArray(latestGroup?.step_result_refs)
+        ? latestGroup.step_result_refs
+        : Array.isArray(group.step_result_refs)
+          ? group.step_result_refs
+          : [],
+  };
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @returns {Record<string, unknown> | null}
+ */
+function readVerificationPlanSurface(init) {
+  const plan = readLatestReportSidecar(init, VERIFICATION_PLAN_REGEX);
+  const summary = readLatestReportSidecar(init, VERIFY_SUMMARY_REGEX);
+  if (!plan && !summary) return null;
+
+  const planDocument = plan?.document ?? {};
+  const summaryDocument = summary?.document ?? {};
+  const summaryGroups = commandGroupIndex(summaryDocument.command_groups);
+  const sourceGroups =
+    Array.isArray(planDocument.command_groups) && planDocument.command_groups.length > 0
+      ? planDocument.command_groups
+      : Array.isArray(summaryDocument.command_groups)
+        ? summaryDocument.command_groups
+        : [];
+  const commandGroups = sourceGroups.map((entry) => {
+    const group = asRecord(entry);
+    const id = asString(group.id);
+    return verificationPlanCommandGroupSurface(group, id ? summaryGroups.get(id) ?? null : null);
+  });
+  return {
+    status: asString(planDocument.status) ?? (commandGroups.length > 0 ? "planned" : "no-tests"),
+    verification_label: asString(planDocument.verification_label) ?? asString(summaryDocument.verification_label) ?? "default",
+    plan_file: plan?.file ?? null,
+    plan_ref: plan?.artifact_ref ?? null,
+    latest_summary_file: summary?.file ?? null,
+    latest_summary_ref: summary?.artifact_ref ?? null,
+    latest_verify_status: asString(summaryDocument.status),
+    command_count: Number.isFinite(Number(planDocument.command_count))
+      ? Number(planDocument.command_count)
+      : commandGroups.reduce((count, group) => count + Number(group.command_count ?? 0), 0),
+    command_groups: commandGroups,
+    discovered_command_groups: Array.isArray(planDocument.discovered_command_groups)
+      ? planDocument.discovered_command_groups
+      : [],
+    discovery_outcomes: Array.isArray(planDocument.discovery_outcomes) ? planDocument.discovery_outcomes : [],
+    discovery_suggestions: Array.isArray(planDocument.discovery_suggestions)
+      ? planDocument.discovery_suggestions
+      : [],
+  };
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef?: string,
@@ -419,6 +564,7 @@ export function readProjectState(options = {}) {
       state_file: null,
       onboarding_summary: buildOnboardingSummary(preview),
       provider_step_status: null,
+      verification_plan: null,
       artifact_display_summaries: [],
     };
   }
@@ -439,6 +585,7 @@ export function readProjectState(options = {}) {
     state_file: init.stateFile,
     onboarding_summary: buildOnboardingSummary(initializedPreview),
     provider_step_status: readLatestProviderStepStatus(init),
+    verification_plan: readVerificationPlanSurface(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };
 }

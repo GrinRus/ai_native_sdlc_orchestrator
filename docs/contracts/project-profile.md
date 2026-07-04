@@ -89,9 +89,36 @@ target projects. Each group must carry:
 - `timeout_class`: `install`, `build`, `focused-test`, `full-suite`, `browser-e2e`, or `quick`
 - `commands[]`
 
+Groups may also carry authoring metadata used by W54 discovery and profile
+generation:
+- `repo_id` to bind the group to one `repos[].repo_id`;
+- `working_dir` as the repo-relative execution directory;
+- `depends_on[]` with prerequisite command-group ids;
+- `detected_from[]` with manifest, script, or operator source refs;
+- `package_manager` for the detected ecosystem driver;
+- `tool_requirements[]` entries with `tool`, optional `version_range`, and
+  optional `install_hint`;
+- `skip_policy` with optional `outcome`, `applies_when`, and `reason`.
+
+Generic command-group outcomes are `no-tests`, `missing-tool`,
+`not-applicable`, and `broken-baseline`. They are AOR verification evidence and
+must not use private proof-harness fields such as target-matrix, run-health, or
+step-quality metadata.
+
+`project init` materializes discovery-backed command groups for detected stacks
+and may record `verification.discovery_outcomes[]` and
+`verification.discovery_suggestions[]` when no runnable verification command is
+detected. These records are evidence for operator review, not invented passing
+commands.
+
 Legacy per-repo `build_commands`, `lint_commands`, and `test_commands` remain
 loadable and are normalized into required command groups by `project verify`
 when `verification.command_groups[]` is absent.
+
+For migration guidance, see
+`docs/ops/verification-command-groups-migration.md`. New profiles should author
+command groups directly, keep legacy command lists only as compatibility read
+models, and treat `warn` and `observe` groups as non-acceptance evidence.
 
 `project verify` target commands are bounded per command.
 `runtime_defaults.verification_command_timeout_sec` may set an explicit
@@ -111,4 +138,6 @@ separate from hang cleanup evidence.
 Non-canonical aliases are rejected instead of normalized.
 
 ## Example
-See `examples/project.aor.yaml`, `examples/project.github.aor.yaml`, and `examples/project.bounded-multirepo.aor.yaml`.
+See `examples/project.aor.yaml`, `examples/project.github.aor.yaml`,
+`examples/project.bounded-multirepo.aor.yaml`, and
+`examples/project.verification-archetypes.aor.yaml`.

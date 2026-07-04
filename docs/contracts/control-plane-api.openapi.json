@@ -1446,6 +1446,18 @@
               }
             ]
           },
+          "verification_plan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "Latest verification-plan read model with generated command groups, discovery candidates, per-group status, outcome, and evidence refs.",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "artifact_display_summaries": {
             "type": "array",
             "description": "User-facing summaries for recent readable artifact refs. Raw refs remain available only inside each summary raw_ref/debug action.",

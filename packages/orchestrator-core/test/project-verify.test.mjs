@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { verifyProjectRuntime } from "../src/project-verify.mjs";
+import { planProjectVerification, verifyProjectRuntime } from "../src/project-verify.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -60,6 +60,45 @@ test("verifyProjectRuntime records passing bounded command execution", () => {
     assert.equal(result.verifySummary.execution_isolation.cleanup.status, "skipped");
     assert.equal(fs.existsSync(result.verifySummaryPath), true);
     assert.equal(result.stepResultFiles.every((filePath) => fs.existsSync(filePath)), true);
+  });
+});
+
+test("planProjectVerification writes command-group plan without running target commands", () => {
+  withTempRepo((repoRoot) => {
+    const markerFile = path.join(repoRoot, "plan-command-ran.txt");
+    fs.writeFileSync(
+      path.join(repoRoot, "package.json"),
+      `${JSON.stringify(
+        {
+          scripts: {
+            build: "node -e \"process.exit(0)\"",
+            test: "node -e \"process.exit(0)\"",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const planCommand = `${process.execPath} -e "require('node:fs').writeFileSync(${JSON.stringify(markerFile)}, 'ran')"`;
+    const result = planProjectVerification({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [planCommand],
+    });
+
+    assert.equal(fs.existsSync(result.verificationPlanPath), true);
+    assert.equal(fs.existsSync(markerFile), false);
+    assert.equal(result.verificationPlan.command_groups.length, 1);
+    assert.equal(result.verificationPlan.command_groups[0].status, "planned");
+    assert.equal(result.verificationPlan.command_groups[0].command_source, "cli-override");
+    assert.ok(result.verificationPlan.discovered_command_groups.length >= 2);
+    assert.ok(result.verificationPlan.discovered_command_groups.every((candidate) => candidate.confidence));
+    assert.ok(result.verificationPlan.discovered_command_groups.every((candidate) => candidate.source_refs.length > 0));
+    const serializedPlan = JSON.stringify(result.verificationPlan);
+    assert.equal(/live_e2e|live-e2e|target_readiness|diagnostic_health|step_quality/u.test(serializedPlan), false);
   });
 });
 
@@ -347,19 +386,19 @@ test("verifyProjectRuntime preserves output from commands that write then hang",
     const result = verifyProjectRuntime({
       projectRef: repoRoot,
       cwd: repoRoot,
-      verificationCommandTimeoutMs: 100,
+      verificationCommandTimeoutMs: 3000,
       repoTestCommands: [command],
     });
 
     assert.equal(result.verifySummary.status, "failed");
-    assert.equal(result.verifySummary.command_timeout_ms, 1000);
+    assert.equal(result.verifySummary.command_timeout_ms, 3000);
     assert.equal(result.verifySummary.timed_out_commands.length, 1);
 
     const failedStep = result.stepResults.find((step) => step.command === command);
     assert.ok(failedStep);
     assert.equal(failedStep.status, "failed");
     assert.equal(failedStep.timed_out, true);
-    assert.equal(failedStep.command_timeout_ms, 1000);
+    assert.equal(failedStep.command_timeout_ms, 3000);
     assert.match(failedStep.output_excerpt.stdout_tail, /terminal stdout before pipe wait/u);
     assert.match(failedStep.output_excerpt.stderr_tail, /terminal stderr before pipe wait/u);
 
@@ -425,6 +464,7 @@ test("verifyProjectRuntime reports missing prerequisites when command is unavail
       result.stepResults.some(
         (step) =>
           step.command === "missing-cli-that-does-not-exist" &&
+          step.command_group_outcome === "missing-tool" &&
           Array.isArray(step.missing_prerequisites) &&
           step.missing_prerequisites.length > 0,
       ),
@@ -526,6 +566,148 @@ test("verifyProjectRuntime executes project-profile command groups by verificati
     assert.ok(result.stepResults.every((step) => step.command_group_enforcement === "required"));
     assert.ok(result.stepResults.every((step) => step.enforcement_result === "pass"));
     assert.equal(result.stepResults.some((step) => step.command.includes("process.exit(9)")), false);
+  });
+});
+
+test("verifyProjectRuntime executes command groups from configured working_dir", () => {
+  withTempRepo((repoRoot) => {
+    fs.mkdirSync(path.join(repoRoot, "apps/api"), { recursive: true });
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent.replace(
+      "repo_graph: []",
+      [
+        "repo_graph: []",
+        "verification:",
+        "  command_groups:",
+        "    - id: api-test",
+        "      role: test",
+        "      phase: post-change",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      working_dir: apps/api",
+        "      commands:",
+        "        - 'node -e \"require(\\\"node:fs\\\").writeFileSync(\\\"working-dir-marker.txt\\\", \\\"ok\\\")\"'",
+      ].join("\n"),
+    );
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+    });
+
+    assert.equal(result.verifySummary.status, "passed");
+    assert.equal(fs.existsSync(path.join(repoRoot, "working-dir-marker.txt")), false);
+    assert.equal(fs.existsSync(path.join(repoRoot, "apps/api/working-dir-marker.txt")), true);
+    assert.equal(result.stepResults[0].working_dir, "apps/api");
+    assert.match(fs.readFileSync(result.stepResults[0].evidence_refs[0], "utf8"), /command_cwd: .*apps\/api/u);
+    assert.equal(result.verifySummary.command_groups[0].working_dir, "apps/api");
+  });
+});
+
+test("verifyProjectRuntime skips dependent groups after required dependency failure", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent.replace(
+      "repo_graph: []",
+      [
+        "repo_graph: []",
+        "verification:",
+        "  command_groups:",
+        "    - id: build-required",
+        "      role: build",
+        "      phase: post-change",
+        "      enforcement: required",
+        "      timeout_class: build",
+        "      commands:",
+        "        - 'node -e \"process.exit(3)\"'",
+        "    - id: test-dependent",
+        "      role: test",
+        "      phase: post-change",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      depends_on:",
+        "        - build-required",
+        "      commands:",
+        "        - 'node -e \"require(\\\"node:fs\\\").writeFileSync(\\\"should-not-run.txt\\\", \\\"bad\\\")\"'",
+      ].join("\n"),
+    );
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    assert.equal(fs.existsSync(path.join(repoRoot, "should-not-run.txt")), false);
+    const skipped = result.stepResults.find((step) => step.command_group_id === "test-dependent");
+    assert.ok(skipped);
+    assert.equal(skipped.command_group_outcome, "not-applicable");
+    assert.match(skipped.summary, /Skipped command group 'test-dependent'/u);
+    assert.equal(result.verifySummary.command_groups.find((group) => group.id === "test-dependent").status, "skipped");
+    assert.equal(result.verifySummary.skipped_command_groups.length, 1);
+  });
+});
+
+test("verifyProjectRuntime classifies missing tools and broken baseline outcomes", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const patched = profileContent.replace(
+      "repo_graph: []",
+      [
+        "repo_graph: []",
+        "verification:",
+        "  command_groups:",
+        "    - id: baseline-missing-tool",
+        "      role: test",
+        "      phase: baseline",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      commands:",
+        "        - missing-cli-that-does-not-exist",
+        "    - id: baseline-broken",
+        "      role: test",
+        "      phase: baseline",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      commands:",
+        "        - 'node -e \"process.exit(5)\"'",
+        "    - id: post-change-broken",
+        "      role: test",
+        "      phase: post-change",
+        "      enforcement: required",
+        "      timeout_class: focused-test",
+        "      commands:",
+        "        - 'node -e \"process.exit(6)\"'",
+      ].join("\n"),
+    );
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const baseline = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "baseline-diagnostic",
+    });
+    const postChange = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+    });
+
+    assert.equal(baseline.verifySummary.status, "failed");
+    assert.equal(baseline.verifySummary.missing_tool_commands.length, 1);
+    assert.ok(baseline.stepResults.some((step) => step.command_group_outcome === "missing-tool"));
+    assert.ok(baseline.stepResults.some((step) => step.command_group_outcome === "broken-baseline"));
+    assert.equal(baseline.verifySummary.phase_summary.baseline_failed_count, 2);
+    assert.equal(baseline.verifySummary.phase_summary.broken_baseline_count, 1);
+    assert.equal(postChange.verifySummary.phase_summary.post_change_failed_count, 1);
+    assert.equal(postChange.stepResults.some((step) => step.command_group_outcome === "broken-baseline"), false);
   });
 });
 

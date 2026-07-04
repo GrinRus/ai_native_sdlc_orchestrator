@@ -9,6 +9,7 @@ const privateSurfaceToken = ["live", "e2e"].join("-");
 const privateSurfaceUnderscoreToken = ["live", "e2e"].join("_");
 const manualPrivateSurfaceToken = ["manual", privateSurfaceToken].join("-");
 const proofRunnerToken = ["proof", "runner"].join("-");
+const proofRunnerUnderscoreToken = ["proof", "runner"].join("_");
 const proofRunnerSpaceToken = ["proof", "runner"].join(" ");
 const privateSurfaceSpaceToken = ["live", "E2E"].join(" ");
 const privateSurfacePublicPathToken = path.posix.join("examples", privateSurfaceToken);
@@ -17,9 +18,14 @@ const forbiddenPublicSurfaceTokens = [
   privateSurfaceUnderscoreToken,
   manualPrivateSurfaceToken,
   proofRunnerToken,
+  proofRunnerUnderscoreToken,
   proofRunnerSpaceToken,
   privateSurfaceSpaceToken,
   privateSurfacePublicPathToken,
+  ["target", "matrix"].join("_"),
+  ["target", "readiness"].join("_"),
+  ["diagnostic", "health"].join("_"),
+  ["step", "quality"].join("_"),
 ];
 const allowedCliCatalogInternalRehearsalSentence = [
   "Installed-user rehearsal is maintained as internal repo tooling under `scripts/",

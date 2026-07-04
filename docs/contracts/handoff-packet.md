@@ -28,6 +28,10 @@ For medium+ implementation work, the packet should carry the same planning-grade
 - `goals[]`, `definition_of_done[]`, `local_tasks[]`, `acceptance_criteria[]`, `expected_evidence[]`, and `kpis[]` from the approved intake/spec when present.
 - `verification_expectations` copied from the wave ticket so review and operator checks can inspect the mission verification contract directly.
 - `verification_plan.command_groups[]` populated with generic AOR command groups for setup, baseline, post-change, and diagnostic checks. Legacy `verification_plan.commands[]` may remain as a compatibility read model for older packets, but new packets should treat command groups as the executable verification contract.
+- Command groups may carry W54 authoring metadata (`repo_id`, `working_dir`,
+  `depends_on[]`, `detected_from[]`, `package_manager`,
+  `tool_requirements[]`, and `skip_policy`) as long as generated handoffs do not
+  embed private proof-harness target-matrix, run-health, or step-quality fields.
 - `allowed_paths[]` narrowed from mission `change_evidence.required_path_prefixes[]` when available; broad `**` scope is acceptable only when the upstream artifact provides no narrower path hints.
 Runner prompts and review gates may use these optional fields as completeness evidence, but older handoff packets without them remain loadable.
 
