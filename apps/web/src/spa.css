@@ -749,6 +749,92 @@ p {
   overflow-wrap: anywhere;
 }
 
+.quality-gate-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #f0c36d;
+  border-radius: 6px;
+  background: #fffaf0;
+}
+
+.quality-gate-card.operator-hold {
+  border-color: #ef9a8c;
+  background: #fff5f3;
+}
+
+.quality-gate-heading,
+.quality-next-action,
+.quality-gate-evidence {
+  min-width: 0;
+}
+
+.quality-gate-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quality-gate-heading span,
+.quality-gate-grid span,
+.quality-next-action span,
+.quality-gate-evidence span {
+  color: #6b6471;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.quality-gate-heading h3,
+.quality-gate-grid strong,
+.quality-next-action code,
+.quality-gate-evidence li {
+  overflow-wrap: anywhere;
+}
+
+.quality-gate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-gate-grid > div,
+.quality-next-action,
+.quality-gate-evidence > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #eadfce;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.quality-gate-grid p,
+.quality-next-action p,
+.quality-gate-evidence p {
+  margin: 0;
+  color: #586472;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.quality-gate-evidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.quality-gate-evidence ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 16px;
+}
+
 .stage-specific-panel {
   display: grid;
   gap: 12px;
@@ -2630,6 +2716,8 @@ code {
   .path-group-grid,
   .provider-evidence-strip,
   .execution-action-grid,
+  .quality-gate-grid,
+  .quality-gate-evidence,
   .template-grid,
   .delivery-mode-grid,
   .request-mode-grid {

@@ -95,6 +95,111 @@ function writeMission(init, missionId, deliveryMode = "patch-only", options = {}
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
  */
+function writeExecutionEvidence(init, runId) {
+  writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, `step-result-${runId}.json`), {
+    step_result_id: `${runId}.implement.pass`,
+    project_id: init.projectId,
+    run_id: runId,
+    step_id: "run.start.implement",
+    step_class: "runner",
+    status: "pass",
+    summary: "Implementation evidence exists for flow projection repair fixture.",
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ */
+function writeReviewEvidence(init, runId) {
+  writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, `review-report-${runId}.json`), {
+    review_report_id: `${runId}.review-report.v1`,
+    project_id: init.projectId,
+    run_id: runId,
+    overall_status: "fail",
+    review_recommendation: "repair",
+    findings: [
+      {
+        finding_id: `${runId}.review.finding`,
+        severity: "blocking",
+        summary: "Fixture review finding requires repair.",
+      },
+    ],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, `runtime-harness-report-${runId}.json`), {
+    report_id: `${runId}.runtime-harness-report.v1`,
+    project_id: init.projectId,
+    run_id: runId,
+    overall_decision: "repair",
+    run_findings: [
+      {
+        finding_id: `${runId}.qa.finding`,
+        severity: "blocking",
+        summary: "Fixture QA finding requires repair.",
+      },
+    ],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @param {{
+ *   sourceStage?: "review" | "qa",
+ *   status?: "requested" | "budget-exhausted",
+ *   remainingAttempts?: number,
+ * }} [options]
+ */
+function writeQualityRepairRequest(init, runId, options = {}) {
+  const sourceStage = options.sourceStage ?? "review";
+  const status = options.status ?? "requested";
+  const sourceRef = sourceStage === "qa"
+    ? `evidence://reports/runtime-harness-report-${runId}.json`
+    : `evidence://reports/review-report-${runId}.json`;
+  writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, `quality-repair-request-${runId}-${sourceStage}-${status}.json`), {
+    request_id: `${runId}.quality-repair-request.${sourceStage}.v1`,
+    project_id: init.projectId,
+    run_id: runId,
+    cycle_id: `${runId}.quality-cycle.${sourceStage}.v1`,
+    source_stage: sourceStage,
+    source_ref: sourceRef,
+    finding_refs: [`${sourceStage}.finding.fixture`],
+    repair_scope: {
+      target_step: "implement",
+      requested_next_step: "execution",
+      allowed_paths: ["docs/**"],
+      verification_refs: [sourceRef],
+      required_evidence_refs: [
+        `evidence://reports/review-report-${runId}.json`,
+        `evidence://reports/runtime-harness-report-${runId}.json`,
+      ],
+      compiled_context_refs: [],
+      reason: "Fixture quality repair request.",
+    },
+    attempt_budget: {
+      policy_ref: `project-profile://${init.projectId}#quality_repair_policy`,
+      max_attempts: 2,
+      attempt_index: status === "budget-exhausted" ? 2 : 1,
+      remaining_attempts: options.remainingAttempts ?? (status === "budget-exhausted" ? 0 : 1),
+    },
+    status,
+    blockers:
+      status === "budget-exhausted"
+        ? ["repair-budget-exhausted", "operator-approval-required-before-delivery"]
+        : [sourceStage === "qa" ? "delivery-blocked-until-post-repair-review-and-qa" : "delivery-blocked-until-post-repair-review"],
+    evidence_refs: [sourceRef],
+    created_at: "2026-07-04T15:00:00.000Z",
+    updated_at: "2026-07-04T15:00:00.000Z",
+  });
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ */
 function writeCompletedClosure(init, runId) {
   writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, `step-result-${runId}.json`), {
     step_result_id: `${runId}.implement.pass`,
@@ -347,5 +452,60 @@ test("flow evidence graph and runtime trace stay scoped and sanitized", () => {
     assert.ok(kinds.includes("live-event"));
     assert.deepEqual(trace.run_ids, ["run.checkout-risk"]);
     assert.equal(JSON.stringify(trace).includes("request_text"), false);
+  });
+});
+
+test("flow projections expose active quality repair gates", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeMission(init, "review-repair", "patch-only");
+    const runId = "run.review-repair";
+    writeExecutionEvidence(init, runId);
+    writeReviewEvidence(init, runId);
+    writeQualityRepairRequest(init, runId, { sourceStage: "review" });
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot, runId });
+
+    const flow = readSelectedFlowProjection({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(flow?.mission_id, "review-repair");
+    assert.equal(flow?.selected_stage, "repair");
+    assert.equal(flow?.active_quality_gate.source_stage, "review");
+    assert.equal(flow?.active_quality_gate.flow_state, "review-repair-requested");
+    assert.equal(flow?.active_quality_gate.delivery_release_blocked, true);
+    assert.equal(flow?.active_quality_gate.next_action.action_id, "run-review-quality-repair");
+    assert.equal(flow?.active_quality_gate.attempt_budget.remaining_attempts, 1);
+    assert.ok(flow?.active_quality_gate.evidence_summaries.some((summary) => summary.raw_ref.includes("quality-repair-request")));
+  });
+
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeMission(init, "qa-repair", "patch-only");
+    const runId = "run.qa-repair";
+    writeExecutionEvidence(init, runId);
+    writeReviewEvidence(init, runId);
+    writeQualityRepairRequest(init, runId, { sourceStage: "qa" });
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot, runId });
+
+    const flow = readSelectedFlowProjection({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(flow?.active_quality_gate.source_stage, "qa");
+    assert.equal(flow?.active_quality_gate.flow_state, "qa-repair-requested");
+    assert.equal(flow?.active_quality_gate.next_action.action_id, "run-qa-quality-repair");
+    assert.ok(flow?.active_quality_gate.blockers.includes("delivery-blocked-until-post-repair-review-and-qa"));
+  });
+
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeMission(init, "repair-exhausted", "patch-only");
+    const runId = "run.repair-exhausted";
+    writeExecutionEvidence(init, runId);
+    writeReviewEvidence(init, runId);
+    writeQualityRepairRequest(init, runId, { status: "budget-exhausted", remainingAttempts: 0 });
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot, runId });
+
+    const flow = readSelectedFlowProjection({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(flow?.active_quality_gate.flow_state, "repair-cycle-exhausted");
+    assert.equal(flow?.active_quality_gate.operator_hold, true);
+    assert.equal(flow?.active_quality_gate.delivery_release_blocked, true);
+    assert.equal(flow?.active_quality_gate.next_action.action_id, "hold-exhausted-quality-repair");
+    assert.equal(flow?.active_quality_gate.attempt_budget.remaining_attempts, 0);
   });
 });

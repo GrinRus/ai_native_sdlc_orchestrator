@@ -24,6 +24,7 @@ const PROJECT_STAGE_TO_UI_STAGE = {
   implement: "implement",
   review: "review",
   qa: "review",
+  repair: "review",
   delivery: "delivery",
   release: "delivery",
   learning: "learning",
@@ -233,6 +234,7 @@ function artifactTypeForRef(ref) {
   const value = String(ref ?? "").toLowerCase();
   if (value.includes("provider") && (value.includes("raw") || value.includes("evidence"))) return "provider-raw-evidence";
   if (value.includes("runtime-harness-report")) return "runtime-harness-report";
+  if (value.includes("quality-repair-request")) return "quality-repair-request";
   if (value.includes("step-result")) return "routed-step-result";
   if (value.includes("verify-summary") || value.includes("validation-report") || value.includes("evaluation-report")) return "verification";
   if (value.includes("target-diff") || value.includes("diff") || value.includes("target-cleanliness")) return "target-diff";
@@ -246,7 +248,7 @@ function artifactTypeForRef(ref) {
 
 function artifactStageForType(type, fallbackStage = "artifact") {
   if (["provider-raw-evidence", "command-trace", "step-observation", "routed-step-result"].includes(type)) return "execution";
-  if (["runtime-harness-report", "review-report", "review-decision"].includes(type)) return "runtime-harness";
+  if (["runtime-harness-report", "review-report", "review-decision", "quality-repair-request"].includes(type)) return "runtime-harness";
   if (["verification", "target-diff"].includes(type)) return "verification";
   if (["delivery-manifest", "release-packet"].includes(type)) return "delivery";
   if (["learning", "learning-handoff"].includes(type)) return "learning";
@@ -1156,6 +1158,104 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
   );
 }
 
+function qualityGateSourceLabel(sourceStage) {
+  if (sourceStage === "qa") return "QA-origin repair";
+  if (sourceStage === "review") return "Review-origin repair";
+  return "Quality repair";
+}
+
+function qualityGateAttemptLabel(gate) {
+  const budget = gate?.attempt_budget ?? {};
+  const attempt = budget.attempt_index ?? "?";
+  const max = budget.max_attempts ?? "?";
+  const remaining = budget.remaining_attempts ?? "?";
+  return `${attempt}/${max} (${remaining} remaining)`;
+}
+
+function qualityGateBlockerRows(gate) {
+  return Array.isArray(gate?.blockers) ? gate.blockers.filter(Boolean) : [];
+}
+
+function QualityGatePanel({ gate, evidenceRows = [] }) {
+  if (!gate) return null;
+  const nextAction = gate.next_action ?? {};
+  const evidenceRefs = Array.isArray(gate.evidence_refs) ? gate.evidence_refs : [];
+  const evidence = artifactRowsForRefs(evidenceRefs, evidenceRows, "review").slice(0, 4);
+  const blockers = qualityGateBlockerRows(gate);
+  const sourceLabel = qualityGateSourceLabel(gate.source_stage);
+  const hold = gate.operator_hold === true;
+  return (
+    <div className={`quality-gate-card ${gate.flow_state ?? "requested"} ${hold ? "operator-hold" : ""}`} aria-label="Active quality gate">
+      <div className="quality-gate-heading">
+        <div>
+          <span>Active Quality Gate</span>
+          <h3>{hold ? "Budget Exhausted Hold" : sourceLabel}</h3>
+          <p>{hold ? "Delivery and release stay blocked until an explicit operator decision is recorded." : "Repair must close through implementation, review, and required QA evidence before delivery."}</p>
+        </div>
+        <StatusPill state={gate.status ?? gate.flow_state ?? "requested"} />
+      </div>
+
+      <div className="quality-gate-grid">
+        <div>
+          <span>Request</span>
+          <strong title={gate.request_ref ?? ""}>{titleFromRef(gate.request_ref)}</strong>
+          <p>{gate.request_id ?? gate.request_ref ?? "request ref pending"}</p>
+        </div>
+        <div>
+          <span>Cycle</span>
+          <strong>{gate.cycle_id ?? "quality cycle"}</strong>
+          <p>{gate.flow_state ?? "repair requested"}</p>
+        </div>
+        <div>
+          <span>Source stage</span>
+          <strong>{sourceLabel}</strong>
+          <p>{gate.source_stage === "qa" ? "QA rerun required after repair." : "Review rerun required after repair."}</p>
+        </div>
+        <div>
+          <span>Attempt budget</span>
+          <strong>{qualityGateAttemptLabel(gate)}</strong>
+          <p>{hold ? "No automatic repair attempt remains." : "Repair attempt budget is still bounded."}</p>
+        </div>
+        <div>
+          <span>Delivery / release</span>
+          <strong>{gate.delivery_release_blocked ? "Blocked" : "Unblocked"}</strong>
+          <p>{gate.delivery_release_blocked ? "Unsafe delivery and release actions are hidden behind the quality gate." : "Quality repair no longer blocks downstream actions."}</p>
+        </div>
+        <div>
+          <span>Findings</span>
+          <strong>{Array.isArray(gate.finding_refs) ? gate.finding_refs.length : 0}</strong>
+          <p>{Array.isArray(gate.finding_refs) && gate.finding_refs[0] ? gate.finding_refs[0] : "No finding refs captured."}</p>
+        </div>
+      </div>
+
+      <div className="quality-next-action">
+        <span>Next safe action</span>
+        <code title={nextAction.command ?? ""}>{actionCommandLabel(nextAction, hold ? "aor review decide" : "aor run start")}</code>
+        <p>{nextAction.reason ?? "Follow the resolver primary action for this repair state."}</p>
+      </div>
+
+      <div className="quality-gate-evidence">
+        <div>
+          <span>Blockers</span>
+          {blockers.length > 0 ? (
+            <ul>{blockers.slice(0, 4).map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
+          ) : (
+            <p>No active blockers listed.</p>
+          )}
+        </div>
+        <div>
+          <span>Evidence summaries</span>
+          {evidence.length > 0 ? (
+            <ul>{evidence.map((row) => <li key={row.ref} title={row.rawRef}>{row.label}</li>)}</ul>
+          ) : (
+            <p>No readable repair evidence summaries yet.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null }) {
   const closureState = flow?.closure_state ?? {};
   const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
@@ -1463,7 +1563,13 @@ function FlowCockpit({
 
   const completed = isCompletedFlow(flow);
   const followUpEligible = flow?.closure_state?.follow_up_eligible === true;
-  const blockers = Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
+  const qualityGate = !completed && flow?.active_quality_gate ? flow.active_quality_gate : null;
+  const qualityGateBlockers = qualityGateBlockerRows(qualityGate);
+  const blockers = qualityGate
+    ? qualityGateBlockers.map((blocker) => ({ code: blocker, summary: blocker }))
+    : Array.isArray(nextAction?.blockers) && !completed
+      ? nextAction.blockers
+      : [];
   const evidenceRefs = Array.isArray(flow?.evidence_refs) && flow.evidence_refs.length > 0
     ? flow.evidence_refs
     : Array.isArray(nextAction?.evidence_refs)
@@ -1483,6 +1589,8 @@ function FlowCockpit({
         command: "read-only evidence inspection",
         reason: "This flow is closed. Its evidence chain remains available for audit and follow-up planning.",
       }
+    : qualityGate?.next_action?.command
+      ? qualityGate.next_action
     : nextAction?.primary_action ?? {
         command: "aor next",
         reason: "Resolve the next deterministic action for the selected flow.",
@@ -1566,6 +1674,8 @@ function FlowCockpit({
       ) : null}
 
       <FlowTimeline currentStage={currentStage} completed={completed} />
+
+      <QualityGatePanel gate={qualityGate} evidenceRows={evidenceRows} />
 
       {completed ? (
         <div className="flow-lock-banner">

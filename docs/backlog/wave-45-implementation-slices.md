@@ -150,7 +150,7 @@ and delivery/release blocking semantics.
 
 ## W45-S04 — Web repair-cycle observability
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make repair cycles understandable in the local console through
   flow-scoped quality gate, evidence, and next-action views.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,
@@ -187,7 +187,7 @@ and delivery/release blocking semantics.
 
 ## W45-S05 — Repair-loop proof fixtures and live profile
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Prepare replayable proof fixtures and a live E2E acceptance profile
   for bounded review/QA repair cycles.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`,
