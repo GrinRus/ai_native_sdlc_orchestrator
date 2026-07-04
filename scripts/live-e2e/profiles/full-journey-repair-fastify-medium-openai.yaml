@@ -29,6 +29,18 @@ implementation_loop:
     - post-run-primary
     - post-run-diagnostic
   stop_on_blocking_review: true
+  proof_expectations:
+    required_repair_paths:
+      - review-origin
+      - qa-origin
+      - budget-exhaustion
+    require_quality_repair_request_refs: true
+    require_implementation_repair_refs: true
+    require_review_rerun_refs: true
+    require_qa_rerun_refs: true
+    qa_origin_requires_post_repair_review: true
+    budget_exhaustion_operator_hold_required: true
+    no_upstream_write_evidence_required: true
 target_catalog_id: fastify
 feature_mission_id: fastify-schema-plugin-repair
 scenario_family: repair

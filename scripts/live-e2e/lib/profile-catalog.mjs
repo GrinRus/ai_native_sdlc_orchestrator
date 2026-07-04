@@ -372,6 +372,16 @@ const FEATURE_SIZE_BUDGETS = Object.freeze({
 });
 const PRODUCT_QUALITY_CYCLE_STEPS = Object.freeze(["execution", "review", "qa"]);
 const PRODUCT_REPAIR_SOURCES = Object.freeze(["review", "qa", "post-run-primary", "post-run-diagnostic"]);
+const PRODUCT_REPAIR_PROOF_PATHS = Object.freeze(["review-origin", "qa-origin", "budget-exhaustion"]);
+const PRODUCT_REPAIR_PROOF_FLAGS = Object.freeze([
+  "require_quality_repair_request_refs",
+  "require_implementation_repair_refs",
+  "require_review_rerun_refs",
+  "require_qa_rerun_refs",
+  "qa_origin_requires_post_repair_review",
+  "budget_exhaustion_operator_hold_required",
+  "no_upstream_write_evidence_required",
+]);
 
 /**
  * @param {Record<string, unknown>} mission
@@ -473,6 +483,21 @@ function assertQualityCycleLoopPolicy(options) {
   }
   if (missingRepairSources.length > 0) {
     problems.push(`implementation_loop.repair_sources must include ${missingRepairSources.join(", ")}`);
+  }
+  if (asNonEmptyString(options.profile.scenario_family) === "repair") {
+    const proofExpectations = asRecord(implementationLoop.proof_expectations);
+    const declaredProofPaths = asStringArray(proofExpectations.required_repair_paths);
+    const missingProofPaths = PRODUCT_REPAIR_PROOF_PATHS.filter((proofPath) => !declaredProofPaths.includes(proofPath));
+    if (missingProofPaths.length > 0) {
+      problems.push(
+        `implementation_loop.proof_expectations.required_repair_paths must include ${missingProofPaths.join(", ")}`,
+      );
+    }
+    for (const flag of PRODUCT_REPAIR_PROOF_FLAGS) {
+      if (proofExpectations[flag] !== true) {
+        problems.push(`implementation_loop.proof_expectations.${flag}=true`);
+      }
+    }
   }
   if (problems.length > 0) {
     throw new UsageError(`Product-change profile '${profileId}' is missing quality-cycle policy: ${problems.join("; ")}.`);
