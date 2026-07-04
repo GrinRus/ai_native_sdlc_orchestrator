@@ -50,6 +50,24 @@ test("resolveAssetBundleMatrix materializes route/wrapper/prompt/context bundles
     assert.deepEqual(implementBundle.context_bundles.expanded_refs.context_doc_refs, [
       "context-doc://context.doc.repo-map.core@v1",
     ]);
+
+    const artifactPromptRefs = new Map(
+      ["discovery", "research", "spec"].map((step) => {
+        const bundle = matrix.find((entry) => entry.step_class === step);
+        assert.ok(bundle, `expected ${step} asset bundle`);
+        assert.equal(bundle.wrapper.wrapper_ref, "wrapper.artifact.default@v1");
+        assert.deepEqual(bundle.context_bundles.bundle_refs, [
+          "context-bundle://context.bundle.artifact.foundation@v1",
+        ]);
+        assert.equal(bundle.prompt_bundle.profile.step_class, "artifact");
+        return [step, bundle.prompt_bundle.prompt_bundle_ref];
+      }),
+    );
+    assert.deepEqual(Object.fromEntries(artifactPromptRefs), {
+      discovery: "prompt-bundle://discovery-default@v1",
+      research: "prompt-bundle://research-default@v1",
+      spec: "prompt-bundle://spec-default@v1",
+    });
   });
 });
 
@@ -75,6 +93,41 @@ test("resolveAssetBundleForStep applies wrapper/prompt/context overrides determi
     assert.equal(resolved.wrapper.resolution_source.kind, "step-override");
     assert.equal(resolved.prompt_bundle.resolution_source.kind, "step-override");
     assert.equal(resolved.context_bundles.resolution_source.kind, "step-override");
+  });
+});
+
+test("resolveAssetBundleForStep preserves artifact-default prompt fallback compatibility", () => {
+  withTempRepo((repoRoot) => {
+    const projectProfilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const projectProfileContent = fs.readFileSync(projectProfilePath, "utf8");
+    fs.writeFileSync(
+      projectProfilePath,
+      projectProfileContent
+        .replace(
+          "discovery: prompt-bundle://discovery-default@v1",
+          "discovery: prompt-bundle://artifact-default@v1",
+        )
+        .replace(
+          "research: prompt-bundle://research-default@v1",
+          "research: prompt-bundle://artifact-default@v1",
+        )
+        .replace("spec: prompt-bundle://spec-default@v1", "spec: prompt-bundle://artifact-default@v1"),
+      "utf8",
+    );
+
+    for (const stepClass of ["discovery", "research", "spec"]) {
+      const resolved = resolveAssetBundleForStep({
+        projectProfilePath,
+        routesRoot: path.join(repoRoot, "examples/routes"),
+        wrappersRoot: path.join(repoRoot, "examples/wrappers"),
+        promptsRoot: path.join(repoRoot, "examples/prompts"),
+        stepClass,
+      });
+
+      assert.equal(resolved.prompt_bundle.prompt_bundle_ref, "prompt-bundle://artifact-default@v1");
+      assert.equal(resolved.prompt_bundle.profile.step_class, "artifact");
+      assert.equal(resolved.wrapper.wrapper_ref, "wrapper.artifact.default@v1");
+    }
   });
 });
 

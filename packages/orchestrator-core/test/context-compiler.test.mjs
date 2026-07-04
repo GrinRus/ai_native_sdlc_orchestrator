@@ -67,6 +67,72 @@ function resolveExecutionArtifacts(repoRoot, stepClass) {
   };
 }
 
+test("compileStepContext resolves distinct artifact workflow prompt refs and stable fingerprints", () => {
+  withTempRepo((repoRoot) => {
+    const cases = [
+      {
+        stepClass: "discovery",
+        promptBundleRef: "prompt-bundle://discovery-default@v1",
+        inputPacketRefs: ["packet://step-input-context"],
+        requiredPackets: ["step-input-context"],
+      },
+      {
+        stepClass: "research",
+        promptBundleRef: "prompt-bundle://research-default@v1",
+        inputPacketRefs: ["packet://discovery"],
+        requiredPackets: ["discovery"],
+      },
+      {
+        stepClass: "spec",
+        promptBundleRef: "prompt-bundle://spec-default@v1",
+        inputPacketRefs: ["packet://discovery", "packet://research"],
+        requiredPackets: ["discovery", "research"],
+      },
+    ];
+
+    const fingerprints = [];
+    for (const scenario of cases) {
+      const resolved = resolveExecutionArtifacts(repoRoot, scenario.stepClass);
+      const compile = () =>
+        compileStepContext({
+          projectRoot: repoRoot,
+          projectProfilePath: resolved.projectProfilePath,
+          stepClass: scenario.stepClass,
+          routeResolution: resolved.routeResolution,
+          assetResolution: resolved.assetResolution,
+          policyResolution: resolved.policyResolution,
+          inputPacketRefs: scenario.inputPacketRefs,
+          runtimeEvidenceRefs: [],
+          skillsRoot: path.join(repoRoot, "examples/skills"),
+        });
+
+      const compiled = compile();
+      const repeated = compile();
+      assert.equal(resolved.assetResolution.prompt_bundle.prompt_bundle_ref, scenario.promptBundleRef);
+      assert.equal(
+        compiled.compiled_context.provenance.prompt_bundle_resolution_source.field,
+        `default_prompt_bundles.${scenario.stepClass}`,
+      );
+      assert.equal(
+        compiled.context_compilation.included_sources.find((source) => source.kind === "prompt-bundle")?.reference,
+        scenario.promptBundleRef,
+      );
+      assert.deepEqual(
+        compiled.compiled_context.required_inputs_resolved.packets.required.map((entry) => entry.packet),
+        scenario.requiredPackets,
+      );
+      assert.equal(compiled.compiled_context.compiled_context_fingerprint.length, 64);
+      assert.equal(
+        compiled.compiled_context.compiled_context_fingerprint,
+        repeated.compiled_context.compiled_context_fingerprint,
+      );
+      fingerprints.push(compiled.compiled_context.compiled_context_fingerprint);
+    }
+
+    assert.equal(new Set(fingerprints).size, 3);
+  });
+});
+
 test("compileStepContext produces compiled context and diagnostics for adapter injection", () => {
   withTempRepo((repoRoot) => {
     const resolved = resolveExecutionArtifacts(repoRoot, "implement");

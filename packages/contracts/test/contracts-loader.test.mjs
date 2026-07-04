@@ -94,6 +94,47 @@ test("loads monorepo and bounded multirepo profiles through the same project-pro
   }
 });
 
+test("artifact workflow prompt bundles validate as artifact execution prompts", () => {
+  const expected = {
+    discovery: {
+      ref: "prompt-bundle://discovery-default@v1",
+      fileName: "discovery-default.yaml",
+      requiredPackets: ["step-input-context"],
+    },
+    research: {
+      ref: "prompt-bundle://research-default@v1",
+      fileName: "research-default.yaml",
+      requiredPackets: ["discovery"],
+    },
+    spec: {
+      ref: "prompt-bundle://spec-default@v1",
+      fileName: "spec-default.yaml",
+      requiredPackets: ["discovery", "research"],
+    },
+  };
+
+  const projectProfile = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(projectProfile.ok, true, "project profile should load as project-profile");
+  const defaultPromptBundles = /** @type {Record<string, string>} */ (projectProfile.document.default_prompt_bundles);
+  assert.equal(new Set(Object.values(expected).map((entry) => entry.ref)).size, 3);
+
+  for (const [step, metadata] of Object.entries(expected)) {
+    assert.equal(defaultPromptBundles[step], metadata.ref);
+    const prompt = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples/prompts", metadata.fileName),
+      family: "prompt-bundle",
+    });
+    assert.equal(prompt.ok, true, `${metadata.fileName} should load as prompt-bundle`);
+    assert.equal(prompt.document.step_class, "artifact");
+    const requiredInputs = /** @type {Record<string, unknown>} */ (prompt.document.required_inputs);
+    const packets = /** @type {Record<string, unknown>} */ (requiredInputs.packets);
+    assert.deepEqual(packets.required, metadata.requiredPackets);
+  }
+});
+
 test("verification archetype profile documents migration command-group examples", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/project.verification-archetypes.aor.yaml"),

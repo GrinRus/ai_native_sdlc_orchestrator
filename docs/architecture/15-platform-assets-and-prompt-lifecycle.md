@@ -82,10 +82,9 @@ The compatibility invariants are:
   context bundle refs, required packet refs, stale or blocked diagnostics, and
   provenance so operators can inspect the choice without raw adapter output.
 
-The first W44 implementation slice defines the taxonomy and transition
-invariants only. Creating `discovery-default@v1`, `research-default@v1`, and
-`spec-default@v1` prompt bundle examples belongs to the later prompt split
-slice.
+W44 keeps `artifact-default@v1` as the legacy fallback while materializing
+step-specific artifact prompt bundles for profiles that opt into the split:
+`discovery-default@v1`, `research-default@v1`, and `spec-default@v1`.
 
 ## Policy loading order and guardrails (W2-S03)
 Policy resolution is deterministic and runs before any adapter invocation:
