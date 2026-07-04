@@ -1,0 +1,362 @@
+project_id: verification-archetypes-sample
+display_name: Verification Archetypes Sample
+repo_topology: bounded-multirepo
+asset_mode: materialized
+repos:
+  - repo_id: node-app
+    name: node-app
+    source:
+      kind: local
+      root: apps/node-app
+    default_branch: main
+    role: application
+    build_commands:
+      - pnpm --dir apps/node-app build
+    test_commands:
+      - pnpm --dir apps/node-app test
+    lint_commands:
+      - pnpm --dir apps/node-app lint
+  - repo_id: python-service
+    name: python-service
+    source:
+      kind: local
+      root: services/python-service
+    default_branch: main
+    role: backend
+    build_commands: []
+    test_commands:
+      - python -m pytest
+    lint_commands:
+      - python -m ruff check .
+  - repo_id: workspace
+    name: workspace
+    source:
+      kind: local
+      root: .
+    default_branch: main
+    role: application
+    build_commands:
+      - pnpm -r build
+    test_commands:
+      - pnpm -r test
+    lint_commands:
+      - pnpm -r lint
+  - repo_id: browser-app
+    name: browser-app
+    source:
+      kind: local
+      root: apps/browser-app
+    default_branch: main
+    role: frontend
+    build_commands:
+      - pnpm --dir apps/browser-app build
+    test_commands:
+      - pnpm --dir apps/browser-app test
+      - pnpm --dir apps/browser-app exec playwright test
+    lint_commands:
+      - pnpm --dir apps/browser-app lint
+  - repo_id: docs-only
+    name: docs-only
+    source:
+      kind: local
+      root: docs
+    default_branch: main
+    role: documentation
+    build_commands: []
+    test_commands: []
+    lint_commands: []
+  - repo_id: legacy-service
+    name: legacy-service
+    source:
+      kind: local
+      root: services/legacy-service
+    default_branch: main
+    role: backend
+    build_commands:
+      - make -C services/legacy-service build
+    test_commands:
+      - make -C services/legacy-service test
+    lint_commands: []
+repo_graph:
+  - from_repo_id: python-service
+    to_repo_id: browser-app
+    relationship: api-contract
+    validation_refs:
+      - validation://integration/python-service-browser-app/api-contract
+verification:
+  command_groups:
+    - id: node-app-readiness-install
+      repo_id: node-app
+      role: setup
+      phase: readiness
+      enforcement: required
+      timeout_class: install
+      working_dir: apps/node-app
+      detected_from:
+        - apps/node-app/package.json#packageManager
+        - apps/node-app/pnpm-lock.yaml
+      package_manager: pnpm
+      tool_requirements:
+        - tool: pnpm
+          version_range: ">=9"
+          install_hint: Enable Corepack or install pnpm before running Node project checks.
+      commands:
+        - pnpm install --frozen-lockfile
+    - id: node-app-baseline-build
+      repo_id: node-app
+      role: build
+      phase: baseline
+      enforcement: required
+      timeout_class: build
+      working_dir: apps/node-app
+      depends_on:
+        - node-app-readiness-install
+      detected_from:
+        - apps/node-app/package.json#scripts.build
+      package_manager: pnpm
+      commands:
+        - pnpm run build
+    - id: node-app-post-change-test
+      repo_id: node-app
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      working_dir: apps/node-app
+      depends_on:
+        - node-app-baseline-build
+      detected_from:
+        - apps/node-app/package.json#scripts.test
+      package_manager: pnpm
+      commands:
+        - pnpm run test
+    - id: python-service-post-change-lint
+      repo_id: python-service
+      role: lint
+      phase: post-change
+      enforcement: warn
+      timeout_class: quick
+      working_dir: services/python-service
+      detected_from:
+        - services/python-service/pyproject.toml#tool.ruff
+      package_manager: pip
+      tool_requirements:
+        - tool: python
+          version_range: ">=3.11"
+          install_hint: Use the project Python version before running Python checks.
+        - tool: ruff
+          install_hint: Install from the Python project optional dev dependencies.
+      commands:
+        - python -m ruff check .
+    - id: python-service-post-change-test
+      repo_id: python-service
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      working_dir: services/python-service
+      detected_from:
+        - services/python-service/pyproject.toml#tool.pytest
+        - services/python-service/tests
+      package_manager: pip
+      commands:
+        - python -m pytest
+    - id: workspace-post-change-full-suite
+      repo_id: workspace
+      role: full-suite
+      phase: post-change
+      enforcement: observe
+      timeout_class: full-suite
+      working_dir: .
+      detected_from:
+        - pnpm-workspace.yaml
+        - package.json#scripts.test
+      package_manager: pnpm
+      commands:
+        - pnpm -r test
+    - id: browser-app-post-change-e2e
+      repo_id: browser-app
+      role: e2e
+      phase: post-change
+      enforcement: warn
+      timeout_class: browser-e2e
+      working_dir: apps/browser-app
+      detected_from:
+        - apps/browser-app/playwright.config.ts
+        - apps/browser-app/package.json#scripts.e2e
+      package_manager: pnpm
+      tool_requirements:
+        - tool: playwright
+          install_hint: Run the project browser dependency install step before browser e2e checks.
+      skip_policy:
+        outcome: missing-tool
+        applies_when: Playwright browsers are not installed on the operator machine.
+        reason: Browser e2e evidence is useful but does not replace required build and focused-test evidence.
+      commands:
+        - pnpm exec playwright test
+    - id: legacy-service-baseline-test
+      repo_id: legacy-service
+      role: test
+      phase: baseline
+      enforcement: required
+      timeout_class: focused-test
+      working_dir: services/legacy-service
+      detected_from:
+        - services/legacy-service/Makefile#test
+      package_manager: custom
+      skip_policy:
+        outcome: broken-baseline
+        applies_when: The unchanged baseline test command fails before AOR applies any target changes.
+        reason: A broken baseline must be repaired or explicitly rebaselined before post-change evidence can be accepted.
+      commands:
+        - make test
+  discovery_outcomes:
+    - working_dir: docs
+      outcome: no-tests
+      confidence: low
+      source_refs: []
+      reason: No recognized project manifest or verification command signal was discovered for the docs-only boundary.
+  discovery_suggestions:
+    - suggestion_id: custom-verification-needed
+      kind: custom
+      working_dir: docs
+      confidence: low
+      source_refs: []
+      reason: Add a docs lint or link-check command group when the documentation boundary becomes release-critical.
+allowed_providers:
+  - openai
+  - anthropic
+  - open-code
+allowed_adapters:
+  - codex-cli
+  - claude-code
+  - open-code
+  - mock-runner
+registry_roots:
+  routes: examples/routes
+  wrappers: examples/wrappers
+  prompts: examples/prompts
+  policies: examples/policies
+  adapters: examples/adapters
+  evaluation: examples
+  skills: examples/skills
+  context_docs: examples/context/docs
+  context_rules: examples/context/rules
+  context_skills: examples/context/skills
+  context_bundles: examples/context/bundles
+default_route_profiles:
+  discovery: route.discovery.default
+  research: route.research.default
+  spec: route.spec.default
+  planning: route.plan.default
+  implement: route.implement.default
+  review: route.review.default
+  qa: route.qa.default
+  repair: route.repair.default
+  eval: route.eval.default
+  harness: route.harness.default
+default_step_policies:
+  artifact: policy.step.artifact.default
+  planner: policy.step.planner.default
+  runner: policy.step.runner.default
+  repair: policy.step.repair.default
+  eval: policy.step.eval.default
+  harness: policy.step.harness.default
+default_wrapper_profiles:
+  artifact: wrapper.artifact.default@v1
+  planner: wrapper.planner.default@v1
+  runner: wrapper.runner.default@v3
+  repair: wrapper.repair.default@v1
+  eval: wrapper.eval.default@v1
+  harness: wrapper.harness.default@v1
+default_prompt_bundles:
+  discovery: prompt-bundle://artifact-default@v1
+  research: prompt-bundle://artifact-default@v1
+  spec: prompt-bundle://artifact-default@v1
+  planning: prompt-bundle://planner-default@v1
+  implement: prompt-bundle://runner-default@v3
+  review: prompt-bundle://runner-default@v3
+  qa: prompt-bundle://runner-default@v3
+  repair: prompt-bundle://repair-default@v1
+  eval: prompt-bundle://eval-default@v1
+  harness: prompt-bundle://harness-default@v1
+default_context_bundles:
+  discovery:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  research:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  spec:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  planning:
+    - context-bundle://context.bundle.planner.foundation@v1
+  implement:
+    - context-bundle://context.bundle.runner.foundation@v1
+  review:
+    - context-bundle://context.bundle.runner.foundation@v1
+  qa:
+    - context-bundle://context.bundle.runner.foundation@v1
+  repair:
+    - context-bundle://context.bundle.repair.foundation@v1
+  eval:
+    - context-bundle://context.bundle.eval.foundation@v1
+  harness:
+    - context-bundle://context.bundle.harness.foundation@v1
+default_skill_profiles:
+  artifact:
+    - skill.artifact.default@v1
+  planner:
+    - skill.planner.default@v1
+  runner:
+    - skill.runner.default@v1
+  repair:
+    - skill.repair.default@v1
+  eval:
+    - skill.eval.default@v1
+  harness:
+    - skill.harness.default@v1
+skill_overrides:
+  implement:
+    - skill.runner.implement@v1
+  review:
+    - skill.runner.review@v1
+  qa:
+    - skill.runner.qa@v1
+budget_policy:
+  default_cost_limit_usd: 75
+  default_timeout_sec: 5400
+approval_policy:
+  required_for_execution: true
+  invalidate_on_material_change: true
+security_policy:
+  redact_secrets: true
+  provider_allowlist_enforced: true
+eval_policy:
+  required_for_release: true
+  default_release_suite_ref: suite.release.core@v1
+runtime_defaults:
+  runtime_root: .aor
+  workspace_mode: ephemeral
+bootstrap_policy:
+  run_project_analysis: true
+  require_project_verify: true
+writeback_policy:
+  default_delivery_mode: fork-first-pr
+  allow_direct_write: false
+  require_delivery_manifest: true
+tooling_policy:
+  network_mode: deny-by-default
+  mcp_allowlist: []
+risk_tiers:
+  low:
+    require_human_approval: false
+  medium:
+    require_human_approval: true
+  high:
+    require_human_approval: true
+    require_security_review: true
+live_ops:
+  enabled: true
+  transport: sse
+  ui_attachable: true
+  ui_catchup_mode: read-model-plus-stream
+  retain_logs_days: 30

@@ -993,11 +993,15 @@ test("live adapter interrupts external runner when public run-control cancel is 
   const cancelScript = [
     "const fs = require('node:fs');",
     `const stateFile = ${JSON.stringify(stateFile)};`,
-    "setTimeout(() => {",
+    "function recordCancel() {",
     "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
     "  state.status = 'canceled';",
     "  state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
     "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "}",
+    "setTimeout(() => {",
+    "  recordCancel();",
+    "  setInterval(recordCancel, 10);",
     "}, 75);",
     "setTimeout(() => {}, 5000);",
   ].join("");
@@ -2295,11 +2299,15 @@ test("live adapter preserves Qwen stream progress when run-control interrupts pr
   const interruptScript = [
     "const fs = require('node:fs');",
     `const stateFile = ${JSON.stringify(stateFile)};`,
+    "function recordCancel() {",
+    "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "  state.status = 'canceled';",
+    "  state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
+    "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "}",
     "process.stdout.write(JSON.stringify({type:'tool_call',name:'read_file'}) + '\\n');",
-    "const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
-    "state.status = 'canceled';",
-    "state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
-    "fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "recordCancel();",
+    "setInterval(recordCancel, 10);",
     "setTimeout(() => {}, 5000);",
   ].join("");
   const adapter = createLiveAdapter({

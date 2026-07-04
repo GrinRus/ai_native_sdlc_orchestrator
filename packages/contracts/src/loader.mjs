@@ -46,6 +46,17 @@ const VERIFICATION_COMMAND_GROUP_TIMEOUT_CLASS_VALUES = [
   "browser-e2e",
   "quick",
 ];
+const VERIFICATION_COMMAND_GROUP_OUTCOME_VALUES = ["no-tests", "missing-tool", "not-applicable", "broken-baseline"];
+const privateCommandGroupField = (...parts) => parts.join("_");
+const PRIVATE_PROOF_HARNESS_COMMAND_GROUP_FIELDS = [
+  privateCommandGroupField("live", "e2e", "profile"),
+  privateCommandGroupField("live", "e2e", "profile", "ref"),
+  privateCommandGroupField("target", "matrix", "cell"),
+  privateCommandGroupField("target", "readiness"),
+  privateCommandGroupField("run", "health"),
+  privateCommandGroupField("step", "quality"),
+  privateCommandGroupField("diagnostic", "health"),
+];
 
 /**
  * @returns {import("./index.d.ts").ContractFamilyIndexEntry[]}
@@ -364,6 +375,13 @@ function validateVerificationCommandGroups(record, source, field, issues, requir
     }
 
     validateNestedStringField({ record: entry, source, field: `${entryField}.id`, issues, required: true });
+    validateUnsupportedNestedFields({
+      record: entry,
+      source,
+      parentField: entryField,
+      fields: PRIVATE_PROOF_HARNESS_COMMAND_GROUP_FIELDS,
+      issues,
+    });
     validateNestedEnumStringField({
       record: entry,
       source,
@@ -420,6 +438,89 @@ function validateVerificationCommandGroups(record, source, field, issues, requir
           message: `Field '${entryField}.commands' must contain at least one command.`,
         }),
       );
+    }
+
+    for (const optionalStringField of ["repo_id", "working_dir", "package_manager"]) {
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${entryField}.${optionalStringField}`,
+        issues,
+        required: false,
+      });
+    }
+    for (const optionalStringArrayField of ["depends_on", "detected_from"]) {
+      validateOptionalStringArrayField({
+        record: entry,
+        source,
+        field: `${entryField}.${optionalStringArrayField}`,
+        issues,
+      });
+    }
+    const toolRequirements = validateOptionalArrayField({
+      record: entry,
+      source,
+      field: `${entryField}.tool_requirements`,
+      issues,
+    });
+    if (toolRequirements) {
+      toolRequirements.forEach((toolRequirement, toolIndex) => {
+        const toolField = `${entryField}.tool_requirements[${toolIndex}]`;
+        if (!isPlainObject(toolRequirement)) {
+          issues.push(
+            issue({
+              code: "field_type_mismatch",
+              source,
+              field: toolField,
+              expected: "object",
+              actual: describeActualType(toolRequirement),
+              message: `Field '${toolField}' must be 'object'.`,
+            }),
+          );
+          return;
+        }
+        validateNestedStringField({
+          record: toolRequirement,
+          source,
+          field: `${toolField}.tool`,
+          issues,
+          required: true,
+        });
+        for (const optionalToolStringField of ["version_range", "install_hint"]) {
+          validateNestedStringField({
+            record: toolRequirement,
+            source,
+            field: `${toolField}.${optionalToolStringField}`,
+            issues,
+            required: false,
+          });
+        }
+      });
+    }
+    const skipPolicy = validateOptionalObjectField({
+      record: entry,
+      source,
+      field: `${entryField}.skip_policy`,
+      issues,
+    });
+    if (skipPolicy) {
+      validateNestedEnumStringField({
+        record: skipPolicy,
+        source,
+        field: `${entryField}.skip_policy.outcome`,
+        allowedValues: VERIFICATION_COMMAND_GROUP_OUTCOME_VALUES,
+        issues,
+        required: false,
+      });
+      for (const optionalSkipStringField of ["applies_when", "reason"]) {
+        validateNestedStringField({
+          record: skipPolicy,
+          source,
+          field: `${entryField}.skip_policy.${optionalSkipStringField}`,
+          issues,
+          required: false,
+        });
+      }
     }
   });
 }
@@ -1267,6 +1368,14 @@ function validateStepResult(document, source) {
     source,
     field: "enforcement_result",
     allowedValues: ["pass", "fail", "warn", "observe"],
+    issues,
+    required: false,
+  });
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "command_group_outcome",
+    allowedValues: VERIFICATION_COMMAND_GROUP_OUTCOME_VALUES,
     issues,
     required: false,
   });

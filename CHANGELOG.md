@@ -9,7 +9,7 @@ versioned AOR snapshots.
 
 ## [0.1.0-alpha.13] - 2026-06-30
 
-- Hardened W52 installed-user hard-target rehearsals with target-readiness owner
+- Hardened W52 installed-user hard-target rehearsals with target setup readiness owner
   propagation, bounded diagnostic timeout handling, and post-run target
   verification isolation.
 - Hardened Codex provider execution by using clean config/rules flags while
@@ -27,7 +27,7 @@ versioned AOR snapshots.
 - Added outcome-oriented internal rehearsal quality assessment with factual-only
   observation reports, separate run-health reports, post-run quality
   assessment reports, and an all-pass advisory gate.
-- Added `diagnostic_health` run-health evidence so diagnostic warnings and
+- Added diagnostic run-health evidence so diagnostic warnings and
   failures stay separate from code, artifact, and outcome quality.
 - Refined AOR operator UI/UX assessment with structured guided-browser
   accessibility proof for keyboard, focus, contrast, semantics, screen-reader,

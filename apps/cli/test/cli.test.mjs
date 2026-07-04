@@ -1070,10 +1070,12 @@ test("operator command help documents routed delivery and audit metadata", () =>
 
   assert.equal(verifyHelp.exitCode, 0);
   assert.match(verifyHelp.stdout, /--verification-label <label>/);
+  assert.match(verifyHelp.stdout, /--plan/);
   assert.match(verifyHelp.stdout, /--repo-build-command <cmd>/);
   assert.match(verifyHelp.stdout, /--output-quality-baseline <verify-summary>/);
   assert.match(verifyHelp.stdout, /--route-overrides <step=route_id,\.\.\.>/);
   assert.match(verifyHelp.stdout, /verification_label/);
+  assert.match(verifyHelp.stdout, /verification_plan_file/);
 
   assert.equal(runStartHelp.exitCode, 0);
   assert.match(runStartHelp.stdout, /--route-overrides <step=route_id,\.\.\.>/);
@@ -3524,6 +3526,118 @@ test("project verify resolves runtime root and contract metadata", () => {
         status: "implemented",
       },
     ]);
+  });
+});
+
+test("project verify --plan exposes command-group plan without executing target commands", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      `${JSON.stringify(
+        {
+          scripts: {
+            build: "node -e \"process.exit(0)\"",
+            test: "node -e \"process.exit(0)\"",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const markerFile = path.join(projectRoot, "cli-plan-command-ran.txt");
+    const planCommand = `${process.execPath} -e "require('node:fs').writeFileSync(${JSON.stringify(markerFile)}, 'ran')"`;
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--verification-label",
+      "post-run-primary",
+      "--repo-test-command",
+      planCommand,
+      "--plan",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.command, "project verify");
+    assert.equal(parsed.verification_label, "post-run-primary");
+    assert.equal(fs.existsSync(parsed.verification_plan_file), true);
+    assert.equal(fs.existsSync(markerFile), false);
+    assert.equal(parsed.verify_summary_file, null);
+    assert.equal(parsed.step_result_files, null);
+    assert.equal(parsed.verification_plan.command_groups[0].command_source, "cli-override");
+    assert.equal(parsed.verification_plan.command_groups[0].status, "planned");
+    assert.ok(parsed.verification_plan.discovered_command_groups.length >= 2);
+    assert.ok(parsed.verification_plan.discovered_command_groups.every((candidate) => candidate.confidence));
+    assert.ok(parsed.verification_plan.discovered_command_groups.every((candidate) => candidate.source_refs.length > 0));
+    const privatePattern = new RegExp(
+      [
+        ["live", "e2e"].join("_"),
+        ["live", "e2e"].join("-"),
+        ["target", "readiness"].join("_"),
+        ["diagnostic", "health"].join("_"),
+        ["step", "quality"].join("_"),
+      ].join("|"),
+      "u",
+    );
+    const serializedPlan = JSON.stringify(parsed.verification_plan);
+    assert.equal(privatePattern.test(serializedPlan), false);
+  });
+});
+
+test("project verify --plan normalizes legacy command override flags into command groups", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const markerFiles = {
+      build: path.join(projectRoot, "legacy-build-ran.txt"),
+      lint: path.join(projectRoot, "legacy-lint-ran.txt"),
+      test: path.join(projectRoot, "legacy-test-ran.txt"),
+    };
+    const markerCommand = (filePath) =>
+      `${process.execPath} -e "require('node:fs').writeFileSync(${JSON.stringify(filePath)}, 'ran')"`;
+
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--verification-label",
+      "baseline-migration",
+      "--repo-build-command",
+      markerCommand(markerFiles.build),
+      "--repo-lint-command",
+      markerCommand(markerFiles.lint),
+      "--repo-test-command",
+      markerCommand(markerFiles.test),
+      "--plan",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    const groups = parsed.verification_plan.command_groups;
+    assert.deepEqual(
+      groups.map((group) => group.id),
+      ["cli-build", "cli-lint", "cli-test"],
+    );
+    assert.deepEqual(
+      groups.map((group) => group.role),
+      ["build", "lint", "test"],
+    );
+    assert.ok(groups.every((group) => group.phase === "baseline"));
+    assert.ok(groups.every((group) => group.enforcement === "required"));
+    assert.ok(groups.every((group) => group.command_source === "cli-override"));
+    assert.deepEqual(
+      groups.map((group) => group.timeout_class),
+      ["build", "quick", "focused-test"],
+    );
+    assert.equal(fs.existsSync(markerFiles.build), false);
+    assert.equal(fs.existsSync(markerFiles.lint), false);
+    assert.equal(fs.existsSync(markerFiles.test), false);
   });
 });
 

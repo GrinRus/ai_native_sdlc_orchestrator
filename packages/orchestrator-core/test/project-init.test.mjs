@@ -10,6 +10,7 @@ import {
   initializeProjectRuntime,
   resolveProjectProfilePath,
 } from "../src/project-init.mjs";
+import { loadContractFile } from "../../contracts/src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -28,6 +29,75 @@ function withTempRepo(callback) {
     callback(tempRoot);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+/**
+ * @param {(tempRoot: string) => void} callback
+ */
+function withCleanTempRepo(callback) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w54-s03-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+
+  try {
+    callback(tempRoot);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {string} relativePath
+ * @param {string} content
+ */
+function writeFile(repoRoot, relativePath, content) {
+  const filePath = path.join(repoRoot, relativePath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content, "utf8");
+}
+
+/**
+ * @param {string} profilePath
+ * @returns {Record<string, unknown>}
+ */
+function loadGeneratedProfile(profilePath) {
+  const loaded = loadContractFile({
+    filePath: profilePath,
+    family: "project-profile",
+  });
+  assert.equal(
+    loaded.ok,
+    true,
+    loaded.ok ? "" : loaded.validation.issues.map((issue) => issue.message).join("; "),
+  );
+  return /** @type {Record<string, unknown>} */ (loaded.document);
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {Array<Record<string, unknown>>}
+ */
+function generatedCommandGroups(profile) {
+  const verification = /** @type {Record<string, unknown>} */ (profile.verification ?? {});
+  return Array.isArray(verification.command_groups)
+    ? verification.command_groups.map((entry) => /** @type {Record<string, unknown>} */ (entry))
+    : [];
+}
+
+/**
+ * @param {string} serializedProfile
+ */
+function assertNoPrivateVerificationVocabulary(serializedProfile) {
+  const forbiddenPatterns = [
+    /\blive_e2e\w*/u,
+    /\blive-e2e\b/u,
+    /\btarget_readiness\b/u,
+    /\bdiagnostic_health\b/u,
+    /\bstep_quality\b/u,
+  ];
+  for (const pattern of forbiddenPatterns) {
+    assert.equal(pattern.test(serializedProfile), false, `generated profile matched ${pattern}`);
   }
 }
 
@@ -130,6 +200,162 @@ test("initializeProjectRuntime onboards a clean repo in bundled mode without tar
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test("initializeProjectRuntime materializes Node command groups from discovery without running target commands", () => {
+  withCleanTempRepo((tempRoot) => {
+    writeFile(
+      tempRoot,
+      "package.json",
+      JSON.stringify(
+        {
+          name: "node-generated-profile",
+          scripts: {
+            build: "vite build",
+            lint: "eslint .",
+            test: "node -e \"require('fs').writeFileSync('target-command-ran', 'yes')\"",
+            typecheck: "tsc --noEmit",
+            "test:e2e": "playwright test",
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFile(tempRoot, "pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+
+    const result = initializeProjectRuntime({
+      cwd: tempRoot,
+      projectRef: tempRoot,
+      assetMode: "materialized",
+    });
+    const profileText = fs.readFileSync(result.projectProfilePath, "utf8");
+    const profile = loadGeneratedProfile(result.projectProfilePath);
+    const groups = generatedCommandGroups(profile);
+    const repos = /** @type {Array<Record<string, unknown>>} */ (profile.repos);
+
+    assert.equal(fs.existsSync(path.join(tempRoot, "target-command-ran")), false);
+    assertNoPrivateVerificationVocabulary(profileText);
+    assert.ok(groups.some((group) => group.id === "post-change-build" && group.commands.includes("pnpm run build")));
+    assert.ok(groups.some((group) => group.id === "post-change-lint" && group.commands.includes("pnpm run lint")));
+    assert.ok(groups.some((group) => group.id === "post-change-test" && group.commands.includes("pnpm run test")));
+    assert.ok(
+      groups.some((group) => group.id === "post-change-typecheck" && group.commands.includes("pnpm run typecheck")),
+    );
+    assert.ok(groups.some((group) => group.id === "post-change-e2e" && group.commands.includes("pnpm run test:e2e")));
+    assert.ok(groups.every((group) => group.repo_id === "target"));
+    assert.ok(groups.every((group) => group.working_dir === "."));
+    assert.ok(groups.every((group) => Array.isArray(group.detected_from) && group.detected_from.length > 0));
+    assert.deepEqual(repos[0].build_commands, ["pnpm run build"]);
+    assert.deepEqual(repos[0].lint_commands, ["pnpm run lint"]);
+    assert.deepEqual(repos[0].test_commands, ["pnpm run test"]);
+  });
+});
+
+test("initializeProjectRuntime materializes generated profiles for public stack archetypes", () => {
+  const cases = [
+    {
+      name: "python",
+      setup(repoRoot) {
+        writeFile(
+          repoRoot,
+          "pyproject.toml",
+          "[project]\nname = 'python-generated-profile'\n[tool.pytest.ini_options]\ntestpaths = ['tests']\n",
+        );
+      },
+      expected(group) {
+        return group.role === "test" && group.commands.includes("python -m pytest");
+      },
+    },
+    {
+      name: "go",
+      setup(repoRoot) {
+        writeFile(repoRoot, "go.mod", "module example.com/generated\n\ngo 1.22\n");
+      },
+      expected(group) {
+        return group.role === "test" && group.commands.includes("go test ./...");
+      },
+    },
+    {
+      name: "rust",
+      setup(repoRoot) {
+        writeFile(repoRoot, "Cargo.toml", "[package]\nname = 'generated'\nversion = '0.1.0'\n");
+      },
+      expected(group) {
+        return group.role === "test" && group.commands.includes("cargo test");
+      },
+    },
+    {
+      name: "frontend",
+      setup(repoRoot) {
+        writeFile(repoRoot, "package.json", JSON.stringify({ name: "frontend-generated-profile" }, null, 2));
+        writeFile(repoRoot, "package-lock.json", "{}\n");
+        writeFile(repoRoot, "playwright.config.ts", "export default {};\n");
+      },
+      expected(group) {
+        return group.role === "e2e" && group.commands.includes("npx playwright test");
+      },
+    },
+    {
+      name: "monorepo",
+      setup(repoRoot) {
+        writeFile(repoRoot, "pnpm-workspace.yaml", "packages:\n  - apps/*\n");
+        writeFile(repoRoot, "package.json", JSON.stringify({ name: "monorepo-generated-profile" }, null, 2));
+        writeFile(
+          repoRoot,
+          "apps/api/package.json",
+          JSON.stringify({ name: "api", scripts: { test: "node --test" } }, null, 2),
+        );
+      },
+      expected(group) {
+        return (
+          group.working_dir === "apps/api" &&
+          group.id === "post-change-test-apps-api" &&
+          group.commands.includes("pnpm run test")
+        );
+      },
+    },
+  ];
+
+  for (const fixture of cases) {
+    withCleanTempRepo((tempRoot) => {
+      fixture.setup(tempRoot);
+      const result = initializeProjectRuntime({
+        cwd: tempRoot,
+        projectRef: tempRoot,
+        assetMode: "materialized",
+      });
+      const profileText = fs.readFileSync(result.projectProfilePath, "utf8");
+      const profile = loadGeneratedProfile(result.projectProfilePath);
+      const groups = generatedCommandGroups(profile);
+
+      assertNoPrivateVerificationVocabulary(profileText);
+      assert.ok(groups.some((group) => fixture.expected(group)), fixture.name);
+    });
+  }
+});
+
+test("initializeProjectRuntime materializes no-tests evidence without inventing command groups", () => {
+  withCleanTempRepo((tempRoot) => {
+    writeFile(tempRoot, "README.md", "# No tests fixture\n");
+
+    const result = initializeProjectRuntime({
+      cwd: tempRoot,
+      projectRef: tempRoot,
+      assetMode: "materialized",
+    });
+    const profile = loadGeneratedProfile(result.projectProfilePath);
+    const verification = /** @type {Record<string, unknown>} */ (profile.verification ?? {});
+    const repos = /** @type {Array<Record<string, unknown>>} */ (profile.repos);
+
+    assert.deepEqual(generatedCommandGroups(profile), []);
+    assert.equal(Array.isArray(verification.discovery_outcomes), true);
+    assert.equal(verification.discovery_outcomes[0].outcome, "no-tests");
+    assert.equal(verification.discovery_suggestions[0].kind, "custom");
+    assert.deepEqual(repos[0].build_commands, []);
+    assert.deepEqual(repos[0].lint_commands, []);
+    assert.deepEqual(repos[0].test_commands, []);
+  });
 });
 
 test("initializeProjectRuntime materializes profile and assets only when materialized mode is explicit", () => {

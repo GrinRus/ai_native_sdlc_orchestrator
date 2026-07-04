@@ -82,17 +82,29 @@ verification_plan:
     - evidence-complete
   command_groups:
     - id: post-change-test
+      repo_id: backend
       role: test
       phase: post-change
       enforcement: required
       timeout_class: focused-test
+      working_dir: .
+      detected_from:
+        - package.json#scripts.test
+      package_manager: pnpm
       commands:
         - pnpm test
     - id: diagnostic-lint
+      repo_id: backend
       role: lint
       phase: diagnostic
       enforcement: warn
       timeout_class: quick
+      depends_on:
+        - post-change-test
+      skip_policy:
+        outcome: not-applicable
+        applies_when: lint script is absent from the target package manifest.
+        reason: Diagnostic lint is informative and must not become acceptance evidence.
       commands:
         - pnpm lint
   commands:

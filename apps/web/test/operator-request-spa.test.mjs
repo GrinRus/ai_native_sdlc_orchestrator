@@ -77,6 +77,9 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);
   assert.match(source, /No upstream writes/u);
   assert.match(source, /Evidence & Documents/u);
+  assert.match(source, /Verification plan/u);
+  assert.match(source, /verification_plan/u);
+  assert.match(source, /group\.outcome/u);
   assert.match(source, /Interactions Inbox/u);
   assert.match(source, /Operator Decision/u);
   assert.match(source, /operatorDecisionRequestsForFlow/u);
@@ -103,6 +106,7 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Latest run/u);
   assert.match(source, /Attach as request target/u);
   assert.match(css, /button:focus-visible/u);
+  assert.match(css, /\.verification-plan-card/u);
   assert.match(css, /\.decision-action-grid button:focus-visible/u);
   assert.match(css, /\.execution-action-grid button:focus-visible/u);
 });

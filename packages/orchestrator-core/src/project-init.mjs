@@ -4,6 +4,7 @@ import { stringify as stringifyYaml } from "yaml";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
+import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 
 const DEFAULT_RUNTIME_ROOT = ".aor";
 const DEFAULT_BOOTSTRAP_TEMPLATE_ID = "github-default";
@@ -417,6 +418,68 @@ function buildDefaultVerificationCommandGroups(verification) {
 }
 
 /**
+ * @param {{ buildCommands?: string[], lintCommands?: string[], testCommands?: string[] }} options
+ * @returns {boolean}
+ */
+function hasVerificationCommandOverrides(options) {
+  return [options.buildCommands, options.lintCommands, options.testCommands].some(
+    (commands) => Array.isArray(commands) && commands.length > 0,
+  );
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function quoteShellPath(value) {
+  return /^[A-Za-z0-9_./-]+$/u.test(value) ? value : `'${value.replace(/'/gu, "'\\''")}'`;
+}
+
+/**
+ * @param {Record<string, unknown>} group
+ * @param {string} command
+ * @returns {string}
+ */
+function toLegacyRepoCommand(group, command) {
+  const workingDir = typeof group.working_dir === "string" && group.working_dir.trim().length > 0
+    ? group.working_dir.trim()
+    : ".";
+  return workingDir === "." ? command : `cd ${quoteShellPath(workingDir)} && ${command}`;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} commandGroups
+ * @param {string} role
+ * @returns {string[]}
+ */
+function collectLegacyCommandsForRole(commandGroups, role) {
+  const commands = [];
+  const seen = new Set();
+  for (const group of commandGroups) {
+    if (group.role !== role || group.phase !== "post-change") continue;
+    const groupCommands = Array.isArray(group.commands) ? group.commands : [];
+    for (const command of groupCommands) {
+      if (typeof command !== "string" || command.trim().length === 0) continue;
+      const legacyCommand = toLegacyRepoCommand(group, command.trim());
+      if (seen.has(legacyCommand)) continue;
+      seen.add(legacyCommand);
+      commands.push(legacyCommand);
+    }
+  }
+  return commands;
+}
+
+/**
+ * @param {ReturnType<typeof discoverVerificationCommandGroups>} discovery
+ * @returns {Array<Record<string, unknown>>}
+ */
+function commandGroupsFromDiscovery(discovery) {
+  return discovery.command_group_candidates
+    .map((candidate) => asRecord(candidate.command_group))
+    .filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
+}
+
+/**
  * @param {{
  *   bootstrapTemplate?: string,
  *   cwd: string,
@@ -470,11 +533,6 @@ function createBootstrapProjectProfile(options) {
 
   const projectName = path.basename(options.projectRoot);
   const projectId = normalizeId(projectName) || "target-project";
-  const verification = detectVerificationCommands(options.projectRoot, {
-    buildCommands: options.repoBuildCommands,
-    lintCommands: options.repoLintCommands,
-    testCommands: options.repoTestCommands,
-  });
   const profile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(loaded.document)));
   profile.project_id = projectId;
   profile.display_name = projectName;
@@ -501,13 +559,44 @@ function createBootstrapProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  primaryRepo.build_commands = verification.buildCommands;
-  primaryRepo.lint_commands = verification.lintCommands;
-  primaryRepo.test_commands = verification.testCommands;
+  const hasOverrides = hasVerificationCommandOverrides({
+    buildCommands: options.repoBuildCommands,
+    lintCommands: options.repoLintCommands,
+    testCommands: options.repoTestCommands,
+  });
+  const verification = detectVerificationCommands(options.projectRoot, {
+    buildCommands: options.repoBuildCommands,
+    lintCommands: options.repoLintCommands,
+    testCommands: options.repoTestCommands,
+  });
+  const stackDiscovery = hasOverrides
+    ? null
+    : discoverVerificationCommandGroups({
+        projectRoot: options.projectRoot,
+        repoId: String(primaryRepo.repo_id),
+      });
+  const generatedCommandGroups = hasOverrides
+    ? buildDefaultVerificationCommandGroups(verification)
+    : commandGroupsFromDiscovery(stackDiscovery);
+  primaryRepo.build_commands = hasOverrides
+    ? verification.buildCommands
+    : collectLegacyCommandsForRole(generatedCommandGroups, "build");
+  primaryRepo.lint_commands = hasOverrides
+    ? verification.lintCommands
+    : collectLegacyCommandsForRole(generatedCommandGroups, "lint");
+  primaryRepo.test_commands = hasOverrides
+    ? verification.testCommands
+    : collectLegacyCommandsForRole(generatedCommandGroups, "test");
   profile.repos = [primaryRepo];
   profile.verification = {
     ...asRecord(profile.verification),
-    command_groups: buildDefaultVerificationCommandGroups(verification),
+    command_groups: generatedCommandGroups,
+    ...(!hasOverrides && stackDiscovery
+      ? {
+          discovery_outcomes: stackDiscovery.outcomes,
+          discovery_suggestions: stackDiscovery.suggestions,
+        }
+      : {}),
   };
 
   const validation = validateContractDocument({

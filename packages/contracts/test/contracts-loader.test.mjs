@@ -94,6 +94,42 @@ test("loads monorepo and bounded multirepo profiles through the same project-pro
   }
 });
 
+test("verification archetype profile documents migration command-group examples", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.verification-archetypes.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(loaded.ok, true, "verification archetype profile should load as project-profile");
+
+  const verification = /** @type {Record<string, unknown>} */ (loaded.document.verification);
+  const groups = /** @type {Array<Record<string, unknown>>} */ (verification.command_groups);
+  const roles = new Set(groups.map((group) => group.role));
+  assert.ok(roles.has("setup"));
+  assert.ok(roles.has("build"));
+  assert.ok(roles.has("lint"));
+  assert.ok(roles.has("test"));
+  assert.ok(roles.has("e2e"));
+  assert.ok(roles.has("full-suite"));
+
+  const browserGroup = groups.find((group) => group.id === "browser-app-post-change-e2e");
+  assert.ok(browserGroup, "expected browser e2e command group");
+  assert.equal(browserGroup?.enforcement, "warn");
+  assert.equal(browserGroup?.timeout_class, "browser-e2e");
+  assert.equal(/** @type {Record<string, unknown>} */ (browserGroup?.skip_policy).outcome, "missing-tool");
+
+  const fullSuiteGroup = groups.find((group) => group.id === "workspace-post-change-full-suite");
+  assert.ok(fullSuiteGroup, "expected workspace full-suite command group");
+  assert.equal(fullSuiteGroup?.enforcement, "observe");
+
+  const baselineGroup = groups.find((group) => group.id === "legacy-service-baseline-test");
+  assert.ok(baselineGroup, "expected legacy-service baseline command group");
+  assert.equal(baselineGroup?.phase, "baseline");
+  assert.equal(/** @type {Record<string, unknown>} */ (baselineGroup?.skip_policy).outcome, "broken-baseline");
+
+  const outcomes = /** @type {Array<Record<string, unknown>>} */ (verification.discovery_outcomes);
+  assert.equal(outcomes.some((outcome) => outcome.outcome === "no-tests" && outcome.working_dir === "docs"), true);
+});
+
 test("returns actionable error when required field is missing", () => {
   const source = path.join(workspaceRoot, "examples/project.aor.yaml");
   const loaded = loadContractFile({ filePath: source, family: "project-profile" });
@@ -257,6 +293,82 @@ test("project profile validates verification command group enums", () => {
     }),
     "enum_value_invalid",
     "verification.command_groups[0].role",
+  );
+});
+
+test("verification command groups accept W54 authoring metadata", () => {
+  const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.verification.command_groups[0] = {
+    ...candidate.verification.command_groups[0],
+    repo_id: "target",
+    working_dir: "packages/app",
+    depends_on: ["setup-readiness"],
+    detected_from: ["package.json#scripts.test"],
+    package_manager: "pnpm",
+    tool_requirements: [
+      {
+        tool: "node",
+        version_range: ">=22",
+        install_hint: "Use the project-pinned Node runtime.",
+      },
+    ],
+    skip_policy: {
+      outcome: "no-tests",
+      applies_when: "No test script is declared.",
+      reason: "No synthetic passing test command should be invented.",
+    },
+  };
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: candidate,
+    source: "test://w54-command-group-authoring-fields",
+  });
+
+  assert.equal(validation.ok, true);
+});
+
+test("verification command groups reject private proof-harness fields", () => {
+  const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.verification.command_groups[0].target_readiness = {
+    owner: "live-e2e",
+  };
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "project-profile",
+      document: candidate,
+      source: "test://private-proof-harness-command-group-field",
+    }),
+    "unsupported_field_present",
+    "verification.command_groups[0].target_readiness",
+  );
+});
+
+test("step result validates generic command group outcomes", () => {
+  const source = path.join(workspaceRoot, "examples/reports/step-result.verify-missing-tool.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "step-result" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.command_group_outcome = "live-e2e-blocked";
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: candidate,
+      source: "test://invalid-command-group-outcome",
+    }),
+    "enum_value_invalid",
+    "command_group_outcome",
   );
 });
 

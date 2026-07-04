@@ -10,6 +10,7 @@ import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 import { resolveProjectRepoScope } from "./repo-scope.mjs";
+import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
   ".ts": "typescript",
@@ -740,11 +741,20 @@ export function analyzeProjectRuntime(options = {}) {
 
   const repoFacts = detectRepoFacts(init.projectRoot, unknownFacts);
   const commandCandidates = detectCommandCandidates(init.projectRoot);
+  const stackDiscovery = discoverVerificationCommandGroups({
+    projectRoot: init.projectRoot,
+  });
 
   const toolchainFacts = {
     build_commands: commandCandidates.buildCommands,
     test_commands: commandCandidates.testCommands,
     lint_commands: commandCandidates.lintCommands,
+    stack_discovery: {
+      detections: stackDiscovery.detections,
+      package_boundaries: stackDiscovery.package_boundaries,
+      outcomes: stackDiscovery.outcomes,
+      suggestions: stackDiscovery.suggestions,
+    },
   };
 
   if (toolchainFacts.build_commands.length === 0) {
@@ -782,6 +792,7 @@ export function analyzeProjectRuntime(options = {}) {
         ...commandCandidates.buildCommands,
       ]),
     ],
+    command_group_candidates: stackDiscovery.command_group_candidates,
   };
 
   if (commandCatalog.required_for_smoke_verify.length === 0) {

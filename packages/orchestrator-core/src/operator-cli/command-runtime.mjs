@@ -80,7 +80,7 @@ export {
   runOperatorRequest,
 } from "../operator-request.mjs";
 export { validateProjectRuntime } from "../project-validate.mjs";
-export { verifyProjectRuntime } from "../project-verify.mjs";
+export { planProjectVerification, verifyProjectRuntime } from "../project-verify.mjs";
 export { materializeIntakeArtifactPacket } from "../artifact-store.mjs";
 export { materializeReviewReport } from "../review-run.mjs";
 export { materializeRuntimeHarnessReport } from "../runtime-harness-report.mjs";

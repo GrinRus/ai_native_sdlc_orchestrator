@@ -282,6 +282,88 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
   });
 });
 
+test("project state exposes verification plan and per-group status surface", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const groups = [
+      ["required-failed", "test", "post-change", "required", "focused-test", "failed", null],
+      ["warning-group", "lint", "post-change", "warn", "quick", "warn", null],
+      ["observed-group", "custom", "diagnostic", "observe", "quick", "observed", null],
+      ["skipped-group", "build", "post-change", "required", "build", "skipped", null],
+      ["not-applicable-group", "test", "post-change", "required", "focused-test", "skipped", "not-applicable"],
+    ].map(([id, role, phase, enforcement, timeoutClass, status, outcome]) => ({
+      id,
+      repo_id: "main",
+      role,
+      phase,
+      enforcement,
+      timeout_class: timeoutClass,
+      working_dir: ".",
+      depends_on: [],
+      command_count: 1,
+      status: "planned",
+      latest_status: status,
+      ...(outcome ? { skip_policy: { outcome } } : {}),
+    }));
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "verification-plan-post-run-primary.json"),
+      `${JSON.stringify(
+        {
+          report_id: `${init.projectId}.verification-plan.post-run-primary.v1`,
+          project_id: init.projectId,
+          version: 1,
+          verification_label: "post-run-primary",
+          status: "planned",
+          command_count: groups.length,
+          command_groups: groups,
+          discovered_command_groups: [
+            {
+              candidate_id: "post-change-test",
+              confidence: "high",
+              source_refs: ["package.json#scripts.test"],
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"),
+      `${JSON.stringify(
+        {
+          run_id: `${init.projectId}.verify.post-run-primary.v1`,
+          verification_label: "post-run-primary",
+          status: "failed",
+          command_groups: groups.map((group) => ({
+            id: group.id,
+            status: group.latest_status,
+            ...(group.skip_policy ? { outcome: group.skip_policy.outcome } : {}),
+            step_result_refs: [`evidence://reports/step-result-${group.id}.json`],
+          })),
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(projectState.verification_plan.verification_label, "post-run-primary");
+    assert.equal(projectState.verification_plan.latest_verify_status, "failed");
+    assert.deepEqual(
+      projectState.verification_plan.command_groups.map((group) => group.status),
+      ["failed", "warn", "observed", "skipped", "skipped"],
+    );
+    assert.equal(
+      projectState.verification_plan.command_groups.find((group) => group.id === "not-applicable-group").outcome,
+      "not-applicable",
+    );
+    assert.equal(projectState.verification_plan.discovered_command_groups[0].confidence, "high");
+  });
+});
+
 test("listRuns includes run-control state snapshots even before packet/report artifacts exist", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });

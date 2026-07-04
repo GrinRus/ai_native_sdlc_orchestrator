@@ -41,6 +41,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Runtime Trace",
     "Next action",
     "Evidence artifacts",
+    "Verification plan",
+    "verification_plan",
+    "group.outcome",
     "No upstream writes",
     "/flows/selected",
     "/evidence-graph",
@@ -208,6 +211,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
+  assert.ok(css.includes(".verification-plan-card"), "SPA CSS should define compact verification plan layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
   assert.equal(
     source.includes("candidates.at(-1)"),

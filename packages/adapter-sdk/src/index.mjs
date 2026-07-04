@@ -304,6 +304,8 @@ let stdoutLineBuffer = "";
 let providerProgressEventCount = 0;
 const providerProgressEvents = [];
 const heartbeatIntervalMs = Math.max(25, asNumber(asObject(options.provider_step_status).heartbeat_interval_ms) || 5000);
+const heartbeatStatusWriteIntervalMs = Math.max(1000, heartbeatIntervalMs);
+let lastHeartbeatStatusWriteMs = Date.now();
 
 function recordProviderProgress(record) {
   const nowIso = new Date().toISOString();
@@ -377,6 +379,15 @@ function finish(result) {
   emit({ ...result, provider_progress_events: providerProgressEvents });
 }
 
+function writeHeartbeatStatusIfDue() {
+  const nowMs = Date.now();
+  if (nowMs - lastHeartbeatStatusWriteMs < heartbeatStatusWriteIntervalMs) {
+    return;
+  }
+  lastHeartbeatStatusWriteMs = nowMs;
+  writeProviderStepStatus({ status: "running" });
+}
+
 let child;
 try {
   writeProviderStepStatus({ status: "running" });
@@ -424,7 +435,7 @@ heartbeatTimer = setInterval(() => {
     }
     return;
   }
-  writeProviderStepStatus({ status: "running" });
+  writeHeartbeatStatusIfDue();
 }, heartbeatIntervalMs);
 
 const timer = setTimeout(() => {

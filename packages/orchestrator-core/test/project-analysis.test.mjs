@@ -59,6 +59,14 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
       "pnpm test",
       "pnpm build",
     ]);
+    assert.ok(
+      result.report.command_catalog.command_group_candidates.some(
+        (candidate) =>
+          candidate.confidence === "high" &&
+          candidate.command_group.id === "post-change-test" &&
+          candidate.command_group.detected_from.includes("package.json#scripts.test"),
+      ),
+    );
     assert.equal(fs.existsSync(result.reportPath), true);
     assert.equal(fs.existsSync(result.routeResolutionPath), true);
     assert.equal(result.routeResolutionMatrix.length, 10);

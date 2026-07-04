@@ -470,14 +470,14 @@ This is the master index for the implementation slices across all defined waves.
 ## W54 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W54-S01 | Verification group authoring contract | EPIC-4, EPIC-7 | ready | `docs/contracts/**`, `packages/contracts/**`, examples | W53-S05 |
-| W54-S02 | Stack discovery engine | EPIC-1, EPIC-4 | blocked | `packages/orchestrator-core/**`, discovery fixtures, tests | W54-S01 |
-| W54-S03 | Project init profile materialization | EPIC-1 | blocked | `packages/orchestrator-core/src/project-init.mjs`, examples, init tests | W54-S02 |
-| W54-S04 | Verifier execution semantics hardening | EPIC-4 | blocked | `packages/orchestrator-core/src/project-verify.mjs`, verifier tests | W54-S03 |
-| W54-S05 | CLI/API/UI verification plan surfaces | EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**` | W54-S04 |
-| W54-S06 | Migration and examples | EPIC-4 | blocked | `docs/contracts/**`, `docs/ops/**`, `examples/**`, CLI tests | W54-S05 |
-| W54-S07 | Real archetype smoke matrix | EPIC-4, EPIC-7 | blocked | verifier fixtures, smoke tests, docs | W54-S06 |
-| W54-S08 | Boundary regression expansion | EPIC-0, EPIC-7 | blocked | boundary tests, public docs/examples, artifact fixtures | W54-S07 |
+| W54-S01 | Verification group authoring contract | EPIC-4, EPIC-7 | done | `docs/contracts/**`, `packages/contracts/**`, examples | W53-S05 |
+| W54-S02 | Stack discovery engine | EPIC-1, EPIC-4 | done | `packages/orchestrator-core/**`, discovery fixtures, tests | W54-S01 |
+| W54-S03 | Project init profile materialization | EPIC-1 | done | `packages/orchestrator-core/src/project-init.mjs`, examples, init tests | W54-S02 |
+| W54-S04 | Verifier execution semantics hardening | EPIC-4 | done | `packages/orchestrator-core/src/project-verify.mjs`, verifier tests | W54-S03 |
+| W54-S05 | CLI/API/UI verification plan surfaces | EPIC-6 | done | `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**` | W54-S04 |
+| W54-S06 | Migration and examples | EPIC-4 | done | `docs/contracts/**`, `docs/ops/**`, `examples/**`, CLI tests | W54-S05 |
+| W54-S07 | Real archetype smoke matrix | EPIC-4, EPIC-7 | done | verifier fixtures, smoke tests, docs | W54-S06 |
+| W54-S08 | Boundary regression expansion | EPIC-0, EPIC-7 | done | boundary tests, public docs/examples, artifact fixtures | W54-S07 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
