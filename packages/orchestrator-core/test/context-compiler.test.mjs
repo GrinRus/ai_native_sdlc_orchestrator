@@ -133,6 +133,68 @@ test("compileStepContext resolves distinct artifact workflow prompt refs and sta
   });
 });
 
+test("compileStepContext keeps artifact workflows on shared context skill and policy provenance", () => {
+  withTempRepo((repoRoot) => {
+    const cases = [
+      {
+        stepClass: "discovery",
+        promptBundleRef: "prompt-bundle://discovery-default@v1",
+        inputPacketRefs: ["packet://step-input-context"],
+      },
+      {
+        stepClass: "research",
+        promptBundleRef: "prompt-bundle://research-default@v1",
+        inputPacketRefs: ["packet://discovery"],
+      },
+      {
+        stepClass: "spec",
+        promptBundleRef: "prompt-bundle://spec-default@v1",
+        inputPacketRefs: ["packet://discovery", "packet://research"],
+      },
+    ];
+
+    for (const scenario of cases) {
+      const resolved = resolveExecutionArtifacts(repoRoot, scenario.stepClass);
+      const compiled = compileStepContext({
+        projectRoot: repoRoot,
+        projectProfilePath: resolved.projectProfilePath,
+        stepClass: scenario.stepClass,
+        routeResolution: resolved.routeResolution,
+        assetResolution: resolved.assetResolution,
+        policyResolution: resolved.policyResolution,
+        inputPacketRefs: scenario.inputPacketRefs,
+        runtimeEvidenceRefs: [],
+        skillsRoot: path.join(repoRoot, "examples/skills"),
+      });
+
+      assert.equal(resolved.routeResolution.route_profile.route_class, "artifact");
+      assert.equal(resolved.assetResolution.wrapper.wrapper_ref, "wrapper.artifact.default@v1");
+      assert.equal(resolved.assetResolution.prompt_bundle.prompt_bundle_ref, scenario.promptBundleRef);
+      assert.deepEqual(compiled.compiled_context.context_refs.context_bundle_refs, [
+        "context-bundle://context.bundle.artifact.foundation@v1",
+      ]);
+      assert.deepEqual(compiled.compiled_context.skill_refs, ["skill.artifact.default@v1"]);
+      assert.equal(compiled.compiled_context.guardrails.policy_id, "policy.step.artifact.default");
+      assert.equal(
+        compiled.compiled_context.provenance.context_bundle_sources.map((source) => path.basename(source)).join(","),
+        "artifact-foundation.yaml",
+      );
+      assert.equal(
+        compiled.compiled_context.provenance.skill_profile_sources.map((source) => path.basename(source)).join(","),
+        "skill-artifact-default.yaml",
+      );
+      assert.equal(
+        compiled.compiled_context.provenance.skill_resolution_source.field,
+        "default_skill_profiles.artifact",
+      );
+      assert.equal(
+        compiled.compiled_context.provenance.policy_resolution_source.field,
+        "default_step_policies.artifact",
+      );
+    }
+  });
+});
+
 test("compileStepContext produces compiled context and diagnostics for adapter injection", () => {
   withTempRepo((repoRoot) => {
     const resolved = resolveExecutionArtifacts(repoRoot, "implement");

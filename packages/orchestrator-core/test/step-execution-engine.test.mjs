@@ -210,6 +210,11 @@ function configureOpenCodeExternalRuntime(repoRoot, runtime) {
 test("executeRoutedStep resolves route/assets/policy/adapter and persists compiled context for runner dry-runs", () => {
   withTempRepo((repoRoot) => {
     for (const stepClass of ["implement", "review", "qa"]) {
+      const expectedSkillRefs = {
+        implement: ["skill.runner.implement@v1"],
+        review: ["skill.runner.review@v1"],
+        qa: ["skill.runner.qa@v1"],
+      }[stepClass];
       const result = executeRoutedStep({
         projectRef: repoRoot,
         cwd: repoRoot,
@@ -258,6 +263,7 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
           "context-bundle://context.bundle.runner.foundation@v1",
         ),
       );
+      assert.deepEqual(contextCompilation.compiled_context_artifact.skill_refs, expectedSkillRefs);
 
       assert.equal(typeof result.stepResult.routed_execution.adapter_request.context, "object");
       assert.equal(
@@ -268,6 +274,7 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
         result.stepResult.routed_execution.adapter_request.context.compiled_context_file,
         contextCompilation.compiled_context_file,
       );
+      assert.deepEqual(result.stepResult.routed_execution.adapter_request.context.skill_refs, expectedSkillRefs);
       assert.ok(
         result.stepResult.evidence_refs.includes(contextCompilation.compiled_context_ref),
       );

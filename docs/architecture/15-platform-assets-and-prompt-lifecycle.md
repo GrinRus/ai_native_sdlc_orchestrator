@@ -86,6 +86,29 @@ W44 keeps `artifact-default@v1` as the legacy fallback while materializing
 step-specific artifact prompt bundles for profiles that opt into the split:
 `discovery-default@v1`, `research-default@v1`, and `spec-default@v1`.
 
+## W44 artifact overlay disposition
+
+W44-S04 does not add discovery-, research-, or spec-specific context bundles,
+skill profiles, or step policies. The W44-S02 prompt split already carries the
+material workflow guidance, and W44-S03 readiness diagnostics carry the
+research ADR-ready and spec handoff-ready gates without introducing a new
+execution policy.
+
+The selected disposition is:
+
+| Workflow step | Prompt bundle | Context bundle | Skill profile | Step policy | Decision |
+|---|---|---|---|---|---|
+| `discovery` | `prompt-bundle://discovery-default@v1` | `context-bundle://context.bundle.artifact.foundation@v1` | `skill.artifact.default@v1` | `policy.step.artifact.default` | prompt-only split |
+| `research` | `prompt-bundle://research-default@v1` | `context-bundle://context.bundle.artifact.foundation@v1` | `skill.artifact.default@v1` | `policy.step.artifact.default` | prompt + readiness diagnostics |
+| `spec` | `prompt-bundle://spec-default@v1` | `context-bundle://context.bundle.artifact.foundation@v1` | `skill.artifact.default@v1` | `policy.step.artifact.default` | prompt + handoff readiness diagnostics |
+
+Compiled-context artifacts must persist the selected prompt bundle,
+`context_*_refs`, and `skill_refs` so operators can prove the shared artifact
+foundation was selected deliberately. A future overlay split is allowed only as
+a separate slice with evidence that the shared foundation cannot express a
+workflow rule, and any policy split must define explicit gate, retry, repair,
+and blocked-reason behavior.
+
 ## Policy loading order and guardrails (W2-S03)
 Policy resolution is deterministic and runs before any adapter invocation:
 1. resolve route for the step (`project default` or `step override`);

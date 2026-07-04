@@ -12,6 +12,7 @@ Runtime artifact that captures the selected prompt bundle, resolved context bund
 - `context_doc_refs`
 - `context_rule_refs`
 - `context_skill_refs`
+- `skill_refs`
 - `packet_refs`
 - `hashes`
 - `provenance`
@@ -25,7 +26,7 @@ This contract family is introduced in `W6-S02` so downstream runtime, harness, a
 
 Runtime outputs are run/step scoped: `compiled_context_id` and the persisted report filename include run identity, step identity, and execution attempt so repeated same-step executions in one runtime root do not overwrite prior artifacts.
 
-Compiled context is the prepare-phase artifact for routed adapter-backed steps. Runtime execution must be able to trace adapter invocation back to the prompt bundle, context docs, context rules, context skills, wrapper, policy, packet refs, guardrails, and provenance used to build the request.
+Compiled context is the prepare-phase artifact for routed adapter-backed steps. Runtime execution must be able to trace adapter invocation back to the prompt bundle, context docs, context rules, context skills, workflow skill profiles, wrapper, policy, packet refs, guardrails, and provenance used to build the request.
 
 `budget_report` records deterministic size estimates before a provider is invoked:
 - `bytes`
