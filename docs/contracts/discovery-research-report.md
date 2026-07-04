@@ -23,3 +23,8 @@ It connects repository facts, AOR-owned runtime context assets, local research i
 
 ## Notes
 This report does not perform autonomous web research and does not collect browser-backed citations. Local research sources must arrive through structured intake source refs or request documents.
+
+`adr-ready` is research readiness evidence, not by itself permission to consume
+a stale spec or stale plan. `next-action-report` owns the current-stage
+readiness decision by comparing mission, discovery, research, spec, and planning
+refs and by exposing blocked or stale reasons to operators.

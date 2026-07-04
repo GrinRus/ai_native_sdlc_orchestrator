@@ -54,13 +54,38 @@ Ownership is singular:
 
 ## Runtime loading order (W2-S02)
 Asset resolution for a step is deterministic and follows this order:
-1. resolve route profile for the step class;
+1. resolve route profile for the workflow step;
 2. choose wrapper profile (`step override` first, then `project default` by route class);
-3. choose prompt bundle (`step override` first, then `project default` by step class);
-4. choose context bundles (`step override` first, then `project default` by step class) and expand docs/rules/skills;
+3. choose prompt bundle (`step override` first, then `project default` by workflow step);
+4. choose context bundles (`step override` first, then `project default` by workflow step) and expand docs/rules/skills;
 5. emit one asset bundle with route, wrapper, prompt bundle, context bundles, and provenance refs.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
+
+## Artifact workflow prompt granularity
+
+Discovery, research, and spec are workflow steps that share the `artifact`
+execution class. This lets AOR give each step task-specific prompt guidance
+while preserving the same artifact wrapper, policy, route class, context
+foundation, and public-repo safety rules.
+
+The compatibility invariants are:
+- route profiles may differ by workflow step, but their `route_class` remains
+  `artifact`;
+- prompt bundles for discovery, research, and spec must keep
+  `step_class: artifact`;
+- `artifact-default@v1` remains a valid fallback for profiles that have not
+  opted into step-specific prompt bundles;
+- context, skill, and policy overlays are added only when evidence from the
+  prompt split or readiness model proves a material workflow difference;
+- compiled-context artifacts must expose the selected prompt bundle ref,
+  context bundle refs, required packet refs, stale or blocked diagnostics, and
+  provenance so operators can inspect the choice without raw adapter output.
+
+The first W44 implementation slice defines the taxonomy and transition
+invariants only. Creating `discovery-default@v1`, `research-default@v1`, and
+`spec-default@v1` prompt bundle examples belongs to the later prompt split
+slice.
 
 ## Policy loading order and guardrails (W2-S03)
 Policy resolution is deterministic and runs before any adapter invocation:

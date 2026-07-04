@@ -35,7 +35,7 @@ assets.
 
 ## W44-S01 — Artifact workflow taxonomy and transition invariants
 - **Epic:** EPIC-0 Repository development system; EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Define the source-of-truth taxonomy and state-transition
   invariants for splitting discovery, research, and spec runtime assets.
 - **Primary modules:** `docs/architecture/**`, `docs/contracts/**`,
@@ -49,6 +49,23 @@ assets.
 3. Record split invariants: keep `step_class=artifact`, shared artifact wrapper behavior, `artifact-default@v1` fallback, and public-repo safety context.
 4. Identify which contracts and examples must change in later slices before runtime code depends on the new split.
 5. Add acceptance notes for stale downstream artifacts when mission, discovery, or research refs change.
+
+### Transition invariants
+| Stage | Ready-state evidence | Blocked-state evidence | Stale-state trigger |
+|---|---|---|---|
+| Mission intake | Complete intake packet and body refs with goals, constraints, KPI, Definition of Done, and source refs. | Missing or malformed intake fields that prevent discovery from naming evidence gaps. | Mission packet/body refs materially change after discovery, research, spec, or planning evidence exists. |
+| Discovery | Current project analysis and discovery evidence linked to the current mission refs. | Missing project profile, missing source refs, failed validation, or discovery command failure. | Mission intake refs or repository/source refs change after discovery evidence was created. |
+| Research | `discovery-research-report.status=adr-ready` for strict readiness, or `incomplete` only when a soft profile records explicit missing evidence. | Strict profile lacks current discovery evidence, local research input refs, or ADR-ready recommendations. | Mission or discovery refs change after the research report was created. |
+| Spec | Current spec evidence linked to current mission, discovery, and research refs; strict mode requires current ADR-ready research. | Strict profile sees missing, incomplete, blocked, or stale research; soft profile lacks an explicit incomplete-research decision. | Mission, discovery, or research refs change after spec evidence was created. |
+| Planning | Current spec can be consumed by planner and handoff creation without stale or blocked upstream evidence. | Spec is missing, blocked, stale, or incomplete under a strict profile. | Spec refs change after wave ticket or handoff planning evidence was created. |
+
+### Downstream implementation targets
+| Slice | Contract/example/test target |
+|---|---|
+| W44-S02 | Add `discovery-default@v1`, `research-default@v1`, and `spec-default@v1` prompt bundle examples with `step_class: artifact`; update project-profile examples and context-compiler tests for distinct prompt refs. |
+| W44-S03 | Add readiness diagnostics to contract examples and runtime/read-surface tests for pending, ready, incomplete, blocked, and stale discovery/research/spec/planning paths. |
+| W44-S04 | Add context, skill, or policy overlays only if W44-S02/S03 evidence proves a material workflow difference; otherwise record an explicit no-split decision. |
+| W44-S05 | Refresh source-of-truth docs and run live E2E proof that the discovery -> research -> spec -> planning path exposes prompt refs and readiness diagnostics. |
 
 ### Acceptance criteria
 1. Architecture and contract docs define workflow-step versus execution-class ownership without changing existing loader enums.
@@ -72,7 +89,7 @@ assets.
 
 ## W44-S02 — Discovery/research/spec prompt bundle split
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Replace the shared artifact prompt default for discovery,
   research, and spec with distinct step-specific prompt bundle refs while
   keeping the artifact execution class intact.
@@ -116,7 +133,7 @@ assets.
   upstream artifacts silently.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core/**`,
   `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests
-- **Hard dependencies:** W44-S01
+- **Hard dependencies:** W44-S02
 - **Primary user story surfaces:** DIS-07, DIS-08, ARC-08, PBO-07, OPS-10.
 
 ### Local tasks

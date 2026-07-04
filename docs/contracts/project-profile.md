@@ -70,6 +70,14 @@ W21 guided onboarding preserves both modes:
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.
 These fields declare deterministic defaults only. Actual context selection, expansion, and prompt/context assembly begin in `W8-S08`.
 
+Workflow-step keys and execution classes are intentionally separate. The
+`discovery`, `research`, and `spec` prompt defaults may point at distinct prompt
+bundle refs, but those prompt bundles remain compatible with
+`step_class: artifact`, `default_wrapper_profiles.artifact`,
+`default_step_policies.artifact`, and `default_skill_profiles.artifact`.
+Profiles that still point all three keys at `prompt-bundle://artifact-default@v1`
+remain valid.
+
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 
