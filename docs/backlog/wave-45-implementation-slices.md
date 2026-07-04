@@ -111,7 +111,7 @@ and delivery/release blocking semantics.
 
 ## W45-S03 — CLI and control-plane quality repair surfaces
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Expose quality repair requests and decisions through public CLI
   and API surfaces without requiring raw artifact editing.
 - **Primary modules:** `apps/cli/**`, `apps/api/**`,
@@ -150,7 +150,7 @@ and delivery/release blocking semantics.
 
 ## W45-S04 — Web repair-cycle observability
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make repair cycles understandable in the local console through
   flow-scoped quality gate, evidence, and next-action views.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,

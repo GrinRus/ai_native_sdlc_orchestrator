@@ -5340,18 +5340,34 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
       const repairDecisionPayload = JSON.parse(repairDecision.stdout);
       assert.equal(repairDecisionPayload.review_decision, "request-repair");
       assert.equal(repairDecisionPayload.review_decision_gate, "blocked");
-	      assert.equal(repairDecisionPayload.review_decision_repair_context.source_phase, "review");
-	      assert.equal(repairDecisionPayload.review_decision_repair_context.cycle_iteration, 1);
-	      assert.equal(repairDecisionPayload.review_decision_repair_context.requested_next_step, "execution");
-	      assert.match(repairDecisionPayload.review_decision_repair_context.context_fingerprint, /^sha256:/u);
-	      const repairDecisionDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.review_decision_file, "utf8"));
-	      assert.equal(repairDecisionDocument.delivery_gate.blocks_downstream, true);
-	      assert.equal(repairDecisionDocument.repair_context.source_phase, "review");
-	      assert.equal(repairDecisionDocument.repair_context.requested_next_step, "execution");
-	      assert.equal(repairDecisionDocument.repair_context.unresolved_findings.length > 0, true);
-	      assert.equal(repairDecisionDocument.repair_context.verification_refs.length > 0, true);
-	      assert.match(repairDecisionDocument.repair_context.context_fingerprint, /^sha256:/u);
-	      assert.deepEqual(repairDecisionDocument.repair_context.new_context_since_previous, ["first-repair-decision"]);
+      assert.match(repairDecisionPayload.quality_repair_request_ref, /^evidence:\/\//u);
+      assert.equal(fs.existsSync(repairDecisionPayload.quality_repair_request_file), true);
+      assert.equal(repairDecisionPayload.quality_repair_request_status, "requested");
+      assert.equal(repairDecisionPayload.quality_repair_request_source_stage, "review");
+      assert.equal(repairDecisionPayload.quality_repair_request_attempt_budget.attempt_index, 1);
+      assert.equal(repairDecisionPayload.quality_repair_request_blockers.length > 0, true);
+      assert.equal(repairDecisionPayload.quality_repair_next_action_status, "blocked");
+      assert.equal(repairDecisionPayload.quality_repair_next_action_stage, "repair");
+      assert.equal(repairDecisionPayload.quality_repair_next_action_primary.action_id, "run-review-quality-repair");
+      assert.match(repairDecisionPayload.quality_repair_next_action_primary.command, /--target-step implement/u);
+      assert.equal(repairDecisionPayload.review_decision_repair_context.source_phase, "review");
+      assert.equal(repairDecisionPayload.review_decision_repair_context.cycle_iteration, 1);
+      assert.equal(repairDecisionPayload.review_decision_repair_context.requested_next_step, "execution");
+      assert.match(repairDecisionPayload.review_decision_repair_context.context_fingerprint, /^sha256:/u);
+      const repairDecisionDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.review_decision_file, "utf8"));
+      const repairRequestDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.quality_repair_request_file, "utf8"));
+      assert.equal(repairDecisionDocument.delivery_gate.blocks_downstream, true);
+      assert.equal(repairDecisionDocument.quality_repair_request_ref, repairDecisionPayload.quality_repair_request_ref);
+      assert.equal(repairDecisionDocument.quality_repair_lineage.request_ref, repairDecisionPayload.quality_repair_request_ref);
+      assert.equal(repairDecisionDocument.repair_context.source_phase, "review");
+      assert.equal(repairDecisionDocument.repair_context.requested_next_step, "execution");
+      assert.equal(repairDecisionDocument.repair_context.unresolved_findings.length > 0, true);
+      assert.equal(repairDecisionDocument.repair_context.verification_refs.length > 0, true);
+      assert.match(repairDecisionDocument.repair_context.context_fingerprint, /^sha256:/u);
+      assert.deepEqual(repairDecisionDocument.repair_context.new_context_since_previous, ["first-repair-decision"]);
+      assert.equal(repairRequestDocument.status, "requested");
+      assert.equal(repairRequestDocument.source_stage, "review");
+      assert.deepEqual(repairRequestDocument.blockers, repairDecisionPayload.quality_repair_request_blockers);
       assert.equal(
         validateContractDocument({
           family: "review-decision",
@@ -5360,6 +5376,78 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         }).ok,
         true,
       );
+      assert.equal(
+        validateContractDocument({
+          family: "quality-repair-request",
+          document: repairRequestDocument,
+          source: "fixture://quality-repair-request-review-origin",
+        }).ok,
+        true,
+      );
+
+      const repairEvidence = invokeCli([
+        "evidence",
+        "show",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+      ]);
+      assert.equal(repairEvidence.exitCode, 0, repairEvidence.stderr);
+      const repairEvidencePayload = JSON.parse(repairEvidence.stdout);
+      assert.equal(
+        repairEvidencePayload.quality_artifacts.some(
+          (artifact) =>
+            artifact.family === "quality-repair-request" &&
+            artifact.artifact_ref === repairDecisionPayload.quality_repair_request_ref,
+        ),
+        true,
+      );
+
+      const invalidRepairContextFile = path.join(projectRoot, "invalid-repair-context.json");
+      fs.writeFileSync(
+        invalidRepairContextFile,
+        `${JSON.stringify(
+          {
+            source_phase: "delivery",
+            cycle_iteration: 1,
+            unresolved_findings: ["invalid source phase"],
+            unresolved_finding_details: [
+              {
+                finding_id: "invalid.source.phase",
+                category: "review",
+                severity: "blocking",
+                summary: "Invalid repair source phase.",
+                evidence_refs: [repairDecisionPayload.review_report_file],
+                resolution_requirement: "Use review or QA repair source phase.",
+              },
+            ],
+            verification_status: "not_pass",
+            verification_refs: [repairDecisionPayload.review_report_file],
+            context_fingerprint: "sha256:invalid-repair-source",
+            requested_next_step: "execution",
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+      const invalidRepairDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "request-repair",
+        "--repair-context-file",
+        invalidRepairContextFile,
+      ]);
+      assert.equal(invalidRepairDecision.exitCode, 1);
+      assert.match(invalidRepairDecision.stderr, /source phase|source_phase|unsupported value/u);
 
       const auditRun = invokeCli([
         "audit",

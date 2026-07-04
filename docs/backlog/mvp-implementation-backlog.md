@@ -387,8 +387,8 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W45-S01 | Quality repair request contract and operating model | EPIC-4 | done | `docs/contracts/**`, `docs/architecture/**`, `examples/reports/**`, `examples/project.aor.yaml`, `docs/backlog/**` | W44-S05 |
 | W45-S02 | Cross-stage repair state machine and next-action resolver | EPIC-4, EPIC-6 | done | `packages/orchestrator-core/**`, `packages/observability/**`, `packages/contracts/**`, tests | W45-S01 |
-| W45-S03 | CLI and control-plane quality repair surfaces | EPIC-6 | ready | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, `examples/control-plane-api/**`, tests | W45-S02 |
-| W45-S04 | Web repair-cycle observability | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, tests | W45-S03 |
+| W45-S03 | CLI and control-plane quality repair surfaces | EPIC-6 | done | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, `examples/control-plane-api/**`, tests | W45-S02 |
+| W45-S04 | Web repair-cycle observability | EPIC-6 | ready | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, tests | W45-S03 |
 | W45-S05 | Repair-loop proof fixtures and internal profile | EPIC-7 | blocked | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
 | W45-S06 | Documentation refresh and internal installed-user rehearsal acceptance | EPIC-7, EPIC-0 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, tests | W45-S05 |
 

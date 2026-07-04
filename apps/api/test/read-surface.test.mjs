@@ -255,10 +255,54 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     const promotions = listPromotionDecisions({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(promotions.some((decision) => decision.document.status === "pass"));
 
+    writeContractFile({
+      family: "quality-repair-request",
+      filePath: path.join(init.runtimeLayout.reportsRoot, `quality-repair-request-${runId}.json`),
+      document: {
+        request_id: `${runId}.quality-repair-request.review.v1`,
+        project_id: init.projectId,
+        run_id: runId,
+        cycle_id: `${runId}.quality-cycle.review.v1`,
+        source_stage: "review",
+        source_ref: `evidence://reports/review-report-${runId}.json`,
+        finding_refs: ["review.finding.api-read-surface"],
+        repair_scope: {
+          target_step: "implement",
+          requested_next_step: "execution",
+          allowed_paths: ["apps/api/**"],
+          verification_refs: [`evidence://reports/runtime-harness-report-${runId}.json`],
+          required_evidence_refs: [
+            `evidence://reports/review-report-${runId}.json`,
+            `evidence://reports/runtime-harness-report-${runId}.json`,
+          ],
+          compiled_context_refs: [],
+          reason: "API read surface fixture for active quality repair request.",
+        },
+        attempt_budget: {
+          policy_ref: `project-profile://${init.projectId}#quality_repair_policy`,
+          max_attempts: 2,
+          attempt_index: 1,
+          remaining_attempts: 1,
+        },
+        status: "requested",
+        blockers: ["delivery-blocked-until-post-repair-review"],
+        evidence_refs: [`evidence://reports/review-report-${runId}.json`],
+        created_at: new Date().toISOString(),
+      },
+    });
+
     const qualityArtifacts = listQualityArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "validation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "evaluation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "review-decision"));
+    assert.ok(
+      qualityArtifacts.some(
+        (artifact) =>
+          artifact.family === "quality-repair-request" &&
+          artifact.document.status === "requested" &&
+          artifact.document.attempt_budget.remaining_attempts === 1,
+      ),
+    );
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "multirepo-coordination-status"));
@@ -279,6 +323,7 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     assert.ok(runSummary.packet_refs.length >= 1);
     assert.ok(runSummary.step_result_refs.length >= 1);
     assert.ok(runSummary.quality_refs.length >= 1);
+    assert.equal(runSummary.quality_refs.some((ref) => ref.includes("quality-repair-request")), true);
   });
 });
 

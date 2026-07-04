@@ -501,6 +501,10 @@ Review run baseline:
 
 Review decision baseline:
 - `review decide` writes one durable `review-decision` artifact for `approve`, `hold`, or `request-repair`;
+- `request-repair` also returns the linked `quality_repair_request_ref`,
+  request file, status, cycle id, source stage, attempt budget, blockers,
+  evidence refs, and the `next-action-report` primary action that operators
+  should run next;
 - `approve` must be blocked unless linked `review-report` and Runtime Harness evidence both pass;
 - delivery/release commands may require this approval through `require_review_decision` lifecycle flags that map to `--require-review-decision`.
 

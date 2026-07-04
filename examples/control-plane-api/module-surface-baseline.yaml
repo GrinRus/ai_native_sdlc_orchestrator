@@ -408,6 +408,17 @@ lifecycle_command_operations:
       - artifact_refs
       - evidence_refs
       - command_output
+    quality_repair_request_fields:
+      - quality_repair_request_ref
+      - quality_repair_request_file
+      - quality_repair_request_status
+      - quality_repair_request_cycle_id
+      - quality_repair_request_source_stage
+      - quality_repair_request_attempt_budget
+      - quality_repair_request_blockers
+      - quality_repair_request_evidence_refs
+      - quality_repair_next_action_primary
+      - quality_repair_next_action_report_file
 
 interactive_continuation:
   owning_slice: W18-S01
