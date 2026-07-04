@@ -73,7 +73,7 @@ and delivery/release blocking semantics.
 
 ## W45-S02 — Cross-stage repair state machine and next-action resolver
 - **Epic:** EPIC-4 Quality platform; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make runtime and `next-action` resolve review/QA repair cycles
   through explicit bounded states.
 - **Primary modules:** `packages/orchestrator-core/**`,
@@ -111,7 +111,7 @@ and delivery/release blocking semantics.
 
 ## W45-S03 — CLI and control-plane quality repair surfaces
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Expose quality repair requests and decisions through public CLI
   and API surfaces without requiring raw artifact editing.
 - **Primary modules:** `apps/cli/**`, `apps/api/**`,

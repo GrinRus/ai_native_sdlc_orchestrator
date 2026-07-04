@@ -284,6 +284,76 @@ function writeReviewDecision(init, runId, decision) {
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
+ * @param {{
+ *   sourceStage?: "review" | "qa",
+ *   status?: "requested" | "in-progress" | "review-required" | "qa-required" | "budget-exhausted" | "closed",
+ *   attemptIndex?: number,
+ *   maxAttempts?: number,
+ *   remainingAttempts?: number,
+ *   blockers?: string[],
+ *   operatorOverrideRef?: string | null,
+ * }} [options]
+ */
+function writeQualityRepairRequest(init, runId, options = {}) {
+  const sourceStage = options.sourceStage ?? "review";
+  const status = options.status ?? "requested";
+  const filePath = path.join(init.runtimeLayout.reportsRoot, `quality-repair-request-${runId}-${sourceStage}-${status}.json`);
+  const sourceRef = sourceStage === "qa"
+    ? `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`
+    : `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`;
+  writeRuntimeJson(filePath, {
+    request_id: `${runId}.quality-repair-request.${sourceStage}.v1`,
+    project_id: init.projectId,
+    run_id: runId,
+    cycle_id: `${runId}.quality-cycle.${sourceStage}.v1`,
+    source_stage: sourceStage,
+    source_ref: sourceRef,
+    finding_refs: [`${sourceStage}.finding.fixture`],
+    repair_scope: {
+      target_step: "implement",
+      requested_next_step: "execution",
+      allowed_paths: ["apps/web/**"],
+      verification_refs: [sourceRef],
+      required_evidence_refs: [
+        `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`,
+        `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`,
+      ],
+      compiled_context_refs: [],
+      reason: "Fixture quality repair request.",
+    },
+    attempt_budget: {
+      policy_ref: `project-profile://${init.projectId}#quality_repair_policy`,
+      max_attempts: options.maxAttempts ?? 2,
+      attempt_index: options.attemptIndex ?? 1,
+      remaining_attempts: options.remainingAttempts ?? 1,
+    },
+    status,
+    blockers:
+      options.blockers ??
+      (status === "budget-exhausted"
+        ? ["repair-budget-exhausted", "operator-approval-required-before-delivery"]
+        : status === "closed"
+          ? []
+          : [sourceStage === "qa" ? "delivery-blocked-until-post-repair-review-and-qa" : "delivery-blocked-until-post-repair-review"]),
+    evidence_refs: [sourceRef],
+    status_history: [
+      {
+        status,
+        changed_at: "2026-07-04T14:20:00.000Z",
+        summary: "Fixture quality repair state.",
+        evidence_refs: [sourceRef],
+      },
+    ],
+    created_at: "2026-07-04T14:20:00.000Z",
+    updated_at: "2026-07-04T14:20:00.000Z",
+    operator_override_ref: options.operatorOverrideRef ?? null,
+  });
+  return filePath;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
  * @param {{ status?: string, blockingReasons?: string[] }} [options]
  */
 function writeDeliveryPlan(init, runId, options = {}) {
@@ -538,6 +608,107 @@ test("resolveNextAction blocks held and repair-requested review decisions", () =
     assert.equal(repair.primary_action.action_id, "run-review-repair");
     assert.equal(repair.blockers[0].code, "review-repair-requested");
     assert.equal(repair.closure_state.review.status, "repair-requested");
+  });
+});
+
+test("resolveNextAction returns one safe primary action for quality repair request states", () => {
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.quality.review-requested");
+    writeReviewEvidence(init, "run.quality.review-requested");
+    writeQualityRepairRequest(init, "run.quality.review-requested", { sourceStage: "review", status: "requested" });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "blocked");
+    assert.equal(report.project_state.stage, "repair");
+    assert.equal(report.primary_action.action_id, "run-review-quality-repair");
+    assert.equal(report.blockers[0].code, "review-repair-requested");
+    assert.equal(report.closure_state.quality_repair.flow_state, "review-repair-requested");
+    assert.equal(report.closure_state.delivery.status, "blocked-quality-repair");
+    assert.equal(report.quality_repair_lineage.request_ref, report.closure_state.quality_repair.request_ref);
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.quality.qa-requested");
+    writeReviewEvidence(init, "run.quality.qa-requested");
+    writeQualityRepairRequest(init, "run.quality.qa-requested", { sourceStage: "qa", status: "requested" });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "blocked");
+    assert.equal(report.primary_action.action_id, "run-qa-quality-repair");
+    assert.equal(report.blockers[0].code, "qa-repair-requested");
+    assert.equal(report.closure_state.quality_repair.flow_state, "qa-repair-requested");
+    assert.match(report.primary_action.command, /--target-step implement/u);
+    assert.match(report.primary_action.reason, /review and QA/u);
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.quality.review-required");
+    writeReviewEvidence(init, "run.quality.review-required");
+    writeQualityRepairRequest(init, "run.quality.review-required", { status: "review-required" });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "ready");
+    assert.equal(report.project_state.stage, "review");
+    assert.equal(report.primary_action.action_id, "review-quality-repair");
+    assert.match(report.primary_action.command, /aor review run/u);
+    assert.equal(report.closure_state.quality_repair.flow_state, "review-required");
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.quality.qa-required");
+    writeReviewEvidence(init, "run.quality.qa-required");
+    writeQualityRepairRequest(init, "run.quality.qa-required", { sourceStage: "qa", status: "qa-required" });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "ready");
+    assert.equal(report.project_state.stage, "qa");
+    assert.equal(report.primary_action.action_id, "qa-quality-repair");
+    assert.match(report.primary_action.command, /--target-step qa/u);
+    assert.equal(report.closure_state.quality_repair.flow_state, "qa-required");
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.quality.exhausted");
+    writeReviewEvidence(init, "run.quality.exhausted");
+    writeQualityRepairRequest(init, "run.quality.exhausted", {
+      status: "budget-exhausted",
+      maxAttempts: 1,
+      attemptIndex: 1,
+      remainingAttempts: 0,
+    });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "blocked");
+    assert.equal(report.primary_action.action_id, "hold-exhausted-quality-repair");
+    assert.equal(report.blockers[0].code, "repair-cycle-exhausted");
+    assert.equal(report.primary_action.command.includes("run start"), false);
+    assert.equal(report.closure_state.quality_repair.flow_state, "repair-cycle-exhausted");
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.quality.closed");
+    writeReviewEvidence(init, "run.quality.closed");
+    writeReviewDecision(init, "run.quality.closed", "approve");
+    writeQualityRepairRequest(init, "run.quality.closed", { status: "closed" });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "ready");
+    assert.equal(report.project_state.stage, "delivery");
+    assert.equal(report.primary_action.action_id, "delivery-prepare");
+    assert.equal(report.closure_state.quality_repair.flow_state, "delivery-ready");
+    assert.equal(report.closure_state.delivery.status, "ready-to-prepare");
   });
 });
 

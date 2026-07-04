@@ -9,4 +9,11 @@ export {
 } from "./learning-loop.mjs";
 export { buildPlannerMetricsSnapshot, PLANNER_METRIC_NAMES } from "./planner-metrics.mjs";
 export { normalizeRedactionPolicy, parseRedactionSecretList, redactSensitiveValue } from "./redaction.mjs";
+export {
+  buildQualityRepairLineage,
+  closeQualityRepairRequest,
+  listQualityRepairRequests,
+  materializeQualityRepairRequest,
+  updateQualityRepairRequest,
+} from "./quality-repair-request.mjs";
 export { listReviewDecisions, materializeReviewDecision } from "./review-decision.mjs";

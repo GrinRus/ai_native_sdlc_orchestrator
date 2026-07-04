@@ -7,6 +7,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
 const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 const DEFAULT_RUNTIME_ROOT = ".aor";
+const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
 
 /**
  * @param {unknown} value
@@ -205,6 +206,8 @@ function findLatestRunEvidence(init, options = {}) {
           ? 90
           : /^review-decision-.*\.json$/u.test(basename)
             ? 65
+            : /^quality-repair-request-.*\.json$/u.test(basename)
+              ? 63
             : /^review-report.*\.json$/u.test(basename) || /^runtime-harness-report.*\.json$/u.test(basename)
               ? 60
               : /^step-result-.*\.json$/u.test(basename)
@@ -274,6 +277,87 @@ function isDeliveryReadyStatus(status) {
 }
 
 /**
+ * @param {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null} entry
+ * @param {boolean} approved
+ * @returns {Record<string, unknown>}
+ */
+function buildQualityRepairState(entry, approved) {
+  if (!entry) {
+    return {
+      status: "not-started",
+      flow_state: null,
+      request_ref: null,
+      request_id: null,
+      cycle_id: null,
+      source_stage: null,
+      attempt_index: null,
+      max_attempts: null,
+      remaining_attempts: null,
+      blockers: [],
+      evidence_refs: [],
+      operator_override_ref: null,
+      blocks_downstream: false,
+      lineage: null,
+    };
+  }
+
+  const document = entry.document;
+  const status = asString(document.status) ?? "requested";
+  const sourceStage = asString(document.source_stage) === "qa" ? "qa" : "review";
+  const attemptBudget = asRecord(document.attempt_budget);
+  const operatorOverrideRef = asString(document.operator_override_ref);
+  const blockers = asStringArray(document.blockers);
+  const blocksDownstream =
+    status !== "closed" &&
+    !(status === "budget-exhausted" && operatorOverrideRef);
+  const flowState = status === "closed"
+    ? approved
+      ? "delivery-ready"
+      : "review-required"
+    : status === "budget-exhausted"
+      ? blocksDownstream
+        ? "repair-cycle-exhausted"
+        : "delivery-ready"
+      : status === "in-progress"
+        ? "repair-running"
+        : status === "review-required"
+          ? "review-required"
+          : status === "qa-required"
+            ? "qa-required"
+            : sourceStage === "qa"
+              ? "qa-repair-requested"
+              : "review-repair-requested";
+  const evidenceRefs = uniqueStrings([entry.artifact_ref, ...asStringArray(document.evidence_refs)]);
+  const lineage = {
+    request_ref: entry.artifact_ref,
+    cycle_id: asString(document.cycle_id) ?? "quality-cycle.unknown",
+    source_stage: sourceStage,
+    status,
+    attempt_index: typeof attemptBudget.attempt_index === "number" ? attemptBudget.attempt_index : 1,
+    evidence_refs: evidenceRefs,
+  };
+
+  return {
+    status,
+    flow_state: flowState,
+    request_ref: entry.artifact_ref,
+    request_id: asString(document.request_id),
+    cycle_id: asString(document.cycle_id),
+    source_stage: sourceStage,
+    source_ref: asString(document.source_ref),
+    finding_refs: asStringArray(document.finding_refs),
+    attempt_index: typeof attemptBudget.attempt_index === "number" ? attemptBudget.attempt_index : null,
+    max_attempts: typeof attemptBudget.max_attempts === "number" ? attemptBudget.max_attempts : null,
+    remaining_attempts: typeof attemptBudget.remaining_attempts === "number" ? attemptBudget.remaining_attempts : null,
+    blockers,
+    evidence_refs: evidenceRefs,
+    operator_override_ref: operatorOverrideRef,
+    blocks_downstream: blocksDownstream,
+    lineage,
+  };
+}
+
+/**
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string | null,
@@ -313,6 +397,7 @@ function buildClosureState(options) {
         handoff_ref: null,
         linked_evidence_refs: [],
       },
+      quality_repair: buildQualityRepairState(null, false),
       evidence_chain: emptyEvidence,
     };
   }
@@ -336,6 +421,13 @@ function buildClosureState(options) {
     runId,
     "review-decision",
     /^review-decision-.*\.json$/u,
+    "reports",
+  );
+  const qualityRepairRequest = findLatestRunDocument(
+    options.init,
+    runId,
+    "quality-repair-request",
+    QUALITY_REPAIR_REQUEST_REGEX,
     "reports",
   );
   const deliveryPlan = findLatestRunDocument(
@@ -382,6 +474,7 @@ function buildClosureState(options) {
     decision === "approve" &&
     deliveryGateStatus === "pass" &&
     blocksDownstream !== true;
+  const qualityRepair = buildQualityRepairState(qualityRepairRequest, approved);
   const reviewStatus = !reviewReport && !runtimeHarnessReport
     ? "missing"
     : !reviewDecision
@@ -398,8 +491,18 @@ function buildClosureState(options) {
   const deliveryPlanBlockers = asStringArray(deliveryPlan?.document.blocking_reasons);
   const releaseRisks = asStringArray(releasePacket?.document.residual_risks);
   const reviewRequiredReason = approved ? [] : ["approved-review-decision-required"];
-  const deliveryBlockedReasons = uniqueStrings([...reviewRequiredReason, ...deliveryPlanBlockers, ...releaseRisks]);
-  const deliveryStatus = !approved
+  const qualityRepairBlockers = qualityRepair.blocks_downstream === true
+    ? asStringArray(qualityRepair.blockers)
+    : [];
+  const deliveryBlockedReasons = uniqueStrings([
+    ...reviewRequiredReason,
+    ...qualityRepairBlockers,
+    ...deliveryPlanBlockers,
+    ...releaseRisks,
+  ]);
+  const deliveryStatus = qualityRepair.blocks_downstream === true
+    ? "blocked-quality-repair"
+    : !approved
     ? "blocked-review-required"
     : deliveryPlanStatus === "blocked" || releasePacketStatus === "blocked" || deliveryPlanBlockers.length > 0 || releaseRisks.length > 0
       ? "blocked"
@@ -428,6 +531,7 @@ function buildClosureState(options) {
     reviewReport?.artifact_ref,
     runtimeHarnessReport?.artifact_ref,
     reviewDecision?.artifact_ref,
+    qualityRepairRequest?.artifact_ref,
     deliveryPlan?.artifact_ref,
     deliveryManifest?.artifact_ref,
     releasePacket?.artifact_ref,
@@ -436,6 +540,7 @@ function buildClosureState(options) {
     ...collectDocumentEvidenceRefs(reviewReport?.document ?? {}),
     ...collectDocumentEvidenceRefs(runtimeHarnessReport?.document ?? {}),
     ...collectDocumentEvidenceRefs(reviewDecision?.document ?? {}),
+    ...collectDocumentEvidenceRefs(qualityRepairRequest?.document ?? {}),
     ...collectDocumentEvidenceRefs(deliveryPlan?.document ?? {}),
     ...collectDocumentEvidenceRefs(deliveryManifest?.document ?? {}),
     ...collectDocumentEvidenceRefs(releasePacket?.document ?? {}),
@@ -480,7 +585,130 @@ function buildClosureState(options) {
         ...asStringArray(learningHandoff?.document.evidence_refs),
       ]),
     },
+    quality_repair: qualityRepair,
     evidence_chain: evidenceChain,
+  };
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   runId: string,
+ *   qualityRepair: Record<string, unknown>,
+ *   evidenceRefs: string[],
+ * }} options
+ */
+function resolveQualityRepairAction(options) {
+  const flowState = asString(options.qualityRepair.flow_state);
+  const requestRef = asString(options.qualityRepair.request_ref);
+  const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.qualityRepair.evidence_refs)]);
+  const repairRunId = `${options.runId}.repair`;
+  const implementCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(repairRunId)} --target-step implement`;
+  const reviewCommand = `${projectCommand("review run", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
+  const qaCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${repairRunId}.qa`)} --target-step qa`;
+  const statusCommand = `${projectCommand("run status", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
+  const holdCommand = `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision hold`;
+
+  if (flowState === "repair-running") {
+    return {
+      status: "blocked",
+      stage: "repair",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "repair-running",
+          summary: "A quality repair request is already in progress; wait for repair evidence before review or QA.",
+          evidenceRefs,
+          nextCommand: statusCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "inspect-quality-repair",
+        command: statusCommand,
+        reason: "Repair implementation is already in progress.",
+        low_level_command: "run status",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (flowState === "review-required") {
+    return {
+      status: "ready",
+      stage: "review",
+      blockers: [],
+      primaryAction: {
+        action_id: "review-quality-repair",
+        command: reviewCommand,
+        reason: "A repair attempt completed; rerun review before QA or delivery.",
+        low_level_command: "review run",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (flowState === "qa-required") {
+    return {
+      status: "ready",
+      stage: "qa",
+      blockers: [],
+      primaryAction: {
+        action_id: "qa-quality-repair",
+        command: qaCommand,
+        reason: "Post-repair review passed; run QA before delivery can continue.",
+        low_level_command: "run start",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (flowState === "repair-cycle-exhausted") {
+    return {
+      status: "blocked",
+      stage: "review",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "repair-cycle-exhausted",
+          summary: "The quality repair budget is exhausted; delivery and release require an explicit operator decision.",
+          evidenceRefs,
+          nextCommand: holdCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "hold-exhausted-quality-repair",
+        command: holdCommand,
+        reason: "Repair budget exhaustion is an operator-visible hold, not another automatic repair run.",
+        low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  const qaOrigin = flowState === "qa-repair-requested";
+  return {
+    status: "blocked",
+    stage: "repair",
+    blockers: [
+      createBlocker({
+        projectRoot: options.projectRoot,
+        code: qaOrigin ? "qa-repair-requested" : "review-repair-requested",
+        summary: qaOrigin
+          ? "QA requested repair; delivery and release must wait for repair implementation, review, and QA closure."
+          : "Review requested repair; delivery and release must wait for repaired execution and refreshed review evidence.",
+        evidenceRefs,
+        nextCommand: implementCommand,
+      }),
+    ],
+    primaryAction: {
+      action_id: qaOrigin ? "run-qa-quality-repair" : "run-review-quality-repair",
+      command: implementCommand,
+      reason: qaOrigin
+        ? "QA-origin repair must start with implementation, then return through review and QA."
+        : "Review-origin repair must start with implementation, then return through review.",
+      low_level_command: "run start",
+      evidence_refs: uniqueStrings([...evidenceRefs, requestRef]),
+    },
   };
 }
 
@@ -498,10 +726,21 @@ function resolveClosureAction(options) {
   const review = asRecord(options.closureState.review);
   const delivery = asRecord(options.closureState.delivery);
   const learning = asRecord(options.closureState.learning);
+  const qualityRepair = asRecord(options.closureState.quality_repair);
   const reviewStatus = asString(review.status);
   const deliveryStatus = asString(delivery.status);
   const learningStatus = asString(learning.status);
+  const qualityRepairFlowState = asString(qualityRepair.flow_state);
   const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.closureState.evidence_chain)]);
+
+  if (qualityRepairFlowState && qualityRepairFlowState !== "delivery-ready") {
+    return resolveQualityRepairAction({
+      projectRoot: options.projectRoot,
+      runId: options.runId,
+      qualityRepair,
+      evidenceRefs,
+    });
+  }
 
   if (reviewStatus === "missing") {
     return {
@@ -1600,6 +1839,7 @@ export function resolveNextAction(options = {}) {
 
   primaryAction = withRuntimeRootActionCommand(primaryAction, init.runtimeRoot, includeRuntimeRoot);
   blockers = withRuntimeRootBlockerCommands(blockers, init.runtimeRoot, includeRuntimeRoot);
+  const qualityRepairLineage = asRecord(asRecord(closureState.quality_repair).lineage);
 
   const report = {
     report_id: `${init.projectId}.next-action.v1`,
@@ -1630,6 +1870,7 @@ export function resolveNextAction(options = {}) {
       forbidden_paths: missionState.forbidden_paths,
       requires_review_before_writeback: missionState.delivery_mode !== "no-write",
     },
+    ...(Object.keys(qualityRepairLineage).length > 0 ? { quality_repair_lineage: qualityRepairLineage } : {}),
     evidence_refs: Array.from(new Set([...evidenceRefs, ...primaryAction.evidence_refs])),
     status,
     created_at: new Date().toISOString(),

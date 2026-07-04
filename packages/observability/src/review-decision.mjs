@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { materializeQualityRepairRequest } from "./quality-repair-request.mjs";
 
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
 const REVIEW_DECISIONS = new Set(["approve", "hold", "request-repair"]);
@@ -267,6 +268,86 @@ function normalizeRepairContext(options) {
 }
 
 /**
+ * @param {Record<string, unknown>} repairContext
+ * @returns {string}
+ */
+function normalizeRepairSourceStage(repairContext) {
+  return asString(repairContext.source_phase) === "qa" ? "qa" : "review";
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} findingDetails
+ * @returns {string[]}
+ */
+function findingRefsFromDetails(findingDetails) {
+  return uniqueStrings(
+    findingDetails.flatMap((finding) => [
+      asString(finding.finding_id),
+      ...asStringArray(finding.evidence_refs),
+    ]),
+  );
+}
+
+/**
+ * @param {{
+ *   projectId: string,
+ *   projectRoot: string,
+ *   runId: string,
+ *   reviewReportRef: string,
+ *   runtimeHarnessReportRef: string,
+ *   repairContext: Record<string, unknown>,
+ *   evidenceRefs: string[],
+ *   generatedAt: string,
+ * }}
+ */
+function buildQualityRepairRequestOptions(options) {
+  const sourceStage = normalizeRepairSourceStage(options.repairContext);
+  const findingDetails = asRecordArray(options.repairContext.unresolved_finding_details);
+  const findingRefs = uniqueStrings([
+    ...asStringArray(options.repairContext.unresolved_findings),
+    ...findingRefsFromDetails(findingDetails),
+  ]);
+  const verificationRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.repairContext.verification_refs));
+  const attemptIndex =
+    typeof options.repairContext.cycle_iteration === "number" && Number.isInteger(options.repairContext.cycle_iteration)
+      ? Math.max(options.repairContext.cycle_iteration, 1)
+      : 1;
+  const maxAttempts =
+    typeof options.repairContext.max_attempts === "number" && Number.isInteger(options.repairContext.max_attempts)
+      ? Math.max(options.repairContext.max_attempts, attemptIndex)
+      : attemptIndex;
+
+  return {
+    projectId: options.projectId,
+    projectRoot: options.projectRoot,
+    runId: options.runId,
+    sourceStage,
+    sourceRef: sourceStage === "qa" ? options.runtimeHarnessReportRef : options.reviewReportRef,
+    findingRefs,
+    repairScope: {
+      target_step: "implement",
+      requested_next_step: asString(options.repairContext.requested_next_step) ?? "execution",
+      allowed_paths: asStringArray(options.repairContext.meaningful_changed_paths),
+      verification_refs: verificationRefs,
+      required_evidence_refs: uniqueStrings([
+        options.reviewReportRef,
+        options.runtimeHarnessReportRef,
+        ...verificationRefs,
+      ]),
+      reason: asString(options.repairContext.stop_reason) ?? "Resolve the linked repair findings before delivery.",
+    },
+    attemptBudget: {
+      policy_ref: `project-profile://${options.projectId}#quality_repair_policy`,
+      max_attempts: maxAttempts,
+      attempt_index: attemptIndex,
+      remaining_attempts: Math.max(maxAttempts - attemptIndex, 0),
+    },
+    evidenceRefs: options.evidenceRefs,
+    createdAt: options.generatedAt,
+  };
+}
+
+/**
  * @param {{
  *   projectId: string,
  *   projectRoot: string,
@@ -341,6 +422,23 @@ export function materializeReviewDecision(options) {
     ]),
     fallbackVerificationRefs: evidenceRefs,
   });
+  const qualityRepairResult = options.decision === "request-repair"
+    ? materializeQualityRepairRequest({
+        ...buildQualityRepairRequestOptions({
+          projectId: options.projectId,
+          projectRoot: options.projectRoot,
+          runId: options.runId,
+          reviewReportRef,
+          runtimeHarnessReportRef,
+          repairContext,
+          evidenceRefs,
+          generatedAt,
+        }),
+        runtimeLayout: options.runtimeLayout,
+      })
+    : null;
+  const qualityRepairRef = qualityRepairResult?.requestRef ?? null;
+  const qualityRepairLineage = qualityRepairResult?.lineage ?? null;
   const decisionId = `${options.runId}.review-decision.${options.decision}.${generatedAt.replace(/[:.]/g, "-")}`;
   const document = {
     decision_id: decisionId,
@@ -370,7 +468,9 @@ export function materializeReviewDecision(options) {
       required_downstream_decision: "approve",
       findings: gate.findings,
     },
-    evidence_refs: evidenceRefs,
+    ...(qualityRepairRef ? { quality_repair_request_ref: qualityRepairRef } : {}),
+    ...(qualityRepairLineage ? { quality_repair_lineage: qualityRepairLineage } : {}),
+    evidence_refs: uniqueStrings([...evidenceRefs, qualityRepairRef]),
     decided_at: generatedAt,
   };
 
@@ -394,6 +494,13 @@ export function materializeReviewDecision(options) {
     decision: document,
     decisionFile,
     decisionRef: toEvidenceRef(options.projectRoot, decisionFile),
+    ...(qualityRepairResult
+      ? {
+          qualityRepairRequest: qualityRepairResult.request,
+          qualityRepairRequestFile: qualityRepairResult.requestFile,
+          qualityRepairRequestRef: qualityRepairResult.requestRef,
+        }
+      : {}),
   };
 }
 
