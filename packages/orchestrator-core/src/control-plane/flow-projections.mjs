@@ -235,6 +235,18 @@ function nextActionMatchesFlow(document, flowSeed) {
 }
 
 /**
+ * @param {Record<string, unknown>} document
+ * @param {{ missionKey: string, packetRef: string, bodyRef: string | null }} flowSeed
+ * @returns {boolean}
+ */
+function nextActionReportSelectableForFlow(document, flowSeed) {
+  if (nextActionMatchesFlow(document, flowSeed)) return true;
+  const closureState = asRecord(document.closure_state);
+  const runId = asString(closureState.run_id);
+  return Boolean(runId && normalizeForId(runId).includes(normalizeForId(flowSeed.missionKey)));
+}
+
+/**
  * @param {Record<string, unknown> | null} report
  * @param {{ missionKey: string }} flowSeed
  * @returns {boolean}
@@ -431,6 +443,65 @@ function buildClosureProjection(options) {
 
 /**
  * @param {{
+ *   report: Record<string, unknown> | null,
+ *   artifactSummaryByRef: Map<string, Record<string, unknown>>,
+ *   selectedStage: string,
+ * }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function buildActiveQualityGateProjection(options) {
+  const closureState = asRecord(options.report?.closure_state);
+  const qualityRepair = asRecord(closureState.quality_repair);
+  const flowState = asString(qualityRepair.flow_state);
+  const requestRef = asString(qualityRepair.request_ref);
+  if (!flowState || flowState === "delivery-ready" || !requestRef) return null;
+
+  const attemptBudget = {
+    attempt_index: typeof qualityRepair.attempt_index === "number" ? qualityRepair.attempt_index : null,
+    max_attempts: typeof qualityRepair.max_attempts === "number" ? qualityRepair.max_attempts : null,
+    remaining_attempts: typeof qualityRepair.remaining_attempts === "number" ? qualityRepair.remaining_attempts : null,
+  };
+  const primaryAction = asRecord(options.report?.primary_action);
+  const projectState = asRecord(options.report?.project_state);
+  const delivery = asRecord(closureState.delivery);
+  const evidenceRefs = uniqueStrings([
+    requestRef,
+    asString(qualityRepair.source_ref),
+    ...asStringArray(qualityRepair.evidence_refs),
+  ]);
+  const blockers = uniqueStrings([
+    ...asStringArray(qualityRepair.blockers),
+    ...asStringArray(delivery.blocked_reasons),
+  ]);
+
+  return {
+    gate_type: "quality-repair",
+    request_ref: requestRef,
+    request_id: asString(qualityRepair.request_id),
+    cycle_id: asString(qualityRepair.cycle_id),
+    source_stage: asString(qualityRepair.source_stage),
+    status: asString(qualityRepair.status),
+    flow_state: flowState,
+    attempt_budget: attemptBudget,
+    blockers,
+    finding_refs: asStringArray(qualityRepair.finding_refs),
+    evidence_refs: evidenceRefs,
+    evidence_summaries: artifactDisplaySummariesForRefs(evidenceRefs, options.artifactSummaryByRef, options.selectedStage),
+    next_action: {
+      status: asString(options.report?.status),
+      stage: asString(projectState.stage),
+      action_id: asString(primaryAction.action_id),
+      command: asString(primaryAction.command),
+      low_level_command: asString(primaryAction.low_level_command),
+      reason: asString(primaryAction.reason),
+    },
+    delivery_release_blocked: qualityRepair.blocks_downstream === true || asString(delivery.status) === "blocked-quality-repair",
+    operator_hold: flowState === "repair-cycle-exhausted",
+  };
+}
+
+/**
+ * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   seed: ReturnType<typeof loadIntakeFlowSeeds>[number],
  *   reportEntry: ReturnType<typeof loadNextActionReports>[number] | null,
@@ -471,6 +542,7 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
     writeback_policy: resolveWritebackPolicy(seed.body, report),
     mission_settings: buildMissionSettingsProjection(seed.body),
     closure_state: buildClosureProjection({ report, status, followUpSourceHandoffRef }),
+    active_quality_gate: buildActiveQualityGateProjection({ report, artifactSummaryByRef, selectedStage }),
     completed_read_only: status === "completed",
     follow_up_source_handoff_ref: followUpSourceHandoffRef,
     updated_at_ref: reportEntry?.artifactRef ?? seed.packetRef,
@@ -487,12 +559,12 @@ export function listFlowProjections(options = {}) {
   const latestReport = reports[0] ?? null;
   const artifactSummaryByRef = buildArtifactDisplaySummaryMap(options);
   const flows = seeds.map((seed) => {
-    const reportEntry = reports.find((entry) => nextActionMatchesFlow(entry.document, seed)) ?? null;
+    const reportEntry = reports.find((entry) => nextActionReportSelectableForFlow(entry.document, seed)) ?? null;
     return {
       flow: buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }),
       seedUpdatedMs: seed.updatedMs,
       reportUpdatedMs: reportEntry?.updatedMs ?? 0,
-      selectedByLatestReport: latestReport ? nextActionMatchesFlow(latestReport.document, seed) : false,
+      selectedByLatestReport: latestReport ? nextActionReportSelectableForFlow(latestReport.document, seed) : false,
     };
   });
 

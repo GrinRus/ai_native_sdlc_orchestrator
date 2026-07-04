@@ -76,6 +76,15 @@ flow, or start `New Flow` through lifecycle-command mutations. They must not
 mutate completed flow evidence, infer a selected flow from local storage, or
 create a follow-up without durable mission/intake and next-action evidence.
 
+When a W45 `quality-repair-request` is active, the flow projection exposes
+`active_quality_gate` for the local console. The cockpit renders the request
+ref, cycle id, source stage, request status, bounded attempt budget, blockers,
+evidence summaries, and the resolver's single primary action. Review-origin
+repair, QA-origin repair, and exhausted repair budgets are displayed as
+operator-visible quality gates; delivery and release actions remain hidden
+behind the gate until the request closes or an explicit exhausted-budget
+operator hold/override is recorded by the runtime.
+
 ## Interactive continuation
 When a runner asks a question, AOR treats it as a run continuation boundary:
 - the routed step persists `step-result.requested_interaction` with a query-safe summary and evidence refs;

@@ -176,6 +176,14 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "awaiting-decision",
     '"exit-0"',
     "Execution Evidence",
+    "Active Quality Gate",
+    "Budget Exhausted Hold",
+    "active_quality_gate",
+    "QualityGatePanel",
+    "qualityGateSourceLabel",
+    "qualityGateAttemptLabel",
+    "delivery_release_blocked",
+    "Next safe action",
     "executionEvidenceForFlow",
     "strongestExecutionEvidenceRun",
     "executionEvidenceScore",
@@ -213,6 +221,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
+  assert.ok(css.includes(".quality-gate-card"), "SPA CSS should define active quality gate layout");
+  assert.ok(css.includes(".quality-gate-card.operator-hold"), "SPA CSS should distinguish exhausted repair budgets");
   assert.ok(css.includes(".verification-plan-card"), "SPA CSS should define compact verification plan layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
   assert.equal(
