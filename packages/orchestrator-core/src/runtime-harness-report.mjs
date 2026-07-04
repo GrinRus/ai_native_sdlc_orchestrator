@@ -639,8 +639,9 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
   });
   const startedAt = asString(routedExecution.started_at);
   const finishedAt = asString(routedExecution.finished_at);
+  const qualityRepairLineage = asRecord(stepResult.quality_repair_lineage);
 
-  return {
+  const decision = {
     step_id: asString(stepResult.step_id) ?? "unknown",
     step_class: asString(stepResult.step_class) ?? "unknown",
     compiled_context_ref: asString(contextCompilation.compiled_context_ref),
@@ -669,6 +670,10 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
     },
     evidence_refs: uniqueStrings([artifactRef, ...asStringArray(stepResult.evidence_refs)]),
   };
+  if (Object.keys(qualityRepairLineage).length > 0) {
+    decision.quality_repair_lineage = cloneJson(qualityRepairLineage);
+  }
+  return decision;
 }
 
 /**
@@ -1205,6 +1210,9 @@ export function materializeRuntimeHarnessReport(options) {
     ...deliveryArtifacts.map((artifact) => artifact.artifact_ref),
     ...stepDecisions.flatMap((decision) => asStringArray(decision.evidence_refs)),
   ]);
+  const qualityRepairLineage = stepDecisions
+    .map((decision) => asRecord(decision.quality_repair_lineage))
+    .find((lineage) => Object.keys(lineage).length > 0);
 
   const report = {
     report_id: `${options.runId}.runtime-harness-report.v1`,
@@ -1224,6 +1232,9 @@ export function materializeRuntimeHarnessReport(options) {
     unresolved_gaps: unresolvedGaps,
     evidence_refs: evidenceRefs,
   };
+  if (qualityRepairLineage) {
+    report.quality_repair_lineage = cloneJson(qualityRepairLineage);
+  }
   if (Object.keys(activeRunController).length > 0) {
     report.run_controller = cloneJson(activeRunController);
   }

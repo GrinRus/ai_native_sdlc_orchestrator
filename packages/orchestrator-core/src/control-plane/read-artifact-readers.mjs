@@ -24,6 +24,7 @@ const VERIFY_SUMMARY_REGEX = /^verify-summary(?:-.+)?\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
+const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/;
 const RUNTIME_HARNESS_REPORT_REGEX = /^runtime-harness-report.*\.json$/;
 const MULTIREPO_COORDINATION_STATUS_REGEX = /^multirepo-coordination-status-.*\.json$/;
 const COMPILER_REVISION_STATUS_REGEX = /^compiler-revision-status-.*\.json$/;
@@ -686,6 +687,7 @@ export function listQualityArtifacts(options = {}) {
       EVALUATION_REPORT_REGEX,
       REVIEW_REPORT_REGEX,
       REVIEW_DECISION_REGEX,
+      QUALITY_REPAIR_REQUEST_REGEX,
       RUNTIME_HARNESS_REPORT_REGEX,
       MULTIREPO_COORDINATION_STATUS_REGEX,
       COMPILER_REVISION_STATUS_REGEX,
@@ -702,6 +704,12 @@ export function listQualityArtifacts(options = {}) {
     ...loadContractDocuments({ init, files: reportFiles, family: "evaluation-report", matcher: EVALUATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "review-report", matcher: REVIEW_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "review-decision", matcher: REVIEW_DECISION_REGEX }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "quality-repair-request",
+      matcher: QUALITY_REPAIR_REQUEST_REGEX,
+    }),
     ...loadContractDocuments({
       init,
       files: reportFiles,

@@ -293,6 +293,18 @@ test("materializeRuntimeHarnessReport aggregates routed step decisions for one r
       runId,
       stepId: "run.start.implement",
     });
+    const stepResult = JSON.parse(fs.readFileSync(step.stepResultPath, "utf8"));
+    stepResult.quality_repair_lineage = {
+      request_ref: "evidence://.aor/projects/aor-core/reports/quality-repair-request-runtime-harness-smoke.json",
+      cycle_id: "runtime-harness-smoke.quality-cycle.review.v1",
+      source_stage: "review",
+      status: "review-required",
+      attempt_index: 1,
+      evidence_refs: [
+        "evidence://.aor/projects/aor-core/reports/quality-repair-request-runtime-harness-smoke.json",
+      ],
+    };
+    fs.writeFileSync(step.stepResultPath, `${JSON.stringify(stepResult, null, 2)}\n`, "utf8");
 
     const report = materializeRuntimeHarnessReport({
       projectRef: repoRoot,
@@ -306,6 +318,8 @@ test("materializeRuntimeHarnessReport aggregates routed step decisions for one r
     assert.equal(report.report.step_decisions.length, 1);
     assert.equal(report.report.step_decisions[0].compiled_context_ref, step.stepResult.routed_execution.context_compilation.compiled_context_ref);
     assert.equal(report.report.step_decisions[0].runtime_harness_decision, "pass");
+    assert.equal(report.report.step_decisions[0].quality_repair_lineage.request_ref, stepResult.quality_repair_lineage.request_ref);
+    assert.equal(report.report.quality_repair_lineage.request_ref, stepResult.quality_repair_lineage.request_ref);
   });
 });
 

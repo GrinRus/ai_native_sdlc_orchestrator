@@ -1162,6 +1162,7 @@ console.log("api tests ok: control-plane read surface smoke endpoints");
 
 const observabilityTests = [
   path.join(root, "packages/observability/test/redaction.test.mjs"),
+  path.join(root, "packages/observability/test/quality-repair-request.test.mjs"),
 ];
 const observabilityTestRun = spawnSync(process.execPath, ["--test", ...observabilityTests], {
   cwd: root,
@@ -1172,7 +1173,7 @@ if (observabilityTestRun.status !== 0) {
   process.exit(observabilityTestRun.status ?? 1);
 }
 
-console.log("observability tests ok: redaction and secret-safe payload helpers");
+console.log("observability tests ok: redaction, secret-safe payload helpers, and quality repair requests");
 
 const webTests = [
   path.join(root, "apps/web/test/operator-console.test.mjs"),

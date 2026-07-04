@@ -96,10 +96,18 @@ It contains:
 - `review` with `status`, review report ref, Runtime Harness report ref, review decision ref, current decision, delivery gate status, downstream block flag, and required evidence refs.
 - `delivery` with `status`, delivery-plan ref, delivery-manifest ref, release-packet ref, release-packet status, write-back result, blocked reasons, and `requires_review_decision=true`.
 - `learning` with `status`, scorecard ref, handoff ref, and linked evidence refs.
+- `quality_repair` with active request ref, cycle id, source stage, status,
+  attempt index/budget, blockers, evidence refs, operator override ref, a
+  `blocks_downstream` flag, and the derived `flow_state`.
 - `evidence_chain`, the combined review, quality, delivery, release, and learning refs that CLI/API/web surfaces must show consistently.
 
 Review statuses are `not-started`, `missing`, `decision-required`, `approved`, `held`, `repair-requested`, or `blocked`.
-Delivery statuses are `waiting-for-review`, `blocked-review-required`, `ready-to-prepare`, `delivery-plan-pending`, `delivery-plan-ready`, `delivery-prepared`, `blocked`, or `release-ready`.
+Quality repair flow states are `review-repair-requested`,
+`qa-repair-requested`, `repair-running`, `review-required`, `qa-required`,
+`repair-cycle-exhausted`, or `delivery-ready`.
+Delivery statuses are `waiting-for-review`, `blocked-review-required`,
+`blocked-quality-repair`, `ready-to-prepare`, `delivery-plan-pending`,
+`delivery-plan-ready`, `delivery-prepared`, `blocked`, or `release-ready`.
 Learning statuses are `waiting-for-release`, `ready-for-handoff`, or `handoff-complete`.
 
 Risky delivery and release recommendations must use `--require-review-decision` and must not be selected while `review.status` is anything other than `approved`.
