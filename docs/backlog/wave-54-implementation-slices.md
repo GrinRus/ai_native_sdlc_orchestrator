@@ -1,19 +1,16 @@
 # W54 implementation slices
 
 W54 turns W53's generic verification execution model into an authoring,
-discovery, and operator-facing workflow for arbitrary project stacks. The wave
-is intentionally planned as a follow-up lane, not the current selected slice:
-W44 still needs an explicit disposition before this lane starts.
+discovery, and operator-facing workflow for arbitrary project stacks. After the
+W44 disposition, this is the selected implementation lane; W44/W45 remain valid
+deferred backlog tracks and are not prerequisites for W54.
 
 ## W54-S01 — Verification group authoring contract
 
 - **Outcome:** Extend the generic command-group contract so it can describe real
   multi-root and multi-stack projects without private proof-harness semantics.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** blocked
-- **External blocker:** Pending W44 disposition: decide whether W44 remains the
-  selected unblocker, is superseded, or is split before starting the W54
-  implementation lane.
+- **State:** ready
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`, examples
 - **Hard dependencies:** W53-S05
 
