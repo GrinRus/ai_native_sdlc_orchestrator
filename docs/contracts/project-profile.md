@@ -89,6 +89,23 @@ human-readable `reason` to allow bounded spec drafting from incomplete research.
 That soft decision must remain visible in `next-action-report.artifact_readiness`
 and does not make stale evidence current.
 
+`quality_repair_policy` is optional. When omitted, W45 repair-cycle behavior
+must resolve its attempt limits and downstream gate behavior from the selected
+runtime policy rather than hardcoding a default in reports. New profiles may
+declare:
+- `policy_ref`, a stable profile-local policy reference;
+- `max_attempts_per_cycle`, copied into
+  `quality-repair-request.attempt_budget.max_attempts`;
+- `requires_review_after_repair`, which should be `true` for public repair
+  loops;
+- `requires_qa_after_passing_review`, which applies when QA is in scope;
+- `budget_exhausted_requires_operator_approval`, which blocks delivery/release
+  until explicit approval exists;
+- `blocks_delivery_while_open`, which blocks delivery/release while a required
+  request is not `closed`;
+- `qa_in_scope_stages[]`, the stages whose repair closure must return through
+  QA after a passing review.
+
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 

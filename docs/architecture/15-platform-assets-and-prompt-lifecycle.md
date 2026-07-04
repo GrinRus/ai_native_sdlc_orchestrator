@@ -160,3 +160,10 @@ That rule tells the runtime to treat `packet://operator-request@...` as
 durable bounded operator intent, validate target refs and delivery mode, and
 produce proposal/patch evidence without silent source mutation for v1
 document-edit flows.
+
+Quality repair requests follow the same compiler path. A repair implementation
+step cites `packet://quality-repair-request@...` in compiled context packet
+refs, and the repair prompt receives source finding refs, required evidence
+refs, and attempt budget as AOR-owned context. The compiler must keep this
+provider-agnostic; adapter-specific repair behavior belongs to adapter
+capabilities and evidence, not to the public request contract.

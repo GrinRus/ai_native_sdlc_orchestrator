@@ -5,6 +5,12 @@ Completed-run diagnosis artifact for the AOR Runtime Harness.
 
 The report records how AOR controlled the run, not the feature result by itself. It aggregates routed step decisions, failure classes, changed-path semantics, repair attempts, verification status, unresolved gaps, and follow-up recommendations. Feature quality remains owned by `review-report`, suite quality remains owned by `evaluation-report`, delivery lineage remains owned by delivery/release artifacts, learning closure remains owned by learning-loop artifacts, and platform asset lifecycle decisions remain owned by `promotion-decision`.
 
+When a W45 public repair cycle is active, the report may carry optional
+`quality_repair_lineage` with request ref, cycle id, source stage, status,
+attempt index, and evidence refs. This lineage points to the shared
+`quality-repair-request`; Runtime Harness `repair_attempts` remain internal
+controller evidence.
+
 ## Required fields
 - `report_id`
 - `project_id`
@@ -97,6 +103,11 @@ Each `step_decisions[]` entry should preserve:
 - `evidence_refs`
 
 `repair_attempts` is the durable Runtime Harness ledger for a non-pass decision. It should preserve the trigger, failure class, selected policy action, input evidence refs, route/compiled-context refs when a repair route is executed, budget match/exhaustion metadata, and the attempt result. If a step has not yet executed repair, the ledger may contain a pending attempt with `result=not_started`. When repair executes, the repair step's compiled context should receive a generated repair input evidence ref containing previous findings, failed transcripts/evidence, diff status, adapter evidence, validator findings, and the current report ref. Exhausted budgets should be machine-readable through `result=exhausted` and `exhausted_budget=true`.
+
+Public quality repair requests are more restrictive than generic harness repair
+attempts: any repair attempt from review or QA must return to review before QA
+or delivery, and any required QA scope must pass after review before delivery
+can become ready.
 
 `runtime_permission_summary` and `runtime_permission_decisions[]` aggregate every run-linked permission decision, including earlier blocked attempts that were later retried successfully and therefore may not appear as the latest `step_decisions[]` entry. The summary records decision counts, selected permission modes, interaction policies, auto-approval profiles, approval scopes/resume modes, continuation strategies, audit refs, and run-scoped grant refs. Each decision entry must remain query-safe and include only sanitized operation/target/command metadata plus evidence refs; raw provider output stays in adapter evidence.
 

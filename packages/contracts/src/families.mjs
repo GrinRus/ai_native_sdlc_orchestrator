@@ -16,6 +16,15 @@ const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
 const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "rejected"];
 const REVIEW_DECISION_VALUES = ["approve", "hold", "request-repair"];
+const QUALITY_REPAIR_SOURCE_STAGE_VALUES = ["review", "qa"];
+const QUALITY_REPAIR_STATUS_VALUES = [
+  "requested",
+  "in-progress",
+  "review-required",
+  "qa-required",
+  "budget-exhausted",
+  "closed",
+];
 const PLANNER_METRICS_STATUS_VALUES = ["no-data", "partial", "ready"];
 const FINANCE_MONITORING_STATUS_VALUES = ["no-data", "partial", "ready"];
 const MULTIREPO_COORDINATION_STATUS_VALUES = ["ready", "blocked", "released"];
@@ -710,6 +719,47 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "decision", allowedValues: REVIEW_DECISION_VALUES }],
   },
   {
+    family: "quality-repair-request",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/quality-repair-request.md",
+    exampleGlob: "examples/reports/quality-repair-request*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "request_id",
+      "project_id",
+      "run_id",
+      "cycle_id",
+      "source_stage",
+      "source_ref",
+      "finding_refs",
+      "repair_scope",
+      "attempt_budget",
+      "status",
+      "blockers",
+      "evidence_refs",
+      "created_at",
+    ],
+    fieldTypes: {
+      request_id: "string",
+      project_id: "string",
+      run_id: "string",
+      cycle_id: "string",
+      source_stage: "string",
+      source_ref: "string",
+      finding_refs: "array",
+      repair_scope: "object",
+      attempt_budget: "object",
+      status: "string",
+      blockers: "array",
+      evidence_refs: "array",
+      created_at: "string",
+    },
+    enumChecks: [
+      { field: "source_stage", allowedValues: QUALITY_REPAIR_SOURCE_STAGE_VALUES },
+      { field: "status", allowedValues: QUALITY_REPAIR_STATUS_VALUES },
+    ],
+  },
+  {
     family: "runtime-harness-report",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/runtime-harness-report.md",
@@ -1398,6 +1448,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/reports\/step-result[^/]*\.ya?ml$/, family: "step-result" },
   { regex: /^examples\/reports\/validation-report[^/]*\.ya?ml$/, family: "validation-report" },
   { regex: /^examples\/reports\/review-report[^/]*\.ya?ml$/, family: "review-report" },
+  { regex: /^examples\/reports\/quality-repair-request[^/]*\.ya?ml$/, family: "quality-repair-request" },
   { regex: /^examples\/reports\/live-run-event[^/]*\.ya?ml$/, family: "live-run-event" },
   { regex: /^examples\/reports\/learning-loop-scorecard[^/]*\.ya?ml$/, family: "learning-loop-scorecard" },
   { regex: /^examples\/reports\/learning-loop-handoff[^/]*\.ya?ml$/, family: "learning-loop-handoff" },

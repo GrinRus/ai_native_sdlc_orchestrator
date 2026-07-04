@@ -34,7 +34,7 @@ and delivery/release blocking semantics.
 
 ## W45-S01 — Quality repair request contract and operating model
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Define the contract-first semantics for bounded review/QA repair
   cycles before runtime behavior depends on them.
 - **Primary modules:** `docs/contracts/**`, `docs/architecture/**`,
@@ -73,7 +73,7 @@ and delivery/release blocking semantics.
 
 ## W45-S02 — Cross-stage repair state machine and next-action resolver
 - **Epic:** EPIC-4 Quality platform; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make runtime and `next-action` resolve review/QA repair cycles
   through explicit bounded states.
 - **Primary modules:** `packages/orchestrator-core/**`,

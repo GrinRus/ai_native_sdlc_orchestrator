@@ -104,6 +104,18 @@ Learning statuses are `waiting-for-release`, `ready-for-handoff`, or `handoff-co
 
 Risky delivery and release recommendations must use `--require-review-decision` and must not be selected while `review.status` is anything other than `approved`.
 
+For W45 repair cycles, `next-action-report` may add optional
+`quality_repair_lineage` with the active request ref, cycle id, source stage,
+status, attempt index, and evidence refs. CLI/API/web surfaces use that lineage
+to show the active quality gate and attempt budget context while still returning
+one `primary_action`.
+
+The safe next action must not advance delivery or release while a required
+repair request is `requested`, `in-progress`, `review-required`, `qa-required`,
+or `budget-exhausted` without operator approval. After any repair attempt, the
+next action must return through review; when QA is in scope, a passing
+post-repair review must be followed by QA before delivery can become ready.
+
 ## Flow projection usage (W34-S01)
 
 Flow-centric UI and control-plane reads consume `next-action-report` as input

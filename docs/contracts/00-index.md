@@ -21,6 +21,7 @@
 - `evaluation-report.md`
 - `review-report.md`
 - `review-decision.md`
+- `quality-repair-request.md`
 - `runtime-harness-report.md`
 - `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`
