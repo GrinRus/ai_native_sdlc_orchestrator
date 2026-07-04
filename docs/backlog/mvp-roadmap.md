@@ -972,6 +972,9 @@ authoring contracts, stack discovery, generated project profiles, multi-root
 execution semantics, operator-visible plan surfaces, migration examples, real
 archetype smoke coverage, and expanded public/private boundary guards.
 
+**Current lane:** After W44 disposition, W54 is the selected implementation lane.
+W44/W45 remain valid deferred backlog tracks and are not W54 prerequisites.
+
 **Exit criteria:**
 - Command groups can describe working directories, dependencies, detection
   source refs, package managers, tool requirements, skip policy, and generic
