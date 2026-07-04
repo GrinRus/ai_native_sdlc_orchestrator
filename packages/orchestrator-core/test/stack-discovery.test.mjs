@@ -109,6 +109,29 @@ test("discovers monorepo package boundaries and package-level Node commands", ()
   });
 });
 
+test("normalizes hyphen-heavy working directory ids in linear time", () => {
+  withTempRepo((repoRoot) => {
+    const packageDir = `${"-".repeat(96)}api${"-".repeat(96)}`;
+    writeFile(
+      repoRoot,
+      `packages/${packageDir}/package.json`,
+      JSON.stringify({ name: "hyphen-fixture", scripts: { test: "node --test" } }, null, 2),
+    );
+
+    const discovery = discoverVerificationCommandGroups({ projectRoot: repoRoot });
+    const group = commandGroups(discovery).find(
+      (candidate) =>
+        candidate.working_dir === `packages/${packageDir}` &&
+        candidate.role === "test" &&
+        candidate.phase === "post-change",
+    );
+
+    assert.ok(group);
+    assert.equal(String(group.id).startsWith("post-change-test-packages-"), true);
+    assert.equal(String(group.id).endsWith("api"), true);
+  });
+});
+
 test("discovers Python pytest, tox, nox, lint, and typecheck signals", () => {
   withTempRepo((repoRoot) => {
     writeFile(

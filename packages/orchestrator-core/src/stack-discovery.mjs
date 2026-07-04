@@ -122,12 +122,82 @@ function toWorkingDir(projectRoot, dir) {
  * @param {string} value
  * @returns {string}
  */
+function trimHyphens(value) {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === "-") start += 1;
+  while (end > start && value[end - 1] === "-") end -= 1;
+  return value.slice(start, end);
+}
+
+/**
+ * @param {string} character
+ * @returns {boolean}
+ */
+function isIdCharacter(character) {
+  if (character.length !== 1) return false;
+  const code = character.charCodeAt(0);
+  return (
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    character === "." ||
+    character === "_" ||
+    character === "-"
+  );
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function collapseInvalidIdCharacters(value) {
+  let result = "";
+  let inReplacementRun = false;
+  for (const character of value) {
+    if (isIdCharacter(character)) {
+      result += character;
+      inReplacementRun = false;
+      continue;
+    }
+    if (!inReplacementRun) {
+      result += "-";
+      inReplacementRun = true;
+    }
+  }
+  return result;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function collapsePathSeparators(value) {
+  let result = "";
+  let inSeparatorRun = false;
+  for (const character of value) {
+    if (character === "." || character === "/") {
+      if (!inSeparatorRun) {
+        result += "-";
+        inSeparatorRun = true;
+      }
+      continue;
+    }
+    result += character;
+    inSeparatorRun = false;
+  }
+  return result;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function normalizeIdPart(value) {
-  const normalized = value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+  const normalized = trimHyphens(collapseInvalidIdCharacters(value.toLowerCase()));
   if (!normalized || normalized === ".") {
     return "root";
   }
-  return normalized.replace(/[/.]+/gu, "-").replace(/^-+|-+$/gu, "") || "root";
+  return trimHyphens(collapsePathSeparators(normalized)) || "root";
 }
 
 /**
