@@ -27,7 +27,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W45:** `W45-S06` Documentation refresh and internal installed-user rehearsal acceptance
 - **W46:** `W46-S01` Contract/docs breaking policy; `W46-S06` Proof-complete acceptance closure and findings intake
 - **W47:** `W47-S04` Full proof rerun and product acceptance closure
-- **W48:** `W48-S01` Quality-cycle contract and profile policy; `W48-S05` Control quality-cycle proof rerun and product acceptance closure
+- **W48:** `W48-S01` Quality-cycle contract and profile policy; `W48-S05` Control quality-cycle proof rerun and product acceptance closure (closed as W49/W50 successor-proof reconciliation, not W48-only product acceptance)
 - **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S04` Full Control internal installed-user rehearsal rerun and product acceptance closure
 - **W50:** `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
 - **W51:** `W51-S01` Clean-commit W50 proof rerun
@@ -194,7 +194,7 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W45:** `W45-S05` Repair-loop proof fixtures and internal profile; `W45-S06` Documentation refresh and internal installed-user rehearsal acceptance
 - **W46:** `W46-S01` Contract/docs breaking policy; `W46-S02` Step evaluator report and runner behavior; `W46-S03` Catalog budget and small-canary migration; `W46-S04` Product-change mission rewrite for current targets; `W46-S05` Hard target expansion; `W46-S06` Proof-complete acceptance closure and findings intake
 - **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure; `W47-S02` Internal installed-user rehearsal target verification isolation and Vitest readiness; `W47-S03` AOR repair/review convergence hardening; `W47-S04` Full proof rerun and product acceptance closure
-- **W48:** `W48-S01` Quality-cycle contract and profile policy; `W48-S02` Quality-cycle runner and controller implementation; `W48-S03` Structured repair context and convergence classification; `W48-S04` Vitest target toolchain policy; `W48-S05` Control quality-cycle proof rerun and product acceptance closure
+- **W48:** `W48-S01` Quality-cycle contract and profile policy; `W48-S02` Quality-cycle runner and controller implementation; `W48-S03` Structured repair context and convergence classification; `W48-S04` Vitest target toolchain policy; `W48-S05` Control quality-cycle proof rerun and product acceptance closure (closed as W49/W50 successor-proof reconciliation, not W48-only product acceptance)
 - **W49:** `W49-S01` Proof findings hygiene and evidence truthfulness; `W49-S02` Repeated repair anti-loop enforcement; `W49-S03` QA-specific step-quality evaluator hardening; `W49-S04` Full Control internal installed-user rehearsal rerun and product acceptance closure
 - **W50:** `W50-S01` Review verification mapping and residual-risk classification; `W50-S02` Internal installed-user rehearsal target toolchain fail-fast and setup-journal hygiene; `W50-S03` Fastify/Vitest control rerun and product acceptance closure; `W50-S04` Findings/backlog state sync
 - **W51:** `W51-S01` Clean-commit W50 proof rerun; `W51-S02` Vitest compatible Node large acceptance; `W51-S03` Automated final quality report hydration; `W51-S04` Explicit target-readiness phase; `W51-S05` Next hard-target expansion after large acceptance

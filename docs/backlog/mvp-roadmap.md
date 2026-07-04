@@ -58,7 +58,7 @@ The authoritative planning model for implementation lives in:
 | W45 | Make review/QA repair cycles bounded, contract-first, operator-visible, and replayable from prompt/context lineage through proof evidence. | 6 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-45-implementation-slices.md` |
 | W46 | Rebuild internal installed-user rehearsal as black-box product-change assessment with step-quality gates, larger mission budgets, catalog migration, and hard target expansion. | 6 | EPIC-0, EPIC-7 | `docs/backlog/wave-46-implementation-slices.md` |
 | W47 | Convert W46 classified blockers into strict product acceptance by closing AOR UI accessibility, hard-target verification isolation, repair convergence evidence, and proof reruns. | 4 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-47-implementation-slices.md` |
-| W48 | Extend medium+ product-change rehearsal into a realistic implementation quality cycle with QA-origin repair, structured repair context, hard-target toolchain policy, and control proof rerun. | 5 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-48-implementation-slices.md` |
+| W48 | Extend medium+ product-change rehearsal into a realistic implementation quality cycle with QA-origin repair, structured repair context, hard-target toolchain policy, and successor-proof reconciliation. | 5 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-48-implementation-slices.md` |
 | W49 | Close quality-cycle proof gaps with repair anti-loop enforcement, QA-specific step quality, findings hygiene, and mandatory Full Control live proof rerun. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-49-implementation-slices.md` |
 | W50 | Close W49 Fastify/Vitest blockers with review verification mapping, target toolchain fail-fast, control proof rerun, and findings sync. | 4 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-50-implementation-slices.md` |
 | W51 | Turn W50 proof into clean-commit closure, pursue Vitest large acceptance, automate final quality hydration, split target-readiness semantics, and add the next hard target only after large proof is stable. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-51-implementation-slices.md` |
@@ -854,8 +854,8 @@ repair boundaries and strict all-pass product acceptance policy.
   context.
 - Vitest large has explicit target Node policy and fails before product
   execution for incompatible toolchains.
-- Control proof rerun remains blocked until a provider/toolchain window exists;
-  blocked runs are not product acceptance.
+- The W48-specific control proof rerun is reconciled as superseded by stricter
+  W49/W50 successor proof evidence; no W48-only product acceptance is claimed.
 
 **Detailed slices:** `docs/backlog/wave-48-implementation-slices.md`
 

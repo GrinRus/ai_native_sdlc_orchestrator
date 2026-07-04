@@ -137,43 +137,37 @@ public repair both returning to the next execution iteration.
 
 ## W48-S05 — Control quality-cycle proof rerun and product acceptance closure
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
-- **External blocker:** Requires a fresh provider/toolchain proof window with compatible Vitest Node and OpenAI credentials.
-- **Backlog reconciliation:** This W48-specific proof rerun remains a
-  historical blocked/superseded gap. W49 and W50 provide stricter successor
-  proof evidence, and no W48-only product acceptance is claimed.
-- **Outcome:** Run the W48 control proof set on one commit and claim product
-  acceptance only for final all-pass gates.
-- **Primary modules:** `scripts/live-e2e/**`,
-  `docs/ops/live-e2e-proof-complete-findings.md`, root checks, live proof runs
+- **State:** done
+- **Backlog reconciliation:** This W48-specific proof rerun is closed as a
+  superseded backlog record. W49 and W50 provide stricter successor proof
+  evidence, and no W48-only product acceptance is claimed.
+- **Outcome:** Reconcile the historical W48 control-proof gap against W49/W50
+  successor evidence so W48 no longer appears as current open work.
+- **Primary modules:** `scripts/live-e2e/**`, `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`, root checks, live proof runs
 - **Hard dependencies:** W48-S04
 
 ### Local tasks
-1. Run same-commit guided AOR UI proof.
-2. Rerun `httpx-medium` because runner flow semantics changed.
-3. Rerun `fastify-repair-medium` and verify review/QA repair lineage.
-4. Rerun `vitest-large` with `AOR_LIVE_E2E_TARGET_NODE_BIN` when available.
-5. Update proof findings with run ids, terminal status, blocker class, and
-   all-pass result.
+1. Preserve W48 implementation validation without claiming W48-only product acceptance.
+2. Link W49/W50 successor proof runs as the terminal control proof evidence for the quality-cycle lane.
+3. Record that W48-S05 has no downstream hard-dependency consumers and W49 intentionally starts from W48-S04.
+4. Update backlog, roadmap, and proof findings so W48-S05 no longer appears as current open work.
+5. Keep `.aor/` runtime artifacts uncommitted.
 
 ### Acceptance criteria
-1. `guided-aor-ui` is all-pass before pairing product runs.
-2. `httpx-medium` product acceptance is claimed only after final
-   `quality-assessment gate --policy all-pass`.
-3. `fastify-repair-medium` all-passes or records a new precise terminal
-   blocker with public repair lineage.
-4. `vitest-large` all-passes under compatible Node or records a setup/provider
-   blocker that is not a live E2E isolation defect.
+1. Master backlog and owning wave doc mark W48-S05 done as superseded reconciliation, not W48-only product acceptance.
+2. Proof findings state that W49/W50 successor evidence owns terminal control proof closure for this lane.
+3. Roadmap and dependency notes no longer advertise W48-S05 as current open proof work.
+4. `pnpm slice:status` no longer reports W48-S05 as an open blocker.
 5. `.aor/` runtime artifacts remain uncommitted.
 
 ### Done evidence
-- `pnpm live-e2e:test`
-- `pnpm test`
-- `pnpm build`
+- W49/W50 successor proof findings with run ids and product-acceptance limits
+- updated backlog, roadmap, and dependency notes
+- `pnpm slice:status`
+- `pnpm slice:sync-ready`
 - `pnpm check`
-- `pnpm slice:gate`
-- committed proof findings update
 
 ### Out of scope
-- counting blocked proof runs as product acceptance
+- claiming W48-only product acceptance
+- rerunning historical W48 profiles after successor proof closure
 - making optional xlarge proof required

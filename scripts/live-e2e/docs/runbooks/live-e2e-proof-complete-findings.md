@@ -1,6 +1,6 @@
 # Live E2E Proof-Complete Findings
 
-Status date: 2026-07-02
+Status date: 2026-07-03
 
 This note records W47-W52 control proof evidence for black-box product live E2E. Runtime artifacts stay under `.aor/` or `/tmp/aor-*` and are intentionally not committed.
 
@@ -12,10 +12,10 @@ This note records W47-W52 control proof evidence for black-box product live E2E.
 - Required control proof set: guided AOR UI proof, paired `httpx` medium final acceptance, `fastify` repair medium, and `vitest` large.
 - Product-quality acceptance is claimed only for runs where final `quality-assessment gate --policy all-pass` passed.
 
-## Backlog Reconciliation Before W51
+## Backlog Reconciliation
 
-- W48-S05 remains blocked as a historical W48-specific proof rerun gap; no
-  W48-only product acceptance is claimed.
+- W48-S05 is closed as a superseded backlog reconciliation record; no W48-only
+  product acceptance is claimed.
 - W49/W50 are stricter successor proof waves and provide terminal control proof
   evidence without depending on W48-S05 acceptance.
 - W50 closes product acceptance only for `httpx-medium` and
@@ -553,8 +553,8 @@ Accepted findings:
 ## W48 Quality-Cycle Closure Plan
 
 W48 implementation changes are committed as source/docs/tests only; no raw
-runtime artifacts are committed. The new control proof rerun remains blocked
-until a provider/toolchain proof window is available.
+runtime artifacts are committed. The original W48-specific control proof rerun
+is superseded by W49/W50 successor proof evidence.
 
 Implemented W48 changes:
 
@@ -573,7 +573,7 @@ Implemented W48 changes:
 - Vitest large profile declares `target_toolchain.node.required_range` and
   honors `AOR_LIVE_E2E_TARGET_NODE_BIN` for target setup and verification.
 
-Required W48 proof rerun before new product acceptance claims:
+Historical W48 proof rerun requirement superseded by W49/W50:
 
 - `installed-user-guided-journey.yaml` same-commit AOR UI proof.
 - `full-journey-regress-httpx-medium-openai.yaml` fresh run because runner
@@ -595,9 +595,9 @@ Local regression validation passed for the W48 implementation hardening:
 - `pnpm check`
 - `pnpm slice:gate`
 
-No new W48 product acceptance is claimed from these local checks. The live proof
-runs listed above remain required before any new all-pass claim after the W48
-runner semantics change.
+No new W48 product acceptance is claimed from these local checks. W49/W50
+successor proof runs own the later all-pass claims after the W48 runner
+semantics change.
 
 ## W49 Quality-Cycle Proof Closure
 

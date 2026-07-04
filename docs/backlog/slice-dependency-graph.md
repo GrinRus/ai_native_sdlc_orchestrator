@@ -1072,6 +1072,10 @@ graph TD
 | W48-S04 | W48-S03 |
 | W48-S05 | W48-S04 |
 
+Backlog reconciliation: `W48-S05` is closed as a superseded successor-proof
+record. W49 intentionally depends on `W48-S04`, not `W48-S05`, because W49/W50
+own the stricter terminal control proof evidence for this lane.
+
 ## W49 hard dependencies
 | Slice ID | Depends on |
 |---|---|
