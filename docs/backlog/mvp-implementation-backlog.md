@@ -377,8 +377,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W44-S01 | Artifact workflow taxonomy and transition invariants | EPIC-0, EPIC-3 | done | `docs/architecture/**`, `docs/contracts/**`, `docs/backlog/**`, `examples/**` | W43-S04 |
-| W44-S02 | Discovery/research/spec prompt bundle split | EPIC-3 | ready | `examples/prompts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, `packages/orchestrator-core/**`, tests | W44-S01 |
-| W44-S03 | Artifact readiness state machine and stale transitions | EPIC-1, EPIC-6 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests | W44-S02 |
+| W44-S02 | Discovery/research/spec prompt bundle split | EPIC-3 | done | `examples/prompts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, `packages/orchestrator-core/**`, tests | W44-S01 |
+| W44-S03 | Artifact readiness state machine and stale transitions | EPIC-1, EPIC-6 | ready | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests | W44-S02 |
 | W44-S04 | Context, skill, and policy overlays from evidence | EPIC-4, EPIC-3 | blocked | `examples/context/**`, `examples/skills/**`, `examples/policies/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `docs/architecture/**`, tests | W44-S02, W44-S03 |
 | W44-S05 | Post-implementation docs and internal installed-user rehearsal validation | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `internal maintainer rehearsal fixtures`, `internal maintainer rehearsal tooling`, tests | W44-S04 |
 

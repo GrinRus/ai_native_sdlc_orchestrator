@@ -89,7 +89,7 @@ assets.
 
 ## W44-S02 — Discovery/research/spec prompt bundle split
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Replace the shared artifact prompt default for discovery,
   research, and spec with distinct step-specific prompt bundle refs while
   keeping the artifact execution class intact.
@@ -127,7 +127,7 @@ assets.
 
 ## W44-S03 — Artifact readiness state machine and stale transitions
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make discovery, research, and spec readiness explicit in runtime
   evidence and next-action behavior so planning cannot consume stale or blocked
   upstream artifacts silently.

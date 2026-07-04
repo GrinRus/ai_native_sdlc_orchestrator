@@ -128,9 +128,9 @@ default_wrapper_profiles:
   eval: wrapper.eval.default@v1
   harness: wrapper.harness.default@v1
 default_prompt_bundles:
-  discovery: prompt-bundle://artifact-default@v1
-  research: prompt-bundle://artifact-default@v1
-  spec: prompt-bundle://artifact-default@v1
+  discovery: prompt-bundle://discovery-default@v1
+  research: prompt-bundle://research-default@v1
+  spec: prompt-bundle://spec-default@v1
   planning: prompt-bundle://planner-default@v1
   implement: prompt-bundle://runner-default@v3
   review: prompt-bundle://runner-default@v3

@@ -75,6 +75,8 @@ Workflow-step keys and execution classes are intentionally separate. The
 bundle refs, but those prompt bundles remain compatible with
 `step_class: artifact`, `default_wrapper_profiles.artifact`,
 `default_step_policies.artifact`, and `default_skill_profiles.artifact`.
+Bundled examples select `prompt-bundle://discovery-default@v1`,
+`prompt-bundle://research-default@v1`, and `prompt-bundle://spec-default@v1`.
 Profiles that still point all three keys at `prompt-bundle://artifact-default@v1`
 remain valid.
 

@@ -21,6 +21,9 @@ different prompt bundle through `default_prompt_bundles.discovery`,
 `default_prompt_bundles.research`, and `default_prompt_bundles.spec`, while all
 three prompt bundles continue to declare `step_class: artifact`.
 
+`discovery-default@v1`, `research-default@v1`, and `spec-default@v1` are
+step-specific artifact prompts. They make required input expectations visible
+before adapter invocation while keeping the same `artifact` execution class.
 `artifact-default@v1` remains the compatibility fallback for profiles that still
 use one shared artifact prompt across discovery, research, and spec. Step-
 specific artifact prompts must validate through this same contract family and

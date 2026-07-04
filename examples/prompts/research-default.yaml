@@ -1,0 +1,46 @@
+prompt_bundle_id: research-default
+version: 1
+step_class: artifact
+objective: convert discovery evidence and local research inputs into ADR-ready recommendations
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Produce a research artifact that compares options, records tradeoffs, and
+    states whether the result is ADR-ready for specification and planning.
+  priorities:
+    - start from current discovery evidence and local research inputs
+    - distinguish supported recommendations from unresolved questions
+    - make ADR readiness explicit without inventing external citations
+required_inputs:
+  packets:
+    required:
+      - discovery
+    optional:
+      - mission-intake
+      - local-research-sources
+      - related-packets
+  files:
+    recommended:
+      - docs/architecture/00-index.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - research-question
+    - options-considered
+    - recommendation
+    - tradeoffs
+    - adr-readiness
+    - unresolved-evidence
+  required_evidence:
+    - discovery-ref
+    - local-source-refs
+stop_conditions:
+  - discovery-missing
+  - local-research-inputs-missing
+  - recommendation-unsupported
+redaction_expectations:
+  - never include secrets or tokens in research evidence
+  - keep third-party source excerpts bounded and attributed
+change_notes:
+  - W44 research-specific artifact prompt split
