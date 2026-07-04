@@ -1568,6 +1568,7 @@ function resolveMissionState(body) {
  *   projectRef?: string,
  *   projectProfile?: string,
  *   runtimeRoot?: string,
+ *   runId?: string,
  * }} options
  */
 export function resolveNextAction(options = {}) {
@@ -1613,8 +1614,22 @@ export function resolveNextAction(options = {}) {
   let latestIntake = null;
   let artifactReadiness = null;
 
-  const activeRun = findActiveRun(init);
-  if (activeRun) {
+  const explicitRunId = asString(options.runId);
+  const activeRun = explicitRunId ? null : findActiveRun(init);
+  if (explicitRunId) {
+    closureState = buildClosureState({ init, runId: explicitRunId });
+    const closureAction = resolveClosureAction({
+      projectRoot,
+      runId: explicitRunId,
+      closureState,
+      evidenceRefs,
+      missionState,
+    });
+    status = closureAction.status;
+    stage = closureAction.stage;
+    primaryAction = closureAction.primaryAction;
+    blockers = closureAction.blockers;
+  } else if (activeRun) {
     const runId = asString(activeRun.state.run_id) ?? "current";
     const activeRunRef = toEvidenceRef(projectRoot, activeRun.stateFile);
     closureState = buildClosureState({ init, runId, runEvidenceRef: activeRunRef });

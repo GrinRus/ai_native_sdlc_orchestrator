@@ -33,6 +33,7 @@ import {
   applyIncidentRecertification,
   materializeLearningLoopArtifacts,
   materializeReviewDecision,
+  resolveNextAction,
   resolveStepPolicyForStep,
   analyzeProjectRuntime,
   initializeProjectRuntime,
@@ -478,10 +479,39 @@ export function handleQualityCommand(context) {
     outputState.reviewDecisionReason = decisionResult.decision.reason;
     outputState.reviewDecisionRepairContext = decisionResult.decision.repair_context;
     outputState.reviewDecisionEvidenceRefs = decisionResult.decision.evidence_refs;
+    if (decisionResult.qualityRepairRequestRef) {
+      const qualityRepairRequest = asPlainObject(decisionResult.qualityRepairRequest);
+      outputState.qualityRepairRequestRef = decisionResult.qualityRepairRequestRef;
+      outputState.qualityRepairRequestFile = decisionResult.qualityRepairRequestFile;
+      outputState.qualityRepairRequestStatus = qualityRepairRequest.status;
+      outputState.qualityRepairRequestCycleId = qualityRepairRequest.cycle_id;
+      outputState.qualityRepairRequestSourceStage = qualityRepairRequest.source_stage;
+      outputState.qualityRepairRequestAttemptBudget = qualityRepairRequest.attempt_budget;
+      outputState.qualityRepairRequestBlockers = qualityRepairRequest.blockers;
+      outputState.qualityRepairRequestEvidenceRefs = qualityRepairRequest.evidence_refs;
+      const nextAction = resolveNextAction({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId,
+      });
+      outputState.qualityRepairNextActionStatus = nextAction.nextActionReport.status;
+      outputState.qualityRepairNextActionStage = nextAction.nextActionReport.project_state.stage;
+      outputState.qualityRepairNextActionPrimary = nextAction.nextActionReport.primary_action;
+      outputState.qualityRepairNextActionReportFile = nextAction.nextActionReportFile;
+    }
     outputState.readOnly = false;
     outputState.futureControlHooks = [
-      `deliver prepare --run-id ${runId} --require-review-decision`,
-      `release prepare --run-id ${runId} --require-review-decision`,
+      ...(decisionResult.qualityRepairRequestRef
+        ? [
+            `run start --run-id ${runId}.repair --target-step implement`,
+            `review run --run-id ${runId}.repair`,
+          ]
+        : [
+            `deliver prepare --run-id ${runId} --require-review-decision`,
+            `release prepare --run-id ${runId} --require-review-decision`,
+          ]),
       `evidence show --run-id ${runId}`,
     ];
   } else if (command === "learning handoff") {

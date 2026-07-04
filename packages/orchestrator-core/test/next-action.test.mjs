@@ -712,6 +712,30 @@ test("resolveNextAction returns one safe primary action for quality repair reque
   });
 });
 
+test("resolveNextAction can scope quality repair guidance to an explicit run", () => {
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init, {
+      kpis: [],
+      definitionOfDone: [],
+      deliveryMode: "no-write",
+    });
+    writeExecutionEvidence(init, "run.quality.scoped");
+    writeReviewEvidence(init, "run.quality.scoped");
+    writeQualityRepairRequest(init, "run.quality.scoped", { sourceStage: "review", status: "requested" });
+
+    const projectReport = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(projectReport.project_state.stage, "mission-intake");
+
+    const runReport = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot, runId: "run.quality.scoped" }).nextActionReport;
+    assert.equal(runReport.status, "blocked");
+    assert.equal(runReport.project_state.stage, "repair");
+    assert.equal(runReport.primary_action.action_id, "run-review-quality-repair");
+    assert.equal(runReport.closure_state.run_id, "run.quality.scoped");
+    assert.equal(runReport.closure_state.quality_repair.flow_state, "review-repair-requested");
+  });
+});
+
 test("resolveNextAction blocks delivery when prepared evidence keeps safety blockers", () => {
   withCleanRepo((tempRoot) => {
     const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
