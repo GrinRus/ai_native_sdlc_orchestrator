@@ -11,6 +11,27 @@ AOR needs one execution model for both execution and non-execution steps.
 - `eval` — suite execution and scoring
 - `harness` — replay, certification, compare-to-baseline, failure-mode runs
 
+## Workflow steps versus execution classes
+
+Workflow steps are the operator-visible lifecycle slots such as `discovery`,
+`research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`,
+and `harness`. Execution classes define the reusable runtime capability used to
+run a step: `artifact`, `planner`, `runner`, `repair`, `eval`, or `harness`.
+
+Discovery, research, and spec are distinct workflow steps, but they remain
+compatible with the `artifact` execution class. Their route profiles may select
+different `step` values and prompt bundle refs while continuing to use
+`route_class: artifact`, `wrapper.artifact.default@v1`,
+`policy.step.artifact.default`, and artifact-compatible skill/context defaults.
+The split is therefore a prompt and readiness taxonomy change, not a new route
+class or adapter capability.
+
+`prompt_bundle.step_class` remains an execution-class field. A discovery,
+research, or spec prompt bundle should use `step_class: artifact` unless a later
+accepted slice introduces a new execution class. Project profiles select prompt
+bundles by workflow step through `default_prompt_bundles.<step>`, and wrappers
+and policies remain selected by route/execution class.
+
 ## Step resolution stack
 For each step AOR resolves:
 1. project profile

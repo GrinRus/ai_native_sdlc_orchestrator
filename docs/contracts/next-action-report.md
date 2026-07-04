@@ -39,6 +39,33 @@ Only one primary action is allowed. Additional suggestions belong in guided UI c
 
 `bounded_execution` makes the selected delivery mode explicit before any delivery-capable recommendation. Installed-user guided flows must keep `upstream_writes_default=false`; delivery-capable modes must require review before write-back.
 
+## Artifact readiness transitions
+
+`next-action-report` is the public read model for discovery, research, spec,
+and planning readiness. Runtime evidence may store detailed diagnostics in
+source reports, but CLI/API/web surfaces should expose the current safe action
+and the readable blocked or stale reason here.
+
+The artifact workflow readiness states are:
+- `pending` when required upstream evidence has not been materialized yet;
+- `complete` for current discovery evidence;
+- `adr-ready` for current research evidence whose `discovery-research-report`
+  status is `adr-ready`;
+- `ready` for current spec or planning evidence that can be consumed by the
+  next stage;
+- `incomplete` when evidence exists but required fields or research inputs are
+  missing and a soft profile has explicitly allowed continuation;
+- `blocked` when strict readiness policy prevents the next stage;
+- `stale` when mission, discovery, or research refs changed after downstream
+  evidence was created.
+
+Strict mode must not report `spec.ready` unless the current mission intake,
+discovery evidence, and research evidence refs are present and current. A soft
+profile may allow spec work from incomplete research only when the report names
+the incomplete reason and the primary action keeps that decision inspectable.
+Planning readiness is blocked whenever the current spec is missing, blocked, or
+stale.
+
 ## Closure state
 `closure_state` is the durable final-stage model for review, delivery, release, and learning UX. It is always present, even before execution has started.
 
