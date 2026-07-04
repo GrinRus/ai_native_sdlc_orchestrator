@@ -644,6 +644,27 @@ W25-S02 `full-journey-production-proof-ky-openai.yaml` run and records `proof_sc
 meaningful implementation changed paths, Runtime Harness/review/delivery evidence summaries, and a passing no-upstream-write
 assertion. It intentionally excludes runtime output paths, target checkout contents, raw transcripts, and secrets.
 
+Full-journey summaries also carry W44 artifact readiness proof:
+- top-level `artifact_readiness_proof.proof_status`
+- top-level `artifact_readiness_proof.readiness_snapshots[]`
+- top-level `artifact_readiness_proof.prompt_lineage.steps[]`
+- top-level `artifact_readiness_proof.discovery_research`
+- top-level `artifact_readiness_proof.planning`
+- `artifacts.artifact_readiness_snapshots[]`
+- `artifacts.next_action_report_files[]`
+- `artifacts.artifact_readiness_next_after_mission_report_file`
+- `artifacts.artifact_readiness_next_after_discovery_report_file`
+- `artifacts.artifact_readiness_next_after_spec_report_file`
+- `artifacts.artifact_readiness_next_after_planning_report_file`
+- `artifacts.discovery_research_report_file`
+
+These fields are acceptance indexes over public AOR artifacts. The durable
+sources remain the linked `next-action-report`, discovery research report, spec
+step-result, wave ticket, and handoff packet. A W44 validation run should not be
+accepted when `artifact_readiness_proof.proof_status` is `missing`, or when the
+snapshots do not expose the expected blocked/stale/ready reasons for the
+observed path.
+
 Guided full-journey summaries also carry:
 - `guided_journey`
 - top-level `guided_web_smoke_summary_file`

@@ -54,7 +54,7 @@ import {
   resolveEvaluatorRunProfileArgs,
   shouldAwaitFirstControllerObservation,
 } from "../step-evaluator.mjs";
-import { writeProofRunnerArtifacts } from "../run-profile.mjs";
+import { buildArtifactReadinessProof, writeProofRunnerArtifacts } from "../run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
@@ -146,6 +146,189 @@ function writeJsonFixture(filePath, payload = {}) {
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   return filePath;
 }
+
+function writeTextFixture(filePath, payload) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, payload, "utf8");
+  return filePath;
+}
+
+test("artifact readiness proof summarizes public readiness and prompt lineage", () => {
+  withTempRoot((tempRoot) => {
+    const generatedProjectProfileFile = writeTextFixture(
+      path.join(tempRoot, "project.aor.yaml"),
+      [
+        "project_id: test-project",
+        "default_prompt_bundles:",
+        "  discovery: prompt-bundle://discovery-default@v1",
+        "  research: prompt-bundle://research-default@v1",
+        "  spec: prompt-bundle://spec-default@v1",
+        "  planning: prompt-bundle://planner-default@v1",
+        "",
+      ].join("\n"),
+    );
+    const nextActionReportFile = writeJsonFixture(path.join(tempRoot, "next-action-report.json"), {
+      next_action_status: "ready",
+      next_action_primary: "planning",
+      artifact_readiness: {
+        policy: { mode: "strict", allow_incomplete_research_for_spec: false },
+        stages: {
+          mission: { status: "complete", evidence_ref: "packet://mission" },
+          discovery: { status: "complete", evidence_ref: "evidence://analysis" },
+          research: { status: "adr-ready", evidence_ref: "evidence://research" },
+          spec: {
+            status: "ready",
+            evidence_ref: "evidence://spec",
+            required_evidence_refs: ["evidence://analysis", "evidence://research", "evidence://spec"],
+          },
+          planning: { status: "ready", evidence_ref: "packet://handoff" },
+        },
+      },
+    });
+    const analysisReportFile = writeJsonFixture(path.join(tempRoot, "analysis-report.json"), {
+      asset_resolution: {
+        matrix: [
+          {
+            step_class: "discovery",
+            route: { resolved_route_id: "route.discovery.default" },
+            wrapper: { wrapper_ref: "wrapper.artifact.default@v1" },
+            prompt_bundle: { prompt_bundle_ref: "prompt-bundle://discovery-default@v1" },
+          },
+          {
+            step_class: "research",
+            route: { resolved_route_id: "route.research.default" },
+            wrapper: { wrapper_ref: "wrapper.artifact.default@v1" },
+            prompt_bundle: { prompt_bundle_ref: "prompt-bundle://research-default@v1" },
+          },
+          {
+            step_class: "spec",
+            route: { resolved_route_id: "route.spec.default" },
+            wrapper: { wrapper_ref: "wrapper.artifact.default@v1" },
+            prompt_bundle: { prompt_bundle_ref: "prompt-bundle://spec-default@v1" },
+          },
+          {
+            step_class: "planning",
+            route: { resolved_route_id: "route.plan.default" },
+            wrapper: { wrapper_ref: "wrapper.planner.default@v1" },
+            prompt_bundle: { prompt_bundle_ref: "prompt-bundle://planner-default@v1" },
+          },
+        ],
+      },
+      architecture_traceability: {
+        step_linkage: [
+          {
+            step_class: "spec",
+            route_id: "route.spec.default",
+            wrapper_ref: "wrapper.artifact.default@v1",
+            prompt_bundle_ref: "prompt-bundle://spec-default@v1",
+            policy_id: "policy.step.artifact.default",
+          },
+        ],
+      },
+    });
+    const discoveryResearchReportFile = writeJsonFixture(path.join(tempRoot, "discovery-research-report.json"), {
+      status: "adr-ready",
+      research_inputs: { source_refs: ["runtime://local-research-note"] },
+      open_questions: [],
+      adr_ready_recommendations: [{ status: "ready" }],
+    });
+    const specStepResultFile = writeJsonFixture(path.join(tempRoot, "spec-step-result.json"), {
+      routed_execution: {
+        architecture_traceability: {
+          selected_step: {
+            step_class: "spec",
+            route_id: "route.spec.default",
+            wrapper_ref: "wrapper.artifact.default@v1",
+            prompt_bundle_ref: "prompt-bundle://spec-default@v1",
+            policy_id: "policy.step.artifact.default",
+          },
+        },
+        context_compilation: {
+          compiled_context_ref: "compiled-context://test.spec",
+          compiled_context_file: path.join(tempRoot, "compiled-context.json"),
+          compiled_context_artifact: {
+            prompt_bundle_ref: "prompt-bundle://spec-default@v1",
+            packet_refs: ["packet://discovery", "packet://research"],
+            context_bundle_refs: ["context-bundle://context.bundle.artifact.foundation@v1"],
+            skill_refs: ["skill.artifact.default@v1"],
+            provenance: {
+              compiler_revision_ref: "compiler-revision://runtime-context-compiler@v1",
+              project_profile_ref: generatedProjectProfileFile,
+              route_profile_ref: "route.spec.default",
+              wrapper_profile_ref: "wrapper.artifact.default@v1",
+            },
+          },
+        },
+        adapter_request: {
+          input_packet_refs: ["packet://discovery", "packet://research"],
+        },
+      },
+    });
+
+    const proof = buildArtifactReadinessProof({
+      artifacts: {
+        generated_project_profile_file: generatedProjectProfileFile,
+        analysis_report_file: analysisReportFile,
+        discovery_research_report_file: discoveryResearchReportFile,
+        spec_step_result_file: specStepResultFile,
+        wave_ticket_file: path.join(tempRoot, "wave-ticket.json"),
+        handoff_packet_file: path.join(tempRoot, "handoff-packet.json"),
+        handoff_status: "pending-approval",
+        next_action_report_files: [nextActionReportFile],
+        artifact_readiness_snapshots: [
+          {
+            checkpoint: "planning",
+            command_label: "artifact-readiness-next-after-planning",
+            transcript_file: path.join(tempRoot, "next-transcript.json"),
+            next_action_report_file: nextActionReportFile,
+            artifact_readiness: {
+              policy: { mode: "strict", allow_incomplete_research_for_spec: false },
+              stages: {
+                mission: { status: "complete", evidence_ref: "packet://mission" },
+                discovery: { status: "complete", evidence_ref: "evidence://analysis" },
+                research: { status: "adr-ready", evidence_ref: "evidence://research" },
+                spec: {
+                  status: "ready",
+                  evidence_ref: "evidence://spec",
+                  required_evidence_refs: ["evidence://analysis", "evidence://research", "evidence://spec"],
+                },
+                planning: { status: "pending", evidence_ref: null },
+              },
+            },
+            evidence_refs: [nextActionReportFile],
+          },
+          {
+            checkpoint: "planning",
+            command_label: "artifact-readiness-next-after-planning",
+            transcript_file: path.join(tempRoot, "next-transcript-resume.json"),
+            next_action_report_file: nextActionReportFile,
+            artifact_readiness: {
+              stages: {
+                planning: { status: "stale", evidence_ref: null },
+              },
+            },
+            evidence_refs: [nextActionReportFile],
+          },
+        ],
+      },
+    });
+
+    assert.equal(proof.proof_status, "available");
+    assert.equal(proof.readiness_snapshots.length, 1);
+    assert.equal(proof.readiness_snapshots[0].stages.research.status, "adr-ready");
+    assert.equal(proof.readiness_snapshots[0].stages.planning.status, "pending");
+    assert.equal(proof.discovery_research.adr_ready, true);
+    assert.equal(proof.planning.handoff_status, "pending-approval");
+    const discoveryStep = proof.prompt_lineage.steps.find((entry) => entry.step === "discovery");
+    assert.equal(discoveryStep.profile_prompt_bundle_ref, "prompt-bundle://discovery-default@v1");
+    assert.equal(discoveryStep.analysis_prompt_bundle_ref, "prompt-bundle://discovery-default@v1");
+    const specStep = proof.prompt_lineage.steps.find((entry) => entry.step === "spec");
+    assert.equal(specStep.compiled_context_ref, "compiled-context://test.spec");
+    assert.equal(specStep.compiled_context_prompt_bundle_ref, "prompt-bundle://spec-default@v1");
+    assert.deepEqual(specStep.required_input_refs, ["packet://discovery", "packet://research"]);
+    assert.ok(proof.evidence_refs.includes(nextActionReportFile));
+  });
+});
 
 const aorOperatorAccessibilityCheckIds = Object.freeze([
   "keyboard_navigation",

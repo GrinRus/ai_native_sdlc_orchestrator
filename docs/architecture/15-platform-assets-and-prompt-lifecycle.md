@@ -109,6 +109,24 @@ a separate slice with evidence that the shared foundation cannot express a
 workflow rule, and any policy split must define explicit gate, retry, repair,
 and blocked-reason behavior.
 
+## W44 maintainer validation evidence
+
+Maintainer validation for the artifact workflow uses public artifacts
+rather than private rehearsal vocabulary. A full-journey rehearsal records
+`aor next` snapshots after mission, discovery, spec, and planning; the run
+summary then exposes `artifact_readiness_proof` with:
+
+- the next-action report refs and stage readiness statuses;
+- discovery, research, spec, and planning prompt-bundle lineage from the
+  generated project profile and project-analysis report;
+- spec compiled-context provenance, including required input refs, context
+  bundle refs, skill refs, and compiler revision refs;
+- discovery research status and planning handoff refs.
+
+This proof is a compact acceptance index. Operators should still treat the
+linked next-action report, discovery research report, spec step-result, and
+handoff packet as the durable source artifacts.
+
 ## Policy loading order and guardrails (W2-S03)
 Policy resolution is deterministic and runs before any adapter invocation:
 1. resolve route for the step (`project default` or `step override`);

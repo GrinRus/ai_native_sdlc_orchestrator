@@ -213,7 +213,7 @@ assets.
 
 ## W44-S05 — Post-implementation docs and live E2E validation
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Update user-facing and maintainer documentation after W44
   implementation, then run a live E2E proof that discovery, research, spec, and
   planning readiness still work end to end.
@@ -244,6 +244,38 @@ assets.
 - follow-up backlog entries for any unresolved non-pass finding
 - `pnpm slice:status`
 - `pnpm slice:gate`
+
+W44-S05 closure evidence:
+- Docs refreshed in `README.md`,
+  `docs/architecture/08-end-to-end-flow.md`,
+  `docs/architecture/15-platform-assets-and-prompt-lifecycle.md`,
+  `docs/contracts/next-action-report.md`,
+  `docs/ops/installed-user-first-run.md`, and
+  `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`.
+- Focused regression coverage:
+  `node --test scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`.
+- Live command:
+  `node ./scripts/live-e2e/run-profile.mjs --project-ref . --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml --run-id w44-s05-ky-medium-codex-20260704-161801 --runner-auth-mode host`,
+  followed by `manual-live-e2e.mjs` operator decisions and step-quality
+  reports for discovery, spec, and planning.
+- Live report refs:
+  `/var/folders/0y/qkpd1n592qjgm3w3rcl_gs6m0000gn/T/aor-live-e2e/w44-s05-ky-medium-codex-20260704-161801/runtime/projects/aor-core/reports/live-e2e-run-summary-w44-s05-ky-medium-codex-20260704-161801.json`,
+  `/var/folders/0y/qkpd1n592qjgm3w3rcl_gs6m0000gn/T/aor-live-e2e/w44-s05-ky-medium-codex-20260704-161801/runtime/projects/aor-core/reports/live-e2e-run-health-report-w44-s05-ky-medium-codex-20260704-161801.json`.
+- Scoped verdict: W44 path accepted through planning readiness. The summary
+  reports `bootstrap`, `discovery`, `spec`, `planning`, and `handoff` as `pass`;
+  `artifact_readiness_proof.proof_status=available`; readiness snapshots show
+  `mission=complete`, `discovery=complete`, `research=adr-ready`,
+  `spec=ready`, and `planning=ready` at the planning checkpoint; prompt lineage
+  exposes `discovery-default@v1`, `research-default@v1`, and `spec-default@v1`
+  over the shared artifact wrapper.
+- Finding classification: live-run implementation findings were fixed in this
+  slice (`README` public-boundary wording, undefined readiness command args,
+  snapshot timing before controller gates, duplicate resume snapshots, frozen
+  next-action snapshot summarization, and intake reuse after manual resume).
+  The remaining run-health block is outside W44 scope:
+  `owner=operator`, `phase=controller_decision`, `class=controller_incomplete`
+  at the handoff gate before execution; the matching evidence warning is tied
+  to that next-stage operator decision. No W44 follow-up slice is required.
 
 ### Out of scope
 - Reopening W44 prompt/readiness implementation scope without a new slice.

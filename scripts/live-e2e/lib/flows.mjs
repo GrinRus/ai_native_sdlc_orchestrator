@@ -4880,6 +4880,60 @@ export function executeFullJourneyFlow(options) {
       }
       return result;
     };
+    const recordArtifactReadinessSnapshot = (checkpoint) => {
+      const existingSnapshot = Array.isArray(artifacts.artifact_readiness_snapshots)
+        ? artifacts.artifact_readiness_snapshots
+            .map((entry) => asRecord(entry))
+            .find((entry) => asNonEmptyString(entry.checkpoint) === checkpoint)
+        : null;
+      if (existingSnapshot) {
+        const existingReportFile = asNonEmptyString(existingSnapshot.next_action_report_file);
+        const existingTranscriptFile = asNonEmptyString(existingSnapshot.transcript_file);
+        if (existingReportFile) {
+          artifacts.next_action_report_file = existingReportFile;
+          artifacts[`artifact_readiness_next_after_${checkpoint}_report_file`] = existingReportFile;
+        }
+        if (existingTranscriptFile) {
+          artifacts[`artifact_readiness_next_after_${checkpoint}_transcript_file`] = existingTranscriptFile;
+        }
+        return existingSnapshot;
+      }
+      const label = `artifact-readiness-next-after-${checkpoint}`;
+      const next = runCommand(label, [
+        "next",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      const reportFile = getStringField(next.payload, "next_action_report_file");
+      const snapshot = {
+        checkpoint,
+        command_label: label,
+        transcript_file: next.transcriptFile,
+        next_action_report_file: reportFile,
+        next_action_status: getStringField(next.payload, "next_action_status"),
+        next_action_primary: getStringField(next.payload, "next_action_primary"),
+        next_action_blockers: asStringArray(next.payload?.next_action_blockers),
+        artifact_readiness: asRecord(next.payload?.next_action_artifact_readiness),
+        evidence_refs: uniqueStrings([next.transcriptFile, reportFile, ...collectStringRefs(next.payload)]),
+      };
+      artifacts.artifact_readiness_snapshots = [
+        ...(Array.isArray(artifacts.artifact_readiness_snapshots) ? artifacts.artifact_readiness_snapshots : []),
+        snapshot,
+      ];
+      artifacts.next_action_report_files = uniqueStrings([
+        ...(Array.isArray(artifacts.next_action_report_files) ? artifacts.next_action_report_files : []),
+        reportFile,
+      ]);
+      artifacts.next_action_report_file = reportFile;
+      artifacts[`artifact_readiness_next_after_${checkpoint}_report_file`] = reportFile;
+      artifacts[`artifact_readiness_next_after_${checkpoint}_transcript_file`] = next.transcriptFile;
+      return snapshot;
+    };
     const runPostRunDiagnosticVerify = (runOptions = {}) => {
       const iteration = Number(runOptions.iteration) || 1;
       const cachedPostRunDiagnosticVerify =
@@ -5127,21 +5181,53 @@ export function executeFullJourneyFlow(options) {
     });
     artifacts.feature_request_file = featureRequest.requestFile;
 
-    const intakeCreate = guidedJourneyEnabled
-      ? runCommand("mission-create", buildGuidedMissionCreateArgs({
-          mission: options.mission,
-          featureRequest,
-          profile: options.profile,
-          projectProfileFile: generatedProfile.generatedProjectProfileFile,
-        }))
-      : runCommand("intake-create", buildIntakeCreateArgs({
-          mission: options.mission,
-          featureRequest,
-          profile: options.profile,
-          projectProfileFile: generatedProfile.generatedProjectProfileFile,
-        }));
+    const cachedIntakePacketFile = asNonEmptyString(artifacts.intake_artifact_packet_file);
+    const cachedIntakePacketBodyFile = asNonEmptyString(artifacts.intake_artifact_packet_body_file);
+    const canReuseIntake =
+      options.stepController?.hasPersistedProgress?.() === true &&
+      cachedIntakePacketFile &&
+      cachedIntakePacketBodyFile &&
+      fileExists(cachedIntakePacketFile) &&
+      fileExists(cachedIntakePacketBodyFile);
+    const intakeCreate = canReuseIntake
+      ? {
+          label: guidedJourneyEnabled ? "mission-create" : "intake-create",
+          ok: true,
+          exitCode: 0,
+          stdout: "",
+          stderr: "",
+          payload: {
+            artifact_packet_file: cachedIntakePacketFile,
+            artifact_packet_body_file: cachedIntakePacketBodyFile,
+          },
+          transcriptFile:
+            asNonEmptyString(artifacts.intake_create_transcript_file) ||
+            asNonEmptyString(artifacts.guided_mission_create_transcript_file) ||
+            "",
+          startedAt: nowIso(),
+          finishedAt: nowIso(),
+          durationSec: 0,
+          commandSurface: "cached intake create",
+        }
+      : guidedJourneyEnabled
+        ? runCommand("mission-create", buildGuidedMissionCreateArgs({
+            mission: options.mission,
+            featureRequest,
+            profile: options.profile,
+            projectProfileFile: generatedProfile.generatedProjectProfileFile,
+          }))
+        : runCommand("intake-create", buildIntakeCreateArgs({
+            mission: options.mission,
+            featureRequest,
+            profile: options.profile,
+            projectProfileFile: generatedProfile.generatedProjectProfileFile,
+          }));
     artifacts.intake_artifact_packet_file = getStringField(intakeCreate.payload, "artifact_packet_file");
     artifacts.intake_artifact_packet_body_file = getStringField(intakeCreate.payload, "artifact_packet_body_file");
+    artifacts.intake_create_transcript_file = intakeCreate.transcriptFile;
+    if (canReuseIntake) {
+      artifacts.intake_reused_after_resume = true;
+    }
     artifacts.intake_quality_gate = evaluateMissionIntakeQuality({
       mission: options.mission,
       featureSize: options.featureSize,
@@ -5163,6 +5249,7 @@ export function executeFullJourneyFlow(options) {
       artifacts.next_action_report_file = getStringField(guidedNextAfterMission.payload, "next_action_report_file");
       artifacts.guided_next_after_mission_transcript_file = guidedNextAfterMission.transcriptFile;
     }
+    recordArtifactReadinessSnapshot("mission");
 
     const analyze = runCommand("project-analyze", [
       "project",
@@ -5177,6 +5264,10 @@ export function executeFullJourneyFlow(options) {
       ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
     ]);
     artifacts.analysis_report_file = getStringField(analyze.payload, "analysis_report_file");
+    artifacts.route_resolution_file = getStringField(analyze.payload, "route_resolution_file");
+    artifacts.asset_resolution_file = getStringField(analyze.payload, "asset_resolution_file");
+    artifacts.policy_resolution_file = getStringField(analyze.payload, "policy_resolution_file");
+    artifacts.evaluation_registry_file = getStringField(analyze.payload, "evaluation_registry_file");
 
     const validate = runCommand("project-validate", [
       "project",
@@ -5469,6 +5560,10 @@ export function executeFullJourneyFlow(options) {
       ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
     ]);
     artifacts.discovery_analysis_report_file = getStringField(discovery.payload, "analysis_report_file");
+    artifacts.discovery_research_report_file = getStringField(discovery.payload, "discovery_research_report_file");
+    artifacts.discovery_research_status = getStringField(discovery.payload, "discovery_research_status");
+    artifacts.discovery_research_adr_ready = discovery.payload?.discovery_research_adr_ready === true;
+    const discoveryReadinessSnapshot = recordArtifactReadinessSnapshot("discovery");
     markStage(
       stageMap,
       "discovery",
@@ -5478,6 +5573,7 @@ export function executeFullJourneyFlow(options) {
         validate.transcriptFile,
         discovery.transcriptFile,
         ...collectStringRefs(discovery.payload),
+        ...asStringArray(discoveryReadinessSnapshot.evidence_refs),
       ]),
       "Feature-driven discovery completed from catalog-backed intake request.",
     );
@@ -5512,11 +5608,16 @@ export function executeFullJourneyFlow(options) {
       );
       throw new Error("Spec build did not materialize a routed step-result artifact.");
     }
+    const specReadinessSnapshot = recordArtifactReadinessSnapshot("spec");
     markStage(
       stageMap,
       "spec",
       "pass",
-      uniqueStrings([specBuild.transcriptFile, ...collectStringRefs(specBuild.payload)]),
+      uniqueStrings([
+        specBuild.transcriptFile,
+        ...collectStringRefs(specBuild.payload),
+        ...asStringArray(specReadinessSnapshot.evidence_refs),
+      ]),
       "Spec build produced feature-traceable dry-run evidence.",
     );
 
@@ -5532,11 +5633,17 @@ export function executeFullJourneyFlow(options) {
     ]);
     artifacts.wave_ticket_file = getStringField(waveCreate.payload, "wave_ticket_file");
     artifacts.handoff_packet_file = getStringField(waveCreate.payload, "handoff_packet_file");
+    artifacts.handoff_status = getStringField(waveCreate.payload, "handoff_status");
+    const planningReadinessSnapshot = recordArtifactReadinessSnapshot("planning");
     markStage(
       stageMap,
       "planning",
       "pass",
-      uniqueStrings([waveCreate.transcriptFile, ...collectStringRefs(waveCreate.payload)]),
+      uniqueStrings([
+        waveCreate.transcriptFile,
+        ...collectStringRefs(waveCreate.payload),
+        ...asStringArray(planningReadinessSnapshot.evidence_refs),
+      ]),
       "Wave and handoff packets were materialized from the public planning flow.",
     );
 
