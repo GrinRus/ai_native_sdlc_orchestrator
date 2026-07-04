@@ -127,7 +127,7 @@ assets.
 
 ## W44-S03 — Artifact readiness state machine and stale transitions
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make discovery, research, and spec readiness explicit in runtime
   evidence and next-action behavior so planning cannot consume stale or blocked
   upstream artifacts silently.
@@ -165,7 +165,7 @@ assets.
 
 ## W44-S04 — Context, skill, and policy overlays from evidence
 - **Epic:** EPIC-4 Quality platform; EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add only the context bundles, artifact skills, and policy
   overlays justified by W44 prompt/readiness evidence, then prove they remain
   traceable through compiled-context artifacts.

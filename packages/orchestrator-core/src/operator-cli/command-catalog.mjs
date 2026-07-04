@@ -147,6 +147,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "next_action_blockers",
       "next_action_evidence_refs",
       "next_action_mission_state",
+      "next_action_artifact_readiness",
       "next_action_closure_state",
       "next_action_bounded_execution",
       "read_only",

@@ -47,6 +47,16 @@ const VERIFICATION_COMMAND_GROUP_TIMEOUT_CLASS_VALUES = [
   "quick",
 ];
 const VERIFICATION_COMMAND_GROUP_OUTCOME_VALUES = ["no-tests", "missing-tool", "not-applicable", "broken-baseline"];
+const ARTIFACT_READINESS_STATUS_VALUES = [
+  "pending",
+  "complete",
+  "adr-ready",
+  "ready",
+  "incomplete",
+  "blocked",
+  "stale",
+];
+const ARTIFACT_READINESS_STAGE_KEYS = ["mission", "discovery", "research", "spec", "planning"];
 const privateCommandGroupField = (...parts) => parts.join("_");
 const PRIVATE_PROOF_HARNESS_COMMAND_GROUP_FIELDS = [
   privateCommandGroupField("live", "e2e", "profile"),
@@ -205,6 +215,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateProjectProfile(document, source));
   }
 
+  if (family === "next-action-report") {
+    issues.push(...validateNextActionReport(document, source));
+  }
+
   if (family === "wave-ticket") {
     issues.push(...validateWaveTicket(document, source));
   }
@@ -285,6 +299,150 @@ function validateProjectProfile(document, source) {
   });
   if (verification) {
     validateVerificationCommandGroups(verification, source, "verification.command_groups", issues, false);
+  }
+  const readinessPolicy = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "artifact_readiness_policy",
+    issues,
+  });
+  if (readinessPolicy) {
+    const researchPolicy = validateOptionalObjectField({
+      record: readinessPolicy,
+      source,
+      field: "artifact_readiness_policy.research",
+      issues,
+    });
+    if (researchPolicy) {
+      validateNestedBooleanField({
+        record: researchPolicy,
+        source,
+        field: "artifact_readiness_policy.research.allow_incomplete_for_spec",
+        issues,
+        required: false,
+      });
+      validateNestedStringField({
+        record: researchPolicy,
+        source,
+        field: "artifact_readiness_policy.research.reason",
+        issues,
+        required: false,
+      });
+    }
+  }
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateNextActionReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const readiness = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "artifact_readiness",
+    issues,
+  });
+  if (!readiness) return issues;
+
+  const policy = validateOptionalObjectField({
+    record: readiness,
+    source,
+    field: "artifact_readiness.policy",
+    issues,
+  });
+  if (policy) {
+    validateNestedEnumStringField({
+      record: policy,
+      source,
+      field: "artifact_readiness.policy.mode",
+      allowedValues: ["strict", "soft"],
+      issues,
+      required: true,
+    });
+    validateNestedBooleanField({
+      record: policy,
+      source,
+      field: "artifact_readiness.policy.allow_incomplete_research_for_spec",
+      issues,
+      required: true,
+    });
+    validateNestedNullableStringField({
+      record: policy,
+      source,
+      field: "artifact_readiness.policy.reason",
+      issues,
+      required: true,
+    });
+  }
+
+  const stages = validateOptionalObjectField({
+    record: readiness,
+    source,
+    field: "artifact_readiness.stages",
+    issues,
+  });
+  if (!stages) return issues;
+
+  for (const stageKey of ARTIFACT_READINESS_STAGE_KEYS) {
+    const stage = validateOptionalObjectField({
+      record: stages,
+      source,
+      field: `artifact_readiness.stages.${stageKey}`,
+      issues,
+    });
+    if (!stage) continue;
+    validateNestedEnumStringField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.status`,
+      allowedValues: ARTIFACT_READINESS_STATUS_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedNullableStringField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.evidence_ref`,
+      issues,
+      required: true,
+    });
+    validateNestedStringField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.reason`,
+      issues,
+      required: true,
+    });
+    validateOptionalStringArrayField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.blocked_reasons`,
+      issues,
+    });
+    validateOptionalStringArrayField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.stale_reasons`,
+      issues,
+    });
+    validateOptionalStringArrayField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.required_evidence_refs`,
+      issues,
+    });
+    validateOptionalObjectField({
+      record: stage,
+      source,
+      field: `artifact_readiness.stages.${stageKey}.soft_decision`,
+      issues,
+      allowNull: true,
+    });
   }
   return issues;
 }

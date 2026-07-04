@@ -83,6 +83,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "graph-flow-canvas",
     "graph-trace-row",
     "StageSpecificPanel",
+    "artifact-readiness-grid",
+    "artifact_readiness",
     "Review Gate Matrix",
     "Delivery / Release Finalization",
     "Learning Closure / Start New Flow",

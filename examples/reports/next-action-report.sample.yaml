@@ -23,6 +23,58 @@ mission_state:
     - packages/payments/**
   forbidden_paths:
     - packages/settlement/**
+artifact_readiness:
+  policy:
+    mode: strict
+    allow_incomplete_research_for_spec: false
+    reason: null
+  stages:
+    mission:
+      status: complete
+      evidence_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+      reason: Mission intake is complete and current.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+      soft_decision: null
+    discovery:
+      status: pending
+      evidence_ref: null
+      reason: Discovery evidence has not been materialized.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+      soft_decision: null
+    research:
+      status: pending
+      evidence_ref: null
+      reason: Research evidence has not been materialized.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs: []
+      soft_decision: null
+    spec:
+      status: blocked
+      evidence_ref: null
+      reason: Spec cannot be ready until current discovery and research evidence are consumable.
+      blocked_reasons:
+        - current-discovery-and-research-required
+      stale_reasons: []
+      required_evidence_refs: []
+      soft_decision: null
+    planning:
+      status: blocked
+      evidence_ref: null
+      reason: Planning waits for current ready spec evidence.
+      blocked_reasons:
+        - spec-ready-required
+      stale_reasons: []
+      required_evidence_refs: []
+      soft_decision: null
 closure_state:
   run_id: null
   review:

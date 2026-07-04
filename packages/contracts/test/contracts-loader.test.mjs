@@ -337,6 +337,47 @@ test("project profile validates verification command group enums", () => {
   );
 });
 
+test("project profile accepts optional artifact readiness soft policy", () => {
+  const source = path.join(workspaceRoot, "examples/project.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.artifact_readiness_policy = {
+    research: {
+      allow_incomplete_for_spec: true,
+      reason: "Explicit operator policy allows bounded spec drafting from incomplete research.",
+    },
+  };
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: candidate,
+    source: "test://artifact-readiness-policy",
+  });
+
+  assert.equal(validation.ok, true);
+});
+
+test("next action report validates artifact readiness statuses", () => {
+  const source = path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "next-action-report" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.artifact_readiness.stages.spec.status = "maybe-ready";
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "next-action-report",
+      document: candidate,
+      source: "test://invalid-artifact-readiness-status",
+    }),
+    "enum_value_invalid",
+    "artifact_readiness.stages.spec.status",
+  );
+});
+
 test("verification command groups accept W54 authoring metadata", () => {
   const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
   const loaded = loadContractFile({ filePath: source, family: "project-profile" });

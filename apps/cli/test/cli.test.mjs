@@ -910,6 +910,9 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.equal(nextPayload.next_action_primary.action_id, "discovery-run");
     assert.equal(nextPayload.next_action_bounded_execution.requested_delivery_mode, "patch-only");
     assert.equal(nextPayload.next_action_bounded_execution.requires_review_before_writeback, true);
+    assert.equal(nextPayload.next_action_artifact_readiness.stages.mission.status, "complete");
+    assert.equal(nextPayload.next_action_artifact_readiness.stages.discovery.status, "pending");
+    assert.equal(nextPayload.guided_readiness.artifact_readiness.stages.discovery.status, "pending");
     assert.equal(nextPayload.next_action_closure_state.run_id, null);
 
     const runtimeLayout = missionPayload.runtime_layout;

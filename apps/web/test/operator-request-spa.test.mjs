@@ -50,6 +50,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /graph-flow-canvas/u);
   assert.match(source, /graph-trace-row/u);
   assert.match(source, /StageSpecificPanel/u);
+  assert.match(source, /artifact-readiness-grid/u);
+  assert.match(source, /artifact_readiness/u);
   assert.match(source, /Review Gate Matrix/u);
   assert.match(source, /Delivery \/ Release Finalization/u);
   assert.match(source, /Learning Closure \/ Start New Flow/u);

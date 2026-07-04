@@ -783,6 +783,7 @@ p {
 }
 
 .stage-signal-grid,
+.artifact-readiness-grid,
 .closure-state-grid,
 .delivery-readiness-grid {
   display: grid;
@@ -791,6 +792,7 @@ p {
 }
 
 .stage-signal-grid > div,
+.artifact-readiness-grid > div,
 .closure-state-grid > div,
 .delivery-readiness-grid > div {
   display: grid;
@@ -803,12 +805,47 @@ p {
 }
 
 .stage-signal-grid span,
+.artifact-readiness-grid span,
 .closure-state-grid span,
 .delivery-readiness-grid span {
   color: #65717d;
   font-size: 11px;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.artifact-readiness-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.artifact-readiness-grid p {
+  margin: 0;
+  color: #586472;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.artifact-readiness-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.artifact-readiness-card li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.artifact-readiness-card li span {
+  color: #5a6673;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .delivery-readiness-grid > div {
@@ -2577,6 +2614,7 @@ code {
   .action-detail-grid,
   .flow-snapshot-grid,
   .stage-signal-grid,
+  .artifact-readiness-grid,
   .closure-state-grid,
   .delivery-readiness-grid,
   .readiness-check-list > div,

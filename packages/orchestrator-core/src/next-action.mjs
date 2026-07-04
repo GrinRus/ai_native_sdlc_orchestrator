@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
@@ -97,6 +97,21 @@ function listJsonFiles(dirPath) {
 }
 
 /**
+ * @param {Record<string, unknown>} document
+ * @returns {boolean}
+ */
+function isClosureRunStepResult(document) {
+  const stepClass = asString(document.step_class);
+  if (stepClass === "runner" || stepClass === "repair" || stepClass === "eval" || stepClass === "harness") {
+    return true;
+  }
+  const routedExecution = asRecord(document.routed_execution);
+  const selectedStep = asRecord(asRecord(routedExecution.architecture_traceability).selected_step);
+  const requestedStepClass = asString(selectedStep.step_class);
+  return requestedStepClass === "implement" || requestedStepClass === "review" || requestedStepClass === "qa";
+}
+
+/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} filePath
  * @param {string} family
@@ -153,6 +168,9 @@ function findLatestRunEvidence(init, options = {}) {
   /** @type {Array<{ runId: string, evidenceRef: string, file: string, priority: number }>} */
   const candidates = [];
   const addCandidate = (filePath, document, priority) => {
+    if (priority === 40 && !isClosureRunStepResult(document)) {
+      return;
+    }
     if (typeof options.notBeforeMs === "number" && fs.statSync(filePath).mtimeMs < options.notBeforeMs) {
       return;
     }
@@ -807,15 +825,405 @@ function findActiveRun(init) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
- * @returns {string | null}
+ * @returns {Record<string, unknown>}
  */
-function findDiscoveryReport(init) {
-  return (
-    listJsonFiles(init.runtimeLayout.reportsRoot).find((filePath) => {
-      const report = readJsonFile(filePath);
-      return asString(report?.report_id)?.includes(".analysis.") || asRecord(report?.discovery_research).status;
-    }) ?? null
+function loadProjectProfileDocument(init) {
+  const loaded = loadContractFile({
+    filePath: init.projectProfilePath,
+    family: "project-profile",
+  });
+  return loaded.ok ? asRecord(loaded.document) : {};
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @returns {{ mode: "strict" | "soft", allow_incomplete_research_for_spec: boolean, reason: string | null }}
+ */
+function resolveArtifactReadinessPolicy(init) {
+  const profile = loadProjectProfileDocument(init);
+  const policy = asRecord(profile.artifact_readiness_policy);
+  const research = asRecord(policy.research);
+  const allowIncomplete =
+    research.allow_incomplete_for_spec === true ||
+    asString(research.incomplete_research_for_spec) === "allow";
+  return {
+    mode: allowIncomplete ? "soft" : "strict",
+    allow_incomplete_research_for_spec: allowIncomplete,
+    reason: asString(research.reason),
+  };
+}
+
+/**
+ * @param {string} filePath
+ * @returns {number | null}
+ */
+function fileMtimeMs(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {"reports" | "artifacts"} root
+ * @param {string} family
+ * @param {(document: Record<string, unknown>, filePath: string) => boolean} predicate
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown>, mtime_ms: number } | null}
+ */
+function findLatestRuntimeEvidence(init, root, family, predicate) {
+  const rootPath = root === "reports" ? init.runtimeLayout.reportsRoot : init.runtimeLayout.artifactsRoot;
+  for (const filePath of listJsonFiles(rootPath)) {
+    const document = readJsonFile(filePath);
+    if (!document || !predicate(document, filePath)) continue;
+    return {
+      family,
+      file: filePath,
+      artifact_ref: toEvidenceRef(init.projectRoot, filePath),
+      document,
+      mtime_ms: fileMtimeMs(filePath) ?? 0,
+    };
+  }
+  return null;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function findAnalysisEvidence(init) {
+  return findLatestRuntimeEvidence(
+    init,
+    "reports",
+    "project-analysis-report",
+    (document, filePath) =>
+      path.basename(filePath) === "project-analysis-report.json" ||
+      Boolean(asString(document.report_id)?.includes(".analysis.")) ||
+      Boolean(asRecord(document.discovery_completeness).status),
   );
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown>, mtime_ms: number } | null} analysis
+ */
+function findResearchEvidence(init, analysis) {
+  return (
+    findLatestRuntimeEvidence(
+      init,
+      "reports",
+      "discovery-research-report",
+      (document, filePath) =>
+        path.basename(filePath) === "discovery-research-report.json" ||
+        Boolean(asString(document.report_id)?.includes(".discovery-research.")) ||
+        Boolean(asRecord(document.research_inputs).source_refs),
+    ) ??
+    (asRecord(analysis?.document.discovery_research).status
+      ? {
+          family: "project-analysis-report",
+          file: analysis?.file ?? "",
+          artifact_ref: analysis?.artifact_ref ?? "",
+          document: asRecord(analysis?.document.discovery_research),
+          mtime_ms: analysis?.mtime_ms ?? 0,
+        }
+      : null)
+  );
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function findSpecEvidence(init) {
+  return findLatestRuntimeEvidence(init, "reports", "step-result", (document) => {
+    const routedExecution = asRecord(document.routed_execution);
+    const selectedStep = asRecord(asRecord(routedExecution.architecture_traceability).selected_step);
+    return asString(selectedStep.step_class) === "spec";
+  });
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function findPlanningEvidence(init) {
+  return findLatestRuntimeEvidence(init, "artifacts", "planning-artifact", (document, filePath) => {
+    const basename = path.basename(filePath);
+    return (
+      basename.startsWith("wave-ticket-") ||
+      /^.+\.handoff\..*\.json$/u.test(basename) ||
+      asString(document.status) === "ready-for-handoff" ||
+      asString(document.status) === "pending-approval"
+    );
+  });
+}
+
+/**
+ * @param {Array<{ name: string, mtime_ms: number | null }>} upstreams
+ * @param {number | null} evidenceMtime
+ * @param {string} stage
+ * @returns {string[]}
+ */
+function staleReasons(upstreams, evidenceMtime, stage) {
+  if (typeof evidenceMtime !== "number") return [];
+  return upstreams
+    .filter((upstream) => typeof upstream.mtime_ms === "number" && upstream.mtime_ms > evidenceMtime)
+    .map((upstream) => `${upstream.name}-changed-after-${stage}`);
+}
+
+/**
+ * @param {{
+ *   status: string,
+ *   evidenceRef?: string | null,
+ *   reason: string,
+ *   blockedReasons?: string[],
+ *   staleReasons?: string[],
+ *   requiredEvidenceRefs?: string[],
+ *   softDecision?: Record<string, unknown> | null,
+ * }} options
+ */
+function readinessStage(options) {
+  return {
+    status: options.status,
+    evidence_ref: options.evidenceRef ?? null,
+    reason: options.reason,
+    blocked_reasons: options.blockedReasons ?? [],
+    stale_reasons: options.staleReasons ?? [],
+    required_evidence_refs: options.requiredEvidenceRefs ?? [],
+    soft_decision: options.softDecision ?? null,
+  };
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   intake: { packetFile: string, bodyFile: string | null, packet: Record<string, unknown>, body: Record<string, unknown> | null } | null,
+ *   missionState: Record<string, unknown>,
+ * }} options
+ */
+function buildArtifactReadiness(options) {
+  const policy = resolveArtifactReadinessPolicy(options.init);
+  const packetRef = options.intake ? toEvidenceRef(options.init.projectRoot, options.intake.packetFile) : null;
+  const bodyRef = options.intake?.bodyFile ? toEvidenceRef(options.init.projectRoot, options.intake.bodyFile) : null;
+  const missionMtime = Math.max(
+    fileMtimeMs(options.intake?.packetFile ?? "") ?? 0,
+    fileMtimeMs(options.intake?.bodyFile ?? "") ?? 0,
+  );
+  const missionComplete = asString(options.missionState.completeness_status) === "complete";
+  const missionStage = !options.intake
+    ? readinessStage({
+        status: "pending",
+        reason: "Mission intake has not been materialized.",
+        blockedReasons: ["intake-request-required"],
+      })
+    : !options.intake.body || !missionComplete
+      ? readinessStage({
+          status: "blocked",
+          evidenceRef: packetRef,
+          reason: "Mission intake is incomplete or unreadable.",
+          blockedReasons: asStringArray(options.missionState.missing_fields).length > 0
+            ? asStringArray(options.missionState.missing_fields)
+            : ["intake-body-readable-required"],
+          requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+        })
+      : readinessStage({
+          status: "complete",
+          evidenceRef: packetRef,
+          reason: "Mission intake is complete and current.",
+          requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+        });
+
+  const analysis = findAnalysisEvidence(options.init);
+  const research = findResearchEvidence(options.init, analysis);
+  const spec = findSpecEvidence(options.init);
+  const planning = findPlanningEvidence(options.init);
+  const missionUpstream = [{ name: "mission", mtime_ms: missionMtime }];
+  const discoveryStale = staleReasons(missionUpstream, analysis?.mtime_ms ?? null, "discovery");
+  const discoveryCompleteness = asRecord(analysis?.document.discovery_completeness);
+  const discoveryBlocking = discoveryCompleteness.blocking === true || asString(discoveryCompleteness.status) === "fail";
+  const discoveryStage = !missionComplete
+    ? readinessStage({
+        status: "pending",
+        reason: "Discovery waits for complete mission intake.",
+        blockedReasons: ["mission-complete-required"],
+        requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+      })
+    : !analysis
+      ? readinessStage({
+          status: "pending",
+          reason: "Discovery evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+        })
+      : discoveryStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: analysis.artifact_ref,
+            reason: "Mission intake changed after discovery evidence was created.",
+            staleReasons: discoveryStale,
+            requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef, analysis.artifact_ref]),
+          })
+        : discoveryBlocking
+          ? readinessStage({
+              status: "blocked",
+              evidenceRef: analysis.artifact_ref,
+              reason: "Discovery completeness checks are blocking downstream spec readiness.",
+              blockedReasons: asStringArray(discoveryCompleteness.checks).length > 0
+                ? ["discovery-completeness-failed"]
+                : [asString(discoveryCompleteness.status) ?? "discovery-blocked"],
+              requiredEvidenceRefs: uniqueStrings([analysis.artifact_ref]),
+            })
+          : readinessStage({
+              status: "complete",
+              evidenceRef: analysis.artifact_ref,
+              reason: "Discovery evidence is complete and current.",
+              requiredEvidenceRefs: uniqueStrings([analysis.artifact_ref]),
+            });
+
+  const researchStatus = asString(research?.document.status) ?? asString(asRecord(research?.document.completeness).status);
+  const researchBlocking = asRecord(research?.document.completeness).blocking === true;
+  const researchStale = staleReasons(
+    [
+      ...missionUpstream,
+      { name: "discovery", mtime_ms: analysis?.mtime_ms ?? null },
+    ],
+    research?.mtime_ms ?? null,
+    "research",
+  );
+  const researchStage = discoveryStage.status === "pending" || discoveryStage.status === "blocked"
+    ? readinessStage({
+        status: "pending",
+        reason: "Research waits for complete discovery evidence.",
+        blockedReasons: ["discovery-complete-required"],
+        requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref]),
+      })
+    : !research
+      ? readinessStage({
+          status: "pending",
+          reason: "Research evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref]),
+        })
+      : researchStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: research.artifact_ref,
+            reason: "Mission or discovery evidence changed after research evidence was created.",
+            staleReasons: researchStale,
+            requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research.artifact_ref]),
+          })
+        : researchStatus === "adr-ready" && !researchBlocking
+          ? readinessStage({
+              status: "adr-ready",
+              evidenceRef: research.artifact_ref,
+              reason: "Research evidence is ADR-ready.",
+              requiredEvidenceRefs: uniqueStrings([research.artifact_ref]),
+            })
+          : policy.allow_incomplete_research_for_spec && researchStatus === "incomplete"
+            ? readinessStage({
+                status: "incomplete",
+                evidenceRef: research.artifact_ref,
+                reason: "Incomplete research is explicitly allowed by the project readiness policy.",
+                blockedReasons: [],
+                requiredEvidenceRefs: uniqueStrings([research.artifact_ref]),
+                softDecision: {
+                  allowed: true,
+                  reason: policy.reason ?? "project-profile artifact_readiness_policy allows incomplete research for spec",
+                  profile_field: "artifact_readiness_policy.research.allow_incomplete_for_spec",
+                },
+              })
+            : readinessStage({
+                status: "blocked",
+                evidenceRef: research.artifact_ref,
+                reason: "Research is not ADR-ready under the strict readiness policy.",
+                blockedReasons: ["research-adr-ready-required"],
+                requiredEvidenceRefs: uniqueStrings([research.artifact_ref]),
+              });
+
+  const specStale = staleReasons(
+    [
+      ...missionUpstream,
+      { name: "discovery", mtime_ms: analysis?.mtime_ms ?? null },
+      { name: "research", mtime_ms: research?.mtime_ms ?? null },
+    ],
+    spec?.mtime_ms ?? null,
+    "spec",
+  );
+  const researchCanFeedSpec = researchStage.status === "adr-ready" || researchStage.status === "incomplete";
+  const specStatus = asString(spec?.document.status);
+  const specStage = !researchCanFeedSpec
+    ? readinessStage({
+        status: "blocked",
+        evidenceRef: spec?.artifact_ref,
+        reason: "Spec cannot be ready until current discovery and research evidence are consumable.",
+        blockedReasons: ["current-discovery-and-research-required"],
+        requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref]),
+      })
+    : !spec
+      ? readinessStage({
+          status: "pending",
+          reason: "Spec evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref]),
+        })
+      : specStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: spec.artifact_ref,
+            reason: "Mission, discovery, or research evidence changed after spec evidence was created.",
+            staleReasons: specStale,
+            requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref, spec.artifact_ref]),
+          })
+        : specStatus === "pass" || specStatus === "passed"
+          ? readinessStage({
+              status: "ready",
+              evidenceRef: spec.artifact_ref,
+              reason: "Spec evidence is current and can feed planning.",
+              requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref, spec.artifact_ref]),
+            })
+          : readinessStage({
+              status: "blocked",
+              evidenceRef: spec.artifact_ref,
+              reason: "Spec evidence exists but did not pass.",
+              blockedReasons: [specStatus ?? "spec-not-passing"],
+              requiredEvidenceRefs: uniqueStrings([spec.artifact_ref]),
+            });
+
+  const planningStale = staleReasons([{ name: "spec", mtime_ms: spec?.mtime_ms ?? null }], planning?.mtime_ms ?? null, "planning");
+  const planningStage = specStage.status !== "ready"
+    ? readinessStage({
+        status: "blocked",
+        evidenceRef: planning?.artifact_ref,
+        reason: "Planning waits for current ready spec evidence.",
+        blockedReasons: ["spec-ready-required"],
+        requiredEvidenceRefs: uniqueStrings([spec?.artifact_ref]),
+      })
+    : !planning
+      ? readinessStage({
+          status: "pending",
+          reason: "Planning handoff evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([spec.artifact_ref]),
+        })
+      : planningStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: planning.artifact_ref,
+            reason: "Spec evidence changed after planning handoff evidence was created.",
+            staleReasons: planningStale,
+            requiredEvidenceRefs: uniqueStrings([spec.artifact_ref, planning.artifact_ref]),
+          })
+        : readinessStage({
+            status: "ready",
+            evidenceRef: planning.artifact_ref,
+            reason: "Planning evidence is current.",
+            requiredEvidenceRefs: uniqueStrings([spec.artifact_ref, planning.artifact_ref]),
+          });
+
+  return {
+    policy,
+    stages: {
+      mission: missionStage,
+      discovery: discoveryStage,
+      research: researchStage,
+      spec: specStage,
+      planning: planningStage,
+    },
+  };
 }
 
 /**
@@ -829,6 +1237,56 @@ function createBlocker(blocker) {
     evidence_refs: blocker.evidenceRefs ?? [],
     next_command: blocker.nextCommand,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} readiness
+ * @param {string} stage
+ * @returns {Record<string, unknown>}
+ */
+function artifactReadinessStage(readiness, stage) {
+  return asRecord(asRecord(readiness.stages)[stage]);
+}
+
+/**
+ * @param {Record<string, unknown>} stage
+ * @returns {string[]}
+ */
+function artifactReadinessEvidenceRefs(stage) {
+  return uniqueStrings([asString(stage.evidence_ref), ...asStringArray(stage.required_evidence_refs)]);
+}
+
+/**
+ * @param {string} stageName
+ * @param {Record<string, unknown>} stage
+ * @returns {string}
+ */
+function artifactReadinessBlockerCode(stageName, stage) {
+  const stale = asStringArray(stage.stale_reasons);
+  if (stale.length > 0) {
+    return `${stageName}-stale`;
+  }
+  const blocked = asStringArray(stage.blocked_reasons);
+  return blocked[0] ?? `${stageName}-blocked`;
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   stageName: string,
+ *   stage: Record<string, unknown>,
+ *   nextCommand: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function createArtifactReadinessBlocker(options) {
+  return createBlocker({
+    projectRoot: options.projectRoot,
+    code: artifactReadinessBlockerCode(options.stageName, options.stage),
+    summary: asString(options.stage.reason) ?? `${options.stageName} readiness is blocked.`,
+    evidenceRefs: artifactReadinessEvidenceRefs(options.stage),
+    nextCommand: options.nextCommand,
+  });
 }
 
 /**
@@ -913,6 +1371,8 @@ export function resolveNextAction(options = {}) {
     forbidden_paths: [],
   };
   let closureState = buildClosureState({ init, runId: null });
+  let latestIntake = null;
+  let artifactReadiness = null;
 
   const activeRun = findActiveRun(init);
   if (activeRun) {
@@ -952,6 +1412,7 @@ export function resolveNextAction(options = {}) {
     };
   } else {
     const intake = findLatestIntakePacket(init);
+    latestIntake = intake;
     if (intake) {
       const packetRef = toEvidenceRef(projectRoot, intake.packetFile);
       const bodyRef = intake.bodyFile ? toEvidenceRef(projectRoot, intake.bodyFile) : null;
@@ -1008,7 +1469,7 @@ export function resolveNextAction(options = {}) {
             evidence_refs: [...evidenceRefs],
           };
         } else {
-          const discoveryReport = findDiscoveryReport(init);
+          artifactReadiness = buildArtifactReadiness({ init, intake, missionState });
           const runEvidence = findLatestRunEvidence(init, { notBeforeMs: fs.statSync(intake.packetFile).mtimeMs });
           if (runEvidence) {
             closureState = buildClosureState({
@@ -1027,30 +1488,115 @@ export function resolveNextAction(options = {}) {
             stage = closureAction.stage;
             primaryAction = closureAction.primaryAction;
             blockers = closureAction.blockers;
-          } else if (discoveryReport) {
-            const discoveryRef = toEvidenceRef(projectRoot, discoveryReport);
-            stage = "spec-build";
-            primaryAction = {
-              action_id: "spec-build",
-              command: `${projectCommand("spec build", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`,
-              reason: "Mission intake and discovery evidence exist; build the routed specification next.",
-              low_level_command: "spec build",
-              evidence_refs: [...evidenceRefs, discoveryRef],
-            };
           } else {
-            stage = "discovery";
-            primaryAction = {
-              action_id: "discovery-run",
-              command: `${projectCommand("discovery run", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`,
-              reason: "Mission intake is complete; discovery should collect repository and research evidence before planning.",
-              low_level_command: "discovery run",
-              evidence_refs: [...evidenceRefs],
-            };
+            const discoveryReadiness = artifactReadinessStage(artifactReadiness, "discovery");
+            const researchReadiness = artifactReadinessStage(artifactReadiness, "research");
+            const specReadiness = artifactReadinessStage(artifactReadiness, "spec");
+            const planningReadiness = artifactReadinessStage(artifactReadiness, "planning");
+            const discoveryCommand = `${projectCommand("discovery run", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`;
+            const specCommand = `${projectCommand("spec build", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`;
+            const handoffPrepareCommand = `${projectCommand("handoff prepare", projectRoot)} --approved-artifact ${shellQuote(intake.packetFile)}`;
+            const discoveryStatus = asString(discoveryReadiness.status);
+            const researchStatus = asString(researchReadiness.status);
+            const specStatus = asString(specReadiness.status);
+            const planningStatus = asString(planningReadiness.status);
+
+            if (discoveryStatus !== "complete") {
+              status = discoveryStatus === "blocked" ? "blocked" : "ready";
+              stage = "discovery";
+              primaryAction = {
+                action_id: "discovery-run",
+                command: discoveryCommand,
+                reason: asString(discoveryReadiness.reason) ?? "Mission intake is complete; discovery evidence should be refreshed.",
+                low_level_command: "discovery run",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(discoveryReadiness)]),
+              };
+              blockers = discoveryStatus === "blocked"
+                ? [
+                    createArtifactReadinessBlocker({
+                      projectRoot,
+                      stageName: "discovery",
+                      stage: discoveryReadiness,
+                      nextCommand: discoveryCommand,
+                    }),
+                  ]
+                : [];
+            } else if (researchStatus !== "adr-ready" && researchStatus !== "incomplete") {
+              status = "blocked";
+              stage = "research";
+              primaryAction = {
+                action_id: "discovery-run",
+                command: discoveryCommand,
+                reason: asString(researchReadiness.reason) ?? "Research readiness must be refreshed before spec build.",
+                low_level_command: "discovery run",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(researchReadiness)]),
+              };
+              blockers = [
+                createArtifactReadinessBlocker({
+                  projectRoot,
+                  stageName: "research",
+                  stage: researchReadiness,
+                  nextCommand: discoveryCommand,
+                }),
+              ];
+            } else if (specStatus !== "ready") {
+              status = specStatus === "pending" ? "ready" : "blocked";
+              stage = "spec-build";
+              primaryAction = {
+                action_id: "spec-build",
+                command: specCommand,
+                reason: asString(specReadiness.reason) ?? "Discovery and research evidence are ready; build the routed specification next.",
+                low_level_command: "spec build",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(specReadiness)]),
+              };
+              blockers = specStatus === "pending"
+                ? []
+                : [
+                    createArtifactReadinessBlocker({
+                      projectRoot,
+                      stageName: "spec",
+                      stage: specReadiness,
+                      nextCommand: specCommand,
+                    }),
+                  ];
+            } else if (planningStatus !== "ready") {
+              status = planningStatus === "pending" ? "ready" : "blocked";
+              stage = "planning";
+              primaryAction = {
+                action_id: "handoff-prepare",
+                command: handoffPrepareCommand,
+                reason: asString(planningReadiness.reason) ?? "Spec evidence is ready; prepare bounded planning handoff evidence next.",
+                low_level_command: "handoff prepare",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(planningReadiness)]),
+              };
+              blockers = planningStatus === "pending"
+                ? []
+                : [
+                    createArtifactReadinessBlocker({
+                      projectRoot,
+                      stageName: "planning",
+                      stage: planningReadiness,
+                      nextCommand: handoffPrepareCommand,
+                    }),
+                  ];
+            } else {
+              const approvalRef = `approval://operator/${normalizeForFileName(asString(missionState.mission_id) ?? "current") || "current"}`;
+              stage = "planning";
+              primaryAction = {
+                action_id: "handoff-approve",
+                command: `${projectCommand("handoff approve", projectRoot)} --approval-ref ${shellQuote(approvalRef)}`,
+                reason: asString(planningReadiness.reason) ?? "Planning evidence is current; approve the handoff before execution-style flows.",
+                low_level_command: "handoff approve",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(planningReadiness)]),
+              };
+            }
           }
         }
       }
     }
   }
+
+  artifactReadiness ??= buildArtifactReadiness({ init, intake: latestIntake, missionState });
 
   primaryAction = withRuntimeRootActionCommand(primaryAction, init.runtimeRoot, includeRuntimeRoot);
   blockers = withRuntimeRootBlockerCommands(blockers, init.runtimeRoot, includeRuntimeRoot);
@@ -1072,6 +1618,7 @@ export function resolveNextAction(options = {}) {
       active_run_ref: activeRun ? toEvidenceRef(projectRoot, activeRun.stateFile) : null,
     },
     mission_state: missionState,
+    artifact_readiness: artifactReadiness,
     closure_state: closureState,
     primary_action: primaryAction,
     blockers,
