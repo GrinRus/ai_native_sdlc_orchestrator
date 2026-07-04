@@ -18,6 +18,27 @@
 15. incident or close
 16. learning handoff, dataset / suite backfill, and recertification when needed
 
+## Discovery-to-planning readiness
+
+The discovery -> research -> spec -> planning path is inspected through the
+same public runtime reports that guide operators:
+
+- `aor discovery run` materializes project analysis plus a
+  `discovery-research-report` whose status determines research readiness.
+- `aor next` materializes `next-action-report.artifact_readiness` after
+  mission, discovery, spec, and planning checkpoints when a maintainer
+  rehearsal needs acceptance evidence.
+- `aor spec build` emits a routed step-result whose compiled-context artifact
+  records the selected spec prompt bundle, required packet refs, context bundle
+  refs, skill refs, and compiler provenance.
+- `aor wave create` materializes the wave ticket and handoff packet that make
+  planning readiness inspectable.
+
+Maintainer rehearsal summaries may copy a compact proof from those public
+reports, but they must not become a second owner of readiness decisions. The
+next-action report remains the public read model for blocked, stale,
+incomplete, ADR-ready, ready, and pending states.
+
 ## Guided installed-user overlay
 The installed-user journey source of truth is `docs/product/02-installed-user-onboarding-journey.md`.
 

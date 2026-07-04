@@ -81,6 +81,13 @@ Each stage record contains `status`, `evidence_ref`, `reason`,
 `soft_decision`. CLI, API, and web surfaces must show blocked or stale reasons
 from this object without inventing a second next-action owner.
 
+Maintainer rehearsal reports that need discovery -> research -> spec ->
+planning proof should cite this object instead of re-deriving readiness from raw
+runtime files. A summary may copy stage statuses, evidence refs, blocked
+reasons, stale reasons, and prompt/context lineage for review convenience, but
+`next-action-report.artifact_readiness` remains the contract-owned readiness
+decision.
+
 ## Closure state
 `closure_state` is the durable final-stage model for review, delivery, release, and learning UX. It is always present, even before execution has started.
 

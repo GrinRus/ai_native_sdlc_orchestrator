@@ -34,7 +34,7 @@ and delivery/release blocking semantics.
 
 ## W45-S01 — Quality repair request contract and operating model
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Define the contract-first semantics for bounded review/QA repair
   cycles before runtime behavior depends on them.
 - **Primary modules:** `docs/contracts/**`, `docs/architecture/**`,

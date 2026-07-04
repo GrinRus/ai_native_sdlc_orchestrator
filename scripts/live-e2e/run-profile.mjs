@@ -15,6 +15,7 @@ import {
   nowIso,
   parseFlags,
   readJson,
+  readYamlDocument,
   requireDirectory,
   resolveOptionalStringFlag,
   resolveRuntimeAgentAutoApprovalProfile,
@@ -198,6 +199,254 @@ function getQualityRelevantStepJournal(stepJournal) {
 function readJsonIfPresent(filePath) {
   const resolved = asNonEmptyString(filePath);
   return resolved && fileExists(resolved) ? asRecord(readJson(resolved)) : {};
+}
+
+/**
+ * @param {string | null} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readYamlIfPresent(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  return resolved && fileExists(resolved) ? asRecord(readYamlDocument(resolved)) : {};
+}
+
+const ARTIFACT_READINESS_PROOF_STAGES = Object.freeze(["mission", "discovery", "research", "spec", "planning"]);
+const ARTIFACT_LINEAGE_STEPS = Object.freeze(["discovery", "research", "spec", "planning"]);
+
+/**
+ * @param {Record<string, unknown>} readiness
+ * @param {string} stage
+ * @returns {Record<string, unknown>}
+ */
+function summarizeReadinessStage(readiness, stage) {
+  const stageReadiness = asRecord(asRecord(readiness.stages)[stage]);
+  return {
+    status: asNonEmptyString(stageReadiness.status) || null,
+    evidence_ref: asNonEmptyString(stageReadiness.evidence_ref) || null,
+    reason: asNonEmptyString(stageReadiness.reason) || null,
+    blocked_reasons: asStringArray(stageReadiness.blocked_reasons),
+    stale_reasons: asStringArray(stageReadiness.stale_reasons),
+    required_evidence_refs: asStringArray(stageReadiness.required_evidence_refs),
+    soft_decision:
+      typeof stageReadiness.soft_decision === "object" && stageReadiness.soft_decision
+        ? asRecord(stageReadiness.soft_decision)
+        : null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} snapshot
+ * @returns {Record<string, unknown>}
+ */
+function summarizeArtifactReadinessSnapshot(snapshot) {
+  const reportFile = asNonEmptyString(snapshot.next_action_report_file);
+  const report = readJsonIfPresent(reportFile);
+  const snapshotReadiness = asRecord(snapshot.artifact_readiness);
+  const reportReadiness = asRecord(report.artifact_readiness);
+  const readiness = Object.keys(snapshotReadiness).length > 0 ? snapshotReadiness : reportReadiness;
+  return {
+    checkpoint: asNonEmptyString(snapshot.checkpoint) || null,
+    command_label: asNonEmptyString(snapshot.command_label) || null,
+    transcript_file: asNonEmptyString(snapshot.transcript_file) || null,
+    next_action_report_file: reportFile || null,
+    next_action_status:
+      asNonEmptyString(snapshot.next_action_status) ||
+      asNonEmptyString(report.next_action_status) ||
+      null,
+    next_action_primary:
+      asNonEmptyString(snapshot.next_action_primary) ||
+      asNonEmptyString(report.next_action_primary) ||
+      null,
+    policy: Object.keys(asRecord(readiness.policy)).length > 0 ? asRecord(readiness.policy) : null,
+    stages: Object.fromEntries(
+      ARTIFACT_READINESS_PROOF_STAGES.map((stage) => [stage, summarizeReadinessStage(readiness, stage)]),
+    ),
+    evidence_refs: uniqueStrings([
+      reportFile,
+      asNonEmptyString(snapshot.transcript_file),
+      ...asStringArray(snapshot.evidence_refs),
+    ]),
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} step
+ * @returns {Record<string, unknown>}
+ */
+function findStepEntry(value, step) {
+  return asRecord(
+    Array.isArray(value)
+      ? value.find((entry) => asNonEmptyString(asRecord(entry).step_class) === step)
+      : null,
+  );
+}
+
+/**
+ * @param {{
+ *   step: string,
+ *   profile: Record<string, unknown>,
+ *   analysisReport: Record<string, unknown>,
+ *   specStepResult: Record<string, unknown>,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function summarizePromptLineageStep(options) {
+  const assetEntry = findStepEntry(asRecord(options.analysisReport.asset_resolution).matrix, options.step);
+  const architectureEntry = findStepEntry(
+    asRecord(options.analysisReport.architecture_traceability).step_linkage,
+    options.step,
+  );
+  const specRoutedExecution = asRecord(options.specStepResult.routed_execution);
+  const specContextCompilation = asRecord(specRoutedExecution.context_compilation);
+  const specCompiledContext = asRecord(specContextCompilation.compiled_context_artifact);
+  const selectedSpecStep = asRecord(asRecord(specRoutedExecution.architecture_traceability).selected_step);
+  const specSelected = options.step === "spec" ? selectedSpecStep : {};
+  return {
+    step: options.step,
+    profile_prompt_bundle_ref: asNonEmptyString(asRecord(options.profile.default_prompt_bundles)[options.step]) || null,
+    analysis_prompt_bundle_ref:
+      asNonEmptyString(asRecord(assetEntry.prompt_bundle).prompt_bundle_ref) ||
+      asNonEmptyString(architectureEntry.prompt_bundle_ref) ||
+      null,
+    wrapper_ref:
+      asNonEmptyString(asRecord(assetEntry.wrapper).wrapper_ref) ||
+      asNonEmptyString(architectureEntry.wrapper_ref) ||
+      null,
+    route_id:
+      asNonEmptyString(asRecord(assetEntry.route).resolved_route_id) ||
+      asNonEmptyString(architectureEntry.route_id) ||
+      null,
+    policy_id: asNonEmptyString(architectureEntry.policy_id) || null,
+    selected_step_prompt_bundle_ref: asNonEmptyString(specSelected.prompt_bundle_ref) || null,
+    compiled_context_ref:
+      options.step === "spec" ? asNonEmptyString(specContextCompilation.compiled_context_ref) || null : null,
+    compiled_context_file:
+      options.step === "spec" ? asNonEmptyString(specContextCompilation.compiled_context_file) || null : null,
+    compiled_context_prompt_bundle_ref:
+      options.step === "spec" ? asNonEmptyString(specCompiledContext.prompt_bundle_ref) || null : null,
+    required_input_refs:
+      options.step === "spec"
+        ? uniqueStrings([
+            ...asStringArray(specCompiledContext.packet_refs),
+            ...asStringArray(asRecord(specRoutedExecution.adapter_request).input_packet_refs),
+          ])
+        : [],
+    context_bundle_refs:
+      options.step === "spec" ? asStringArray(specCompiledContext.context_bundle_refs) : [],
+    skill_refs:
+      options.step === "spec" ? asStringArray(specCompiledContext.skill_refs) : [],
+    provenance:
+      options.step === "spec" && Object.keys(asRecord(specCompiledContext.provenance)).length > 0
+        ? {
+            compiler_revision_ref: asNonEmptyString(asRecord(specCompiledContext.provenance).compiler_revision_ref) || null,
+            project_profile_ref: asNonEmptyString(asRecord(specCompiledContext.provenance).project_profile_ref) || null,
+            route_profile_ref: asNonEmptyString(asRecord(specCompiledContext.provenance).route_profile_ref) || null,
+            wrapper_profile_ref: asNonEmptyString(asRecord(specCompiledContext.provenance).wrapper_profile_ref) || null,
+          }
+        : null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} discoveryResearch
+ * @returns {Record<string, unknown>}
+ */
+function summarizeDiscoveryResearch(discoveryResearch) {
+  const researchInputs = asRecord(discoveryResearch.research_inputs);
+  return {
+    status: asNonEmptyString(discoveryResearch.status) || null,
+    adr_ready: discoveryResearch.adr_ready === true || asNonEmptyString(discoveryResearch.status) === "adr-ready",
+    source_ref_count: asStringArray(researchInputs.source_refs).length,
+    open_question_count: Array.isArray(discoveryResearch.open_questions)
+      ? discoveryResearch.open_questions.length
+      : 0,
+    recommendation_count: Array.isArray(discoveryResearch.adr_ready_recommendations)
+      ? discoveryResearch.adr_ready_recommendations.length
+      : 0,
+  };
+}
+
+/**
+ * @param {{ artifacts: Record<string, unknown> }} options
+ * @returns {Record<string, unknown>}
+ */
+export function buildArtifactReadinessProof(options) {
+  const artifacts = options.artifacts;
+  const snapshots = Array.isArray(artifacts.artifact_readiness_snapshots)
+    ? artifacts.artifact_readiness_snapshots.map((entry) => asRecord(entry))
+    : [];
+  const seenSnapshotCheckpoints = new Set();
+  const readinessSnapshots = snapshots
+    .filter((snapshot) => {
+      const checkpoint = asNonEmptyString(snapshot.checkpoint);
+      if (!checkpoint) return true;
+      if (seenSnapshotCheckpoints.has(checkpoint)) return false;
+      seenSnapshotCheckpoints.add(checkpoint);
+      return true;
+    })
+    .map((snapshot) => summarizeArtifactReadinessSnapshot(snapshot));
+  const generatedProfileFile = asNonEmptyString(artifacts.generated_project_profile_file);
+  const projectProfile = readYamlIfPresent(generatedProfileFile);
+  const analysisReportFile =
+    asNonEmptyString(artifacts.analysis_report_file) ||
+    asNonEmptyString(artifacts.discovery_analysis_report_file);
+  const analysisReport = readJsonIfPresent(analysisReportFile);
+  const specStepResultFile = asNonEmptyString(artifacts.spec_step_result_file);
+  const specStepResult = readJsonIfPresent(specStepResultFile);
+  const discoveryResearchReportFile = asNonEmptyString(artifacts.discovery_research_report_file);
+  const discoveryResearchReport = readJsonIfPresent(discoveryResearchReportFile);
+  const promptLineageSteps = ARTIFACT_LINEAGE_STEPS.map((step) =>
+    summarizePromptLineageStep({
+      step,
+      profile: projectProfile,
+      analysisReport,
+      specStepResult,
+    }),
+  );
+  const evidenceRefs = uniqueStrings([
+    ...readinessSnapshots.flatMap((snapshot) => asStringArray(snapshot.evidence_refs)),
+    generatedProfileFile,
+    analysisReportFile,
+    discoveryResearchReportFile,
+    specStepResultFile,
+    asNonEmptyString(artifacts.wave_ticket_file),
+    asNonEmptyString(artifacts.handoff_packet_file),
+  ]);
+  const hasReadiness = readinessSnapshots.length > 0;
+  const hasPromptRefs = promptLineageSteps.some((entry) =>
+    asNonEmptyString(entry.profile_prompt_bundle_ref) ||
+    asNonEmptyString(entry.analysis_prompt_bundle_ref) ||
+    asNonEmptyString(entry.compiled_context_prompt_bundle_ref),
+  );
+  return {
+    proof_status: hasReadiness && hasPromptRefs ? "available" : hasReadiness || hasPromptRefs ? "partial" : "missing",
+    summary:
+      hasReadiness && hasPromptRefs
+        ? "Artifact readiness snapshots and prompt lineage are available from public AOR reports."
+        : "Artifact readiness proof is incomplete; inspect missing source refs before using this run for W44 acceptance.",
+    next_action_report_files: uniqueStrings([
+      ...asStringArray(artifacts.next_action_report_files),
+      ...readinessSnapshots.map((snapshot) => asNonEmptyString(snapshot.next_action_report_file)),
+    ]),
+    readiness_snapshots: readinessSnapshots,
+    prompt_lineage: {
+      generated_project_profile_file: generatedProfileFile || null,
+      analysis_report_file: analysisReportFile || null,
+      spec_step_result_file: specStepResultFile || null,
+      steps: promptLineageSteps,
+    },
+    discovery_research: {
+      report_file: discoveryResearchReportFile || null,
+      ...summarizeDiscoveryResearch(discoveryResearchReport),
+    },
+    planning: {
+      wave_ticket_file: asNonEmptyString(artifacts.wave_ticket_file) || null,
+      handoff_packet_file: asNonEmptyString(artifacts.handoff_packet_file) || null,
+      handoff_status: asNonEmptyString(artifacts.handoff_status) || null,
+    },
+    evidence_refs: evidenceRefs,
+  };
 }
 
 /**
@@ -1536,9 +1785,28 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "intake_artifact_packet_file",
     "intake_artifact_packet_body_file",
     "analysis_report_file",
+    "route_resolution_file",
+    "asset_resolution_file",
+    "policy_resolution_file",
+    "evaluation_registry_file",
     "discovery_analysis_report_file",
+    "discovery_research_report_file",
+    "discovery_research_status",
+    "discovery_research_adr_ready",
     "spec_step_result_file",
+    "artifact_readiness_snapshots",
+    "next_action_report_files",
+    "next_action_report_file",
+    "artifact_readiness_next_after_mission_report_file",
+    "artifact_readiness_next_after_mission_transcript_file",
+    "artifact_readiness_next_after_discovery_report_file",
+    "artifact_readiness_next_after_discovery_transcript_file",
+    "artifact_readiness_next_after_spec_report_file",
+    "artifact_readiness_next_after_spec_transcript_file",
+    "artifact_readiness_next_after_planning_report_file",
+    "artifact_readiness_next_after_planning_transcript_file",
     "handoff_packet_file",
+    "handoff_status",
     "approved_handoff_packet_file",
     "routed_step_result_file",
     "runtime_harness_report_file",
@@ -3293,6 +3561,9 @@ export function writeProofRunnerArtifacts(options) {
     scorecardFile: learningLoopScorecardFile,
     handoffFile: learningLoopHandoffFile,
   });
+  const artifactReadinessProof = buildArtifactReadinessProof({
+    artifacts: options.flowResult.artifacts,
+  });
 
   const summary = {
     run_id: options.runId,
@@ -3323,6 +3594,7 @@ export function writeProofRunnerArtifacts(options) {
     command_health: runHealthReport.command_health,
     controller_health: runHealthReport.controller_health,
     evidence_health: runHealthReport.evidence_health,
+    artifact_readiness_proof: artifactReadinessProof,
     failure_summary: runHealthReport.failure_summary,
     target_repo: asRecord(options.profile.target_repo),
     target_checkout_root:

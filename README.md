@@ -495,8 +495,8 @@ The current alpha distribution is tracked through `W54` and focuses on:
 - W30 alpha hardening through ADRs, OpenAPI route drift checks, self-hosted
   operations runbooks, and release smoke evidence.
 - Installed-user local app launch with a guided Mission intake UI.
-- Discovery/research/spec prompt granularity, readiness transition planning,
-  documentation sync, and maintainer validation.
+- Discovery/research/spec prompt granularity, artifact-readiness transitions,
+  operator-visible prompt/context lineage, and maintainer validation evidence.
 - Bounded review/QA repair-loop planning with shared repair requests,
   prompt/context lineage, explicit attempt budgets, operator-visible next
   actions, documentation refresh, and required maintainer acceptance evidence.

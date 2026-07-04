@@ -144,6 +144,37 @@ aor mission create \
 aor next --project-ref <repo> --runtime-root <repo>/.aor --json
 ```
 
+## Artifact readiness and prompt lineage
+
+Use `aor next --json` as the public readiness read model after each
+discovery/research/spec/planning transition. The stable automation fields are:
+
+- `next_action_artifact_readiness.policy`
+- `next_action_artifact_readiness.stages.mission`
+- `next_action_artifact_readiness.stages.discovery`
+- `next_action_artifact_readiness.stages.research`
+- `next_action_artifact_readiness.stages.spec`
+- `next_action_artifact_readiness.stages.planning`
+
+Blocked or stale transitions must be explained by the stage record's
+`reason`, `blocked_reasons[]`, `stale_reasons[]`, and
+`required_evidence_refs[]`. Do not infer readiness from a missing UI button or
+from raw runtime filenames when the next-action report is available.
+
+For maintainer rehearsal proof, inspect the run summary's
+`artifact_readiness_proof`. It is a compact index over public artifacts:
+
+- `readiness_snapshots[]` points at the `aor next` reports captured after
+  mission, discovery, spec, and planning.
+- `prompt_lineage.steps[]` shows profile/default prompt refs, analysis prompt
+  refs, and spec compiled-context refs.
+- `discovery_research` summarizes the discovery research report status.
+- `planning` points at the wave ticket and handoff packet.
+
+Treat linked next-action reports, discovery research reports, spec
+step-results, and handoff packets as the durable evidence. The summary only
+keeps acceptance review short.
+
 ## Ask AOR / operator request
 Use Ask AOR when the operator wants AOR to analyze, explain, revise, repair,
 validate, plan, implement, or review a bounded artifact without starting a
