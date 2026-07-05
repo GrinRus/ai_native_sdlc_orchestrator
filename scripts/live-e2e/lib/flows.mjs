@@ -16,6 +16,10 @@ import {
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
+import {
+  closeQualityRepairRequest,
+  listQualityRepairRequests,
+} from "../../../packages/observability/src/index.mjs";
 import { createStageMap, flattenStageMap, getProfileStages, markStage as markStageRaw } from "./stages.mjs";
 import {
   buildLiveE2eStepInstanceId,
@@ -273,6 +277,74 @@ function reviewRequiresActionableRepair(reviewReport, reviewOverallStatus) {
   if (recommendation === "repair" || reviewOverallStatus === "fail") return true;
   const findings = collectReviewFindingRecords(reviewReport);
   return findings.some((finding) => reviewFindingRequiresImplementationChange(finding));
+}
+
+/**
+ * @param {Record<string, unknown>} proofExpectations
+ * @returns {Record<string, unknown> | null}
+ */
+export function resolveAcceptanceRepairDrill(proofExpectations) {
+  const drill = asRecord(proofExpectations.acceptance_repair_drill);
+  const sourcePhase = asNonEmptyString(drill.source_phase);
+  if (!["review", "qa"].includes(sourcePhase)) return null;
+  return {
+    source_phase: sourcePhase,
+    trigger: asNonEmptyString(drill.trigger) || "when-no-organic-repair",
+    finding_id:
+      asNonEmptyString(drill.finding_id) ||
+      `w45.acceptance.${sourcePhase}.repair-drill`,
+    summary:
+      asNonEmptyString(drill.summary) ||
+      `W45 acceptance drill requests ${sourcePhase}-origin public repair evidence.`,
+    resolution_requirement:
+      asNonEmptyString(drill.resolution_requirement) ||
+      "Complete one bounded public repair execution, then provide refreshed review and QA evidence before delivery.",
+  };
+}
+
+/**
+ * @param {{
+ *   drill: Record<string, unknown> | null,
+ *   iteration: number,
+ *   sourcePhase: string,
+ *   currentRepairSource: string | null,
+ *   stageStatus: string,
+ *   secondaryStatus?: string,
+ *   priorRepairDecisionFiles: string[],
+ * }} options
+ * @returns {Record<string, unknown> | null}
+ */
+export function resolveActiveAcceptanceRepairDrill(options) {
+  if (!options.drill) return null;
+  if (options.iteration !== 1) return null;
+  if (asNonEmptyString(options.drill.source_phase) !== options.sourcePhase) return null;
+  if (options.currentRepairSource) return null;
+  if (options.stageStatus !== "pass") return null;
+  if (options.secondaryStatus && options.secondaryStatus !== "pass") return null;
+  if (options.priorRepairDecisionFiles.length > 0) return null;
+  return options.drill;
+}
+
+/**
+ * @param {{
+ *   drill: Record<string, unknown>,
+ *   sourcePhase: string,
+ *   iteration: number,
+ *   evidenceRefs: string[],
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+export function buildAcceptanceRepairDrillFinding(options) {
+  return {
+    finding_id: asNonEmptyString(options.drill.finding_id),
+    category: options.sourcePhase,
+    severity: "blocking",
+    summary: asNonEmptyString(options.drill.summary),
+    evidence_refs: uniqueStrings(options.evidenceRefs),
+    resolution_requirement: asNonEmptyString(options.drill.resolution_requirement),
+    acceptance_drill: true,
+    cycle_iteration: options.iteration,
+  };
 }
 
 /**
@@ -1215,6 +1287,8 @@ function resolveImplementationLoopPolicy(profile) {
       ? asStringArray(loop.repair_sources)
       : ["review", "post-run-primary"],
     stopOnBlockingReview: loop.stop_on_blocking_review !== false,
+    proofExpectations: asRecord(loop.proof_expectations),
+    acceptanceRepairDrill: resolveAcceptanceRepairDrill(asRecord(loop.proof_expectations)),
   };
 }
 
@@ -2493,6 +2567,253 @@ function readRepairDecisionContexts(refs) {
       }
     })
     .filter((context) => Object.keys(context).length > 0);
+}
+
+/**
+ * @param {string[]} refs
+ * @returns {Record<string, unknown>[]}
+ */
+function readRepairDecisionDocuments(refs) {
+  return refs
+    .map((ref) => asNonEmptyString(ref))
+    .filter((ref) => ref && path.isAbsolute(ref) && fileExists(ref))
+    .map((ref) => {
+      try {
+        return asRecord(readJson(ref));
+      } catch {
+        return {};
+      }
+    })
+    .filter((document) => Object.keys(document).length > 0);
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ */
+function collectRepairProofEvidence(artifacts) {
+  const loop = asRecord(artifacts.implementation_loop);
+  const iterations = Array.isArray(loop.iterations)
+    ? loop.iterations.map((entry) => asRecord(entry)).filter((entry) => Object.keys(entry).length > 0)
+    : [];
+  const repairDecisionFiles = uniqueStrings(asStringArray(artifacts.review_repair_decision_files));
+  const repairDecisionDocuments = readRepairDecisionDocuments(repairDecisionFiles);
+  const sourceStages = uniqueStrings(
+    repairDecisionDocuments.map((document) => asNonEmptyString(asRecord(document.repair_context).source_phase)),
+  );
+  const qualityRepairRequestRefs = uniqueStrings([
+    ...asStringArray(artifacts.quality_repair_request_refs),
+    ...repairDecisionDocuments.map((document) => asNonEmptyString(document.quality_repair_request_ref)),
+  ]);
+  const qualityRepairRequestFiles = uniqueStrings(asStringArray(artifacts.quality_repair_request_files));
+  const closedQualityRepairRequestRefs = uniqueStrings(asStringArray(artifacts.closed_quality_repair_request_refs));
+  const postRequestIterations = iterations.filter(
+    (entry) =>
+      Number(entry.iteration) > 1 ||
+      (
+        asStringArray(entry.previous_repair_decision_files).length > 0 &&
+        entry.repair_requested !== true
+      ),
+  );
+
+  return {
+    iterations,
+    repair_decision_files: repairDecisionFiles,
+    repair_source_stages: sourceStages,
+    quality_repair_request_refs: qualityRepairRequestRefs,
+    quality_repair_request_files: qualityRepairRequestFiles,
+    closed_quality_repair_request_refs: closedQualityRepairRequestRefs,
+    implementation_repair_refs: uniqueStrings(postRequestIterations.map((entry) => asNonEmptyString(entry.routed_step_result_file))),
+    review_rerun_refs: uniqueStrings(postRequestIterations.map((entry) => asNonEmptyString(entry.review_report_file))),
+    qa_rerun_refs: uniqueStrings(
+      postRequestIterations.flatMap((entry) => [
+        asNonEmptyString(entry.evaluation_report_file),
+        asNonEmptyString(entry.post_run_verify_summary_file),
+        asNonEmptyString(entry.post_run_diagnostic_verify_summary_file),
+      ]),
+    ),
+  };
+}
+
+/**
+ * @param {{ profile?: Record<string, unknown>, artifacts: Record<string, unknown> }} options
+ */
+export function evaluateRepairProofExpectations(options) {
+  const profile = asRecord(options.profile);
+  const loop = asRecord(profile.implementation_loop);
+  const proofExpectations = asRecord(loop.proof_expectations);
+  const requiredRepairPaths = asStringArray(proofExpectations.required_repair_paths);
+  const requiresRepairProof =
+    requiredRepairPaths.length > 0 ||
+    proofExpectations.require_quality_repair_request_refs === true ||
+    proofExpectations.require_implementation_repair_refs === true ||
+    proofExpectations.require_review_rerun_refs === true ||
+    proofExpectations.require_qa_rerun_refs === true ||
+    proofExpectations.qa_origin_requires_post_repair_review === true ||
+    proofExpectations.no_upstream_write_evidence_required === true;
+
+  const evidence = collectRepairProofEvidence(options.artifacts);
+  const artifactRecord = asRecord(options.artifacts);
+  const observedRepairPaths = uniqueStrings([
+    evidence.repair_source_stages.includes("review") ? "review-origin" : "",
+    evidence.repair_source_stages.includes("qa") ? "qa-origin" : "",
+    artifactRecord.implementation_loop_exhausted === true ||
+    /exhausted/u.test(asNonEmptyString(artifactRecord.failure_class))
+      ? "budget-exhaustion"
+      : "",
+  ]);
+  const observedDeclaredRepairPaths =
+    requiredRepairPaths.length > 0
+      ? observedRepairPaths.filter((repairPath) => requiredRepairPaths.includes(repairPath))
+      : observedRepairPaths;
+  /** @type {string[]} */
+  const findings = [];
+
+  if (!requiresRepairProof) {
+    return {
+      status: "pass",
+      findings,
+      summary: "No repair-loop proof expectations were declared.",
+      evidence,
+      evidence_refs: [],
+    };
+  }
+
+  if (
+    proofExpectations.require_quality_repair_request_refs === true &&
+    evidence.quality_repair_request_refs.length === 0
+  ) {
+    findings.push("Repair proof expected at least one quality_repair_request ref, but none was materialized.");
+  }
+  if (requiredRepairPaths.length > 0 && observedDeclaredRepairPaths.length === 0) {
+    findings.push("Repair proof expected at least one declared repair path to be materialized in this run.");
+  }
+  if (
+    evidence.quality_repair_request_refs.length > 0 &&
+    evidence.closed_quality_repair_request_refs.length < evidence.quality_repair_request_refs.length
+  ) {
+    findings.push("Repair proof expected every materialized quality_repair_request to be closed by refreshed review and QA evidence.");
+  }
+  if (
+    proofExpectations.require_implementation_repair_refs === true &&
+    evidence.implementation_repair_refs.length === 0
+  ) {
+    findings.push("Repair proof expected implementation repair refs from a post-request execution iteration.");
+  }
+  if (proofExpectations.require_review_rerun_refs === true && evidence.review_rerun_refs.length === 0) {
+    findings.push("Repair proof expected review rerun refs after the repair implementation.");
+  }
+  if (proofExpectations.require_qa_rerun_refs === true && evidence.qa_rerun_refs.length === 0) {
+    findings.push("Repair proof expected QA rerun refs after the repair implementation.");
+  }
+  if (
+    proofExpectations.qa_origin_requires_post_repair_review === true &&
+    evidence.repair_source_stages.includes("qa") &&
+    evidence.review_rerun_refs.length === 0
+  ) {
+    findings.push("QA-origin repair proof expected a post-repair review rerun before QA closure.");
+  }
+  if (proofExpectations.no_upstream_write_evidence_required === true) {
+    const outputPolicy = asRecord(profile.output_policy);
+    if (outputPolicy.write_back_to_remote !== false) {
+      findings.push("Repair proof expected no-upstream-write policy evidence.");
+    }
+  }
+
+  return {
+    status: findings.length > 0 ? "fail" : "pass",
+    findings,
+    summary: findings[0] ?? "Repair-loop proof expectations were satisfied.",
+    evidence: {
+      ...evidence,
+      observed_repair_paths: observedRepairPaths,
+      observed_declared_repair_paths: observedDeclaredRepairPaths,
+    },
+    evidence_refs: uniqueStrings([
+      ...evidence.repair_decision_files,
+      ...evidence.quality_repair_request_files,
+      ...evidence.implementation_repair_refs,
+      ...evidence.review_rerun_refs,
+      ...evidence.qa_rerun_refs,
+    ]),
+  };
+}
+
+/**
+ * @param {{
+ *   artifacts: Record<string, unknown>,
+ *   projectRoot: string,
+ *   runtimeLayout: { reportsRoot?: string, reports_root?: string },
+ *   evidenceRefs: string[],
+ * }} options
+ */
+function closeSatisfiedQualityRepairRequests(options) {
+  const evidence = collectRepairProofEvidence(options.artifacts);
+  if (evidence.quality_repair_request_refs.length === 0) {
+    return {
+      closed_refs: [],
+      closed_files: [],
+    };
+  }
+
+  const requestRefs = new Set(evidence.quality_repair_request_refs);
+  const requests = listQualityRepairRequests({
+    projectRoot: options.projectRoot,
+    runtimeLayout: options.runtimeLayout,
+  });
+  const matchingRequests = requests.filter(
+    (request) =>
+      requestRefs.has(request.artifact_ref) ||
+      [...requestRefs].some((requestRef) => requestRef.endsWith(path.basename(request.file))),
+  );
+  const matchedRequestFiles = new Set(matchingRequests.map((request) => request.file));
+  const directRequestFiles = evidence.quality_repair_request_files
+    .filter((requestFile) => path.isAbsolute(requestFile) && fileExists(requestFile))
+    .filter((requestFile) => !matchedRequestFiles.has(requestFile));
+  /** @type {string[]} */
+  const closedRefs = [];
+  /** @type {string[]} */
+  const closedFiles = [];
+
+  for (const request of matchingRequests) {
+    if (asNonEmptyString(request.document.status) === "closed") {
+      closedRefs.push(request.artifact_ref);
+      closedFiles.push(request.file);
+      continue;
+    }
+    const closed = closeQualityRepairRequest({
+      projectRoot: options.projectRoot,
+      runtimeLayout: options.runtimeLayout,
+      requestFile: request.file,
+      request: request.document,
+      evidenceRefs: options.evidenceRefs,
+      summary: "Quality repair request closed by live E2E refreshed review and QA evidence.",
+    });
+    closedRefs.push(closed.requestRef);
+    closedFiles.push(closed.requestFile);
+  }
+  for (const requestFile of directRequestFiles) {
+    const request = readJson(requestFile);
+    if (asNonEmptyString(request.status) === "closed") {
+      closedRefs.push(asNonEmptyString(request.artifact_ref) || `evidence://${path.basename(requestFile)}`);
+      closedFiles.push(requestFile);
+      continue;
+    }
+    const closed = closeQualityRepairRequest({
+      projectRoot: options.projectRoot,
+      runtimeLayout: options.runtimeLayout,
+      requestFile,
+      request,
+      evidenceRefs: options.evidenceRefs,
+      summary: "Quality repair request closed by live E2E refreshed review and QA evidence.",
+    });
+    closedRefs.push(closed.requestRef);
+    closedFiles.push(closed.requestFile);
+  }
+
+  return {
+    closed_refs: uniqueStrings(closedRefs),
+    closed_files: uniqueStrings(closedFiles),
+  };
 }
 
 /**
@@ -5725,6 +6046,8 @@ export function executeFullJourneyFlow(options) {
       review_repair_actions: implementationLoopPolicy.reviewRepairActions,
       cycle_steps: implementationLoopPolicy.cycleSteps,
       repair_sources: implementationLoopPolicy.repairSources,
+      proof_expectations: implementationLoopPolicy.proofExpectations,
+      acceptance_repair_drill: implementationLoopPolicy.acceptanceRepairDrill,
       iterations: [],
     };
     let reviewReport = {};
@@ -5943,6 +6266,19 @@ export function executeFullJourneyFlow(options) {
         : primaryNeedsRepair && repairSources.has("post-run-primary")
           ? "post-run-primary"
           : null;
+      let activeAcceptanceRepairDrill = resolveActiveAcceptanceRepairDrill({
+        drill: implementationLoopPolicy.acceptanceRepairDrill,
+        iteration,
+        sourcePhase: "review",
+        currentRepairSource: repairSource,
+        stageStatus: reviewOverallStatus,
+        secondaryStatus: asNonEmptyString(artifacts.post_run_verify_status) || "unknown",
+        priorRepairDecisionFiles: asStringArray(artifacts.review_repair_decision_files),
+      });
+      if (activeAcceptanceRepairDrill && repairSources.has("review")) {
+        repairSource = "review";
+        artifacts.acceptance_repair_drill_source = "review";
+      }
       let repairNeeded =
         (repairSource === "review" && (reviewRepairActions.has("request-repair") || reviewRepairActions.has("repair"))) ||
         (repairSource === "post-run-primary" && reviewRepairActions.has("failed-quality-findings"));
@@ -6060,6 +6396,19 @@ export function executeFullJourneyFlow(options) {
           : diagnosticNeedsRepair && repairSources.has("post-run-diagnostic")
             ? "post-run-diagnostic"
             : null;
+        activeAcceptanceRepairDrill = resolveActiveAcceptanceRepairDrill({
+          drill: implementationLoopPolicy.acceptanceRepairDrill,
+          iteration,
+          sourcePhase: "qa",
+          currentRepairSource: repairSource,
+          stageStatus: qaEvaluationStatus,
+          secondaryStatus: qaDiagnosticStatus,
+          priorRepairDecisionFiles: asStringArray(artifacts.review_repair_decision_files),
+        });
+        if (activeAcceptanceRepairDrill && repairSources.has("qa")) {
+          repairSource = "qa";
+          artifacts.acceptance_repair_drill_source = "qa";
+        }
         repairNeeded =
           (repairSource === "qa" && (reviewRepairActions.has("request-repair") || reviewRepairActions.has("repair"))) ||
           (repairSource === "post-run-diagnostic" && reviewRepairActions.has("failed-quality-findings"));
@@ -6168,118 +6517,134 @@ export function executeFullJourneyFlow(options) {
                 : "Implementation quality cycle stopped because post-run primary verification did not pass.";
         repairStopReason = artifacts.implementation_loop_failure_summary;
       }
-	      if (canRepair) {
-	        repairStopReason =
-	          repairSource === "qa"
+      if (canRepair) {
+        repairStopReason =
+          repairSource === "qa"
             ? "QA evidence requested another public implementation iteration."
             : repairSource === "post-run-diagnostic"
               ? "Post-run diagnostic verification requested another public implementation iteration."
               : repairSource === "post-run-primary"
                 ? "Post-run primary verification requested another public implementation iteration."
-	                : "Review requested another public implementation iteration.";
-	        repairNecessity = repairSource ?? "review";
-	      }
-	      const repairChangedPaths = uniqueStrings([
-	        ...collectRuntimeHarnessChangedPaths(artifacts.runtime_harness_report_file),
-	        ...collectReviewChangedPaths(artifacts.review_report_file),
-	      ]);
-	      const repairVerificationRefs = uniqueStrings([
-	        postRunVerifySummaryPath,
-	        asNonEmptyString(artifacts.review_report_file),
-	        asNonEmptyString(artifacts.evaluation_report_file),
-	        asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
-	        ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
-	      ]);
-	      const previousRepairDecisionRefs = asStringArray(artifacts.review_repair_decision_files);
-	      const previousRepairContexts = readRepairDecisionContexts(previousRepairDecisionRefs);
-	      const previousRepairContext = previousRepairContexts.at(-1) ?? null;
-	      let pendingRepairContext = null;
-	      let pendingRepairContextFingerprint = null;
-	      let newRepairContextSignals = [];
-	      if (canRepair) {
-	        const repairFindingDetails = unresolvedRepairFindingDetails.map((entry, index) => {
-	          const record = asRecord(entry);
-	          return {
-	            finding_id:
-	              asNonEmptyString(record.finding_id) ||
-	              `${repairSource ?? "review"}.${iteration}.finding-${index + 1}`,
-	            category: asNonEmptyString(record.category) || repairSource || "review",
-	            severity: asNonEmptyString(record.severity) || "blocking",
-	            summary: asNonEmptyString(record.summary) || "Repair was requested before delivery.",
-	            evidence_refs: uniqueStrings([
-	              ...asStringArray(record.evidence_refs),
-	              ...asStringArray(record.evidenceRefs),
-	              ...repairVerificationRefs,
-	            ]),
-	            resolution_requirement:
-	              asNonEmptyString(record.resolution_requirement) ||
-	              "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
-	          };
-	        });
-	        pendingRepairContext = {
-	          source_phase: repairSource ?? "review",
-	          cycle_iteration: iteration,
-	          unresolved_findings: unresolvedRepairFindings.length > 0
-	            ? unresolvedRepairFindings
-	            : ["Repair was requested before delivery."],
-	          unresolved_finding_details: repairFindingDetails.length > 0
-	            ? repairFindingDetails
-	            : [
-	                {
-	                  finding_id: `${repairSource ?? "review"}.${iteration}.unspecified-repair`,
-	                  category: repairSource ?? "review",
-	                  severity: "blocking",
-	                  summary: "Repair was requested before delivery.",
-	                  evidence_refs: repairVerificationRefs,
-	                  resolution_requirement:
-	                    "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
-	                },
-	              ],
-	          meaningful_changed_paths: repairChangedPaths,
-	          verification_status:
-	            repairSource === "qa"
-	              ? qaEvaluationStatus
-	              : repairSource === "post-run-diagnostic"
-	                ? qaDiagnosticStatus
-	                : asNonEmptyString(artifacts.post_run_verify_status) || "unknown",
-	          verification_refs: repairVerificationRefs,
-	          previous_repair_decision_refs: previousRepairDecisionRefs,
-	          stop_reason: repairStopReason || "Repair requested before delivery.",
-	          requested_next_step: "execution",
-	        };
-	        pendingRepairContextFingerprint = repairContextFingerprint(pendingRepairContext);
-	        newRepairContextSignals = resolveNewRepairContextSignals(previousRepairContext, pendingRepairContext);
-	        pendingRepairContext.context_fingerprint = pendingRepairContextFingerprint;
-	        pendingRepairContext.new_context_since_previous = newRepairContextSignals;
-	        const previousFingerprint = asNonEmptyString(asRecord(previousRepairContext).context_fingerprint);
-	        if (previousFingerprint && previousFingerprint === pendingRepairContextFingerprint && newRepairContextSignals.length === 0) {
-	          canRepair = false;
-	          terminalCycleFailure = true;
-	          artifacts.failure_owner = "provider";
-	          artifacts.failure_phase = repairSource === "qa" ? "qa" : repairSource === "post-run-diagnostic" ? "target_verification" : "review";
-	          artifacts.failure_class = classifyRepeatedRepairContextBlocker({
-	            repairSource,
-	            pendingRepairContext,
-	            artifacts,
-	            newRepairContextSignals,
-	          });
-	          artifacts.implementation_loop_failure_summary =
-	            "Implementation quality cycle stopped because repeated repair context had no new actionable evidence.";
-	          repairStopReason = artifacts.implementation_loop_failure_summary;
-	          markStage(
-	            stageMap,
-	            repairSource === "qa" || repairSource === "post-run-diagnostic" ? "qa" : "review",
-	            "fail",
-	            repairVerificationRefs,
-	            artifacts.implementation_loop_failure_summary,
-	            { iteration },
-	          );
-	        }
-	        artifacts.latest_repair_context_fingerprint = pendingRepairContextFingerprint;
-	        artifacts.latest_repair_context_new_signals = newRepairContextSignals;
-	      }
-	      const iterationRecord = {
-	        iteration,
+                : "Review requested another public implementation iteration.";
+        repairNecessity = repairSource ?? "review";
+      }
+      const repairChangedPaths = uniqueStrings([
+        ...collectRuntimeHarnessChangedPaths(artifacts.runtime_harness_report_file),
+        ...collectReviewChangedPaths(artifacts.review_report_file),
+      ]);
+      const repairVerificationRefs = uniqueStrings([
+        postRunVerifySummaryPath,
+        asNonEmptyString(artifacts.review_report_file),
+        asNonEmptyString(artifacts.evaluation_report_file),
+        asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
+        ...asStringArray(artifacts.post_run_diagnostic_verify_step_result_files),
+      ]);
+      if (activeAcceptanceRepairDrill) {
+        const drillFinding = buildAcceptanceRepairDrillFinding({
+          drill: activeAcceptanceRepairDrill,
+          sourcePhase: repairSource ?? asNonEmptyString(activeAcceptanceRepairDrill.source_phase) ?? "review",
+          iteration,
+          evidenceRefs: repairVerificationRefs,
+        });
+        unresolvedRepairFindings = uniqueStrings([
+          ...unresolvedRepairFindings,
+          asNonEmptyString(drillFinding.summary),
+        ]);
+        unresolvedRepairFindingDetails = [
+          ...unresolvedRepairFindingDetails,
+          drillFinding,
+        ];
+      }
+      const previousRepairDecisionRefs = asStringArray(artifacts.review_repair_decision_files);
+      const previousRepairContexts = readRepairDecisionContexts(previousRepairDecisionRefs);
+      const previousRepairContext = previousRepairContexts.at(-1) ?? null;
+      let pendingRepairContext = null;
+      let pendingRepairContextFingerprint = null;
+      let newRepairContextSignals = [];
+      if (canRepair) {
+        const repairFindingDetails = unresolvedRepairFindingDetails.map((entry, index) => {
+          const record = asRecord(entry);
+          return {
+            finding_id:
+              asNonEmptyString(record.finding_id) ||
+              `${repairSource ?? "review"}.${iteration}.finding-${index + 1}`,
+            category: asNonEmptyString(record.category) || repairSource || "review",
+            severity: asNonEmptyString(record.severity) || "blocking",
+            summary: asNonEmptyString(record.summary) || "Repair was requested before delivery.",
+            evidence_refs: uniqueStrings([
+              ...asStringArray(record.evidence_refs),
+              ...asStringArray(record.evidenceRefs),
+              ...repairVerificationRefs,
+            ]),
+            resolution_requirement:
+              asNonEmptyString(record.resolution_requirement) ||
+              "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
+          };
+        });
+        pendingRepairContext = {
+          source_phase: repairSource ?? "review",
+          cycle_iteration: iteration,
+          unresolved_findings: unresolvedRepairFindings.length > 0
+            ? unresolvedRepairFindings
+            : ["Repair was requested before delivery."],
+          unresolved_finding_details: repairFindingDetails.length > 0
+            ? repairFindingDetails
+            : [
+                {
+                  finding_id: `${repairSource ?? "review"}.${iteration}.unspecified-repair`,
+                  category: repairSource ?? "review",
+                  severity: "blocking",
+                  summary: "Repair was requested before delivery.",
+                  evidence_refs: repairVerificationRefs,
+                  resolution_requirement:
+                    "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
+                },
+              ],
+          meaningful_changed_paths: repairChangedPaths,
+          verification_status:
+            repairSource === "qa"
+              ? qaEvaluationStatus
+              : repairSource === "post-run-diagnostic"
+                ? qaDiagnosticStatus
+                : asNonEmptyString(artifacts.post_run_verify_status) || "unknown",
+          verification_refs: repairVerificationRefs,
+          previous_repair_decision_refs: previousRepairDecisionRefs,
+          stop_reason: repairStopReason || "Repair requested before delivery.",
+          requested_next_step: "execution",
+        };
+        pendingRepairContextFingerprint = repairContextFingerprint(pendingRepairContext);
+        newRepairContextSignals = resolveNewRepairContextSignals(previousRepairContext, pendingRepairContext);
+        pendingRepairContext.context_fingerprint = pendingRepairContextFingerprint;
+        pendingRepairContext.new_context_since_previous = newRepairContextSignals;
+        const previousFingerprint = asNonEmptyString(asRecord(previousRepairContext).context_fingerprint);
+        if (previousFingerprint && previousFingerprint === pendingRepairContextFingerprint && newRepairContextSignals.length === 0) {
+          canRepair = false;
+          terminalCycleFailure = true;
+          artifacts.failure_owner = "provider";
+          artifacts.failure_phase = repairSource === "qa" ? "qa" : repairSource === "post-run-diagnostic" ? "target_verification" : "review";
+          artifacts.failure_class = classifyRepeatedRepairContextBlocker({
+            repairSource,
+            pendingRepairContext,
+            artifacts,
+            newRepairContextSignals,
+          });
+          artifacts.implementation_loop_failure_summary =
+            "Implementation quality cycle stopped because repeated repair context had no new actionable evidence.";
+          repairStopReason = artifacts.implementation_loop_failure_summary;
+          markStage(
+            stageMap,
+            repairSource === "qa" || repairSource === "post-run-diagnostic" ? "qa" : "review",
+            "fail",
+            repairVerificationRefs,
+            artifacts.implementation_loop_failure_summary,
+            { iteration },
+          );
+        }
+        artifacts.latest_repair_context_fingerprint = pendingRepairContextFingerprint;
+        artifacts.latest_repair_context_new_signals = newRepairContextSignals;
+      }
+      const iterationRecord = {
+        iteration,
         run_id: iterationRunId,
         routed_step_result_file: asNonEmptyString(artifacts.routed_step_result_file) || null,
         post_run_verify_summary_file: postRunVerifySummaryPath,
@@ -6292,19 +6657,27 @@ export function executeFullJourneyFlow(options) {
         post_run_verify_status: asNonEmptyString(artifacts.post_run_verify_status),
         qa_status: qaOverallStatus,
         evaluation_status: qaEvaluationStatus,
+        evaluation_report_file: asNonEmptyString(artifacts.evaluation_report_file) || null,
+        post_run_diagnostic_verify_summary_file: asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file) || null,
         post_run_diagnostic_status: qaDiagnosticStatus,
         repair_source: repairSource,
         repair_necessity: repairNecessity,
-	        unresolved_review_findings: unresolvedReviewFindings,
-	        unresolved_review_finding_details: unresolvedReviewFindingDetails,
-	        unresolved_repair_findings: unresolvedRepairFindings,
-	        unresolved_repair_finding_details: unresolvedRepairFindingDetails,
-	        previous_repair_decision_files: previousRepairDecisionRefs,
-	        repair_context_fingerprint: pendingRepairContextFingerprint,
-	        new_context_since_previous: newRepairContextSignals,
-	        repair_stop_reason: repairStopReason,
-	        repair_requested: canRepair,
-	      };
+        unresolved_review_findings: unresolvedReviewFindings,
+        unresolved_review_finding_details: unresolvedReviewFindingDetails,
+        unresolved_repair_findings: unresolvedRepairFindings,
+        unresolved_repair_finding_details: unresolvedRepairFindingDetails,
+        previous_repair_decision_files: previousRepairDecisionRefs,
+        repair_context_fingerprint: pendingRepairContextFingerprint,
+        new_context_since_previous: newRepairContextSignals,
+        repair_stop_reason: repairStopReason,
+        acceptance_repair_drill: activeAcceptanceRepairDrill
+          ? {
+              source_phase: asNonEmptyString(activeAcceptanceRepairDrill.source_phase),
+              finding_id: asNonEmptyString(activeAcceptanceRepairDrill.finding_id),
+            }
+          : null,
+        repair_requested: canRepair,
+      };
       {
         const currentIterations = Array.isArray(asRecord(artifacts.implementation_loop).iterations)
           ? asRecord(artifacts.implementation_loop).iterations
@@ -6361,16 +6734,42 @@ export function executeFullJourneyFlow(options) {
           `Runtime Harness decision: ${asNonEmptyString(artifacts.runtime_harness_overall_decision) || "unknown"}.`,
         ].join(" "),
       ], { allowNonZeroWithPayload: true, iteration });
+      const reviewRepairDecisionFile = getStringField(reviewRepairDecision.payload, "review_decision_file");
+      const qualityRepairRequestRef = getStringField(reviewRepairDecision.payload, "quality_repair_request_ref");
+      const qualityRepairRequestFile = getStringField(reviewRepairDecision.payload, "quality_repair_request_file");
       artifacts.review_repair_decision_files = uniqueStrings([
         ...asStringArray(artifacts.review_repair_decision_files),
-        getStringField(reviewRepairDecision.payload, "review_decision_file"),
+        reviewRepairDecisionFile,
       ]);
+      artifacts.quality_repair_request_refs = uniqueStrings([
+        ...asStringArray(artifacts.quality_repair_request_refs),
+        qualityRepairRequestRef,
+      ]);
+      artifacts.quality_repair_request_files = uniqueStrings([
+        ...asStringArray(artifacts.quality_repair_request_files),
+        qualityRepairRequestFile,
+      ]);
+      const loopIterations = Array.isArray(asRecord(artifacts.implementation_loop).iterations)
+        ? asRecord(artifacts.implementation_loop).iterations.map((entry) => asRecord(entry))
+        : [];
+      if (loopIterations.length > 0) {
+        const lastIteration = {
+          ...asRecord(loopIterations.at(-1)),
+          repair_decision_file: reviewRepairDecisionFile,
+          quality_repair_request_ref: qualityRepairRequestRef,
+          quality_repair_request_file: qualityRepairRequestFile,
+        };
+        asRecord(artifacts.implementation_loop).iterations = [
+          ...loopIterations.slice(0, -1),
+          lastIteration,
+        ];
+      }
       latestPromotionEvidenceRefs = uniqueStrings([
         ...promotionEvidenceRefs,
         asNonEmptyString(artifacts.routed_step_result_file),
         postRunVerifySummaryPath,
         asNonEmptyString(artifacts.review_report_file),
-        getStringField(reviewRepairDecision.payload, "review_decision_file"),
+        reviewRepairDecisionFile,
       ]);
     }
     {
@@ -6412,6 +6811,28 @@ export function executeFullJourneyFlow(options) {
     }
     if (reviewOverallStatus !== "pass" || qaOverallStatus === "fail" || artifacts.post_run_verify_status === "fail") {
       throw new Error("Implementation review, QA, or post-run verification failed before delivery.");
+    }
+    if (asStringArray(artifacts.review_repair_decision_files).length > 0) {
+      const repairClosure = closeSatisfiedQualityRepairRequests({
+        artifacts,
+        projectRoot: targetCheckout.targetCheckoutRoot,
+        runtimeLayout: options.layout,
+        evidenceRefs: uniqueStrings([
+          asNonEmptyString(artifacts.review_report_file),
+          asNonEmptyString(artifacts.evaluation_report_file),
+          asNonEmptyString(artifacts.post_run_verify_summary_file),
+          asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
+          ...asStringArray(artifacts.review_repair_decision_files),
+        ]),
+      });
+      artifacts.closed_quality_repair_request_refs = uniqueStrings([
+        ...asStringArray(artifacts.closed_quality_repair_request_refs),
+        ...repairClosure.closed_refs,
+      ]);
+      artifacts.closed_quality_repair_request_files = uniqueStrings([
+        ...asStringArray(artifacts.closed_quality_repair_request_files),
+        ...repairClosure.closed_files,
+      ]);
     }
     if (guidedJourneyEnabled) {
       const guidedNextAfterReview = runCommand("guided-next-after-review", [
@@ -7032,6 +7453,20 @@ export function executeFullJourneyFlow(options) {
       runId: options.runId,
     });
     artifacts.artifact_consistency = artifactConsistency;
+    const repairProofExpectations = evaluateRepairProofExpectations({
+      profile: options.profile,
+      artifacts,
+    });
+    artifacts.repair_proof_expectations = repairProofExpectations;
+    if (repairProofExpectations.status === "fail") {
+      markStage(
+        stageMap,
+        "delivery",
+        "fail",
+        asStringArray(repairProofExpectations.evidence_refs),
+        repairProofExpectations.summary,
+      );
+    }
     const scenarioCoverage = evaluateScenarioCoverage({
       scenarioPolicy: options.scenarioPolicy,
       stageResults: flattenStageMap(stageMap),
@@ -7085,6 +7520,7 @@ export function executeFullJourneyFlow(options) {
       run_start_runtime_harness_decision: runtimeHarnessDecision,
       latest_runtime_harness_decision: latestRuntimeHarnessDecision,
       artifact_consistency_status: artifactConsistency.status,
+      repair_proof_expectations_status: repairProofExpectations.status,
       scenario_coverage_state: scenarioCoverage.status,
       delivery_blocking: artifacts.delivery_blocking === true,
       delivery_manifest_file: asNonEmptyString(artifacts.delivery_manifest_file) || null,

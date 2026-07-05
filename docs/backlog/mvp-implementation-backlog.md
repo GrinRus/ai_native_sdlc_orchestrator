@@ -390,7 +390,7 @@ This is the master index for the implementation slices across all defined waves.
 | W45-S03 | CLI and control-plane quality repair surfaces | EPIC-6 | done | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, `examples/control-plane-api/**`, tests | W45-S02 |
 | W45-S04 | Web repair-cycle observability | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, tests | W45-S03 |
 | W45-S05 | Repair-loop proof fixtures and internal profile | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
-| W45-S06 | Documentation refresh and internal installed-user rehearsal acceptance | EPIC-7, EPIC-0 | ready | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, tests | W45-S05 |
+| W45-S06 | Documentation refresh and internal installed-user rehearsal acceptance | EPIC-7, EPIC-0 | done | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, tests | W45-S05 |
 
 ## W46 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

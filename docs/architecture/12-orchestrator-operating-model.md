@@ -126,11 +126,33 @@ Delivery and release remain blocked while a required repair request is
 loop and requires explicit operator approval evidence before downstream
 delivery/release can continue.
 
+Post-run primary or diagnostic verification failures are repair-source evidence
+when the selected implementation-loop policy declares those sources. They must
+route through the same public request-repair path instead of failing execution
+before review can materialize repair context. Verification-mapping-only review
+warnings with passing primary verification are not actionable repair requests on
+their own; they stay review evidence for QA/delivery inspection unless another
+implementation finding requires repair.
+
+Repair-profile acceptance is fail-closed. If a selected live profile declares
+`implementation_loop.proof_expectations`, terminal run evidence must include the
+materialized `quality_repair_request`, repair implementation refs, review rerun
+refs, QA rerun refs when QA is in scope, and closed-request evidence before the
+run can be treated as repair-loop acceptance.
+
 Repair implementation uses normal routed execution. During prepare, the context
 compiler adds the materialized repair request as a packet/evidence ref in the
 compiled context. Prompt bundles receive the request ref, finding refs, required
 evidence refs, and attempt budget through provider-agnostic compiled context,
 not through ad hoc chat text or private harness vocabulary.
+
+Post-run verification may accept a failed target command only when an explicit
+baseline verify summary proves the same command failure was pre-existing. The
+current step-result must keep `baseline_failure_status=pre_existing` and
+`baseline_failure_evidence_refs[]`; verify summaries aggregate the match under
+`verification_failure_baseline_matches[]`. This is broken-baseline evidence, not
+repair closure evidence, and it must not satisfy W45 repair-proof expectations
+unless a real `quality-repair-request` was materialized and closed.
 
 When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a resumable `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime resumes from that boundary when `continuation.next_action=resume_from_boundary`; if validation, policy, or an unsupported boundary blocks continuation, the run remains blocked with the same interaction, `state_history[]`, and reason evidence.
 

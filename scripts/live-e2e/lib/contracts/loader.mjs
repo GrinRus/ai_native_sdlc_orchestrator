@@ -1178,6 +1178,21 @@ function validateStepResult(document, source) {
     });
   }
 
+  validateNestedEnumStringField({
+    record: document,
+    source,
+    field: "baseline_failure_status",
+    allowedValues: ["pre_existing"],
+    issues,
+    required: false,
+  });
+  validateOptionalStringArrayField({
+    record: document,
+    source,
+    field: "baseline_failure_evidence_refs",
+    issues,
+  });
+
   const repairAttempts = validateOptionalArrayField({
     record: document,
     source,

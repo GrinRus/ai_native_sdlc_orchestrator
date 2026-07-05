@@ -1,6 +1,6 @@
 # Live E2E Proof-Complete Findings
 
-Status date: 2026-07-03
+Status date: 2026-07-04
 
 This note records W47-W52 control proof evidence for black-box product live E2E. Runtime artifacts stay under `.aor/` or `/tmp/aor-*` and are intentionally not committed.
 
@@ -21,6 +21,43 @@ This note records W47-W52 control proof evidence for black-box product live E2E.
 - W50 closes product acceptance only for `httpx-medium` and
   `fastify-repair-medium`; `vitest-large` remains a non-accepted classified
   setup blocker until W51-S02 runs with a compatible Node toolchain.
+
+## W45-S06 Branch-Local Repair Acceptance Evidence
+
+The `codex/w45-s06-repair-live-acceptance` branch fixed live E2E acceptance
+blockers and proof gaps found while attempting W45-S06:
+
+- failed post-run primary verification now routes through the declared public
+  repair loop instead of making the execution step fail before review can
+  request repair;
+- review reports now derive primary verification command evidence from
+  `verify-summary.command_groups[].step_result_refs` when legacy
+  `command_overrides.test_commands` is empty.
+- repair-profile run summaries now fail closed when declared
+  `implementation_loop.proof_expectations` are missing materialized
+  `quality_repair_request`, repair implementation, review rerun, QA rerun, or
+  closed-request refs.
+- W45 acceptance profiles can declare an internal
+  `acceptance_repair_drill` that injects a review-origin or QA-origin public
+  repair finding only after the relevant stage has otherwise passed. The drill
+  still creates the normal public repair context and uses `review decide
+  --decision request-repair`; it is not a private runtime mutation path.
+
+Fresh live runs after those fixes produced the following W45 repair evidence:
+
+| Proof | Profile | Run id | Terminal status | Repair evidence | Acceptance |
+|---|---|---|---|---|---|
+| `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | `w45-s06-fastify-openai-20260704-acceptance-3` | run-health `pass`; provider/target/diagnostic/evidence health `pass`; patch-only/no-upstream-write delivery | one implementation-loop iteration, `repair_requested=false`, no `quality_repair_request` refs | green regression evidence only; not W45-S06 repair acceptance |
+| `httpie-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-httpie-medium-anthropic.yaml` | `w45-s06-httpie-anthropic-20260704-acceptance-1` | run-health `pass`; provider/target/diagnostic/evidence health `pass`; patch-only/no-upstream-write delivery | one implementation-loop iteration, `repair_requested=false`, no `quality_repair_request` refs | green regression evidence only; not W45-S06 repair acceptance |
+| `commander-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-commander-js-medium-anthropic.yaml` | `w45-s06-commander-anthropic-20260704-acceptance-1` | run-health `blocked`; command/controller/provider/evidence health `pass`; failure owner `provider`, phase `review`, class `provider_did_not_address_finding` | review-origin `request-repair` materialized one `quality_repair_request` ref and launched public `execution#2`; post-run primary verification remained `fail`, QA/delivery were not reached, request was not closed | review-origin blocker evidence only; not W45-S06 repair closure |
+| `fastify-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml` | `w45-s06-fastify-openai-20260704-review-drill-1` | step-evaluator exited successfully; run summary `warn`; command/controller/provider/target/diagnostic/evidence health `pass` | review-origin `quality_repair_request` ref, closed-request ref, public `execution#2`, review rerun, QA rerun refs, `post_run_verify_status=pass`, no-upstream-write evidence, `repair_proof_expectations.status=pass` | accepted review-origin repair-closure proof; `warn` is limited to non-blocking factual run-health findings |
+| `pluggy-repair-medium` | `scripts/live-e2e/profiles/full-journey-repair-pluggy-medium-anthropic.yaml` | `w45-s06-pluggy-anthropic-20260704-acceptance-1` | run-health `pass`; command/controller/provider/target/diagnostic/evidence health `pass` | QA-origin `quality_repair_request` ref, closed-request ref, public `execution#2`, post-repair review before QA rerun, `post_run_verify_status=pass`, no-upstream-write evidence, `repair_proof_expectations.status=pass` | accepted QA-origin repair-closure proof |
+
+`w45-s06-fastify-openai-20260704-review-drill-2` is intentionally not counted:
+that fresh rerun blocked at `handoff` with `controller_incomplete` before the
+repair loop and was stopped. W45-S06 closure is based on the accepted
+review-origin and QA-origin repair-closure proof above plus deterministic
+budget-exhaustion coverage from W45-S05.
 
 ## Required Proof Set
 
@@ -837,3 +874,40 @@ Accepted findings:
 W50 product acceptance is claimed only for `httpx-medium` and
 `fastify-repair-medium`, where terminal run-health passed and final
 `quality-assessment gate --policy all-pass` returned `status=ok`.
+
+## W45 Repair Live Acceptance Attempts
+
+- `w45-s06-commander-anthropic-20260704-acceptance-2` materialized a
+  review-origin `quality-repair-request` and launched public `execution#2`, but
+  post-repair verification stayed failed because baseline matching included
+  volatile Node test duration text in the failure signature. Result:
+  run-health `blocked`, owner `provider`, phase `review`, class
+  `provider_did_not_address_finding`; not closure evidence.
+- `w45-s06-commander-anthropic-20260704-acceptance-3` completed execution,
+  review, QA, and delivery. Post-run verification passed with
+  `verification_failure_baseline_matches[]` and command-group
+  `outcome=broken-baseline` for the pre-existing Commander `NO_COLOR` test
+  failure. Result: green lifecycle evidence for baseline-aware verification,
+  but repair-profile proof failed closed because no `quality_repair_request`
+  was materialized.
+- `w45-s06-fastify-openai-20260704-review-drill-1` materialized and closed a
+  review-origin `quality-repair-request` through public
+  `review decide --decision request-repair`, public `execution#2`, refreshed
+  review, refreshed QA, delivery unblock, and no-upstream-write evidence.
+  Result: step-evaluator exited successfully with
+  `repair_proof_expectations.status=pass` and observed path `review-origin`.
+  The run summary is `warn` only because the run-health report preserved
+  non-blocking factual findings; command, controller, provider, target,
+  diagnostic, and evidence health all passed.
+- `w45-s06-pluggy-anthropic-20260704-acceptance-1` materialized and closed a
+  QA-origin `quality-repair-request` through public repair implementation,
+  post-repair review before QA closure, delivery unblock, and no-upstream-write
+  evidence. Result: run-health `pass`, `repair_proof_expectations.status=pass`,
+  and observed path `qa-origin`.
+
+Accepted finding: `project verify --output-quality-baseline` must normalize
+volatile failure signature fragments such as test durations before matching
+post-change command failures to explicit baseline failure evidence. W45-S06
+live acceptance is now backed by separate review-origin and QA-origin closure
+evidence; budget-exhaustion remains deterministic fixture/profile coverage as
+an operator-visible hold path.

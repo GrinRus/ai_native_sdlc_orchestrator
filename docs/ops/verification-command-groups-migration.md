@@ -87,7 +87,9 @@ missing prerequisite explicit.
 `not-applicable` is for a known verification group that does not apply to the
 current project shape or platform.
 
-`broken-baseline` means an unchanged baseline command already fails. Treat it as
+`broken-baseline` means an unchanged baseline command already fails, or a
+post-change command failure matched explicit baseline failure evidence through
+`project verify --output-quality-baseline`. Treat unmatched broken baselines as
 baseline repair or rebaseline work before post-change verification can be
 accepted.
 

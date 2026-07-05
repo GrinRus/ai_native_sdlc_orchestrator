@@ -196,8 +196,7 @@ function describeTestCommandCoverage(command, changedPath, projectRoot) {
  */
 function findChangedTestVerificationGaps(verifySummary, changedPaths, projectRoot) {
   const changedTestPaths = changedPaths.filter((candidate) => isTestSourcePath(candidate));
-  const commandOverrides = asRecord(asRecord(verifySummary).command_overrides);
-  const testCommands = asStringArray(commandOverrides.test_commands);
+  const testCommands = collectVerifySummaryTestCommands(verifySummary, projectRoot);
   if (changedTestPaths.length === 0) {
     return {
       changedTestPaths,
@@ -277,6 +276,68 @@ function toEvidenceRef(projectRoot, filePath) {
  */
 function readJson(filePath) {
   return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {string | null}
+ */
+function resolveArtifactPath(projectRoot, ref) {
+  if (path.isAbsolute(ref)) return ref;
+  if (ref.startsWith("evidence://")) {
+    const relativeRef = ref.slice("evidence://".length);
+    return path.resolve(projectRoot, relativeRef);
+  }
+  return path.resolve(projectRoot, ref);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {Record<string, unknown> | null}
+ */
+function readArtifactRef(projectRoot, ref) {
+  const filePath = resolveArtifactPath(projectRoot, ref);
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    return readJson(filePath);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {Record<string, unknown> | null} verifySummary
+ * @param {string} projectRoot
+ * @returns {string[]}
+ */
+function collectVerifySummaryTestCommands(verifySummary, projectRoot) {
+  const summary = asRecord(verifySummary);
+  const commandOverrides = asRecord(summary.command_overrides);
+  const commands = [...asStringArray(commandOverrides.test_commands)];
+  const groups = Array.isArray(summary.command_groups) ? summary.command_groups : [];
+  for (const entry of groups) {
+    const group = asRecord(entry);
+    if (asString(group.role) !== "test") continue;
+    commands.push(...asStringArray(group.commands));
+    for (const ref of asStringArray(group.step_result_refs)) {
+      const stepResult = readArtifactRef(projectRoot, ref);
+      const command = asString(stepResult?.command);
+      if (command) commands.push(command);
+    }
+  }
+  if (commands.length > 0) return uniqueStrings(commands);
+
+  for (const ref of asStringArray(summary.step_result_refs)) {
+    const stepResult = readArtifactRef(projectRoot, ref);
+    const commandKind = asString(stepResult?.command_kind);
+    const commandGroupRole = asString(stepResult?.command_group_role);
+    if (commandKind !== "test" && commandGroupRole !== "test") continue;
+    const command = asString(stepResult?.command);
+    if (command) commands.push(command);
+  }
+  return uniqueStrings(commands);
 }
 
 /**

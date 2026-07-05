@@ -1753,7 +1753,7 @@ test("live E2E step controller rejects skill-agent continue when deterministic c
   });
 });
 
-test("live E2E step controller marks execution not_pass when post-run verification fails", () => {
+test("live E2E step controller marks execution not_pass when post-run verification fails without repair loop", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({
       reportsRoot,
@@ -1801,6 +1801,81 @@ test("live E2E step controller marks execution not_pass when post-run verificati
     assert.match(entry.semantic_analysis.findings.join("\n"), /post-run verification reported 'fail'/);
     const decisionRequest = JSON.parse(fs.readFileSync(entry.agent_decision_request_ref, "utf8"));
     assert.equal(decisionRequest.deterministic_analysis.recommendation, "diagnose");
+  });
+});
+
+test("live E2E step controller lets post-run primary failures continue to declared repair loop", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "01-run-start.json");
+    const verifySummaryFile = path.join(reportsRoot, "verify-summary-post-run-primary.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(verifySummaryFile, "{}\n", "utf8");
+    const implementationLoop = {
+      enabled: true,
+      max_iterations: 3,
+      review_repair_actions: ["request-repair", "failed-quality-findings"],
+      cycle_steps: ["execution", "review", "qa"],
+      repair_sources: ["review", "qa", "post-run-primary", "post-run-diagnostic"],
+      iterations: [],
+    };
+    assert.deepEqual(
+      resolveStepArtifactGateFailures("execution", {
+        post_run_verify_status: "fail",
+        implementation_loop: implementationLoop,
+      }),
+      [],
+    );
+
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-execution-post-run-repair",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start" });
+    writeSkillAgentDecision(reportsRoot, "controller-execution-post-run-repair", 1, "execution", {
+      nextStep: "review",
+      inspectedEvidenceRefs: [transcriptFile, verifySummaryFile],
+    });
+
+    const result = controller.observeStage({
+      stage: "execution",
+      stageResult: {
+        stage: "execution",
+        status: "pass",
+        evidence_refs: [transcriptFile, verifySummaryFile],
+        summary: "Execution completed; post-run primary verification will route through repair.",
+      },
+      commandResults: [
+        {
+          label: "run-start",
+          command_surface: "aor run start",
+          status: "pass",
+          transcript_file: transcriptFile,
+          artifact_refs: [transcriptFile, verifySummaryFile],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {
+        post_run_verify_status: "fail",
+        post_run_verify_summary_file: verifySummaryFile,
+        implementation_loop: implementationLoop,
+      },
+    });
+
+    assert.equal(result.action, "continue");
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.deterministic_analysis.status, "pass");
+    assert.equal(entry.final_step_verdict, "pass");
+    assert.equal(entry.decision.next_step, "review");
+    assert.doesNotMatch(entry.semantic_analysis.findings.join("\n"), /post-run verification reported 'fail'/);
   });
 });
 

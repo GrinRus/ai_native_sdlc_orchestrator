@@ -58,6 +58,15 @@ changed path, verification status, or evidence ref that makes another public
 repair actionable. The runner must create this decision through the public
 CLI/API lifecycle; it must not mutate the target checkout directly.
 
+Do not use `request-repair` for a verification-mapping-only review warning when
+primary verification passed and review has no actionable implementation finding.
+In that case the operator should preserve the warning as review evidence, let QA
+and delivery gates inspect the linked verification summary, and avoid creating a
+repair request that would only repeat the same context.
+The same applies to `baseline_failure_status=pre_existing` and
+`verification_failure_baseline_matches[]`: those refs prove a known broken
+baseline, not a new implementation defect.
+
 ## Delivery and release gate
 Delivery and release can require an explicit approval decision:
 

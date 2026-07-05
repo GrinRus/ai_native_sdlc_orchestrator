@@ -342,6 +342,84 @@ test("review report treats broad npm test:ci command as covering changed test fi
   });
 });
 
+test("review report resolves broad test commands from verify command-group step results", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-command-group-step-result-coverage";
+    fs.writeFileSync(
+      path.join(repoRoot, "test/schema-feature.test.js"),
+      [
+        "test('existing schema coverage', t => t.pass());",
+        "test('new schema feature coverage', t => t.pass());",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    const stepResultPath = path.join(init.runtimeLayout.reportsRoot, "step-result-post-run-primary-1.json");
+    writeJson(stepResultPath, {
+      step_result_id: `${runId}.verify.post-run-primary.v1.step.1`,
+      run_id: `${runId}.verify.post-run-primary.v1`,
+      step_id: "verify.post-run-primary.command.1",
+      step_class: "runner",
+      status: "passed",
+      summary: "Verification command 'npm run test:ci' passed.",
+      evidence_refs: [],
+      command: "npm run test:ci",
+      command_kind: "test",
+      command_group_id: "post-change-primary",
+      command_group_role: "test",
+      command_group_phase: "post-change",
+      enforcement_result: "pass",
+    });
+    writeJson(path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"), {
+      run_id: `${runId}.verify.post-run-primary.v1`,
+      verification_label: "post-run-primary",
+      status: "passed",
+      command_source: "project-profile",
+      command_overrides: {
+        build_commands: [],
+        lint_commands: [],
+        test_commands: [],
+      },
+      command_groups: [
+        {
+          id: "post-change-primary",
+          role: "test",
+          phase: "post-change",
+          status: "passed",
+          step_result_refs: [`evidence://${path.relative(repoRoot, stepResultPath).replace(/\\/g, "/")}`],
+        },
+      ],
+      step_result_refs: [],
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    assert.equal(reviewReport.overall_status, "pass");
+    assert.equal(reviewReport.review_recommendation, "proceed");
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.changed_test_paths, [
+      "test/schema-feature.test.js",
+    ]);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.covered_test_paths, [
+      "test/schema-feature.test.js",
+    ]);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.uncovered_test_paths, []);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.covering_commands, ["npm run test:ci"]);
+    assert.deepEqual(reviewReport.artifact_quality.verification_coverage.recorded_test_commands, ["npm run test:ci"]);
+    assert.equal(reviewReport.artifact_quality.verification_coverage.coverage_reason, "broad-repo-test-command");
+    assert.ok(
+      reviewReport.artifact_quality.findings.every(
+        (finding) => !String(finding.summary).includes("Primary verification did not explicitly exercise changed test file"),
+      ),
+    );
+  });
+});
+
 test("review report does not treat test support config files as changed test specs", () => {
   withGitRepo((repoRoot) => {
     const runId = "run.review-test-support-config";
