@@ -25,6 +25,7 @@ const OUTPUT_QUALITY_WARNING_PATTERNS = Object.freeze([
   },
 ]);
 const OUTPUT_QUALITY_BASELINE_STATUS_PRE_EXISTING = "pre_existing";
+const VERIFICATION_FAILURE_BASELINE_STATUS_PRE_EXISTING = "pre_existing";
 const COMMAND_GROUP_ROLE_VALUES = Object.freeze(["setup", "build", "lint", "test", "typecheck", "e2e", "full-suite", "custom"]);
 const COMMAND_GROUP_PHASE_VALUES = Object.freeze(["readiness", "baseline", "post-change", "diagnostic"]);
 const COMMAND_GROUP_ENFORCEMENT_VALUES = Object.freeze(["required", "warn", "observe"]);
@@ -62,6 +63,14 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function asNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
 }
 
 /**
@@ -936,6 +945,141 @@ function collectOutputQualityBaselineIndex(baselineFiles) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNullableNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeFailureExcerpt(value) {
+  const text = typeof value === "string" ? value : "";
+  const lines = text
+    .split(/\r?\n/u)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const signatureLines = lines.filter((entry) =>
+    /^(?:test at |\u2716 |not ok |FAIL\b|FAILED\b|Error:|AssertionError\b|Expected values|actual:|expected:|operator:)/u.test(entry),
+  );
+  const selected = signatureLines.length > 0 ? signatureLines : lines;
+  return selected
+    .join("\n")
+    .replace(/file:\/\/\/\S+/gu, "file:///<path>")
+    .replace(/(?:\/private)?\/var\/folders\/\S+/gu, "<path>")
+    .replace(/\/tmp\/\S+/gu, "<path>")
+    .replace(/\(\d+(?:\.\d+)?ms\)/gu, "(<duration>)")
+    .replace(/\s+/gu, " ")
+    .slice(0, 1000);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function outputExcerptText(value) {
+  const excerpt = asRecord(value);
+  return [excerpt.stdout_tail, excerpt.stderr_tail]
+    .filter((entry) => typeof entry === "string" && entry.length > 0)
+    .join("\n");
+}
+
+/**
+ * @param {{ command?: unknown, exit_code?: unknown, output_excerpt?: unknown }} record
+ * @returns {string | null}
+ */
+function verificationFailureKey(record) {
+  const command = typeof record.command === "string" && record.command.trim().length > 0 ? record.command.trim() : "";
+  const exitCode = asNullableNumber(record.exit_code);
+  const excerpt = normalizeFailureExcerpt(outputExcerptText(record.output_excerpt));
+  if (!command || exitCode === null || !excerpt) return null;
+  return `${command}::exit:${exitCode}::${excerpt}`;
+}
+
+/**
+ * @param {unknown} ref
+ * @param {string} baseDir
+ * @returns {string | null}
+ */
+function resolveLocalEvidencePath(ref, baseDir) {
+  if (typeof ref !== "string" || ref.trim().length === 0) return null;
+  const value = ref.trim();
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(value)) return null;
+  return path.isAbsolute(value) ? value : path.resolve(baseDir, value);
+}
+
+/**
+ * @param {Record<string, unknown>} summary
+ * @param {string} summaryPath
+ * @returns {string[]}
+ */
+function collectStepResultRefsFromSummary(summary, summaryPath) {
+  const baseDir = path.dirname(summaryPath);
+  const refs = [
+    ...asStringArray(summary.step_result_refs),
+    ...asRecordArray(summary.command_groups).flatMap((group) => asStringArray(group.step_result_refs)),
+  ];
+  return Array.from(
+    new Set(
+      refs
+        .map((ref) => resolveLocalEvidencePath(ref, baseDir))
+        .filter((entry) => typeof entry === "string" && fs.existsSync(entry)),
+    ),
+  );
+}
+
+/**
+ * @param {string[]} baselineFiles
+ * @returns {Map<string, Array<{ baseline_summary_ref: string, baseline_step_result_ref: string, summary: string | null }>>}
+ */
+function collectVerificationFailureBaselineIndex(baselineFiles) {
+  /** @type {Map<string, Array<{ baseline_summary_ref: string, baseline_step_result_ref: string, summary: string | null }>>} */
+  const baselineIndex = new Map();
+  for (const baselineFile of baselineFiles) {
+    if (!fs.existsSync(baselineFile)) {
+      throw new Error(`Output quality baseline file '${baselineFile}' was not found.`);
+    }
+    const summary = asRecord(JSON.parse(fs.readFileSync(baselineFile, "utf8")));
+    for (const stepResultRef of collectStepResultRefsFromSummary(summary, baselineFile)) {
+      const stepResult = readJsonObject(stepResultRef);
+      if (!stepResult || stepResult.status !== "failed") continue;
+      if (asNonEmptyString(stepResult.command_group_phase) !== "baseline") continue;
+      const key = verificationFailureKey(stepResult);
+      if (!key) continue;
+      const refs = baselineIndex.get(key) ?? [];
+      refs.push({
+        baseline_summary_ref: baselineFile,
+        baseline_step_result_ref: stepResultRef,
+        summary: asNonEmptyString(stepResult.summary) || null,
+      });
+      baselineIndex.set(key, refs);
+    }
+  }
+  return baselineIndex;
+}
+
+/**
+ * @param {Map<string, Array<{ baseline_summary_ref: string, baseline_step_result_ref: string, summary: string | null }>>} baselineIndex
+ * @param {{ command: string, exit_code: number | null, output_excerpt: Record<string, unknown> }} record
+ * @returns {{ status: string, evidence_refs: string[], matches: Array<{ baseline_summary_ref: string, baseline_step_result_ref: string, summary: string | null }> } | null}
+ */
+function findVerificationFailureBaselineMatch(baselineIndex, record) {
+  const key = verificationFailureKey(record);
+  const matches = key ? baselineIndex.get(key) ?? [] : [];
+  if (matches.length === 0) return null;
+  return {
+    status: VERIFICATION_FAILURE_BASELINE_STATUS_PRE_EXISTING,
+    evidence_refs: Array.from(
+      new Set(matches.flatMap((entry) => [entry.baseline_summary_ref, entry.baseline_step_result_ref])),
+    ),
+    matches,
+  };
+}
+
+/**
  * @param {Array<{ rule_id: string, source: string, severity: string, summary: string, excerpt: string }>} findings
  * @param {Map<string, string[]>} baselineIndex
  * @returns {Array<{ rule_id: string, source: string, severity: string, summary: string, excerpt: string, baseline_status?: string, baseline_evidence_refs?: string[] }>}
@@ -1085,6 +1229,8 @@ function terminateTimedOutProcessGroup(pid) {
  *     baseline_status?: string,
  *     baseline_evidence_refs?: string[],
  *   }>,
+ *   baselineFailureStatus?: string | null,
+ *   baselineFailureEvidenceRefs?: string[],
  * }} options
  * @returns {{ stepResultPath: string, stepResult: Record<string, unknown> }}
  */
@@ -1138,6 +1284,12 @@ function materializeStepResult(options) {
   }
   if (Array.isArray(options.outputQualityFindings) && options.outputQualityFindings.length > 0) {
     stepResult.output_quality_findings = options.outputQualityFindings;
+  }
+  if (typeof options.baselineFailureStatus === "string" && options.baselineFailureStatus.length > 0) {
+    stepResult.baseline_failure_status = options.baselineFailureStatus;
+    stepResult.baseline_failure_evidence_refs = Array.isArray(options.baselineFailureEvidenceRefs)
+      ? options.baselineFailureEvidenceRefs
+      : [];
   }
   for (const [field, value] of [
     ["command_group_id", options.commandGroupId],
@@ -1231,6 +1383,7 @@ export function verifyProjectRuntime(options = {}) {
     options.cwd ?? process.cwd(),
   );
   const outputQualityBaselineIndex = collectOutputQualityBaselineIndex(outputQualityBaselineFiles);
+  const verificationFailureBaselineIndex = collectVerificationFailureBaselineIndex(outputQualityBaselineFiles);
   const runId = `${init.projectId}.verify.${verificationLabel}.v1`;
   const workspaceIsolation = prepareWorkspaceIsolation({
     projectRoot: init.projectRoot,
@@ -1496,6 +1649,22 @@ export function verifyProjectRuntime(options = {}) {
       const hasOutputQualityFailure = outputQualityFailureFindings.length > 0;
       const hasPreExistingOutputQualityFindings =
         outputQualityFindings.length > 0 && outputQualityFailureFindings.length === 0;
+      const outputExcerpt = {
+        stdout_tail: excerptOutputTail(commandRun.stdout),
+        stderr_tail: excerptOutputTail(commandRun.stderr),
+      };
+      const failedByExitOrSignal = commandRun.status !== 0 || signal !== null || errorCode !== null;
+      const failureMissingPrerequisites =
+        failedByExitOrSignal && !timedOut && !hasOutputQualityFailure ? inferMissingPrerequisites(item.command, commandRun) : [];
+      const baselineFailureMatch =
+        failedByExitOrSignal && !timedOut && failureMissingPrerequisites.length === 0
+          ? findVerificationFailureBaselineMatch(verificationFailureBaselineIndex, {
+              command: item.command,
+              exit_code: exitCode,
+              output_excerpt: outputExcerpt,
+            })
+          : null;
+      const hasPreExistingVerificationFailure = baselineFailureMatch !== null;
 
       const transcript = [
         `command: ${item.command}`,
@@ -1523,7 +1692,10 @@ export function verifyProjectRuntime(options = {}) {
       ].join("\n");
       fs.writeFileSync(transcriptPath, `${transcript}\n`, "utf8");
 
-      const status = commandRun.status === 0 && !timedOut && !hasOutputQualityFailure ? "passed" : "failed";
+      const status =
+        (commandRun.status === 0 && !timedOut && !hasOutputQualityFailure) || hasPreExistingVerificationFailure
+          ? "passed"
+          : "failed";
       const enforcementResult =
         status === "passed"
           ? "pass"
@@ -1532,16 +1704,15 @@ export function verifyProjectRuntime(options = {}) {
             : item.commandGroupEnforcement === "warn"
               ? "warn"
               : "fail";
-      const missingPrerequisites =
-        status === "failed" && !timedOut && !hasOutputQualityFailure
-          ? inferMissingPrerequisites(item.command, commandRun)
-          : [];
+      const missingPrerequisites = status === "failed" ? failureMissingPrerequisites : [];
       const commandGroupOutcome =
-        status === "failed" && missingPrerequisites.length > 0
-          ? "missing-tool"
-          : status === "failed" && item.commandGroupPhase === "baseline" && item.commandGroupEnforcement === "required"
-            ? "broken-baseline"
-            : null;
+        hasPreExistingVerificationFailure
+          ? "broken-baseline"
+          : status === "failed" && missingPrerequisites.length > 0
+            ? "missing-tool"
+            : status === "failed" && item.commandGroupPhase === "baseline" && item.commandGroupEnforcement === "required"
+              ? "broken-baseline"
+              : null;
       const blockedNextStep =
         status === "failed"
           ? timedOut
@@ -1555,16 +1726,18 @@ export function verifyProjectRuntime(options = {}) {
 
       const summary =
         status === "passed"
-          ? hasPreExistingOutputQualityFindings
-            ? `Verification command '${item.command}' passed; warning output matched baseline diagnostic evidence.`
-            : `Verification command '${item.command}' passed under owner '${item.repoId}'.`
+          ? hasPreExistingVerificationFailure
+            ? `Verification command '${item.command}' matched pre-existing baseline failure evidence.`
+            : hasPreExistingOutputQualityFindings
+              ? `Verification command '${item.command}' passed; warning output matched baseline diagnostic evidence.`
+              : `Verification command '${item.command}' passed under owner '${item.repoId}'.`
           : timedOut
             ? `Verification command '${item.command}' timed out after ${commandTimeoutMs}ms.`
             : hasOutputQualityFailure
               ? `Verification command '${item.command}' exited 0 but emitted warning output on stderr.`
-          : missingPrerequisites.length > 0
-            ? `Verification command '${item.command}' failed: missing prerequisite(s) detected.`
-            : `${phaseFailureLabel(item.commandGroupPhase)} verification command '${item.command}' failed with exit code ${commandRun.status ?? -1}.`;
+              : missingPrerequisites.length > 0
+                ? `Verification command '${item.command}' failed: missing prerequisite(s) detected.`
+                : `${phaseFailureLabel(item.commandGroupPhase)} verification command '${item.command}' failed with exit code ${commandRun.status ?? -1}.`;
 
       const { stepResult, stepResultPath } = materializeStepResult({
         runtimeLayout: init.runtimeLayout,
@@ -1604,11 +1777,10 @@ export function verifyProjectRuntime(options = {}) {
         exitCode,
         signal,
         errorCode,
-        outputExcerpt: {
-          stdout_tail: excerptOutputTail(commandRun.stdout),
-          stderr_tail: excerptOutputTail(commandRun.stderr),
-        },
+        outputExcerpt,
         outputQualityFindings,
+        baselineFailureStatus: baselineFailureMatch?.status ?? null,
+        baselineFailureEvidenceRefs: baselineFailureMatch?.evidence_refs ?? [],
       });
       stepResults.push(stepResult);
       stepResultFiles.push(stepResultPath);
@@ -1669,6 +1841,9 @@ export function verifyProjectRuntime(options = {}) {
     const failedSteps = groupSteps.filter((result) => result.status === "failed");
     const skippedSteps = groupSteps.filter((result) => result.command_group_outcome === "not-applicable");
     const executableFailedSteps = failedSteps.filter((result) => result.command_group_outcome !== "not-applicable");
+    const outcomeStep = groupSteps.find(
+      (result) => typeof result.command_group_outcome === "string" && result.command_group_outcome.length > 0,
+    );
     const status =
       skippedSteps.length > 0 && executableFailedSteps.length === 0
         ? "skipped"
@@ -1692,7 +1867,7 @@ export function verifyProjectRuntime(options = {}) {
       command_count: group.commands.length,
       failed_command_count: failedSteps.length,
       skipped_command_count: skippedSteps.length,
-      outcome: typeof skippedSteps[0]?.command_group_outcome === "string" ? skippedSteps[0].command_group_outcome : null,
+      outcome: typeof outcomeStep?.command_group_outcome === "string" ? outcomeStep.command_group_outcome : null,
       step_result_refs: groupSteps
         .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
         .filter((entry) => typeof entry === "string" && entry.length > 0),
@@ -1706,6 +1881,9 @@ export function verifyProjectRuntime(options = {}) {
   );
   const postChangeFailures = stepResults.filter(
     (result) => result.status === "failed" && result.command_group_phase === "post-change",
+  );
+  const baselineFailureMatchedSteps = stepResults.filter(
+    (result) => result.baseline_failure_status === VERIFICATION_FAILURE_BASELINE_STATUS_PRE_EXISTING,
   );
   const verifySummary = {
     run_id: runId,
@@ -1806,6 +1984,17 @@ export function verifyProjectRuntime(options = {}) {
         findings: result.output_quality_findings,
       })),
     output_quality_baseline_files: outputQualityBaselineFiles,
+    verification_failure_baseline_files: outputQualityBaselineFiles,
+    verification_failure_baseline_matches: baselineFailureMatchedSteps.map((result) => ({
+      repo_scope: result.repo_scope ?? null,
+      command: result.command ?? null,
+      exit_code: result.exit_code ?? null,
+      step_result_ref: stepResultFiles[stepResults.indexOf(result)] ?? null,
+      baseline_status: result.baseline_failure_status,
+      baseline_evidence_refs: Array.isArray(result.baseline_failure_evidence_refs)
+        ? result.baseline_failure_evidence_refs
+        : [],
+    })),
     output_quality_baseline_matches: stepResults
       .filter((result) =>
         Array.isArray(result.output_quality_findings) &&

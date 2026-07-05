@@ -226,7 +226,7 @@ and delivery/release blocking semantics.
 
 ## W45-S06 — Documentation refresh and live E2E acceptance
 - **Epic:** EPIC-7 Live E2E and rehearsal; EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** After W45 implementation lands, update source-of-truth documentation
   and run live E2E acceptance proving the bounded review/QA repair loop is OK.
 - **Primary modules:** `docs/architecture/**`, `docs/contracts/**`,
@@ -257,6 +257,71 @@ and delivery/release blocking semantics.
 - review-origin and QA-origin repair evidence refs
 - `pnpm slice:status`
 - `pnpm slice:gate`
+
+### Current W45-S06 proof notes
+- The live runner fails repair-profile acceptance closed when declared
+  `implementation_loop.proof_expectations` are not backed by materialized
+  `quality_repair_request`, repair implementation, review rerun, QA rerun,
+  closed-request refs, and no-upstream-write evidence. This prevents
+  one-iteration green repair profiles from being misclassified as W45-S06
+  acceptance.
+- W45 acceptance profiles may declare an internal
+  `implementation_loop.proof_expectations.acceptance_repair_drill` for live
+  proof only. The drill does not mutate private runtime state: it creates the
+  same public repair context and invokes `review decide --decision
+  request-repair`, then requires the normal public repair implementation,
+  review rerun, QA rerun, request closure, delivery unblock, and
+  no-upstream-write proof.
+- Review-origin acceptance proof:
+  `w45-s06-fastify-openai-20260704-review-drill-1` on
+  `scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml`
+  materialized one review-origin `quality_repair_request`, ran public
+  `execution#2`, reran review and QA, closed the request, kept
+  `post_run_verify_status=pass`, and produced
+  `repair_proof_expectations.status=pass` with observed path `review-origin`.
+  The step-evaluator exited successfully. The run summary remains
+  `status=warn` only because run-health records non-blocking factual findings;
+  command, controller, provider, target, diagnostic, and evidence health are all
+  `pass`.
+- QA-origin acceptance proof:
+  `w45-s06-pluggy-anthropic-20260704-acceptance-1` on
+  `scripts/live-e2e/profiles/full-journey-repair-pluggy-medium-anthropic.yaml`
+  finished with run-health `pass`, command/controller/provider/target/
+  diagnostic/evidence health `pass`, one QA-origin `quality_repair_request`,
+  public `execution#2`, post-repair review before QA closure, closed request
+  refs, `post_run_verify_status=pass`, no-upstream-write evidence, and
+  `repair_proof_expectations.status=pass` with observed path `qa-origin`.
+- Together those two runs satisfy the W45-S06 live repair-closure acceptance
+  requirement for review-origin and QA-origin paths. Budget-exhaustion remains
+  covered by deterministic W45-S05 fixture/profile evidence as an
+  operator-visible hold path, not as a successful delivery path.
+- `w45-s06-fastify-openai-20260704-review-drill-2` is not acceptance evidence:
+  it was a fresh rerun attempt that blocked at `handoff` with
+  `controller_incomplete` before execution acceptance and was stopped.
+- `w45-s06-commander-anthropic-20260704-acceptance-1` exercised a real
+  review-origin repair path on the commander repair profile: review produced
+  `request-repair`, materialized a
+  `quality_repair_request` ref, and launched public `execution#2`. The run
+  remained non-accepted: run-health was `blocked`, failure owner `provider`,
+  phase `review`, class `provider_did_not_address_finding`; post-run primary
+  verification was still `fail`, QA and delivery were not reached, and the
+  request was not closed. Treat this as useful review-origin blocker evidence,
+  not closure evidence.
+- `w45-s06-commander-anthropic-20260704-acceptance-2` reproduced the same
+  review-origin path after baseline-aware verification was added, but the
+  baseline failure matcher still treated volatile Node test durations as a new
+  post-change failure. The run remained blocked before QA/delivery closure and
+  proved that command-failure baseline matching must normalize volatile timing
+  in bounded excerpts.
+- `w45-s06-commander-anthropic-20260704-acceptance-3` completed execution,
+  review, QA, and delivery with `post_run_verify_status=pass`,
+  `review_status=pass`, and `evaluation_status=pass`. The post-run verify
+  summary recorded `verification_failure_baseline_matches[]` for the
+  pre-existing Commander `NO_COLOR` failure and command group
+  `outcome=broken-baseline`. This is valid green full-lifecycle regression
+  evidence for the verifier fix, but it still did not materialize
+  `quality_repair_request` refs, so it is not W45-S06 live repair-closure
+  acceptance evidence.
 
 ### Out of scope
 - Publishing a new npm release.

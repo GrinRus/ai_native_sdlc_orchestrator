@@ -91,6 +91,16 @@ internal repair remains execution-health evidence only; it does not replace the
 public `run start` / `review run` / `eval run` /
 `review decide --decision request-repair` loop.
 
+W45 repair-acceptance profiles may declare
+`implementation_loop.proof_expectations.acceptance_repair_drill` when organic
+provider behavior would otherwise finish a repair profile without materializing
+a repair request. The drill is a live E2E proof hook, not a product contract:
+it activates only after the declared source stage has already passed with
+public evidence, builds the normal public repair context, invokes
+`review decide --decision request-repair`, and then requires the same bounded
+public repair execution, post-repair review, QA closure, closed-request refs,
+delivery unblock, and no-upstream-write evidence as an organic repair.
+
 The full-journey runner must pass the canonical target checkout root to review
 commands (`review run --execution-root <target_checkout_root>` and
 `review decide --execution-root <target_checkout_root>`). Runtime Harness,

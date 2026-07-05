@@ -33,14 +33,18 @@ import {
   collectGuidedBrowserTaskProof,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
+  buildAcceptanceRepairDrillFinding,
   evaluateBaselineVerifyGate,
+  evaluateRepairProofExpectations,
   evaluateTargetToolchainPreflight,
   nextActionReportClosesFlow,
   nodeVersionSatisfiesRequiredRange,
   prepareAorInstallationProof,
   reconcileSummaryMeaningfulChangedPaths,
+  resolveAcceptanceRepairDrill,
   runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
+  resolveActiveAcceptanceRepairDrill,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
 } from "../lib/flows.mjs";
 import {
@@ -3655,6 +3659,10 @@ test("W45 repair profiles declare replayable repair-loop proof expectations", ()
     "budget_exhaustion_operator_hold_required",
     "no_upstream_write_evidence_required",
   ];
+  const acceptanceDrillSources = new Map([
+    ["scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml", "review"],
+    ["scripts/live-e2e/profiles/full-journey-repair-pluggy-medium-anthropic.yaml", "qa"],
+  ]);
 
   for (const profileRef of repairProfileRefs) {
     const loaded = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
@@ -3677,6 +3685,13 @@ test("W45 repair profiles declare replayable repair-loop proof expectations", ()
       ["patch-only", "fork-first-pr"].includes(resolved.resolvedProfile.output_policy.preferred_delivery_mode),
       `${profileRef} must keep no-upstream-write delivery evidence bounded`,
     );
+    if (acceptanceDrillSources.has(profileRef)) {
+      const drill = proofExpectations.acceptance_repair_drill;
+      assert.equal(drill.source_phase, acceptanceDrillSources.get(profileRef));
+      assert.equal(drill.trigger, "when-no-organic-repair");
+      assert.match(drill.finding_id, /^w45\./u);
+      assert.match(drill.resolution_requirement, /public repair execution/u);
+    }
   }
 
   const loaded = loadProofRunnerProfile({
@@ -3704,6 +3719,79 @@ test("W45 repair profiles declare replayable repair-loop proof expectations", ()
       }),
     /implementation_loop\.proof_expectations\.qa_origin_requires_post_repair_review=true/u,
   );
+});
+
+test("W45 acceptance repair drills activate only for clean first-pass public evidence", () => {
+  const drill = resolveAcceptanceRepairDrill({
+    acceptance_repair_drill: {
+      source_phase: "qa",
+      trigger: "when-no-organic-repair",
+      finding_id: "w45.qa.acceptance-drill",
+      summary: "Request QA-origin repair proof.",
+      resolution_requirement: "Complete a public repair execution before delivery.",
+    },
+  });
+
+  assert.equal(drill.source_phase, "qa");
+  assert.equal(
+    resolveActiveAcceptanceRepairDrill({
+      drill,
+      iteration: 1,
+      sourcePhase: "qa",
+      currentRepairSource: null,
+      stageStatus: "pass",
+      secondaryStatus: "pass",
+      priorRepairDecisionFiles: [],
+    }),
+    drill,
+  );
+  assert.equal(
+    resolveActiveAcceptanceRepairDrill({
+      drill,
+      iteration: 2,
+      sourcePhase: "qa",
+      currentRepairSource: null,
+      stageStatus: "pass",
+      secondaryStatus: "pass",
+      priorRepairDecisionFiles: [],
+    }),
+    null,
+  );
+  assert.equal(
+    resolveActiveAcceptanceRepairDrill({
+      drill,
+      iteration: 1,
+      sourcePhase: "qa",
+      currentRepairSource: "qa",
+      stageStatus: "pass",
+      secondaryStatus: "pass",
+      priorRepairDecisionFiles: [],
+    }),
+    null,
+  );
+  assert.equal(
+    resolveActiveAcceptanceRepairDrill({
+      drill,
+      iteration: 1,
+      sourcePhase: "qa",
+      currentRepairSource: null,
+      stageStatus: "fail",
+      secondaryStatus: "pass",
+      priorRepairDecisionFiles: [],
+    }),
+    null,
+  );
+
+  const finding = buildAcceptanceRepairDrillFinding({
+    drill,
+    sourcePhase: "qa",
+    iteration: 1,
+    evidenceRefs: ["review-report.json", "evaluation-report.json"],
+  });
+  assert.equal(finding.finding_id, "w45.qa.acceptance-drill");
+  assert.equal(finding.category, "qa");
+  assert.equal(finding.acceptance_drill, true);
+  assert.deepEqual(finding.evidence_refs, ["review-report.json", "evaluation-report.json"]);
 });
 
 test("W45 repair-loop proof fixture covers review-origin, QA-origin, and exhausted budget paths", () => {
@@ -3761,6 +3849,291 @@ test("W45 repair-loop proof fixture covers review-origin, QA-origin, and exhaust
   assert.equal(exhausted.review_rerun_refs.length, exhausted.attempt_budget.max_attempts);
   assert.deepEqual(exhausted.qa_rerun_refs, []);
   assert.match(exhausted.operator_hold_ref, /next-action-budget-exhausted/u);
+});
+
+test("W45 repair proof expectations fail closed without materialized repair refs", () => {
+  const result = evaluateRepairProofExpectations({
+    profile: {
+      implementation_loop: {
+        proof_expectations: {
+          required_repair_paths: ["review-origin", "qa-origin"],
+          require_quality_repair_request_refs: true,
+          require_implementation_repair_refs: true,
+          require_review_rerun_refs: true,
+          require_qa_rerun_refs: true,
+          qa_origin_requires_post_repair_review: true,
+          no_upstream_write_evidence_required: true,
+        },
+      },
+      output_policy: {
+        write_back_to_remote: false,
+      },
+    },
+    artifacts: {
+      implementation_loop: {
+        iterations: [
+          {
+            iteration: 1,
+            repair_requested: false,
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(result.status, "fail");
+  assert.ok(
+    result.findings.some((finding) => finding.includes("quality_repair_request ref")),
+    "missing request refs should block repair-profile acceptance",
+  );
+  assert.ok(
+    result.findings.some((finding) => finding.includes("declared repair path")),
+    "missing any declared repair path should block repair-profile acceptance",
+  );
+});
+
+test("W45 repair proof expectations accept one closed declared repair path per run", () => {
+  withTempRoot((tempRoot) => {
+    const reviewDecisionFile = path.join(tempRoot, "review-decision-review-origin.json");
+    fs.writeFileSync(
+      reviewDecisionFile,
+      `${JSON.stringify(
+        {
+          decision: "request-repair",
+          quality_repair_request_ref: "evidence://reports/quality-repair-request-review-origin.json",
+          repair_context: {
+            source_phase: "review",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = evaluateRepairProofExpectations({
+      profile: {
+        implementation_loop: {
+          proof_expectations: {
+            required_repair_paths: ["review-origin", "qa-origin", "budget-exhaustion"],
+            require_quality_repair_request_refs: true,
+            require_implementation_repair_refs: true,
+            require_review_rerun_refs: true,
+            require_qa_rerun_refs: true,
+            qa_origin_requires_post_repair_review: true,
+            no_upstream_write_evidence_required: true,
+          },
+        },
+        output_policy: {
+          write_back_to_remote: false,
+        },
+      },
+      artifacts: {
+        review_repair_decision_files: [reviewDecisionFile],
+        quality_repair_request_refs: ["evidence://reports/quality-repair-request-review-origin.json"],
+        quality_repair_request_files: [path.join(tempRoot, "quality-repair-request-review-origin.json")],
+        closed_quality_repair_request_refs: ["evidence://reports/quality-repair-request-review-origin.json"],
+        implementation_loop: {
+          iterations: [
+            {
+              iteration: 1,
+              repair_requested: true,
+              repair_decision_file: reviewDecisionFile,
+            },
+            {
+              iteration: 2,
+              routed_step_result_file: path.join(tempRoot, "step-result-repair-2.json"),
+              review_report_file: path.join(tempRoot, "review-report-repair-2.json"),
+              evaluation_report_file: path.join(tempRoot, "evaluation-report-repair-2.json"),
+              qa_status: "pass",
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(result.status, "pass");
+    assert.deepEqual(result.evidence.observed_declared_repair_paths, ["review-origin"]);
+    assert.equal(result.evidence.implementation_repair_refs.length, 1);
+    assert.equal(result.evidence.review_rerun_refs.length, 1);
+    assert.equal(result.evidence.qa_rerun_refs.length, 1);
+  });
+});
+
+test("W45 repair proof expectations accept resumed final repair iteration evidence", () => {
+  withTempRoot((tempRoot) => {
+    const reviewDecisionFile = path.join(tempRoot, "review-decision-review-origin.json");
+    fs.writeFileSync(
+      reviewDecisionFile,
+      `${JSON.stringify(
+        {
+          decision: "request-repair",
+          quality_repair_request_ref: "evidence://reports/quality-repair-request-review-origin.json",
+          repair_context: {
+            source_phase: "review",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = evaluateRepairProofExpectations({
+      profile: {
+        implementation_loop: {
+          proof_expectations: {
+            required_repair_paths: ["review-origin", "qa-origin", "budget-exhaustion"],
+            require_quality_repair_request_refs: true,
+            require_implementation_repair_refs: true,
+            require_review_rerun_refs: true,
+            require_qa_rerun_refs: true,
+            qa_origin_requires_post_repair_review: true,
+            no_upstream_write_evidence_required: true,
+          },
+        },
+        output_policy: {
+          write_back_to_remote: false,
+        },
+      },
+      artifacts: {
+        review_repair_decision_files: [reviewDecisionFile],
+        quality_repair_request_refs: ["evidence://reports/quality-repair-request-review-origin.json"],
+        quality_repair_request_files: [path.join(tempRoot, "quality-repair-request-review-origin.json")],
+        closed_quality_repair_request_refs: ["evidence://reports/quality-repair-request-review-origin.json"],
+        implementation_loop: {
+          iterations: [
+            {
+              iteration: 1,
+              previous_repair_decision_files: [reviewDecisionFile],
+              routed_step_result_file: path.join(tempRoot, "step-result-repair-resumed.json"),
+              review_report_file: path.join(tempRoot, "review-report-repair-resumed.json"),
+              evaluation_report_file: path.join(tempRoot, "evaluation-report-repair-resumed.json"),
+              qa_status: "pass",
+              repair_requested: false,
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(result.status, "pass");
+    assert.deepEqual(result.evidence.observed_declared_repair_paths, ["review-origin"]);
+    assert.deepEqual(result.evidence.implementation_repair_refs, [
+      path.join(tempRoot, "step-result-repair-resumed.json"),
+    ]);
+    assert.deepEqual(result.evidence.review_rerun_refs, [
+      path.join(tempRoot, "review-report-repair-resumed.json"),
+    ]);
+    assert.deepEqual(result.evidence.qa_rerun_refs, [
+      path.join(tempRoot, "evaluation-report-repair-resumed.json"),
+    ]);
+  });
+});
+
+test("W45 repair proof expectations accept closed review-origin and QA-origin evidence", () => {
+  withTempRoot((tempRoot) => {
+    const reviewDecisionFile = path.join(tempRoot, "review-decision-review-origin.json");
+    const qaDecisionFile = path.join(tempRoot, "review-decision-qa-origin.json");
+    fs.writeFileSync(
+      reviewDecisionFile,
+      `${JSON.stringify(
+        {
+          decision: "request-repair",
+          quality_repair_request_ref: "evidence://reports/quality-repair-request-review-origin.json",
+          repair_context: {
+            source_phase: "review",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      qaDecisionFile,
+      `${JSON.stringify(
+        {
+          decision: "request-repair",
+          quality_repair_request_ref: "evidence://reports/quality-repair-request-qa-origin.json",
+          repair_context: {
+            source_phase: "qa",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = evaluateRepairProofExpectations({
+      profile: {
+        implementation_loop: {
+          proof_expectations: {
+            required_repair_paths: ["review-origin", "qa-origin"],
+            require_quality_repair_request_refs: true,
+            require_implementation_repair_refs: true,
+            require_review_rerun_refs: true,
+            require_qa_rerun_refs: true,
+            qa_origin_requires_post_repair_review: true,
+            no_upstream_write_evidence_required: true,
+          },
+        },
+        output_policy: {
+          write_back_to_remote: false,
+        },
+      },
+      artifacts: {
+        review_repair_decision_files: [reviewDecisionFile, qaDecisionFile],
+        quality_repair_request_refs: [
+          "evidence://reports/quality-repair-request-review-origin.json",
+          "evidence://reports/quality-repair-request-qa-origin.json",
+        ],
+        quality_repair_request_files: [
+          path.join(tempRoot, "quality-repair-request-review-origin.json"),
+          path.join(tempRoot, "quality-repair-request-qa-origin.json"),
+        ],
+        closed_quality_repair_request_refs: [
+          "evidence://reports/quality-repair-request-review-origin.json",
+          "evidence://reports/quality-repair-request-qa-origin.json",
+        ],
+        implementation_loop: {
+          iterations: [
+            {
+              iteration: 1,
+              repair_requested: true,
+              repair_decision_file: reviewDecisionFile,
+            },
+            {
+              iteration: 2,
+              routed_step_result_file: path.join(tempRoot, "step-result-repair-2.json"),
+              review_report_file: path.join(tempRoot, "review-report-repair-2.json"),
+              evaluation_report_file: path.join(tempRoot, "evaluation-report-repair-2.json"),
+              qa_status: "pass",
+            },
+            {
+              iteration: 3,
+              repair_requested: true,
+              repair_decision_file: qaDecisionFile,
+            },
+            {
+              iteration: 4,
+              routed_step_result_file: path.join(tempRoot, "step-result-repair-4.json"),
+              review_report_file: path.join(tempRoot, "review-report-repair-4.json"),
+              evaluation_report_file: path.join(tempRoot, "evaluation-report-repair-4.json"),
+              qa_status: "pass",
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(result.status, "pass");
+    assert.deepEqual(result.evidence.repair_source_stages.sort(), ["qa", "review"]);
+    assert.equal(result.evidence.implementation_repair_refs.length, 2);
+    assert.equal(result.evidence.review_rerun_refs.length, 2);
+    assert.equal(result.evidence.qa_rerun_refs.length, 2);
+  });
 });
 
 test("run-profile rejects xlarge profiles outside manual controller mode", () => {

@@ -41,6 +41,12 @@ implementation_loop:
     qa_origin_requires_post_repair_review: true
     budget_exhaustion_operator_hold_required: true
     no_upstream_write_evidence_required: true
+    acceptance_repair_drill:
+      source_phase: qa
+      trigger: when-no-organic-repair
+      finding_id: w45.pluggy.qa.acceptance-drill
+      summary: W45 QA-origin acceptance drill requires one public repair iteration after clean QA evidence.
+      resolution_requirement: Complete a bounded public repair execution that refreshes the changed Pluggy regression evidence, then rerun review and QA before delivery.
 target_catalog_id: pluggy
 feature_mission_id: pluggy-diagnostics-repair
 scenario_family: repair

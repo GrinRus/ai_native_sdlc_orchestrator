@@ -140,6 +140,9 @@ Generic command-group outcomes are `no-tests`, `missing-tool`,
 `not-applicable`, and `broken-baseline`. They are AOR verification evidence and
 must not use private proof-harness fields such as target-matrix, run-health, or
 step-quality metadata.
+`broken-baseline` may describe a baseline-phase command that fails before the
+change or a post-change command failure that matches explicit baseline failure
+evidence supplied to `project verify --output-quality-baseline`.
 
 `project init` materializes discovery-backed command groups for detected stacks
 and may record `verification.discovery_outcomes[]` and

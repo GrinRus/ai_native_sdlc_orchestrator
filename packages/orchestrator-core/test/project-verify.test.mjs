@@ -215,6 +215,79 @@ test("verifyProjectRuntime still fails warning output that is not in the baselin
   });
 });
 
+test("verifyProjectRuntime accepts command failures that match explicit baseline failure evidence", () => {
+  withTempRepo((repoRoot) => {
+    const counterFile = path.join(repoRoot, "verify-counter.txt");
+    const command = [
+      "node -e",
+      JSON.stringify(
+        [
+          "const fs=require('node:fs');",
+          `const f=${JSON.stringify(counterFile)};`,
+          "const next=fs.existsSync(f)?'0.456ms':'0.123ms';",
+          "fs.writeFileSync(f,'seen');",
+          "console.log('test at tests/example.test.js:1:1');",
+          "console.log(`\\u2716 known broken baseline (${next})`);",
+          "process.exit(5);",
+        ].join(""),
+      ),
+    ].join(" ");
+    const baseline = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "baseline-diagnostic",
+      repoTestCommands: [command],
+    });
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [command],
+      outputQualityBaselineFiles: [baseline.verifySummaryPath],
+    });
+
+    assert.equal(baseline.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.status, "passed");
+    assert.equal(result.verifySummary.verification_failure_baseline_matches.length, 1);
+    const step = result.stepResults.find((candidate) => candidate.command === command);
+    assert.ok(step);
+    assert.equal(step.status, "passed");
+    assert.equal(step.command_group_outcome, "broken-baseline");
+    assert.equal(step.baseline_failure_status, "pre_existing");
+    assert.ok(step.baseline_failure_evidence_refs.includes(baseline.verifySummaryPath));
+    assert.match(step.summary, /matched pre-existing baseline failure evidence/u);
+  });
+});
+
+test("verifyProjectRuntime still fails command failures that do not match baseline evidence", () => {
+  withTempRepo((repoRoot) => {
+    const baselineCommand = "node -e \"console.log('test at tests/example.test.js:1:1'); console.log('\\u2716 old failure'); process.exit(5)\"";
+    const currentCommand = "node -e \"console.log('test at tests/example.test.js:1:1'); console.log('\\u2716 new failure'); process.exit(5)\"";
+    const baseline = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "baseline-diagnostic",
+      repoTestCommands: [baselineCommand],
+    });
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [currentCommand],
+      outputQualityBaselineFiles: [baseline.verifySummaryPath],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.verification_failure_baseline_matches.length, 0);
+    const step = result.stepResults.find((candidate) => candidate.command === currentCommand);
+    assert.ok(step);
+    assert.equal(step.status, "failed");
+    assert.equal(step.baseline_failure_status, undefined);
+  });
+});
+
 test("verifyProjectRuntime keeps labeled step results distinct across repeated verifies", () => {
   withTempRepo((repoRoot) => {
     const primary = verifyProjectRuntime({

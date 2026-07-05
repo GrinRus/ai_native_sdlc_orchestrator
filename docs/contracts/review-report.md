@@ -83,7 +83,42 @@ silently emitting an empty changed-path pass.
 - `recorded_test_commands`
 - `coverage_reason`
 
-For test specs, `code_quality.findings` should flag likely coverage weakening, including lowered `t.plan(...)` counts or removed assertions without an equivalent replacement. `artifact_quality.findings` should warn when changed test specs are not exercised by explicit primary verification test commands, unless the command is a broad repo/package test command such as `npm test`, `npm run test`, `npm run test:ci`, `pnpm test`, `pnpm run test`, `yarn test`, `bun test`, repo-wide `pytest`, `python -m pytest`, or a package-level workspace/filter command that covers the changed test file's nearest package, such as `yarn workspace <package-name> test-unit`, `pnpm --filter <package-name> test`, or `npm --workspace <package-name> test`. A broad verification mapping warning is non-repair evidence when primary verification passed, `code_quality.status=pass`, and `feature_size_fit.status=pass`; downstream quality gates must not convert that warning into `request-repair` without an actionable implementation finding. The changed-test-spec guardrail applies to conventional test locations such as `test/**`, `tests/**`, package/app `test/**`, package/app `tests/**`, `src/test/**`, `src/tests/**`, `__tests__/**`, and `*.test.*` / `*.spec.*` files; support/config files under paths such as `config/tests/**` are reviewed as changed implementation/support files, not as standalone test specs. Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`, `.swp`, and `~` files should also be flagged because they are not valid implementation deliverables. Review no longer fails implementation quality from legacy intake `allowed_paths`/`forbidden_paths`; it judges whether the final diff satisfies the mission and verification evidence. When an approved handoff packet has explicit `allowed_paths[]`, review must fail `code_quality` for any non-bootstrap changed path outside that approved handoff scope. These findings are review signals; they do not replace deterministic post-run verification.
+For test specs, `code_quality.findings` should flag likely coverage weakening,
+including lowered `t.plan(...)` counts or removed assertions without an
+equivalent replacement. `artifact_quality.findings` should warn when changed test
+specs are not exercised by explicit primary verification commands. The review
+report may derive `recorded_test_commands` from legacy
+`verify-summary.command_overrides.test_commands`, from
+`verify-summary.command_groups[].commands`, or from the command text in
+`verify-summary.command_groups[].step_result_refs` / `step_result_refs` when the
+step result belongs to a `role=test` command group. Broad repo/package commands
+such as `npm test`, `npm run test`, `npm run test:ci`, `pnpm test`,
+`pnpm run test`, `yarn test`, `bun test`, repo-wide `pytest`,
+`python -m pytest`, or a package-level workspace/filter command that covers the
+changed test file's nearest package, such as
+`yarn workspace <package-name> test-unit`, `pnpm --filter <package-name> test`,
+or `npm --workspace <package-name> test`, count as covering changed tests. A
+broad verification mapping warning is non-repair evidence when primary
+verification passed, `code_quality.status=pass`, and
+`feature_size_fit.status=pass`; downstream quality gates must not convert that
+warning into `request-repair` without an actionable implementation finding. The
+same rule applies when primary verification passes because a failed command
+matched explicit `baseline_failure_status=pre_existing` evidence: review should
+keep the broken-baseline refs visible, but it must not treat that stale target
+failure as a new repair request by itself. The
+changed-test-spec guardrail applies to conventional test locations such as
+`test/**`, `tests/**`, package/app `test/**`, package/app `tests/**`,
+`src/test/**`, `src/tests/**`, `__tests__/**`, and `*.test.*` / `*.spec.*`
+files; support/config files under paths such as `config/tests/**` are reviewed
+as changed implementation/support files, not as standalone test specs.
+Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`,
+`.swp`, and `~` files should also be flagged because they are not valid
+implementation deliverables. Review no longer fails implementation quality from
+legacy intake `allowed_paths`/`forbidden_paths`; it judges whether the final diff
+satisfies the mission and verification evidence. When an approved handoff packet
+has explicit `allowed_paths[]`, review must fail `code_quality` for any
+non-bootstrap changed path outside that approved handoff scope. These findings
+are review signals; they do not replace deterministic post-run verification.
 
 `feature_size_fit` should preserve:
 - `status`

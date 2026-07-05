@@ -623,6 +623,26 @@ function postRunDiagnosticDeferralIsNonBlocking(artifacts) {
 }
 
 /**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {boolean}
+ */
+function postRunPrimaryFailureRoutesThroughRepairLoop(artifacts) {
+  const rawStatus = asNonEmptyString(artifacts.post_run_verify_status);
+  if (!rawStatus || !["not_pass", "blocked"].includes(toLiveE2eObservationStatus(rawStatus))) return false;
+  const loop = asRecord(artifacts.implementation_loop);
+  if (loop.enabled !== true) return false;
+  if (artifacts.implementation_loop_blocked === true || artifacts.implementation_loop_exhausted === true) return false;
+  const repairSources = new Set(asStringArray(loop.repair_sources));
+  const cycleSteps = new Set(asStringArray(loop.cycle_steps));
+  const repairActions = new Set(asStringArray(loop.review_repair_actions));
+  return (
+    repairSources.has("post-run-primary") &&
+    cycleSteps.has("review") &&
+    repairActions.has("failed-quality-findings")
+  );
+}
+
+/**
  * @param {string} step
  * @param {Record<string, unknown>} artifacts
  * @returns {string[]}
@@ -632,7 +652,9 @@ export function resolveStepArtifactGateFailures(step, artifacts) {
     return uniqueStrings([
       failingArtifactGate(artifacts, "provider_execution_status", "provider execution"),
       failingArtifactGate(artifacts, "real_code_change_status", "real code change gate"),
-      failingArtifactGate(artifacts, "post_run_verify_status", "post-run verification"),
+      postRunPrimaryFailureRoutesThroughRepairLoop(artifacts)
+        ? null
+        : failingArtifactGate(artifacts, "post_run_verify_status", "post-run verification"),
     ]);
   }
   if (step === "review") {

@@ -41,6 +41,12 @@ implementation_loop:
     qa_origin_requires_post_repair_review: true
     budget_exhaustion_operator_hold_required: true
     no_upstream_write_evidence_required: true
+    acceptance_repair_drill:
+      source_phase: review
+      trigger: when-no-organic-repair
+      finding_id: w45.fastify.review.acceptance-drill
+      summary: W45 review-origin acceptance drill requires one public repair iteration after clean review evidence.
+      resolution_requirement: Complete a bounded public repair execution that refreshes the changed Fastify test or type evidence, then rerun review and QA before delivery.
 target_catalog_id: fastify
 feature_mission_id: fastify-schema-plugin-repair
 scenario_family: repair
