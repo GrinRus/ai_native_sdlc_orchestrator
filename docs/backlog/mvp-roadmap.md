@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-54-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-55-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -65,6 +65,7 @@ The authoritative planning model for implementation lives in:
 | W52 | Convert the remaining Vitest and SQLAlchemy hard-target installed-user rehearsal evidence into product acceptance or precise non-acceptance blockers, then harden manual evidence depth and final acceptance reporting. | 10 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-52-implementation-slices.md` |
 | W53 | Generalize target verification into AOR command groups and enforce the boundary between AOR runtime artifacts and live E2E proof harness evidence. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-53-implementation-slices.md` |
 | W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
+| W55 | Turn `ky` large/xlarge control findings into actionable repair evidence, target-catalog alignment, Claude guardrails, and rerun reporting. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-55-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -997,6 +998,25 @@ W44/W45 remain valid deferred backlog tracks and are not W54 prerequisites.
   artifact shapes.
 
 **Detailed slices:** `docs/backlog/wave-54-implementation-slices.md`
+
+## W55 - actionable repair evidence and hard-target control stability
+**Goal:** Convert the latest `ky` large/xlarge control findings into generic
+repair-evidence, target-catalog, provider-guardrail, and proof-reporting fixes
+without reopening W45 or W54.
+
+**Exit criteria:**
+- W55 follow-up slices are tracked as a new wave with W45/W54 still done.
+- Failed verification review findings include bounded command-level details
+  that flow into public `request-repair` decisions and provider repair packets.
+- The `ky-request-lifecycle-observability-xlarge` primary command set explicitly
+  exercises focused retry lifecycle tests while keeping `npm test` as
+  manual/overnight diagnostic warning evidence.
+- Claude xlarge execution has auth-compatible compact guardrails and preserves
+  provider-owned `provider_context_window_exceeded` evidence.
+- Control reruns distinguish known-good medium regression signal, `ky` large
+  product/provider outcomes, and manual xlarge observation evidence.
+
+**Detailed slices:** `docs/backlog/wave-55-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

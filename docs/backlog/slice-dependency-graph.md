@@ -267,6 +267,11 @@ graph TD
   W54S06[W54-S06 Migration and examples]
   W54S07[W54-S07 Real archetype smoke matrix]
   W54S08[W54-S08 Boundary regression expansion]
+  W55S01[W55-S01 Backlog intake and control finding disposition]
+  W55S02[W55-S02 Actionable verification failure repair evidence]
+  W55S03[W55-S03 ky xlarge primary verification alignment]
+  W55S04[W55-S04 Claude xlarge context guardrails]
+  W55S05[W55-S05 Control rerun and findings report]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -647,6 +652,11 @@ graph TD
   W54S05 --> W54S06
   W54S06 --> W54S07
   W54S07 --> W54S08
+  W54S08 --> W55S01
+  W55S01 --> W55S02
+  W55S02 --> W55S03
+  W55S03 --> W55S04
+  W55S04 --> W55S05
 ```
 
 ## W0 hard dependencies
@@ -1136,6 +1146,15 @@ own the stricter terminal control proof evidence for this lane.
 | W54-S07 | W54-S06 |
 | W54-S08 | W54-S07 |
 
+## W55 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W55-S01 | W54-S08 |
+| W55-S02 | W55-S01 |
+| W55-S03 | W55-S02 |
+| W55-S04 | W55-S03 |
+| W55-S05 | W55-S04 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1400,6 +1419,11 @@ own the stricter terminal control proof evidence for this lane.
 261. W54-S06
 262. W54-S07
 263. W54-S08
+264. W55-S01
+265. W55-S02
+266. W55-S03
+267. W55-S04
+268. W55-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
