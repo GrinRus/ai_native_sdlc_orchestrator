@@ -101,9 +101,33 @@ test("request-repair review decisions materialize and link one quality repair re
       findings: [
         {
           finding_id: "review.finding.coverage-gap",
+          category: "artifact-quality",
           severity: "fail",
           summary: "Coverage gap blocks delivery.",
           evidence_refs: ["evidence://reports/review-report-run-review-request.json"],
+          verification_failure_details: [
+            {
+              command: "npx xo",
+              command_group_id: "post-change-lint",
+              role: "lint",
+              phase: "post-change",
+              enforcement: "required",
+              enforcement_result: "fail",
+              outcome: null,
+              exit_code: 1,
+              signal: null,
+              error_code: null,
+              timed_out: false,
+              timeout_class: "focused-test",
+              command_timeout_ms: 300000,
+              working_dir: ".",
+              repo_scope: "target",
+              stdout_excerpt: "",
+              stderr_excerpt: "test/retry.ts: Type string | null is not assignable to type string.",
+              failure_summary: "Post-change verification command 'npx xo' failed with exit code 1.",
+              evidence_refs: ["evidence://reports/step-result-post-run-primary-1.json"],
+            },
+          ],
         },
       ],
       evidence_refs: ["evidence://reports/step-result-run-review-request.json"],
@@ -134,6 +158,14 @@ test("request-repair review decisions materialize and link one quality repair re
     assert.equal(result.decision.decision, "request-repair");
     assert.equal(result.decision.quality_repair_request_ref, result.qualityRepairRequestRef);
     assert.equal(result.decision.quality_repair_lineage.request_ref, result.qualityRepairRequestRef);
+    assert.equal(
+      result.decision.repair_context.unresolved_finding_details[0].verification_failure_details[0].command,
+      "npx xo",
+    );
+    assert.match(
+      result.decision.repair_context.unresolved_finding_details[0].verification_failure_details[0].stderr_excerpt,
+      /string \| null/u,
+    );
     assert.equal(result.qualityRepairRequest.source_stage, "review");
     assert.equal(result.qualityRepairRequest.status, "requested");
     assert.equal(

@@ -11,6 +11,8 @@ import {
   matchesScopePattern,
 } from "./shared/mission-scope.mjs";
 
+const VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS = 2000;
+
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
@@ -45,6 +47,25 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNumberOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function boundedOutputExcerpt(value) {
+  const text = typeof value === "string" ? value : "";
+  return text.length > VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS
+    ? text.slice(-VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS)
+    : text;
 }
 
 /**
@@ -271,6 +292,22 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {string}
+ */
+function normalizeEvidenceRef(projectRoot, ref) {
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) return ref;
+  if (path.isAbsolute(ref)) {
+    const relative = path.relative(projectRoot, ref).replace(/\\/g, "/");
+    if (relative.length > 0 && !relative.startsWith("../")) {
+      return `evidence://${relative}`;
+    }
+  }
+  return `evidence://${ref.replace(/\\/g, "/")}`;
+}
+
+/**
  * @param {string} filePath
  * @returns {Record<string, unknown>}
  */
@@ -338,6 +375,70 @@ function collectVerifySummaryTestCommands(verifySummary, projectRoot) {
     if (command) commands.push(command);
   }
   return uniqueStrings(commands);
+}
+
+/**
+ * @param {Record<string, unknown> | null} verifySummary
+ * @returns {string[]}
+ */
+function collectVerifySummaryStepResultRefs(verifySummary) {
+  const summary = asRecord(verifySummary);
+  return uniqueStrings([
+    ...asStringArray(summary.step_result_refs),
+    ...asStringArray(asRecord(summary.enforcement_summary).required_failed_step_result_refs),
+    ...asStringArray(asRecord(summary.enforcement_summary).warn_step_result_refs),
+    ...asStringArray(asRecord(summary.enforcement_summary).observe_step_result_refs),
+    ...asStringArray(asRecord(summary.phase_summary).baseline_failed_step_result_refs),
+    ...asStringArray(asRecord(summary.phase_summary).post_change_failed_step_result_refs),
+    ...(Array.isArray(summary.command_groups)
+      ? summary.command_groups.flatMap((entry) => asStringArray(asRecord(entry).step_result_refs))
+      : []),
+  ]);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {Record<string, unknown> | null} verifySummary
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectVerificationFailureDetails(projectRoot, verifySummary) {
+  /** @type {Array<Record<string, unknown>>} */
+  const details = [];
+  for (const ref of collectVerifySummaryStepResultRefs(verifySummary)) {
+    const stepResult = readArtifactRef(projectRoot, ref);
+    if (asString(stepResult?.status) !== "failed") continue;
+    const outputExcerpt = asRecord(stepResult?.output_excerpt);
+    const command = asString(stepResult?.command) ?? "unknown verification command";
+    const stepEvidenceRefs = asStringArray(stepResult?.evidence_refs).map((entry) =>
+      normalizeEvidenceRef(projectRoot, entry),
+    );
+    details.push({
+      command,
+      command_group_id: asString(stepResult?.command_group_id),
+      role: asString(stepResult?.command_group_role) ?? asString(stepResult?.command_kind) ?? "unknown",
+      phase: asString(stepResult?.command_group_phase),
+      enforcement: asString(stepResult?.command_group_enforcement) ?? "required",
+      enforcement_result: asString(stepResult?.enforcement_result) ?? "fail",
+      outcome: asString(stepResult?.command_group_outcome),
+      exit_code: Object.prototype.hasOwnProperty.call(stepResult ?? {}, "exit_code")
+        ? asNumberOrNull(stepResult?.exit_code)
+        : null,
+      signal: asString(stepResult?.signal),
+      error_code: asString(stepResult?.error_code),
+      timed_out: stepResult?.timed_out === true,
+      timeout_class: asString(stepResult?.command_group_timeout_class) ?? "unknown",
+      command_timeout_ms: Object.prototype.hasOwnProperty.call(stepResult ?? {}, "command_timeout_ms")
+        ? asNumberOrNull(stepResult?.command_timeout_ms)
+        : null,
+      working_dir: asString(stepResult?.working_dir),
+      repo_scope: asString(stepResult?.repo_scope),
+      stdout_excerpt: boundedOutputExcerpt(outputExcerpt.stdout_tail),
+      stderr_excerpt: boundedOutputExcerpt(outputExcerpt.stderr_tail),
+      failure_summary: asString(stepResult?.summary) ?? `Verification command '${command}' failed.`,
+      evidence_refs: uniqueStrings([normalizeEvidenceRef(projectRoot, ref), ...stepEvidenceRefs]),
+    });
+  }
+  return details;
 }
 
 /**
@@ -586,16 +687,21 @@ function detectTestWeakening(projectRoot, changedPaths) {
  *   category: string,
  *   summary: string,
  *   evidenceRefs?: string[],
+ *   verificationFailureDetails?: Array<Record<string, unknown>>,
  * }} options
  */
 function pushFinding(options) {
-  options.findings.push({
+  const finding = {
     finding_id: `${options.category}.${String(options.findings.length + 1).padStart(2, "0")}`,
     severity: options.severity,
     category: options.category,
     summary: options.summary,
     evidence_refs: uniqueStrings(options.evidenceRefs ?? []),
-  });
+  };
+  if (Array.isArray(options.verificationFailureDetails) && options.verificationFailureDetails.length > 0) {
+    finding.verification_failure_details = options.verificationFailureDetails;
+  }
+  options.findings.push(finding);
 }
 
 /**
@@ -840,13 +946,23 @@ export function materializeReviewReport(options) {
 
   /** @type {Array<Record<string, unknown>>} */
   const artifactFindings = [];
+  const verifySummaryFailureDetails = collectVerificationFailureDetails(init.projectRoot, verifySummary);
   if (!verifySummary || verifySummary.status !== "passed") {
+    const failedCommands = uniqueStrings(
+      verifySummaryFailureDetails
+        .map((detail) => asString(detail.command))
+        .filter((entry) => entry !== null),
+    );
     pushFinding({
       findings: artifactFindings,
       severity: "fail",
       category: "artifact-quality",
-      summary: "Verify-summary is missing or did not pass, so build/lint/test linkage is incomplete.",
+      summary:
+        verifySummaryFailureDetails.length > 0
+          ? `Verify-summary failed with command-level details for: ${failedCommands.join("; ")}.`
+          : "Verify-summary is missing or did not pass, so build/lint/test linkage is incomplete.",
       evidenceRefs: fs.existsSync(verifySummaryPath) ? [toEvidenceRef(init.projectRoot, verifySummaryPath)] : [],
+      verificationFailureDetails: verifySummaryFailureDetails,
     });
   }
   if (executionStepResults.length === 0) {

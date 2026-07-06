@@ -1,0 +1,152 @@
+review_report_id: review-report.verification-failure
+project_id: aor-example
+run_id: run.verification-failure
+generated_at: "2026-07-06T00:00:00.000Z"
+overall_status: fail
+review_recommendation: repair
+feature_traceability:
+  status: pass
+  mission_id: ky-retry-hooks-governance
+  input_packet_ref: packet://ky-retry-hooks-governance
+  request_title: Expose retry hook context
+  request_brief: Make shouldRetry receive request and normalized options.
+  scenario_family: governance
+  provider_variant_id: openai-primary
+  feature_size: large
+  matrix_cell:
+    cell_id: ky.governance.large.openai
+    target_catalog_id: ky
+    feature_mission_id: ky-retry-hooks-governance
+    scenario_family: governance
+    provider_variant_id: openai-primary
+    feature_size: large
+    coverage_tier: required
+  coverage_follow_up:
+    current_cell_required: true
+    remaining_required_matrix_cells: []
+discovery_quality:
+  status: pass
+  analysis_report_ref: evidence://reports/project-analysis-report-run.verification-failure.json
+  spec_step_result_ref: evidence://reports/step-result-run.verification-failure-spec.json
+  handoff_packet_ref: packet://handoff-run.verification-failure
+  findings: []
+artifact_quality:
+  status: fail
+  verify_summary_ref: evidence://reports/verify-summary-post-run-primary.json
+  execution_step_result_refs:
+    - evidence://reports/step-result-run.verification-failure-execution.json
+  delivery_manifest_ref: null
+  release_packet_ref: null
+  verification_coverage:
+    changed_test_paths:
+      - test/retry.ts
+    covered_test_paths:
+      - test/retry.ts
+    uncovered_test_paths: []
+    covering_commands:
+      - npx ava test/retry.ts --match='*shouldRetry*'
+    recorded_test_commands:
+      - npx ava test/retry.ts --match='*shouldRetry*'
+    coverage_reason: explicit-test-path
+  findings:
+    - finding_id: artifact-quality.01
+      severity: fail
+      category: artifact-quality
+      summary: "Verify-summary failed with command-level details for: npx ava test/retry.ts --match='*shouldRetry*'."
+      evidence_refs:
+        - evidence://reports/verify-summary-post-run-primary.json
+      verification_failure_details:
+        - command: npx ava test/retry.ts --match='*shouldRetry*'
+          command_group_id: post-change-test
+          role: test
+          phase: post-change
+          enforcement: required
+          enforcement_result: fail
+          outcome: null
+          exit_code: 1
+          signal: null
+          error_code: null
+          timed_out: false
+          timeout_class: focused-test
+          command_timeout_ms: 300000
+          working_dir: .
+          repo_scope: target
+          stdout_excerpt: shouldRetry receives request context
+          stderr_excerpt: "AssertionError: missing request context"
+          failure_summary: "Post-change verification command 'npx ava test/retry.ts --match='*shouldRetry*'' failed with exit code 1."
+          evidence_refs:
+            - evidence://reports/step-result-post-run-primary-post-change-test.json
+            - evidence://reports/verify-transcript-post-change-test.txt
+code_quality:
+  status: pass
+  target_checkout_root: /workspace/ky
+  git_status_available: true
+  changed_paths:
+    - test/retry.ts
+  changed_path_diagnostics:
+    git_status_root: /workspace/ky
+    raw_changed_paths:
+      - test/retry.ts
+    non_bootstrap_changed_paths:
+      - test/retry.ts
+    non_input_changed_paths:
+      - test/retry.ts
+    meaningful_changed_paths:
+      - test/retry.ts
+    runner_owned_state_paths: []
+    ignored_input_files: []
+  findings: []
+feature_size_fit:
+  status: pass
+  feature_size: large
+  size_budget:
+    max_changed_files: 8
+    max_added_lines: 300
+  actual_change:
+    changed_files: 1
+    added_lines: 28
+    deleted_lines: 3
+    touched_lines: 31
+  findings: []
+provider_traceability:
+  status: pass
+  provider_variant_id: openai-primary
+  requested_provider: openai
+  requested_adapter: codex-cli
+  actual_provider: openai
+  actual_adapter: codex-cli
+  route_id: route.implement.default.openai-primary
+  route_profile_source: examples/routes/implement-default.yaml
+  findings: []
+findings:
+  - finding_id: artifact-quality.01
+    severity: fail
+    category: artifact-quality
+    summary: "Verify-summary failed with command-level details for: npx ava test/retry.ts --match='*shouldRetry*'."
+    evidence_refs:
+      - evidence://reports/verify-summary-post-run-primary.json
+    verification_failure_details:
+      - command: npx ava test/retry.ts --match='*shouldRetry*'
+        command_group_id: post-change-test
+        role: test
+        phase: post-change
+        enforcement: required
+        enforcement_result: fail
+        outcome: null
+        exit_code: 1
+        signal: null
+        error_code: null
+        timed_out: false
+        timeout_class: focused-test
+        command_timeout_ms: 300000
+        working_dir: .
+        repo_scope: target
+        stdout_excerpt: shouldRetry receives request context
+        stderr_excerpt: "AssertionError: missing request context"
+        failure_summary: "Post-change verification command 'npx ava test/retry.ts --match='*shouldRetry*'' failed with exit code 1."
+        evidence_refs:
+          - evidence://reports/step-result-post-run-primary-post-change-test.json
+          - evidence://reports/verify-transcript-post-change-test.txt
+evidence_refs:
+  - evidence://reports/verify-summary-post-run-primary.json
+  - evidence://reports/step-result-post-run-primary-post-change-test.json

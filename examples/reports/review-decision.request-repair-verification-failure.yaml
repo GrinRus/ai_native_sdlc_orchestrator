@@ -1,0 +1,76 @@
+decision_id: run.verification-failure.review-decision.request-repair.2026-07-06T00-05-00-000Z
+project_id: aor-example
+run_id: run.verification-failure
+decision: request-repair
+decider_ref: operator://cli
+reason: Failed post-change verification requires another implementation pass.
+review_report_ref: evidence://reports/review-report-run.verification-failure.json
+runtime_harness_report_ref: evidence://reports/runtime-harness-report-run.verification-failure.json
+delivery_manifest_refs: []
+learning_handoff_refs: []
+decision_basis:
+  review_overall_status: fail
+  review_recommendation: repair
+  runtime_harness_overall_decision: repair
+  blocking_findings:
+    - summary: "Verify-summary failed with command-level details for: npx ava test/retry.ts --match='*shouldRetry*'."
+      evidence_refs:
+        - evidence://reports/verify-summary-post-run-primary.json
+repair_context:
+  source_phase: review
+  cycle_iteration: 1
+  unresolved_findings:
+    - "Verify-summary failed with command-level details for: npx ava test/retry.ts --match='*shouldRetry*'."
+  unresolved_finding_details:
+    - finding_id: artifact-quality.01
+      category: artifact-quality
+      severity: fail
+      summary: "Verify-summary failed with command-level details for: npx ava test/retry.ts --match='*shouldRetry*'."
+      evidence_refs:
+        - evidence://reports/verify-summary-post-run-primary.json
+      resolution_requirement: Repair the failed retry lifecycle behavior and rerun the focused post-change verification command.
+      verification_failure_details:
+        - command: npx ava test/retry.ts --match='*shouldRetry*'
+          command_group_id: post-change-test
+          role: test
+          phase: post-change
+          enforcement: required
+          enforcement_result: fail
+          outcome: null
+          exit_code: 1
+          signal: null
+          error_code: null
+          timed_out: false
+          timeout_class: focused-test
+          command_timeout_ms: 300000
+          working_dir: .
+          repo_scope: target
+          stdout_excerpt: shouldRetry receives request context
+          stderr_excerpt: "AssertionError: missing request context"
+          failure_summary: "Post-change verification command 'npx ava test/retry.ts --match='*shouldRetry*'' failed with exit code 1."
+          evidence_refs:
+            - evidence://reports/step-result-post-run-primary-post-change-test.json
+            - evidence://reports/verify-transcript-post-change-test.txt
+  meaningful_changed_paths:
+    - test/retry.ts
+  verification_status: fail
+  verification_refs:
+    - evidence://reports/verify-summary-post-run-primary.json
+    - evidence://reports/step-result-post-run-primary-post-change-test.json
+  previous_repair_decision_refs: []
+  context_fingerprint: sha256:w55-verification-failure-context
+  new_context_since_previous:
+    - first-repair-decision
+  stop_reason: Failed post-change verification blocks delivery.
+  requested_next_step: execution
+delivery_gate:
+  status: blocked
+  blocks_downstream: true
+  required_downstream_decision: approve
+  findings:
+    - Review decision requests repair before delivery or release approval.
+evidence_refs:
+  - evidence://reports/review-report-run.verification-failure.json
+  - evidence://reports/runtime-harness-report-run.verification-failure.json
+  - evidence://reports/verify-summary-post-run-primary.json
+decided_at: "2026-07-06T00:05:00.000Z"

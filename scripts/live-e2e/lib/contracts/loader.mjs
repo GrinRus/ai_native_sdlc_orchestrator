@@ -1538,6 +1538,12 @@ function validateRepairContextFindingDetails(options) {
         }),
       );
     }
+    validateVerificationFailureDetails({
+      entries: entry.verification_failure_details,
+      source: options.source,
+      field: `repair_context.unresolved_finding_details[${index}].verification_failure_details`,
+      issues: options.issues,
+    });
   });
 }
 
@@ -2063,6 +2069,127 @@ function validateReviewFindings(options) {
       field: `${options.field}[${index}].evidence_refs`,
       issues: options.issues,
     });
+    validateVerificationFailureDetails({
+      entries: entry.verification_failure_details,
+      source: options.source,
+      field: `${options.field}[${index}].verification_failure_details`,
+      issues: options.issues,
+    });
+  });
+}
+
+/**
+ * @param {{ entries: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateVerificationFailureDetails(options) {
+  if (options.entries === undefined) return;
+  if (!Array.isArray(options.entries)) {
+    options.issues.push(
+      issue({
+        code: "field_type_mismatch",
+        source: options.source,
+        field: options.field,
+        expected: "array",
+        actual: describeActualType(options.entries),
+        message: `Field '${options.field}' must be 'array'.`,
+      }),
+    );
+    return;
+  }
+
+  options.entries.forEach((entry, index) => {
+    const field = `${options.field}[${index}]`;
+    if (!isPlainObject(entry)) {
+      options.issues.push(
+        issue({
+          code: "field_type_mismatch",
+          source: options.source,
+          field,
+          expected: "object",
+          actual: describeActualType(entry),
+          message: `Field '${field}' must be 'object'.`,
+        }),
+      );
+      return;
+    }
+
+    for (const detailField of ["command", "role", "enforcement", "timeout_class", "failure_summary"]) {
+      validateNestedStringField({
+        record: entry,
+        source: options.source,
+        field: `${field}.${detailField}`,
+        issues: options.issues,
+        required: true,
+      });
+    }
+    for (const detailField of [
+      "command_group_id",
+      "phase",
+      "enforcement_result",
+      "outcome",
+      "signal",
+      "error_code",
+      "working_dir",
+      "repo_scope",
+      "stdout_excerpt",
+      "stderr_excerpt",
+    ]) {
+      validateNestedNullableStringField({
+        record: entry,
+        source: options.source,
+        field: `${field}.${detailField}`,
+        issues: options.issues,
+        required: false,
+      });
+    }
+    validateNestedNumberField({
+      record: entry,
+      source: options.source,
+      field: `${field}.exit_code`,
+      issues: options.issues,
+      required: false,
+      allowNull: true,
+    });
+    validateNestedNumberField({
+      record: entry,
+      source: options.source,
+      field: `${field}.command_timeout_ms`,
+      issues: options.issues,
+      required: false,
+      allowNull: true,
+    });
+    validateNestedBooleanField({
+      record: entry,
+      source: options.source,
+      field: `${field}.timed_out`,
+      issues: options.issues,
+      required: false,
+    });
+    validateNestedArrayField({
+      record: entry,
+      source: options.source,
+      field: `${field}.evidence_refs`,
+      issues: options.issues,
+      required: true,
+    });
+    validateStringArrayItems({
+      values: entry.evidence_refs,
+      source: options.source,
+      field: `${field}.evidence_refs`,
+      issues: options.issues,
+    });
+    if (!Array.isArray(entry.evidence_refs) || entry.evidence_refs.length === 0) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `${field}.evidence_refs`,
+          expected: "non-empty array",
+          actual: Array.isArray(entry.evidence_refs) ? "empty" : describeActualType(entry.evidence_refs),
+          message: "Verification failure details must preserve evidence refs.",
+        }),
+      );
+    }
   });
 }
 

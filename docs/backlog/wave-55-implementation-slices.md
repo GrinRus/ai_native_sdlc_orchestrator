@@ -52,7 +52,7 @@ for the next repair execution to close specific command failures.
 - **Outcome:** Failed verification review findings carry bounded command-level
   details into public repair decisions and provider repair packets.
 - **Epic:** EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/contracts/**`,
   `packages/orchestrator-core/src/review-run.mjs`, `packages/adapter-sdk/**`,
   tests
@@ -84,7 +84,7 @@ for the next repair execution to close specific command failures.
   gate explicitly covers retry lifecycle tests while keeping full-suite
   diagnostics manual/overnight warning evidence.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Primary modules:** `scripts/live-e2e/catalog/targets/ky.yaml`,
   generated profile tests, runbook docs
 - **Hard dependencies:** W55-S02

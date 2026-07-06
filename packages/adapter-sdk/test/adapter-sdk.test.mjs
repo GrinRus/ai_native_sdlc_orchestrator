@@ -1484,6 +1484,29 @@ test("live adapter repair request-artifact packet includes repair closure policy
                 summary: "test/headers.ts coverage was weakened.",
                 evidence_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
                 resolution_requirement: "Restore the weakened assertion coverage or provide equivalent stronger coverage.",
+                verification_failure_details: [
+                  {
+                    command: "npx ava test/headers.ts",
+                    command_group_id: "post-change-test",
+                    role: "test",
+                    phase: "post-change",
+                    enforcement: "required",
+                    enforcement_result: "fail",
+                    outcome: null,
+                    exit_code: 1,
+                    signal: null,
+                    error_code: null,
+                    timed_out: false,
+                    timeout_class: "focused-test",
+                    command_timeout_ms: 300000,
+                    working_dir: ".",
+                    repo_scope: "target",
+                    stdout_excerpt: "headers coverage failed",
+                    stderr_excerpt: "",
+                    failure_summary: "Post-change verification command 'npx ava test/headers.ts' failed with exit code 1.",
+                    evidence_refs: ["evidence://.aor/projects/adapter-test/reports/step-result-post-run-primary-1.json"],
+                  },
+                ],
               },
             ],
             meaningful_changed_paths: ["test/headers.ts"],
@@ -1561,6 +1584,10 @@ test("live adapter repair request-artifact packet includes repair closure policy
     assert.equal(
       response.output.runner_output.repair_policy.unresolved_finding_details[0].finding_id,
       "code-quality.headers-coverage",
+    );
+    assert.equal(
+      response.output.runner_output.repair_policy.unresolved_finding_details[0].verification_failure_details[0].command,
+      "npx ava test/headers.ts",
     );
   });
 });

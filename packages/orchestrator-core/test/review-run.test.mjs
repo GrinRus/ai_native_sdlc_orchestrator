@@ -183,6 +183,114 @@ function writeReviewRuntimeFixture(init, runId, options = {}) {
   });
 }
 
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @param {{
+ *   command: string,
+ *   role: string,
+ *   groupId: string,
+ *   exitCode: number,
+ *   stdoutTail?: string,
+ *   stderrTail?: string,
+ *   summary?: string,
+ * }} options
+ */
+function writeFailedVerifyRuntimeFixture(init, runId, options) {
+  const transcriptFile = path.join(init.runtimeLayout.reportsRoot, `verify-transcript-${options.groupId}.txt`);
+  fs.writeFileSync(
+    transcriptFile,
+    [
+      `command: ${options.command}`,
+      `exit_code: ${options.exitCode}`,
+      "stdout:",
+      options.stdoutTail ?? "",
+      "stderr:",
+      options.stderrTail ?? "",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  const stepResultFile = path.join(init.runtimeLayout.reportsRoot, `step-result-post-run-primary-${options.groupId}.json`);
+  const stepSummary =
+    options.summary ?? `Post-change verification command '${options.command}' failed with exit code ${options.exitCode}.`;
+  writeJson(stepResultFile, {
+    step_result_id: `${runId}.verify.post-run-primary.${options.groupId}`,
+    run_id: `${runId}.verify.post-run-primary.v1`,
+    step_id: `verify.post-run-primary.${options.groupId}`,
+    step_class: "runner",
+    status: "failed",
+    summary: stepSummary,
+    evidence_refs: [transcriptFile],
+    repo_scope: "target",
+    command: options.command,
+    command_owner: "target",
+    command_source: "project-profile",
+    command_kind: options.role,
+    verification_label: "post-run-primary",
+    command_group_id: options.groupId,
+    command_group_role: options.role,
+    command_group_phase: "post-change",
+    command_group_enforcement: "required",
+    command_group_timeout_class: "focused-test",
+    enforcement_result: "fail",
+    command_timeout_ms: 300000,
+    timed_out: false,
+    exit_code: options.exitCode,
+    signal: null,
+    error_code: null,
+    output_excerpt: {
+      stdout_tail: options.stdoutTail ?? "",
+      stderr_tail: options.stderrTail ?? "",
+    },
+  });
+  writeJson(path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"), {
+    run_id: `${runId}.verify.post-run-primary.v1`,
+    verification_label: "post-run-primary",
+    status: "failed",
+    validation_gate_status: "failed",
+    command_source: "project-profile",
+    command_overrides: {
+      build_commands: [],
+      lint_commands: [],
+      test_commands: [],
+    },
+    command_groups: [
+      {
+        id: options.groupId,
+        role: options.role,
+        phase: "post-change",
+        enforcement: "required",
+        timeout_class: "focused-test",
+        status: "failed",
+        command_count: 1,
+        failed_command_count: 1,
+        skipped_command_count: 0,
+        outcome: null,
+        step_result_refs: [stepResultFile],
+      },
+    ],
+    step_result_refs: [stepResultFile],
+    command_timeout_ms: 300000,
+    timed_out_commands: [],
+    phase_summary: {
+      baseline_failed_count: 0,
+      post_change_failed_count: 1,
+      broken_baseline_count: 0,
+      baseline_failed_step_result_refs: [],
+      post_change_failed_step_result_refs: [stepResultFile],
+    },
+    enforcement_summary: {
+      required_failed_count: 1,
+      warn_failed_count: 0,
+      observe_failed_count: 0,
+      required_failed_step_result_refs: [stepResultFile],
+      warn_step_result_refs: [],
+      observe_step_result_refs: [],
+    },
+  });
+}
+
 test("review report warns when changed test files are outside explicit primary verification commands", () => {
   withGitRepo((repoRoot) => {
     const runId = "run.review-coverage";
@@ -217,11 +325,92 @@ test("review report warns when changed test files are outside explicit primary v
     });
 
     const artifactFindings = reviewReport.artifact_quality.findings;
+    assert.equal(reviewReport.overall_status, "warn");
+    assert.equal(reviewReport.review_recommendation, "required-human-review");
     assert.ok(
       artifactFindings.some((finding) =>
         String(finding.summary).includes("Primary verification did not explicitly exercise changed test file(s): test/retry.ts"),
       ),
     );
+    assert.ok(artifactFindings.every((finding) => !Array.isArray(finding.verification_failure_details)));
+  });
+});
+
+test("review report attaches actionable XO verification failure details", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-xo-failure";
+    fs.writeFileSync(path.join(repoRoot, "source/index.ts"), "export const existing: string | null = null;\n", "utf8");
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    writeFailedVerifyRuntimeFixture(init, runId, {
+      command: "npx xo",
+      role: "lint",
+      groupId: "post-change-lint",
+      exitCode: 1,
+      stderrTail: "test/retry.ts: Type 'string | null' is not assignable to type 'string'.",
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    const verifyFinding = reviewReport.artifact_quality.findings.find((finding) =>
+      String(finding.summary).includes("Verify-summary failed with command-level details"),
+    );
+    assert.ok(verifyFinding);
+    assert.equal(verifyFinding.verification_failure_details.length, 1);
+    const [detail] = verifyFinding.verification_failure_details;
+    assert.equal(detail.command, "npx xo");
+    assert.equal(detail.role, "lint");
+    assert.equal(detail.enforcement, "required");
+    assert.equal(detail.exit_code, 1);
+    assert.equal(detail.timeout_class, "focused-test");
+    assert.match(detail.stderr_excerpt, /string \| null/u);
+    assert.ok(detail.evidence_refs.some((ref) => String(ref).includes("step-result-post-run-primary-post-change-lint")));
+  });
+});
+
+test("review report attaches actionable AVA verification failure details", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-ava-failure";
+    fs.writeFileSync(
+      path.join(repoRoot, "test/retry.ts"),
+      [
+        "test('existing retry coverage', t => t.pass());",
+        "test('shouldRetry receives request context', t => t.fail('missing request context'));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    writeFailedVerifyRuntimeFixture(init, runId, {
+      command: "npx ava test/retry.ts --match='*shouldRetry*'",
+      role: "test",
+      groupId: "post-change-test",
+      exitCode: 1,
+      stdoutTail: "shouldRetry receives request context",
+      stderrTail: "AssertionError: missing request context",
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    const verifyFinding = reviewReport.artifact_quality.findings.find((finding) =>
+      String(finding.summary).includes("Verify-summary failed with command-level details"),
+    );
+    assert.ok(verifyFinding);
+    const [detail] = verifyFinding.verification_failure_details;
+    assert.equal(detail.command, "npx ava test/retry.ts --match='*shouldRetry*'");
+    assert.equal(detail.role, "test");
+    assert.equal(detail.exit_code, 1);
+    assert.match(detail.stdout_excerpt, /shouldRetry/u);
+    assert.match(detail.stderr_excerpt, /missing request context/u);
   });
 });
 

@@ -82,6 +82,16 @@ weakening findings should require restoring the weakened assertion or plan
 coverage, or adding equivalent stronger coverage with final diff and
 verification evidence.
 
+When the source review finding came from failed public verification evidence,
+each unresolved finding detail may add optional
+`verification_failure_details[]`. This is copied from
+`review-report.findings[].verification_failure_details[]` and keeps the repair
+packet actionable without introducing a separate repair artifact. Each entry
+preserves the failed command, role, enforcement, exit/signal/error metadata,
+timeout class, bounded stdout/stderr excerpts, failure summary, and evidence
+refs. The field is additive; older W45 repair decisions without these command
+details remain valid.
+
 ## Delivery gate
 `delivery_gate` should preserve:
 - `status` (`pass|blocked`)

@@ -483,8 +483,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W55-S01 | Backlog intake and control finding disposition | EPIC-0, EPIC-7 | done | `docs/backlog/**`, `README.md` | W54-S08 |
-| W55-S02 | Actionable verification failure repair evidence | EPIC-4, EPIC-7 | ready | `docs/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, `packages/adapter-sdk/**`, tests | W55-S01 |
-| W55-S03 | `ky` xlarge primary verification alignment | EPIC-7 | blocked | `scripts/live-e2e/catalog/targets/ky.yaml`, generated profile tests, runbook docs | W55-S02 |
+| W55-S02 | Actionable verification failure repair evidence | EPIC-4, EPIC-7 | done | `docs/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, `packages/adapter-sdk/**`, tests | W55-S01 |
+| W55-S03 | `ky` xlarge primary verification alignment | EPIC-7 | ready | `scripts/live-e2e/catalog/targets/ky.yaml`, generated profile tests, runbook docs | W55-S02 |
 | W55-S04 | Claude xlarge context guardrails | EPIC-7 | blocked | `examples/adapters/claude-code.yaml`, `packages/adapter-sdk/**`, adapter tests, provider runbooks | W55-S03 |
 | W55-S05 | Control rerun and findings report | EPIC-0, EPIC-7 | blocked | `docs/backlog/**`, `docs/ops/**`, internal live E2E run artifacts | W55-S04 |
 

@@ -752,6 +752,29 @@ test("review decision example preserves explicit approval vocabulary", () => {
         summary: "QA evaluation found a regression that requires another implementation iteration.",
         evidence_refs: [loaded.document.review_report_ref],
         resolution_requirement: "Repair the regression or provide fresh evidence that the QA finding is stale.",
+        verification_failure_details: [
+          {
+            command: "npx ava test/retry.ts --match='*shouldRetry*'",
+            command_group_id: "post-change-test",
+            role: "test",
+            phase: "post-change",
+            enforcement: "required",
+            enforcement_result: "fail",
+            outcome: null,
+            exit_code: 1,
+            signal: null,
+            error_code: null,
+            timed_out: false,
+            timeout_class: "focused-test",
+            command_timeout_ms: 300000,
+            working_dir: ".",
+            repo_scope: "target",
+            stdout_excerpt: "shouldRetry hook failed",
+            stderr_excerpt: "",
+            failure_summary: "Post-change verification command failed with exit code 1.",
+            evidence_refs: [loaded.document.review_report_ref],
+          },
+        ],
       },
     ],
     meaningful_changed_paths: ["src/client.py", "tests/test_client.py"],
@@ -1345,6 +1368,52 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     }),
     "field_type_mismatch",
     "findings[0].evidence_refs",
+  );
+  const reviewReportWithVerificationDetails = structuredClone(reviewReport.document);
+  reviewReportWithVerificationDetails.findings[0].verification_failure_details = [
+    {
+      command: "npx xo",
+      command_group_id: "post-change-lint",
+      role: "lint",
+      phase: "post-change",
+      enforcement: "required",
+      enforcement_result: "fail",
+      outcome: null,
+      exit_code: 1,
+      signal: null,
+      error_code: null,
+      timed_out: false,
+      timeout_class: "focused-test",
+      command_timeout_ms: 300000,
+      working_dir: ".",
+      repo_scope: "target",
+      stdout_excerpt: "",
+      stderr_excerpt: "test/retry.ts: Type string | null is not assignable to type string.",
+      failure_summary: "Post-change verification command 'npx xo' failed with exit code 1.",
+      evidence_refs: [
+        "evidence://.aor/projects/aor-core/reports/step-result-post-run-primary-1.json",
+        "evidence://.aor/projects/aor-core/reports/transcript-post-run-primary-1.txt",
+      ],
+    },
+  ];
+  assert.equal(
+    validateContractDocument({
+      family: "review-report",
+      document: reviewReportWithVerificationDetails,
+      source: "test://w55-review-report-verification-failure-details",
+    }).ok,
+    true,
+  );
+  const invalidVerificationDetails = structuredClone(reviewReportWithVerificationDetails);
+  invalidVerificationDetails.findings[0].verification_failure_details[0].evidence_refs = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: invalidVerificationDetails,
+      source: "test://w55-review-report-invalid-verification-failure-details",
+    }),
+    "required_field_missing",
+    "findings[0].verification_failure_details[0].evidence_refs",
   );
   const missingVerificationCoverageReport = structuredClone(reviewReport.document);
   delete missingVerificationCoverageReport.artifact_quality.verification_coverage;
