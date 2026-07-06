@@ -34,6 +34,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W52:** `W52-S05` Hard-target proof rerun and findings sync; `W52-S10` Acceptance evidence matrix and xlarge observation reporting
 - **W53:** `W53-S04` AOR/live E2E leak guards
 - **W54:** `W54-S08` Boundary regression expansion
+- **W55:** `W55-S01` Backlog intake and control finding disposition; `W55-S05` Control rerun and findings report
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -100,6 +101,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W52:** `W52-S02` Diagnostic command hang and timeout hardening; `W52-S08` Manual step-quality assessment depth; `W52-S09` Diagnostic command classification precision
 - **W53:** `W53-S01` Generic verification command-group contract; `W53-S02` AOR project verify command-group execution; `W53-S05` Generic verification archetype fixtures
 - **W54:** `W54-S01` Verification group authoring contract; `W54-S02` Stack discovery engine; `W54-S04` Verifier execution semantics hardening; `W54-S06` Migration and examples; `W54-S07` Real archetype smoke matrix
+- **W55:** `W55-S02` Actionable verification failure repair evidence
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -201,3 +203,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W52:** `W52-S01` Target-readiness owner propagation; `W52-S02` Diagnostic command hang and timeout hardening; `W52-S06` Codex provider tool-surface hardening; `W52-S07` Manual xlarge step-quality continuation; `W52-S03` Vitest large product acceptance closure; `W52-S04` SQLAlchemy large diagnostic policy and acceptance closure; `W52-S05` Hard-target proof rerun and findings sync; `W52-S08` Manual step-quality assessment depth; `W52-S09` Diagnostic command classification precision; `W52-S10` Acceptance evidence matrix and xlarge observation reporting
 - **W53:** `W53-S01` Generic verification command-group contract; `W53-S03` Live E2E adapter boundary mapping; `W53-S04` AOR/live E2E leak guards; `W53-S05` Generic verification archetype fixtures
 - **W54:** `W54-S01` Verification group authoring contract; `W54-S07` Real archetype smoke matrix; `W54-S08` Boundary regression expansion
+- **W55:** `W55-S01` Backlog intake and control finding disposition; `W55-S02` Actionable verification failure repair evidence; `W55-S03` `ky` xlarge primary verification alignment; `W55-S04` Claude xlarge context guardrails; `W55-S05` Control rerun and findings report

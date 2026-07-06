@@ -479,5 +479,14 @@ This is the master index for the implementation slices across all defined waves.
 | W54-S07 | Real archetype smoke matrix | EPIC-4, EPIC-7 | done | verifier fixtures, smoke tests, docs | W54-S06 |
 | W54-S08 | Boundary regression expansion | EPIC-0, EPIC-7 | done | boundary tests, public docs/examples, artifact fixtures | W54-S07 |
 
+## W55 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W55-S01 | Backlog intake and control finding disposition | EPIC-0, EPIC-7 | done | `docs/backlog/**`, `README.md` | W54-S08 |
+| W55-S02 | Actionable verification failure repair evidence | EPIC-4, EPIC-7 | ready | `docs/contracts/**`, `packages/orchestrator-core/src/review-run.mjs`, `packages/adapter-sdk/**`, tests | W55-S01 |
+| W55-S03 | `ky` xlarge primary verification alignment | EPIC-7 | blocked | `scripts/live-e2e/catalog/targets/ky.yaml`, generated profile tests, runbook docs | W55-S02 |
+| W55-S04 | Claude xlarge context guardrails | EPIC-7 | blocked | `examples/adapters/claude-code.yaml`, `packages/adapter-sdk/**`, adapter tests, provider runbooks | W55-S03 |
+| W55-S05 | Control rerun and findings report | EPIC-0, EPIC-7 | blocked | `docs/backlog/**`, `docs/ops/**`, internal live E2E run artifacts | W55-S04 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
