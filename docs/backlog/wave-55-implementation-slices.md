@@ -84,7 +84,7 @@ for the next repair execution to close specific command failures.
   gate explicitly covers retry lifecycle tests while keeping full-suite
   diagnostics manual/overnight warning evidence.
 - **Epic:** EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `scripts/live-e2e/catalog/targets/ky.yaml`,
   generated profile tests, runbook docs
 - **Hard dependencies:** W55-S02
@@ -112,7 +112,7 @@ for the next repair execution to close specific command failures.
 - **Outcome:** Claude Code xlarge execution has an auth-compatible compact mode
   and clearer fail-early evidence for provider context-window overflow.
 - **Epic:** EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Primary modules:** `examples/adapters/claude-code.yaml`,
   `packages/adapter-sdk/**`, adapter tests, provider runbooks
 - **Hard dependencies:** W55-S03

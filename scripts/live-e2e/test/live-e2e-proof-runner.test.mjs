@@ -1356,6 +1356,53 @@ test("generated ky large Anthropic profile uses bounded governance verification"
   });
 });
 
+test("generated ky xlarge manual profile includes focused retry primary verification", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/manual-xlarge-governance-ky-openai.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "assets");
+    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+    const result = materializeGeneratedProjectProfile({
+      hostRoot: repoRoot,
+      profilePath: loadedProfile.profilePath,
+      profile: resolved.resolvedProfile,
+      catalogEntry: resolved.catalogEntry,
+      mission: resolved.mission,
+      providerVariant: resolved.providerVariant,
+      runId: "ky-xlarge-openai-focused-retry-primary",
+      targetCheckout: {
+        targetRepoId: "ky",
+        targetRepoRef: "main",
+      },
+      generatedAssetsRoot,
+    });
+
+    const loaded = loadContractFile({
+      filePath: result.generatedProjectProfileFile,
+      family: "project-profile",
+    });
+    assert.equal(loaded.ok, true);
+    assert.deepEqual(loaded.document.repos[0].test_commands, [
+      "npx xo",
+      "npm run build",
+      "npx ava test/main.ts test/hooks.ts",
+      "npx ava test/retry.ts --match='*shouldRetry*'",
+    ]);
+    assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
+      "npx playwright install",
+      "npm test",
+    ]);
+    assert.equal(resolved.mission.post_run_quality.diagnostic_failure_mode, "warn");
+    assert.equal(loaded.document.repos[0].test_commands.includes("npm test"), false);
+    assert.equal(loaded.document.repos[0].lint_commands.includes("npm test"), false);
+  });
+});
+
 test("generated Vitest large profile isolates verification and checks hard-target setup before execution", () => {
   withTempRoot((tempRoot) => {
     const profileRef = "scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml";
