@@ -127,6 +127,14 @@ provider-side overflow blockers such as `provider_context_window_exceeded` are
 run-health issues in `phase=provider_execution`. They do not evaluate produced
 code or artifacts.
 
+For Claude xlarge observation cells, `provider_context_window_exceeded` remains
+provider-owned when AOR's compiled/provider work-packet budget passes and the
+runner reports prompt or context-window overflow after launch. Preserve the raw
+provider summary, context-budget report, and top context-size sources in the
+run-health evidence. Retry only after reducing or splitting the target request,
+or after adding a narrower mission/catalog primary gate; do not count the
+blocked run as product acceptance or as an AOR compiled-context failure.
+
 ## W40 proof notes
 
 W40-S04 does not require fresh long-running live provider execution on every

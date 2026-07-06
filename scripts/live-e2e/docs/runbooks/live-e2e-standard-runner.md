@@ -234,12 +234,20 @@ This is required for Claude Code because `--permission-mode auto` can ask the op
 Provider permission-mode analogues:
 - Codex full-bypass: `--ask-for-approval never` plus `codex exec --ignore-user-config --ignore-rules` with the configured workspace sandbox.
 - Codex restricted: `codex exec --ignore-user-config --ignore-rules` without the approval bypass.
-- Claude Code full-bypass: `--dangerously-skip-permissions`.
-- Claude Code restricted: `--permission-mode auto`.
+- Claude Code full-bypass: `--append-system-prompt <bounded AOR guardrail>` plus
+  `--effort high` and `--dangerously-skip-permissions`.
+- Claude Code restricted: the same bounded guardrail and `--effort high` plus
+  `--permission-mode auto`.
 - OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions` with the AOR request attached through OpenCode's message/`--file` CLI surface.
 - OpenCode restricted: `opencode run --format json` with the same file-attached request transport.
 - Qwen candidate full-bypass: `qwen --bare --auth-type anthropic --output-format stream-json --include-partial-messages --approval-mode yolo --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with `external_runtime.env_from` mapping `ANTHROPIC_AUTH_TOKEN` to `ANTHROPIC_API_KEY` when needed by the host setup.
 - Qwen candidate restricted: `qwen --bare --auth-type anthropic --output-format stream-json --include-partial-messages --approval-mode default --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the same auth env bridge.
+
+Do not enable Claude `--bare` by default for live E2E Claude profiles while
+local runs rely on host Claude auth. Current Claude `--bare` skips OAuth/keychain
+auth and requires `ANTHROPIC_API_KEY` or explicit settings, while the local
+operator path can expose only `ANTHROPIC_AUTH_TOKEN`. Qwen is the only current
+profile that maps `ANTHROPIC_AUTH_TOKEN` into `ANTHROPIC_API_KEY`.
 
 Qwen candidate runs also rely on Runtime Harness runner-state leakage detection: target-checkout changes under `.codex/`, `.claude/`, `.qwen/`, or `.opencode/` are classified as `runner-owned-state-leak` and block the run before delivery proof can treat runner-local state as patch content.
 

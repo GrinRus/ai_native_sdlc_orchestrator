@@ -112,7 +112,7 @@ for the next repair execution to close specific command failures.
 - **Outcome:** Claude Code xlarge execution has an auth-compatible compact mode
   and clearer fail-early evidence for provider context-window overflow.
 - **Epic:** EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `examples/adapters/claude-code.yaml`,
   `packages/adapter-sdk/**`, adapter tests, provider runbooks
 - **Hard dependencies:** W55-S03
@@ -142,7 +142,7 @@ for the next repair execution to close specific command failures.
   quality/finding report that separates regression signal, large product
   acceptance, and xlarge observation evidence.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Primary modules:** `docs/backlog/**`, `docs/ops/**`,
   internal live E2E run artifacts
 - **Hard dependencies:** W55-S04
