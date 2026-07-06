@@ -151,6 +151,28 @@ test("Codex live adapter args use clean config and rules while preserving host a
   });
 });
 
+test("Claude live adapter args keep host auth and compact context guardrails", () => {
+  withTempRepo((repoRoot) => {
+    const registry = buildAdapterRegistry({
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+    const claude = registry.get("claude-code");
+    const externalRuntime = claude.profile.execution.external_runtime;
+    const modes = externalRuntime.permission_policy.modes;
+    assert.equal(externalRuntime.env_from?.ANTHROPIC_API_KEY, undefined);
+    for (const mode of ["full-bypass", "restricted"]) {
+      const args = modes[mode].args;
+      assert.equal(args.includes("--bare"), false, `${mode} args must preserve host Claude auth`);
+      assert.ok(args.includes("--print"), `${mode} args must use non-interactive print mode`);
+      assert.ok(args.includes("--append-system-prompt"), `${mode} args must include compact guardrail prompt`);
+      assert.ok(args.includes("--effort"), `${mode} args must declare supported effort bound`);
+      assert.match(args.join(" "), /provider_context_window_exceeded/u, mode);
+    }
+    assert.match(externalRuntime.request_file.message, /provider_context_window_exceeded/u);
+    assert.match(externalRuntime.request_file.message, /resolved_local_refs\[\]\.local_path/u);
+  });
+});
+
 test("resolveAdapterForRoute passes when required capabilities are declared by selected adapter", () => {
   withTempRepo((repoRoot) => {
     const routeResolution = resolveRouteForStep({
@@ -1735,6 +1757,8 @@ test("live adapter maps provider prompt overflow to provider context-window fail
     assert.equal(response.output.external_runner.context_budget_status, "pass");
     assert.equal(response.output.external_runner.context_budget_failure_class, "provider_context_window_exceeded");
     assert.match(response.output.external_runner.raw_provider_error_summary, /Prompt is too long/i);
+    assert.ok(response.output.external_runner.raw_evidence_ref.startsWith("evidence://"));
+    assert.ok(response.output.external_runner.top_context_size_sources.length > 0);
   });
 });
 
