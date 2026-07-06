@@ -125,6 +125,16 @@ function collectFindingRecords(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function asRecordList(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)).map(asRecord)
+    : [];
+}
+
+/**
  * @param {Record<string, unknown>} reviewReport
  * @returns {Array<Record<string, unknown>>}
  */
@@ -213,22 +223,51 @@ function resolutionRequirementForFinding(finding) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function normalizeVerificationFailureDetails(value) {
+  return asRecordList(value).map((entry) => {
+    const normalized = { ...entry };
+    normalized.evidence_refs = asStringArray(entry.evidence_refs);
+    return normalized;
+  });
+}
+
+/**
  * @param {Record<string, unknown>} reviewReport
  * @returns {Array<Record<string, unknown>>}
  */
-function collectReviewFindingDetails(reviewReport) {
-  return collectReviewFindingRecords(reviewReport).slice(0, 12).map((finding, index) => ({
-    finding_id: reviewFindingId(finding, index),
-    category: asNonEmptyString(finding.category) || "review",
-    severity: asNonEmptyString(finding.severity) || "blocking",
-    summary: reviewFindingSummary(finding),
-    evidence_refs: uniqueStrings([
-      ...asStringArray(finding.evidence_refs),
-      ...asStringArray(finding.evidenceRefs),
-      ...collectStringRefs(finding),
-    ]),
-    resolution_requirement: resolutionRequirementForFinding(finding),
-  }));
+export function collectReviewFindingDetails(reviewReport) {
+  const seen = new Set();
+  const details = [];
+  for (const [index, finding] of collectReviewFindingRecords(reviewReport).entries()) {
+    const findingId = reviewFindingId(finding, index);
+    const summary = reviewFindingSummary(finding);
+    const dedupeKey = `${findingId}\n${summary}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const verificationFailureDetails = normalizeVerificationFailureDetails(finding.verification_failure_details);
+    const detail = {
+      finding_id: findingId,
+      category: asNonEmptyString(finding.category) || "review",
+      severity: asNonEmptyString(finding.severity) || "blocking",
+      summary,
+      evidence_refs: uniqueStrings([
+        ...asStringArray(finding.evidence_refs),
+        ...asStringArray(finding.evidenceRefs),
+        ...verificationFailureDetails.flatMap((entry) => asStringArray(entry.evidence_refs)),
+      ]),
+      resolution_requirement: resolutionRequirementForFinding(finding),
+    };
+    if (verificationFailureDetails.length > 0) {
+      detail.verification_failure_details = verificationFailureDetails;
+    }
+    details.push(detail);
+    if (details.length >= 12) break;
+  }
+  return details;
 }
 
 /**
@@ -6564,7 +6603,8 @@ export function executeFullJourneyFlow(options) {
       if (canRepair) {
         const repairFindingDetails = unresolvedRepairFindingDetails.map((entry, index) => {
           const record = asRecord(entry);
-          return {
+          const verificationFailureDetails = normalizeVerificationFailureDetails(record.verification_failure_details);
+          const detail = {
             finding_id:
               asNonEmptyString(record.finding_id) ||
               `${repairSource ?? "review"}.${iteration}.finding-${index + 1}`,
@@ -6574,12 +6614,17 @@ export function executeFullJourneyFlow(options) {
             evidence_refs: uniqueStrings([
               ...asStringArray(record.evidence_refs),
               ...asStringArray(record.evidenceRefs),
+              ...verificationFailureDetails.flatMap((findingDetail) => asStringArray(findingDetail.evidence_refs)),
               ...repairVerificationRefs,
             ]),
             resolution_requirement:
               asNonEmptyString(record.resolution_requirement) ||
               "Complete the requested repair through the next public execution iteration and include explicit closure evidence.",
           };
+          if (verificationFailureDetails.length > 0) {
+            detail.verification_failure_details = verificationFailureDetails;
+          }
+          return detail;
         });
         pendingRepairContext = {
           source_phase: repairSource ?? "review",

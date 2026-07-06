@@ -1601,6 +1601,10 @@ test("live adapter repair request-artifact packet includes repair closure policy
     assert.ok(response.output.runner_output.roles.includes("review_decision"));
     assert.ok(response.output.runner_output.roles.includes("review_report"));
     assert.equal(response.output.runner_output.repair_context.context.source_phase, "review");
+    assert.equal(
+      response.output.runner_output.repair_context.context.unresolved_finding_details[0].verification_failure_details[0].command,
+      "npx ava test/headers.ts",
+    );
     assert.equal(response.output.runner_output.repair_policy.required, true);
     assert.equal(response.output.runner_output.repair_policy.must_address_each_unresolved_finding, true);
     assert.equal(

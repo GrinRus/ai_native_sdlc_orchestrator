@@ -1470,6 +1470,11 @@ test("executeRuntimeHarnessControlledStep repairs a failed implement step and re
       ),
     );
     assert.ok(
+      repairStepResult.routed_execution.adapter_request.context.runtime_evidence_refs.some((ref) =>
+        String(ref).includes("runtime-harness-repair-input"),
+      ),
+    );
+    assert.ok(
       repairStepResult.evidence_refs.some((ref) => String(ref).includes("runtime-harness-repair-input")),
     );
 
