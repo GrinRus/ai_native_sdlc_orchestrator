@@ -196,6 +196,7 @@ function evaluateDecisionGate(options) {
  *   defaultVerificationStatus: string,
  *   fallbackFindings?: string[],
  *   fallbackVerificationRefs?: string[],
+ *   fallbackFindingDetails?: Array<Record<string, unknown>>,
  * }} options
  * @returns {Record<string, unknown>}
  */
@@ -222,6 +223,7 @@ function normalizeRepairContext(options) {
   }
   const fallbackFindings = asStringArray(options.fallbackFindings);
   const fallbackVerificationRefs = asStringArray(options.fallbackVerificationRefs);
+  const fallbackFindingDetails = asRecordArray(options.fallbackFindingDetails);
   const contextDetails = Array.isArray(context.unresolved_finding_details)
     ? context.unresolved_finding_details
     : [];
@@ -237,15 +239,17 @@ function normalizeRepairContext(options) {
       : fallbackFindings,
     unresolved_finding_details: contextDetails.length > 0
       ? contextDetails
-      : fallbackFindings.map((finding, index) => ({
-          finding_id: `fallback.${index + 1}`,
-          category: "review",
-          severity: "blocking",
-          summary: finding,
-          evidence_refs: fallbackVerificationRefs,
-          resolution_requirement:
-            "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
-        })),
+      : fallbackFindingDetails.length > 0
+        ? fallbackFindingDetails
+        : fallbackFindings.map((finding, index) => ({
+            finding_id: `fallback.${index + 1}`,
+            category: "review",
+            severity: "blocking",
+            summary: finding,
+            evidence_refs: fallbackVerificationRefs,
+            resolution_requirement:
+              "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
+          })),
     meaningful_changed_paths: asStringArray(context.meaningful_changed_paths),
     verification_status: asString(context.verification_status) ?? options.defaultVerificationStatus ?? "unknown",
     verification_refs: asStringArray(context.verification_refs).length > 0
@@ -286,6 +290,36 @@ function findingRefsFromDetails(findingDetails) {
       ...asStringArray(finding.evidence_refs),
     ]),
   );
+}
+
+/**
+ * @param {{ findings: Array<Record<string, unknown>>, fallbackEvidenceRefs: string[] }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildFallbackRepairFindingDetails(options) {
+  return options.findings
+    .filter((finding) => asString(finding.severity) === "fail")
+    .map((finding, index) => {
+      const evidenceRefs = uniqueStrings([
+        ...asStringArray(finding.evidence_refs),
+        ...options.fallbackEvidenceRefs,
+      ]);
+      const detail = {
+        finding_id: asString(finding.finding_id) ?? `fallback.${index + 1}`,
+        category: asString(finding.category) ?? "review",
+        severity: asString(finding.severity) ?? "blocking",
+        summary: asString(finding.summary) ?? "Blocking review finding.",
+        evidence_refs: evidenceRefs,
+        resolution_requirement:
+          asString(finding.resolution_requirement) ??
+          "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
+      };
+      const verificationFailureDetails = asRecordArray(finding.verification_failure_details);
+      if (verificationFailureDetails.length > 0) {
+        detail.verification_failure_details = verificationFailureDetails;
+      }
+      return detail;
+    });
 }
 
 /**
@@ -414,6 +448,10 @@ export function materializeReviewDecision(options) {
     decision: options.decision,
     context: options.repairContext,
     defaultVerificationStatus: runtimeDecision === "pass" && reviewStatus === "pass" ? "pass" : "not_pass",
+    fallbackFindingDetails: buildFallbackRepairFindingDetails({
+      findings: [...reviewFindings, ...runtimeFindings],
+      fallbackEvidenceRefs: evidenceRefs,
+    }),
     fallbackFindings: uniqueStrings([
       ...blockingFindings.map((finding) => asString(finding.summary) ?? "Blocking review finding."),
       ...gate.findings,

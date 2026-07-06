@@ -145,6 +145,33 @@ Each finding should keep:
 - `summary`
 - `evidence_refs`
 
+Findings may add optional `verification_failure_details[]` when the finding was
+derived from a failed `verify-summary` step-result. Each entry is generic AOR
+verification evidence and should preserve:
+- `command`
+- `command_group_id`
+- `role`
+- `phase`
+- `enforcement`
+- `enforcement_result`
+- `outcome`
+- `exit_code`
+- `signal`
+- `error_code`
+- `timed_out`
+- `timeout_class`
+- `command_timeout_ms`
+- `working_dir`
+- `repo_scope`
+- bounded `stdout_excerpt`
+- bounded `stderr_excerpt`
+- `failure_summary`
+- `evidence_refs`
+
+Review should attach these details when command-level step-result evidence is
+available. Generic "verify-summary failed" findings are only a fallback when the
+failed command details cannot be loaded.
+
 When a review or QA report participates in a W45 repair cycle, it may add
 optional `quality_repair_lineage` with:
 - `request_ref`
@@ -164,7 +191,10 @@ The shared contract loader validates the nested review report shape used by CLI/
 - nested `matrix_cell` values validate known identity, scenario, and provider fields when those fields are present;
 - nested `coverage_follow_up` validates `current_cell_required` and next/remaining matrix cells when those fields are present; legacy non-catalog outputs may keep an empty object;
 - optional provider traceability fields may be strings or `null` when the upstream runtime evidence was intentionally missing or blocked;
-- each finding must be an object with `finding_id`, `severity`, `category`, `summary`, and `evidence_refs[]`.
+- each finding must be an object with `finding_id`, `severity`, `category`, `summary`, and `evidence_refs[]`;
+- optional `verification_failure_details[]` entries must carry command,
+  role/enforcement, timeout class, process result, bounded stdout/stderr
+  excerpts, failure summary, and evidence refs.
 
 ## Notes
 `review-report` is report-only. A failing review must remain machine-readable without forcing command failure unless the CLI itself encounters usage, runtime, or contract-resolution errors.
