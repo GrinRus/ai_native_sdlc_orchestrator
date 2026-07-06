@@ -63,6 +63,9 @@ For canonical setup and verification dependency details per profile, use `script
     - `xlarge`, `governance|repair`, manual-only
     - broader retry, hook, public type, and observability rehearsal with operator
       review required for every controller step
+    - post-run primary gate uses `test/main.ts`, `test/hooks.ts`, and focused
+      `test/retry.ts --match='*shouldRetry*'`; the full `npm test` suite stays
+      manual/overnight diagnostic evidence with `diagnostic_failure_mode=warn`
 - Best profiles:
   - full-journey required/candidate cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
@@ -410,6 +413,10 @@ Extended candidate cells:
 - `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
 - `ky.governance.xlarge.openai` / `ky.governance.xlarge.anthropic` (`ky-request-lifecycle-observability-xlarge`, manual-only)
+  - primary verification: `npx xo`, `npm run build`, `npx ava test/main.ts test/hooks.ts`,
+    and `npx ava test/retry.ts --match='*shouldRetry*'`
+  - diagnostic observation: `npx playwright install` then `npm test`; failures remain warning
+    evidence unless a future profile explicitly promotes the full suite to acceptance
 - `httpie-cli.governance.xlarge.openai` / `httpie-cli.governance.xlarge.anthropic` (`httpie-cli-request-policy-orchestration-xlarge`, manual-only)
 - `nextjs.release.xlarge.openai` / `nextjs.release.xlarge.anthropic` (`nextjs-cross-package-release-orchestration`, manual-only)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)

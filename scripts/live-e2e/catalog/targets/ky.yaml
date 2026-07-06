@@ -615,6 +615,7 @@ feature_missions:
         - npx xo
         - npm run build
         - npx ava test/main.ts test/hooks.ts
+        - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
         - npm test
@@ -685,6 +686,7 @@ feature_missions:
         - "Primary verification command: npx xo"
         - "Primary verification command: npm run build"
         - "Primary verification command: npx ava test/main.ts test/hooks.ts"
+        - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
         - "Diagnostic evidence command: npx playwright install"
         - "Diagnostic evidence command: npm test"
     final_code_rubric:
