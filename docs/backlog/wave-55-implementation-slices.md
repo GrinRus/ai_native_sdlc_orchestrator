@@ -142,7 +142,7 @@ for the next repair execution to close specific command failures.
   quality/finding report that separates regression signal, large product
   acceptance, and xlarge observation evidence.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Primary modules:** `docs/backlog/**`, `docs/ops/**`,
   internal live E2E run artifacts
 - **Hard dependencies:** W55-S04
@@ -163,6 +163,39 @@ for the next repair execution to close specific command failures.
 - live E2E run ids and final summaries
 - updated findings/reporting notes
 - `pnpm check`
+
+### Control rerun report
+
+W55-S05 found two W55 repair-evidence propagation defects before the final
+control matrix was trustworthy:
+
+- `w55-s05-ky-large-codex-20260706-081928` proved that review findings carried
+  actionable `verification_failure_details`, but live review repair context did
+  not preserve the nested details and instead flattened command/stdout snippets
+  into `evidence_refs`.
+- `w55-s05-ky-large-codex-postfix-20260706-131215` proved that preserved repair
+  context still did not reach the provider repair packet because
+  `--promotion-evidence-refs` were absent from the routed adapter request
+  context.
+
+The W55-S05 fix keeps the public repair artifact model unchanged: failed
+verification details remain nested under existing review finding/repair context
+fields, and provider work packets receive them through existing
+`repair_closure_policy`/repair context inputs without private live E2E
+vocabulary.
+
+| Run | Cell | Terminal status | Classification | Evidence notes |
+|---|---|---|---|---|
+| `w55-s05-fastify-medium-openai-20260706-074319` | known-good medium repair canary | `status=ok`, health `warn` | regression signal passed | W45 repair cycle still created and closed one quality repair request through `execution#2`; command, controller, provider, diagnostic, and evidence health passed. |
+| `w55-s05-ky-large-codex-propagation-20260706-135852` | `ky` large / Codex | `status=ok`, health `pass` | product gate passed | Primary verification passed after focused target changes; no repair iteration was needed in the final run. |
+| `w55-s05-ky-large-claude-20260706-141750` | `ky` large / Claude | `status=failed`, health `not_pass` | provider repair convergence failed | Claude guardrails/auth worked, provider completed, context budget passed, and the repair work packet preserved command-level AVA failure details; final primary verification still failed. |
+| `w55-s05-ky-xlarge-codex-20260706-145201` | manual `ky` xlarge / Codex | `status=ok`, summary `pass` | xlarge observation passed | Primary xlarge command groups passed; diagnostic `npm test` finished and failed as warn/manual overnight evidence, not as quick acceptance or timeout. |
+| `w55-s05-ky-xlarge-claude-20260706-114100` | manual `ky` xlarge / Claude | `status=not_pass`, health `blocked` | provider did not address review finding | Initial and repair provider executions completed without auth or context-window failure; the repair packet included two verification failure details, then review stopped with `provider_did_not_address_finding` before QA/delivery. |
+
+Follow-up decision: no new W45/W54 work is needed. The remaining hard-target
+non-pass cases are provider/target convergence observations with actionable
+repair evidence available to the next provider attempt. Xlarge remains manual
+observation evidence and is not claimed as product acceptance.
 
 ### Out of scope
 - Claiming xlarge product acceptance.

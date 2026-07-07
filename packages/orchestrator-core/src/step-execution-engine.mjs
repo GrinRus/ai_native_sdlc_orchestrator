@@ -1455,6 +1455,7 @@ export function executeRoutedStep(options) {
           packet_refs: compiledContextArtifact.packet_refs,
           instruction_set: compiled.compiled_context.instruction_set,
           required_inputs_resolved: compiled.compiled_context.required_inputs_resolved,
+          runtime_evidence_refs: evidenceRefs,
           guardrails: compiled.compiled_context.guardrails,
           skill_refs: compiled.compiled_context.skill_refs,
           provenance: compiled.compiled_context.provenance,

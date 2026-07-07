@@ -31,6 +31,7 @@ import {
   archivedNextActionReportForMission,
   buildTargetPreExecutionStatusReport,
   collectGuidedBrowserTaskProof,
+  collectReviewFindingDetails,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
   buildAcceptanceRepairDrillFinding,
@@ -4320,22 +4321,74 @@ test("full journey requests repair only for actionable review or QA findings bef
   assert.match(flowsSource, /--repair-context-file/u);
   assert.match(flowsSource, /source_phase: repairSource \?\? "review"/u);
   assert.match(flowsSource, /qaOverallStatus === "fail"/u);
-	  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
-	  assert.match(flowsSource, /const unresolvedReviewFindingDetails = collectReviewFindingDetails\(reviewReport\)/u);
-	  assert.match(flowsSource, /unresolved_finding_details: repairFindingDetails/u);
-	  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
-	  assert.match(flowsSource, /previous_repair_decision_files: previousRepairDecisionRefs/u);
-	  assert.match(flowsSource, /repair_context_fingerprint: pendingRepairContextFingerprint/u);
-	  assert.match(flowsSource, /new_context_since_previous: newRepairContextSignals/u);
-	  assert.match(flowsSource, /newRepairContextSignals,\s*\n\s*\}\);/u);
-	  assert.match(flowsSource, /repeated_repair_context_without_new_evidence/u);
-	  assert.match(flowsSource, /Unresolved findings:/u);
-	  assert.match(flowsSource, /Runtime Harness decision:/u);
-	  assert.ok(
-	    flowsSource.indexOf('runCommand("review-run"') < flowsSource.indexOf("const previousRepairContexts = readRepairDecisionContexts"),
-	    "expected fresh review evidence before repeated repair context comparison",
-	  );
-	});
+  assert.match(flowsSource, /const unresolvedReviewFindings = collectReviewFindingSummaries\(reviewReport\)/u);
+  assert.match(flowsSource, /const unresolvedReviewFindingDetails = collectReviewFindingDetails\(reviewReport\)/u);
+  assert.match(flowsSource, /unresolved_finding_details: repairFindingDetails/u);
+  assert.match(flowsSource, /repair_necessity: repairNecessity/u);
+  assert.match(flowsSource, /previous_repair_decision_files: previousRepairDecisionRefs/u);
+  assert.match(flowsSource, /repair_context_fingerprint: pendingRepairContextFingerprint/u);
+  assert.match(flowsSource, /new_context_since_previous: newRepairContextSignals/u);
+  assert.match(flowsSource, /newRepairContextSignals,\s*\n\s*\}\);/u);
+  assert.match(flowsSource, /repeated_repair_context_without_new_evidence/u);
+  assert.match(flowsSource, /Unresolved findings:/u);
+  assert.match(flowsSource, /Runtime Harness decision:/u);
+  assert.ok(
+    flowsSource.indexOf('runCommand("review-run"') < flowsSource.indexOf("const previousRepairContexts = readRepairDecisionContexts"),
+    "expected fresh review evidence before repeated repair context comparison",
+  );
+});
+
+test("repair context keeps verification failure details structured", () => {
+  const [detail] = collectReviewFindingDetails({
+    findings: [
+      {
+        finding_id: "artifact-quality.01",
+        category: "artifact-quality",
+        severity: "fail",
+        summary: "Verify-summary failed with command-level details for: npx xo.",
+        evidence_refs: ["evidence://reports/verify-summary-post-run-primary.json"],
+        verification_failure_details: [
+          {
+            command: "npx xo",
+            command_group_id: "post-change-primary",
+            role: "test",
+            phase: "post-change",
+            enforcement: "required",
+            enforcement_result: "fail",
+            exit_code: 1,
+            timed_out: false,
+            timeout_class: "focused-test",
+            command_timeout_ms: 1800000,
+            working_dir: ".",
+            repo_scope: "sindresorhus/ky",
+            stdout_excerpt: "source/utils/merge.ts:206:1\n  TODO warning plus test/retry.ts null type error",
+            stderr_excerpt: "",
+            failure_summary: "Post-change verification command 'npx xo' failed with exit code 1.",
+            evidence_refs: [
+              "evidence://reports/step-result-post-run-primary-2.json",
+              "evidence://reports/verify-command-post-run-primary-2.log",
+            ],
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(detail.finding_id, "artifact-quality.01");
+  assert.deepEqual(detail.evidence_refs, [
+    "evidence://reports/verify-summary-post-run-primary.json",
+    "evidence://reports/step-result-post-run-primary-2.json",
+    "evidence://reports/verify-command-post-run-primary-2.log",
+  ]);
+  assert.equal(detail.verification_failure_details[0].command, "npx xo");
+  assert.match(detail.verification_failure_details[0].stdout_excerpt, /test\/retry\.ts null type/u);
+  assert.equal(detail.evidence_refs.includes("npx xo"), false);
+  assert.equal(detail.evidence_refs.some((ref) => ref.includes("source/utils/merge.ts")), false);
+  assert.equal(
+    detail.evidence_refs.includes("Post-change verification command 'npx xo' failed with exit code 1."),
+    false,
+  );
+});
 
 test("proof runner writes run-health reports for blocked live E2E reports", () => {
   withTempRoot((tempRoot) => {
