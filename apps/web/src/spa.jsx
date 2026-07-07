@@ -884,6 +884,7 @@ function projectStatusLabel(project) {
 
 function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAddProject, busy }) {
   const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
+  const runtimeRoot = activeProject?.runtime_root ?? "runtime pending";
   return (
     <div className="project-switcher" aria-label="Project switcher">
       <label htmlFor="project-switcher-control">
@@ -904,7 +905,12 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
       </label>
       <div className="project-switcher-meta">
         <StatusPill state={projectStatusLabel(activeProject)} />
-        <code title={activeProject?.runtime_root ?? ""}>{activeProject?.runtime_root ?? "runtime pending"}</code>
+        <details className="runtime-path-details">
+          <summary>
+            <code title={runtimeRoot}>{runtimeRoot}</code>
+          </summary>
+          <code className="runtime-path-full">{runtimeRoot}</code>
+        </details>
       </div>
       <button className="utility-button compact" type="button" onClick={onOpenAddProject} disabled={busy}>
         <Icon name="folder" />Add local project
@@ -915,20 +921,27 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
 
 function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null }) {
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
+  const currentStageEntry = STAGES[currentIndex] ?? STAGES[0];
   const completed = isCompletedFlow(flow);
+  const firstRunFocus = !flow || newFlowDraft;
   const railTitle = newFlowDraft ? "New flow draft" : flow ? flowDisplayName(flow) : "No active flow";
   const railDescription = newFlowDraft
     ? "Draft mission settings are not durable evidence until submitted."
     : completed
       ? "Closed flow evidence is immutable and read-only."
-      : flow
+        : flow
         ? "Navigation is scoped to the selected flow."
         : "Readiness prepares the runtime before a flow is created.";
   return (
-    <aside className="stage-rail">
+    <aside className={`stage-rail ${firstRunFocus ? "compact-first-run" : ""}`}>
       <div className="rail-title">
         <span>Flow stages</span>
         <strong>{newFlowDraft ? "Draft" : flow?.status ?? `${currentIndex + 1}/7`}</strong>
+      </div>
+      <div className="stage-progress-strip" aria-label="Compact stage progress">
+        <span>{newFlowDraft ? "2/7" : `${currentIndex + 1}/7`}</span>
+        <strong>{currentStageEntry.label}</strong>
+        <em>{newFlowDraft ? "Mission draft" : currentStageEntry.hint}</em>
       </div>
       {providerStepStatus ? (
         <div className="provider-heartbeat-rail" aria-label="Provider step heartbeat">
@@ -992,60 +1005,12 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
 
 function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, onCancel = null, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
   const selectedDeliveryMode = form.deliveryMode || "no-write";
-
-  return (
-    <form className="mission-form" aria-label="Mission intake" onSubmit={submitMission}>
-      <div className="form-header">
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        <div className="form-actions">
-          {onCancel ? (
-            <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
-              Cancel New Flow
-            </button>
-          ) : null}
-          <button className="secondary" type="button" onClick={applyTemplate} disabled={busy}>
-            Load template
-          </button>
-          <button className="secondary" type="button" onClick={onAsk} disabled={busy || askDisabled}>
-            <Icon name="target" />
-            Ask AOR
-          </button>
-        </div>
-      </div>
-      <div className="template-grid" aria-label="New flow templates">
-        <button className={`template-card ${form.templateId === "blank-mission" ? "selected" : ""}`} type="button" onClick={() => setForm(EMPTY_TEMPLATE)} disabled={busy}>
-          <Icon name="plus" />
-          <span>Blank mission</span>
-          <p>Start from scratch</p>
-        </button>
-        <button className={`template-card ${form.templateId === SAFE_TEMPLATE_ID ? "selected" : ""}`} type="button" onClick={applyTemplate} disabled={busy}>
-          <Icon name="shield" />
-          <span>Safe walkthrough template</span>
-          <p>Guided, best-practice path</p>
-        </button>
-        <button className={`template-card ${followUpSourceHandoffRef ? "selected" : ""}`} type="button" disabled>
-          <Icon name="lock" />
-          <span>From learning handoff</span>
-          <p>{followUpSourceHandoffRef ? "Captured guidance attached" : "Available from closed flows"}</p>
-        </button>
-        <button className="template-card" type="button" disabled>
-          <Icon name="target" />
-          <span>From selected evidence / ref</span>
-          <p>Attach evidence after a flow exists</p>
-        </button>
-      </div>
-      {followUpSourceHandoffRef ? (
-        <div className="follow-up-lineage">
-          <Icon name="lock" />
-          <div>
-            <span>Follow-up source handoff</span>
-            <code>{followUpSourceHandoffRef}</code>
-          </div>
-        </div>
-      ) : null}
+  const safeTemplateMode = form.templateId === SAFE_TEMPLATE_ID && !followUpSourceHandoffRef;
+  const askDisabledReason = "Ask AOR requires a selected active flow";
+  const learningHandoffReason = followUpSourceHandoffRef ? "Captured guidance attached" : "Available after completed flow";
+  const selectedEvidenceReason = "Requires selected active flow";
+  const missionDetailFields = (
+    <>
       <Field label="Title">
         <input name="mission-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
       </Field>
@@ -1092,8 +1057,94 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
           ))}
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <form className={`mission-form ${safeTemplateMode ? "summary-first" : ""}`} aria-label="Mission intake" onSubmit={submitMission}>
+      <div className="form-header">
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <div className="form-actions">
+          {onCancel ? (
+            <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
+              Cancel New Flow
+            </button>
+          ) : null}
+          <button className="secondary" type="button" onClick={applyTemplate} disabled={busy}>
+            Load template
+          </button>
+          <button className="secondary" type="button" onClick={onAsk} disabled={busy || askDisabled} title={askDisabled ? askDisabledReason : "Ask AOR for selected flow"} aria-label="Ask AOR for selected flow">
+            <Icon name="target" />
+            Ask AOR
+          </button>
+          {askDisabled ? <p className="form-action-reason">{askDisabledReason}</p> : null}
+        </div>
+      </div>
+      <div className="template-grid" aria-label="New flow templates">
+        <button className={`template-card ${form.templateId === "blank-mission" ? "selected" : ""}`} type="button" onClick={() => setForm(EMPTY_TEMPLATE)} disabled={busy}>
+          <Icon name="plus" />
+          <span>Blank mission</span>
+          <p>Start from scratch</p>
+        </button>
+        <button className={`template-card ${form.templateId === SAFE_TEMPLATE_ID ? "selected" : ""}`} type="button" onClick={applyTemplate} disabled={busy}>
+          <Icon name="shield" />
+          <span>Safe walkthrough template</span>
+          <p>Guided, best-practice path</p>
+        </button>
+        <button className={`template-card ${followUpSourceHandoffRef ? "selected" : ""}`} type="button" title={learningHandoffReason} disabled>
+          <Icon name="lock" />
+          <span>From learning handoff</span>
+          <p>{followUpSourceHandoffRef ? "Captured guidance attached" : "Available after completed flow"}</p>
+          <p className="disabled-reason">{learningHandoffReason}</p>
+        </button>
+        <button className="template-card" type="button" title={selectedEvidenceReason} disabled>
+          <Icon name="target" />
+          <span>From selected evidence / ref</span>
+          <p>Attach evidence after a flow exists</p>
+          <p className="disabled-reason">{selectedEvidenceReason}</p>
+        </button>
+      </div>
+      {followUpSourceHandoffRef ? (
+        <div className="follow-up-lineage">
+          <Icon name="lock" />
+          <div>
+            <span>Follow-up source handoff</span>
+            <code>{followUpSourceHandoffRef}</code>
+          </div>
+        </div>
+      ) : null}
+      {safeTemplateMode ? (
+        <>
+          <section className="safe-template-summary" aria-label="Safe walkthrough summary">
+            <div>
+              <span>Prefilled title</span>
+              <strong>{form.title}</strong>
+              <p>{form.brief}</p>
+            </div>
+            <div>
+              <span>Safety</span>
+              <strong>{selectedDeliveryMode === "no-write" ? "No upstream writes" : selectedDeliveryMode}</strong>
+              <p>{form.constraints || "Local evidence first; no upstream writes by default."}</p>
+            </div>
+            <div>
+              <span>Definition of Done</span>
+              <strong>{splitLines(form.dod).length || 0} checks</strong>
+              <p>{splitLines(form.dod).slice(0, 2).join("; ") || "Confirm evidence and next-action readiness."}</p>
+            </div>
+          </section>
+          <details className="mission-detail-fields">
+            <summary>Edit mission details</summary>
+            <div className="mission-detail-grid">
+              {missionDetailFields}
+            </div>
+          </details>
+        </>
+      ) : missionDetailFields}
       <button className="primary" type="submit" disabled={busy}>
-        {followUpSourceHandoffRef ? "Create Follow-up Mission & Resolve Next Action" : "Create Mission Packet & Resolve Next Action"}
+        {followUpSourceHandoffRef ? "Create Follow-up Flow & Resolve Next Action" : "Create Flow & Resolve Next Action"}
         <Icon name="target" />
       </button>
     </form>
@@ -1523,6 +1574,29 @@ function FlowCockpit({
           </div>
         </div>
 
+        <div className="first-run-next-action-grid" aria-label="First-run next action and safety">
+          <div>
+            <span>Next action</span>
+            <strong>{stateReady ? "Configure First Flow" : "Initialize Project Runtime"}</strong>
+            <p>{stateReady ? "Open the safe walkthrough mission form and create the first no-write flow." : "Prepare local runtime state before mission intake."}</p>
+          </div>
+          <div>
+            <span>Blockers</span>
+            <strong>{stateReady ? "None for safe template" : "Runtime not initialized"}</strong>
+            <p>{stateReady ? "Mission intake is the only required next step." : "AOR needs a local state file before flow evidence exists."}</p>
+          </div>
+          <div>
+            <span>Safety</span>
+            <strong>No upstream writes</strong>
+            <p>First-run defaults keep execution in local evidence mode.</p>
+          </div>
+          <div>
+            <span>Runtime readiness</span>
+            <strong>{stateReady ? "Runtime ready" : "Needs initialization"}</strong>
+            <p>{stateReady ? "State evidence is reachable for this project." : "Initialize once, then configure the first flow."}</p>
+          </div>
+        </div>
+
         {!stateReady ? (
           <div className="readiness-action">
             <div>
@@ -1541,19 +1615,19 @@ function FlowCockpit({
             <div>
               <Icon name="plus" />
               <div>
-                <h3>Start First Flow</h3>
+                <h3>Configure First Flow</h3>
                 <p>Runtime is ready. Create a no-write mission packet and let AOR resolve the next action.</p>
               </div>
             </div>
             <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
-              Start First Flow
+              Configure First Flow
             </button>
           </div>
         )}
 
         <div className="flow-lifecycle-preview" aria-label="Flow lifecycle after readiness">
           <div className="complete"><span className="check-dot" /><strong>Initialize project</strong><p>Prepare runtime and policy</p></div>
-          <div><span className="check-dot" /><strong>Start first flow</strong><p>Create a new mission</p></div>
+          <div><span className="check-dot" /><strong>Configure first flow</strong><p>Create a new mission</p></div>
           <div><span className="check-dot" /><strong>Create mission packet</strong><p>Define intent and targets</p></div>
           <div><span className="check-dot" /><strong>Resolve next action</strong><p>Let AOR recommend the safest step</p></div>
         </div>
@@ -1674,6 +1748,27 @@ function FlowCockpit({
       ) : null}
 
       <FlowTimeline currentStage={currentStage} completed={completed} />
+
+      {!completed ? (
+        <div className="active-flow-handoff" aria-label="Active flow status summary">
+          <div>
+            <span>Active flow id</span>
+            <strong title={flow?.flow_id ?? flow?.mission_id ?? ""}>{flow?.flow_id ?? flow?.mission_id ?? "active flow"}</strong>
+          </div>
+          <div>
+            <span>Next action</span>
+            <strong>{actionCommandLabel(nextPrimary)}</strong>
+          </div>
+          <div>
+            <span>No-write safety</span>
+            <strong>{deliveryMode === "no-write" ? "On" : "Explicit review"}</strong>
+          </div>
+          <div>
+            <span>Evidence count</span>
+            <strong>{visibleEvidence.length}</strong>
+          </div>
+        </div>
+      ) : null}
 
       <QualityGatePanel gate={qualityGate} evidenceRows={evidenceRows} />
 
@@ -2304,6 +2399,8 @@ function EvidenceGraphPanel({ graph }) {
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
   const selectedNode = nodes[nodes.length - 1] ?? nodes[0] ?? null;
+  const completedFlowsReason = "Available after completed flow";
+  const lineageReason = "Available after completed flow";
   return (
     <section className="work-card graph-panel">
       <div className="work-heading compact-heading">
@@ -2315,9 +2412,10 @@ function EvidenceGraphPanel({ graph }) {
       </div>
       <div className="graph-context-tabs" aria-label="Evidence graph context">
         <button className="selected" type="button">Current Flow</button>
-        <button type="button" disabled>Completed Flows</button>
-        <button type="button" disabled>Cross-flow Lineage</button>
+        <button type="button" title={completedFlowsReason} disabled>Completed Flows</button>
+        <button type="button" title={lineageReason} disabled>Cross-flow Lineage</button>
       </div>
+      <p className="disabled-tab-reason">Completed Flows and Cross-flow Lineage are {completedFlowsReason.toLowerCase()}.</p>
       <div className="graph-summary">
         <div>
           <span>Nodes</span>
@@ -2411,6 +2509,44 @@ function RuntimeTracePanel({ trace }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCount, decisionCount }) {
+  return (
+    <section className="workbench-row advanced-evidence-row">
+      <details className="work-card advanced-evidence-disclosure">
+        <summary>
+          <div>
+            <h3>Advanced evidence</h3>
+            <p>{newFlowDraft ? "Draft flow has no runtime evidence yet." : "Debug surfaces appear after a selected flow has relevant data."}</p>
+          </div>
+          <StatusPill state={`${evidenceCount} artifacts`} />
+        </summary>
+        <div className="advanced-evidence-summary-grid">
+          <div>
+            <span>Execution Evidence</span>
+            <strong>{evidenceCount > 0 ? "Available after flow evidence" : "Hidden until relevant"}</strong>
+            <p>Provider execution, Runtime Harness, and verification details remain available once they exist.</p>
+          </div>
+          <div>
+            <span>Evidence Graph</span>
+            <strong>{evidenceCount} refs</strong>
+            <p>Selected-flow graph and runtime trace are scoped to an active flow.</p>
+          </div>
+          <div>
+            <span>Interactions Inbox</span>
+            <strong>{interactionCount}</strong>
+            <p>Runtime-initiated questions appear here after a flow requests input.</p>
+          </div>
+          <div>
+            <span>Operator Decision</span>
+            <strong>{decisionCount}</strong>
+            <p>Bounded operator decisions are hidden until a runtime decision request exists.</p>
+          </div>
+        </div>
+      </details>
     </section>
   );
 }
@@ -2529,7 +2665,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
           <span>Target flow</span>
           <strong>{flowDisplayName(flow)}</strong>
           <code>{flow?.flow_id ?? "new-flow-draft"}</code>
-          <p>{flowMissing ? "Ask AOR requires a selected flow." : completed ? "Read-only inspection only. Mutation requests are blocked by the control plane." : "Requests are scoped to the selected active flow."}</p>
+          <p>{flowMissing ? "Ask AOR requires a selected active flow." : completed ? "Read-only inspection only. Mutation requests are blocked by the control plane." : "Requests are scoped to the selected active flow."}</p>
         </div>
         <div className="field">
           <span>Intent</span>
@@ -3386,9 +3522,11 @@ function App() {
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
+  const firstRunFocusMode = draftSurface || !selectedFlow;
+  const topbarAskReason = selectedFlow ? "Ask AOR for selected flow" : "Ask AOR requires a selected active flow";
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">A</div>
@@ -3420,11 +3558,18 @@ function App() {
         <div className="topbar-spacer" />
         <StatusPill state={config ? "connected" : "loading"} />
         <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
-        <button className="utility-button topbar-ask-button" type="button" onClick={() => openRequestDrawer()} disabled={busy || !selectedFlow}>
-          <Icon name="target" />Ask AOR
+        <button
+          className="utility-button topbar-ask-button"
+          type="button"
+          onClick={() => openRequestDrawer()}
+          disabled={busy || !selectedFlow}
+          title={topbarAskReason}
+          aria-label="Ask AOR for selected flow"
+        >
+          <Icon name="target" />Ask AOR for selected flow
         </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
-        <button className="utility-button" type="button" onClick={() => copyRef(projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor")}>
+        <button className="utility-button runtime-copy-chip" type="button" onClick={() => copyRef(projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor")}>
           <Icon name="folder" />Copy runtime path
         </button>
       </header>
@@ -3544,43 +3689,54 @@ function App() {
         </div>
       </section>
 
-      <section className="workbench-row execution-evidence-row">
-        <ExecutionEvidencePanel
-          evidence={executionEvidence}
-          providerEvidenceRows={providerEvidenceRows}
-          copyRef={copyRef}
-          busy={busy}
+      {firstRunFocusMode ? (
+        <AdvancedEvidenceDisclosure
+          newFlowDraft={draftSurface}
+          evidenceCount={workbenchEvidenceRows.length}
+          interactionCount={interactions.length}
+          decisionCount={operatorDecisionRequests.length}
         />
-      </section>
+      ) : (
+        <>
+          <section className="workbench-row execution-evidence-row">
+            <ExecutionEvidencePanel
+              evidence={executionEvidence}
+              providerEvidenceRows={providerEvidenceRows}
+              copyRef={copyRef}
+              busy={busy}
+            />
+          </section>
 
-      <section className="workbench-row graph-trace-row">
-        <EvidenceGraphPanel graph={selectedFlowEvidenceGraph} />
-        <RuntimeTracePanel trace={selectedFlowRuntimeTrace} />
-      </section>
+          <section className="workbench-row graph-trace-row">
+            <EvidenceGraphPanel graph={selectedFlowEvidenceGraph} />
+            <RuntimeTracePanel trace={selectedFlowRuntimeTrace} />
+          </section>
 
-      <section className="workbench-row secondary-workbench-row">
-        <EvidenceWorkbench
-          rows={workbenchEvidenceRows}
-          selectedRef={selectedRef}
-          setSelectedRef={setSelectedRef}
-          attachTarget={attachTarget}
-          copyRef={copyRef}
-        />
-        <div className="operator-side-stack">
-          <InteractionsInbox
-            interactions={interactions}
-            answers={answers}
-            setAnswers={setAnswers}
-            submitAnswer={submitAnswer}
-            busy={busy}
-          />
-          <OperatorDecisionDrawer
-            decisionRequests={operatorDecisionRequests}
-            copyRef={copyRef}
-            busy={busy}
-          />
-        </div>
-      </section>
+          <section className="workbench-row secondary-workbench-row">
+            <EvidenceWorkbench
+              rows={workbenchEvidenceRows}
+              selectedRef={selectedRef}
+              setSelectedRef={setSelectedRef}
+              attachTarget={attachTarget}
+              copyRef={copyRef}
+            />
+            <div className="operator-side-stack">
+              <InteractionsInbox
+                interactions={interactions}
+                answers={answers}
+                setAnswers={setAnswers}
+                submitAnswer={submitAnswer}
+                busy={busy}
+              />
+              <OperatorDecisionDrawer
+                decisionRequests={operatorDecisionRequests}
+                copyRef={copyRef}
+                busy={busy}
+              />
+            </div>
+          </section>
+        </>
+      )}
 
       <RequestDrawer
         open={requestDrawerOpen}

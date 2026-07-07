@@ -16,6 +16,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   }
 
   assert.match(source, /Ask AOR/u);
+  assert.match(source, /Ask AOR for selected flow/u);
+  assert.match(source, /Ask AOR requires a selected active flow/u);
   assert.match(source, /FlowSelector/u);
   assert.match(source, /One Recommended Action/u);
   assert.match(source, /EvidenceGraphPanel/u);
@@ -59,7 +61,17 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /selected-node-panel/u);
   assert.match(source, /trace-timeline-strip/u);
   assert.match(source, /Initialize Project Runtime/u);
+  assert.match(source, /Configure First Flow/u);
   assert.match(source, /First-run wizard/u);
+  assert.match(source, /firstRunFocusMode/u);
+  assert.match(source, /AdvancedEvidenceDisclosure/u);
+  assert.match(source, /Advanced evidence/u);
+  assert.match(source, /first-run-next-action-grid/u);
+  assert.match(source, /stage-progress-strip/u);
+  assert.match(source, /compact-first-run/u);
+  assert.match(source, /safe-template-summary/u);
+  assert.match(source, /Edit mission details/u);
+  assert.match(source, /active-flow-handoff/u);
   assert.match(source, /Project Context/u);
   assert.match(source, /Runtime Readiness/u);
   assert.match(source, /Project switcher/u);
@@ -78,6 +90,9 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /interactions-layout/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);
   assert.match(source, /No upstream writes/u);
+  assert.match(source, /Create Flow & Resolve Next Action/u);
+  assert.match(source, /Available after completed flow/u);
+  assert.match(source, /Requires selected active flow/u);
   assert.match(source, /Evidence & Documents/u);
   assert.match(source, /Verification plan/u);
   assert.match(source, /verification_plan/u);

@@ -51,6 +51,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W43:** `W43-S02` Alpha.10 installed-user onboarding and evidence smoke
 - **W44:** `W44-S03` Artifact readiness state machine and stale transitions
 - **W54:** `W54-S02` Stack discovery engine; `W54-S03` Project init profile materialization
+- **W56:** `W56-S01` First-run console focus and action clarity
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -154,6 +155,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W47:** `W47-S01` AOR operator keyboard accessibility and guided proof closure
 - **W48:** `W48-S03` Structured repair context and convergence classification
 - **W54:** `W54-S05` CLI/API/UI verification plan surfaces
+- **W56:** `W56-S01` First-run console focus and action clarity
 
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.

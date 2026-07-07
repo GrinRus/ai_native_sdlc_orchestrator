@@ -272,6 +272,7 @@ graph TD
   W55S03[W55-S03 ky xlarge primary verification alignment]
   W55S04[W55-S04 Claude xlarge context guardrails]
   W55S05[W55-S05 Control rerun and findings report]
+  W56S01[W56-S01 First-run console focus and action clarity]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -657,6 +658,7 @@ graph TD
   W55S02 --> W55S03
   W55S03 --> W55S04
   W55S04 --> W55S05
+  W55S05 --> W56S01
 ```
 
 ## W0 hard dependencies
@@ -1155,6 +1157,11 @@ own the stricter terminal control proof evidence for this lane.
 | W55-S04 | W55-S03 |
 | W55-S05 | W55-S04 |
 
+## W56 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W56-S01 | W55-S05 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1424,6 +1431,7 @@ own the stricter terminal control proof evidence for this lane.
 266. W55-S03
 267. W55-S04
 268. W55-S05
+269. W56-S01
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
