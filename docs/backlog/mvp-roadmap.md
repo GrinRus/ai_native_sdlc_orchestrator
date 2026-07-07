@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-55-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-56-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -66,6 +66,7 @@ The authoritative planning model for implementation lives in:
 | W53 | Generalize target verification into AOR command groups and enforce the boundary between AOR runtime artifacts and live E2E proof harness evidence. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-53-implementation-slices.md` |
 | W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
 | W55 | Turn `ky` large/xlarge control findings into actionable repair evidence, target-catalog alignment, Claude guardrails, and rerun reporting. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-55-implementation-slices.md` |
+| W56 | Harden the installed-user first-run console so the next safe action stays primary while advanced evidence remains progressively disclosed. | 1 | EPIC-1, EPIC-6 | `docs/backlog/wave-56-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -222,6 +223,7 @@ The authoritative planning model for implementation lives in:
 | W45-S04 | repair-cycle console visibility target: OPS-01, OPS-02, OPS-04, OPS-11, RQA-02 |
 | W45-S05 | repair-loop proof/profile target: DEV-05, RQA-05, OPS-06, OPS-07, FIN-03 |
 | W45-S06 | post-implementation docs/internal installed-user rehearsal acceptance target: DEV-05, DEV-07, RQA-02, RQA-05, RQA-06, OPS-04, OPS-06, OPS-07, FIN-03 |
+| W56-S01 | first-run console UX hardening target: PBO-09, OPS-01, OPS-10, OPS-11 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1017,6 +1019,23 @@ without reopening W45 or W54.
   product/provider outcomes, and manual xlarge observation evidence.
 
 **Detailed slices:** `docs/backlog/wave-55-implementation-slices.md`
+
+## W56 - first-run console focus and action clarity
+**Goal:** Make the installed-user local console first-run path easier to scan by
+keeping one safe next action primary while advanced evidence/debug surfaces stay
+available through progressive disclosure.
+
+**Exit criteria:**
+- Clean first-run and initialized-without-flow screens prioritize the runtime
+  initialization or first-flow setup action without showing empty advanced
+  evidence panels as primary content.
+- CTA copy distinguishes configuring a first flow from creating durable mission
+  evidence and resolving the first next action.
+- Disabled flow-dependent controls explain what state is required to recover.
+- Mobile first-run layout keeps project, status, stage progress, and primary
+  action within the viewport without horizontal overflow.
+
+**Detailed slices:** `docs/backlog/wave-56-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

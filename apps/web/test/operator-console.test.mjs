@@ -27,7 +27,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
 
   for (const required of [
     "safe-walkthrough",
-    "Create Mission Packet & Resolve Next Action",
+    "Create Flow & Resolve Next Action",
+    "Create Follow-up Flow & Resolve Next Action",
     "Mission intake",
     "Flow selector",
     "Active flows",
@@ -109,6 +110,23 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "First-run wizard",
     "Project Context",
     "Runtime Readiness",
+    "Configure First Flow",
+    "firstRunFocusMode",
+    "first-run-focus-mode",
+    "AdvancedEvidenceDisclosure",
+    "Advanced evidence",
+    "first-run-next-action-grid",
+    "stage-progress-strip",
+    "compact-first-run",
+    "safe-template-summary",
+    "Edit mission details",
+    "active-flow-handoff",
+    "Ask AOR for selected flow",
+    "Ask AOR requires a selected active flow",
+    "Available after completed flow",
+    "Requires selected active flow",
+    "runtime-path-details",
+    "runtime-copy-chip",
     "Project switcher",
     'htmlFor="project-switcher-control"',
     'id="project-switcher-control"',
@@ -234,6 +252,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
+  assert.ok(css.includes(".stage-rail.compact-first-run .stage-progress-strip"), "SPA CSS should show a compact first-run stage progress strip on mobile");
+  assert.ok(css.includes(".stage-rail.compact-first-run nav"), "SPA CSS should collapse the full stage rail behind the compact first-run strip on mobile");
   assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
   assert.match(
     css,
@@ -244,6 +264,16 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher-meta code,\s*\.top-context code\s*\{[\s\S]*?white-space: normal;/u,
     "SPA CSS should wrap long runtime paths on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-focus-mode \.project-switcher-meta code,[\s\S]*?white-space: nowrap;/u,
+    "SPA CSS should truncate long runtime paths in first-run mobile focus mode",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-next-action-grid,[\s\S]*?\.active-flow-handoff,[\s\S]*?\.advanced-evidence-summary-grid,[\s\S]*?grid-template-columns: 1fr;/u,
+    "SPA CSS should collapse first-run focus grids on mobile",
   );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
   assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");

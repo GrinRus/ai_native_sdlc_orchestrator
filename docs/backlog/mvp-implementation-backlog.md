@@ -488,5 +488,10 @@ This is the master index for the implementation slices across all defined waves.
 | W55-S04 | Claude xlarge context guardrails | EPIC-7 | done | `examples/adapters/claude-code.yaml`, `packages/adapter-sdk/**`, adapter tests, provider runbooks | W55-S03 |
 | W55-S05 | Control rerun and findings report | EPIC-0, EPIC-7 | done | `docs/backlog/**`, `docs/ops/**`, internal live E2E run artifacts | W55-S04 |
 
+## W56 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W56-S01 | First-run console focus and action clarity | EPIC-1, EPIC-6 | done | `apps/web/**`, `docs/backlog/**`, `README.md`, tests | W55-S05 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
