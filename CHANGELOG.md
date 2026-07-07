@@ -7,6 +7,19 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.14] - 2026-07-07
+
+- Added generic verification command groups and verification authoring flows for
+  stack discovery, generated project profiles, public plan surfaces, and
+  archetype smoke coverage.
+- Split discovery, research, and spec prompt/readiness semantics while keeping
+  artifact execution compatibility and documenting live readiness proof.
+- Added bounded review/QA quality repair contracts, runtime state, CLI/API/web
+  surfaces, proof fixtures, and live acceptance evidence.
+- Hardened hard-target repair evidence with command-level verification failure
+  details, `ky` xlarge primary alignment, Claude xlarge guardrails, and W55
+  control rerun reporting.
+
 ## [0.1.0-alpha.13] - 2026-06-30
 
 - Hardened W52 installed-user hard-target rehearsals with target setup readiness owner
