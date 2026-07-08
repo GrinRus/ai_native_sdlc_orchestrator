@@ -119,8 +119,10 @@ The packaged SPA now treats the flow as the primary object:
   same manual installed-user decision-helper path from `agent_decision_request_ref`.
   Rejection reasons are shown as readable copy, and pending decisions expose
   copy actions for a selected-action handoff bundle, action note, and expected
-  operator-decision file. Raw request refs and handoff payloads remain behind
-  copy/debug actions.
+  operator-decision file. Rejected decisions render a correction-required
+  recovery panel with the rejected reason, rubric coverage, expected file
+  availability, and copyable correction payload. Raw request refs and handoff
+  payloads remain behind copy/debug actions.
 - The Execution Evidence panel renders `RunSummary.execution_evidence` for the
   selected flow: provider status, Runtime Harness decision, real-code-change
   status, post-run verification, review, delivery readiness,

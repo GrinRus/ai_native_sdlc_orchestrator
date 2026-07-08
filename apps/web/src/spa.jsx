@@ -410,6 +410,7 @@ function normalizeArtifactSummary(value, fallbackRef = "", fallback = {}) {
     raw_ref: rawRef,
     actions: Array.isArray(raw.actions) ? raw.actions : [{ action_id: "copy_raw_ref", label: "Copy raw ref", kind: "debug" }],
     decision_rubric_summary: raw.decision_rubric_summary ?? fallback.decision_rubric_summary ?? null,
+    rejection_reason: raw.rejection_reason ?? raw.operator_decision_rejection_reason ?? fallback.rejectionReason ?? fallback.rejection_reason ?? "",
   };
 }
 
@@ -429,6 +430,7 @@ function artifactRowFromSummary(summary, overrides = {}) {
     actions: normalized.actions,
     displaySummary: normalized,
     decisionRubricSummary: normalized.decision_rubric_summary,
+    rejectionReason: normalized.rejection_reason,
     targetFlowId: overrides.targetFlowId,
   };
 }
@@ -3325,6 +3327,40 @@ function operatorDecisionHelperPlan(selectedRequest, selectedActionEntry, decisi
   };
 }
 
+function isRejectedOperatorDecision(selectedRequest) {
+  const status = String(selectedRequest?.status ?? "").trim().toLowerCase();
+  return status === "rejected" || Boolean(String(selectedRequest?.rejectionReason ?? "").trim());
+}
+
+function operatorDecisionCorrectionPlan(selectedRequest, selectedActionEntry, decisionRubric, decisionRecordPlan) {
+  if (!isRejectedOperatorDecision(selectedRequest)) return null;
+  const rejectionReason = String(selectedRequest?.rejectionReason ?? "").trim() || "The previous decision was rejected by validation.";
+  const actionId = selectedActionEntry?.id ?? "continue";
+  const actionLabel = selectedActionEntry?.label ?? actionId;
+  const semanticStatus = selectedActionEntry?.semanticStatus ?? "pending";
+  const expectedDecisionRef = decisionRecordPlan?.expectedDecisionRef ?? "";
+  const requiredEvidenceRefCount = decisionRubric?.requiredEvidenceRefCount ?? 0;
+  const requiredCheckCount = decisionRubric?.requiredCheckCount ?? 0;
+  const correction = {
+    request_ref: selectedRequest?.ref ?? "",
+    replacement_action: actionId,
+    semantic_status: semanticStatus,
+    rejection_reason: rejectionReason,
+    expected_decision_ref: expectedDecisionRef,
+    required_evidence_ref_count: requiredEvidenceRefCount,
+    required_check_count: requiredCheckCount,
+  };
+  return {
+    rejectionReason,
+    actionLabel,
+    semanticStatus,
+    expectedDecisionRef,
+    requiredEvidenceRefCount,
+    requiredCheckCount,
+    correctionJson: JSON.stringify(correction, null, 2),
+  };
+}
+
 function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
@@ -3335,6 +3371,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   const decisionRubric = normalizeDecisionRubricSummary(selectedRequest?.decisionRubricSummary);
   const decisionRecordPlan = operatorDecisionRecordPlan(selectedRequest, selectedActionEntry, externalRunHealth);
   const decisionHelperPlan = operatorDecisionHelperPlan(selectedRequest, selectedActionEntry, decisionRecordPlan, externalRunHealth);
+  const decisionCorrectionPlan = operatorDecisionCorrectionPlan(selectedRequest, selectedActionEntry, decisionRubric, decisionRecordPlan);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   useEffect(() => {
     setSelectedAction(preferredAction);
@@ -3357,10 +3394,44 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
               Copy request ref
             </button>
           </div>
-          {rejectionReason ? (
+          {rejectionReason && !decisionCorrectionPlan ? (
             <div className="decision-rejection-copy">
               <span>Rejected decision reason</span>
               <strong>{rejectionReason}</strong>
+            </div>
+          ) : null}
+          {decisionCorrectionPlan ? (
+            <div className="decision-correction-plan" aria-label="Rejected decision correction plan">
+              <div className="decision-correction-heading">
+                <div>
+                  <span>Correction required</span>
+                  <strong>{decisionCorrectionPlan.actionLabel} / {decisionCorrectionPlan.semanticStatus}</strong>
+                  <p>The previous decision was rejected. Reuse this request, fix the validation gap, and record a replacement action.</p>
+                </div>
+                <StatusPill state="rejected" />
+              </div>
+              <div className="decision-correction-grid">
+                <div>
+                  <span>Rejected reason</span>
+                  <strong>{decisionCorrectionPlan.rejectionReason}</strong>
+                </div>
+                <div>
+                  <span>Rubric coverage</span>
+                  <strong>{decisionCorrectionPlan.requiredCheckCount} checks / {decisionCorrectionPlan.requiredEvidenceRefCount} refs</strong>
+                </div>
+                <div>
+                  <span>Expected file</span>
+                  <strong>{decisionCorrectionPlan.expectedDecisionRef ? "available" : "missing"}</strong>
+                </div>
+              </div>
+              <div className="decision-correction-actions">
+                <button className="secondary compact" type="button" onClick={() => copyRef(decisionCorrectionPlan.correctionJson)} disabled={busy}>
+                  Copy correction JSON
+                </button>
+                <button className="secondary compact" type="button" onClick={() => copyRef(decisionCorrectionPlan.rejectionReason)} disabled={busy}>
+                  Copy rejected reason
+                </button>
+              </div>
             </div>
           ) : null}
           <div className="decision-action-grid" role="group" aria-label="Operator decision actions">
@@ -3467,7 +3538,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
                 <div>
                   <span>Decision handoff</span>
                   <strong>{decisionHelperPlan.helperLabel}</strong>
-                  <p>Copy this bundle for the decision preparation step. The runner still validates evidence coverage before resume.</p>
+                  <p>Copy this bundle for the decision preparation step. AOR still validates evidence coverage before resume.</p>
                 </div>
                 {decisionHelperPlan.runId ? <code title={decisionHelperPlan.runId}>{shortPathLabel(decisionHelperPlan.runId)}</code> : null}
               </div>
