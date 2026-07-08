@@ -3036,6 +3036,56 @@ tr.selected td {
   white-space: normal;
 }
 
+.decision-record-plan {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, max-content);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e3e8ee;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.decision-record-plan > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.decision-record-plan span {
+  color: #65717d;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.decision-record-plan strong,
+.decision-record-plan p,
+.decision-record-plan em,
+.decision-record-plan button {
+  overflow-wrap: anywhere;
+}
+
+.decision-record-plan strong {
+  color: #24313d;
+  font-size: 12px;
+}
+
+.decision-record-plan p,
+.decision-record-plan em {
+  margin: 0;
+  color: #64717d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.decision-record-plan button {
+  justify-content: center;
+  min-height: 34px;
+  white-space: normal;
+}
+
 .decision-checklist {
   display: grid;
   gap: 8px;
@@ -3090,6 +3140,10 @@ tr.selected td {
   }
 
   .decision-rubric-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-record-plan {
     grid-template-columns: 1fr;
   }
 }

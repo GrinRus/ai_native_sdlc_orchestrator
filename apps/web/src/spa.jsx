@@ -3266,6 +3266,19 @@ function normalizeDecisionRubricSummary(value) {
   };
 }
 
+function operatorDecisionRecordPlan(selectedRequest, selectedActionEntry, externalRunHealth) {
+  if (!selectedRequest) return null;
+  const pending = externalRunHealth?.pending_decision ?? {};
+  const expectedDecisionRef = typeof pending.expected_decision_ref === "string" ? pending.expected_decision_ref.trim() : "";
+  const requestRef = typeof pending.request_ref === "string" ? pending.request_ref.trim() : "";
+  const matchesSelectedRequest = !requestRef || evidenceRefsMatch(requestRef, selectedRequest.ref);
+  return {
+    actionLabel: selectedActionEntry?.label ?? "Selected action",
+    semanticStatus: selectedActionEntry?.semanticStatus ?? "pending",
+    expectedDecisionRef: matchesSelectedRequest ? expectedDecisionRef : "",
+  };
+}
+
 function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
@@ -3274,6 +3287,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
   const decisionChecklist = operatorDecisionChecklistItems(selectedRequest, selectedActionEntry);
   const decisionRubric = normalizeDecisionRubricSummary(selectedRequest?.decisionRubricSummary);
+  const decisionRecordPlan = operatorDecisionRecordPlan(selectedRequest, selectedActionEntry, externalRunHealth);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   useEffect(() => {
     setSelectedAction(preferredAction);
@@ -3382,6 +3396,22 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
                   )}
                 </div>
               </div>
+            </div>
+          ) : null}
+          {decisionRecordPlan ? (
+            <div className="decision-record-plan" aria-label="Decision record destination">
+              <div>
+                <span>Decision record</span>
+                <strong>{decisionRecordPlan.actionLabel} / {decisionRecordPlan.semanticStatus}</strong>
+                <p>Record this decision after the required evidence has been inspected, then refresh run status.</p>
+              </div>
+              {decisionRecordPlan.expectedDecisionRef ? (
+                <button className="secondary compact" type="button" onClick={() => copyRef(decisionRecordPlan.expectedDecisionRef)} disabled={busy} title={decisionRecordPlan.expectedDecisionRef}>
+                  Copy expected decision ref
+                </button>
+              ) : (
+                <em>Expected decision ref is not available for this request.</em>
+              )}
             </div>
           ) : null}
           {decisionChecklist.length > 0 ? (
