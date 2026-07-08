@@ -504,6 +504,37 @@ function StatusPill({ state }) {
   return <span className={`status-pill ${statusTone(state)}`}>{state}</span>;
 }
 
+function groupStatusValue(group) {
+  return group?.outcome ?? group?.status ?? group?.last_result_status ?? "planned";
+}
+
+function isFailedVerificationStatus(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "failed" || normalized === "fail" || normalized === "error" || normalized === "not_pass";
+}
+
+function failedRequiredVerificationGroups(verificationPlan) {
+  const groups = Array.isArray(verificationPlan?.command_groups) ? verificationPlan.command_groups : [];
+  return groups.filter((group) => {
+    const enforcement = String(group?.enforcement ?? "").trim().toLowerCase();
+    return enforcement === "required" && isFailedVerificationStatus(groupStatusValue(group));
+  });
+}
+
+function verificationGroupTitle(group) {
+  const role = group?.role ?? "verification";
+  const phase = group?.phase ?? "post-change";
+  return `${role} / ${phase}`;
+}
+
+function verificationFailureBlocker(group, index) {
+  const title = verificationGroupTitle(group);
+  return {
+    code: group?.id ?? `required-verification-${index + 1}`,
+    summary: `Required verification failed: ${title}`,
+  };
+}
+
 function asProviderStepStatus(value) {
   return value && typeof value === "object" && !Array.isArray(value) && value.status ? value : null;
 }
@@ -738,6 +769,13 @@ function Icon({ name }) {
       <>
         <rect x="5" y="11" width="14" height="10" rx="2" />
         <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </>
+    ),
+    alert: (
+      <>
+        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
       </>
     ),
     shield: (
@@ -1658,6 +1696,43 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
   );
 }
 
+function VerificationFailureBanner({ plan, failures = [] }) {
+  if (failures.length === 0) return null;
+  const summaryRef = plan?.latest_summary_ref ?? plan?.latest_summary_file ?? "";
+  return (
+    <div className="verification-hold-banner" role="alert" aria-label="Required verification failure">
+      <Icon name="alert" />
+      <div className="verification-hold-content">
+        <div className="verification-hold-heading">
+          <div>
+            <span>Required verification failed</span>
+            <h3>Review is blocked by failed post-run evidence</h3>
+          </div>
+          <StatusPill state={plan?.latest_verify_status ?? "failed"} />
+        </div>
+        <p>Resolve the failed required command group before treating review, QA, or delivery as low risk.</p>
+        <div className="verification-hold-grid">
+          {failures.slice(0, 3).map((group, index) => (
+            <div key={group.id ?? `${group.role}-${group.phase}-${index}`}>
+              <span>{group.enforcement ?? "required"}</span>
+              <strong>{verificationGroupTitle(group)}</strong>
+              <p>{group.id ?? "verification group"} / {group.command_count ?? 0} commands</p>
+              <StatusPill state={groupStatusValue(group)} />
+            </div>
+          ))}
+          <div>
+            <span>Evidence</span>
+            <strong>{summaryRef ? "Verify summary" : "Summary pending"}</strong>
+            <div className="verification-summary-ref">
+              {summaryRef ? <CompactInlineValue value={summaryRef} kind="path" /> : "No verification summary ref available."}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null }) {
   const closureState = flow?.closure_state ?? {};
   const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
@@ -2016,11 +2091,17 @@ function FlowCockpit({
   const followUpEligible = flow?.closure_state?.follow_up_eligible === true;
   const qualityGate = !completed && flow?.active_quality_gate ? flow.active_quality_gate : null;
   const qualityGateBlockers = qualityGateBlockerRows(qualityGate);
-  const blockers = qualityGate
+  const actionBlockers = qualityGate
     ? qualityGateBlockers.map((blocker) => qualityGateBlockerForActionContext(blocker))
     : Array.isArray(nextAction?.blockers) && !completed
       ? nextAction.blockers
       : [];
+  const verificationPlan = projectState?.verification_plan ?? null;
+  const verificationFailures = completed ? [] : failedRequiredVerificationGroups(verificationPlan);
+  const blockers = [
+    ...actionBlockers,
+    ...verificationFailures.map((group, index) => verificationFailureBlocker(group, index)),
+  ];
   const evidenceRefs = Array.isArray(flow?.evidence_refs) && flow.evidence_refs.length > 0
     ? flow.evidence_refs
     : Array.isArray(nextAction?.evidence_refs)
@@ -2202,6 +2283,7 @@ function FlowCockpit({
       <FlowTimeline currentStage={currentStage} completed={completed} />
 
       <QualityGatePanel gate={qualityGate} evidenceRows={evidenceRows} />
+      <VerificationFailureBanner plan={verificationPlan} failures={verificationFailures} />
 
       {completed ? (
         <div className="flow-lock-banner">
@@ -2331,7 +2413,13 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   } else if (completed && nextAction?.primary_action?.action_id !== "start-new-flow") {
     nextPrimary = { command: "read-only evidence inspection", reason: "Completed flow evidence remains inspectable." };
   }
-  const blockers = Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
+  const verificationPlan = projectState?.verification_plan ?? null;
+  const verificationFailures = completed ? [] : failedRequiredVerificationGroups(verificationPlan);
+  const actionBlockers = Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
+  const blockers = [
+    ...actionBlockers,
+    ...verificationFailures.map((group, index) => verificationFailureBlocker(group, index)),
+  ];
   const evidenceRefs = Array.isArray(selectedFlow?.evidence_refs) && selectedFlow.evidence_refs.length > 0
     ? selectedFlow.evidence_refs
     : Array.isArray(nextAction?.evidence_refs)
@@ -2350,7 +2438,6 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   const latestRequest =
     latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft }) ??
     (!selectedFlow && !newFlowDraft ? latestDecisionRequestFromEvidence(evidenceRows) : null);
-  const verificationPlan = projectState?.verification_plan ?? null;
   const verificationGroups = Array.isArray(verificationPlan?.command_groups) ? verificationPlan.command_groups : [];
 
   return (

@@ -376,6 +376,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-next-action-grid,[\s\S]*?\.active-flow-handoff,[\s\S]*?\.advanced-evidence-summary-grid,[\s\S]*?grid-template-columns: 1fr;/u,
     "SPA CSS should collapse first-run focus grids on mobile",
   );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.compact-inline-value > code,\s*\.compact-detail-value > span\s*\{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;/u,
+    "SPA CSS should wrap compact command and path values on mobile",
+  );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
   assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");
   assert.match(
@@ -406,6 +411,26 @@ test("active quality gate blockers preserve structured recovery details", () => 
   assert.match(css, /\.quality-blocker-list li\s*\{[\s\S]*?display: grid;/u);
   assert.match(css, /\.quality-blocker-meta\s*\{[\s\S]*?flex-wrap: wrap;/u);
   assert.match(css, /\.quality-blocker-meta code,\s*\.quality-blocker-meta em\s*\{[\s\S]*?overflow-wrap: anywhere;/u);
+});
+
+test("required verification failures surface as active cockpit blockers", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
+
+  assert.match(source, /failedRequiredVerificationGroups/u);
+  assert.match(source, /verificationFailureBlocker/u);
+  assert.match(source, /VerificationFailureBanner/u);
+  assert.match(source, /Required verification failed/u);
+  assert.match(source, /Review is blocked by failed post-run evidence/u);
+  assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} \/>/u);
+  assert.match(source, /\.\.\.verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\),/u);
+  assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
+  assert.match(css, /\.verification-hold-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.verification-hold-grid,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Required verification failure cards should collapse on mobile",
+  );
 });
 
 test("web package no longer exports static operator snapshot modules", () => {

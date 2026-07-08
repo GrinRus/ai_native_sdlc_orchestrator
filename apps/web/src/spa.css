@@ -1104,6 +1104,80 @@ p {
   padding-left: 16px;
 }
 
+.verification-hold-banner {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #ef9a8c;
+  border-radius: 6px;
+  background: #fff5f3;
+}
+
+.verification-hold-banner svg {
+  width: 24px;
+  height: 24px;
+  color: #b42318;
+}
+
+.verification-hold-content,
+.verification-hold-heading {
+  min-width: 0;
+}
+
+.verification-hold-content {
+  display: grid;
+  gap: 10px;
+}
+
+.verification-hold-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.verification-hold-heading span,
+.verification-hold-grid span {
+  color: #7a3a30;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.verification-hold-heading h3,
+.verification-hold-grid strong,
+.verification-summary-ref {
+  overflow-wrap: anywhere;
+}
+
+.verification-hold-content p,
+.verification-hold-grid p,
+.verification-summary-ref {
+  margin: 0;
+  color: #5f514d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.verification-hold-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.verification-hold-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #f1c5bb;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
 .quality-blocker-list {
   list-style-position: outside;
 }
@@ -3420,6 +3494,7 @@ code {
   .execution-action-grid,
   .quality-gate-grid,
   .quality-gate-evidence,
+  .verification-hold-grid,
   .template-grid,
   .delivery-mode-grid,
   .request-mode-grid {
@@ -3520,6 +3595,14 @@ code {
 
   .active-flow-handoff strong {
     white-space: normal;
+  }
+
+  .compact-inline-value > code,
+  .compact-detail-value > span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .work-heading {
