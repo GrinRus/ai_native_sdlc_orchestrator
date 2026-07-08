@@ -135,6 +135,10 @@ The packaged SPA now treats the flow as the primary object:
   linked repair evidence summaries from the flow projection, blocker count, and
   delivery/release exit condition so first-time operators can see why delivery
   remains blocked and what closes the loop.
+- Required verification failures render as alert-level recovery paths before
+  raw failed group details: the panel shows failed required command group count,
+  the held downstream action, verify summary evidence, rerun command, and the
+  review/QA/delivery unlock condition.
 - Completed flows render as read-only closure/evidence views with mutation
   controls disabled or replaced by no-write inspection actions.
 - Ask AOR submissions include `target_flow_id` for the selected flow; completed

@@ -513,21 +513,29 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /failedRequiredVerificationGroups/u);
   assert.match(source, /verificationFailureBlocker/u);
   assert.match(source, /verificationFailurePrimaryAction/u);
+  assert.match(source, /verificationFailureRecoveryPlan/u);
   assert.match(source, /Fix failed required verification, then rerun/u);
   assert.match(source, /Held downstream action/u);
   assert.match(source, /Verification rerun/u);
   assert.match(source, /VerificationFailureBanner/u);
   assert.match(source, /Required verification failed/u);
   assert.match(source, /Review is blocked by failed post-run evidence/u);
-  assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} \/>/u);
+  assert.match(source, /Verification failure recovery path/u);
+  assert.match(source, /Fix failed verification first/u);
+  assert.match(source, /AOR is holding the downstream action/u);
+  assert.match(source, /Rerun required verification/u);
+  assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} heldAction=\{resolverPrimary\} \/>/u);
   assert.match(source, /\.\.\.verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\),/u);
   assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary\)/u);
   assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
+  assert.match(css, /\.verification-recovery-path\s*\{/u);
+  assert.match(css, /\.verification-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.verification-recovery-path li\.active\s*\{/u);
   assert.match(css, /\.held-action-note\s*\{/u);
   assert.match(css, /\.verification-hold-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
   assert.match(
     css,
-    /@media \(max-width: 860px\) \{[\s\S]*?\.verification-hold-grid,[\s\S]*?grid-template-columns: 1fr;/u,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.verification-recovery-path ol,[\s\S]*?\.verification-hold-grid,[\s\S]*?grid-template-columns: 1fr;/u,
     "Required verification failure cards should collapse on mobile",
   );
 });

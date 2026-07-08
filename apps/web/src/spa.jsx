@@ -578,6 +578,21 @@ function verificationFailurePrimaryAction(plan, failures, heldAction) {
   };
 }
 
+function verificationFailureRecoveryPlan(plan, failures, heldAction) {
+  const firstFailure = Array.isArray(failures) ? failures[0] : null;
+  const failureCount = Array.isArray(failures) ? failures.length : 0;
+  const failedGroupLabel = `${failureCount} required command group${failureCount === 1 ? "" : "s"}`;
+  const summaryRef = plan?.latest_summary_ref ?? plan?.latest_summary_file ?? "";
+  return {
+    failedGroupLabel,
+    firstFailureTitle: firstFailure ? verificationGroupTitle(firstFailure) : "Required verification",
+    heldActionLabel: heldAction?.command ? actionCommandTitle(heldAction) : "Review, QA, or delivery",
+    proofLabel: summaryRef ? "Verify summary" : "Verify summary pending",
+    rerunCommand: verificationFailureRerunCommand(plan),
+    summaryRef,
+  };
+}
+
 function asProviderStepStatus(value) {
   return value && typeof value === "object" && !Array.isArray(value) && value.status ? value : null;
 }
@@ -2156,9 +2171,9 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
   );
 }
 
-function VerificationFailureBanner({ plan, failures = [] }) {
+function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
   if (failures.length === 0) return null;
-  const summaryRef = plan?.latest_summary_ref ?? plan?.latest_summary_file ?? "";
+  const recoveryPlan = verificationFailureRecoveryPlan(plan, failures, heldAction);
   return (
     <div className="verification-hold-banner" role="alert" aria-label="Required verification failure">
       <Icon name="alert" />
@@ -2171,7 +2186,40 @@ function VerificationFailureBanner({ plan, failures = [] }) {
           <StatusPill state={plan?.latest_verify_status ?? "failed"} />
         </div>
         <p>Resolve the failed required command group before treating review, QA, or delivery as low risk.</p>
+        <div className="verification-recovery-path" aria-label="Verification failure recovery path">
+          <div className="verification-recovery-heading">
+            <span>Recovery path</span>
+            <strong>Fix failed verification first</strong>
+            <p>AOR is holding the downstream action until required verification passes.</p>
+          </div>
+          <ol>
+            <li className="active">
+              <span>Failed evidence</span>
+              <strong>{recoveryPlan.failedGroupLabel}</strong>
+              <p>{recoveryPlan.firstFailureTitle}</p>
+            </li>
+            <li>
+              <span>Proof to inspect</span>
+              <strong>{recoveryPlan.proofLabel}</strong>
+              {recoveryPlan.summaryRef ? (
+                <CompactInlineValue value={recoveryPlan.summaryRef} kind="path" />
+              ) : (
+                <p>Inspect failed step-result logs before retrying.</p>
+              )}
+            </li>
+            <li>
+              <span>Unlock condition</span>
+              <strong>Rerun required verification</strong>
+              <CompactInlineValue value={recoveryPlan.rerunCommand} kind="command" />
+            </li>
+          </ol>
+        </div>
         <div className="verification-hold-grid">
+          <div>
+            <span>Held downstream action</span>
+            <strong>{recoveryPlan.heldActionLabel}</strong>
+            <p>Hidden until required verification returns to passing.</p>
+          </div>
           {failures.slice(0, 3).map((group, index) => (
             <div key={group.id ?? `${group.role}-${group.phase}-${index}`}>
               <span>{group.enforcement ?? "required"}</span>
@@ -2182,9 +2230,9 @@ function VerificationFailureBanner({ plan, failures = [] }) {
           ))}
           <div>
             <span>Evidence</span>
-            <strong>{summaryRef ? "Verify summary" : "Summary pending"}</strong>
+            <strong>{recoveryPlan.summaryRef ? "Verify summary" : "Summary pending"}</strong>
             <div className="verification-summary-ref">
-              {summaryRef ? <CompactInlineValue value={summaryRef} kind="path" /> : "No verification summary ref available."}
+              {recoveryPlan.summaryRef ? <CompactInlineValue value={recoveryPlan.summaryRef} kind="path" /> : "No verification summary ref available."}
             </div>
           </div>
         </div>
@@ -2808,7 +2856,7 @@ function FlowCockpit({
       <FlowTimeline currentStage={currentStage} completed={completed} />
 
       <QualityGatePanel gate={qualityGate} evidenceRows={evidenceRows} />
-      <VerificationFailureBanner plan={verificationPlan} failures={verificationFailures} />
+      <VerificationFailureBanner plan={verificationPlan} failures={verificationFailures} heldAction={resolverPrimary} />
 
       {completed ? (
         <div className="flow-lock-banner">

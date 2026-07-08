@@ -1197,6 +1197,8 @@ p {
 }
 
 .verification-hold-heading span,
+.verification-recovery-heading span,
+.verification-recovery-path li span,
 .verification-hold-grid span {
   color: #7a3a30;
   font-size: 11px;
@@ -1205,18 +1207,67 @@ p {
 }
 
 .verification-hold-heading h3,
+.verification-recovery-heading strong,
+.verification-recovery-path li strong,
 .verification-hold-grid strong,
 .verification-summary-ref {
   overflow-wrap: anywhere;
 }
 
 .verification-hold-content p,
+.verification-recovery-heading p,
+.verification-recovery-path li p,
 .verification-hold-grid p,
 .verification-summary-ref {
   margin: 0;
   color: #5f514d;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.verification-recovery-path {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #f1c5bb;
+  border-radius: var(--radius-panel);
+  background: #ffffff;
+}
+
+.verification-recovery-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.verification-recovery-path ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.verification-recovery-path li {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #f1c5bb;
+  border-radius: var(--radius-control);
+  background: #fff8f6;
+}
+
+.verification-recovery-path li.active {
+  border-color: #ef9a8c;
+  background: #fff1ed;
+}
+
+.verification-recovery-path .compact-inline-value {
+  min-width: 0;
 }
 
 .verification-hold-grid {
@@ -3996,6 +4047,7 @@ code {
   .provider-evidence-strip,
   .execution-action-grid,
   .quality-recovery-path ol,
+  .verification-recovery-path ol,
   .quality-gate-grid,
   .quality-gate-evidence,
   .verification-hold-grid,
