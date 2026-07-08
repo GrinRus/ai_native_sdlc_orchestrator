@@ -117,8 +117,10 @@ The packaged SPA now treats the flow as the primary object:
 - The Operator Decision drawer is action-first: `Continue`, `Diagnose`,
   `Block`, `Retry public step`, `Answer`, and `Frontend interact` prepare the
   same manual installed-user decision-helper path from `agent_decision_request_ref`.
-  Rejection reasons are shown as readable copy, while raw request refs and
-  helper command text remain behind copy/debug actions.
+  Rejection reasons are shown as readable copy, and pending decisions expose
+  copy actions for a selected-action handoff bundle, action note, and expected
+  operator-decision file. Raw request refs and handoff payloads remain behind
+  copy/debug actions.
 - The Execution Evidence panel renders `RunSummary.execution_evidence` for the
   selected flow: provider status, Runtime Harness decision, real-code-change
   status, post-run verification, review, delivery readiness,

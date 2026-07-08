@@ -3086,6 +3086,112 @@ tr.selected td {
   white-space: normal;
 }
 
+.decision-helper-plan {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dce9e8;
+  border-radius: 6px;
+  background: #f7fcfb;
+}
+
+.decision-helper-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(92px, max-content);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.decision-helper-heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.decision-helper-heading span,
+.decision-helper-details span {
+  color: #65717d;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.decision-helper-heading strong,
+.decision-helper-heading p,
+.decision-helper-heading code,
+.decision-helper-actions button,
+.decision-helper-actions em,
+.decision-helper-details code {
+  overflow-wrap: anywhere;
+}
+
+.decision-helper-heading strong {
+  color: #24313d;
+  font-size: 12px;
+}
+
+.decision-helper-heading p,
+.decision-helper-actions em {
+  margin: 0;
+  color: #64717d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.decision-helper-heading code {
+  align-self: start;
+  max-width: 180px;
+  padding: 4px 6px;
+  border: 1px solid #dce9e8;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #2b4f56;
+  font-size: 11px;
+}
+
+.decision-helper-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.decision-helper-actions button {
+  justify-content: center;
+  min-height: 34px;
+  white-space: normal;
+}
+
+.decision-helper-details {
+  min-width: 0;
+}
+
+.decision-helper-details summary {
+  cursor: pointer;
+  color: #38515a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.decision-helper-details > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #e3e8ee;
+  border-radius: 5px;
+  background: #ffffff;
+}
+
+.decision-helper-details code {
+  color: #24313d;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .decision-checklist {
   display: grid;
   gap: 8px;
@@ -3145,6 +3251,14 @@ tr.selected td {
 
   .decision-record-plan {
     grid-template-columns: 1fr;
+  }
+
+  .decision-helper-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-helper-heading code {
+    max-width: 100%;
   }
 }
 

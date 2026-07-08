@@ -3279,6 +3279,52 @@ function operatorDecisionRecordPlan(selectedRequest, selectedActionEntry, extern
   };
 }
 
+function operatorDecisionHelperFinding(actionId) {
+  switch (actionId) {
+    case "continue":
+      return "Required public evidence refs were inspected.";
+    case "diagnose":
+      return "Required evidence was inspected and the blocker needs diagnosis.";
+    case "block":
+      return "Required evidence was inspected and continuation is unsafe.";
+    case "retry_public_step":
+      return "Required evidence was inspected before retrying the public step.";
+    case "answer":
+      return "Requested interaction evidence was inspected before answering.";
+    case "frontend_interact":
+      return "Browser evidence requirements were inspected before frontend interaction.";
+    default:
+      return "Required public evidence refs were inspected.";
+  }
+}
+
+function operatorDecisionHelperPlan(selectedRequest, selectedActionEntry, decisionRecordPlan, externalRunHealth) {
+  if (!selectedRequest) return null;
+  const requestRef = String(selectedRequest.ref ?? "").trim();
+  const actionId = selectedActionEntry?.id ?? "continue";
+  const finding = operatorDecisionHelperFinding(actionId);
+  const expectedDecisionRef = decisionRecordPlan?.expectedDecisionRef ?? "";
+  const semanticStatus = selectedActionEntry?.semanticStatus ?? "pending";
+  const handoff = {
+    request_ref: requestRef,
+    action: actionId,
+    semantic_status: semanticStatus,
+    finding,
+    expected_decision_ref: expectedDecisionRef,
+    inspected_evidence_refs: "auto-fill from decision rubric",
+  };
+  return {
+    canPrepareFromRef: Boolean(requestRef),
+    helperLabel: "Selected action handoff",
+    requestRef,
+    actionLabel: selectedActionEntry?.label ?? actionId,
+    actionNote: `${selectedActionEntry?.label ?? actionId}: ${finding}`,
+    handoffJson: JSON.stringify(handoff, null, 2),
+    expectedDecisionRef,
+    runId: String(externalRunHealth?.run_id ?? "").trim(),
+  };
+}
+
 function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
@@ -3288,6 +3334,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   const decisionChecklist = operatorDecisionChecklistItems(selectedRequest, selectedActionEntry);
   const decisionRubric = normalizeDecisionRubricSummary(selectedRequest?.decisionRubricSummary);
   const decisionRecordPlan = operatorDecisionRecordPlan(selectedRequest, selectedActionEntry, externalRunHealth);
+  const decisionHelperPlan = operatorDecisionHelperPlan(selectedRequest, selectedActionEntry, decisionRecordPlan, externalRunHealth);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   useEffect(() => {
     setSelectedAction(preferredAction);
@@ -3411,6 +3458,52 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
                 </button>
               ) : (
                 <em>Expected decision ref is not available for this request.</em>
+              )}
+            </div>
+          ) : null}
+          {decisionHelperPlan ? (
+            <div className="decision-helper-plan" aria-label="Decision handoff bundle">
+              <div className="decision-helper-heading">
+                <div>
+                  <span>Decision handoff</span>
+                  <strong>{decisionHelperPlan.helperLabel}</strong>
+                  <p>Copy this bundle for the decision preparation step. The runner still validates evidence coverage before resume.</p>
+                </div>
+                {decisionHelperPlan.runId ? <code title={decisionHelperPlan.runId}>{shortPathLabel(decisionHelperPlan.runId)}</code> : null}
+              </div>
+              {decisionHelperPlan.canPrepareFromRef ? (
+                <>
+                  <div className="decision-helper-actions">
+                    <button className="secondary compact" type="button" onClick={() => copyRef(decisionHelperPlan.handoffJson)} disabled={busy}>
+                      Copy handoff JSON
+                    </button>
+                    <button className="secondary compact" type="button" onClick={() => copyRef(decisionHelperPlan.actionNote)} disabled={busy}>
+                      Copy action note
+                    </button>
+                    {decisionHelperPlan.expectedDecisionRef ? (
+                      <button className="secondary compact" type="button" onClick={() => copyRef(decisionHelperPlan.expectedDecisionRef)} disabled={busy}>
+                        Copy expected file ref
+                      </button>
+                    ) : (
+                      <em>Expected decision file appears when the request exposes it.</em>
+                    )}
+                  </div>
+                  <details className="decision-helper-details">
+                    <summary>Show handoff JSON</summary>
+                    <div>
+                      <span>Handoff</span>
+                      <code>{decisionHelperPlan.handoffJson}</code>
+                    </div>
+                    {decisionHelperPlan.expectedDecisionRef ? (
+                      <div>
+                        <span>Expected file</span>
+                        <code>{decisionHelperPlan.expectedDecisionRef}</code>
+                      </div>
+                    ) : null}
+                  </details>
+                </>
+              ) : (
+                <em>Open an agent decision request ref before preparing the selected action.</em>
               )}
             </div>
           ) : null}
