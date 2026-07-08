@@ -159,7 +159,9 @@ The advanced workbench is flow-scoped:
   learning artifacts, and operator requests for the selected flow.
 - Ask AOR requires a selected flow and target refs before creating a request;
   request creation sends `target_flow_id`, target stage, intent, delivery mode,
-  allowed paths, and target refs.
+  allowed paths, and target refs. The drawer renders a request-readiness path
+  so blocked submission states name the missing flow, request text, target refs,
+  scope, or read-only-compatible mode before the operator tries to submit.
 - Runtime-requested interactions remain in the Interactions Inbox and continue
   through the public `/interactions/answers` control-plane mutation. The
   detail panel renders an answer recovery path with the selected runtime

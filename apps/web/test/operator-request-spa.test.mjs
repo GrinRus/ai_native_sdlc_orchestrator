@@ -23,6 +23,10 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /EvidenceGraphPanel/u);
   assert.match(source, /RuntimeTracePanel/u);
   assert.match(source, /targetRefsMissing/u);
+  assert.match(source, /requestReadinessItems/u);
+  assert.match(source, /Ask AOR request readiness/u);
+  assert.match(source, /Complete required fields first/u);
+  assert.match(source, /Ready to create request evidence/u);
   assert.match(source, /draftFollowUpHandoffRef/u);
   assert.match(source, /follow-up-source-handoff-ref/u);
   assert.match(source, /Create follow-up from learning handoff/u);
@@ -162,6 +166,9 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(css, /\.flow-active-mode \.stage-rail \.stage-progress-strip/u);
   assert.match(css, /\.advanced-workbench-disclosure/u);
   assert.match(css, /\.advanced-workbench-tabs/u);
+  assert.match(css, /\.request-readiness-path\s*\{/u);
+  assert.match(css, /\.request-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.request-readiness-path li\.ready\s*\{/u);
   assert.match(css, /\.interaction-recovery-path\s*\{/u);
   assert.match(css, /\.interaction-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.interaction-row label\s*\{/u);
@@ -175,6 +182,11 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.interaction-recovery-path ol,[\s\S]*?\.interaction-row,[\s\S]*?grid-template-columns: 1fr;/u,
     "Runtime interaction answer path should collapse on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.request-readiness-path ol,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Ask AOR request readiness should collapse on mobile",
   );
   assert.match(css, /\.decision-action-grid button:focus-visible/u);
   assert.match(css, /\.execution-action-grid button:focus-visible/u);

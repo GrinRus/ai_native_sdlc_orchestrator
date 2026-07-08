@@ -510,6 +510,48 @@ function interactionRecoveryPlan(interaction, answer) {
   };
 }
 
+function requestReadinessItems({ flow, completed, form, targetStep, flowMissing, targetRefsMissing, requestTextMissing, scopeMissing, readOnlyAllowed }) {
+  const targetRefCount = splitRefs(form.targetRefs).length;
+  const allowedPathCount = splitRefs(form.allowedPaths).length;
+  return [
+    {
+      key: "flow",
+      label: "Flow",
+      ready: !flowMissing,
+      title: flowMissing ? "Select active flow" : flowDisplayName(flow),
+      detail: flowMissing ? "Ask AOR needs a selected active flow before it can create request evidence." : "The request will carry target_flow_id.",
+    },
+    {
+      key: "request",
+      label: "Request",
+      ready: !requestTextMissing,
+      title: requestTextMissing ? "Write request text" : "Request text ready",
+      detail: requestTextMissing ? "Describe the analysis, proposal, validation, review, or repair question." : `Compiled into the ${targetStep} step.`,
+    },
+    {
+      key: "targets",
+      label: "Target refs",
+      ready: !targetRefsMissing,
+      title: targetRefsMissing ? "Attach evidence or file refs" : `${targetRefCount} target ref${targetRefCount === 1 ? "" : "s"}`,
+      detail: targetRefsMissing ? "Add at least one ref so the request is auditable and flow-scoped." : "Targets define what AOR may inspect.",
+    },
+    {
+      key: "scope",
+      label: "Scope",
+      ready: !scopeMissing,
+      title: scopeMissing ? "Allowed paths required" : form.deliveryMode === "no-write" ? "No-write scope" : `${allowedPathCount} allowed path${allowedPathCount === 1 ? "" : "s"}`,
+      detail: scopeMissing ? "Non-no-write requests need explicit allowed paths before submit." : "Bounded execution remains explicit.",
+    },
+    {
+      key: "mode",
+      label: "Mode",
+      ready: readOnlyAllowed,
+      title: readOnlyAllowed ? form.deliveryMode : "Use no-write inspection",
+      detail: completed && !readOnlyAllowed ? "Completed flows only allow no-write analyze, explain, review, or validate requests." : "Delivery mode is compatible with the selected flow state.",
+    },
+  ];
+}
+
 async function readJson(url, options = {}) {
   const response = await fetch(url, {
     headers: {
@@ -4295,10 +4337,23 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
   const scopeMissing = form.deliveryMode !== "no-write" && form.allowedPaths.trim().length === 0;
   const targetRefsMissing = splitRefs(form.targetRefs).length === 0;
   const flowMissing = !flow?.flow_id;
+  const requestTextMissing = form.requestText.trim().length === 0;
   const readOnlyAllowed = !completed || (form.deliveryMode === "no-write" && READ_ONLY_INSPECTION_INTENTS.has(form.intent));
   const deliveryModes = completed
     ? DELIVERY_MODE_OPTIONS.filter((option) => option.value === "no-write")
     : DELIVERY_MODE_OPTIONS;
+  const readinessItems = requestReadinessItems({
+    flow,
+    completed,
+    form,
+    targetStep,
+    flowMissing,
+    targetRefsMissing,
+    requestTextMissing,
+    scopeMissing,
+    readOnlyAllowed,
+  });
+  const readinessReady = readinessItems.every((item) => item.ready);
   const requestPreview =
     flowMissing
       ? "Select an existing flow before creating an operator request."
@@ -4403,7 +4458,23 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
           <span>What runtime will do</span>
           <p>{scopeMissing ? `${requestPreview} Add allowed paths before running this non-no-write request.` : requestPreview}</p>
         </div>
-        <button className="primary drawer-submit" type="button" onClick={onRun} disabled={busy || flowMissing || targetRefsMissing || form.requestText.trim().length === 0 || scopeMissing || !readOnlyAllowed}>
+        <div className="request-readiness-path" aria-label="Ask AOR request readiness">
+          <div className="request-readiness-heading">
+            <span>Request readiness</span>
+            <strong>{readinessReady ? "Ready to create request evidence" : "Complete required fields first"}</strong>
+            <p>{readinessReady ? "Submit will create the operator-request packet, run the selected step, refresh the flow, and keep audit refs visible." : "AOR keeps submission disabled until the flow, request, targets, scope, and mode are auditable."}</p>
+          </div>
+          <ol>
+            {readinessItems.map((item) => (
+              <li key={item.key} className={item.ready ? "ready" : "blocked"}>
+                <span>{item.label}</span>
+                <strong>{item.title}</strong>
+                <p>{item.detail}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <button className="primary drawer-submit" type="button" onClick={onRun} disabled={busy || flowMissing || targetRefsMissing || requestTextMissing || scopeMissing || !readOnlyAllowed}>
           <Icon name="play" />
           {completed ? "Create no-write inspection request" : "Create and run request"}
         </button>
