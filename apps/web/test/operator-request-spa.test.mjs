@@ -125,6 +125,9 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Available after completed flow/u);
   assert.match(source, /Requires selected active flow/u);
   assert.match(source, /Evidence & Documents/u);
+  assert.match(source, /qualityClosurePlan/u);
+  assert.match(source, /Quality closure path/u);
+  assert.match(source, /Run-health is factual status/u);
   assert.match(source, /Verification plan/u);
   assert.match(source, /verification_plan/u);
   assert.match(source, /group\.outcome/u);
@@ -176,6 +179,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(css, /\.interaction-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.evidence-readiness-path\s*\{/u);
   assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.quality-closure-path\s*\{/u);
+  assert.match(css, /\.quality-closure-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.interaction-row label\s*\{/u);
   assert.match(css, /\.compact-inline-value/u);
   assert.match(css, /\.compact-detail-value/u);
@@ -192,6 +197,11 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.evidence-readiness-path ol,[\s\S]*?grid-template-columns: 1fr;/u,
     "Graph and trace readiness path should collapse on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.quality-closure-path ol,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Quality closure path should collapse on mobile",
   );
   assert.match(
     css,

@@ -47,6 +47,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Refresh run status or open Execution Evidence",
     "Next action",
     "Evidence artifacts",
+    "qualityClosurePlan",
+    "Quality closure path",
+    "Quality closure still needs evidence",
+    "Run-health is factual status",
+    "Run or attach the outcome assessment",
     "Verification plan",
     "verification_plan",
     "group.outcome",
@@ -410,6 +415,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "SPA should not show the last trace run when a stronger implementation execution evidence run exists",
   );
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
+  assert.ok(css.includes(".quality-closure-path"), "SPA CSS should define quality closure path layout");
+  assert.match(css, /\.quality-closure-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.quality-closure-path li\.blocked\s*\{/u);
   assert.ok(css.includes(".execution-recovery-path"), "SPA CSS should define execution recovery path layout");
   assert.match(css, /\.execution-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.execution-recovery-path li\.ready\s*\{/u);

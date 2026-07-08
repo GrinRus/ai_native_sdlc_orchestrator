@@ -152,6 +152,11 @@ The packaged SPA now treats the flow as the primary object:
 
 The advanced workbench is flow-scoped:
 
+- Evidence & Documents renders a quality closure path before raw artifact
+  tables. The path separates factual run-health status from outcome-quality
+  judgement and shows whether review/QA evidence, deterministic gate or
+  delivery evidence, and assessment evidence are visible before the operator
+  treats a flow as quality-closed.
 - Evidence Graph reads use
   `GET /api/projects/:projectId/flows/:flowId/evidence-graph` and render only
   selected-flow refs plus sanitized operator requests that target the selected

@@ -229,6 +229,8 @@ const ARTIFACT_REF_LABELS = [
   { tokens: ["discovery-research-report"], label: "Discovery Research Report" },
   { tokens: ["runtime-harness-report"], label: "Runtime Harness Report" },
   { tokens: ["quality-repair-request"], label: "Repair Request" },
+  { tokens: ["quality-assessment-report"], label: "Quality Assessment Report" },
+  { tokens: ["quality-assessment-request"], label: "Quality Assessment Request" },
   { tokens: ["review-decision"], label: "Review Decision" },
   { tokens: ["review-report"], label: "Review Report" },
   { tokens: ["validation-report"], label: "Validation Report" },
@@ -258,6 +260,8 @@ const ARTIFACT_TYPE_LABELS = {
   "next-action": "Next Action Report",
   "runtime-harness-report": "Runtime Harness Report",
   "quality-repair-request": "Repair Request",
+  "quality-assessment-report": "Quality Assessment Report",
+  "quality-assessment-request": "Quality Assessment Request",
   "routed-step-result": "Routed Step Result",
   verification: "Verification Summary",
   evaluation: "Evaluation Report",
@@ -372,6 +376,8 @@ function artifactTypeForRef(ref) {
   if (value.includes("step-observation") || value.includes("observation-report")) return "step-observation";
   if (value.includes("runtime-harness-report")) return "runtime-harness-report";
   if (value.includes("quality-repair-request")) return "quality-repair-request";
+  if (value.includes("quality-assessment-report")) return "quality-assessment-report";
+  if (value.includes("quality-assessment-request")) return "quality-assessment-request";
   if (value.includes("step-result")) return "routed-step-result";
   if (value.includes("verify-summary") || value.includes("validation-report") || value.includes("evaluation-report")) return "verification";
   if (value.includes("target-diff") || value.includes("diff") || value.includes("target-cleanliness")) return "target-diff";
@@ -386,7 +392,7 @@ function artifactTypeForRef(ref) {
 function artifactStageForType(type, fallbackStage = "artifact") {
   if (type === "next-action") return "planning";
   if (["provider-raw-evidence", "command-trace", "step-observation", "routed-step-result"].includes(type)) return "execution";
-  if (["runtime-harness-report", "review-report", "review-decision", "quality-repair-request"].includes(type)) return "runtime-harness";
+  if (["runtime-harness-report", "review-report", "review-decision", "quality-repair-request", "quality-assessment-report", "quality-assessment-request"].includes(type)) return "runtime-harness";
   if (["verification", "target-diff"].includes(type)) return "verification";
   if (["delivery-manifest", "release-packet"].includes(type)) return "delivery";
   if (["learning", "learning-handoff"].includes(type)) return "learning";
@@ -474,6 +480,70 @@ function evidenceRowForTokens(rows, tokens) {
   return (Array.isArray(rows) ? rows : []).find((row) =>
     tokens.some((token) => `${row.ref} ${row.sourceRef} ${row.label} ${row.kind}`.toLowerCase().includes(token.toLowerCase())),
   ) ?? null;
+}
+
+function artifactRowText(row) {
+  return `${row?.ref ?? ""} ${row?.sourceRef ?? ""} ${row?.rawRef ?? ""} ${row?.label ?? ""} ${row?.kind ?? ""} ${row?.stage ?? ""} ${row?.summary ?? ""}`.toLowerCase();
+}
+
+function artifactRowsForTokens(rows, tokens) {
+  return (Array.isArray(rows) ? rows : []).filter((row) => {
+    const haystack = artifactRowText(row);
+    return tokens.some((token) => haystack.includes(token));
+  });
+}
+
+function qualityClosureStep(rows, options) {
+  const matched = artifactRowsForTokens(rows, options.tokens);
+  const first = matched[0] ?? null;
+  return {
+    id: options.id,
+    label: options.label,
+    status: matched.length > 0 ? "ready" : "blocked",
+    title: matched.length > 0 ? `${matched.length} ${options.readyNoun}${matched.length === 1 ? "" : "s"}` : options.missingTitle,
+    detail: matched.length > 0
+      ? `${options.readyDetail} First visible artifact: ${first ? conciseArtifactLabel(first) : options.readyNoun}.`
+      : options.missingDetail,
+  };
+}
+
+function qualityClosurePlan(rows) {
+  const steps = [
+    qualityClosureStep(rows, {
+      id: "review",
+      label: "Review / QA",
+      tokens: ["review-report", "review-decision", "quality-repair", " qa ", "qa-", "-qa", " qa"],
+      readyNoun: "review artifact",
+      readyDetail: "Review or QA evidence is visible for outcome inspection.",
+      missingTitle: "Review evidence missing",
+      missingDetail: "Run review or QA before treating delivery as quality-closed.",
+    }),
+    qualityClosureStep(rows, {
+      id: "verification",
+      label: "Verification / Delivery",
+      tokens: ["verify-summary", "verification", "validation-report", "evaluation-report", "runtime-harness-report", "delivery-plan", "delivery-manifest", "release-packet"],
+      readyNoun: "gate artifact",
+      readyDetail: "Deterministic gate or delivery evidence is visible.",
+      missingTitle: "Gate evidence missing",
+      missingDetail: "Run required verification, review, or delivery preparation before approval.",
+    }),
+    qualityClosureStep(rows, {
+      id: "assessment",
+      label: "Assessment",
+      tokens: ["quality-assessment", "assessment-report", "assessment request"],
+      readyNoun: "assessment artifact",
+      readyDetail: "Assessment evidence is visible for quality judgement.",
+      missingTitle: "Assessment evidence missing",
+      missingDetail: "Run or attach the outcome assessment before claiming product-quality closure.",
+    }),
+  ];
+  const readyCount = steps.filter((step) => step.status === "ready").length;
+  return {
+    status: readyCount === steps.length ? "ready" : "blocked",
+    heading: readyCount === steps.length ? "Quality closure evidence is visible" : "Quality closure still needs evidence",
+    detail: "Run-health is factual status. Use review, verification, delivery, and assessment artifacts before judging outcome quality.",
+    steps,
+  };
 }
 
 function missionIdFromTitle(title) {
@@ -3243,6 +3313,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
 
 function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef }) {
   const [filter, setFilter] = useState("all");
+  const qualityPlan = qualityClosurePlan(rows);
   const filteredRows = rows.filter((row) => artifactFilterMatches(row, filter));
   const selected = filteredRows.find((row) => row.ref === selectedRef) ?? filteredRows[0] ?? null;
   const groupedRows = filteredRows.reduce((groups, row) => {
@@ -3258,6 +3329,22 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
           <h3>Evidence & Documents</h3>
           <p>Grouped artifact summaries for the selected flow or project-level live evidence. Raw refs are available through debug actions.</p>
         </div>
+      </div>
+      <div className="quality-closure-path" aria-label="Quality closure path">
+        <div className="quality-closure-heading">
+          <span>Quality closure</span>
+          <strong>{qualityPlan.heading}</strong>
+          <p>{qualityPlan.detail}</p>
+        </div>
+        <ol>
+          {qualityPlan.steps.map((step) => (
+            <li key={step.id} className={step.status}>
+              <span>{step.label}</span>
+              <strong>{step.title}</strong>
+              <p>{step.detail}</p>
+            </li>
+          ))}
+        </ol>
       </div>
       <div className="artifact-filter-bar" aria-label="Artifact filters">
         {ARTIFACT_FILTERS.map((entry) => (
