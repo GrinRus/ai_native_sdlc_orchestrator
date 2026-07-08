@@ -177,16 +177,24 @@ quality. It should preserve web-smoke refs, browser-task request/proof refs,
 screenshot refs, keyboard focus sequence, structured accessibility checks, weak
 evidence refs, and supporting evidence refs when the profile declares
 `browser-task-proof`.
+When present, early guided UI proof refs such as `early_guided_*`,
+`early_screenshot_refs`, `early_keyboard_focus_sequence`,
+`early_accessibility_checks`, and `early_evidence_refs` are diagnostic evidence
+only. They help diagnose blocked or long-running runs before the complete flow
+loop reaches learning, but they do not satisfy the required
+`guided-web-smoke` browser-task proof.
 
 For guided installed-user profiles that declare `live_e2e.frontend_capability: browser-task-proof`,
 `guided_journey.browser_task_proof.required: true`, or `browser-task-proof` in proof requirements, missing or non-passing
-AOR operator browser-task evidence is a factual run-health blocker, not an outcome-quality verdict:
+required `guided-web-smoke` AOR operator browser-task evidence is a factual run-health blocker, not an outcome-quality verdict:
 - `failure_summary.owner: operator`
 - `failure_summary.phase: ui_validation`
 - `failure_summary.class: guided_browser_task_proof_missing`
 
 The runner should still preserve deterministic app-smoke refs in `frontend_interactions[]`; `aor app --smoke` remains a
 render guardrail and does not satisfy required browser-task proof by itself.
+Likewise, an `early-guided-ui-proof` interaction does not satisfy the required
+`guided-web-smoke` interaction for final run-health.
 The corresponding `guided_browser_task_proof_request_file` should identify the
 live browser inspection surface via `app_url`, `control_plane`, and
 `app_server_pid`. `smoke_app_url` is only the short-lived render-guardrail URL
