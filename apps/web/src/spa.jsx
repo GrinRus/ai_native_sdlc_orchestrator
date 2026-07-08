@@ -189,6 +189,105 @@ const STAGE_SCOPE_SUMMARY = {
   learning: "Learning -> New Flow",
 };
 
+const EXTERNAL_RUN_STEP_CONTEXT = {
+  discovery: {
+    title: "Discovery evidence",
+    description: "Project analysis, discovery research, and next-action evidence are checked before spec work starts.",
+    expectedOutputs: ["Project analysis report", "Discovery research report", "Next-action report"],
+    scope: "Mission -> Discovery",
+    scopeDetail: "No upstream writes. The run is checking whether discovery evidence is ready for spec.",
+    signals: [
+      { label: "Discovery report", tokens: ["discovery-research-report"] },
+      { label: "Project analysis", tokens: ["project-analysis-report"] },
+      { label: "Next-action report", tokens: ["next-action-report"] },
+    ],
+  },
+  spec: {
+    title: "Spec evidence",
+    description: "Feature-traceable spec evidence is checked before planning can continue.",
+    expectedOutputs: ["Spec step result", "Traceable feature scope", "Next-action report"],
+    scope: "Discovery -> Spec",
+    scopeDetail: "No upstream writes. The run is checking whether the spec is ready for planning.",
+    signals: [
+      { label: "Spec step result", tokens: ["step-result", "spec"] },
+      { label: "Discovery input", tokens: ["discovery-research-report"] },
+      { label: "Next-action report", tokens: ["next-action-report"] },
+    ],
+  },
+  planning: {
+    title: "Planning evidence",
+    description: "Wave-ticket and handoff-planning evidence are checked before the execution handoff.",
+    expectedOutputs: ["Wave ticket", "Handoff packet", "Next-action report"],
+    scope: "Spec -> Planning",
+    scopeDetail: "No upstream writes. The run is checking whether implementation scope is bounded.",
+    signals: [
+      { label: "Wave ticket", tokens: ["wave-ticket"] },
+      { label: "Handoff packet", tokens: ["handoff"] },
+      { label: "Next-action report", tokens: ["next-action-report"] },
+    ],
+  },
+  handoff: {
+    title: "Execution handoff readiness",
+    description: "Handoff packet and wave-ticket evidence are checked before controlled execution starts.",
+    expectedOutputs: ["Approved handoff packet", "Wave ticket", "Execution scope evidence"],
+    scope: "Planning -> Execution handoff",
+    scopeDetail: "No upstream writes. The run is checking whether execution can start from approved planning evidence.",
+    signals: [
+      { label: "Handoff packet", tokens: ["handoff"] },
+      { label: "Wave ticket", tokens: ["wave-ticket"] },
+      { label: "Execution scope", tokens: ["delivery-plan", "next-action-report"] },
+    ],
+  },
+  execution: {
+    title: "Execution evidence",
+    description: "Routed implementation evidence and Runtime Harness checks are inspected before review.",
+    expectedOutputs: ["Routed step result", "Runtime Harness report", "Patch/proposal evidence"],
+    scope: "Execution -> Review",
+    scopeDetail: "Write-back remains bounded by policy; no upstream writes happen by default.",
+    signals: [
+      { label: "Step result", tokens: ["step-result"] },
+      { label: "Runtime Harness", tokens: ["runtime-harness-report"] },
+      { label: "Patch evidence", tokens: ["patch", "proposal"] },
+    ],
+  },
+  review: {
+    title: "Review evidence",
+    description: "Validation, evaluation, and review decision evidence are checked before QA or delivery.",
+    expectedOutputs: ["Validation report", "Evaluation report", "Review decision"],
+    scope: "Review -> QA",
+    scopeDetail: "Validation precedes evaluation; downstream delivery remains blocked until review is durable.",
+    signals: [
+      { label: "Validation report", tokens: ["validation-report"] },
+      { label: "Evaluation report", tokens: ["evaluation-report"] },
+      { label: "Review decision", tokens: ["review-decision"] },
+    ],
+  },
+  qa: {
+    title: "QA evidence",
+    description: "QA and repair-loop evidence are checked before delivery preparation.",
+    expectedOutputs: ["QA verdict", "Repair closure evidence", "Runtime Harness pass"],
+    scope: "QA -> Delivery",
+    scopeDetail: "Delivery stays gated until QA and any repair loop are closed.",
+    signals: [
+      { label: "QA evidence", tokens: ["qa", "quality"] },
+      { label: "Repair closure", tokens: ["repair", "quality-repair-request"] },
+      { label: "Runtime Harness", tokens: ["runtime-harness-report"] },
+    ],
+  },
+  delivery: {
+    title: "Delivery evidence",
+    description: "Delivery manifest, release packet, and promotion guardrails are checked before closure.",
+    expectedOutputs: ["Delivery manifest", "Release packet", "Promotion guardrails"],
+    scope: "Delivery -> Release",
+    scopeDetail: "Write-back remains policy-gated and explicit.",
+    signals: [
+      { label: "Delivery manifest", tokens: ["delivery-manifest"] },
+      { label: "Release packet", tokens: ["release-packet"] },
+      { label: "Promotion evidence", tokens: ["promotion", "certification"] },
+    ],
+  },
+};
+
 function splitLines(value) {
   return value
     .split("\n")
@@ -1480,6 +1579,16 @@ function actionOutcomeDetail(action, { completed = false, providerFocusActive = 
   return "AOR will run the selected lifecycle step through public control-plane commands.";
 }
 
+function externalRunStepContext(health) {
+  const step = String(health?.current_step ?? health?.blocked_step_id ?? "").trim().toLowerCase();
+  if (!step) return null;
+  if (step === "implement" || step === "run-active") return EXTERNAL_RUN_STEP_CONTEXT.execution;
+  if (step === "validation" || step === "eval" || step === "evaluation" || step === "harness") {
+    return EXTERNAL_RUN_STEP_CONTEXT.review;
+  }
+  return EXTERNAL_RUN_STEP_CONTEXT[step] ?? null;
+}
+
 function flowStageId(flow, nextAction, projectState) {
   if (flow?.selected_stage) return toUiStageId(flow.selected_stage);
   if (!flow) return "readiness";
@@ -2154,8 +2263,15 @@ function FlowTimeline({ currentStage, completed }) {
   );
 }
 
-function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blockers, deliveryMode, projectLevelProviderFocus = false }) {
-  const expectedOutputs = STAGE_EXPECTED_OUTPUTS[stage.id] ?? ["Evidence artifact", "Policy decision", "Next-action report"];
+function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blockers, deliveryMode, projectLevelProviderFocus = false, externalRunHealth = null }) {
+  const runStepContext = projectLevelProviderFocus ? externalRunStepContext(externalRunHealth) : null;
+  const expectedOutputs = runStepContext?.expectedOutputs ?? STAGE_EXPECTED_OUTPUTS[stage.id] ?? ["Evidence artifact", "Policy decision", "Next-action report"];
+  const scopeTitle = runStepContext?.scope ?? STAGE_SCOPE_SUMMARY[stage.id] ?? stage.label;
+  const scopeDetail = runStepContext?.scopeDetail ?? (
+    deliveryMode === "no-write"
+      ? "No upstream writes. Analysis and evidence only."
+      : "Explicit allowed paths and review gates required."
+  );
   const riskLevel = blockers.length > 0 ? "Blocked" : deliveryMode === "no-write" ? "Low" : "Gated";
   const visibleEvidence = evidenceRefs.length > 0
     ? artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id)
@@ -2174,8 +2290,8 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
       </div>
       <div>
         <span>Scope</span>
-        <strong>{STAGE_SCOPE_SUMMARY[stage.id] ?? stage.label}</strong>
-        <p>{deliveryMode === "no-write" ? "No upstream writes. Analysis and evidence only." : "Explicit allowed paths and review gates required."}</p>
+        <strong>{scopeTitle}</strong>
+        <p>{scopeDetail}</p>
       </div>
       <div>
         <span>Risk level</span>
@@ -2504,11 +2620,34 @@ function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
   );
 }
 
-function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null, projectLevelProviderFocus = false }) {
+function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null, projectLevelProviderFocus = false, externalRunHealth = null }) {
   const closureState = flow?.closure_state ?? {};
   const visibleEvidence = projectLevelProviderFocus && evidenceRefs.length === 0
     ? evidenceRows
     : artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
+  const runStepContext = projectLevelProviderFocus ? externalRunStepContext(externalRunHealth) : null;
+  if (!completed && runStepContext) {
+    const signals = Array.isArray(runStepContext.signals) ? runStepContext.signals : [];
+    return (
+      <div className="stage-specific-panel external-run-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>{runStepContext.title}</h3>
+            <p>{runStepContext.description}</p>
+          </div>
+          <StatusPill state={blockers.length > 0 ? "blocked" : "ready"} />
+        </div>
+        <div className="stage-signal-grid">
+          {signals.map((signal) => (
+            <div key={signal.label}>
+              <span>{signal.label}</span>
+              <strong>{visibleEvidence.filter((row) => evidenceRefMatchesTokens(`${row.ref} ${row.kind} ${row.label}`, signal.tokens)).length}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (completed || stage.id === "learning") {
     const sourceHandoffRefs = Array.isArray(closureState.source_learning_handoff_refs)
       ? closureState.source_learning_handoff_refs
@@ -3164,6 +3303,7 @@ function FlowCockpit({
         deliveryMode={deliveryMode}
         artifactReadiness={artifactReadiness}
         projectLevelProviderFocus={providerFocusActive}
+        externalRunHealth={externalRunHealth}
       />
 
       <div className="flow-snapshot-grid">
@@ -3197,6 +3337,7 @@ function FlowCockpit({
         blockers={blockers}
         deliveryMode={deliveryMode}
         projectLevelProviderFocus={providerFocusActive}
+        externalRunHealth={externalRunHealth}
       />
     </section>
   );

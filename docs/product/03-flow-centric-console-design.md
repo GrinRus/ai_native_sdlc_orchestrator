@@ -114,6 +114,10 @@ The packaged SPA now treats the flow as the primary object:
   and `handoff` stay under `Discovery / Spec / Plan`, while `eval` and
   `harness` stay under `Review / QA`; they must not fall through to
   `Delivery / Release`.
+- When run-health is blocked on a granular live-run step, the context cards and
+  stage-specific panel must explain that step's concrete evidence boundary. A
+  `handoff` blocker should mention handoff packet, wave ticket, and execution
+  scope evidence instead of generic discovery outputs.
 - The active cockpit explains the single recommended action as an operator
   outcome first; raw lifecycle commands stay available through technical
   details or copy/debug affordances instead of competing with the primary CTA.
