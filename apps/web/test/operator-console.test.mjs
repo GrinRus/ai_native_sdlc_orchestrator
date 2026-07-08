@@ -91,6 +91,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "flowSelectionVersion",
     "selectionVersion",
     "selectionApplied",
+    "selectionStillCurrent && !didChooseStage.current",
+    "setSelectedStage(\"discovery\");",
     "refresh({ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion })",
     "ADVANCED_WORKBENCH_FOCUS_EVENT",
     "ADVANCED_WORKBENCH_TAB_IDS",

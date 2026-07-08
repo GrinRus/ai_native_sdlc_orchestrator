@@ -106,6 +106,9 @@ The packaged SPA now treats the flow as the primary object:
   only through `mission create` followed by `next`.
 - Active flows render an active cockpit with one recommended action, blockers,
   evidence artifacts, runtime root, write-back mode, and safety status.
+- When the operator has not manually selected a completed or future stage for
+  inspection, the stage rail, compact stage strip, active cockpit heading, and
+  next-action context must agree on the current runtime stage.
 - Blocking run-health evidence takes priority over the selected-flow next
   action. When the latest run-health projection is blocked, the active cockpit,
   stage rail, right rail, and top-bar action show the run blocker and route the

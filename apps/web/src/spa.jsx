@@ -5159,7 +5159,7 @@ function App() {
     setStepResults(Array.isArray(stepList) ? stepList : []);
     setRuns(Array.isArray(runList) ? runList : []);
     setOperatorRequests(Array.isArray(requestList) ? requestList : []);
-    if (selectionStillCurrent && !didAutoSelectStage.current && !didChooseStage.current) {
+    if (selectionStillCurrent && !didChooseStage.current) {
       setSelectedStage(draftMode ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
       didAutoSelectStage.current = true;
     }
@@ -5526,12 +5526,12 @@ function App() {
       }
       await runLifecycle("mission create", flags);
       await runLifecycle("next", { json: true });
+      setSelectedStage("discovery");
       setNewFlowDraft(false);
       setDraftSourceFlow(null);
       setDraftFollowUpHandoffRef(null);
       setSelectedFlowId(null);
       await refresh({ newFlowDraft: false, selectedFlowId: null });
-      setSelectedStage("discovery");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
