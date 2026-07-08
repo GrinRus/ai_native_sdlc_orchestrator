@@ -109,6 +109,11 @@ The packaged SPA now treats the flow as the primary object:
 - When the operator has not manually selected a completed or future stage for
   inspection, the stage rail, compact stage strip, active cockpit heading, and
   next-action context must agree on the current runtime stage.
+- Live-run step names that are more granular than the seven UI stages must map
+  to the owning grouped stage before rendering progress. For example, `spec`
+  and `handoff` stay under `Discovery / Spec / Plan`, while `eval` and
+  `harness` stay under `Review / QA`; they must not fall through to
+  `Delivery / Release`.
 - The active cockpit explains the single recommended action as an operator
   outcome first; raw lifecycle commands stay available through technical
   details or copy/debug affordances instead of competing with the primary CTA.
