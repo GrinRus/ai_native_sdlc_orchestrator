@@ -580,7 +580,7 @@ function providerFocusStageId(status) {
 }
 
 function providerFocusTitle(status) {
-  if (status?.status === "completed") return "Provider run completed";
+  if (status?.status === "completed") return "Review / QA gate ready";
   if (status?.status === "failed") return "Provider run failed";
   if (status?.status === "interrupted") return "Provider run interrupted";
   return "Provider run in progress";
@@ -588,7 +588,7 @@ function providerFocusTitle(status) {
 
 function providerFocusDescription(status) {
   if (status?.status === "completed") {
-    return "Provider execution completed before a flow could be selected. Inspect verification, review, or QA evidence before delivery.";
+    return "Provider execution finished before a flow could be selected. Review validation, review, and QA evidence before delivery.";
   }
   if (status?.status === "failed") {
     return "Provider execution failed before a flow could be selected. Inspect evidence, then diagnose or retry through public controls.";
@@ -602,11 +602,11 @@ function providerFocusDescription(status) {
 function providerFocusPrimaryAction(status) {
   if (status?.status === "completed") {
     return {
-      action_label: "Inspect post-run evidence",
+      action_label: "Review QA gate evidence",
       command: "aor run status --json",
-      dry_run_label: "Status preview",
+      dry_run_label: "Quality gate preview",
       dry_run_command: "aor run status --json",
-      reason: "Provider completed. Inspect verification, review, or QA evidence before delivery.",
+      reason: "Provider execution is done. Inspect validation warnings, review findings, and QA evidence before deciding delivery readiness.",
     };
   }
   if (status?.status === "failed") {
@@ -661,7 +661,7 @@ function providerStatusCopy(status) {
   if (status.last_progress_at) return `Provider activity observed: ${progressLabel}.`;
   if (status.last_output_at) return "Provider output observed; step is still running.";
   if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
-  if (status.status === "completed") return "Provider completed. Continue with verification evidence.";
+  if (status.status === "completed") return "Provider execution finished. Review validation, review, and QA evidence before delivery.";
   if (status.status === "interrupted" && status.interruption_owner === "operator") {
     return status.interruption_reason
       ? `Provider was stopped by the operator: ${status.interruption_reason}`
