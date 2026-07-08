@@ -549,6 +549,10 @@ button:disabled {
   gap: 8px;
 }
 
+.form-actions .form-primary-action {
+  min-height: var(--control-height);
+}
+
 .form-action-reason {
   flex: 1 1 100%;
   color: #8a5f14;
@@ -640,7 +644,15 @@ button:disabled {
 }
 
 .mission-detail-fields summary {
+  min-height: var(--touch-control-height);
+  display: flex;
+  align-items: center;
   cursor: pointer;
+  list-style: none;
+}
+
+.mission-detail-fields summary::-webkit-details-marker {
+  display: none;
 }
 
 .mission-detail-grid {

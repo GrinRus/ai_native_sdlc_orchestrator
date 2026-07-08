@@ -1096,6 +1096,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
 function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, onCancel = null, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
   const selectedDeliveryMode = form.deliveryMode || "no-write";
   const safeTemplateMode = form.templateId === SAFE_TEMPLATE_ID && !followUpSourceHandoffRef;
+  const missionSubmitLabel = followUpSourceHandoffRef ? "Create Follow-up Flow & Resolve Next Action" : "Create Flow & Resolve Next Action";
   const askDisabledReason = "Ask AOR requires a selected active flow";
   const learningHandoffReason = followUpSourceHandoffRef ? "Captured guidance attached" : "Available after completed flow";
   const selectedEvidenceReason = "Requires selected active flow";
@@ -1158,6 +1159,12 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
           <p>{description}</p>
         </div>
         <div className="form-actions">
+          {safeTemplateMode ? (
+            <button className="primary form-primary-action" type="submit" disabled={busy}>
+              {missionSubmitLabel}
+              <Icon name="target" />
+            </button>
+          ) : null}
           {onCancel ? (
             <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
               Cancel New Flow
@@ -1236,10 +1243,12 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
           </details>
         </>
       ) : missionDetailFields}
-      <button className="primary" type="submit" disabled={busy}>
-        {followUpSourceHandoffRef ? "Create Follow-up Flow & Resolve Next Action" : "Create Flow & Resolve Next Action"}
-        <Icon name="target" />
-      </button>
+      {!safeTemplateMode ? (
+        <button className="primary" type="submit" disabled={busy}>
+          {missionSubmitLabel}
+          <Icon name="target" />
+        </button>
+      ) : null}
     </form>
   );
 }
@@ -1765,6 +1774,14 @@ function FlowCockpit({
   const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
+  const openAdvancedWorkbench = () => {
+    if (typeof document === "undefined") return;
+    const workbench = document.getElementById("flow-advanced-workbench");
+    if (!workbench) return;
+    workbench.scrollIntoView({ block: "start" });
+    const summary = workbench.querySelector("summary");
+    if (summary && typeof summary.focus === "function") summary.focus({ preventScroll: true });
+  };
 
   return (
     <section className={`work-card flow-cockpit ${completed ? "read-only" : "active"}`}>
@@ -1871,6 +1888,10 @@ function FlowCockpit({
           <button className="primary" type="button" onClick={onResolveNext} disabled={busy || completed}>
             <Icon name="play" />
             Resolve Next Action
+          </button>
+          <button className="secondary workbench-jump" type="button" onClick={openAdvancedWorkbench}>
+            <Icon name="target" />
+            Workbench
           </button>
           <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
             <Icon name="refresh" />
@@ -2669,7 +2690,7 @@ function FlowAdvancedWorkbench({
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
     const media = window.matchMedia("(max-width: 1180px)");
     const syncExpandedToViewport = () => {
-      if (media.matches) setExpanded(false);
+      setExpanded(!media.matches);
     };
     syncExpandedToViewport();
     if (typeof media.addEventListener === "function") {
@@ -2707,7 +2728,7 @@ function FlowAdvancedWorkbench({
     );
 
   return (
-    <section className="workbench-row advanced-workbench-row">
+    <section className="workbench-row advanced-workbench-row" id="flow-advanced-workbench">
       <details
         className="work-card advanced-workbench-disclosure"
         open={expanded}
@@ -3349,6 +3370,15 @@ function App() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
+
+  useEffect(() => {
+    const shouldResetScroll = newFlowDraft || Boolean(selectedFlowId);
+    if (typeof window === "undefined" || !shouldResetScroll) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [newFlowDraft, selectedFlowId]);
 
   useEffect(() => {
     if (!apiProjectBase || !isActiveProviderStepStatus(providerStepStatus)) return undefined;

@@ -121,6 +121,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "FlowAdvancedWorkbench",
     "Advanced evidence workbench",
     "advanced-workbench-tabs",
+    "flow-advanced-workbench",
+    "setExpanded(!media.matches)",
+    "Workbench",
     "support-table-grid",
     "shortPathLabel",
     "runtimeRootLabel",
@@ -129,6 +132,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "stage-progress-strip",
     "compact-first-run",
     "safe-template-summary",
+    "form-primary-action",
     "Edit mission details",
     "active-flow-handoff",
     "Ask AOR for selected flow",
@@ -169,6 +173,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "setAddProjectDrawerOpen(false)",
     "activeProject?.runtime_root",
     "Create the first no-write mission packet, then resolve the first next action.",
+    'window.scrollTo({ top: 0, left: 0, behavior: "auto" })',
     "No active flow",
     'htmlFor="flow-selector-control"',
     'id="flow-selector-control"',
@@ -271,6 +276,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".advanced-workbench-tabs"), "SPA CSS should define active advanced workbench tabs");
   assert.ok(css.includes(".compact-inline-value"), "SPA CSS should define compact inline value layout");
   assert.ok(css.includes(".compact-detail-value"), "SPA CSS should define compact detail value layout");
+  assert.match(css, /\.form-actions \.form-primary-action\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Safe first-flow submit action should stay in the first mission form action row");
+  assert.match(css, /\.safe-template-summary\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u, "Safe first-flow summary should remain a compact information grid");
+  assert.match(css, /\.mission-detail-fields summary\s*\{[\s\S]*?min-height: var\(--touch-control-height\);/u, "Mission detail disclosure should meet mobile touch target size");
   assert.match(css, /summary:focus-visible/u, "SPA CSS should expose keyboard focus on disclosure controls");
   assert.match(css, /\.debug-ref-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Debug disclosure controls should meet the shared target size");
   assert.match(css, /\.runtime-path-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Runtime path disclosure controls should meet the shared target size");
