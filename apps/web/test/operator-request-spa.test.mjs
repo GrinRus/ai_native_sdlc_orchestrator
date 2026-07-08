@@ -71,6 +71,13 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /support-table-grid/u);
   assert.match(source, /shortPathLabel/u);
   assert.match(source, /compactVisibleValue/u);
+  assert.match(source, /Show runtime root path details/u);
+  assert.match(source, /Copy runtime root path/u);
+  assert.match(source, /conciseArtifactLabel/u);
+  assert.match(source, /artifactActionLabel/u);
+  assert.match(source, /Open evidence artifact/u);
+  assert.match(source, /Copy raw ref for/u);
+  assert.match(source, /Attach as request target:/u);
   assert.match(source, /CompactInlineValue/u);
   assert.match(source, /CompactDetailValue/u);
   assert.match(source, /topbar-status-strip/u);

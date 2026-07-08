@@ -222,6 +222,41 @@ function titleFromRef(ref) {
   return clean ? clean.replace(/\b\w/gu, (match) => match.toUpperCase()) : "Artifact";
 }
 
+function humanizeToken(value) {
+  return String(value ?? "")
+    .replace(/[_./-]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/\b\w/gu, (match) => match.toUpperCase());
+}
+
+function looksLikeTechnicalRef(value) {
+  const text = String(value ?? "");
+  return (
+    text.length > 72 ||
+    /(?:^\/|\.aor|evidence:\/\/|packet:\/\/|artifact\.|run-\d|\.json|\.[a-z0-9]{6,})/iu.test(text)
+  );
+}
+
+function conciseArtifactLabel(row) {
+  const label = String(row?.label ?? "").trim();
+  if (label && !looksLikeTechnicalRef(label)) return label;
+
+  const stage = humanizeToken(row?.stage);
+  const kind = humanizeToken(row?.kind);
+  const status = String(row?.status ?? "").toLowerCase();
+  if (status === "missing") return `${stage ? `${stage} ` : ""}Evidence Missing`.trim();
+  if (stage && kind && stage.toLowerCase() !== kind.toLowerCase()) return `${stage} ${kind}`;
+  return kind || stage || "Evidence Artifact";
+}
+
+function artifactActionLabel(action, row) {
+  const artifact = conciseArtifactLabel(row);
+  if (action === "copy") return `Copy raw ref for ${artifact}`;
+  if (action === "attach") return `Attach as request target: ${artifact}`;
+  return `Open evidence artifact: ${artifact}`;
+}
+
 function artifactSeverityForStatus(status) {
   const normalized = String(status ?? "").toLowerCase();
   if (["fail", "failed", "not_pass", "blocked", "rejected", "error", "timeout", "missing", "unreadable"].includes(normalized)) return "critical";
@@ -996,7 +1031,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
       <div className="project-switcher-meta">
         <StatusPill state={projectStatusLabel(activeProject)} />
         <details className="runtime-path-details">
-          <summary>
+          <summary aria-label="Show runtime root path details" title="Show runtime root path details">
             <code title={runtimeRoot}>{runtimeRootLabel}</code>
           </summary>
           <code className="runtime-path-full">{runtimeRoot}</code>
@@ -2297,15 +2332,21 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
                   <tr key={`${row.kind}-${row.ref}`} className={selected?.ref === row.ref ? "selected" : ""}>
                     <td>{row.stage ?? "artifact"}</td>
                     <td>
-                      <button className="artifact-summary-button" type="button" onClick={() => setSelectedRef(row.ref)}>
-                        <strong>{row.label}</strong>
+                      <button
+                        className="artifact-summary-button"
+                        type="button"
+                        onClick={() => setSelectedRef(row.ref)}
+                        title={row.label}
+                        aria-label={artifactActionLabel("open", row)}
+                      >
+                        <strong>{conciseArtifactLabel(row)}</strong>
                         <span>{row.kind}</span>
                       </button>
                     </td>
                     <td><StatusPill state={row.status ?? "ready"} /></td>
                     <td className="row-actions">
-                      <IconButton label="Copy raw ref" onClick={() => copyRef(row.rawRef ?? row.ref)}><Icon name="copy" /></IconButton>
-                      <IconButton label="Attach as request target" onClick={() => attachTarget(row.rawRef ?? row.ref)}><Icon name="target" /></IconButton>
+                      <IconButton label={artifactActionLabel("copy", row)} onClick={() => copyRef(row.rawRef ?? row.ref)}><Icon name="copy" /></IconButton>
+                      <IconButton label={artifactActionLabel("attach", row)} onClick={() => attachTarget(row.rawRef ?? row.ref)}><Icon name="target" /></IconButton>
                     </td>
                   </tr>
                 ))}
@@ -3959,7 +4000,7 @@ function App() {
           <Icon name="target" /><span className="action-label">Ask AOR for selected flow</span>
         </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
-        <button className="utility-button runtime-copy-chip" type="button" title={runtimeRoot} onClick={() => copyRef(runtimeRoot)}>
+        <button className="utility-button runtime-copy-chip" type="button" title="Copy runtime root path" aria-label="Copy runtime root path" onClick={() => copyRef(runtimeRoot)}>
           <Icon name="folder" />Copy runtime path
         </button>
       </header>
