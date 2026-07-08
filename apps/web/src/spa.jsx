@@ -1264,15 +1264,24 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
   const currentStageEntry = STAGES[currentIndex] ?? STAGES[0];
   const completed = isCompletedFlow(flow);
-  const firstRunFocus = !flow || newFlowDraft;
-  const railTitle = newFlowDraft ? "New flow draft" : flow ? flowDisplayName(flow) : "No active flow";
+  const projectLevelProviderFocus = !flow && !newFlowDraft && Boolean(providerStepStatus);
+  const firstRunFocus = (!flow && !projectLevelProviderFocus) || newFlowDraft;
+  const railTitle = newFlowDraft
+    ? "New flow draft"
+    : flow
+      ? flowDisplayName(flow)
+      : projectLevelProviderFocus
+        ? "Provider run in progress"
+        : "No active flow";
   const railDescription = newFlowDraft
     ? "Draft mission settings are not durable evidence until submitted."
     : completed
       ? "Closed flow evidence is immutable and read-only."
         : flow
         ? "Navigation is scoped to the selected flow."
-        : "Readiness prepares the runtime before a flow is created.";
+        : projectLevelProviderFocus
+          ? "Live execution is running from project-level evidence before a flow can be selected."
+          : "Readiness prepares the runtime before a flow is created.";
   return (
     <aside className={`stage-rail ${firstRunFocus ? "compact-first-run" : ""}`}>
       <div className="rail-title">
@@ -1524,7 +1533,7 @@ function FlowTimeline({ currentStage, completed }) {
   );
 }
 
-function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blockers, deliveryMode }) {
+function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blockers, deliveryMode, projectLevelProviderFocus = false }) {
   const expectedOutputs = STAGE_EXPECTED_OUTPUTS[stage.id] ?? ["Evidence artifact", "Policy decision", "Next-action report"];
   const riskLevel = blockers.length > 0 ? "Blocked" : deliveryMode === "no-write" ? "Low" : "Gated";
   const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
@@ -1551,12 +1560,12 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
       <div>
         <span>Command provenance</span>
         <strong>AOR runtime</strong>
-        <p>Generated from selected-flow evidence and latest next-action state.</p>
+        <p>{projectLevelProviderFocus ? "Generated from project-level provider evidence and latest run-control state." : "Generated from selected-flow evidence and latest next-action state."}</p>
       </div>
       <div>
         <span>{action?.dry_run_label ?? "Dry-run preview"}</span>
         <CompactInlineValue value={actionDryRunPreview(action)} kind="command" />
-        <p>{visibleEvidence.length} selected-flow artifacts available before execution.</p>
+        <p>{visibleEvidence.length} {projectLevelProviderFocus ? "project-level artifacts available for this provider step." : "selected-flow artifacts available before execution."}</p>
       </div>
     </div>
   );
@@ -1764,7 +1773,7 @@ function VerificationFailureBanner({ plan, failures = [] }) {
   );
 }
 
-function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null }) {
+function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null, projectLevelProviderFocus = false }) {
   const closureState = flow?.closure_state ?? {};
   const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   if (completed || stage.id === "learning") {
@@ -1881,7 +1890,7 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows
         <div className="panel-heading">
           <div>
             <h3>Execution Boundary</h3>
-            <p>Runtime trace, permission requests, and requested interactions remain scoped to this flow.</p>
+            <p>{projectLevelProviderFocus ? "Provider status, runtime evidence, and recovery actions are shown from project-level run-control state." : "Runtime trace, permission requests, and requested interactions remain scoped to this flow."}</p>
           </div>
           <StatusPill state={evidenceGateStatus(evidenceRefs, ["step-result", "run"], "waiting")} />
         </div>
@@ -1953,7 +1962,8 @@ function FlowCockpit({
   providerStepStatus = null,
   evidenceRows = [],
 }) {
-  if (!flow) {
+  const projectLevelProviderFocus = !flow && Boolean(providerStepStatus);
+  if (!flow && !projectLevelProviderFocus) {
     const projectRef = activeProject?.project_ref ?? config?.project_ref ?? "loading";
     const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
     const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
@@ -2138,14 +2148,24 @@ function FlowCockpit({
     : Array.isArray(nextAction?.evidence_refs)
       ? nextAction.evidence_refs
       : [];
-  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
+  const visibleEvidence = evidenceRefs.length > 0
+    ? artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id)
+    : projectLevelProviderFocus
+      ? evidenceRows
+      : [];
   const deliveryMode =
     flow?.writeback_policy?.mode ??
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
-  const resolverPrimary = completed
+  const resolverPrimary = projectLevelProviderFocus
+    ? {
+        action_label: "Monitor provider run",
+        command: "aor run status --json",
+        reason: providerStatusCopy(providerStepStatus),
+      }
+    : completed
     ? nextAction?.primary_action?.action_id === "start-new-flow"
       ? nextAction.primary_action
       : {
@@ -2182,9 +2202,9 @@ function FlowCockpit({
           </div>
           <p>{stageRuntimeCopy}</p>
         </div>
-        <button className="secondary" type="button" onClick={onAsk}>
-          <Icon name={completed ? "eye" : "target"} />
-          {completed ? "Inspect" : "Ask AOR"}
+        <button className="secondary" type="button" onClick={projectLevelProviderFocus ? onRefresh : onAsk}>
+          <Icon name={projectLevelProviderFocus ? "refresh" : completed ? "eye" : "target"} />
+          {projectLevelProviderFocus ? "Refresh" : completed ? "Inspect" : "Ask AOR"}
         </button>
       </div>
 
@@ -2301,8 +2321,12 @@ function FlowCockpit({
       {!completed ? (
         <div className="active-flow-handoff" aria-label="Active flow status summary">
           <div>
-            <span>Active flow id</span>
-            <strong title={flow?.flow_id ?? flow?.mission_id ?? ""}>{flow?.flow_id ?? flow?.mission_id ?? "active flow"}</strong>
+            <span>{projectLevelProviderFocus ? "Provider run" : "Active flow id"}</span>
+            <strong title={projectLevelProviderFocus ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "" : flow?.flow_id ?? flow?.mission_id ?? ""}>
+              {projectLevelProviderFocus
+                ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "provider step"
+                : flow?.flow_id ?? flow?.mission_id ?? "active flow"}
+            </strong>
           </div>
           <div>
             <span>Next action</span>
@@ -2354,6 +2378,7 @@ function FlowCockpit({
         blockers={blockers}
         deliveryMode={deliveryMode}
         artifactReadiness={artifactReadiness}
+        projectLevelProviderFocus={projectLevelProviderFocus}
       />
 
       <div className="flow-snapshot-grid">
@@ -2368,9 +2393,13 @@ function FlowCockpit({
           <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0] ? conciseArtifactLabel(visibleEvidence[0]) : "No flow evidence yet."}</p>
         </div>
         <div>
-          <span>Flow ID</span>
-          <strong>{flow?.mission_id ?? "draft"}</strong>
-          <p title={flow?.flow_id ?? ""}>{compactVisibleValue(flow?.flow_id ?? "Mission packet will create the flow identity.")}</p>
+          <span>{projectLevelProviderFocus ? "Provider run" : "Flow ID"}</span>
+          <strong>{projectLevelProviderFocus ? providerStepStatus.status : flow?.mission_id ?? "draft"}</strong>
+          <p title={projectLevelProviderFocus ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "" : flow?.flow_id ?? ""}>
+            {compactVisibleValue(projectLevelProviderFocus
+              ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "provider step"
+              : flow?.flow_id ?? "Mission packet will create the flow identity.")}
+          </p>
         </div>
       </div>
 
@@ -2382,6 +2411,7 @@ function FlowCockpit({
         evidenceRows={evidenceRows}
         blockers={blockers}
         deliveryMode={deliveryMode}
+        projectLevelProviderFocus={projectLevelProviderFocus}
       />
     </section>
   );
@@ -2424,15 +2454,22 @@ function DraftFlowRail({ form }) {
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [] }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null }) {
   const completed = isCompletedFlow(selectedFlow);
+  const projectLevelProviderFocus = !selectedFlow && !newFlowDraft && Boolean(providerStepStatus);
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
   const runtimeReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
   let nextPrimary = nextAction?.primary_action ?? {};
   if (!selectedFlow && !newFlowDraft) {
-    nextPrimary = runtimeReady
+    nextPrimary = projectLevelProviderFocus
+      ? {
+        low_level_command: "run status",
+        command: "aor run status --json",
+        reason: providerStatusCopy(providerStepStatus),
+      }
+      : runtimeReady
       ? {
         low_level_command: "mission create",
         command: "aor mission create",
@@ -2574,6 +2611,11 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
           <div className="flow-inventory-row selected">
             <strong>{flowDisplayName(selectedFlow)}</strong>
             <span>{completed ? "Completed" : "Active"}</span>
+          </div>
+        ) : projectLevelProviderFocus ? (
+          <div className="flow-inventory-row selected">
+            <strong>Provider run in progress</strong>
+            <span>{providerStepStatus.status}</span>
           </div>
         ) : (
           <p>No active flow selected.</p>
@@ -3518,7 +3560,6 @@ function App() {
 
   const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES[1];
   const draftSurface = newFlowDraft;
-  const currentStage = draftSurface ? "mission" : flowStageId(selectedFlow, nextAction, projectState);
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
   const projectOptions = Array.isArray(projectIndex?.projects) && projectIndex.projects.length > 0
     ? projectIndex.projects
@@ -3627,6 +3668,12 @@ function App() {
     () => resolveProviderStepStatus(projectState, runs),
     [projectState, runs],
   );
+  const projectLevelProviderFocus = !draftSurface && !selectedFlow && Boolean(providerStepStatus);
+  const currentStage = draftSurface
+    ? "mission"
+    : projectLevelProviderFocus
+      ? "implement"
+      : flowStageId(selectedFlow, nextAction, projectState);
   const executionEvidence = useMemo(() => {
     const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, selectedFlowRuntimeTrace, { draft: draftSurface });
     if (flowExecutionEvidence || draftSurface || selectedFlow?.flow_id || !providerStepStatus) return flowExecutionEvidence;
@@ -3793,6 +3840,12 @@ function App() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
+
+  useEffect(() => {
+    if (!projectLevelProviderFocus || didChooseStage.current) return;
+    setSelectedStage("implement");
+    didAutoSelectStage.current = true;
+  }, [projectLevelProviderFocus]);
 
   useEffect(() => {
     const shouldResetScroll = newFlowDraft || Boolean(selectedFlowId);
@@ -4266,8 +4319,12 @@ function App() {
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
-  const firstRunFocusMode = draftSurface || !selectedFlow;
-  const topbarAskReason = selectedFlow ? "Ask AOR for selected flow" : "Ask AOR requires a selected active flow";
+  const firstRunFocusMode = draftSurface || (!selectedFlow && !projectLevelProviderFocus);
+  const topbarAskReason = selectedFlow
+    ? "Ask AOR for selected flow"
+    : projectLevelProviderFocus
+      ? "Ask AOR is disabled until the provider run materializes a selectable flow."
+      : "Ask AOR requires a selected active flow";
   const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
 
   return (
@@ -4301,6 +4358,7 @@ function App() {
         </div>
         <div className="topbar-status-strip" aria-label="Console status">
           <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No active flow"} />
+          {projectLevelProviderFocus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
           <StatusPill state={config ? "connected" : "loading"} />
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         </div>
@@ -4388,7 +4446,7 @@ function App() {
             activeProject={activeProject}
             onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
-            evidenceRows={flowEvidenceRows}
+            evidenceRows={projectLevelProviderFocus ? workbenchEvidenceRows : flowEvidenceRows}
           />
         )}
       </main>
@@ -4403,6 +4461,7 @@ function App() {
           operatorRequests={operatorRequests}
           flows={flowOptions}
           evidenceRows={workbenchEvidenceRows}
+          providerStepStatus={providerStepStatus}
         />
       ) : null}
 
