@@ -1857,17 +1857,31 @@ svg {
   color: #334155;
 }
 
-.command-panel {
-  background: #0f1d2b !important;
+.next-step-panel {
+  border-color: var(--color-primary-tint) !important;
+  background: var(--color-primary-soft) !important;
 }
 
-.command-panel span,
-.command-panel p {
-  color: #d6e4ef;
+.next-step-panel strong {
+  color: var(--color-heading);
 }
 
-.command-panel code {
-  color: #ffffff;
+.next-step-panel p {
+  color: var(--color-text);
+}
+
+.action-command-details {
+  margin-top: 4px;
+}
+
+.action-command-details summary {
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.action-command-details .compact-inline-value > code {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .held-action-note {
@@ -1875,7 +1889,7 @@ svg {
   gap: 4px;
   margin-top: 6px;
   padding-top: 8px;
-  border-top: 1px solid rgba(214, 228, 239, 0.26);
+  border-top: 1px solid var(--color-border-strong);
 }
 
 .held-action-note > span {

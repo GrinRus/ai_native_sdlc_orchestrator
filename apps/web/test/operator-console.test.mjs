@@ -71,6 +71,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "latestRequestForFlow",
     "flowScopedInteractions",
     "actionCommandLabel",
+    "actionOutcomeTitle",
+    "actionOutcomeDetail",
+    "What happens next",
+    "Show CLI command",
+    "Materialize discovery evidence",
     "topbar-ask-button",
     "draft: newFlowDraft",
     "draftSurface",
@@ -410,6 +415,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".advanced-workbench-tabs"), "SPA CSS should define active advanced workbench tabs");
   assert.ok(css.includes(".compact-inline-value"), "SPA CSS should define compact inline value layout");
   assert.ok(css.includes(".compact-detail-value"), "SPA CSS should define compact detail value layout");
+  assert.ok(css.includes(".next-step-panel"), "Active cockpit should present the recommended action as an operator outcome");
+  assert.ok(css.includes(".action-command-details"), "Active cockpit should keep raw lifecycle commands behind technical details");
   assert.match(css, /\.form-actions \.form-primary-action\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Safe first-flow submit action should stay in the first mission form action row");
   assert.match(css, /\.safe-template-summary\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u, "Safe first-flow summary should remain a compact information grid");
   assert.match(css, /\.mission-detail-fields summary\s*\{[\s\S]*?min-height: var\(--touch-control-height\);/u, "Mission detail disclosure should meet mobile touch target size");

@@ -1442,6 +1442,33 @@ function actionDryRunPreview(action) {
   return command.includes("--dry-run") ? command : `${command} --dry-run`;
 }
 
+function actionOutcomeTitle(action, stage, { completed = false, providerFocusActive = false } = {}) {
+  const explicitLabel = String(action?.action_label ?? "").trim();
+  if (explicitLabel && !/^command$/iu.test(explicitLabel)) return explicitLabel;
+  const command = actionCommandLabel(action).toLowerCase();
+  if (completed) return "Inspect completed evidence";
+  if (providerFocusActive || command.includes("run status")) return "Review run blocker";
+  if (command.includes("project init")) return "Initialize local runtime";
+  if (command.includes("mission create")) return "Create a no-write flow";
+  if (command.includes("discovery")) return "Materialize discovery evidence";
+  if (command.includes("spec")) return "Materialize spec evidence";
+  if (command.includes("wave")) return "Plan the implementation wave";
+  if (command.includes("run start") || command.includes("execution")) return "Start controlled execution";
+  if (command.includes("review")) return "Run review and QA gate";
+  if (command.includes("delivery")) return "Prepare delivery evidence";
+  if (command.includes("release")) return "Prepare release evidence";
+  if (command.includes("learning")) return "Close learning evidence";
+  return stage?.label ? `Advance ${stage.label}` : "Resolve next action";
+}
+
+function actionOutcomeDetail(action, { completed = false, providerFocusActive = false } = {}) {
+  const reason = String(action?.reason ?? "").trim();
+  if (reason) return reason;
+  if (completed) return "Review locked artifacts without mutating the completed flow.";
+  if (providerFocusActive) return "Inspect the blocking run evidence, record the required operator decision, then refresh status.";
+  return "AOR will run the selected lifecycle step through public control-plane commands.";
+}
+
 function flowStageId(flow, nextAction, projectState) {
   if (flow?.selected_stage) return toUiStageId(flow.selected_stage);
   if (!flow) return "readiness";
@@ -2913,6 +2940,8 @@ function FlowCockpit({
   const workbenchAction = hasOpenDecisionRequest
     ? { label: "Decision Request", icon: "target", tabId: "decisions" }
     : { label: "Workbench", icon: "target", tabId: "evidence" };
+  const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
+  const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
   const openAdvancedWorkbench = (tabId = "evidence") => {
     if (typeof document === "undefined") return;
     const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
@@ -3019,10 +3048,14 @@ function FlowCockpit({
           <StatusPill state={blockers.length > 0 ? "blocked" : completed ? "read-only" : "ready"} />
         </div>
         <div className="action-grid">
-          <div className="command-panel">
-            <span>{nextPrimary.action_label ?? "Command"}</span>
-            <CompactInlineValue value={actionCommandTitle(nextPrimary)} kind="command" />
-            <p>{nextPrimary.reason}</p>
+          <div className="next-step-panel">
+            <span>What happens next</span>
+            <strong>{actionOutcome}</strong>
+            <p>{actionDetail}</p>
+            <details className="debug-ref-details action-command-details">
+              <summary>Show CLI command</summary>
+              <CompactInlineValue value={actionCommandTitle(nextPrimary)} kind="command" />
+            </details>
             {nextPrimary.held_action_label ? (
               <div className="held-action-note">
                 <span>Held downstream action</span>
