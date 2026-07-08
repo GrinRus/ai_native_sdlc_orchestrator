@@ -2935,6 +2935,53 @@ tr.selected td {
   overflow-wrap: anywhere;
 }
 
+.decision-checklist {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dfe7ef;
+  border-radius: 6px;
+  background: #f8fbfc;
+}
+
+.decision-checklist > span {
+  color: #384653;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.decision-checklist ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.decision-checklist li {
+  min-width: 0;
+  padding-left: 2px;
+  color: #384653;
+}
+
+.decision-checklist strong,
+.decision-checklist p {
+  overflow-wrap: anywhere;
+}
+
+.decision-checklist strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.decision-checklist p {
+  margin: 2px 0 0;
+  color: #64717d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .drawer-backdrop {
   position: fixed;
   inset: 0;

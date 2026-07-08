@@ -3182,12 +3182,55 @@ function preferredOperatorDecisionAction(externalRunHealth, supportedActions) {
   return actions[0] ?? "continue";
 }
 
+function operatorDecisionActionOutcomeCopy(actionId) {
+  switch (actionId) {
+    case "continue":
+      return "Continue only after the required checks pass or remain bounded warnings.";
+    case "diagnose":
+      return "Record a diagnosis after the required evidence confirms the blocker.";
+    case "block":
+      return "Record a blocker decision when continuation is unsafe or evidence is incomplete.";
+    case "retry_public_step":
+      return "Retry the public step only after the blocker has been reviewed.";
+    case "answer":
+      return "Answer the operator question through the interaction surface before continuing.";
+    case "frontend_interact":
+      return "Complete the browser evidence check before continuing.";
+    default:
+      return "Record the selected action after the request evidence has been reviewed.";
+  }
+}
+
+function operatorDecisionChecklistItems(selectedRequest, selectedActionEntry) {
+  if (!selectedRequest) return [];
+  const actionLabel = selectedActionEntry?.label ?? "selected action";
+  return [
+    {
+      label: "Inspect the decision request",
+      detail: "Copy or open the request ref before deciding.",
+    },
+    {
+      label: "Confirm evidence coverage",
+      detail: `Use the required evidence artifacts from the request rubric before recording ${actionLabel}.`,
+    },
+    {
+      label: "Record selected action",
+      detail: `${actionLabel}: ${operatorDecisionActionOutcomeCopy(selectedActionEntry?.id)}`,
+    },
+    {
+      label: "Refresh run status",
+      detail: "Confirm the blocker clears or remains actionable after the decision is recorded.",
+    },
+  ];
+}
+
 function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
   const preferredAction = preferredOperatorDecisionAction(externalRunHealth, supportedActions);
   const [selectedAction, setSelectedAction] = useState(preferredAction);
   const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
+  const decisionChecklist = operatorDecisionChecklistItems(selectedRequest, selectedActionEntry);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   useEffect(() => {
     setSelectedAction(preferredAction);
@@ -3247,6 +3290,19 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
               <strong>Preserved when required</strong>
             </div>
           </div>
+          {decisionChecklist.length > 0 ? (
+            <div className="decision-checklist" aria-label="Decision completion checklist">
+              <span>Decision checklist</span>
+              <ol>
+                {decisionChecklist.map((item) => (
+                  <li key={item.label}>
+                    <strong>{item.label}</strong>
+                    <p>{item.detail}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
           <details className="debug-ref-details decision-debug">
             <summary>Debug raw request ref</summary>
             <code>{selectedRequest.ref}</code>
