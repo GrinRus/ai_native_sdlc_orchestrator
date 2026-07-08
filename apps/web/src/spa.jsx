@@ -569,6 +569,67 @@ function isActiveProviderStepStatus(status) {
   return Boolean(status && !["completed", "failed", "interrupted"].includes(status.status));
 }
 
+function isTerminalProviderStepStatus(status) {
+  return Boolean(status && ["completed", "failed", "interrupted"].includes(status.status));
+}
+
+function providerFocusStageId(status) {
+  if (!isTerminalProviderStepStatus(status)) return "implement";
+  if (status?.status === "completed") return "review";
+  return "implement";
+}
+
+function providerFocusTitle(status) {
+  if (status?.status === "completed") return "Provider run completed";
+  if (status?.status === "failed") return "Provider run failed";
+  if (status?.status === "interrupted") return "Provider run interrupted";
+  return "Provider run in progress";
+}
+
+function providerFocusDescription(status) {
+  if (status?.status === "completed") {
+    return "Provider execution completed before a flow could be selected. Inspect verification, review, or QA evidence before delivery.";
+  }
+  if (status?.status === "failed") {
+    return "Provider execution failed before a flow could be selected. Inspect evidence, then diagnose or retry through public controls.";
+  }
+  if (status?.status === "interrupted") {
+    return "Provider execution was interrupted before a flow could be selected. Save partial evidence, then diagnose or retry through public controls.";
+  }
+  return "Live execution is running from project-level evidence before a flow can be selected.";
+}
+
+function providerFocusPrimaryAction(status) {
+  if (status?.status === "completed") {
+    return {
+      action_label: "Inspect post-run evidence",
+      command: "aor run status --json",
+      dry_run_label: "Status preview",
+      dry_run_command: "aor run status --json",
+      reason: "Provider completed. Inspect verification, review, or QA evidence before delivery.",
+    };
+  }
+  if (status?.status === "failed") {
+    return {
+      action_label: "Inspect failed provider run",
+      command: "aor run status --json",
+      reason: providerStatusCopy(status),
+    };
+  }
+  if (status?.status === "interrupted") {
+    return {
+      action_label: "Save partial evidence",
+      command: "aor run status --json",
+      reason: providerStatusCopy(status),
+    };
+  }
+  return {
+    action_label: "Monitor provider run",
+    command: "aor run status --json",
+    reason: providerStatusCopy(status),
+  };
+}
+
 function formatDurationMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "n/a";
   const totalSeconds = Math.floor(value / 1000);
@@ -1271,7 +1332,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
     : flow
       ? flowDisplayName(flow)
       : projectLevelProviderFocus
-        ? "Provider run in progress"
+        ? providerFocusTitle(providerStepStatus)
         : "No active flow";
   const railDescription = newFlowDraft
     ? "Draft mission settings are not durable evidence until submitted."
@@ -1280,7 +1341,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
         : flow
         ? "Navigation is scoped to the selected flow."
         : projectLevelProviderFocus
-          ? "Live execution is running from project-level evidence before a flow can be selected."
+          ? providerFocusDescription(providerStepStatus)
           : "Readiness prepares the runtime before a flow is created.";
   return (
     <aside className={`stage-rail ${firstRunFocus ? "compact-first-run" : ""}`}>
@@ -1775,7 +1836,9 @@ function VerificationFailureBanner({ plan, failures = [] }) {
 
 function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode, artifactReadiness = null, projectLevelProviderFocus = false }) {
   const closureState = flow?.closure_state ?? {};
-  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
+  const visibleEvidence = projectLevelProviderFocus && evidenceRefs.length === 0
+    ? evidenceRows
+    : artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   if (completed || stage.id === "learning") {
     const sourceHandoffRefs = Array.isArray(closureState.source_learning_handoff_refs)
       ? closureState.source_learning_handoff_refs
@@ -2160,11 +2223,7 @@ function FlowCockpit({
     "no-write";
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
   const resolverPrimary = projectLevelProviderFocus
-    ? {
-        action_label: "Monitor provider run",
-        command: "aor run status --json",
-        reason: providerStatusCopy(providerStepStatus),
-      }
+    ? providerFocusPrimaryAction(providerStepStatus)
     : completed
     ? nextAction?.primary_action?.action_id === "start-new-flow"
       ? nextAction.primary_action
@@ -2464,11 +2523,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   let nextPrimary = nextAction?.primary_action ?? {};
   if (!selectedFlow && !newFlowDraft) {
     nextPrimary = projectLevelProviderFocus
-      ? {
-        low_level_command: "run status",
-        command: "aor run status --json",
-        reason: providerStatusCopy(providerStepStatus),
-      }
+      ? providerFocusPrimaryAction(providerStepStatus)
       : runtimeReady
       ? {
         low_level_command: "mission create",
@@ -2614,7 +2669,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
           </div>
         ) : projectLevelProviderFocus ? (
           <div className="flow-inventory-row selected">
-            <strong>Provider run in progress</strong>
+            <strong>{providerFocusTitle(providerStepStatus)}</strong>
             <span>{providerStepStatus.status}</span>
           </div>
         ) : (
@@ -3672,7 +3727,7 @@ function App() {
   const currentStage = draftSurface
     ? "mission"
     : projectLevelProviderFocus
-      ? "implement"
+      ? providerFocusStageId(providerStepStatus)
       : flowStageId(selectedFlow, nextAction, projectState);
   const executionEvidence = useMemo(() => {
     const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, selectedFlowRuntimeTrace, { draft: draftSurface });
@@ -3843,9 +3898,9 @@ function App() {
 
   useEffect(() => {
     if (!projectLevelProviderFocus || didChooseStage.current) return;
-    setSelectedStage("implement");
+    setSelectedStage(providerFocusStageId(providerStepStatus));
     didAutoSelectStage.current = true;
-  }, [projectLevelProviderFocus]);
+  }, [projectLevelProviderFocus, providerStepStatus?.status]);
 
   useEffect(() => {
     const shouldResetScroll = newFlowDraft || Boolean(selectedFlowId);
