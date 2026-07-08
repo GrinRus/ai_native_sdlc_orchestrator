@@ -595,6 +595,13 @@ const GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES = new Set([
   "Run artifacts declared a primary failure owner, phase, or class.",
 ]);
 
+const EXTERNAL_DECISION_OPERATOR_LABEL = ["Skill", "agent"].join("-");
+
+const GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS = new Set([
+  `${EXTERNAL_DECISION_OPERATOR_LABEL} operator decision is required before continuation.`,
+  `${EXTERNAL_DECISION_OPERATOR_LABEL} operator decision is required before the next public step.`,
+]);
+
 const EXTERNAL_RUN_FAILURE_CLASS_COPY = {
   compiled_context_budget_exceeded: "compiled context budget exceeded",
   guided_browser_task_proof_missing: "guided browser proof missing",
@@ -684,6 +691,31 @@ function externalRunHealthUserSummary(health) {
   ].filter(Boolean).join(" ");
 }
 
+function externalRunPendingDecisionUserReason(health, pendingDecision = health?.pending_decision) {
+  if (!pendingDecision || typeof pendingDecision !== "object") return null;
+  const rawReason = typeof pendingDecision.reason === "string" ? pendingDecision.reason.trim() : "";
+  if (rawReason && !GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(rawReason)) return rawReason;
+  const action = String(pendingDecision.action ?? "").trim();
+  if (!action) return null;
+  const stepLabel = externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  switch (action) {
+    case "answer":
+      return `Answer the ${stepLabel} operator question before continuing.`;
+    case "block":
+      return `Record the ${stepLabel} block decision before continuing.`;
+    case "continue":
+      return `Accept the ${stepLabel} operator decision before continuing.`;
+    case "diagnose":
+      return `Review the ${stepLabel} decision request and record the operator diagnosis before continuing.`;
+    case "frontend_interact":
+      return `Complete the ${stepLabel} browser evidence check before continuing.`;
+    case "retry_public_step":
+      return `Retry the ${stepLabel} public step after reviewing the blocker.`;
+    default:
+      return `Record the ${stepLabel} operator decision before continuing.`;
+  }
+}
+
 function externalRunHealthBlockerSummary(health, blocker, index) {
   const failure = health?.failure_summary ?? {};
   const code = String(blocker?.code ?? "");
@@ -696,6 +728,18 @@ function externalRunHealthBlockerSummary(health, blocker, index) {
   const missingDecisionMatch = code.match(/^run_health\.(.+)\.operator_decision_missing$/u);
   if (missingDecisionMatch) {
     return `Accept the ${externalRunStepLabel(missingDecisionMatch[1])} operator decision before continuing.`;
+  }
+  const pendingDecisionMatch = code.match(/^run_health\.(.+)\.pending_(.+)$/u);
+  if (pendingDecisionMatch) {
+    const pendingDecision = {
+      ...(health?.pending_decision ?? {}),
+      action: pendingDecisionMatch[2],
+      reason: summary,
+    };
+    return externalRunPendingDecisionUserReason({
+      ...health,
+      current_step: pendingDecisionMatch[1],
+    }, pendingDecision) ?? (summary || code);
   }
   if (code === "run_health.missing_evidence") {
     const missingEvidenceRefs = Array.isArray(health?.missing_evidence_refs) ? health.missing_evidence_refs : [];
@@ -778,7 +822,7 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
       dry_run_label: "Run-health",
       dry_run_command: "aor run status --json",
       reason:
-        pending.reason ??
+        externalRunPendingDecisionUserReason(externalRunHealth, pending) ??
         externalRunHealthUserSummary(externalRunHealth) ??
         `${stepLabel} is blocked by run-health evidence.`,
     };

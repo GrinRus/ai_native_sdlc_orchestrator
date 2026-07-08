@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "source_hash": "2f218c285d055f1a8f0c64631efab390aa4a1ad13bc1671c080b31fb54299719",
+  "source_hash": "d6dc915b597780f8620de7cd2d8ee734d2fc077641e925ae6816b4a8ce45ef63",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -10,7 +10,7 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-Bx8kjkkd.css",
-    "apps/web/dist/assets/index-CtqknbS5.js",
+    "apps/web/dist/assets/index-CZz5ATE-.js",
     "apps/web/dist/index.html"
   ]
 }
