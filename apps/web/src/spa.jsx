@@ -554,6 +554,30 @@ function providerStatusCopy(status) {
   return "Provider step is running.";
 }
 
+function isGenericProviderCommandLabel(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "" || normalized === "external-provider-runner";
+}
+
+function providerCommandDisplayLabel(status) {
+  const label = String(status?.current_command_label ?? "").trim();
+  if (!isGenericProviderCommandLabel(label)) return compactCommandLabel(label);
+  if (status?.status === "completed") return "Provider CLI session completed";
+  if (status?.status === "failed") return "Provider CLI session failed";
+  if (status?.status === "interrupted") return "Provider CLI session interrupted";
+  return "Provider CLI session";
+}
+
+function providerCommandDetail(status) {
+  const rawLabel = String(status?.current_command_label ?? "").trim();
+  if (!isGenericProviderCommandLabel(rawLabel)) return status?.recommended_action ?? "Track this command through provider evidence.";
+  const adapter = status?.adapter ?? "configured provider adapter";
+  if (status?.status === "completed") return `The ${adapter} process finished. Continue with verification, review, or the next quality gate.`;
+  if (status?.status === "failed") return `The ${adapter} process failed. Inspect provider evidence before retrying or diagnosing.`;
+  if (status?.status === "interrupted") return `The ${adapter} process was interrupted. Save partial evidence, then diagnose or retry through public controls.`;
+  return `AOR is waiting on the ${adapter} process. Use Activity, Last output, and Last artifact to judge progress.`;
+}
+
 function resolveProviderStepStatus(projectState, runs) {
   const fromProject = asProviderStepStatus(projectState?.provider_step_status);
   const fromRuns = Array.isArray(runs)
@@ -1194,7 +1218,8 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
         <div className="provider-heartbeat-rail" aria-label="Provider step heartbeat">
           <div>
             <span>{providerStepStatus.provider ?? "Provider"}</span>
-            <strong>{providerStepStatus.adapter ?? providerStepStatus.route_id ?? "external runner"}</strong>
+            <strong title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</strong>
+            <em>{providerStepStatus.adapter ?? providerStepStatus.route_id ?? "provider adapter"}</em>
           </div>
           <StatusPill state={providerStepStatus.status} />
           <p>{providerStatusCopy(providerStepStatus)}</p>
@@ -2075,8 +2100,11 @@ function FlowCockpit({
             </div>
           </div>
           <div className="provider-heartbeat-action">
-            <span>{providerStepStatus.current_command_label ?? "external-provider-runner"}</span>
-            <strong>{providerStepStatus.recommended_action ?? "Provider is still running."}</strong>
+            <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
+            <strong>{providerCommandDetail(providerStepStatus)}</strong>
+            {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? (
+              <small>Raw runner label: external-provider-runner</small>
+            ) : null}
           </div>
         </div>
       ) : null}

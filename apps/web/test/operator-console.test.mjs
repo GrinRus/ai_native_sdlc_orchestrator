@@ -100,6 +100,10 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Provider progress was observed earlier",
     "Provider output was observed earlier",
     "Provider was stopped by the operator",
+    "providerCommandDisplayLabel",
+    "Provider CLI session",
+    "providerCommandDetail",
+    "Raw runner label: external-provider-runner",
     "interruption_owner",
     "Interruption owner",
     "Interruption status",
@@ -281,6 +285,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
+  assert.ok(css.includes(".provider-heartbeat-action small"), "Provider heartbeat should demote raw runner labels to secondary debug copy");
   assert.ok(css.includes(".quality-gate-card"), "SPA CSS should define active quality gate layout");
   assert.ok(css.includes(".quality-gate-card.operator-hold"), "SPA CSS should distinguish exhausted repair budgets");
   assert.ok(css.includes(".verification-plan-card"), "SPA CSS should define compact verification plan layout");

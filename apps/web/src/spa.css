@@ -357,10 +357,16 @@ button:disabled {
 }
 
 .provider-heartbeat-rail span,
-.provider-heartbeat-rail small {
+.provider-heartbeat-rail small,
+.provider-heartbeat-rail em {
   color: #b9d7e2;
   font-size: 11px;
   font-weight: 750;
+}
+
+.provider-heartbeat-rail em {
+  font-style: normal;
+  overflow-wrap: anywhere;
 }
 
 .provider-heartbeat-rail strong,
@@ -993,6 +999,12 @@ p {
 
 .provider-heartbeat-grid strong,
 .provider-heartbeat-action strong {
+  overflow-wrap: anywhere;
+}
+
+.provider-heartbeat-action small {
+  color: #65717d;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
