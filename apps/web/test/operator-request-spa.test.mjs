@@ -40,7 +40,7 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /topbar-ask-button/u);
   assert.match(source, /draft: newFlowDraft/u);
   assert.match(source, /draftSurface/u);
-  assert.match(source, /currentStage = draftSurface \? "mission"/u);
+  assert.match(source, /currentStage = draftSurface\s*\?\s*"mission"/u);
   assert.match(source, /Draft flow has no artifacts yet/u);
   assert.match(source, /New Flow Preview/u);
   assert.match(source, /Completeness Checklist/u);

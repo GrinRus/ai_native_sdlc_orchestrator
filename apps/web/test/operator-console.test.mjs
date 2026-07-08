@@ -130,6 +130,13 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "StageSpecificPanel",
     "artifact-readiness-grid",
     "artifact_readiness",
+    "qualityGateEvidenceRows",
+    "gate?.evidence_summaries",
+    "qualityGateRecoveryPlan",
+    "Quality gate recovery path",
+    "Recovery path",
+    "Run repair implementation",
+    "Delivery stays blocked",
     "Review Gate Matrix",
     "Delivery / Release Finalization",
     "Learning Closure / Start New Flow",
@@ -476,10 +483,19 @@ test("active quality gate blockers preserve structured recovery details", () => 
   assert.match(source, /normalizeQualityGateBlockerRow/u);
   assert.match(source, /normalizedBlockerField/u);
   assert.match(source, /qualityGateBlockerForActionContext/u);
+  assert.match(source, /qualityGateEvidenceRows/u);
+  assert.match(source, /qualityGateRecoveryPlan/u);
   assert.match(source, /"next_command"/u);
   assert.match(source, /record\.evidence_refs/u);
+  assert.match(source, /gate\?\.evidence_summaries/u);
+  assert.match(source, /Quality gate recovery path/u);
+  assert.match(source, /Recovery path/u);
+  assert.match(source, /Delivery stays blocked/u);
   assert.match(source, /quality-blocker-list/u);
   assert.match(source, /quality-blocker-meta/u);
+  assert.match(css, /\.quality-recovery-path\s*\{/u);
+  assert.match(css, /\.quality-recovery-path ol\s*\{/u);
+  assert.match(css, /\.quality-recovery-path li\.active\s*\{/u);
   assert.doesNotMatch(
     source,
     /qualityGateBlockers\.map\(\(blocker\) => \(\{ code: blocker, summary: blocker \}\)\)/u,

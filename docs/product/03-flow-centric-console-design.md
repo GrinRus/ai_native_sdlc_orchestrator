@@ -130,6 +130,11 @@ The packaged SPA now treats the flow as the primary object:
   stop/save/diagnose/retry controls. Scratch-only output is explicitly
   non-passing, while `.qwen/`, `.codex/`, `.claude/`, and `.opencode/` target
   checkout state is shown as blocking runner-owned leakage.
+- Active review/QA repair gates render as recovery paths before raw gate
+  details: the panel shows the current repair step, compact next command,
+  linked repair evidence summaries from the flow projection, blocker count, and
+  delivery/release exit condition so first-time operators can see why delivery
+  remains blocked and what closes the loop.
 - Completed flows render as read-only closure/evidence views with mutation
   controls disabled or replaced by no-write inspection actions.
 - Ask AOR submissions include `target_flow_id` for the selected flow; completed

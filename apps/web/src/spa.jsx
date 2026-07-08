@@ -1986,14 +1986,62 @@ function qualityGateBlockerForActionContext(blocker) {
   };
 }
 
+function qualityGateEvidenceRows(gate, evidenceRows = []) {
+  const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
+  const evidenceRefs = Array.isArray(gate?.evidence_refs) ? gate.evidence_refs : [];
+  const summaries = Array.isArray(gate?.evidence_summaries) ? gate.evidence_summaries : [];
+  const summaryRows = summaries.map((summary, index) => artifactRowFromSummary(summary, {
+    ref: summary?.raw_ref ?? summary?.source_ref ?? `quality-gate-summary-${index}`,
+    stage: "review",
+  }));
+  const rowForRef = (ref) => {
+    return rows.find((row) => evidenceRefsMatch(row.ref, ref) || evidenceRefsMatch(row.sourceRef, ref))
+      ?? summaryRows.find((row) => evidenceRefsMatch(row.ref, ref) || evidenceRefsMatch(row.sourceRef, ref))
+      ?? missingArtifactRow(ref, "review");
+  };
+  return evidenceRefs.length > 0 ? evidenceRefs.map(rowForRef) : summaryRows;
+}
+
+function qualityGateRecoveryPlan(gate, blockers, evidenceCount) {
+  const flowState = String(gate?.flow_state ?? gate?.status ?? "").trim();
+  const sourceStage = String(gate?.source_stage ?? "").trim();
+  const hold = gate?.operator_hold === true || flowState === "repair-cycle-exhausted";
+  const nextAction = gate?.next_action ?? {};
+  const currentStep = hold
+    ? "Record explicit operator decision"
+    : flowState === "review-required"
+      ? "Run post-repair review"
+      : flowState === "qa-required"
+        ? "Run QA rerun"
+        : flowState === "in-progress"
+          ? "Wait for repair evidence"
+          : "Run repair implementation";
+  const closureStep = sourceStage === "qa"
+    ? "Post-repair review and QA must pass before delivery."
+    : "Post-repair review must pass before delivery; QA follows when in scope.";
+  const evidenceStep = evidenceCount > 0
+    ? `${evidenceCount} repair evidence summaries linked.`
+    : "Repair request and source evidence are still being materialized.";
+  const blockerStep = blockers.length > 0
+    ? `${blockers.length} blocker${blockers.length === 1 ? "" : "s"} must be cleared.`
+    : "No active blockers are listed beyond the gate state.";
+  return {
+    currentStep,
+    nextCommand: actionCommandLabel(nextAction, hold ? "aor review decide" : "aor run start"),
+    evidenceStep,
+    blockerStep,
+    closureStep,
+  };
+}
+
 function QualityGatePanel({ gate, evidenceRows = [] }) {
   if (!gate) return null;
   const nextAction = gate.next_action ?? {};
-  const evidenceRefs = Array.isArray(gate.evidence_refs) ? gate.evidence_refs : [];
-  const evidence = artifactRowsForRefs(evidenceRefs, evidenceRows, "review").slice(0, 4);
   const blockers = qualityGateBlockerRows(gate);
+  const evidence = qualityGateEvidenceRows(gate, evidenceRows).slice(0, 4);
   const sourceLabel = qualityGateSourceLabel(gate.source_stage);
   const hold = gate.operator_hold === true;
+  const recoveryPlan = qualityGateRecoveryPlan(gate, blockers, evidence.length);
   return (
     <div className={`quality-gate-card ${gate.flow_state ?? "requested"} ${hold ? "operator-hold" : ""}`} aria-label="Active quality gate">
       <div className="quality-gate-heading">
@@ -2003,6 +2051,31 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
           <p>{hold ? "Delivery and release stay blocked until an explicit operator decision is recorded." : "Repair must close through implementation, review, and required QA evidence before delivery."}</p>
         </div>
         <StatusPill state={gate.status ?? gate.flow_state ?? "requested"} />
+      </div>
+
+      <div className="quality-recovery-path" aria-label="Quality gate recovery path">
+        <div className="quality-recovery-heading">
+          <span>Recovery path</span>
+          <strong>{recoveryPlan.currentStep}</strong>
+          <p>{hold ? "Automatic repair is exhausted; an operator must explicitly decide how to proceed." : "Keep delivery and release blocked until the repair loop proves closure."}</p>
+        </div>
+        <ol>
+          <li className="active">
+            <span>Now</span>
+            <strong>{recoveryPlan.currentStep}</strong>
+            <CompactInlineValue value={recoveryPlan.nextCommand} kind="command" />
+          </li>
+          <li>
+            <span>Evidence</span>
+            <strong>{recoveryPlan.evidenceStep}</strong>
+            <p>{recoveryPlan.blockerStep}</p>
+          </li>
+          <li>
+            <span>Exit condition</span>
+            <strong>{gate.delivery_release_blocked ? "Delivery stays blocked" : "Delivery unblocked"}</strong>
+            <p>{recoveryPlan.closureStep}</p>
+          </li>
+        </ol>
       </div>
 
       <div className="quality-gate-grid">
