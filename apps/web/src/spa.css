@@ -749,6 +749,22 @@ p {
   border-color: #bfd7e5;
 }
 
+.first-run-wizard .readiness-action {
+  order: 1;
+}
+
+.first-run-wizard .first-run-next-action-grid {
+  order: 2;
+}
+
+.first-run-wizard .readiness-check-list {
+  order: 3;
+}
+
+.first-run-wizard .flow-lifecycle-preview {
+  order: 4;
+}
+
 .wizard-heading-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3412,7 +3428,23 @@ code {
   }
 
   .flow-active-mode .recommended-action .cockpit-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     order: 2;
+    width: 100%;
+  }
+
+  .flow-active-mode .recommended-action .cockpit-actions .primary {
+    grid-column: 1 / -1;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .flow-active-mode .recommended-action .cockpit-actions .secondary {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
   }
 
   .flow-active-mode .recommended-action .action-grid {

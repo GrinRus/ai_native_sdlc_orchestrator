@@ -284,6 +284,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.runtime-path-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Runtime path disclosure controls should meet the shared target size");
   assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
   assert.match(css, /\.row-actions \.icon-button\s*\{[\s\S]*?width: var\(--control-height\);[\s\S]*?height: var\(--control-height\);/u, "Artifact row icon actions should meet the shared target size");
+  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u, "First-run primary action should stay above supporting readiness details");
+  assert.match(css, /\.first-run-wizard \.first-run-next-action-grid\s*\{[\s\S]*?order: 2;/u, "First-run next-action summary should follow the primary action");
   assert.ok(css.includes(".support-table-grid"), "SPA CSS should hide first-run support tables behind disclosure");
   assert.equal(
     source.includes("candidates.at(-1)"),
@@ -294,6 +296,21 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes(".flow-active-mode .recommended-action .cockpit-actions"), "SPA CSS should place active mobile cockpit actions before stacked details");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.flow-active-mode \.recommended-action \.cockpit-actions\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?width: 100%;/u,
+    "Active mobile cockpit actions should use a bounded two-column grid",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?width: 100%;/u,
+    "Active mobile cockpit primary action should span the full action row",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.recommended-action \.cockpit-actions \.secondary\s*\{[\s\S]*?width: 100%;[\s\S]*?min-width: 0;/u,
+    "Active mobile cockpit secondary actions should fit within the viewport",
+  );
   assert.match(
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-focus-mode \.topbar\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: minmax\(0, 1fr\) max-content max-content;/u,

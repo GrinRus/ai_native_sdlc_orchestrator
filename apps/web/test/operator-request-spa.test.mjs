@@ -149,6 +149,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(css, /\.compact-inline-value/u);
   assert.match(css, /\.compact-detail-value/u);
   assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions/u);
+  assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;/u);
+  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u);
   assert.match(css, /\.verification-plan-card/u);
   assert.match(css, /\.decision-action-grid button:focus-visible/u);
   assert.match(css, /\.execution-action-grid button:focus-visible/u);
