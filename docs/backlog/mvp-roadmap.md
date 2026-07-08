@@ -66,7 +66,7 @@ The authoritative planning model for implementation lives in:
 | W53 | Generalize target verification into AOR command groups and enforce the boundary between AOR runtime artifacts and live E2E proof harness evidence. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-53-implementation-slices.md` |
 | W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
 | W55 | Turn `ky` large/xlarge control findings into actionable repair evidence, target-catalog alignment, Claude guardrails, and rerun reporting. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-55-implementation-slices.md` |
-| W56 | Harden the installed-user first-run console so the next safe action stays primary while advanced evidence remains progressively disclosed. | 1 | EPIC-1, EPIC-6 | `docs/backlog/wave-56-implementation-slices.md` |
+| W56 | Harden the installed-user console so first-run setup and active-flow cockpit work stay primary while advanced evidence remains progressively disclosed. | 3 | EPIC-1, EPIC-6 | `docs/backlog/wave-56-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -224,6 +224,8 @@ The authoritative planning model for implementation lives in:
 | W45-S05 | repair-loop proof/profile target: DEV-05, RQA-05, OPS-06, OPS-07, FIN-03 |
 | W45-S06 | post-implementation docs/internal installed-user rehearsal acceptance target: DEV-05, DEV-07, RQA-02, RQA-05, RQA-06, OPS-04, OPS-06, OPS-07, FIN-03 |
 | W56-S01 | first-run console UX hardening target: PBO-09, OPS-01, OPS-10, OPS-11 |
+| W56-S02 | rendered cockpit UX hardening target: PBO-09, OPS-01, OPS-10, OPS-11 |
+| W56-S03 | rendered UX audit closure target: PBO-09, OPS-01, OPS-10, OPS-11 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1020,10 +1022,10 @@ without reopening W45 or W54.
 
 **Detailed slices:** `docs/backlog/wave-55-implementation-slices.md`
 
-## W56 - first-run console focus and action clarity
-**Goal:** Make the installed-user local console first-run path easier to scan by
-keeping one safe next action primary while advanced evidence/debug surfaces stay
-available through progressive disclosure.
+## W56 - first-run console focus and cockpit action clarity
+**Goal:** Make the installed-user local console first-run and active-flow paths
+easier to scan by keeping one safe next action primary while advanced
+evidence/debug surfaces stay available through progressive disclosure.
 
 **Exit criteria:**
 - Clean first-run and initialized-without-flow screens prioritize the runtime
@@ -1034,6 +1036,9 @@ available through progressive disclosure.
 - Disabled flow-dependent controls explain what state is required to recover.
 - Mobile first-run layout keeps project, status, stage progress, and primary
   action within the viewport without horizontal overflow.
+- Active-flow desktop, tablet, and mobile layouts keep selected project, flow,
+  no-write safety, and `Resolve Next Action` reachable before advanced evidence
+  workbench content.
 
 **Detailed slices:** `docs/backlog/wave-56-implementation-slices.md`
 

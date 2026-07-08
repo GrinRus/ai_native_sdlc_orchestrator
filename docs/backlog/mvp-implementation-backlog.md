@@ -492,6 +492,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W56-S01 | First-run console focus and action clarity | EPIC-1, EPIC-6 | done | `apps/web/**`, `docs/backlog/**`, `README.md`, tests | W55-S05 |
+| W56-S02 | Rendered cockpit UX hardening | EPIC-1, EPIC-6 | done | `apps/web/**`, `docs/backlog/**`, tests | W56-S01 |
+| W56-S03 | Rendered UX audit closure | EPIC-1, EPIC-6 | done | `apps/web/**`, `docs/backlog/**`, tests | W56-S02 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
