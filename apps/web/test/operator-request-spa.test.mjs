@@ -92,6 +92,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Project switcher/u);
   assert.match(source, /Add local project/u);
   assert.match(source, /Runtime root preview/u);
+  assert.match(source, /Project profile/u);
+  assert.match(source, /project_profile/u);
   assert.match(source, /Add and initialize/u);
   assert.match(source, /No active flow/u);
   assert.match(source, /Readiness prepares the runtime before a flow is created/u);

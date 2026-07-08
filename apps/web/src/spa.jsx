@@ -3085,6 +3085,7 @@ function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, o
   if (!open) return null;
   const projectPath = form.projectRef.trim();
   const runtimePreview = form.runtimeRoot.trim() || (projectPath ? `${projectPath.replace(/\/+$/u, "")}/.aor` : "<project>/.aor");
+  const profilePreview = form.projectProfile.trim() || "Default discovery or generated bundled profile";
   return (
     <div className="drawer-backdrop add-project-backdrop" role="presentation">
       <aside className="request-drawer add-project-drawer" aria-label="Add local project drawer">
@@ -3120,9 +3121,21 @@ function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, o
               placeholder="Defaults to <project>/.aor"
             />
           </label>
+          <label>
+            Project profile
+            <input
+              value={form.projectProfile}
+              onChange={(event) => setForm({ ...form, projectProfile: event.target.value })}
+              placeholder="Optional project.aor.yaml path"
+            />
+          </label>
           <div className="runtime-root-preview" aria-label="Runtime root preview">
             <span>Runtime root preview</span>
             <code>{runtimePreview}</code>
+          </div>
+          <div className="runtime-root-preview" aria-label="Project profile preview">
+            <span>Project profile</span>
+            <code>{profilePreview}</code>
           </div>
         </div>
         {result ? (
@@ -3332,7 +3345,7 @@ function App() {
   const [form, setForm] = useState(SAFE_TEMPLATE);
   const [requestDrawerOpen, setRequestDrawerOpen] = useState(false);
   const [addProjectDrawerOpen, setAddProjectDrawerOpen] = useState(false);
-  const [addProjectForm, setAddProjectForm] = useState({ projectRef: "", label: "", runtimeRoot: "" });
+  const [addProjectForm, setAddProjectForm] = useState({ projectRef: "", label: "", runtimeRoot: "", projectProfile: "" });
   const [addProjectResult, setAddProjectResult] = useState(null);
   const [requestForm, setRequestForm] = useState(DEFAULT_REQUEST);
   const [requestResult, setRequestResult] = useState(null);
@@ -3715,6 +3728,7 @@ function App() {
           project_ref: addProjectForm.projectRef.trim(),
           ...(addProjectForm.label.trim() ? { label: addProjectForm.label.trim() } : {}),
           ...(addProjectForm.runtimeRoot.trim() ? { runtime_root: addProjectForm.runtimeRoot.trim() } : {}),
+          ...(addProjectForm.projectProfile.trim() ? { project_profile: addProjectForm.projectProfile.trim() } : {}),
         }),
       });
       const nextProjectId = payload.project?.project_id;
@@ -3723,7 +3737,7 @@ function App() {
         projects: Array.isArray(payload.projects) ? payload.projects : [],
       });
       let resultMessage = "Project added to this local app session.";
-      setAddProjectForm({ projectRef: "", label: "", runtimeRoot: "" });
+      setAddProjectForm({ projectRef: "", label: "", runtimeRoot: "", projectProfile: "" });
       if (nextProjectId) {
         resetProjectScopedState();
         setActiveProjectId(nextProjectId);

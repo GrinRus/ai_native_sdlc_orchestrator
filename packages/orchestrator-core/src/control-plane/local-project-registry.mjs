@@ -150,7 +150,12 @@ function resolveRegistryProjectId(context, contexts) {
   }
 
   const base = normalizeId(path.basename(context.resolvedProjectRoot)) || normalizeId(context.runtimeProjectId);
-  const suffix = shortHash(`${context.resolvedProjectRoot}\0${context.resolvedRuntimeRoot}\0${context.runtimeProjectId}`);
+  const suffix = shortHash([
+    context.resolvedProjectRoot,
+    context.resolvedRuntimeRoot,
+    context.runtimeProjectId,
+    projectProfileIdentity(context),
+  ].join("\0"));
   let candidate = `${base}-${suffix}`;
   let collision = 1;
   while (contexts.has(candidate)) {
@@ -161,12 +166,25 @@ function resolveRegistryProjectId(context, contexts) {
 }
 
 /**
+ * @param {ReturnType<typeof createProjectContext>} context
+ * @returns {string}
+ */
+function projectProfileIdentity(context) {
+  const projectProfile = optionalString(context.runtimeOptions.projectProfile);
+  return projectProfile ? path.resolve(context.runtimeOptions.cwd ?? process.cwd(), projectProfile) : "";
+}
+
+/**
  * @param {ReturnType<typeof createProjectContext>} left
  * @param {ReturnType<typeof createProjectContext>} right
  * @returns {boolean}
  */
 function isSameRegisteredTarget(left, right) {
-  return left.resolvedProjectRoot === right.resolvedProjectRoot && left.resolvedRuntimeRoot === right.resolvedRuntimeRoot;
+  return (
+    left.resolvedProjectRoot === right.resolvedProjectRoot
+    && left.resolvedRuntimeRoot === right.resolvedRuntimeRoot
+    && projectProfileIdentity(left) === projectProfileIdentity(right)
+  );
 }
 
 /**

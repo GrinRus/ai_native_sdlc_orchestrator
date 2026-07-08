@@ -1260,6 +1260,51 @@ test("local app project index and add-project action keep project runtimes isola
   });
 });
 
+test("local app add-project action accepts an explicit project profile", async () => {
+  await withTempRepo(async (profiledProjectRoot) => {
+    const profiledRuntimeRoot = path.join(profiledProjectRoot, ".aor-explicit");
+    const explicitProjectProfile = path.join(workspaceRoot, "examples/project.aor.yaml");
+    const transport = await createControlPlaneHttpServer({
+      cwd: workspaceRoot,
+      projectRef: profiledProjectRoot,
+      runtimeRoot: profiledRuntimeRoot,
+      host: "127.0.0.1",
+      port: 0,
+      app: {
+        staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+        packageVersion: "0.0.0-test",
+      },
+    });
+
+    try {
+      const initialIndexResponse = await getJson(`${transport.baseUrl}/api/projects`);
+      assert.equal(initialIndexResponse.status, 200);
+      const initialIndex = await initialIndexResponse.json();
+      assert.equal(initialIndex.projects.length, 1);
+
+      const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
+        action: "add",
+        project_ref: profiledProjectRoot,
+        project_profile: explicitProjectProfile,
+        runtime_root: profiledRuntimeRoot,
+        label: "Profiled target",
+      });
+      assert.equal(addResponse.status, 200);
+      const added = await addResponse.json();
+      assert.equal(added.projects.length, 2);
+      assert.equal(added.project.label, "Profiled target");
+      assert.equal(added.project.runtime_project_id, "aor-core");
+      assert.equal(added.project.project_profile_ref, explicitProjectProfile);
+      assert.equal(added.project.project_profile_source, "explicit");
+      assert.equal(added.project.runtime_root, profiledRuntimeRoot);
+      assert.notEqual(added.project.project_id, initialIndex.projects[0].project_id);
+      assert.equal(fs.existsSync(profiledRuntimeRoot), false, "adding an explicit profile must not initialize runtime state");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("production-hardened transport enforces authz and redacts configured secrets from denials and logs", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.production-hardening.v1";
