@@ -52,6 +52,17 @@ const READ_ONLY_INSPECTION_INTENTS = new Set(["analyze", "explain", "review", "v
 
 const RUN_HEALTH_FIELD = ["run", "health"].join("_");
 
+const ADVANCED_WORKBENCH_FOCUS_EVENT = "aor.advanced-workbench.focus";
+
+const ADVANCED_WORKBENCH_TAB_IDS = new Set([
+  "evidence",
+  "execution",
+  "graph",
+  "trace",
+  "interactions",
+  "decisions",
+]);
+
 const SAFE_TEMPLATE_ID = "safe-walkthrough";
 
 const SAFE_TEMPLATE = {
@@ -2538,13 +2549,30 @@ function FlowCockpit({
     : stageRuntimeCopy;
   const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
   const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
-  const openAdvancedWorkbench = () => {
+  const hasOpenDecisionRequest = projectLevelProviderFocus && visibleEvidence.some((row) => {
+    return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
+  });
+  const workbenchAction = hasOpenDecisionRequest
+    ? { label: "Decision Request", icon: "target", tabId: "decisions" }
+    : { label: "Workbench", icon: "target", tabId: "evidence" };
+  const openAdvancedWorkbench = (tabId = "evidence") => {
     if (typeof document === "undefined") return;
-    const workbench = document.getElementById("flow-advanced-workbench");
-    if (!workbench) return;
-    workbench.scrollIntoView({ block: "start" });
-    const summary = workbench.querySelector("summary");
-    if (summary && typeof summary.focus === "function") summary.focus({ preventScroll: true });
+    const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function" && typeof window.CustomEvent === "function") {
+      window.dispatchEvent(new window.CustomEvent(ADVANCED_WORKBENCH_FOCUS_EVENT, { detail: { tabId: requestedTab } }));
+    }
+    const focusWorkbench = () => {
+      const workbench = document.getElementById("flow-advanced-workbench");
+      if (!workbench) return;
+      workbench.scrollIntoView({ block: "start" });
+      const summary = workbench.querySelector("summary");
+      if (summary && typeof summary.focus === "function") summary.focus({ preventScroll: true });
+    };
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(focusWorkbench);
+    } else {
+      focusWorkbench();
+    }
   };
 
   return (
@@ -2662,9 +2690,9 @@ function FlowCockpit({
             <Icon name={primaryActionButton.icon} />
             {primaryActionButton.label}
           </button>
-          <button className="secondary workbench-jump" type="button" onClick={openAdvancedWorkbench}>
-            <Icon name="target" />
-            Workbench
+          <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
+            <Icon name={workbenchAction.icon} />
+            {workbenchAction.label}
           </button>
           <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
             <Icon name="refresh" />
@@ -3146,12 +3174,24 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
   );
 }
 
-function OperatorDecisionDrawer({ decisionRequests, copyRef, busy }) {
-  const [selectedAction, setSelectedAction] = useState("continue");
+function preferredOperatorDecisionAction(externalRunHealth, supportedActions) {
+  const actions = Array.isArray(supportedActions) ? supportedActions : [];
+  const pendingAction = String(externalRunHealth?.pending_decision?.action ?? "").trim();
+  if (pendingAction && actions.includes(pendingAction)) return pendingAction;
+  if (actions.includes("continue")) return "continue";
+  return actions[0] ?? "continue";
+}
+
+function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
-  const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
+  const preferredAction = preferredOperatorDecisionAction(externalRunHealth, supportedActions);
+  const [selectedAction, setSelectedAction] = useState(preferredAction);
+  const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
+  useEffect(() => {
+    setSelectedAction(preferredAction);
+  }, [preferredAction, selectedRequest?.ref]);
   return (
     <section className="work-card operator-decision-drawer">
       <div className="work-heading compact-heading">
@@ -3486,10 +3526,23 @@ function FlowAdvancedWorkbench({
   setAnswers,
   submitAnswer,
   decisionRequests,
+  externalRunHealth,
   busy,
 }) {
   const [expanded, setExpanded] = useState(defaultAdvancedWorkbenchOpen);
   const [selectedTab, setSelectedTab] = useState("evidence");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.addEventListener !== "function") return undefined;
+    const focusRequestedTab = (event) => {
+      const requestedTab = typeof event.detail?.tabId === "string" ? event.detail.tabId : "evidence";
+      const nextTab = ADVANCED_WORKBENCH_TAB_IDS.has(requestedTab) ? requestedTab : "evidence";
+      setSelectedTab(nextTab);
+      setExpanded(true);
+    };
+    window.addEventListener(ADVANCED_WORKBENCH_FOCUS_EVENT, focusRequestedTab);
+    return () => window.removeEventListener(ADVANCED_WORKBENCH_FOCUS_EVENT, focusRequestedTab);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
@@ -3527,7 +3580,7 @@ function FlowAdvancedWorkbench({
     ) : selected.id === "interactions" ? (
       <InteractionsInbox interactions={interactions} answers={answers} setAnswers={setAnswers} submitAnswer={submitAnswer} busy={busy} />
     ) : selected.id === "decisions" ? (
-      <OperatorDecisionDrawer decisionRequests={decisionRequests} copyRef={copyRef} busy={busy} />
+      <OperatorDecisionDrawer decisionRequests={decisionRequests} copyRef={copyRef} busy={busy} externalRunHealth={externalRunHealth} />
     ) : (
       <EvidenceWorkbench rows={evidenceRows} selectedRef={selectedRef} setSelectedRef={setSelectedRef} attachTarget={attachTarget} copyRef={copyRef} />
     );
@@ -4862,6 +4915,7 @@ function App() {
           setAnswers={setAnswers}
           submitAnswer={submitAnswer}
           decisionRequests={operatorDecisionRequests}
+          externalRunHealth={externalRunHealth}
           busy={busy}
         />
       )}
