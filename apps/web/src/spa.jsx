@@ -535,6 +535,32 @@ function verificationFailureBlocker(group, index) {
   };
 }
 
+function verificationFailureRerunCommand(plan) {
+  const label = String(plan?.verification_label ?? "post-run-primary").trim() || "post-run-primary";
+  return `aor project verify --verification-label ${label} (--project-ref, --runtime-root)`;
+}
+
+function verificationFailurePrimaryAction(plan, failures, heldAction) {
+  if (!Array.isArray(failures) || failures.length === 0) return null;
+  const firstFailure = failures[0];
+  const firstTitle = verificationGroupTitle(firstFailure);
+  const failureCount = failures.length;
+  const groupLabel = `${failureCount} required command group${failureCount === 1 ? "" : "s"}`;
+  const summaryRef = plan?.latest_summary_ref ?? plan?.latest_summary_file;
+  const evidenceCopy = summaryRef
+    ? "Inspect the verify summary and failed step-result logs"
+    : "Inspect the failed step-result logs";
+  return {
+    action_id: "resolve-required-verification-failure",
+    action_label: "Blocked next step",
+    command: `Fix failed required verification, then rerun ${verificationFailureRerunCommand(plan)}`,
+    dry_run_label: "Verification rerun",
+    dry_run_command: verificationFailureRerunCommand(plan),
+    held_action_label: heldAction?.command ? actionCommandTitle(heldAction) : null,
+    reason: `${groupLabel} failed (${firstTitle}). ${evidenceCopy}, fix the target change or command prerequisite, then rerun verification before review, QA, or delivery.`,
+  };
+}
+
 function asProviderStepStatus(value) {
   return value && typeof value === "object" && !Array.isArray(value) && value.status ? value : null;
 }
@@ -872,6 +898,12 @@ function actionCommandLabel(action, fallback = "Run aor next") {
 
 function actionCommandTitle(action) {
   return action?.command ?? actionCommandLabel(action);
+}
+
+function actionDryRunPreview(action) {
+  if (action?.dry_run_command) return action.dry_run_command;
+  const command = actionCommandLabel(action);
+  return command.includes("--dry-run") ? command : `${command} --dry-run`;
 }
 
 function flowStageId(flow, nextAction, projectState) {
@@ -1494,7 +1526,6 @@ function FlowTimeline({ currentStage, completed }) {
 
 function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blockers, deliveryMode }) {
   const expectedOutputs = STAGE_EXPECTED_OUTPUTS[stage.id] ?? ["Evidence artifact", "Policy decision", "Next-action report"];
-  const command = actionCommandLabel(action);
   const riskLevel = blockers.length > 0 ? "Blocked" : deliveryMode === "no-write" ? "Low" : "Gated";
   const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   return (
@@ -1523,8 +1554,8 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
         <p>Generated from selected-flow evidence and latest next-action state.</p>
       </div>
       <div>
-        <span>Dry-run preview</span>
-        <CompactInlineValue value={command.includes("--dry-run") ? command : `${command} --dry-run`} kind="command" />
+        <span>{action?.dry_run_label ?? "Dry-run preview"}</span>
+        <CompactInlineValue value={actionDryRunPreview(action)} kind="command" />
         <p>{visibleEvidence.length} selected-flow artifacts available before execution.</p>
       </div>
     </div>
@@ -2114,7 +2145,7 @@ function FlowCockpit({
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
-  const nextPrimary = completed
+  const resolverPrimary = completed
     ? nextAction?.primary_action?.action_id === "start-new-flow"
       ? nextAction.primary_action
       : {
@@ -2127,6 +2158,8 @@ function FlowCockpit({
         command: "aor next",
         reason: "Resolve the next deterministic action for the selected flow.",
       };
+  const verificationPrimary = completed ? null : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
+  const nextPrimary = verificationPrimary ?? resolverPrimary;
   const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
@@ -2226,9 +2259,15 @@ function FlowCockpit({
         </div>
         <div className="action-grid">
           <div className="command-panel">
-            <span>Command</span>
+            <span>{nextPrimary.action_label ?? "Command"}</span>
             <CompactInlineValue value={actionCommandTitle(nextPrimary)} kind="command" />
             <p>{nextPrimary.reason}</p>
+            {nextPrimary.held_action_label ? (
+              <div className="held-action-note">
+                <span>Held downstream action</span>
+                <CompactInlineValue value={nextPrimary.held_action_label} kind="command" className="held-action-value" />
+              </div>
+            ) : null}
           </div>
           <div>
             <span>Runtime root</span>

@@ -1693,6 +1693,30 @@ svg {
   color: #ffffff;
 }
 
+.held-action-note {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(214, 228, 239, 0.26);
+}
+
+.held-action-note > span {
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.held-action-value {
+  display: grid;
+  gap: 4px;
+}
+
+.held-action-note code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .cockpit-actions {
   justify-content: flex-start;
 }
