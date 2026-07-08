@@ -762,6 +762,7 @@ const GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES = new Set([
   "Run artifacts declared a primary failure owner, phase, or class.",
 ]);
 
+const EXTERNAL_RUN_PRIVATE_DISPLAY_LABEL = ["Live", "E2E"].join(" ");
 const EXTERNAL_DECISION_OPERATOR_LABEL = ["Skill", "agent"].join("-");
 
 const GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS = new Set([
@@ -815,7 +816,11 @@ function externalRunFailureClassLabel(failureClass) {
 
 function isGenericExternalRunFailureSummary(summary) {
   const normalized = String(summary ?? "").trim();
-  return !normalized || GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES.has(normalized);
+  const lower = normalized.toLowerCase();
+  return !normalized
+    || GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES.has(normalized)
+    || lower.includes(`${EXTERNAL_RUN_PRIVATE_DISPLAY_LABEL.toLowerCase()} observation is still in progress`)
+    || lower.includes("requires a terminal controller decision");
 }
 
 function externalRunHealthRecoverySentences(health) {
@@ -846,6 +851,9 @@ function externalRunFailureUserSummary(health) {
   const failureClass = String(failure.class ?? "").trim();
   if (failureClass === "verification_mapping_gap" && String(failure.phase ?? "") === "review") {
     return "Review evidence did not connect the provider change to verification results.";
+  }
+  if (failureClass === "controller_incomplete") {
+    return externalRunPendingDecisionUserReason(health) ?? "Review the operator decision request before continuing.";
   }
   const classLabel = externalRunFailureClassLabel(failureClass);
   return `${phase} evidence is blocked by ${owner.toLowerCase()} ${classLabel}.`;
@@ -1586,6 +1594,49 @@ function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRow
   const seen = new Set();
   return [...traceRefs, ...evidenceRefs]
     .filter((entry) => entry.ref)
+    .filter((entry) => {
+      const key = comparableEvidenceRef(entry.ref).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function supportedDecisionActionsFromRubric(rubric) {
+  const rawOptions = Array.isArray(rubric?.action_options) ? rubric.action_options : [];
+  const supported = rawOptions
+    .map((entry) => String(entry ?? "").trim())
+    .filter((entry) => OPERATOR_DECISION_ACTIONS.some((action) => action.id === entry));
+  return supported.length > 0 ? supported : OPERATOR_DECISION_ACTIONS.map((action) => action.id);
+}
+
+function operatorDecisionRequestsFromExternalRunHealth(externalRunHealth) {
+  const pending = externalRunHealth?.pending_decision && typeof externalRunHealth.pending_decision === "object"
+    ? externalRunHealth.pending_decision
+    : null;
+  const requestRef = typeof pending?.request_ref === "string" ? pending.request_ref.trim() : "";
+  if (!requestRef) return [];
+  const status = normalizeOperatorDecisionStatus(
+    pending.status ?? externalRunHealth?.resume_interaction_health?.status ?? "awaiting-decision",
+    "awaiting-decision",
+  );
+  if (!isOpenOperatorDecisionStatus(status)) return [];
+  const stepLabel = externalRunStepLabel(externalRunHealth?.current_step ?? externalRunHealth?.blocked_step_id);
+  return [{
+    ref: requestRef,
+    label: `${stepLabel} operator decision request`,
+    status,
+    rejectionReason: pending.rejection_reason ?? externalRunHealth?.controller_health?.rejection_reason ?? "",
+    supportedActions: supportedDecisionActionsFromRubric(pending.decision_rubric_summary),
+    decisionRubricSummary: pending.decision_rubric_summary ?? null,
+  }];
+}
+
+function mergeOperatorDecisionRequests(...requestLists) {
+  const seen = new Set();
+  return requestLists
+    .flat()
+    .filter((entry) => entry?.ref)
     .filter((entry) => {
       const key = comparableEvidenceRef(entry.ref).toLowerCase();
       if (seen.has(key)) return false;
@@ -2774,12 +2825,16 @@ function FlowCockpit({
   }
 
   const completed = isCompletedFlow(flow);
+  const blockingExternalRunHealth = !completed && isBlockingExternalRunHealth(externalRunHealth);
+  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth;
   const followUpEligible = flow?.closure_state?.follow_up_eligible === true;
   const qualityGate = !completed && flow?.active_quality_gate ? flow.active_quality_gate : null;
   const qualityGateBlockers = qualityGateBlockerRows(qualityGate);
-  const actionBlockers = qualityGate
+  const actionBlockers = blockingExternalRunHealth
+    ? externalRunHealthBlockers(externalRunHealth)
+    : qualityGate
     ? qualityGateBlockers.map((blocker) => qualityGateBlockerForActionContext(blocker))
-    : projectLevelProviderFocus && externalRunHealth
+    : providerFocusActive && externalRunHealth
       ? externalRunHealthBlockers(externalRunHealth)
     : Array.isArray(nextAction?.blockers) && !completed
       ? nextAction.blockers
@@ -2795,9 +2850,11 @@ function FlowCockpit({
     : Array.isArray(nextAction?.evidence_refs)
       ? nextAction.evidence_refs
       : [];
-  const visibleEvidence = evidenceRefs.length > 0
+  const visibleEvidence = providerFocusActive
+    ? evidenceRows
+    : evidenceRefs.length > 0
     ? artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id)
-    : projectLevelProviderFocus
+    : providerFocusActive
       ? evidenceRows
       : [];
   const deliveryMode =
@@ -2806,7 +2863,7 @@ function FlowCockpit({
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
-  const resolverPrimary = projectLevelProviderFocus
+  const resolverPrimary = providerFocusActive
     ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth)
     : completed
     ? nextAction?.primary_action?.action_id === "start-new-flow"
@@ -2823,7 +2880,7 @@ function FlowCockpit({
       };
   const verificationPrimary = completed ? null : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
   const nextPrimary = verificationPrimary ?? resolverPrimary;
-  const primaryActionButton = projectLevelProviderFocus
+  const primaryActionButton = providerFocusActive
     ? {
       label: "Refresh Run Status",
       icon: "refresh",
@@ -2839,18 +2896,18 @@ function FlowCockpit({
   const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
-  const cockpitTitle = projectLevelProviderFocus && isBlockingExternalRunHealth(externalRunHealth)
+  const cockpitTitle = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusTitle(providerStepStatus, externalRunHealth)
     : completed ? "Learning / Closure" : stage.label;
-  const cockpitStatus = projectLevelProviderFocus && isBlockingExternalRunHealth(externalRunHealth)
+  const cockpitStatus = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? "blocked"
     : stageRuntimeState;
-  const cockpitCopy = projectLevelProviderFocus && isBlockingExternalRunHealth(externalRunHealth)
+  const cockpitCopy = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusDescription(providerStepStatus, externalRunHealth)
     : stageRuntimeCopy;
   const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
   const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
-  const hasOpenDecisionRequest = projectLevelProviderFocus && visibleEvidence.some((row) => {
+  const hasOpenDecisionRequest = providerFocusActive && visibleEvidence.some((row) => {
     return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
   });
   const workbenchAction = hasOpenDecisionRequest
@@ -2886,9 +2943,9 @@ function FlowCockpit({
           </div>
           <p>{cockpitCopy}</p>
         </div>
-        <button className="secondary" type="button" onClick={projectLevelProviderFocus ? onRefresh : onAsk}>
-          <Icon name={projectLevelProviderFocus ? "refresh" : completed ? "eye" : "target"} />
-          {projectLevelProviderFocus ? "Refresh" : completed ? "Inspect" : "Ask AOR"}
+        <button className="secondary" type="button" onClick={providerFocusActive ? onRefresh : onAsk}>
+          <Icon name={providerFocusActive ? "refresh" : completed ? "eye" : "target"} />
+          {providerFocusActive ? "Refresh" : completed ? "Inspect" : "Ask AOR"}
         </button>
       </div>
 
@@ -3005,9 +3062,9 @@ function FlowCockpit({
       {!completed ? (
         <div className="active-flow-handoff" aria-label="Active flow status summary">
           <div>
-            <span>{projectLevelProviderFocus ? "Run evidence" : "Active flow id"}</span>
-            <strong title={projectLevelProviderFocus ? projectRunIdentity : flow?.flow_id ?? flow?.mission_id ?? ""}>
-              {projectLevelProviderFocus
+            <span>{providerFocusActive ? "Run evidence" : "Active flow id"}</span>
+            <strong title={providerFocusActive ? projectRunIdentity : flow?.flow_id ?? flow?.mission_id ?? ""}>
+              {providerFocusActive
                 ? projectRunIdentity
                 : flow?.flow_id ?? flow?.mission_id ?? "active flow"}
             </strong>
@@ -3062,7 +3119,7 @@ function FlowCockpit({
         blockers={blockers}
         deliveryMode={deliveryMode}
         artifactReadiness={artifactReadiness}
-        projectLevelProviderFocus={projectLevelProviderFocus}
+        projectLevelProviderFocus={providerFocusActive}
       />
 
       <div className="flow-snapshot-grid">
@@ -3077,10 +3134,10 @@ function FlowCockpit({
           <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0] ? conciseArtifactLabel(visibleEvidence[0]) : "No flow evidence yet."}</p>
         </div>
         <div>
-          <span>{projectLevelProviderFocus ? "Run evidence" : "Flow ID"}</span>
-          <strong>{projectLevelProviderFocus ? projectRunStatus : flow?.mission_id ?? "draft"}</strong>
-          <p title={projectLevelProviderFocus ? projectRunIdentity : flow?.flow_id ?? ""}>
-            {compactVisibleValue(projectLevelProviderFocus
+          <span>{providerFocusActive ? "Run evidence" : "Flow ID"}</span>
+          <strong>{providerFocusActive ? projectRunStatus : flow?.mission_id ?? "draft"}</strong>
+          <p title={providerFocusActive ? projectRunIdentity : flow?.flow_id ?? ""}>
+            {compactVisibleValue(providerFocusActive
               ? projectRunIdentity
               : flow?.flow_id ?? "Mission packet will create the flow identity.")}
           </p>
@@ -3095,7 +3152,7 @@ function FlowCockpit({
         evidenceRows={evidenceRows}
         blockers={blockers}
         deliveryMode={deliveryMode}
-        projectLevelProviderFocus={projectLevelProviderFocus}
+        projectLevelProviderFocus={providerFocusActive}
       />
     </section>
   );
@@ -3141,12 +3198,16 @@ function DraftFlowRail({ form }) {
 function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null, externalRunHealth = null }) {
   const completed = isCompletedFlow(selectedFlow);
   const projectLevelProviderFocus = !selectedFlow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
+  const blockingExternalRunHealth = !completed && !newFlowDraft && isBlockingExternalRunHealth(externalRunHealth);
+  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth;
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
   const runtimeReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
   let nextPrimary = nextAction?.primary_action ?? {};
-  if (!selectedFlow && !newFlowDraft) {
+  if (providerFocusActive) {
+    nextPrimary = providerFocusPrimaryAction(providerStepStatus, externalRunHealth);
+  } else if (!selectedFlow && !newFlowDraft) {
     nextPrimary = projectLevelProviderFocus
       ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth)
       : runtimeReady
@@ -3171,7 +3232,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   }
   const verificationPlan = projectState?.verification_plan ?? null;
   const verificationFailures = completed ? [] : failedRequiredVerificationGroups(verificationPlan);
-  const actionBlockers = projectLevelProviderFocus && externalRunHealth
+  const actionBlockers = providerFocusActive && externalRunHealth
     ? externalRunHealthBlockers(externalRunHealth)
     : Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
   const blockers = [
@@ -3183,7 +3244,9 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
     : Array.isArray(nextAction?.evidence_refs)
       ? nextAction.evidence_refs
       : [];
-  const visibleEvidence = evidenceRefs.length > 0
+  const visibleEvidence = providerFocusActive
+    ? evidenceRows
+    : evidenceRefs.length > 0
     ? artifactRowsForRefs(evidenceRefs, evidenceRows, selectedFlow?.selected_stage ?? "artifact")
     : (!selectedFlow && !newFlowDraft ? evidenceRows : []);
   const deliveryMode =
@@ -3195,7 +3258,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   const artifactReadinessStages = artifactReadiness?.stages ?? {};
   const latestRequest =
     latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft }) ??
-    (!selectedFlow && !newFlowDraft ? latestDecisionRequestFromEvidence(evidenceRows) : null);
+    (providerFocusActive || (!selectedFlow && !newFlowDraft) ? latestDecisionRequestFromEvidence(evidenceRows) : null);
   const verificationGroups = Array.isArray(verificationPlan?.command_groups) ? verificationPlan.command_groups : [];
 
   return (
@@ -3294,7 +3357,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
             <strong>{flowDisplayName(selectedFlow)}</strong>
             <span>{completed ? "Completed" : "Active"}</span>
           </div>
-        ) : projectLevelProviderFocus ? (
+        ) : providerFocusActive ? (
           <div className="flow-inventory-row selected">
             <strong>{providerFocusTitle(providerStepStatus, externalRunHealth)}</strong>
             <span>{externalRunHealth?.status ?? providerStepStatus?.status}</span>
@@ -4899,12 +4962,25 @@ function App() {
     if (!selectedFlow?.flow_id || flowEvidenceGraph?.flow_id !== selectedFlow.flow_id) return null;
     return flowEvidenceGraph;
   }, [flowEvidenceGraph, selectedFlow?.flow_id]);
-  const workbenchEvidenceRows = useMemo(
+  const scopedWorkbenchEvidenceRows = useMemo(
     () => {
       if (draftSurface) return [];
       return selectedFlow?.flow_id ? flowEvidenceRows : evidenceRows;
     },
     [draftSurface, selectedFlow, flowEvidenceRows, evidenceRows],
+  );
+  const providerStepStatus = useMemo(
+    () => resolveProviderStepStatus(projectState, runs),
+    [projectState, runs],
+  );
+  const externalRunHealth = useMemo(
+    () => resolveExternalRunHealth(projectState, runs),
+    [projectState, runs],
+  );
+  const blockingExternalRunHealth = !draftSurface && isBlockingExternalRunHealth(externalRunHealth);
+  const workbenchEvidenceRows = useMemo(
+    () => (blockingExternalRunHealth ? evidenceRows : scopedWorkbenchEvidenceRows),
+    [blockingExternalRunHealth, evidenceRows, scopedWorkbenchEvidenceRows],
   );
 
   useEffect(() => {
@@ -4921,20 +4997,15 @@ function App() {
     return flowScopedInteractions(stepResults, selectedFlow, selectedFlowRuntimeTrace, { draft: draftSurface });
   }, [stepResults, selectedFlow, selectedFlowRuntimeTrace, draftSurface]);
   const operatorDecisionRequests = useMemo(() => {
-    return operatorDecisionRequestsForFlow(selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface });
-  }, [selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
-  const providerStepStatus = useMemo(
-    () => resolveProviderStepStatus(projectState, runs),
-    [projectState, runs],
-  );
-  const externalRunHealth = useMemo(
-    () => resolveExternalRunHealth(projectState, runs),
-    [projectState, runs],
-  );
+    return mergeOperatorDecisionRequests(
+      operatorDecisionRequestsFromExternalRunHealth(externalRunHealth),
+      operatorDecisionRequestsForFlow(selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface }),
+    );
+  }, [externalRunHealth, selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
   const projectLevelProviderFocus = !draftSurface && !selectedFlow && Boolean(providerStepStatus || externalRunHealth);
   const currentStage = draftSurface
     ? "mission"
-    : projectLevelProviderFocus
+    : projectLevelProviderFocus || blockingExternalRunHealth
       ? providerFocusStageId(providerStepStatus, externalRunHealth)
       : flowStageId(selectedFlow, nextAction, projectState);
   const executionEvidence = useMemo(() => {
@@ -5109,10 +5180,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!projectLevelProviderFocus || didChooseStage.current) return;
+    if ((!projectLevelProviderFocus && !blockingExternalRunHealth) || didChooseStage.current) return;
     setSelectedStage(providerFocusStageId(providerStepStatus, externalRunHealth));
     didAutoSelectStage.current = true;
-  }, [projectLevelProviderFocus, providerStepStatus?.status, externalRunHealth?.status, externalRunHealth?.current_step]);
+  }, [projectLevelProviderFocus, blockingExternalRunHealth, providerStepStatus?.status, externalRunHealth?.status, externalRunHealth?.current_step]);
 
   useEffect(() => {
     const shouldResetScroll = newFlowDraft || Boolean(selectedFlowId);
@@ -5551,6 +5622,26 @@ function App() {
     openRequestDrawer(ref);
   }
 
+  function focusAdvancedWorkbench(tabId = "evidence") {
+    if (typeof document === "undefined") return;
+    const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function" && typeof window.CustomEvent === "function") {
+      window.dispatchEvent(new window.CustomEvent(ADVANCED_WORKBENCH_FOCUS_EVENT, { detail: { tabId: requestedTab } }));
+    }
+    const focusWorkbench = () => {
+      const workbench = document.getElementById("flow-advanced-workbench");
+      if (!workbench) return;
+      workbench.scrollIntoView({ block: "start" });
+      const summary = workbench.querySelector("summary");
+      if (summary && typeof summary.focus === "function") summary.focus({ preventScroll: true });
+    };
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(focusWorkbench);
+    } else {
+      focusWorkbench();
+    }
+  }
+
   async function copyRef(ref) {
     const value = String(ref ?? "");
     if (!value) return;
@@ -5587,15 +5678,19 @@ function App() {
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const firstRunFocusMode = draftSurface || (!selectedFlow && !projectLevelProviderFocus);
-  const topbarFlowStatus = draftSurface
+  const topbarFlowStatus = blockingExternalRunHealth
+    ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
+    : draftSurface
     ? "Draft flow"
     : selectedFlow?.status ?? (projectLevelProviderFocus ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth) : "No active flow");
-  const topbarAskReason = selectedFlow
+  const topbarAskReason = blockingExternalRunHealth
+    ? "Use the Decision Request workbench before asking for another flow action."
+    : selectedFlow
     ? "Ask AOR for selected flow"
     : projectLevelProviderFocus
       ? "Ask AOR needs a selectable flow; use run evidence controls for this blocker."
       : "Ask AOR requires a selected active flow";
-  const topbarAskLabel = selectedFlow ? "Ask AOR for selected flow" : projectLevelProviderFocus ? "Ask AOR needs a flow" : "Ask AOR for selected flow";
+  const topbarAskLabel = blockingExternalRunHealth ? "Decision needed" : selectedFlow ? "Ask AOR for selected flow" : projectLevelProviderFocus ? "Ask AOR needs a flow" : "Ask AOR for selected flow";
   const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
 
   return (
@@ -5639,8 +5734,8 @@ function App() {
         <button
           className="utility-button topbar-ask-button"
           type="button"
-          onClick={() => openRequestDrawer()}
-          disabled={busy || !selectedFlow}
+          onClick={() => (blockingExternalRunHealth ? focusAdvancedWorkbench("decisions") : openRequestDrawer())}
+          disabled={busy || (!selectedFlow && !blockingExternalRunHealth)}
           title={topbarAskReason}
           aria-label={topbarAskReason}
         >
@@ -5721,7 +5816,7 @@ function App() {
             onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
             externalRunHealth={externalRunHealth}
-            evidenceRows={projectLevelProviderFocus ? workbenchEvidenceRows : flowEvidenceRows}
+            evidenceRows={projectLevelProviderFocus || blockingExternalRunHealth ? workbenchEvidenceRows : flowEvidenceRows}
           />
         )}
       </main>

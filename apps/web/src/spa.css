@@ -3574,7 +3574,7 @@ tr.selected td {
   justify-content: center;
   min-width: 0;
   width: 100%;
-  min-height: 34px;
+  min-height: var(--control-height);
   padding: 6px 8px;
   white-space: normal;
 }
@@ -3625,7 +3625,7 @@ tr.selected td {
 
 .decision-record-plan button {
   justify-content: center;
-  min-height: 34px;
+  min-height: var(--control-height);
   white-space: normal;
 }
 
@@ -3788,7 +3788,7 @@ tr.selected td {
 
 .decision-helper-actions button {
   justify-content: center;
-  min-height: 34px;
+  min-height: var(--control-height);
   white-space: normal;
 }
 
@@ -4631,7 +4631,7 @@ code {
   }
 
   .row-actions .icon-button {
-    width: 36px;
-    height: 36px;
+    width: var(--control-height);
+    height: var(--control-height);
   }
 }
