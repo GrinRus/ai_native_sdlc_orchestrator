@@ -1627,6 +1627,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "profile_mismatch_candidate_project_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": true

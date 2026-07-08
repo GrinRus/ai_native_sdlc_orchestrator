@@ -806,6 +806,16 @@ p {
   background: transparent;
 }
 
+.readiness-check-list .blocked {
+  border-color: #f3c7c7;
+  background: #fff8f8;
+}
+
+.readiness-check-list .blocked .check-dot {
+  border-color: #dc2626;
+  background: transparent;
+}
+
 .readiness-check-list code {
   justify-self: end;
   max-width: 100%;

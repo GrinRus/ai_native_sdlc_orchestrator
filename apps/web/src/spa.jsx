@@ -1852,6 +1852,15 @@ function FlowCockpit({
     const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
     const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
     const stateReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
+    const profileMismatchProjectIds = Array.isArray(onboarding.profile_mismatch_candidate_project_ids)
+      ? onboarding.profile_mismatch_candidate_project_ids.filter(Boolean)
+      : [];
+    const hasProfileMismatch = !stateReady && profileMismatchProjectIds.length > 0;
+    const profileMismatchLabel = profileMismatchProjectIds.slice(0, 2).join(", ");
+    const profileMismatchSuffix = profileMismatchProjectIds.length > 2 ? `, +${profileMismatchProjectIds.length - 2} more` : "";
+    const profileMismatchCopy = profileMismatchLabel
+      ? `Existing evidence is under ${profileMismatchLabel}${profileMismatchSuffix}. Add the matching project profile to attach it.`
+      : "Add the matching project profile to attach existing runtime evidence.";
     const flowReady = false;
     const wizardStatus = stateReady ? "Runtime ready" : "First launch";
     const wizardSteps = [
@@ -1863,8 +1872,12 @@ function FlowCockpit({
       },
       {
         label: "Runtime Readiness",
-        status: stateReady ? "ready" : "pending",
-        detail: stateReady ? "Runtime state is reachable." : "Runtime folders and state evidence are not initialized yet.",
+        status: stateReady ? "ready" : hasProfileMismatch ? "blocked" : "pending",
+        detail: stateReady
+          ? "Runtime state is reachable."
+          : hasProfileMismatch
+            ? "Runtime root has existing evidence for a different project profile."
+            : "Runtime folders and state evidence are not initialized yet.",
         code: projectState?.state_file ?? "state file pending",
       },
       {
@@ -1928,13 +1941,13 @@ function FlowCockpit({
         <div className="first-run-next-action-grid" aria-label="First-run next action and safety">
           <div>
             <span>Next action</span>
-            <strong>{stateReady ? "Configure First Flow" : "Initialize Project Runtime"}</strong>
-            <p>{stateReady ? "Open the safe walkthrough mission form and create the first no-write flow." : "Prepare local runtime state before mission intake."}</p>
+            <strong>{stateReady ? "Configure First Flow" : hasProfileMismatch ? "Add Matching Project Profile" : "Initialize Project Runtime"}</strong>
+            <p>{stateReady ? "Open the safe walkthrough mission form and create the first no-write flow." : hasProfileMismatch ? profileMismatchCopy : "Prepare local runtime state before mission intake."}</p>
           </div>
           <div>
             <span>Blockers</span>
-            <strong>{stateReady ? "None for safe template" : "Runtime not initialized"}</strong>
-            <p>{stateReady ? "First-flow setup is the only required next step." : "AOR needs a local state file before flow evidence exists."}</p>
+            <strong>{stateReady ? "None for safe template" : hasProfileMismatch ? "Profile mismatch detected" : "Runtime not initialized"}</strong>
+            <p>{stateReady ? "First-flow setup is the only required next step." : hasProfileMismatch ? "Do not initialize over existing evidence; attach it with Project profile." : "AOR needs a local state file before flow evidence exists."}</p>
           </div>
           <div>
             <span>Safety</span>
@@ -1943,12 +1956,25 @@ function FlowCockpit({
           </div>
           <div>
             <span>Runtime readiness</span>
-            <strong>{stateReady ? "Runtime ready" : "Needs initialization"}</strong>
-            <p>{stateReady ? "State evidence is reachable for this project." : "Initialize once, then configure the first flow."}</p>
+            <strong>{stateReady ? "Runtime ready" : hasProfileMismatch ? "Profile required" : "Needs initialization"}</strong>
+            <p>{stateReady ? "State evidence is reachable for this project." : hasProfileMismatch ? "Attach the matching project profile before initializing a new runtime." : "Initialize once, then configure the first flow."}</p>
           </div>
         </div>
 
-        {!stateReady ? (
+        {!stateReady && hasProfileMismatch ? (
+          <div className="readiness-action">
+            <div>
+              <Icon name="folder" />
+              <div>
+                <h3>Add Matching Project Profile</h3>
+                <p>{profileMismatchCopy}</p>
+              </div>
+            </div>
+            <button className="primary" type="button" onClick={onOpenAddProject ?? onRefresh} disabled={busy}>
+              Add Local Project
+            </button>
+          </div>
+        ) : !stateReady ? (
           <div className="readiness-action">
             <div>
               <Icon name="play" />
