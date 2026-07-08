@@ -257,6 +257,24 @@ function artifactActionLabel(action, row) {
   return `Open evidence artifact: ${artifact}`;
 }
 
+function graphNodeArtifactLabel(node) {
+  return conciseArtifactLabel({
+    label: node?.display_summary?.label ?? node?.label,
+    kind: node?.display_summary?.type ?? node?.kind ?? node?.family,
+    stage: node?.display_summary?.stage ?? node?.stage,
+    status: node?.display_summary?.status ?? node?.status,
+  });
+}
+
+function traceArtifactLabel(item) {
+  return conciseArtifactLabel({
+    label: item?.display_summary?.label ?? item?.summary,
+    kind: item?.display_summary?.type ?? item?.kind ?? item?.event_type,
+    stage: item?.display_summary?.stage ?? item?.stage,
+    status: item?.display_summary?.status ?? item?.status,
+  });
+}
+
 function artifactSeverityForStatus(status) {
   const normalized = String(status ?? "").toLowerCase();
   if (["fail", "failed", "not_pass", "blocked", "rejected", "error", "timeout", "missing", "unreadable"].includes(normalized)) return "critical";
@@ -1501,7 +1519,7 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
         <div>
           <span>Evidence summaries</span>
           {evidence.length > 0 ? (
-            <ul>{evidence.map((row) => <li key={row.ref} title={row.rawRef}>{row.label}</li>)}</ul>
+            <ul>{evidence.map((row) => <li key={row.ref} title={row.rawRef}>{conciseArtifactLabel(row)}</li>)}</ul>
           ) : (
             <p>No readable repair evidence summaries yet.</p>
           )}
@@ -2068,7 +2086,7 @@ function FlowCockpit({
         <div>
           <span>Evidence artifacts</span>
           <strong>{visibleEvidence.length}</strong>
-          <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0]?.label ?? "No flow evidence yet."}</p>
+          <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0] ? conciseArtifactLabel(visibleEvidence[0]) : "No flow evidence yet."}</p>
         </div>
         <div>
           <span>Flow ID</span>
@@ -2209,7 +2227,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
             <span className="artifact-empty">No artifacts yet</span>
           ) : visibleEvidence.slice(0, 4).map((row) => (
             <span className={`artifact-chip ${row.severity}`} key={row.ref} title={row.rawRef}>
-              <strong>{row.label}</strong>
+              <strong>{conciseArtifactLabel(row)}</strong>
               <em>{row.type ?? row.kind} / {row.status ?? "ready"}</em>
             </span>
           ))}
@@ -2358,7 +2376,7 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
           <span>Preview</span>
           {selected ? (
             <>
-              <strong>{selected.label}</strong>
+              <strong title={selected.label}>{conciseArtifactLabel(selected)}</strong>
               <div className="artifact-meta-line">
                 <StatusPill state={selected.status ?? "ready"} />
                 <em>{selected.stage ?? "artifact"} / {selected.kind}</em>
@@ -2583,7 +2601,7 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy 
             </div>
             {providerEvidenceRows.length > 0 ? providerEvidenceRows.slice(0, 4).map((row) => (
               <button className="artifact-chip-button" type="button" key={row.ref} onClick={() => copyRef(row.rawRef ?? row.ref)} disabled={busy}>
-                <span>{row.label}</span>
+                <span title={row.label}>{conciseArtifactLabel(row)}</span>
                 <em>{row.status ?? "ready"}</em>
               </button>
             )) : <p>No provider evidence refs linked yet.</p>}
@@ -2658,7 +2676,7 @@ function EvidenceGraphPanel({ graph }) {
         ) : nodes.slice(0, 8).map((node) => (
           <div className="graph-node" key={node.node_id ?? node.ref}>
             <span>{node.display_summary?.type ?? node.family ?? node.kind ?? "evidence"}</span>
-            <strong title={node.ref}>{node.display_summary?.label ?? node.label ?? "Evidence artifact"}</strong>
+            <strong title={node.ref}>{graphNodeArtifactLabel(node)}</strong>
             <em>{node.display_summary?.status ?? node.status ?? "linked"}</em>
           </div>
         ))}
@@ -2668,7 +2686,7 @@ function EvidenceGraphPanel({ graph }) {
           {nodes.slice(0, 10).map((node, index) => (
             <div className="graph-flow-node" key={node.node_id ?? node.ref}>
               <span>{index + 1}</span>
-              <strong>{node.label ?? node.family ?? "Evidence"}</strong>
+              <strong title={node.ref}>{graphNodeArtifactLabel(node)}</strong>
               <em>{node.status ?? node.family ?? "linked"}</em>
             </div>
           ))}
@@ -2677,7 +2695,7 @@ function EvidenceGraphPanel({ graph }) {
       {selectedNode ? (
         <div className="selected-node-panel">
           <span>Selected node</span>
-          <strong title={selectedNode.ref}>{selectedNode.display_summary?.label ?? selectedNode.label ?? selectedNode.family ?? "Evidence"}</strong>
+          <strong title={selectedNode.ref}>{graphNodeArtifactLabel(selectedNode)}</strong>
           <p>{selectedNode.display_summary?.description ?? selectedNode.summary ?? "Selected-flow evidence node."}</p>
         </div>
       ) : null}
@@ -2725,7 +2743,7 @@ function RuntimeTracePanel({ trace }) {
                 <td>{item.event_type ?? item.kind}</td>
                 <td>{Array.isArray(item.run_ids) ? item.run_ids.join(", ") : ""}</td>
                 <td>{item.status ?? "read"}</td>
-                <td><span className="artifact-ref-label" title={item.ref ?? item.trace_id}>{item.display_summary?.label ?? item.summary ?? item.kind}</span></td>
+                <td><span className="artifact-ref-label" title={item.ref ?? item.trace_id}>{traceArtifactLabel(item)}</span></td>
               </tr>
             ))}
           </tbody>
@@ -2763,7 +2781,7 @@ function ActivityArtifactsTables({ activity, evidenceRows, draftSurface, classNa
               <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No visible artifacts yet"}</td></tr>
             ) : evidenceRows.slice(0, 5).map((row) => (
               <tr key={row.ref}>
-                <td><span className="artifact-ref-label" title={row.rawRef ?? row.ref}>{row.label}</span></td>
+                <td><span className="artifact-ref-label" title={row.rawRef ?? row.ref}>{conciseArtifactLabel(row)}</span></td>
                 <td>{row.status ?? "ready"}</td>
               </tr>
             ))}
