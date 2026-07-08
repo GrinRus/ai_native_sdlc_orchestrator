@@ -167,7 +167,7 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Latest run/u);
   assert.match(source, /Attach as request target/u);
   assert.match(css, /button:focus-visible/u);
-  assert.match(css, /--control-height: 38px/u);
+  assert.match(css, /--control-height: 40px/u);
   assert.match(css, /--touch-control-height: 44px/u);
   assert.match(css, /\.flow-active-mode \.stage-rail \.stage-progress-strip/u);
   assert.match(css, /\.advanced-workbench-disclosure/u);

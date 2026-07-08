@@ -24,7 +24,7 @@
   --radius-control: 5px;
   --radius-panel: 6px;
   --radius-pill: 999px;
-  --control-height: 38px;
+  --control-height: 40px;
   --touch-control-height: 44px;
   --space-page: 18px;
   color: var(--color-text);
@@ -2648,6 +2648,7 @@ th {
 
 .artifact-filter-bar button {
   min-height: var(--control-height);
+  min-width: var(--control-height);
   padding: 0 10px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
@@ -2675,7 +2676,9 @@ th {
   display: grid;
   gap: 3px;
   width: 100%;
+  min-height: var(--control-height);
   min-width: 0;
+  align-content: center;
   padding: 0;
   border: 0;
   background: transparent;

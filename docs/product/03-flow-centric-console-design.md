@@ -231,7 +231,9 @@ contract:
   `operator_request.target_flow_id`.
 - Frontend evidence records rendered HTML, DOM snapshot, accessibility summary,
   screenshot or visual guardrail refs, task outcome, UX findings, and a
-  browser-task proof ref.
+  browser-task proof ref. Current UI checks include horizontal overflow,
+  keyboard focus, and interactive target sizing: desktop controls keep at least
+  a 40px shared target and mobile controls keep the 44px touch target.
 - Acceptance remains fail-closed when browser-task proof, flow-loop fields,
   run-health evidence, required assessment refs, inspected refs, or no-upstream-write
   assertions are missing.

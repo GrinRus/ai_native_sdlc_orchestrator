@@ -377,7 +377,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
   }
   assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
-  assert.ok(css.includes("--control-height: 38px"), "SPA CSS should define a desktop control height token");
+  assert.ok(css.includes("--control-height: 40px"), "SPA CSS should define a desktop control height token");
   assert.ok(css.includes("--touch-control-height: 44px"), "SPA CSS should define a mobile touch target token");
   assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
@@ -404,7 +404,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /summary:focus-visible/u, "SPA CSS should expose keyboard focus on disclosure controls");
   assert.match(css, /\.debug-ref-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Debug disclosure controls should meet the shared target size");
   assert.match(css, /\.runtime-path-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Runtime path disclosure controls should meet the shared target size");
-  assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
+  assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);[\s\S]*?min-width: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
+  assert.match(css, /\.artifact-summary-button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact summary rows should meet the shared target size");
   assert.match(css, /\.row-actions \.icon-button\s*\{[\s\S]*?width: var\(--control-height\);[\s\S]*?height: var\(--control-height\);/u, "Artifact row icon actions should meet the shared target size");
   assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u, "First-run primary action should stay above supporting readiness details");
   assert.match(css, /\.first-run-wizard \.first-run-next-action-grid\s*\{[\s\S]*?order: 2;/u, "First-run next-action summary should follow the primary action");
