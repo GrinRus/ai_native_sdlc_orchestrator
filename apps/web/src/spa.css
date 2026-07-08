@@ -3392,6 +3392,92 @@ tr.selected td {
   overflow-wrap: anywhere;
 }
 
+.decision-resume-path {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d9e2ee;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+
+.decision-resume-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.decision-resume-heading span,
+.decision-resume-path li span {
+  color: #5f6e80;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.decision-resume-heading strong,
+.decision-resume-path li strong,
+.decision-resume-path li p,
+.decision-resume-path button {
+  overflow-wrap: anywhere;
+}
+
+.decision-resume-heading strong {
+  color: #24313d;
+  font-size: 12px;
+}
+
+.decision-resume-heading p,
+.decision-resume-path li p {
+  margin: 0;
+  color: #60707f;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.decision-resume-path ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decision-resume-path li {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 9px;
+  border: 1px solid #e0e8f0;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.decision-resume-path li.ready {
+  border-color: #c9e2d6;
+  background: #f5fcf8;
+}
+
+.decision-resume-path li.blocked {
+  border-color: #f0d2c3;
+  background: #fff8f4;
+}
+
+.decision-resume-path li strong {
+  color: #24313d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.decision-resume-path button {
+  justify-content: center;
+  min-height: var(--control-height);
+  white-space: normal;
+}
+
 .decision-rubric-summary {
   display: grid;
   gap: 10px;

@@ -3673,6 +3673,39 @@ function operatorDecisionHelperPlan(selectedRequest, selectedActionEntry, decisi
   };
 }
 
+function operatorDecisionResumePath(selectedRequest, selectedActionEntry, decisionRecordPlan) {
+  if (!selectedRequest) return [];
+  const requestRef = String(selectedRequest.ref ?? "").trim();
+  const expectedDecisionRef = String(decisionRecordPlan?.expectedDecisionRef ?? "").trim();
+  const actionLabel = selectedActionEntry?.label ?? "Selected action";
+  return [
+    {
+      label: "1. Inspect request",
+      title: requestRef ? "Request is linked" : "Request ref missing",
+      detail: requestRef
+        ? "Open the decision request and inspect every required evidence item before choosing an action."
+        : "The runtime has not exposed a decision request ref yet; refresh run status before recording an action.",
+      status: requestRef ? "ready" : "blocked",
+    },
+    {
+      label: "2. Record decision",
+      title: expectedDecisionRef ? "Decision file ready" : "Decision file missing",
+      detail: expectedDecisionRef
+        ? `${actionLabel} must be written to the expected decision file after evidence coverage is complete.`
+        : "The expected decision destination is unavailable; use the request handoff before continuing.",
+      status: expectedDecisionRef ? "ready" : "blocked",
+    },
+    {
+      label: "3. Resume run",
+      title: expectedDecisionRef ? "Resume after write" : "Resolve destination first",
+      detail: expectedDecisionRef
+        ? "Resume the run with the completed decision artifact, then refresh this console to verify the blocker cleared."
+        : "AOR needs a materialized decision artifact before the current run can move to the next step.",
+      status: expectedDecisionRef ? "ready" : "blocked",
+    },
+  ];
+}
+
 function isRejectedOperatorDecision(selectedRequest) {
   const status = String(selectedRequest?.status ?? "").trim().toLowerCase();
   return status === "rejected" || Boolean(String(selectedRequest?.rejectionReason ?? "").trim());
@@ -3717,6 +3750,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   const decisionRubric = normalizeDecisionRubricSummary(selectedRequest?.decisionRubricSummary);
   const decisionRecordPlan = operatorDecisionRecordPlan(selectedRequest, selectedActionEntry, externalRunHealth);
   const decisionHelperPlan = operatorDecisionHelperPlan(selectedRequest, selectedActionEntry, decisionRecordPlan, externalRunHealth);
+  const decisionResumePath = operatorDecisionResumePath(selectedRequest, selectedActionEntry, decisionRecordPlan);
   const decisionCorrectionPlan = operatorDecisionCorrectionPlan(selectedRequest, selectedActionEntry, decisionRubric, decisionRecordPlan);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   useEffect(() => {
@@ -3811,6 +3845,29 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
               <strong>Preserved when required</strong>
             </div>
           </div>
+          {decisionResumePath.length > 0 ? (
+            <div className="decision-resume-path" aria-label="Decision resume path">
+              <div className="decision-resume-heading">
+                <span>Resume path</span>
+                <strong>{selectedActionEntry.label} before next step</strong>
+                <p>The run is paused until the decision artifact is recorded and the status is refreshed.</p>
+              </div>
+              <ol>
+                {decisionResumePath.map((item) => (
+                  <li key={item.label} className={item.status}>
+                    <span>{item.label}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </li>
+                ))}
+              </ol>
+              {decisionRecordPlan?.expectedDecisionRef ? (
+                <button className="secondary compact" type="button" onClick={() => copyRef(decisionRecordPlan.expectedDecisionRef)} disabled={busy} title={decisionRecordPlan.expectedDecisionRef}>
+                  Copy decision file ref
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {decisionRubric ? (
             <div className="decision-rubric-summary" aria-label="Decision evidence rubric">
               <div className="decision-rubric-heading">

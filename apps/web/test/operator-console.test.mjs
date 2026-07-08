@@ -127,6 +127,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Copy expected file ref",
     "Decision handoff bundle",
     "Selected action handoff",
+    "operatorDecisionResumePath",
+    "Resume path",
+    "Decision resume path",
+    "Copy decision file ref",
+    "Resume after write",
     "Inspect the decision request",
     "Confirm evidence coverage",
     "Record selected action",
@@ -422,6 +427,10 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".execution-recovery-path"), "SPA CSS should define execution recovery path layout");
   assert.match(css, /\.execution-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.execution-recovery-path li\.ready\s*\{/u);
+  assert.ok(css.includes(".decision-resume-path"), "SPA CSS should define operator decision resume path layout");
+  assert.match(css, /\.decision-resume-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(148px, 1fr\)\);/u);
+  assert.match(css, /\.decision-resume-path li\.blocked\s*\{/u);
+  assert.match(css, /\.decision-resume-path button\s*\{[\s\S]*?min-height: var\(--control-height\);/u);
   assert.ok(css.includes(".evidence-readiness-path"), "SPA CSS should define graph and trace readiness path layout");
   assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.evidence-readiness-path li\.blocked\s*\{/u);
