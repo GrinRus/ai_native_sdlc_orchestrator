@@ -127,9 +127,12 @@ The packaged SPA now treats the flow as the primary object:
   selected flow: provider status, Runtime Harness decision, real-code-change
   status, post-run verification, review, delivery readiness,
   no-upstream-write status, changed-path relevance groups, blockers, and public
-  stop/save/diagnose/retry controls. Scratch-only output is explicitly
-  non-passing, while `.qwen/`, `.codex/`, `.claude/`, and `.opencode/` target
-  checkout state is shown as blocking runner-owned leakage.
+  stop/save/diagnose/retry controls. The panel shows an execution recovery path
+  before raw controls so interrupted or blocked runs name the current state,
+  provider evidence to preserve, and the next public control to use.
+  Scratch-only output is explicitly non-passing, while `.qwen/`, `.codex/`,
+  `.claude/`, and `.opencode/` target checkout state is shown as blocking
+  runner-owned leakage.
 - Active review/QA repair gates render as recovery paths before raw gate
   details: the panel shows the current repair step, compact next command,
   linked repair evidence summaries from the flow projection, blocker count, and

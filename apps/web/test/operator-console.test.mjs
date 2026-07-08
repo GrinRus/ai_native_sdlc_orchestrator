@@ -335,6 +335,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "delivery_release_blocked",
     "Next safe action",
     "executionEvidenceForFlow",
+    "executionRecoveryPlan",
     "strongestExecutionEvidenceRun",
     "executionEvidenceScore",
     "selectedFlowRuntimeTrace",
@@ -355,6 +356,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Save partial evidence",
     "Diagnose current step",
     "Retry public step",
+    "Execution evidence recovery path",
+    "Stabilize execution evidence first",
+    "Next public control",
     "aor run cancel",
     "aor run status --run-id",
     "delivery-mode={selectedDeliveryMode}",
@@ -401,6 +405,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "SPA should not show the last trace run when a stronger implementation execution evidence run exists",
   );
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
+  assert.ok(css.includes(".execution-recovery-path"), "SPA CSS should define execution recovery path layout");
+  assert.match(css, /\.execution-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.execution-recovery-path li\.ready\s*\{/u);
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes(".flow-active-mode .recommended-action .cockpit-actions"), "SPA CSS should place active mobile cockpit actions before stacked details");

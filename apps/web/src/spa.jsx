@@ -1159,6 +1159,43 @@ function executionActionCommand(action, evidence) {
   return action.command_surface ?? "public control-plane action";
 }
 
+function executionRecoveryAction(actions, evidence) {
+  const normalizedStatus = String(evidence?.provider_execution_status ?? evidence?.provider_step_status?.status ?? evidence?.status ?? "").toLowerCase();
+  const actionList = Array.isArray(actions) ? actions : [];
+  const priorities = normalizedStatus === "running" || normalizedStatus === "silent-running" || normalizedStatus === "timeout-risk"
+    ? ["save_partial_evidence", "stop_provider", "diagnose_current_step", "retry_public_step"]
+    : ["save_partial_evidence", "diagnose_current_step", "retry_public_step", "stop_provider"];
+  return priorities
+    .map((actionId) => actionList.find((action) => action.action_id === actionId))
+    .find((action) => action?.enabled) ?? actionList.find((action) => action?.enabled) ?? actionList[0] ?? null;
+}
+
+function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions) {
+  const providerStatus = evidence?.provider_execution_status ?? evidence?.provider_step_status?.status ?? "unknown";
+  const runStatus = evidence?.status ?? providerStatus;
+  const blockerCount = Array.isArray(blockers) ? blockers.length : 0;
+  const providerEvidenceCount = Array.isArray(providerEvidenceRows) ? providerEvidenceRows.length : 0;
+  const nextAction = executionRecoveryAction(actions, evidence);
+  const actionEnabled = nextAction?.enabled === true;
+  return {
+    stateTitle: `${providerStatus} / ${runStatus}`,
+    stateDetail: blockerCount > 0
+      ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"} must be cleared before delivery or release.`
+      : "No blocking execution evidence is listed.",
+    evidenceTitle: providerEvidenceCount > 0
+      ? `${providerEvidenceCount} provider evidence ref${providerEvidenceCount === 1 ? "" : "s"}`
+      : "No provider evidence linked yet",
+    evidenceDetail: providerEvidenceCount > 0
+      ? "Save or copy linked evidence before diagnosing or retrying."
+      : "Refresh run status or save partial evidence before deciding.",
+    actionTitle: nextAction?.label ?? EXECUTION_ACTION_LABELS[nextAction?.action_id] ?? "Public recovery action",
+    actionCommand: actionEnabled ? executionActionCommand(nextAction, evidence) : "",
+    actionDetail: actionEnabled
+      ? "Use the public control-plane action before making delivery or release decisions."
+      : nextAction?.reason ?? "No public recovery action is currently enabled.",
+  };
+}
+
 function selectedStageRuntimeState(stage, currentStage, completed) {
   if (completed) return "Completed";
   if (stage.id === currentStage) return "Active";
@@ -3830,6 +3867,7 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy 
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
   const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
+  const recoveryPlan = evidence ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions) : null;
   return (
     <section className="work-card execution-evidence-panel">
       <div className="work-heading compact-heading">
@@ -3843,6 +3881,30 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy 
         <p className="empty-state">No execution evidence visible yet.</p>
       ) : (
         <>
+          <div className="execution-recovery-path" aria-label="Execution evidence recovery path">
+            <div className="execution-recovery-heading">
+              <span>Recovery path</span>
+              <strong>Stabilize execution evidence first</strong>
+              <p>Use public run controls to preserve evidence, diagnose blockers, or retry before treating delivery as safe.</p>
+            </div>
+            <ol>
+              <li className={blockers.length > 0 ? "blocked" : "ready"}>
+                <span>Current state</span>
+                <strong>{recoveryPlan.stateTitle}</strong>
+                <p>{recoveryPlan.stateDetail}</p>
+              </li>
+              <li>
+                <span>Evidence to keep</span>
+                <strong>{recoveryPlan.evidenceTitle}</strong>
+                <p>{recoveryPlan.evidenceDetail}</p>
+              </li>
+              <li className={recoveryPlan.actionCommand ? "ready" : "blocked"}>
+                <span>Next public control</span>
+                <strong>{recoveryPlan.actionTitle}</strong>
+                {recoveryPlan.actionCommand ? <CompactInlineValue value={recoveryPlan.actionCommand} kind="command" /> : <p>{recoveryPlan.actionDetail}</p>}
+              </li>
+            </ol>
+          </div>
           <div className="execution-status-grid">
             {statusRows.map((row) => (
               <div key={row.label}>
