@@ -1082,6 +1082,40 @@ p {
   padding-left: 16px;
 }
 
+.quality-blocker-list {
+  list-style-position: outside;
+}
+
+.quality-blocker-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.quality-blocker-list strong {
+  color: #412b12;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.quality-blocker-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.quality-blocker-meta code,
+.quality-blocker-meta em {
+  max-width: 100%;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #fff7ed;
+  color: #7c2d12;
+  font-size: 11px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
 .stage-specific-panel {
   display: grid;
   gap: 12px;

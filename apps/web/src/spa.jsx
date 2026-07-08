@@ -1325,8 +1325,58 @@ function qualityGateAttemptLabel(gate) {
   return `${attempt}/${max} (${remaining} remaining)`;
 }
 
+function normalizedBlockerField(record, keys) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function normalizeQualityGateBlockerRow(blocker, index) {
+  if (typeof blocker === "string") {
+    const summary = blocker.trim();
+    if (!summary) return null;
+    return {
+      key: `${summary}-${index}`,
+      summary,
+      code: summary,
+      nextCommand: "",
+      evidenceRefs: [],
+    };
+  }
+  if (!blocker || typeof blocker !== "object") return null;
+  const record = blocker;
+  const code = normalizedBlockerField(record, ["code", "reason_code", "blocker_id", "id"]);
+  const summary = normalizedBlockerField(record, ["summary", "message", "reason"]) || code;
+  const nextCommand = normalizedBlockerField(record, ["next_command", "command"]);
+  const evidenceRefs = Array.isArray(record.evidence_refs)
+    ? record.evidence_refs.filter(Boolean).map((ref) => String(ref))
+    : [];
+  const label = summary || code || nextCommand;
+  if (!label && evidenceRefs.length === 0) return null;
+  return {
+    key: `${code || label || "quality-blocker"}-${index}`,
+    summary: label || "Blocking evidence required",
+    code,
+    nextCommand,
+    evidenceRefs,
+  };
+}
+
 function qualityGateBlockerRows(gate) {
-  return Array.isArray(gate?.blockers) ? gate.blockers.filter(Boolean) : [];
+  return Array.isArray(gate?.blockers)
+    ? gate.blockers.map((blocker, index) => normalizeQualityGateBlockerRow(blocker, index)).filter(Boolean)
+    : [];
+}
+
+function qualityGateBlockerForActionContext(blocker) {
+  return {
+    code: blocker.code || blocker.summary,
+    summary: blocker.summary,
+    next_command: blocker.nextCommand,
+    evidence_refs: blocker.evidenceRefs,
+  };
 }
 
 function QualityGatePanel({ gate, evidenceRows = [] }) {
@@ -1391,7 +1441,24 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
         <div>
           <span>Blockers</span>
           {blockers.length > 0 ? (
-            <ul>{blockers.slice(0, 4).map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
+            <ul className="quality-blocker-list">
+              {blockers.slice(0, 4).map((blocker) => (
+                <li key={blocker.key}>
+                  <strong>{blocker.summary}</strong>
+                  {blocker.code && blocker.code !== blocker.summary ? (
+                    <div className="quality-blocker-meta">
+                      <code>{blocker.code}</code>
+                    </div>
+                  ) : null}
+                  {blocker.nextCommand || blocker.evidenceRefs.length > 0 ? (
+                    <div className="quality-blocker-meta">
+                      {blocker.nextCommand ? <code title={blocker.nextCommand}>{blocker.nextCommand}</code> : null}
+                      {blocker.evidenceRefs.length > 0 ? <em>{blocker.evidenceRefs.length} evidence refs</em> : null}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           ) : (
             <p>No active blockers listed.</p>
           )}
@@ -1742,7 +1809,7 @@ function FlowCockpit({
   const qualityGate = !completed && flow?.active_quality_gate ? flow.active_quality_gate : null;
   const qualityGateBlockers = qualityGateBlockerRows(qualityGate);
   const blockers = qualityGate
-    ? qualityGateBlockers.map((blocker) => ({ code: blocker, summary: blocker }))
+    ? qualityGateBlockers.map((blocker) => qualityGateBlockerForActionContext(blocker))
     : Array.isArray(nextAction?.blockers) && !completed
       ? nextAction.blockers
       : [];

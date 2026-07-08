@@ -363,6 +363,27 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });
 
+test("active quality gate blockers preserve structured recovery details", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
+
+  assert.match(source, /normalizeQualityGateBlockerRow/u);
+  assert.match(source, /normalizedBlockerField/u);
+  assert.match(source, /qualityGateBlockerForActionContext/u);
+  assert.match(source, /"next_command"/u);
+  assert.match(source, /record\.evidence_refs/u);
+  assert.match(source, /quality-blocker-list/u);
+  assert.match(source, /quality-blocker-meta/u);
+  assert.doesNotMatch(
+    source,
+    /qualityGateBlockers\.map\(\(blocker\) => \(\{ code: blocker, summary: blocker \}\)\)/u,
+    "Active quality gate blockers should not be collapsed into opaque string-only rows",
+  );
+  assert.match(css, /\.quality-blocker-list li\s*\{[\s\S]*?display: grid;/u);
+  assert.match(css, /\.quality-blocker-meta\s*\{[\s\S]*?flex-wrap: wrap;/u);
+  assert.match(css, /\.quality-blocker-meta code,\s*\.quality-blocker-meta em\s*\{[\s\S]*?overflow-wrap: anywhere;/u);
+});
+
 test("web package no longer exports static operator snapshot modules", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(workspaceRoot, "apps/web/package.json"), "utf8"));
   const oldScriptName = `operator-console-${"smoke"}.mjs`;
