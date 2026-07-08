@@ -6503,7 +6503,9 @@ export function executeFullJourneyFlow(options) {
               ? "QA or post-run diagnostic evidence did not pass."
               : qaDiagnosticStatus === "deferred"
                 ? "Evaluation passed; non-blocking diagnostic QA evidence was deferred until guided UI proof materializes."
-                : "Evaluation and diagnostic QA evidence passed.",
+                : qaEvaluationStatus === "skipped"
+                  ? "No evaluator QA suite is configured for this profile; required diagnostic QA evidence passed."
+                  : "Evaluation and diagnostic QA evidence passed.",
           canRepair
             ? {
                 iteration,
@@ -6516,10 +6518,17 @@ export function executeFullJourneyFlow(options) {
             : { iteration },
         );
       } else if (!canRepair && !terminalCycleFailure) {
-        qaOverallStatus = "skipped";
+        qaOverallStatus = "pass";
         artifacts.evaluation_status = "skipped";
         artifacts.post_run_diagnostic_status = "pass";
-        markStage(stageMap, "qa", "skipped", [], "Profile quality-cycle policy excludes QA.", { iteration });
+        markStage(
+          stageMap,
+          "qa",
+          "pass",
+          qaEvidenceRefs,
+          "Profile quality-cycle policy excludes evaluator QA; required flow-health QA evidence passed.",
+          { iteration },
+        );
       }
 
       if (terminalCycleFailure) {

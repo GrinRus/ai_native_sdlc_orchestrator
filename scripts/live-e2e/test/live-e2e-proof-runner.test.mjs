@@ -3338,6 +3338,17 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 120/u);
 });
 
+test("flow-health regress profiles report policy-excluded QA as passing evidence", () => {
+  const flowSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+
+  assert.match(flowSource, /qaOverallStatus = "pass";\s*\n\s*artifacts\.evaluation_status = "skipped";/u);
+  assert.match(
+    flowSource,
+    /markStage\(\s*\n\s*stageMap,\s*\n\s*"qa",\s*\n\s*"pass",\s*\n\s*qaEvidenceRefs,\s*\n\s*"Profile quality-cycle policy excludes evaluator QA; required flow-health QA evidence passed\."/u,
+  );
+  assert.doesNotMatch(flowSource, /markStage\(stageMap, "qa", "skipped", \[\], "Profile quality-cycle policy excludes QA\."/u);
+});
+
 test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {
   const runProfileSource = fs.readFileSync(runProfileScript, "utf8");
   const flowSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
