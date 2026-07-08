@@ -139,8 +139,47 @@ test("control-plane read model projects sibling live E2E run-health for target c
       )}\n`,
       "utf8",
     );
+    const siblingRunStateRoot = path.join(
+      targetRuntimeRoot,
+      "projects",
+      "sample-target-live-run",
+      "state",
+    );
+    fs.mkdirSync(siblingRunStateRoot, { recursive: true });
+    const providerUpdatedAt = new Date().toISOString();
+    fs.writeFileSync(
+      path.join(siblingRunStateRoot, `run-control-state-${runId}.json`),
+      `${JSON.stringify(
+        {
+          run_id: runId,
+          status: "running",
+          current_step: "execution",
+          updated_at: providerUpdatedAt,
+          provider_step_status: {
+            provider: "openai",
+            adapter: "codex-cli",
+            route_id: "route.implement.default.openai-primary",
+            step_id: "run.start.implement",
+            status: "running",
+            elapsed_ms: 42000,
+            timeout_budget_ms: 1800000,
+            remaining_budget_ms: 1758000,
+            last_output_at: providerUpdatedAt,
+            current_command_label: "external-provider-runner",
+            recommended_action: "Provider is still running.",
+            started_at: providerUpdatedAt,
+            updated_at: providerUpdatedAt,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
 
     const projectState = readProjectState({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
+    assert.equal(projectState.provider_step_status.status, "running");
+    assert.equal(projectState.provider_step_status.step_id, "run.start.implement");
     assert.equal(projectState.run_health.status, "blocked");
     assert.equal(projectState.run_health.current_step, "delivery");
     assert.equal(projectState.run_health.failure_summary.class, "verification_mapping_gap");
@@ -161,6 +200,7 @@ test("control-plane read model projects sibling live E2E run-health for target c
     const runs = listRuns({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
     const runSummary = runs.find((run) => run.run_id === runId);
     assert.ok(runSummary);
+    assert.equal(runSummary.provider_step_status.status, "running");
     assert.equal(runSummary.run_health.status, "blocked");
     assert.ok(runSummary.artifact_display_summaries.some((summary) => summary.label === "Run health"));
   } finally {

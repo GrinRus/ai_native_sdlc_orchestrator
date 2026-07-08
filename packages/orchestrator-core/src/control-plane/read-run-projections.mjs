@@ -10,14 +10,13 @@ import { listExternalRunHealthProjectionsForRuntime } from "./external-run-healt
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
   applyReadModelLimit,
-  listJsonFiles,
   listPacketArtifacts,
   listQualityArtifacts,
   listRunControlAudits,
+  listRunControlStateFiles,
   listStepResults,
 } from "./read-artifact-readers.mjs";
 
-const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
 
@@ -463,10 +462,7 @@ function classifyRunRisk(run) {
  */
 function listRunControlStateRecords(options = {}) {
   const init = initializeProjectRuntime(options);
-  const stateFiles = applyReadModelLimit(
-    listJsonFiles(init.runtimeLayout.stateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath))),
-    options.limit,
-  );
+  const stateFiles = applyReadModelLimit(listRunControlStateFiles(init), options.limit);
 
   /** @type {Array<{ runId: string, file: string, state: Record<string, unknown> }>} */
   const records = [];

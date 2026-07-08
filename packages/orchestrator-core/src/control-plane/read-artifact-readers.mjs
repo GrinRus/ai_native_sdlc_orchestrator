@@ -267,12 +267,23 @@ function loadJsonDocuments(options) {
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {string[]}
  */
-function listRunControlStateFiles(init) {
+export function listRunControlStateFiles(init) {
   const rootStateFiles = listJsonFiles(init.runtimeLayout.stateRoot)
     .filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)));
+  const currentProjectRuntimeRoot = path.resolve(init.runtimeLayout.projectRuntimeRoot);
+  const siblingStateFiles = fs.existsSync(init.runtimeLayout.projectsRoot)
+    ? fs.readdirSync(init.runtimeLayout.projectsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((projectEntry) => {
+        const projectRuntimeRoot = path.join(init.runtimeLayout.projectsRoot, projectEntry.name);
+        if (path.resolve(projectRuntimeRoot) === currentProjectRuntimeRoot) return [];
+        const stateRoot = path.join(projectRuntimeRoot, "state");
+        return listJsonFiles(stateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)));
+      })
+    : [];
   const targetCheckoutsRoot = path.join(init.runtimeLayout.projectRuntimeRoot, "target-checkouts");
   if (!fs.existsSync(targetCheckoutsRoot)) {
-    return rootStateFiles;
+    return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles]);
   }
 
   const nestedStateFiles = fs.readdirSync(targetCheckoutsRoot, { withFileTypes: true })
@@ -288,7 +299,7 @@ function listRunControlStateFiles(init) {
         });
     });
 
-  return sortFilesByFreshness([...rootStateFiles, ...nestedStateFiles]);
+  return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles, ...nestedStateFiles]);
 }
 
 /**
@@ -386,15 +397,18 @@ function listReadableEvidenceSidecarSummaries(options = {}) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ runId?: string | null }} [options]
  * @returns {Record<string, unknown> | null}
  */
-function readLatestProviderStepStatus(init) {
+function readLatestProviderStepStatus(init, options = {}) {
+  const requestedRunId = asString(options.runId);
   const runControlStatuses = listRunControlStateFiles(init)
     .flatMap((filePath) => {
       try {
         const state = JSON.parse(fs.readFileSync(filePath, "utf8"));
         const normalized = normalizeProviderStepStatus(asRecord(state).provider_step_status);
-        return normalized ? [{ status: normalized, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
+        const runId = asString(asRecord(state).run_id);
+        return normalized ? [{ status: normalized, runId, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
       } catch {
         return [];
       }
@@ -406,7 +420,10 @@ function readLatestProviderStepStatus(init) {
       const rightUpdated = Date.parse(String(right.status.updated_at ?? "")) || right.updatedMs;
       return rightUpdated - leftUpdated;
     });
-  return statuses[0]?.status ?? null;
+  const matchingStatuses = requestedRunId
+    ? statuses.filter((entry) => entry.runId === requestedRunId)
+    : statuses;
+  return (matchingStatuses[0] ?? statuses[0])?.status ?? null;
 }
 
 /**
@@ -581,6 +598,7 @@ export function readProjectState(options = {}) {
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
   });
+  const runHealth = readLatestExternalRunHealthProjectionForRuntime(init);
   return {
     project_id: init.projectId,
     display_name: init.displayName,
@@ -590,8 +608,8 @@ export function readProjectState(options = {}) {
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
     onboarding_summary: buildOnboardingSummary(initializedPreview),
-    provider_step_status: readLatestProviderStepStatus(init),
-    run_health: readLatestExternalRunHealthProjectionForRuntime(init),
+    provider_step_status: readLatestProviderStepStatus(init, { runId: asString(runHealth?.run_id) }),
+    run_health: runHealth,
     verification_plan: readVerificationPlanSurface(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };

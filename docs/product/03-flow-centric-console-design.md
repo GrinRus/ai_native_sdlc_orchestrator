@@ -129,6 +129,11 @@ The packaged SPA now treats the flow as the primary object:
   control-plane read models. `silent-running` states explicitly say the provider
   has no output yet but is still running, without exposing raw process commands
   or secrets.
+- Active provider heartbeat takes priority over a previously accepted
+  `continue` gate for the same live-run step. The console must show provider
+  monitoring copy, elapsed/remaining budget, and the latest run-control status
+  instead of a stale accepted decision reason such as a completed handoff
+  step-quality gate.
 - Evidence lists render `artifact_display_summaries[]` as user-facing
   artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
   paths, packet URIs, and evidence URIs are not primary visible text; raw refs

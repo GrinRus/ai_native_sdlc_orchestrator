@@ -860,6 +860,36 @@ function isBlockingExternalRunHealth(health) {
   return Boolean(health && ["blocked", "fail", "failed", "not_pass"].includes(String(health.status ?? "").toLowerCase()));
 }
 
+function activeProviderSupersedesExternalRunBlocker(health, status) {
+  if (!isActiveProviderStepStatus(status) || !isBlockingExternalRunHealth(health)) return false;
+  const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
+  if (String(pending.action ?? "").trim() !== "continue") return false;
+  const currentStep = String(health?.current_step ?? health?.blocked_step_id ?? "").trim();
+  const nextStep = String(pending.next_step ?? "").trim();
+  if (!currentStep || !nextStep) return true;
+  if (currentStep === nextStep) return true;
+  return PROJECT_STAGE_TO_UI_STAGE[currentStep] === PROJECT_STAGE_TO_UI_STAGE[nextStep];
+}
+
+function displayExternalRunHealth(health, status) {
+  if (!activeProviderSupersedesExternalRunBlocker(health, status)) return health;
+  return {
+    ...health,
+    status: status?.status ?? "running",
+    pending_decision: null,
+    blockers: [],
+    missing_operator_decision_steps: [],
+    failure_summary: null,
+    resume_interaction_health: {
+      ...(health?.resume_interaction_health && typeof health.resume_interaction_health === "object"
+        ? health.resume_interaction_health
+        : {}),
+      status: status?.status ?? "running",
+      pending_decision_count: 0,
+    },
+  };
+}
+
 function externalRunStepLabel(step) {
   const normalized = String(step ?? "").trim();
   if (!normalized) return "Controller";
@@ -3003,7 +3033,7 @@ function FlowCockpit({
 
   const completed = isCompletedFlow(flow);
   const blockingExternalRunHealth = !completed && isBlockingExternalRunHealth(externalRunHealth);
-  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth;
+  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth || isActiveProviderStepStatus(providerStepStatus);
   const followUpEligible = flow?.closure_state?.follow_up_eligible === true;
   const qualityGate = !completed && flow?.active_quality_gate ? flow.active_quality_gate : null;
   const qualityGateBlockers = qualityGateBlockerRows(qualityGate);
@@ -3384,7 +3414,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   const completed = isCompletedFlow(selectedFlow);
   const projectLevelProviderFocus = !selectedFlow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
   const blockingExternalRunHealth = !completed && !newFlowDraft && isBlockingExternalRunHealth(externalRunHealth);
-  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth;
+  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth || isActiveProviderStepStatus(providerStepStatus);
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
@@ -5158,10 +5188,15 @@ function App() {
     () => resolveProviderStepStatus(projectState, runs),
     [projectState, runs],
   );
-  const externalRunHealth = useMemo(
+  const rawExternalRunHealth = useMemo(
     () => resolveExternalRunHealth(projectState, runs),
     [projectState, runs],
   );
+  const externalRunHealth = useMemo(
+    () => displayExternalRunHealth(rawExternalRunHealth, providerStepStatus),
+    [rawExternalRunHealth, providerStepStatus],
+  );
+  const activeProviderStep = isActiveProviderStepStatus(providerStepStatus);
   const blockingExternalRunHealth = !draftSurface && isBlockingExternalRunHealth(externalRunHealth);
   const workbenchEvidenceRows = useMemo(
     () => (blockingExternalRunHealth ? evidenceRows : scopedWorkbenchEvidenceRows),
@@ -5188,14 +5223,15 @@ function App() {
     );
   }, [externalRunHealth, selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
   const projectLevelProviderFocus = !draftSurface && !selectedFlow && Boolean(providerStepStatus || externalRunHealth);
+  const providerWorkbenchFocus = projectLevelProviderFocus || blockingExternalRunHealth || activeProviderStep;
   const currentStage = draftSurface
     ? "mission"
-    : projectLevelProviderFocus || blockingExternalRunHealth
+    : providerWorkbenchFocus
       ? providerFocusStageId(providerStepStatus, externalRunHealth)
       : flowStageId(selectedFlow, nextAction, projectState);
   const executionEvidence = useMemo(() => {
     const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, selectedFlowRuntimeTrace, { draft: draftSurface });
-    if (flowExecutionEvidence || draftSurface || selectedFlow?.flow_id || (!providerStepStatus && !externalRunHealth)) return flowExecutionEvidence;
+    if (flowExecutionEvidence || draftSurface || (selectedFlow?.flow_id && !activeProviderStep) || (!providerStepStatus && !externalRunHealth)) return flowExecutionEvidence;
     const healthBlockers = externalRunHealthBlockers(externalRunHealth);
     const healthFailurePhase = externalRunHealth?.failure_summary?.phase ?? null;
     const healthStatus = externalRunHealth?.status ?? "pending";
@@ -5215,7 +5251,7 @@ function App() {
       provider_step_status: providerStepStatus,
       [RUN_HEALTH_FIELD]: externalRunHealth,
     };
-  }, [selectedFlow, runs, selectedFlowRuntimeTrace, draftSurface, providerStepStatus, externalRunHealth]);
+  }, [selectedFlow, runs, selectedFlowRuntimeTrace, draftSurface, activeProviderStep, providerStepStatus, externalRunHealth]);
   const providerEvidenceRows = useMemo(() => {
     return workbenchEvidenceRows.filter((row) => artifactFilterMatches(row, "provider"));
   }, [workbenchEvidenceRows]);
@@ -5862,8 +5898,10 @@ function App() {
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
-  const firstRunFocusMode = draftSurface || (!selectedFlow && !projectLevelProviderFocus);
+  const firstRunFocusMode = draftSurface || (!selectedFlow && !providerWorkbenchFocus);
   const topbarFlowStatus = blockingExternalRunHealth
+    ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
+    : activeProviderStep
     ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
     : draftSurface
     ? "Draft flow"
@@ -5911,7 +5949,7 @@ function App() {
         </div>
         <div className="topbar-status-strip" aria-label="Console status">
           <StatusPill state={topbarFlowStatus} />
-          {projectLevelProviderFocus && providerStepStatus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
+          {providerStepStatus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
           <StatusPill state={config ? "connected" : "loading"} />
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         </div>
@@ -6001,7 +6039,7 @@ function App() {
             onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
             externalRunHealth={externalRunHealth}
-            evidenceRows={projectLevelProviderFocus || blockingExternalRunHealth ? workbenchEvidenceRows : flowEvidenceRows}
+            evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}
           />
         )}
       </main>
