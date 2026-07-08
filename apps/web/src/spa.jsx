@@ -210,7 +210,69 @@ const ARTIFACT_FILTERS = [
   { id: "learning", label: "Learning" },
 ];
 
+const ARTIFACT_REF_LABELS = [
+  { tokens: ["next-action-report", "next-action"], label: "Next Action Report" },
+  { tokens: ["project-analysis-report"], label: "Project Analysis Report" },
+  { tokens: ["discovery-research-report"], label: "Discovery Research Report" },
+  { tokens: ["runtime-harness-report"], label: "Runtime Harness Report" },
+  { tokens: ["quality-repair-request"], label: "Repair Request" },
+  { tokens: ["review-decision"], label: "Review Decision" },
+  { tokens: ["review-report"], label: "Review Report" },
+  { tokens: ["validation-report"], label: "Validation Report" },
+  { tokens: ["evaluation-report"], label: "Evaluation Report" },
+  { tokens: ["verify-summary", "verification-summary"], label: "Verification Summary" },
+  { tokens: ["verification-plan"], label: "Verification Plan" },
+  { tokens: ["step-result"], label: "Routed Step Result" },
+  { tokens: ["target-cleanliness"], label: "Target Cleanliness" },
+  { tokens: ["target-diff", "diff-summary"], label: "Target Diff" },
+  { tokens: ["delivery-manifest"], label: "Delivery Manifest" },
+  { tokens: ["delivery-plan"], label: "Delivery Plan" },
+  { tokens: ["release-packet"], label: "Release Packet" },
+  { tokens: ["learning-loop-handoff"], label: "Learning Handoff" },
+  { tokens: ["learning-loop-scorecard"], label: "Learning Scorecard" },
+  { tokens: ["adapter-live", "provider-raw-evidence"], label: "Provider Evidence" },
+  { tokens: ["compiled-context"], label: "Compiled Context" },
+  { tokens: ["step-observation", "observation-report"], label: "Step Observation" },
+  { tokens: ["agent-decision-request", "operator-decision-request"], label: "Operator Decision Request" },
+  { tokens: ["operator-request"], label: "Operator Request" },
+  { tokens: ["run-control-state"], label: "Run Control State" },
+  { tokens: ["run-control-event", "command-trace"], label: "Command Trace" },
+  { tokens: ["project-init-state"], label: "Project Runtime State" },
+  { tokens: ["onboarding-report"], label: "Onboarding Report" },
+];
+
+const ARTIFACT_TYPE_LABELS = {
+  "next-action": "Next Action Report",
+  "runtime-harness-report": "Runtime Harness Report",
+  "quality-repair-request": "Repair Request",
+  "routed-step-result": "Routed Step Result",
+  verification: "Verification Summary",
+  evaluation: "Evaluation Report",
+  "target-diff": "Target Diff",
+  "delivery-manifest": "Delivery Manifest",
+  "delivery-plan": "Delivery Plan",
+  "release-packet": "Release Packet",
+  "learning-handoff": "Learning Handoff",
+  "provider-raw-evidence": "Provider Evidence",
+  "command-trace": "Command Trace",
+  "step-observation": "Step Observation",
+  "operator-request": "Operator Request",
+  packet: "Artifact Packet",
+  evidence: "Evidence Artifact",
+  file: "Evidence Artifact",
+};
+
+function semanticArtifactTitleFromRef(ref) {
+  const normalized = String(ref ?? "")
+    .replace(/^packet:\/\/[^@]+@/u, "")
+    .replace(/^evidence:\/\//u, "")
+    .toLowerCase();
+  return ARTIFACT_REF_LABELS.find((entry) => entry.tokens.some((token) => normalized.includes(token)))?.label ?? null;
+}
+
 function titleFromRef(ref) {
+  const semanticTitle = semanticArtifactTitleFromRef(ref);
+  if (semanticTitle) return semanticTitle;
   const clean = String(ref ?? "artifact")
     .replace(/^packet:\/\/[^@]+@/u, "")
     .replace(/^evidence:\/\//u, "")
@@ -241,6 +303,12 @@ function looksLikeTechnicalRef(value) {
 function conciseArtifactLabel(row) {
   const label = String(row?.label ?? "").trim();
   if (label && !looksLikeTechnicalRef(label)) return label;
+
+  const semanticTitle = semanticArtifactTitleFromRef(row?.rawRef ?? row?.ref ?? row?.sourceRef ?? "");
+  if (semanticTitle) return semanticTitle;
+
+  const kindLabel = ARTIFACT_TYPE_LABELS[String(row?.kind ?? "").toLowerCase()];
+  if (kindLabel) return kindLabel;
 
   const stage = humanizeToken(row?.stage);
   const kind = humanizeToken(row?.kind);
@@ -285,7 +353,10 @@ function artifactSeverityForStatus(status) {
 
 function artifactTypeForRef(ref) {
   const value = String(ref ?? "").toLowerCase();
-  if (value.includes("provider") && (value.includes("raw") || value.includes("evidence"))) return "provider-raw-evidence";
+  if (value.includes("next-action")) return "next-action";
+  if (value.includes("adapter-live") || (value.includes("provider") && (value.includes("raw") || value.includes("evidence")))) return "provider-raw-evidence";
+  if (value.includes("agent-decision-request") || value.includes("operator-decision-request")) return "operator-request";
+  if (value.includes("step-observation") || value.includes("observation-report")) return "step-observation";
   if (value.includes("runtime-harness-report")) return "runtime-harness-report";
   if (value.includes("quality-repair-request")) return "quality-repair-request";
   if (value.includes("step-result")) return "routed-step-result";
@@ -300,6 +371,7 @@ function artifactTypeForRef(ref) {
 }
 
 function artifactStageForType(type, fallbackStage = "artifact") {
+  if (type === "next-action") return "planning";
   if (["provider-raw-evidence", "command-trace", "step-observation", "routed-step-result"].includes(type)) return "execution";
   if (["runtime-harness-report", "review-report", "review-decision", "quality-repair-request"].includes(type)) return "runtime-harness";
   if (["verification", "target-diff"].includes(type)) return "verification";
