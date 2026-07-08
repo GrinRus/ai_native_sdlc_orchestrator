@@ -231,6 +231,40 @@ event snapshots follow the same redaction and normalization rules as project
 state and run summaries; raw commands, args, prompts, file contents, and secrets
 remain out of the event payload.
 
+## External run-health projection (W35-S06)
+
+When a project is opened from an external runner target checkout, the
+controller may write public observation and run-health artifacts in the parent
+external runner project runtime rather than inside the target checkout `.aor`
+tree. The control-plane read surface exposes a compact, query-safe
+`run_health` projection so the web console and CLI/API consumers do not show
+completed provider execution as delivery-ready while the declared external
+flow is blocked.
+
+`run_health` is additive on:
+- `GET /api/projects/:projectId/state` as the latest external run-health
+  projection visible from the selected project runtime;
+- `GET /api/projects/:projectId/runs` as the run summary projection whose
+  `run_id` matches the external run-health report.
+
+The projection may include:
+- `run_id`, `profile_id`, `status`, `report_status`, `generated_at`;
+- `current_step`, `blocked_step_id`, `pending_steps`, and `completed_steps`;
+- `missing_operator_decision_steps[]` and `missing_evidence_refs[]`;
+- `failure_summary` with `owner`, `phase`, `class`, and `summary`;
+- `pending_decision` with action, reason, next step, decision-request ref, and
+  expected decision ref;
+- compact `controller_health` and `resume_interaction_health` fields;
+- `blockers[]` suitable for operator-facing next-action/readiness surfaces;
+- `artifact_display_summaries[]` for the run-health, observation, and open
+  operator-decision request refs.
+
+This projection is a read model over public runner artifacts only. It must not
+read private process state, raw provider prompts, command args, file contents,
+environment variables, bearer tokens, auth tokens, or provider secrets. It does
+not judge product outcome quality; final code, artifact, accessibility, UI, or
+UX quality remains owned by the external quality-assessment report family.
+
 ## Execution evidence summaries (W35-S04)
 
 Run summaries expose additive `execution_evidence` for operator-facing

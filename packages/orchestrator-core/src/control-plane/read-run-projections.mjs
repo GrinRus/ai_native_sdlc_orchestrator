@@ -6,6 +6,7 @@ import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs"
 import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
+import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
   applyReadModelLimit,
@@ -496,9 +497,11 @@ function listRunControlStateRecords(options = {}) {
  * }} options
  */
 export function listRuns(options = {}) {
+  const init = initializeProjectRuntime(options);
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
   const quality = listQualityArtifacts(options);
+  const externalRunHealth = listExternalRunHealthProjectionsForRuntime(init);
 
   /**
    * @typedef {{
@@ -556,6 +559,7 @@ export function listRuns(options = {}) {
  *   },
  *   run_control_state: Record<string, unknown> | null,
  *   provider_step_status: Record<string, unknown> | null,
+ *   run_health: Record<string, unknown> | null,
  *   execution_documents: {
  *     step_results: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
  *     runtime_harness_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
@@ -611,6 +615,7 @@ export function listRuns(options = {}) {
         },
         run_control_state: null,
         provider_step_status: null,
+        run_health: null,
         execution_documents: {
           step_results: [],
           runtime_harness_reports: [],
@@ -864,6 +869,14 @@ export function listRuns(options = {}) {
     run.provider_step_status = normalizeProviderStepStatus(asRecord(record.state.provider_step_status));
   }
 
+  for (const health of externalRunHealth) {
+    const runId = asString(health.run_id);
+    if (!runId) continue;
+    const run = ensureRun(normalizeRunRef(runId));
+    run.run_health = health;
+    run.artifact_display_summaries.push(...(Array.isArray(health.artifact_display_summaries) ? health.artifact_display_summaries : []));
+  }
+
   return applyReadModelLimit([...runMap.values()], options.limit).map((entry) => {
     const selectedPromotionCandidate = selectCanonicalPromotionCandidate(entry.finance_evidence.promotion_candidates);
     const seenTrailKeys = new Set();
@@ -922,6 +935,7 @@ export function listRuns(options = {}) {
       },
       run_control_state: entry.run_control_state,
       provider_step_status: entry.provider_step_status,
+      run_health: entry.run_health,
       execution_evidence: buildExecutionEvidenceSummary({
         runId: entry.run_id,
         stepResults: entry.execution_documents.step_results,

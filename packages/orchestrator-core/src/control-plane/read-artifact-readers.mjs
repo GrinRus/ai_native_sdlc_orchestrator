@@ -8,6 +8,10 @@ import {
 } from "../artifact-display-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "../project-init.mjs";
+import {
+  listExternalRunHealthArtifactDisplaySummariesForRuntime,
+  readLatestExternalRunHealthProjectionForRuntime,
+} from "./external-run-health-read-model.mjs";
 import { buildOnboardingSummary } from "./onboarding-summary.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
@@ -565,6 +569,7 @@ export function readProjectState(options = {}) {
       state_file: null,
       onboarding_summary: buildOnboardingSummary(preview),
       provider_step_status: null,
+      run_health: null,
       verification_plan: null,
       artifact_display_summaries: [],
     };
@@ -586,6 +591,7 @@ export function readProjectState(options = {}) {
     state_file: init.stateFile,
     onboarding_summary: buildOnboardingSummary(initializedPreview),
     provider_step_status: readLatestProviderStepStatus(init),
+    run_health: readLatestExternalRunHealthProjectionForRuntime(init),
     verification_plan: readVerificationPlanSurface(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };
@@ -875,6 +881,7 @@ export function listArtifactDisplaySummaries(options = {}) {
     ...listStepResults(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listQualityArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listOperatorRequests(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...listExternalRunHealthArtifactDisplaySummariesForRuntime(initializeProjectRuntime(options), options),
     ...(nextActionReport?.artifact_display_summaries ?? []),
   ];
   return applyReadModelLimit(uniqueArtifactDisplaySummaries(summaries), options.limit);

@@ -1446,6 +1446,16 @@
               }
             ]
           },
+          "run_health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalRunHealthProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "verification_plan": {
             "anyOf": [
               {
@@ -1853,6 +1863,170 @@
             "items": {
               "$ref": "#/components/schemas/ExecutionEvidenceAction"
             }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExternalRunHealthProjection": {
+        "type": "object",
+        "description": "Compact, query-safe projection of public external run-health and observation artifacts visible from a selected project runtime.",
+        "required": [
+          "run_id",
+          "status",
+          "blockers",
+          "artifact_display_summaries"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "profile_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "blocked",
+              null
+            ]
+          },
+          "report_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "final",
+              "in_progress",
+              null
+            ]
+          },
+          "generated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "current_step": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocked_step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completed_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_operator_decision_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failure_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pending_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "controller_health": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "resume_interaction_health": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadModelBlocker"
+            }
+          },
+          "report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_observation_report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ReadModelBlocker": {
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "summary"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "warning",
+              "info"
+            ]
+          },
+          "summary": {
+            "type": "string"
           }
         },
         "additionalProperties": true
@@ -2739,6 +2913,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalRunHealthProjection"
               },
               {
                 "type": "null"
