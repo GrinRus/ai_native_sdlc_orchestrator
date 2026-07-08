@@ -3982,12 +3982,43 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy 
   );
 }
 
+function EvidenceReadinessPath({ label, scope, count, unit, readyDetail, missingDetail, nextReady, nextMissing }) {
+  const hasEvidence = count > 0;
+  return (
+    <div className="evidence-readiness-path" aria-label={`${label} readiness path`}>
+      <div className="evidence-readiness-heading">
+        <span>Readiness path</span>
+        <strong>{hasEvidence ? `${label} is ready to inspect` : `${label} needs flow evidence`}</strong>
+        <p>{hasEvidence ? readyDetail : missingDetail}</p>
+      </div>
+      <ol>
+        <li className="ready">
+          <span>Scope</span>
+          <strong>{scope}</strong>
+          <p>Only selected-flow artifacts are shown here.</p>
+        </li>
+        <li className={hasEvidence ? "ready" : "blocked"}>
+          <span>Evidence loaded</span>
+          <strong>{count} {unit}{count === 1 ? "" : "s"}</strong>
+          <p>{hasEvidence ? readyDetail : missingDetail}</p>
+        </li>
+        <li className={hasEvidence ? "ready" : "blocked"}>
+          <span>Next check</span>
+          <strong>{hasEvidence ? "Inspect linked evidence" : "Refresh or create evidence"}</strong>
+          <p>{hasEvidence ? nextReady : nextMissing}</p>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
 function EvidenceGraphPanel({ graph }) {
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
   const selectedNode = nodes[nodes.length - 1] ?? nodes[0] ?? null;
   const completedFlowsReason = "Available after completed flow";
   const lineageReason = "Available after completed flow";
+  const graphScope = graph?.flow_id ? `Flow ${graph.flow_id}` : "Selected flow";
   return (
     <section className="work-card graph-panel">
       <div className="work-heading compact-heading">
@@ -4003,6 +4034,16 @@ function EvidenceGraphPanel({ graph }) {
         <button type="button" title={lineageReason} disabled>Cross-flow Lineage</button>
       </div>
       <p className="disabled-tab-reason">Completed Flows and Cross-flow Lineage are {completedFlowsReason.toLowerCase()}.</p>
+      <EvidenceReadinessPath
+        label="Evidence graph"
+        scope={graphScope}
+        count={nodes.length}
+        unit="node"
+        readyDetail={`Loaded selected-flow graph: ${nodes.length} node${nodes.length === 1 ? "" : "s"}, ${edges.length} edge${edges.length === 1 ? "" : "s"}.`}
+        missingDetail="No selected-flow graph nodes are loaded yet."
+        nextReady="Use node summaries to verify the packet chain before opening raw artifact refs."
+        nextMissing="Refresh the selected flow after a lifecycle command, or create the first flow evidence before judging traceability."
+      />
       <div className="graph-summary">
         <div>
           <span>Nodes</span>
@@ -4052,6 +4093,7 @@ function EvidenceGraphPanel({ graph }) {
 
 function RuntimeTracePanel({ trace }) {
   const items = Array.isArray(trace?.trace_items) ? trace.trace_items : [];
+  const traceScope = trace?.flow_id ? `Flow ${trace.flow_id}` : "Selected flow";
   return (
     <section className="work-card trace-panel">
       <div className="work-heading compact-heading">
@@ -4061,6 +4103,16 @@ function RuntimeTracePanel({ trace }) {
         </div>
         <StatusPill state={`${items.length} items`} />
       </div>
+      <EvidenceReadinessPath
+        label="Runtime trace"
+        scope={traceScope}
+        count={items.length}
+        unit="event"
+        readyDetail={`Loaded runtime trace: ${items.length} flow-scoped event${items.length === 1 ? "" : "s"}.`}
+        missingDetail="No flow-scoped runtime events are loaded yet."
+        nextReady="Compare run events, step results, decisions, and delivery artifacts before judging outcome quality."
+        nextMissing="Refresh run status or open Execution Evidence to preserve provider refs before deciding next action."
+      />
       <div className="trace-timeline-strip" aria-label="Trace timeline">
         {items.length === 0 ? (
           <span>No trace events yet</span>

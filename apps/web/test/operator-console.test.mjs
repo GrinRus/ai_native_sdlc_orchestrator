@@ -40,6 +40,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "follow-up-source-handoff-ref",
     "Evidence Graph",
     "Runtime Trace",
+    "EvidenceReadinessPath",
+    "Readiness path",
+    "needs flow evidence",
+    "Refresh the selected flow after a lifecycle command",
+    "Refresh run status or open Execution Evidence",
     "Next action",
     "Evidence artifacts",
     "Verification plan",
@@ -408,6 +413,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".execution-recovery-path"), "SPA CSS should define execution recovery path layout");
   assert.match(css, /\.execution-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.execution-recovery-path li\.ready\s*\{/u);
+  assert.ok(css.includes(".evidence-readiness-path"), "SPA CSS should define graph and trace readiness path layout");
+  assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.evidence-readiness-path li\.blocked\s*\{/u);
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes(".flow-active-mode .recommended-action .cockpit-actions"), "SPA CSS should place active mobile cockpit actions before stacked details");

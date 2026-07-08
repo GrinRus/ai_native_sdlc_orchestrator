@@ -2749,6 +2749,75 @@ th {
   font-size: 12px;
 }
 
+.evidence-readiness-path {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface-muted);
+}
+
+.evidence-readiness-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.evidence-readiness-heading span,
+.evidence-readiness-path li span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.evidence-readiness-heading strong,
+.evidence-readiness-path li strong {
+  overflow-wrap: anywhere;
+}
+
+.evidence-readiness-heading p,
+.evidence-readiness-path li p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.evidence-readiness-path ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-readiness-path li {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.evidence-readiness-path li.ready {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.evidence-readiness-path li.blocked {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+}
+
 .graph-summary > div,
 .graph-node {
   display: grid;
@@ -4253,6 +4322,7 @@ code {
   .provider-heartbeat-grid,
   .execution-status-grid,
   .execution-recovery-path ol,
+  .evidence-readiness-path ol,
   .path-group-grid,
   .provider-evidence-strip,
   .execution-action-grid,

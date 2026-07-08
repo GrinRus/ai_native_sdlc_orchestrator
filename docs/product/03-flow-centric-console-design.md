@@ -155,11 +155,15 @@ The advanced workbench is flow-scoped:
 - Evidence Graph reads use
   `GET /api/projects/:projectId/flows/:flowId/evidence-graph` and render only
   selected-flow refs plus sanitized operator requests that target the selected
-  flow.
+  flow. Empty or partial graph states render a readiness path that names the
+  selected-flow scope, loaded node count, and refresh/create-evidence recovery
+  step before the operator treats traceability as missing.
 - Runtime Trace reads use
   `GET /api/projects/:projectId/flows/:flowId/runtime-trace` and link run
   events, step results, Runtime Harness decisions, delivery/release artifacts,
-  learning artifacts, and operator requests for the selected flow.
+  learning artifacts, and operator requests for the selected flow. Empty trace
+  states use the same readiness pattern so the operator can refresh run status
+  or preserve execution evidence before judging outcome quality.
 - Ask AOR requires a selected flow and target refs before creating a request;
   request creation sends `target_flow_id`, target stage, intent, delivery mode,
   allowed paths, and target refs. The drawer renders a request-readiness path
