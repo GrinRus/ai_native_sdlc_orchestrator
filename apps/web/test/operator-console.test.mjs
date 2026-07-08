@@ -126,6 +126,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Workbench",
     "support-table-grid",
     "shortPathLabel",
+    "projectDisplayLabel",
     "runtimeRootLabel",
     "Show runtime root path details",
     "Copy runtime root path",

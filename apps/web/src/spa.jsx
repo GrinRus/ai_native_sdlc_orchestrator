@@ -961,6 +961,32 @@ function shortPathLabel(value) {
   return `.../${parts.slice(-2).join("/")}`;
 }
 
+function conciseSlugLabel(value, fallback = "Local project") {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  const tail = text.split(/[\\/]+/u).filter(Boolean).pop() ?? text;
+  const tokens = tail
+    .split(/[._-]+/u)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (tokens.length === 0) return fallback;
+  const firstDigitToken = tokens.findIndex((token) => /\d/u.test(token));
+  const stableTokens = firstDigitToken >= 0
+    ? tokens.slice(0, Math.max(2, firstDigitToken >= 3 ? firstDigitToken - 1 : firstDigitToken + 1))
+    : tokens;
+  const meaningfulTokens = stableTokens
+    .filter((token) => !/^(tmp|target|checkout|checkouts|project|repo)$/iu.test(token))
+    .slice(0, 3);
+  const label = humanizeToken((meaningfulTokens.length > 0 ? meaningfulTokens : stableTokens.slice(0, 3)).join(" "));
+  return label || fallback;
+}
+
+function projectDisplayLabel(project) {
+  const rawLabel = String(project?.label ?? project?.display_name ?? project?.project_id ?? "").trim();
+  if (rawLabel && !looksLikeTechnicalRef(rawLabel)) return rawLabel;
+  return conciseSlugLabel(project?.project_ref ?? rawLabel, rawLabel ? "Local project" : "Project pending");
+}
+
 function compactCommandLabel(value) {
   const text = String(value ?? "").trim();
   if (!text) return "pending";
@@ -1027,6 +1053,11 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
   const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
   const runtimeRoot = activeProject?.runtime_root ?? "runtime pending";
   const runtimeRootLabel = shortPathLabel(runtimeRoot);
+  const activeProjectLabel = projectDisplayLabel(activeProject);
+  const activeProjectRawLabel = activeProject?.label ?? activeProject?.display_name ?? activeProject?.project_id ?? "";
+  const activeProjectTitle = activeProjectRawLabel && activeProjectRawLabel !== activeProjectLabel
+    ? `${activeProjectLabel} (${activeProjectRawLabel})`
+    : activeProjectRawLabel;
   return (
     <div className="project-switcher" aria-label="Project switcher">
       <label htmlFor="project-switcher-control">
@@ -1035,13 +1066,14 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
           id="project-switcher-control"
           name="project-switcher"
           aria-label="Project switcher"
+          title={activeProjectTitle}
           value={activeProject?.project_id ?? ""}
           onChange={(event) => onSelectProject(event.target.value)}
           disabled={busy || projects.length === 0}
         >
           {projects.map((project) => (
-            <option key={project.project_id} value={project.project_id}>
-              {project.label ?? project.display_name ?? project.project_id}
+            <option key={project.project_id} value={project.project_id} title={project.label ?? project.display_name ?? project.project_id}>
+              {projectDisplayLabel(project)}
             </option>
           ))}
         </select>
