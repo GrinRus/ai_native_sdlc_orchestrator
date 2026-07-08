@@ -70,6 +70,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "workbenchEvidenceRows",
     "latestDecisionRequestFromEvidence",
     "selected flow or project-level live evidence",
+    "compactVisibleValue",
+    "CompactInlineValue",
+    "CompactDetailValue",
     "New Flow Preview",
     "Completeness Checklist",
     "Cancel New Flow",
@@ -82,7 +85,6 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "request-intent-segment",
     "request-scope-card",
     "graph-flow-canvas",
-    "graph-trace-row",
     "StageSpecificPanel",
     "artifact-readiness-grid",
     "artifact_readiness",
@@ -111,10 +113,18 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Project Context",
     "Runtime Readiness",
     "Configure First Flow",
+    "First-flow setup is the only required next step.",
     "firstRunFocusMode",
     "first-run-focus-mode",
     "AdvancedEvidenceDisclosure",
     "Advanced evidence",
+    "FlowAdvancedWorkbench",
+    "Advanced evidence workbench",
+    "advanced-workbench-tabs",
+    "support-table-grid",
+    "shortPathLabel",
+    "runtimeRootLabel",
+    "topbar-status-strip",
     "first-run-next-action-grid",
     "stage-progress-strip",
     "compact-first-run",
@@ -131,6 +141,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     'htmlFor="project-switcher-control"',
     'id="project-switcher-control"',
     'name="project-switcher"',
+    'aria-label="Project switcher"',
     "Add local project",
     "Runtime root preview",
     "Add and initialize",
@@ -143,6 +154,10 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "trace-timeline-strip",
     "Create and run request",
     "Create no-write inspection request",
+    "requestDrawerOpenerRef",
+    "pendingRequestDrawerFocusRestore",
+    "restoreRequestDrawerFocus",
+    "clearResult: false",
     "Add at least one target ref",
     "Initialize Project Runtime",
     "First launch",
@@ -182,9 +197,14 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Evidence artifacts",
     "Operator Decision",
     "operatorDecisionRequestsForFlow",
+    "isOperatorDecisionRequestRef",
+    "normalizeOperatorDecisionStatus",
+    "isOpenOperatorDecisionStatus",
     "supportedDecisionActionsFromRecord",
     "isOperatorDecisionRequestRow",
     "Review the runtime decision request",
+    "No pending agent decision request for this flow.",
+    "agent_decision_request_ref",
     "aor run steer --run-id",
     "Copy request ref",
     "copyFeedback",
@@ -225,10 +245,14 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Retry public step",
     "aor run cancel",
     "aor run status --run-id",
+    "delivery-mode={selectedDeliveryMode}",
+    "syncExpandedToViewport",
   ]) {
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
   }
   assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
+  assert.ok(css.includes("--control-height: 38px"), "SPA CSS should define a desktop control height token");
+  assert.ok(css.includes("--touch-control-height: 44px"), "SPA CSS should define a mobile touch target token");
   assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
   assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
@@ -243,6 +267,16 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".quality-gate-card.operator-hold"), "SPA CSS should distinguish exhausted repair budgets");
   assert.ok(css.includes(".verification-plan-card"), "SPA CSS should define compact verification plan layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
+  assert.ok(css.includes(".advanced-workbench-disclosure"), "SPA CSS should group active advanced surfaces behind one disclosure");
+  assert.ok(css.includes(".advanced-workbench-tabs"), "SPA CSS should define active advanced workbench tabs");
+  assert.ok(css.includes(".compact-inline-value"), "SPA CSS should define compact inline value layout");
+  assert.ok(css.includes(".compact-detail-value"), "SPA CSS should define compact detail value layout");
+  assert.match(css, /summary:focus-visible/u, "SPA CSS should expose keyboard focus on disclosure controls");
+  assert.match(css, /\.debug-ref-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Debug disclosure controls should meet the shared target size");
+  assert.match(css, /\.runtime-path-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Runtime path disclosure controls should meet the shared target size");
+  assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
+  assert.match(css, /\.row-actions \.icon-button\s*\{[\s\S]*?width: var\(--control-height\);[\s\S]*?height: var\(--control-height\);/u, "Artifact row icon actions should meet the shared target size");
+  assert.ok(css.includes(".support-table-grid"), "SPA CSS should hide first-run support tables behind disclosure");
   assert.equal(
     source.includes("candidates.at(-1)"),
     false,
@@ -251,9 +285,27 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
+  assert.ok(css.includes(".flow-active-mode .recommended-action .cockpit-actions"), "SPA CSS should place active mobile cockpit actions before stacked details");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-focus-mode \.topbar\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: minmax\(0, 1fr\) max-content max-content;/u,
+    "SPA CSS should compact first-run topbar into a two-action grid on mobile",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.advanced-workbench-row\s*\{[\s\S]*?grid-row: 3;/u,
+    "Active advanced workbench should render before Activity / Events support tables on desktop",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.bottom-bar\s*\{[\s\S]*?grid-row: 4;/u,
+    "Active Activity / Events support tables should follow the advanced workbench on desktop",
+  );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
   assert.ok(css.includes(".stage-rail.compact-first-run .stage-progress-strip"), "SPA CSS should show a compact first-run stage progress strip on mobile");
   assert.ok(css.includes(".stage-rail.compact-first-run nav"), "SPA CSS should collapse the full stage rail behind the compact first-run strip on mobile");
+  assert.ok(css.includes(".flow-active-mode .stage-rail .stage-progress-strip"), "SPA CSS should show a compact active-flow stage progress strip on tablet and mobile");
+  assert.ok(css.includes(".flow-active-mode .topbar-ask-button .action-label"), "SPA CSS should collapse long active-flow topbar button copy on mobile");
   assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
   assert.match(
     css,

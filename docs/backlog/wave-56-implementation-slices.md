@@ -1,8 +1,8 @@
 # W56 implementation slices
 
-W56 turns the latest local app UX gap analysis into one focused installed-user
-console hardening slice. It does not change AOR contracts, CLI/API behavior,
-runtime orchestration, delivery modes, or live E2E acceptance policy.
+W56 turns the latest local app UX gap analysis into installed-user console
+hardening slices. It does not change AOR contracts, CLI/API behavior, runtime
+orchestration, delivery modes, or live E2E acceptance policy.
 
 ## W56-S01 — First-run console focus and action clarity
 
@@ -53,3 +53,121 @@ runtime orchestration, delivery modes, or live E2E acceptance policy.
 - Broad visual redesign beyond first-run focus, progressive disclosure, copy,
   and mobile scannability.
 - Committing `.aor/` runtime evidence.
+
+## W56-S02 — Rendered cockpit UX hardening
+
+- **Outcome:** The local AOR console keeps the active-flow cockpit primary on
+  desktop, tablet, and mobile while first-run support surfaces remain behind
+  progressive disclosure.
+- **Epic:** EPIC-1, EPIC-6
+- **State:** done
+- **Primary modules:** `apps/web/**`, `docs/backlog/**`, tests
+- **Hard dependencies:** W56-S01
+- **Primary user story surfaces:** PBO-09, OPS-01, OPS-10, OPS-11.
+
+### Local tasks
+1. Keep clean first-run, initialized-without-flow, and draft-flow screens
+   focused on the wizard by moving rail, activity, artifacts, and inventory
+   support surfaces behind collapsed disclosure.
+2. Make active-flow cockpit task-first on desktop, tablet, and mobile so the
+   selected project, flow, safety status, and one recommended action appear
+   before long evidence surfaces.
+3. Group flow-scoped Evidence/Documents, Execution Evidence, Evidence Graph,
+   Runtime Trace, Interactions Inbox, and Operator Decision surfaces into one
+   advanced workbench with tabs/disclosure.
+4. Add a minimal semantic CSS-token pass for touched shell, controls, focus,
+   and responsive states, including mobile-sized touch targets.
+5. Update focused web tests and run build, smoke, and rendered browser checks
+   on a clean temp target.
+
+### Acceptance criteria
+1. At `390x844` and `768x1024`, the active-flow top bar and stage rail do not
+   push the main cockpit below the first viewport, and `Resolve Next Action`
+   is reachable without a long scroll.
+2. First-run focus mode does not render right rail, activity tables, artifact
+   tables, flow inventory, execution evidence, graph, trace, interaction, or
+   decision panels as first-class content.
+3. Long `project-ref` and `runtime-root` values render as short path chips with
+   full values available through title/details/copy affordances.
+4. Flow-scoped advanced surfaces are grouped in one advanced workbench and do
+   not render as multiple long inline sections by default.
+5. Desktop controls keep at least a 38px target and mobile touch controls keep
+   at least a 44px target while preserving visible focus states.
+
+### Done evidence
+- updated web source and focused web tests
+- `node --test apps/web/test/operator-console.test.mjs`
+- `node --test apps/web/test/operator-request-spa.test.mjs`
+- `pnpm web:build`
+- `pnpm aor app --project-ref <temp-target> --runtime-root <temp-target>/.aor --smoke --open false --json`
+- rendered browser check at `1440x900`, `390x844`, and `768x1024`
+
+### Out of scope
+- Changing contracts, public CLI/API payloads, runtime command behavior, or
+  packet schemas.
+- Changing orchestration ownership or making `apps/web` responsible for
+  critical runtime logic.
+- Committing `.aor/` runtime evidence, temp targets, screenshots, or ad hoc
+  audit notes.
+
+## W56-S03 — Rendered UX audit closure
+
+- **Outcome:** The local AOR console closes the P1/P2 findings from the
+  rendered UX/UI audit while preserving the W56 flow-first cockpit and
+  docs-first runtime boundaries.
+- **Epic:** EPIC-1, EPIC-6
+- **State:** done
+- **Primary modules:** `apps/web/**`, `docs/backlog/**`, tests
+- **Hard dependencies:** W56-S02
+- **Primary user story surfaces:** PBO-09, OPS-01, OPS-10, OPS-11.
+
+### Local tasks
+1. Add compact first-run shell rules for mobile and tablet so secondary topbar
+   controls do not push the first-run wizard below the first viewport.
+2. Gate Operator Decision actions on real pending `agent_decision_request_ref`
+   evidence instead of deriving actionable requests from generic artifacts.
+3. Render long runtime paths and lifecycle commands as compact primary labels
+   with full values available through title, copy, or debug details.
+4. Restore focus to the Ask AOR opener after the request drawer closes and keep
+   no-write request behavior unchanged.
+5. Make `delivery-mode=no-write` explicit in the safe walkthrough summary and
+   place the advanced workbench before support activity tables on active flows.
+6. Tokenize only the touched topbar, activity, drawer, decision, and workbench
+   styles.
+
+### Acceptance criteria
+1. Clean first-run topbar height is at most `180px` at `390x844` and at most
+   `220px` at `768x1024`; there is no horizontal overflow and
+   `Initialize Project Runtime` remains visible in the first viewport.
+2. An active first flow with no pending decision shows Operator Decision count
+   `0`, no action buttons, no fake `ready` pill, and the empty copy
+   "No pending agent decision request for this flow."
+3. First-run and active cockpit ordinary visible text does not expose full
+   `/var/folders/...` paths or full `aor mission create --project-ref ...
+   --runtime-root ...` commands as primary table/card text.
+4. Closing Ask AOR through Escape, close button, or successful submit returns
+   focus to the opener or the nearest still-mounted Ask AOR trigger.
+5. The safe walkthrough draft renders literal `delivery-mode=no-write`.
+6. At `1440x900`, the advanced workbench is reached before Activity / Events
+   support tables after the cockpit; at `390x844` and `768x1024`, it remains
+   collapsed and does not push `Resolve Next Action` out of the first viewport.
+7. New or changed CSS in touched blocks uses semantic variables for colors,
+   borders, radii, and control heights, with no new raw hex values outside
+   token declarations.
+
+### Done evidence
+- updated web source and focused web tests
+- `node --test apps/web/test/operator-console.test.mjs`
+- `node --test apps/web/test/operator-request-spa.test.mjs`
+- `pnpm web:build`
+- `pnpm aor app --project-ref <temp-target> --runtime-root <temp-target>/.aor --smoke --open false --json`
+- rendered browser check at `1440x900`, `390x844`, and `768x1024`
+
+### Out of scope
+- Changing contracts, public CLI/API payloads, runtime command behavior, or
+  packet schemas.
+- Faking completed-flow or operator-decision runtime states that are not present
+  in available evidence.
+- Broad visual redesign or full-file design-system cleanup.
+- Committing `.aor/` runtime evidence, temp targets, screenshots, or ad hoc
+  audit notes.

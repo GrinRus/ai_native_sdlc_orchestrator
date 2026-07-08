@@ -741,7 +741,7 @@ function latestDecisionRequestFromEvidence(evidenceRows) {
   if (!requestRow) return null;
   return {
     request_summary: requestRow.label ?? "Operator decision request",
-    status: requestRow.status ?? "pending",
+    status: normalizeOperatorDecisionStatus(requestRow.status, "pending"),
   };
 }
 
@@ -776,8 +776,30 @@ function flowScopedInteractions(stepResults, selectedFlow, runtimeTrace, { draft
 }
 
 function isOperatorDecisionRequestRow(row) {
-  const type = String(row?.kind ?? row?.type ?? row?.displaySummary?.type ?? "").toLowerCase();
-  return type === "operator-decision-request";
+  const refs = [
+    row?.rawRef,
+    row?.sourceRef,
+    row?.ref,
+    row?.displaySummary?.raw_ref,
+    row?.displaySummary?.source_ref,
+  ].filter(Boolean).join(" ");
+  return isOperatorDecisionRequestRef(refs);
+}
+
+function isOperatorDecisionRequestRef(value) {
+  const normalized = String(value ?? "").toLowerCase().replace(/_/gu, "-");
+  return normalized.includes("agent-decision-request") || normalized.includes("operator-decision-request");
+}
+
+function normalizeOperatorDecisionStatus(status, fallback = "pending") {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (!normalized || normalized === "ready" || normalized === "read") return fallback;
+  return normalized;
+}
+
+function isOpenOperatorDecisionStatus(status) {
+  const normalized = normalizeOperatorDecisionStatus(status, "missing");
+  return !["accepted", "answered", "closed", "completed", "resolved", "pass"].includes(normalized);
 }
 
 function supportedDecisionActionsFromRecord(record) {
@@ -792,30 +814,26 @@ function supportedDecisionActionsFromRecord(record) {
 function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRows, { draft = false } = {}) {
   if (draft) return [];
   const traceItems = selectedFlow?.flow_id && Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items : [];
-  const traceRefs = traceItems.flatMap((item) => {
-    const refs = [
-      item.agent_decision_request_ref,
-      item.display_summary?.raw_ref,
-      item.display_summary?.source_ref,
-      item.ref,
-    ].filter(Boolean);
-    return refs.map((ref) => ({
-      ref,
+  const traceRefs = traceItems
+    .filter((item) => item.agent_decision_request_ref)
+    .map((item) => ({
+      ref: item.agent_decision_request_ref,
       label: item.display_summary?.label ?? item.summary ?? "Agent decision request",
-      status: item.operator_decision_status ?? item.status ?? "pending",
+      status: normalizeOperatorDecisionStatus(item.operator_decision_status ?? item.status, "missing"),
       rejectionReason: item.operator_decision_rejection_reason ?? item.rejection_reason ?? "",
       supportedActions: supportedDecisionActionsFromRecord(item),
-    }));
-  });
+    }))
+    .filter((entry) => isOpenOperatorDecisionStatus(entry.status));
   const evidenceRefs = evidenceRows
     .filter((row) => isOperatorDecisionRequestRow(row))
     .map((row) => ({
       ref: row.rawRef ?? row.sourceRef ?? row.ref,
       label: row.label ?? "Agent decision request",
-      status: row.status ?? "pending",
+      status: normalizeOperatorDecisionStatus(row.status, "pending"),
       rejectionReason: row.rejectionReason ?? "",
       supportedActions: OPERATOR_DECISION_ACTIONS.map((action) => action.id),
-    }));
+    }))
+    .filter((entry) => isOpenOperatorDecisionStatus(entry.status));
   const seen = new Set();
   return [...traceRefs, ...evidenceRefs]
     .filter((entry) => entry.ref)
@@ -882,9 +900,80 @@ function projectStatusLabel(project) {
   return "First launch";
 }
 
+function shortPathLabel(value) {
+  const text = String(value ?? "").trim();
+  if (text.length <= 34) return text || "runtime pending";
+  const parts = text.split(/[\\/]+/u).filter(Boolean);
+  if (parts.length <= 2) return text;
+  return `.../${parts.slice(-2).join("/")}`;
+}
+
+function compactCommandLabel(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "pending";
+  const parts = text.split(/\s+/u).filter(Boolean);
+  const commandPrefix = parts[0] === "aor" ? parts.slice(0, 3).join(" ") : parts.slice(0, 2).join(" ");
+  const flagNames = ["--project-ref", "--runtime-root", "--allowed-path", "--delivery-mode"]
+    .filter((flag) => parts.includes(flag));
+  if (flagNames.length > 0) return `${commandPrefix} (${flagNames.join(", ")})`;
+  return text.length > 72 ? `${text.slice(0, 68)}...` : text;
+}
+
+function compactVisibleValue(value, kind = "auto") {
+  const text = String(value ?? "").trim();
+  if (!text) return "pending";
+  if (kind === "command" || /^aor\s+/u.test(text) || text.includes(" --project-ref ") || text.includes(" --runtime-root ")) {
+    return compactCommandLabel(text);
+  }
+  if (kind === "path" || text.startsWith("/") || text.startsWith("~/") || /^[A-Za-z]:[\\/]/u.test(text)) {
+    return shortPathLabel(text);
+  }
+  return text.length > 72 ? `${text.slice(0, 68)}...` : text;
+}
+
+function CompactInlineValue({ value, kind = "auto", className = "" }) {
+  const fullValue = String(value ?? "").trim();
+  const label = compactVisibleValue(fullValue, kind);
+  const truncated = fullValue.length > 0 && label !== fullValue;
+  return (
+    <span className={`compact-inline-value ${className}`.trim()} title={fullValue}>
+      <code>{label}</code>
+      {truncated ? (
+        <details className="debug-ref-details compact-value-details">
+          <summary>Details</summary>
+          <code>{fullValue}</code>
+        </details>
+      ) : null}
+    </span>
+  );
+}
+
+function CompactDetailValue({ value, copyValue = null, kind = "auto" }) {
+  const fullValue = String(value ?? "").trim();
+  const label = compactVisibleValue(fullValue, kind);
+  const truncated = fullValue.length > 0 && label !== fullValue;
+  return (
+    <div className="compact-detail-value">
+      <span title={fullValue}>{label}</span>
+      {truncated && copyValue ? (
+        <button className="secondary compact" type="button" onClick={() => copyValue(fullValue)}>
+          Copy
+        </button>
+      ) : null}
+      {truncated ? (
+        <details className="debug-ref-details compact-value-details">
+          <summary>Debug full value</summary>
+          <code>{fullValue}</code>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAddProject, busy }) {
   const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
   const runtimeRoot = activeProject?.runtime_root ?? "runtime pending";
+  const runtimeRootLabel = shortPathLabel(runtimeRoot);
   return (
     <div className="project-switcher" aria-label="Project switcher">
       <label htmlFor="project-switcher-control">
@@ -892,6 +981,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
         <select
           id="project-switcher-control"
           name="project-switcher"
+          aria-label="Project switcher"
           value={activeProject?.project_id ?? ""}
           onChange={(event) => onSelectProject(event.target.value)}
           disabled={busy || projects.length === 0}
@@ -907,7 +997,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
         <StatusPill state={projectStatusLabel(activeProject)} />
         <details className="runtime-path-details">
           <summary>
-            <code title={runtimeRoot}>{runtimeRoot}</code>
+            <code title={runtimeRoot}>{runtimeRootLabel}</code>
           </summary>
           <code className="runtime-path-full">{runtimeRoot}</code>
         </details>
@@ -1127,7 +1217,10 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
             <div>
               <span>Safety</span>
               <strong>{selectedDeliveryMode === "no-write" ? "No upstream writes" : selectedDeliveryMode}</strong>
-              <p>{form.constraints || "Local evidence first; no upstream writes by default."}</p>
+              <p>
+                <code>delivery-mode={selectedDeliveryMode}</code>
+                {form.constraints ? ` / ${form.constraints}` : " / Local evidence first; no upstream writes by default."}
+              </p>
             </div>
             <div>
               <span>Definition of Done</span>
@@ -1202,7 +1295,7 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
       </div>
       <div>
         <span>Dry-run preview</span>
-        <code>{command.includes("--dry-run") ? command : `${command} --dry-run`}</code>
+        <CompactInlineValue value={command.includes("--dry-run") ? command : `${command} --dry-run`} kind="command" />
         <p>{visibleEvidence.length} selected-flow artifacts available before execution.</p>
       </div>
     </div>
@@ -1561,7 +1654,7 @@ function FlowCockpit({
                 <strong>{step.label}</strong>
                 <p>{step.detail}</p>
               </div>
-              <code>{step.code}</code>
+              <CompactInlineValue value={step.code} />
             </div>
           ))}
           <div className="ready">
@@ -1570,7 +1663,7 @@ function FlowCockpit({
               <strong>Runtime root policy</strong>
               <p>No-write safety and local control-plane defaults stay visible before any flow exists.</p>
             </div>
-            <code>{runtimeRoot}</code>
+            <CompactInlineValue value={runtimeRoot} kind="path" />
           </div>
         </div>
 
@@ -1583,12 +1676,12 @@ function FlowCockpit({
           <div>
             <span>Blockers</span>
             <strong>{stateReady ? "None for safe template" : "Runtime not initialized"}</strong>
-            <p>{stateReady ? "Mission intake is the only required next step." : "AOR needs a local state file before flow evidence exists."}</p>
+            <p>{stateReady ? "First-flow setup is the only required next step." : "AOR needs a local state file before flow evidence exists."}</p>
           </div>
           <div>
             <span>Safety</span>
             <strong>No upstream writes</strong>
-            <p>First-run defaults keep execution in local evidence mode.</p>
+            <p>First-run defaults keep execution in local evidence mode with <code>delivery-mode=no-write</code>.</p>
           </div>
           <div>
             <span>Runtime readiness</span>
@@ -1747,7 +1840,44 @@ function FlowCockpit({
         </div>
       ) : null}
 
-      <FlowTimeline currentStage={currentStage} completed={completed} />
+      <div className="recommended-action">
+        <div className="action-header">
+          <div>
+            <h3>One Recommended Action</h3>
+            <p>{completed ? "Single read-only action" : "Single safest next step"}</p>
+          </div>
+          <StatusPill state={blockers.length > 0 ? "blocked" : completed ? "read-only" : "ready"} />
+        </div>
+        <div className="action-grid">
+          <div className="command-panel">
+            <span>Command</span>
+            <CompactInlineValue value={actionCommandTitle(nextPrimary)} kind="command" />
+            <p>{nextPrimary.reason}</p>
+          </div>
+          <div>
+            <span>Runtime root</span>
+            <CompactInlineValue value={projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"} kind="path" />
+          </div>
+          <div>
+            <span>Write-back mode</span>
+            <code>{deliveryMode}</code>
+          </div>
+          <div>
+            <span>Safety status</span>
+            <strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit review required"}</strong>
+          </div>
+        </div>
+        <div className="cockpit-actions">
+          <button className="primary" type="button" onClick={onResolveNext} disabled={busy || completed}>
+            <Icon name="play" />
+            Resolve Next Action
+          </button>
+          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
+            <Icon name="refresh" />
+            Refresh
+          </button>
+        </div>
+      </div>
 
       {!completed ? (
         <div className="active-flow-handoff" aria-label="Active flow status summary">
@@ -1757,7 +1887,7 @@ function FlowCockpit({
           </div>
           <div>
             <span>Next action</span>
-            <strong>{actionCommandLabel(nextPrimary)}</strong>
+            <strong title={actionCommandTitle(nextPrimary)}>{compactVisibleValue(actionCommandTitle(nextPrimary), "command")}</strong>
           </div>
           <div>
             <span>No-write safety</span>
@@ -1769,6 +1899,8 @@ function FlowCockpit({
           </div>
         </div>
       ) : null}
+
+      <FlowTimeline currentStage={currentStage} completed={completed} />
 
       <QualityGatePanel gate={qualityGate} evidenceRows={evidenceRows} />
 
@@ -1794,45 +1926,6 @@ function FlowCockpit({
         </div>
       ) : null}
 
-      <div className="recommended-action">
-        <div className="action-header">
-          <div>
-            <h3>One Recommended Action</h3>
-            <p>{completed ? "Single read-only action" : "Single safest next step"}</p>
-          </div>
-          <StatusPill state={blockers.length > 0 ? "blocked" : completed ? "read-only" : "ready"} />
-        </div>
-        <div className="action-grid">
-          <div className="command-panel">
-            <span>Command</span>
-            <code title={actionCommandTitle(nextPrimary)}>{actionCommandLabel(nextPrimary)}</code>
-            <p>{nextPrimary.reason}</p>
-          </div>
-          <div>
-            <span>Runtime root</span>
-            <code>{projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
-          </div>
-          <div>
-            <span>Write-back mode</span>
-            <code>{deliveryMode}</code>
-          </div>
-          <div>
-            <span>Safety status</span>
-            <strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit review required"}</strong>
-          </div>
-        </div>
-        <div className="cockpit-actions">
-          <button className="primary" type="button" onClick={onResolveNext} disabled={busy || completed}>
-            <Icon name="play" />
-            Resolve Next Action
-          </button>
-          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
-            <Icon name="refresh" />
-            Refresh
-          </button>
-        </div>
-      </div>
-
       <ActionContextGrid
         stage={actionStage}
         action={nextPrimary}
@@ -1857,7 +1950,7 @@ function FlowCockpit({
         <div>
           <span>Flow ID</span>
           <strong>{flow?.mission_id ?? "draft"}</strong>
-          <p>{flow?.flow_id ?? "Mission packet will create the flow identity."}</p>
+          <p title={flow?.flow_id ?? ""}>{compactVisibleValue(flow?.flow_id ?? "Mission packet will create the flow identity.")}</p>
         </div>
       </div>
 
@@ -2025,7 +2118,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
       </section>
       <section className="rail-card">
         <h3>Runtime root</h3>
-        <p><code>{projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"}</code></p>
+        <p><CompactInlineValue value={projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"} kind="path" /></p>
         <div className="meter"><span /></div>
       </section>
       <section className="rail-card">
@@ -2513,7 +2606,148 @@ function RuntimeTracePanel({ trace }) {
   );
 }
 
-function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCount, decisionCount }) {
+function defaultAdvancedWorkbenchOpen() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return true;
+  return window.matchMedia("(min-width: 1181px)").matches;
+}
+
+function ActivityArtifactsTables({ activity, evidenceRows, draftSurface, className = "bottom-bar", copyValue = null }) {
+  return (
+    <section className={className}>
+      <div className="activity-table">
+        <h3>Activity / Events</h3>
+        <table>
+          <thead><tr><th>Event</th><th>Details</th></tr></thead>
+          <tbody>
+            {activity.length === 0 ? <tr><td colSpan="2">No activity yet</td></tr> : activity.map((entry) => (
+              <tr key={entry.id}><td>{entry.label}</td><td><CompactDetailValue value={entry.detail} copyValue={copyValue} /></td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="activity-table">
+        <h3>Artifacts (Recent)</h3>
+        <table>
+          <thead><tr><th>Artifact</th><th>Status</th></tr></thead>
+          <tbody>
+            {evidenceRows.length === 0 ? (
+              <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No visible artifacts yet"}</td></tr>
+            ) : evidenceRows.slice(0, 5).map((row) => (
+              <tr key={row.ref}>
+                <td><span className="artifact-ref-label" title={row.rawRef ?? row.ref}>{row.label}</span></td>
+                <td>{row.status ?? "ready"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function FlowAdvancedWorkbench({
+  evidenceRows,
+  selectedRef,
+  setSelectedRef,
+  attachTarget,
+  copyRef,
+  executionEvidence,
+  providerEvidenceRows,
+  evidenceGraph,
+  runtimeTrace,
+  interactions,
+  answers,
+  setAnswers,
+  submitAnswer,
+  decisionRequests,
+  busy,
+}) {
+  const [expanded, setExpanded] = useState(defaultAdvancedWorkbenchOpen);
+  const [selectedTab, setSelectedTab] = useState("evidence");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia("(max-width: 1180px)");
+    const syncExpandedToViewport = () => {
+      if (media.matches) setExpanded(false);
+    };
+    syncExpandedToViewport();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", syncExpandedToViewport);
+      return () => media.removeEventListener("change", syncExpandedToViewport);
+    }
+    media.addListener(syncExpandedToViewport);
+    return () => media.removeListener(syncExpandedToViewport);
+  }, []);
+
+  const traceCount = Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items.length : 0;
+  const graphCount = Array.isArray(evidenceGraph?.nodes) ? evidenceGraph.nodes.length : 0;
+  const tabs = [
+    { id: "evidence", label: "Evidence / Documents", count: evidenceRows.length },
+    { id: "execution", label: "Execution", count: executionEvidence ? 1 : 0 },
+    { id: "graph", label: "Graph", count: graphCount },
+    { id: "trace", label: "Runtime Trace", count: traceCount },
+    { id: "interactions", label: "Interactions Inbox", count: interactions.length },
+    { id: "decisions", label: "Operator Decision", count: decisionRequests.length },
+  ];
+  const selected = tabs.find((tab) => tab.id === selectedTab) ?? tabs[0];
+  const panel =
+    selected.id === "execution" ? (
+      <ExecutionEvidencePanel evidence={executionEvidence} providerEvidenceRows={providerEvidenceRows} copyRef={copyRef} busy={busy} />
+    ) : selected.id === "graph" ? (
+      <EvidenceGraphPanel graph={evidenceGraph} />
+    ) : selected.id === "trace" ? (
+      <RuntimeTracePanel trace={runtimeTrace} />
+    ) : selected.id === "interactions" ? (
+      <InteractionsInbox interactions={interactions} answers={answers} setAnswers={setAnswers} submitAnswer={submitAnswer} busy={busy} />
+    ) : selected.id === "decisions" ? (
+      <OperatorDecisionDrawer decisionRequests={decisionRequests} copyRef={copyRef} busy={busy} />
+    ) : (
+      <EvidenceWorkbench rows={evidenceRows} selectedRef={selectedRef} setSelectedRef={setSelectedRef} attachTarget={attachTarget} copyRef={copyRef} />
+    );
+
+  return (
+    <section className="workbench-row advanced-workbench-row">
+      <details
+        className="work-card advanced-workbench-disclosure"
+        open={expanded}
+        onToggle={(event) => setExpanded(event.currentTarget.open)}
+      >
+        <summary>
+          <div>
+            <h3>Advanced evidence workbench</h3>
+            <p>Flow-scoped Evidence / Documents, Runtime Trace, Interactions Inbox, and Operator Decision surfaces stay grouped below the cockpit.</p>
+          </div>
+          <StatusPill state={expanded ? selected.label : `${evidenceRows.length} artifacts`} />
+        </summary>
+        {expanded ? (
+          <>
+            <div className="advanced-workbench-tabs" role="tablist" aria-label="Advanced flow-scoped surfaces">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={selected.id === tab.id ? "selected" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected.id === tab.id}
+                  onClick={() => setSelectedTab(tab.id)}
+                >
+                  <span>{tab.label}</span>
+                  <strong>{tab.count}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="advanced-workbench-panel" role="tabpanel" aria-label={selected.label}>
+              {panel}
+            </div>
+          </>
+        ) : null}
+      </details>
+    </section>
+  );
+}
+
+function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCount, decisionCount, activity = [], evidenceRows = [], flows = [], copyValue = null }) {
   return (
     <section className="workbench-row advanced-evidence-row">
       <details className="work-card advanced-evidence-disclosure">
@@ -2545,7 +2779,24 @@ function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCo
             <strong>{decisionCount}</strong>
             <p>Bounded operator decisions are hidden until a runtime decision request exists.</p>
           </div>
+          <div>
+            <span>Flow Inventory</span>
+            <strong>{flows.length}</strong>
+            <p>Flow selection appears after a durable active or completed flow exists.</p>
+          </div>
+          <div>
+            <span>Activity / Events</span>
+            <strong>{activity.length}</strong>
+            <p>Local UI activity stays available here without competing with first-run setup.</p>
+          </div>
         </div>
+        <ActivityArtifactsTables
+          activity={activity}
+          evidenceRows={evidenceRows}
+          draftSurface={newFlowDraft}
+          className="support-table-grid"
+          copyValue={copyValue}
+        />
       </details>
     </section>
   );
@@ -2812,6 +3063,8 @@ function App() {
   const didChooseStage = useRef(false);
   const didAutoSelectStage = useRef(false);
   const flowSelectionVersion = useRef(0);
+  const requestDrawerOpenerRef = useRef(null);
+  const pendingRequestDrawerFocusRestore = useRef(false);
 
   const apiProjectBase = useMemo(() => {
     const projectId = activeProjectId ?? config?.default_project_id ?? config?.project_id;
@@ -3292,6 +3545,12 @@ function App() {
   }
 
   function openRequestDrawer(prefillRef = "") {
+    if (typeof document !== "undefined") {
+      const opener = document.activeElement;
+      if (opener && opener !== document.body && typeof opener.focus === "function") {
+        requestDrawerOpenerRef.current = opener;
+      }
+    }
     const completed = isCompletedFlow(selectedFlow);
     const targetFlowId = selectedFlow?.flow_id ?? "";
     const sameFlow = requestForm.targetFlowId === targetFlowId;
@@ -3324,20 +3583,50 @@ function App() {
     setRequestDrawerOpen(true);
   }
 
-  function closeRequestDrawer() {
+  function restoreRequestDrawerFocus() {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const restore = (attempt = 0) => {
+      const opener = requestDrawerOpenerRef.current;
+      if (opener && opener.isConnected && typeof opener.focus === "function" && !opener.disabled) {
+        opener.focus();
+        requestDrawerOpenerRef.current = null;
+        return;
+      }
+      if (opener && opener.isConnected && attempt < 6) {
+        window.setTimeout(() => restore(attempt + 1), 50);
+        return;
+      }
+      const fallback = document.querySelector(
+        ".topbar-ask-button:not(:disabled), .flow-cockpit button.secondary:not(:disabled), .mission-form button[aria-label='Ask AOR for selected flow']:not(:disabled)",
+      );
+      if (fallback && typeof fallback.focus === "function") fallback.focus();
+      requestDrawerOpenerRef.current = null;
+    };
+    window.setTimeout(() => restore(), 0);
+  }
+
+  function closeRequestDrawer({ clearResult = true, restoreFocus = true } = {}) {
+    if (restoreFocus) pendingRequestDrawerFocusRestore.current = true;
     setRequestDrawerOpen(false);
-    setRequestResult(null);
+    if (clearResult) setRequestResult(null);
   }
 
   useEffect(() => {
     if (!requestDrawerOpen) return undefined;
     function handleKeyDown(event) {
       if (event.key === "Escape") {
+        event.preventDefault();
         closeRequestDrawer();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [requestDrawerOpen]);
+
+  useEffect(() => {
+    if (requestDrawerOpen || !pendingRequestDrawerFocusRestore.current) return;
+    pendingRequestDrawerFocusRestore.current = false;
+    restoreRequestDrawerFocus();
   }, [requestDrawerOpen]);
 
   async function runLifecycle(command, flags = {}) {
@@ -3451,6 +3740,7 @@ function App() {
       pushActivity("operator-request.completed", run.operator_request_run?.compiled_context_ref ?? request.operator_request_ref);
       setRequestResult(run.operator_request_run ?? null);
       await refresh();
+      closeRequestDrawer({ clearResult: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -3524,6 +3814,7 @@ function App() {
     "no-write";
   const firstRunFocusMode = draftSurface || !selectedFlow;
   const topbarAskReason = selectedFlow ? "Ask AOR for selected flow" : "Ask AOR requires a selected active flow";
+  const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
 
   return (
     <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
@@ -3552,24 +3843,26 @@ function App() {
         />
         <div className="top-context runtime-context">
           <span>Runtime root</span>
-          <code>{projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
+          <code title={runtimeRoot}>{shortPathLabel(runtimeRoot)}</code>
         </div>
-        <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No active flow"} />
+        <div className="topbar-status-strip" aria-label="Console status">
+          <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No active flow"} />
+          <StatusPill state={config ? "connected" : "loading"} />
+          <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
+        </div>
         <div className="topbar-spacer" />
-        <StatusPill state={config ? "connected" : "loading"} />
-        <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         <button
           className="utility-button topbar-ask-button"
           type="button"
           onClick={() => openRequestDrawer()}
           disabled={busy || !selectedFlow}
           title={topbarAskReason}
-          aria-label="Ask AOR for selected flow"
+          aria-label={topbarAskReason}
         >
-          <Icon name="target" />Ask AOR for selected flow
+          <Icon name="target" /><span className="action-label">Ask AOR for selected flow</span>
         </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
-        <button className="utility-button runtime-copy-chip" type="button" onClick={() => copyRef(projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor")}>
+        <button className="utility-button runtime-copy-chip" type="button" title={runtimeRoot} onClick={() => copyRef(runtimeRoot)}>
           <Icon name="folder" />Copy runtime path
         </button>
       </header>
@@ -3646,48 +3939,18 @@ function App() {
         )}
       </main>
 
-      <RightRail
-        nextAction={draftSurface ? null : nextAction}
-        selectedFlow={selectedFlow}
-        projectState={projectState}
-        config={config}
-        activeProject={activeProject}
-        operatorRequests={operatorRequests}
-        flows={flowOptions}
-        newFlowDraft={draftSurface}
-        missionDraft={draftSurface ? form : null}
-        evidenceRows={workbenchEvidenceRows}
-      />
-
-      <section className="bottom-bar">
-        <div className="activity-table">
-          <h3>Activity / Events</h3>
-          <table>
-            <thead><tr><th>Event</th><th>Details</th></tr></thead>
-            <tbody>
-              {activity.length === 0 ? <tr><td colSpan="2">No activity yet</td></tr> : activity.map((entry) => (
-                <tr key={entry.id}><td>{entry.label}</td><td>{entry.detail}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="activity-table">
-          <h3>Artifacts (Recent)</h3>
-          <table>
-            <thead><tr><th>Artifact</th><th>Status</th></tr></thead>
-            <tbody>
-              {workbenchEvidenceRows.length === 0 ? (
-                <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No visible artifacts yet"}</td></tr>
-              ) : workbenchEvidenceRows.slice(0, 5).map((row) => (
-                <tr key={row.ref}>
-                  <td><span className="artifact-ref-label" title={row.rawRef ?? row.ref}>{row.label}</span></td>
-                  <td>{row.status ?? "ready"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {!firstRunFocusMode ? (
+        <RightRail
+          nextAction={nextAction}
+          selectedFlow={selectedFlow}
+          projectState={projectState}
+          config={config}
+          activeProject={activeProject}
+          operatorRequests={operatorRequests}
+          flows={flowOptions}
+          evidenceRows={workbenchEvidenceRows}
+        />
+      ) : null}
 
       {firstRunFocusMode ? (
         <AdvancedEvidenceDisclosure
@@ -3695,48 +3958,39 @@ function App() {
           evidenceCount={workbenchEvidenceRows.length}
           interactionCount={interactions.length}
           decisionCount={operatorDecisionRequests.length}
+          activity={activity}
+          evidenceRows={workbenchEvidenceRows}
+          flows={flowOptions}
+          copyValue={copyRef}
         />
       ) : (
-        <>
-          <section className="workbench-row execution-evidence-row">
-            <ExecutionEvidencePanel
-              evidence={executionEvidence}
-              providerEvidenceRows={providerEvidenceRows}
-              copyRef={copyRef}
-              busy={busy}
-            />
-          </section>
-
-          <section className="workbench-row graph-trace-row">
-            <EvidenceGraphPanel graph={selectedFlowEvidenceGraph} />
-            <RuntimeTracePanel trace={selectedFlowRuntimeTrace} />
-          </section>
-
-          <section className="workbench-row secondary-workbench-row">
-            <EvidenceWorkbench
-              rows={workbenchEvidenceRows}
-              selectedRef={selectedRef}
-              setSelectedRef={setSelectedRef}
-              attachTarget={attachTarget}
-              copyRef={copyRef}
-            />
-            <div className="operator-side-stack">
-              <InteractionsInbox
-                interactions={interactions}
-                answers={answers}
-                setAnswers={setAnswers}
-                submitAnswer={submitAnswer}
-                busy={busy}
-              />
-              <OperatorDecisionDrawer
-                decisionRequests={operatorDecisionRequests}
-                copyRef={copyRef}
-                busy={busy}
-              />
-            </div>
-          </section>
-        </>
+        <FlowAdvancedWorkbench
+          evidenceRows={workbenchEvidenceRows}
+          selectedRef={selectedRef}
+          setSelectedRef={setSelectedRef}
+          attachTarget={attachTarget}
+          copyRef={copyRef}
+          executionEvidence={executionEvidence}
+          providerEvidenceRows={providerEvidenceRows}
+          evidenceGraph={selectedFlowEvidenceGraph}
+          runtimeTrace={selectedFlowRuntimeTrace}
+          interactions={interactions}
+          answers={answers}
+          setAnswers={setAnswers}
+          submitAnswer={submitAnswer}
+          decisionRequests={operatorDecisionRequests}
+          busy={busy}
+        />
       )}
+
+      {!firstRunFocusMode ? (
+        <ActivityArtifactsTables
+          activity={activity}
+          evidenceRows={workbenchEvidenceRows}
+          draftSurface={draftSurface}
+          copyValue={copyRef}
+        />
+      ) : null}
 
       <RequestDrawer
         open={requestDrawerOpen}
