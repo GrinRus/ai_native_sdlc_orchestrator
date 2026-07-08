@@ -485,6 +485,31 @@ function interactionKey(interaction) {
   return `${interaction.run_id ?? "run"}:${interaction.interaction_id ?? "interaction"}`;
 }
 
+function interactionDomId(interaction, suffix) {
+  return `${interactionKey(interaction)}:${suffix}`.replace(/[^a-zA-Z0-9_-]/gu, "-");
+}
+
+function interactionAnswerChoiceLabel(answer) {
+  const decision = String(answer?.decision ?? "").trim();
+  const freeform = String(answer?.answer ?? "").trim();
+  if (decision && freeform) return `${decision} with note`;
+  if (decision) return decision;
+  if (freeform) return "Free-form answer";
+  return "Choose answer type or write a reason";
+}
+
+function interactionRecoveryPlan(interaction, answer) {
+  const hasAnswer = Boolean(String(answer?.decision ?? "").trim() || String(answer?.answer ?? "").trim());
+  return {
+    promptSummary: interaction?.prompt_summary ?? "Runtime requested input",
+    interactionType: interaction?.interaction_type ?? "runtime question",
+    evidenceLabel: titleFromRef(interaction?.step_result_ref),
+    answerChoice: interactionAnswerChoiceLabel(answer),
+    submitState: hasAnswer ? "Ready to submit" : "Answer required",
+    submitCopy: "Submit Answer writes an audit ref, refreshes run status, and lets the flow continue from public control-plane evidence.",
+  };
+}
+
 async function readJson(url, options = {}) {
   const response = await fetch(url, {
     headers: {
@@ -3257,6 +3282,9 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
             const key = interactionKey(selectedInteraction);
             const answer = answers[key] ?? { answer: "", decision: "" };
             const canSend = (answer.answer ?? "").trim().length > 0 || (answer.decision ?? "").length > 0;
+            const decisionFieldId = interactionDomId(selectedInteraction, "decision");
+            const answerFieldId = interactionDomId(selectedInteraction, "answer");
+            const recoveryPlan = interactionRecoveryPlan(selectedInteraction, answer);
             return (
               <div className="interaction-detail-panel">
                 <div className="panel-heading">
@@ -3274,20 +3302,51 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
                   <dt>Evidence</dt>
                   <dd><span className="artifact-ref-label" title={selectedInteraction.step_result_ref}>{titleFromRef(selectedInteraction.step_result_ref)}</span></dd>
                 </dl>
+                <div className="interaction-recovery-path" aria-label="Interaction answer recovery path">
+                  <div className="interaction-recovery-heading">
+                    <span>Answer path</span>
+                    <strong>Resolve runtime question first</strong>
+                    <p>The run stays paused until an audited answer is submitted for this interaction.</p>
+                  </div>
+                  <ol>
+                    <li className="active">
+                      <span>Runtime question</span>
+                      <strong>{recoveryPlan.promptSummary}</strong>
+                      <p>{recoveryPlan.interactionType}</p>
+                    </li>
+                    <li>
+                      <span>Evidence to inspect</span>
+                      <strong>{recoveryPlan.evidenceLabel}</strong>
+                      <p>Inspect the step result before choosing an answer.</p>
+                    </li>
+                    <li className={canSend ? "ready" : ""}>
+                      <span>Unlock condition</span>
+                      <strong>{recoveryPlan.submitState}</strong>
+                      <p>{recoveryPlan.submitCopy}</p>
+                    </li>
+                  </ol>
+                </div>
                 <div className="allowed-answer-types">
                   <span>Allowed answer types</span>
                   <strong>approve_once</strong>
                   <strong>approve_for_run</strong>
                   <strong>deny</strong>
                 </div>
-                <div className="interaction-row">
-                  <select name="interaction-decision" value={answer.decision} onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, decision: event.target.value } })}>
-                    <option value="">answer</option>
-                    <option value="approve_once">approve_once</option>
-                    <option value="deny">deny</option>
-                    <option value="approve_for_run">approve_for_run</option>
-                  </select>
-                  <input name="interaction-answer" value={answer.answer} placeholder="Answer or reason" onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, answer: event.target.value } })} />
+                <div className="interaction-row" aria-label="Submit runtime interaction answer">
+                  <div>
+                    <label htmlFor={decisionFieldId}>Answer type</label>
+                    <select id={decisionFieldId} name="interaction-decision" value={answer.decision} onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, decision: event.target.value } })}>
+                      <option value="">Free-form answer</option>
+                      <option value="approve_once">approve_once</option>
+                      <option value="deny">deny</option>
+                      <option value="approve_for_run">approve_for_run</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={answerFieldId}>Answer or reason</label>
+                    <input id={answerFieldId} name="interaction-answer" value={answer.answer} placeholder="Write the answer, reason, or approval note" onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, answer: event.target.value } })} />
+                    <span>{recoveryPlan.answerChoice}</span>
+                  </div>
                   <button className="secondary" type="button" onClick={() => submitAnswer(selectedInteraction)} disabled={busy || !canSend}>
                     Submit Answer
                   </button>

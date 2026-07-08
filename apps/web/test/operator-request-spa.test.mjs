@@ -104,7 +104,14 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Flow inventory/u);
   assert.match(source, /stage-status-badge/u);
   assert.match(source, /Interaction Detail/u);
+  assert.match(source, /interactionRecoveryPlan/u);
+  assert.match(source, /Interaction answer recovery path/u);
+  assert.match(source, /Resolve runtime question first/u);
+  assert.match(source, /Submit Answer writes an audit ref/u);
   assert.match(source, /interactions-layout/u);
+  assert.match(source, /Submit runtime interaction answer/u);
+  assert.match(source, /htmlFor=\{decisionFieldId\}/u);
+  assert.match(source, /htmlFor=\{answerFieldId\}/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);
   assert.match(source, /No upstream writes/u);
   assert.match(source, /Create Flow & Resolve Next Action/u);
@@ -155,12 +162,20 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(css, /\.flow-active-mode \.stage-rail \.stage-progress-strip/u);
   assert.match(css, /\.advanced-workbench-disclosure/u);
   assert.match(css, /\.advanced-workbench-tabs/u);
+  assert.match(css, /\.interaction-recovery-path\s*\{/u);
+  assert.match(css, /\.interaction-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.interaction-row label\s*\{/u);
   assert.match(css, /\.compact-inline-value/u);
   assert.match(css, /\.compact-detail-value/u);
   assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions/u);
   assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;/u);
   assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u);
   assert.match(css, /\.verification-plan-card/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.interaction-recovery-path ol,[\s\S]*?\.interaction-row,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Runtime interaction answer path should collapse on mobile",
+  );
   assert.match(css, /\.decision-action-grid button:focus-visible/u);
   assert.match(css, /\.execution-action-grid button:focus-visible/u);
   assert.match(css, /\.flow-active-mode \.advanced-workbench-row\s*\{[\s\S]*?grid-row: 3;/u);

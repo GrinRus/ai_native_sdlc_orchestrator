@@ -161,7 +161,10 @@ The advanced workbench is flow-scoped:
   request creation sends `target_flow_id`, target stage, intent, delivery mode,
   allowed paths, and target refs.
 - Runtime-requested interactions remain in the Interactions Inbox and continue
-  through the public `/interactions/answers` control-plane mutation.
+  through the public `/interactions/answers` control-plane mutation. The
+  detail panel renders an answer recovery path with the selected runtime
+  question, step-result evidence, answer type/reason fields, and the audit-ref
+  refresh condition that unlocks continuation.
 - Sanitized read payloads omit raw operator request text while preserving
   summaries and refs.
 
