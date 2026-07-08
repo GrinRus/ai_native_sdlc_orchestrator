@@ -591,18 +591,143 @@ function externalRunStepLabel(step) {
     .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
+const GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES = new Set([
+  "Run artifacts declared a primary failure owner, phase, or class.",
+]);
+
+const EXTERNAL_RUN_FAILURE_CLASS_COPY = {
+  compiled_context_budget_exceeded: "compiled context budget exceeded",
+  guided_browser_task_proof_missing: "guided browser proof missing",
+  "no-op": "no code change produced",
+  post_run_diagnostic_failed: "post-run diagnostic failed",
+  provider_context_window_exceeded: "provider context window exceeded",
+  provider_work_packet_not_executed: "provider work packet was not executed",
+  qa_repair_loop_exhausted: "QA repair loop exhausted",
+  repeated_repair_context_without_new_evidence: "repeated repair context without new evidence",
+  review_quality_not_approved: "review quality not approved",
+  review_repair_loop_exhausted: "review repair loop exhausted",
+  target_verification_failed: "target verification failed",
+  verification_mapping_gap: "verification mapping gap",
+};
+
+function externalRunPhrase(value) {
+  return String(value ?? "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function externalRunFailureOwnerLabel(owner) {
+  switch (String(owner ?? "").trim()) {
+    case "aor":
+      return "AOR";
+    case "environment":
+      return "Environment";
+    case "operator":
+      return "Operator";
+    case "provider":
+      return "Provider";
+    case "target_repository":
+      return "Target repository";
+    default:
+      return "Run";
+  }
+}
+
+function externalRunFailureClassLabel(failureClass) {
+  const normalized = String(failureClass ?? "").trim();
+  return EXTERNAL_RUN_FAILURE_CLASS_COPY[normalized] ?? externalRunPhrase(normalized || "evidence blocker");
+}
+
+function isGenericExternalRunFailureSummary(summary) {
+  const normalized = String(summary ?? "").trim();
+  return !normalized || GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES.has(normalized);
+}
+
+function externalRunHealthRecoverySentences(health) {
+  if (!health) return [];
+  const missingDecisionSteps = Array.isArray(health.missing_operator_decision_steps)
+    ? health.missing_operator_decision_steps
+    : [];
+  const missingEvidenceRefs = Array.isArray(health.missing_evidence_refs)
+    ? health.missing_evidence_refs
+    : [];
+  const sentences = [];
+  if (missingDecisionSteps.length > 0) {
+    const stepsLabel = missingDecisionSteps.map(externalRunStepLabel).join(", ");
+    sentences.push(`Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`);
+  }
+  if (missingEvidenceRefs.length > 0) {
+    sentences.push(`Attach or restore ${missingEvidenceRefs.length} required evidence artifact${missingEvidenceRefs.length === 1 ? "" : "s"}.`);
+  }
+  return sentences;
+}
+
+function externalRunFailureUserSummary(health) {
+  const failure = health?.failure_summary ?? {};
+  const rawSummary = typeof failure.summary === "string" ? failure.summary.trim() : "";
+  if (!isGenericExternalRunFailureSummary(rawSummary)) return rawSummary;
+  const phase = failure.phase ? externalRunStepLabel(failure.phase) : externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  const owner = externalRunFailureOwnerLabel(failure.owner);
+  const failureClass = String(failure.class ?? "").trim();
+  if (failureClass === "verification_mapping_gap" && String(failure.phase ?? "") === "review") {
+    return "Review evidence did not connect the provider change to verification results.";
+  }
+  const classLabel = externalRunFailureClassLabel(failureClass);
+  return `${phase} evidence is blocked by ${owner.toLowerCase()} ${classLabel}.`;
+}
+
+function externalRunHealthUserSummary(health) {
+  return [
+    externalRunFailureUserSummary(health),
+    ...externalRunHealthRecoverySentences(health),
+  ].filter(Boolean).join(" ");
+}
+
+function externalRunHealthBlockerSummary(health, blocker, index) {
+  const failure = health?.failure_summary ?? {};
+  const code = String(blocker?.code ?? "");
+  const summary = typeof blocker?.summary === "string" ? blocker.summary.trim() : "";
+  const isFailureBlocker = index === 0 && (
+    code === String(failure.class ?? "") ||
+    summary === String(failure.summary ?? "")
+  );
+  if (isFailureBlocker) return externalRunFailureUserSummary(health);
+  const missingDecisionMatch = code.match(/^run_health\.(.+)\.operator_decision_missing$/u);
+  if (missingDecisionMatch) {
+    return `Accept the ${externalRunStepLabel(missingDecisionMatch[1])} operator decision before continuing.`;
+  }
+  if (code === "run_health.missing_evidence") {
+    const missingEvidenceRefs = Array.isArray(health?.missing_evidence_refs) ? health.missing_evidence_refs : [];
+    const count = missingEvidenceRefs.length || 1;
+    return `Attach or restore ${count} required evidence artifact${count === 1 ? "" : "s"}.`;
+  }
+  return summary || code;
+}
+
 function externalRunHealthBlockers(health) {
   if (!health) return [];
   const blockers = Array.isArray(health.blockers)
     ? health.blockers.filter((blocker) => blocker && typeof blocker === "object")
     : [];
-  if (blockers.length > 0) return blockers;
+  if (blockers.length > 0) {
+    return blockers.map((blocker, index) => ({
+      ...blocker,
+      summary: externalRunHealthBlockerSummary(health, blocker, index),
+    }));
+  }
   const failureSummary = health.failure_summary ?? {};
-  return failureSummary.summary
+  const hasFailureSummary = Boolean(
+    failureSummary.summary ||
+    failureSummary.class ||
+    failureSummary.owner ||
+    failureSummary.phase,
+  );
+  return hasFailureSummary
     ? [{
       code: failureSummary.class ?? "run_health_blocked",
       severity: "critical",
-      summary: failureSummary.summary,
+      summary: externalRunFailureUserSummary(health),
     }]
     : [];
 }
@@ -629,20 +754,7 @@ function providerFocusTitle(status, externalRunHealth = null) {
 
 function providerFocusDescription(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
-    const failure = externalRunHealth.failure_summary ?? {};
-    const missingDecisionSteps = Array.isArray(externalRunHealth.missing_operator_decision_steps)
-      ? externalRunHealth.missing_operator_decision_steps
-      : [];
-    const missingEvidenceRefs = Array.isArray(externalRunHealth.missing_evidence_refs)
-      ? externalRunHealth.missing_evidence_refs
-      : [];
-    const evidenceCopy = missingEvidenceRefs.length > 0
-      ? ` ${missingEvidenceRefs.length} required evidence ref${missingEvidenceRefs.length === 1 ? "" : "s"} missing.`
-      : "";
-    const decisionCopy = missingDecisionSteps.length > 0
-      ? ` Waiting on operator decision for ${missingDecisionSteps.map(externalRunStepLabel).join(", ")}.`
-      : "";
-    return `${failure.summary ?? "Run-health is blocked."}${decisionCopy}${evidenceCopy}`;
+    return externalRunHealthUserSummary(externalRunHealth);
   }
   if (status?.status === "completed") {
     return "Provider execution finished before a flow could be selected. Review validation, review, and QA evidence before delivery.";
@@ -667,7 +779,7 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
       dry_run_command: "aor run status --json",
       reason:
         pending.reason ??
-        externalRunHealth.failure_summary?.summary ??
+        externalRunHealthUserSummary(externalRunHealth) ??
         `${stepLabel} is blocked by run-health evidence.`,
     };
   }
