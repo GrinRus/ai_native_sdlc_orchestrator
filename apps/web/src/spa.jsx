@@ -701,6 +701,34 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
   };
 }
 
+function projectRunEvidenceSelectorLabel(status, externalRunHealth = null) {
+  if (isBlockingExternalRunHealth(externalRunHealth)) {
+    return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} blocker evidence`;
+  }
+  if (externalRunHealth?.status) return "Run evidence";
+  if (status) return "Provider run evidence";
+  return "No active flow";
+}
+
+function projectRunEvidenceStatus(status, externalRunHealth = null) {
+  if (isBlockingExternalRunHealth(externalRunHealth)) return "Run evidence blocked";
+  if (externalRunHealth?.status) return `Run evidence ${externalRunHealth.status}`;
+  if (status?.status) return `Provider ${status.status}`;
+  return "No active flow";
+}
+
+function projectRunEvidenceIdentity(status, externalRunHealth = null) {
+  if (isBlockingExternalRunHealth(externalRunHealth)) {
+    return providerFocusTitle(status, externalRunHealth);
+  }
+  return (
+    status?.route_id ??
+    status?.step_id ??
+    externalRunHealth?.run_id ??
+    "run evidence"
+  );
+}
+
 function formatDurationMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "n/a";
   const totalSeconds = Math.floor(value / 1000);
@@ -1204,17 +1232,18 @@ function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRow
     });
 }
 
-function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false }) {
+function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false, providerStepStatus = null, externalRunHealth = null }) {
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const value = newFlowDraft ? "__new__" : selectedFlowId ?? "";
+  const projectLevelProviderFocus = !newFlowDraft && flows.length === 0 && Boolean(providerStepStatus || externalRunHealth);
   return (
     <div className="flow-selector">
       <label htmlFor="flow-selector-control">
         <span>Flow</span>
         <select id="flow-selector-control" name="flow-selector" value={value} aria-label="Flow selector" onChange={(event) => onSelectFlow(event.target.value)}>
           {newFlowDraft ? <option value="__new__">New flow draft</option> : null}
-          {flows.length === 0 ? <option value="">No active flow</option> : null}
+          {flows.length === 0 ? <option value="">{projectLevelProviderFocus ? projectRunEvidenceSelectorLabel(providerStepStatus, externalRunHealth) : "No active flow"}</option> : null}
           {activeFlows.length > 0 ? (
             <optgroup label="Active flows">
               {activeFlows.map((flow) => (
@@ -1405,6 +1434,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
   const currentStageEntry = STAGES[currentIndex] ?? STAGES[0];
   const completed = isCompletedFlow(flow);
   const projectLevelProviderFocus = !flow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
+  const blockingExternalRun = isBlockingExternalRunHealth(externalRunHealth);
   const firstRunFocus = (!flow && !projectLevelProviderFocus) || newFlowDraft;
   const railTitle = newFlowDraft
     ? "New flow draft"
@@ -1433,7 +1463,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
         <strong>{currentStageEntry.label}</strong>
         <em>{newFlowDraft ? "Mission draft" : currentStageEntry.hint}</em>
       </div>
-      {providerStepStatus ? (
+      {providerStepStatus && !blockingExternalRun ? (
         <div className="provider-heartbeat-rail" aria-label="Provider step heartbeat">
           <div>
             <span>{providerStepStatus.provider ?? "Provider"}</span>
@@ -2337,6 +2367,8 @@ function FlowCockpit({
   const cockpitCopy = projectLevelProviderFocus && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusDescription(providerStepStatus, externalRunHealth)
     : stageRuntimeCopy;
+  const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
+  const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
   const openAdvancedWorkbench = () => {
     if (typeof document === "undefined") return;
     const workbench = document.getElementById("flow-advanced-workbench");
@@ -2475,10 +2507,10 @@ function FlowCockpit({
       {!completed ? (
         <div className="active-flow-handoff" aria-label="Active flow status summary">
           <div>
-            <span>{projectLevelProviderFocus ? "Provider run" : "Active flow id"}</span>
-            <strong title={projectLevelProviderFocus ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "" : flow?.flow_id ?? flow?.mission_id ?? ""}>
+            <span>{projectLevelProviderFocus ? "Run evidence" : "Active flow id"}</span>
+            <strong title={projectLevelProviderFocus ? projectRunIdentity : flow?.flow_id ?? flow?.mission_id ?? ""}>
               {projectLevelProviderFocus
-                ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "provider step"
+                ? projectRunIdentity
                 : flow?.flow_id ?? flow?.mission_id ?? "active flow"}
             </strong>
           </div>
@@ -2547,11 +2579,11 @@ function FlowCockpit({
           <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0] ? conciseArtifactLabel(visibleEvidence[0]) : "No flow evidence yet."}</p>
         </div>
         <div>
-          <span>{projectLevelProviderFocus ? "Provider run" : "Flow ID"}</span>
-          <strong>{projectLevelProviderFocus ? providerStepStatus.status : flow?.mission_id ?? "draft"}</strong>
-          <p title={projectLevelProviderFocus ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "" : flow?.flow_id ?? ""}>
+          <span>{projectLevelProviderFocus ? "Run evidence" : "Flow ID"}</span>
+          <strong>{projectLevelProviderFocus ? projectRunStatus : flow?.mission_id ?? "draft"}</strong>
+          <p title={projectLevelProviderFocus ? projectRunIdentity : flow?.flow_id ?? ""}>
             {compactVisibleValue(projectLevelProviderFocus
-              ? providerStepStatus.route_id ?? providerStepStatus.step_id ?? "provider step"
+              ? projectRunIdentity
               : flow?.flow_id ?? "Mission packet will create the flow identity.")}
           </p>
         </div>
@@ -4480,6 +4512,9 @@ function App() {
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const firstRunFocusMode = draftSurface || (!selectedFlow && !projectLevelProviderFocus);
+  const topbarFlowStatus = draftSurface
+    ? "Draft flow"
+    : selectedFlow?.status ?? (projectLevelProviderFocus ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth) : "No active flow");
   const topbarAskReason = selectedFlow
     ? "Ask AOR for selected flow"
     : projectLevelProviderFocus
@@ -4511,14 +4546,16 @@ function App() {
           onSelectFlow={selectFlow}
           onNewFlow={startNewFlow}
           newFlowDisabled={!activeProjectRuntimeReady || busy}
+          providerStepStatus={providerStepStatus}
+          externalRunHealth={externalRunHealth}
         />
         <div className="top-context runtime-context">
           <span>Runtime root</span>
           <code title={runtimeRoot}>{shortPathLabel(runtimeRoot)}</code>
         </div>
         <div className="topbar-status-strip" aria-label="Console status">
-          <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No active flow"} />
-          {projectLevelProviderFocus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
+          <StatusPill state={topbarFlowStatus} />
+          {projectLevelProviderFocus && providerStepStatus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
           <StatusPill state={config ? "connected" : "loading"} />
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         </div>
