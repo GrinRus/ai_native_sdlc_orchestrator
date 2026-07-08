@@ -2935,6 +2935,107 @@ tr.selected td {
   overflow-wrap: anywhere;
 }
 
+.decision-rubric-summary {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d6e5e4;
+  border-radius: 6px;
+  background: #f4fbfa;
+}
+
+.decision-rubric-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.decision-rubric-heading span,
+.decision-rubric-columns > div > span,
+.decision-rubric-facts span {
+  color: #5f7072;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.decision-rubric-heading strong {
+  color: #0f766e;
+  font-size: 12px;
+}
+
+.decision-rubric-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+.decision-rubric-facts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #dce9e8;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.decision-rubric-facts strong,
+.decision-rubric-columns li,
+.decision-rubric-columns p,
+.decision-evidence-ref-list button {
+  overflow-wrap: anywhere;
+}
+
+.decision-rubric-facts strong {
+  color: #24313d;
+  font-size: 12px;
+}
+
+.decision-rubric-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 10px;
+}
+
+.decision-rubric-columns > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.decision-rubric-columns ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.decision-rubric-columns li,
+.decision-rubric-columns p {
+  margin: 0;
+  color: #5c6b72;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.decision-evidence-ref-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 6px;
+}
+
+.decision-evidence-ref-list button {
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  white-space: normal;
+}
+
 .decision-checklist {
   display: grid;
   gap: 8px;
@@ -2980,6 +3081,17 @@ tr.selected td {
   color: #64717d;
   font-size: 12px;
   line-height: 1.45;
+}
+
+@media (max-width: 860px) {
+  .decision-rubric-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .decision-rubric-columns {
+    grid-template-columns: 1fr;
+  }
 }
 
 .drawer-backdrop {

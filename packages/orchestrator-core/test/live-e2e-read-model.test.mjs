@@ -67,6 +67,28 @@ test("control-plane read model projects sibling live E2E run-health for target c
           request_id: `${runId}.delivery.operator-decision-request`,
           run_id: runId,
           step_id: "delivery",
+          deterministic_analysis: {
+            status: "not_pass",
+            failure_class: "delivery-failed",
+            recommendation: "diagnose",
+          },
+          decision_rubric: {
+            required_checks: [
+              "inspect-public-command-transcript",
+              "inspect-materialized-artifact-refs",
+            ],
+            required_evidence_refs: [
+              requestFile,
+              path.join(reportsRoot, `live-e2e-step-plan-${runId}-15-delivery.json`),
+            ],
+          },
+          expected_response_shape: {
+            action: "continue|diagnose|block",
+            evidence_refs: [
+              requestFile,
+              path.join(reportsRoot, `live-e2e-step-classification-${runId}-15-delivery.json`),
+            ],
+          },
           operator_decision_expected_ref: expectedDecisionFile,
         },
         null,
@@ -123,12 +145,18 @@ test("control-plane read model projects sibling live E2E run-health for target c
     assert.equal(projectState.run_health.current_step, "delivery");
     assert.equal(projectState.run_health.failure_summary.class, "verification_mapping_gap");
     assert.equal(projectState.run_health.pending_decision.request_ref, requestFile);
+    assert.equal(projectState.run_health.pending_decision.decision_rubric_summary.required_check_count, 2);
+    assert.equal(projectState.run_health.pending_decision.decision_rubric_summary.required_evidence_ref_count, 3);
+    assert.equal(projectState.run_health.pending_decision.decision_rubric_summary.recommended_action, "diagnose");
     assert.ok(projectState.run_health.blockers.some((blocker) => blocker.code === "run_health.delivery.operator_decision_missing"));
-    assert.ok(
-      projectState.artifact_display_summaries.some(
-        (summary) => summary.label === "Delivery operator decision request" && summary.status === "awaiting-decision",
-      ),
+    const decisionSummary = projectState.artifact_display_summaries.find(
+      (summary) => summary.label === "Delivery operator decision request" && summary.status === "awaiting-decision",
     );
+    assert.ok(decisionSummary);
+    assert.equal(decisionSummary.decision_rubric_summary.required_check_count, 2);
+    assert.equal(decisionSummary.decision_rubric_summary.required_evidence_ref_count, 3);
+    assert.ok(decisionSummary.decision_rubric_summary.evidence_refs.some((entry) => entry.label === "Decision request"));
+    assert.ok(decisionSummary.decision_rubric_summary.evidence_refs.some((entry) => entry.label === "Step plan"));
 
     const runs = listRuns({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
     const runSummary = runs.find((run) => run.run_id === runId);

@@ -409,6 +409,7 @@ function normalizeArtifactSummary(value, fallbackRef = "", fallback = {}) {
     source_ref: raw.source_ref ?? rawRef,
     raw_ref: rawRef,
     actions: Array.isArray(raw.actions) ? raw.actions : [{ action_id: "copy_raw_ref", label: "Copy raw ref", kind: "debug" }],
+    decision_rubric_summary: raw.decision_rubric_summary ?? fallback.decision_rubric_summary ?? null,
   };
 }
 
@@ -427,6 +428,7 @@ function artifactRowFromSummary(summary, overrides = {}) {
     timestamp: normalized.timestamp,
     actions: normalized.actions,
     displaySummary: normalized,
+    decisionRubricSummary: normalized.decision_rubric_summary,
     targetFlowId: overrides.targetFlowId,
   };
 }
@@ -1376,6 +1378,7 @@ function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRow
       status: normalizeOperatorDecisionStatus(item.operator_decision_status ?? item.status, "missing"),
       rejectionReason: item.operator_decision_rejection_reason ?? item.rejection_reason ?? "",
       supportedActions: supportedDecisionActionsFromRecord(item),
+      decisionRubricSummary: item.display_summary?.decision_rubric_summary ?? item.decision_rubric_summary ?? null,
     }))
     .filter((entry) => isOpenOperatorDecisionStatus(entry.status));
   const evidenceRefs = evidenceRows
@@ -1386,6 +1389,7 @@ function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRow
       status: normalizeOperatorDecisionStatus(row.status, "pending"),
       rejectionReason: row.rejectionReason ?? "",
       supportedActions: OPERATOR_DECISION_ACTIONS.map((action) => action.id),
+      decisionRubricSummary: row.decisionRubricSummary ?? row.displaySummary?.decision_rubric_summary ?? null,
     }))
     .filter((entry) => isOpenOperatorDecisionStatus(entry.status));
   const seen = new Set();
@@ -3224,6 +3228,44 @@ function operatorDecisionChecklistItems(selectedRequest, selectedActionEntry) {
   ];
 }
 
+function normalizeDecisionRubricSummary(value) {
+  const raw = value && typeof value === "object" ? value : null;
+  if (!raw) return null;
+  const requiredChecks = Array.isArray(raw.required_checks)
+    ? raw.required_checks.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const evidenceRefs = Array.isArray(raw.evidence_refs)
+    ? raw.evidence_refs
+      .map((entry, index) => {
+        const record = entry && typeof entry === "object" ? entry : {};
+        const ref = typeof record.ref === "string" ? record.ref.trim() : "";
+        if (!ref) return null;
+        return {
+          label: typeof record.label === "string" && record.label.trim() ? record.label.trim() : `Evidence ${index + 1}`,
+          ref,
+        };
+      })
+      .filter(Boolean)
+    : [];
+  const requiredCheckCount = Number.isFinite(Number(raw.required_check_count))
+    ? Number(raw.required_check_count)
+    : requiredChecks.length;
+  const requiredEvidenceRefCount = Number.isFinite(Number(raw.required_evidence_ref_count))
+    ? Number(raw.required_evidence_ref_count)
+    : evidenceRefs.length;
+  if (requiredCheckCount === 0 && requiredEvidenceRefCount === 0 && evidenceRefs.length === 0) return null;
+  return {
+    requiredCheckCount,
+    requiredEvidenceRefCount,
+    requiredChecks,
+    evidenceRefs,
+    evidenceRefOverflowCount: Number.isFinite(Number(raw.evidence_ref_overflow_count)) ? Number(raw.evidence_ref_overflow_count) : 0,
+    deterministicStatus: typeof raw.deterministic_status === "string" ? raw.deterministic_status : "",
+    recommendedAction: typeof raw.recommended_action === "string" ? raw.recommended_action : "",
+    failureClass: typeof raw.failure_class === "string" ? raw.failure_class : "",
+  };
+}
+
 function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
@@ -3231,6 +3273,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   const [selectedAction, setSelectedAction] = useState(preferredAction);
   const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
   const decisionChecklist = operatorDecisionChecklistItems(selectedRequest, selectedActionEntry);
+  const decisionRubric = normalizeDecisionRubricSummary(selectedRequest?.decisionRubricSummary);
   const rejectionReason = selectedRequest?.rejectionReason ?? "";
   useEffect(() => {
     setSelectedAction(preferredAction);
@@ -3290,6 +3333,57 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
               <strong>Preserved when required</strong>
             </div>
           </div>
+          {decisionRubric ? (
+            <div className="decision-rubric-summary" aria-label="Decision evidence rubric">
+              <div className="decision-rubric-heading">
+                <span>Evidence rubric</span>
+                <strong>{decisionRubric.requiredCheckCount} checks / {decisionRubric.requiredEvidenceRefCount} refs</strong>
+              </div>
+              <div className="decision-rubric-facts">
+                <div>
+                  <span>Recommended action</span>
+                  <strong>{decisionRubric.recommendedAction || selectedActionEntry.label}</strong>
+                </div>
+                <div>
+                  <span>Deterministic status</span>
+                  <strong>{decisionRubric.deterministicStatus || selectedActionEntry.semanticStatus}</strong>
+                </div>
+                {decisionRubric.failureClass ? (
+                  <div>
+                    <span>Failure class</span>
+                    <strong>{decisionRubric.failureClass}</strong>
+                  </div>
+                ) : null}
+              </div>
+              <div className="decision-rubric-columns">
+                <div>
+                  <span>Required checks</span>
+                  {decisionRubric.requiredChecks.length > 0 ? (
+                    <ul>
+                      {decisionRubric.requiredChecks.map((check) => <li key={check}>{check}</li>)}
+                    </ul>
+                  ) : (
+                    <p>No explicit check labels provided.</p>
+                  )}
+                </div>
+                <div>
+                  <span>Required evidence</span>
+                  {decisionRubric.evidenceRefs.length > 0 ? (
+                    <div className="decision-evidence-ref-list">
+                      {decisionRubric.evidenceRefs.map((entry) => (
+                        <button className="secondary compact" type="button" key={entry.ref} onClick={() => copyRef(entry.ref)} disabled={busy} title={entry.ref}>
+                          {entry.label}
+                        </button>
+                      ))}
+                      {decisionRubric.evidenceRefOverflowCount > 0 ? <p>{decisionRubric.evidenceRefOverflowCount} more refs in request.</p> : null}
+                    </div>
+                  ) : (
+                    <p>No explicit evidence refs provided.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
           {decisionChecklist.length > 0 ? (
             <div className="decision-checklist" aria-label="Decision completion checklist">
               <span>Decision checklist</span>

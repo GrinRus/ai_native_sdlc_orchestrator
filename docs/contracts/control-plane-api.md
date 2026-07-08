@@ -259,6 +259,13 @@ The projection may include:
 - `artifact_display_summaries[]` for the run-health, observation, and open
   operator-decision request refs.
 
+Open operator-decision request summaries may include additive
+`decision_rubric_summary` metadata with required-check counts, required
+evidence-ref counts, short required-check labels, and short evidence-ref labels
+plus copyable refs. This summary must stay query-safe: it may expose evidence
+refs and operator-facing rubric labels, but not raw provider prompts, command
+args, file contents, secrets, auth material, or private operator identity.
+
 This projection is a read model over public runner artifacts only. It must not
 read private process state, raw provider prompts, command args, file contents,
 environment variables, bearer tokens, auth tokens, or provider secrets. It does
@@ -324,6 +331,11 @@ Each artifact display summary includes:
 - `label`, `status`, `severity`, `description`, and optional `timestamp`;
 - `source_ref` and `raw_ref` for audit/debug use;
 - `actions[]`, including `copy_raw_ref` for explicit debug copying.
+
+Artifact summaries may include type-specific additive metadata. For open
+operator-decision request summaries, `decision_rubric_summary` lets web and
+CLI/API consumers explain which evidence should be inspected before accepting,
+diagnosing, blocking, retrying, or answering a decision request.
 
 Missing or unreadable refs are represented as summaries with
 `status=missing` and `severity=critical` rather than disappearing from the

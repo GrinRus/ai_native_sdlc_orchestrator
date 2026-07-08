@@ -10,6 +10,8 @@ const INTERNAL_RUNNER_PREFIX = ["live", "e2e"].join("-");
 const RUN_HEALTH_REPORT_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-run-health-report-.+\\.json$`, "u");
 const OBSERVATION_REPORT_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-observation-report-.+\\.json$`, "u");
 const AGENT_DECISION_REQUEST_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-agent-decision-request-.+\\.json$`, "u");
+const DECISION_RUBRIC_REF_LIMIT = 5;
+const DECISION_RUBRIC_CHECK_LIMIT = 5;
 
 /**
  * @param {unknown} value
@@ -43,6 +45,22 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  const seen = new Set();
+  const unique = [];
+  for (const value of values) {
+    const normalized = String(value ?? "").trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    unique.push(normalized);
+  }
+  return unique;
 }
 
 /**
@@ -127,6 +145,56 @@ function stageLabel(step) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function decisionRubricEvidenceLabel(value) {
+  const normalized = path.basename(String(value ?? "")).toLowerCase();
+  if (normalized.includes("agent-decision-request") || normalized.includes("operator-decision-request")) return "Decision request";
+  if (normalized.includes("step-plan")) return "Step plan";
+  if (normalized.includes("step-inspection")) return "Step inspection";
+  if (normalized.includes("step-classification")) return "Step classification";
+  if (normalized.includes("step-observation")) return "Step observation";
+  if (normalized.includes("run-health")) return "Run health";
+  return "Evidence artifact";
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {Record<string, unknown> | null}
+ */
+function sanitizeDecisionRubricSummary(document) {
+  const rubric = asRecord(document.decision_rubric);
+  const expectedResponse = asRecord(document.expected_response_shape);
+  const deterministic = asRecord(document.deterministic_analysis);
+  const requiredChecks = asStringArray(rubric.required_checks);
+  const evidenceRefs = uniqueStrings([
+    ...asStringArray(rubric.required_evidence_refs),
+    ...asStringArray(expectedResponse.evidence_refs),
+    ...asStringArray(expectedResponse.inspected_evidence_refs),
+  ]);
+  const actionOptions = uniqueStrings((asString(expectedResponse.action) ?? "")
+    .split("|")
+    .map((entry) => entry.trim()));
+  if (requiredChecks.length === 0 && evidenceRefs.length === 0 && actionOptions.length === 0) return null;
+  return {
+    step_id: asString(document.step_id),
+    required_check_count: requiredChecks.length,
+    required_evidence_ref_count: evidenceRefs.length,
+    required_checks: requiredChecks.slice(0, DECISION_RUBRIC_CHECK_LIMIT),
+    evidence_refs: evidenceRefs.slice(0, DECISION_RUBRIC_REF_LIMIT).map((ref) => ({
+      label: decisionRubricEvidenceLabel(ref),
+      ref,
+    })),
+    evidence_ref_overflow_count: Math.max(0, evidenceRefs.length - DECISION_RUBRIC_REF_LIMIT),
+    action_options: actionOptions,
+    deterministic_status: asString(deterministic.status),
+    recommended_action: asString(deterministic.recommendation),
+    failure_class: asString(deterministic.failure_class),
+  };
+}
+
+/**
  * @param {string} reportsRoot
  * @param {string} runId
  * @param {string | null} currentStep
@@ -204,13 +272,18 @@ function sanitizePendingDecision(pendingDecision, request) {
   const requestRef = request?.file ?? null;
   const expectedDecisionRef = asString(request?.document.operator_decision_expected_ref);
   if (!action && !reason && !nextStep && !requestRef && !expectedDecisionRef) return null;
-  return {
+  const sanitized = {
     action,
     reason,
     next_step: nextStep,
     request_ref: requestRef,
     expected_decision_ref: expectedDecisionRef,
   };
+  const rubricSummary = request ? sanitizeDecisionRubricSummary(request.document) : null;
+  if (rubricSummary) {
+    sanitized.decision_rubric_summary = rubricSummary;
+  }
+  return sanitized;
 }
 
 /**
@@ -261,7 +334,7 @@ function buildBlockers(input) {
 
 /**
  * @param {Record<string, unknown>} projection
- * @param {{ healthFile: string, observationFile: string | null, decisionRequestFile: string | null }}
+ * @param {{ healthFile: string, observationFile: string | null, decisionRequest: { file: string, document: Record<string, unknown> } | null }}
  * @returns {Record<string, unknown>[]}
  */
 function buildDisplaySummaries(projection, files) {
@@ -298,19 +371,24 @@ function buildDisplaySummaries(projection, files) {
       timestamp: asString(projection.generated_at),
     }));
   }
-  if (files.decisionRequestFile) {
-    summaries.push(buildArtifactDisplaySummary({
-      file: files.decisionRequestFile,
+  if (files.decisionRequest) {
+    const decisionSummary = buildArtifactDisplaySummary({
+      file: files.decisionRequest.file,
       artifactRef: `run-health://operator-decision-request/${projection.run_id}/${currentStep ?? "current"}`,
-      sourceRef: files.decisionRequestFile,
-      rawRef: files.decisionRequestFile,
+      sourceRef: files.decisionRequest.file,
+      rawRef: files.decisionRequest.file,
       type: "operator-request",
       stage: currentStep ?? "delivery",
       label: `${stageLabel(currentStep)} operator decision request`,
       description: `${stageLabel(currentStep)} requires an accepted operator decision before the run can continue.`,
       status: "awaiting-decision",
       timestamp: asString(projection.generated_at),
-    }));
+    });
+    const rubricSummary = sanitizeDecisionRubricSummary(files.decisionRequest.document);
+    if (rubricSummary) {
+      decisionSummary.decision_rubric_summary = rubricSummary;
+    }
+    summaries.push(decisionSummary);
   }
   return uniqueArtifactDisplaySummaries(summaries);
 }
@@ -382,7 +460,7 @@ export function listExternalRunHealthProjectionsForRuntime(init, options = {}) {
       projection.artifact_display_summaries = buildDisplaySummaries(projection, {
         healthFile,
         observationFile: observationRef,
-        decisionRequestFile: decisionRequest?.file ?? null,
+        decisionRequest,
       });
       entries.push({
         projection,
