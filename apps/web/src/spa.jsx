@@ -2355,6 +2355,19 @@ function FlowCockpit({
       };
   const verificationPrimary = completed ? null : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
   const nextPrimary = verificationPrimary ?? resolverPrimary;
+  const primaryActionButton = projectLevelProviderFocus
+    ? {
+      label: "Refresh Run Status",
+      icon: "refresh",
+      onClick: onRefresh,
+      disabled: busy,
+    }
+    : {
+      label: "Resolve Next Action",
+      icon: "play",
+      onClick: onResolveNext,
+      disabled: busy || completed,
+    };
   const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
@@ -2489,9 +2502,9 @@ function FlowCockpit({
           </div>
         </div>
         <div className="cockpit-actions">
-          <button className="primary" type="button" onClick={onResolveNext} disabled={busy || completed}>
-            <Icon name="play" />
-            Resolve Next Action
+          <button className="primary" type="button" onClick={primaryActionButton.onClick} disabled={primaryActionButton.disabled}>
+            <Icon name={primaryActionButton.icon} />
+            {primaryActionButton.label}
           </button>
           <button className="secondary workbench-jump" type="button" onClick={openAdvancedWorkbench}>
             <Icon name="target" />
@@ -4518,8 +4531,9 @@ function App() {
   const topbarAskReason = selectedFlow
     ? "Ask AOR for selected flow"
     : projectLevelProviderFocus
-      ? "Ask AOR is disabled until the provider run materializes a selectable flow."
+      ? "Ask AOR needs a selectable flow; use run evidence controls for this blocker."
       : "Ask AOR requires a selected active flow";
+  const topbarAskLabel = selectedFlow ? "Ask AOR for selected flow" : projectLevelProviderFocus ? "Ask AOR needs a flow" : "Ask AOR for selected flow";
   const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
 
   return (
@@ -4568,7 +4582,7 @@ function App() {
           title={topbarAskReason}
           aria-label={topbarAskReason}
         >
-          <Icon name="target" /><span className="action-label">Ask AOR for selected flow</span>
+          <Icon name="target" /><span className="action-label">{topbarAskLabel}</span>
         </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
         <button className="utility-button runtime-copy-chip" type="button" title="Copy runtime root path" aria-label="Copy runtime root path" onClick={() => copyRef(runtimeRoot)}>
