@@ -239,7 +239,7 @@ function readPendingDecisionRequest(reportsRoot, runId, currentStep) {
  */
 function readMaterializedOperatorDecision(reportsRoot, runId, currentStep, pendingDecision) {
   const action = asString(pendingDecision.action);
-  if (!action || action === "continue") return null;
+  if (!action) return null;
   const candidates = listJsonFilesByFreshness(reportsRoot)
     .filter((filePath) => OPERATOR_DECISION_REGEX.test(path.basename(filePath)))
     .flatMap((filePath) => {
@@ -494,9 +494,12 @@ function buildDisplaySummaries(projection, files) {
     const pendingDecision = asRecord(projection.pending_decision);
     const action = asString(pendingDecision.action);
     const decisionStatus = asString(pendingDecision.operator_decision_status) ?? asString(pendingDecision.status) ?? "awaiting-decision";
-    const description = decisionStatus === "accepted" && action && action !== "continue"
-      ? `${stageLabel(currentStep)} ${action} decision was recorded; use linked repair or retry evidence before continuing.`
-      : `${stageLabel(currentStep)} requires an accepted operator decision before the run can continue.`;
+    const acceptedDecisionRecorded = ["accepted", "answered", "completed", "resolved"].includes(decisionStatus);
+    const description = acceptedDecisionRecorded && action === "continue"
+      ? `${stageLabel(currentStep)} continue decision was recorded; refresh run status to confirm the controller advanced.`
+      : acceptedDecisionRecorded && action
+        ? `${stageLabel(currentStep)} ${action} decision was recorded; use linked repair or retry evidence before continuing.`
+        : `${stageLabel(currentStep)} requires an accepted operator decision before the run can continue.`;
     const decisionSummary = buildArtifactDisplaySummary({
       file: files.decisionRequest.file,
       artifactRef: `run-health://operator-decision-request/${projection.run_id}/${currentStep ?? "current"}`,

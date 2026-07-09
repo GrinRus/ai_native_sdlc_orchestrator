@@ -195,6 +195,9 @@ human gate or a real environment failure.
   then stopped at the Discovery step-quality assessment gate as expected.
 - Rendered desktop and mobile checks covered the generic decision gate, the
   step-quality assessment gate, and the real target setup blocker screen.
+- Rendered desktop and mobile checks covered a materialized accepted
+  `continue` decision fixture where the controller run-health report was still
+  blocked but the expected operator-decision file already existed.
 
 ### UX quality report
 
@@ -237,6 +240,7 @@ human gate or a real environment failure.
 | Repair decision source contradiction | In `Repair Decision needed`, the first card said `No agent request file is pending`, which sounded like no decision was needed even though the tab and run state required a public repair decision. | The public repair decision card now leads with `Public repair decision required` and moves the missing request-file fact into explanatory copy tied to failed verification evidence and new repair context. |
 | Rejected decision replacement default | In a rendered rejected-decision state, the correction panel defaulted the replacement to the previously rejected `Block / blocked` action even though the decision rubric recommended `continue`, and the concrete rejection reason was not carried into the console. | Rejected decision requests now preserve the controller rejection reason in the read model and default the replacement action to the rubric-recommended supported action, so the first correction JSON reflects the action AOR expects after the validation gap is fixed. |
 | Stale assessment text in execution blocker | In the medium `ky` run, an Execution decision gate could lead with stale `handoff product-change step quality was assessed...` copy from the previous step, making the current blocker sound like a completed handoff assessment instead of the next operator action. | Step-quality completion notes are now treated as generic run-health summaries whether they appear on `failure_summary` or pending-decision reason, and completed-provider copy now honors active run-health gates, so the cockpit, blocker cards, and provider heartbeat promote the current Execution operator decision guidance. |
+| Materialized continue decision visibility | After a controller decision request wrote the expected `continue` decision file, the read model could hide both the request and the decision status because `continue` decisions were excluded from materialized-decision lookup. A first-time operator could see stale `Decision needed` copy even though the public decision artifact existed. | Materialized `continue` decisions are now linked back to their source request, exposed with operator-decision ref/status and rubric metadata, and rendered as `decision recorded` / `refresh run status` guidance instead of asking the operator to repeat an accepted decision. |
 | Responsive readability | The inspected desktop and mobile states had no horizontal overflow or clipped primary blocker/decision copy. | Keep the current compact recovery labels as the baseline for the next live E2E pass. |
 
 ### Follow-up plan

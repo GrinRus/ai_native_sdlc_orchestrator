@@ -252,12 +252,14 @@ The projection may include:
 - `current_step`, `blocked_step_id`, `pending_steps`, and `completed_steps`;
 - `missing_operator_decision_steps[]` and `missing_evidence_refs[]`;
 - `failure_summary` with `owner`, `phase`, `class`, and `summary`;
-- `pending_decision` with action, reason, next step, decision-request ref, and
-  expected decision ref;
+- `pending_decision` with action, reason, next step, decision-request ref,
+  expected decision ref, and materialized operator-decision ref/status when a
+  decision file already exists;
 - compact `controller_health` and `resume_interaction_health` fields;
 - `blockers[]` suitable for operator-facing next-action/readiness surfaces;
-- `artifact_display_summaries[]` for the run-health, observation, and open
-  operator-decision request refs.
+- `artifact_display_summaries[]` for the run-health, observation, and linked
+  operator-decision request refs, including closed requests that remain needed
+  to explain a blocked external-run state.
 
 Open operator-decision request summaries may include additive
 `decision_rubric_summary` metadata with required-check counts, required

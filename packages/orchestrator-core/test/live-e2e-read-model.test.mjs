@@ -262,3 +262,146 @@ test("control-plane read model projects sibling live E2E run-health for target c
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
+
+test("control-plane read model keeps materialized continue decisions visible", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-continue-decision-"));
+  try {
+    const runId = "live-e2e.test.continue";
+    const liveProjectRoot = path.join(tempRoot, "runtime", "projects", "aor-core");
+    const reportsRoot = path.join(liveProjectRoot, "reports");
+    const targetRoot = path.join(liveProjectRoot, "target-checkouts", "sample-target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(targetRoot, { recursive: true });
+    fs.mkdirSync(path.join(targetRoot, ".git"), { recursive: true });
+    fs.writeFileSync(path.join(targetRoot, "README.md"), "# Sample target\n", "utf8");
+    const targetRuntimeRoot = path.join(targetRoot, ".aor");
+    initializeProjectRuntime({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
+
+    const controllerFile = path.join(reportsRoot, `live-e2e-controller-state-${runId}.json`);
+    const healthFile = path.join(reportsRoot, `live-e2e-run-health-report-${runId}.json`);
+    const requestFile = path.join(reportsRoot, `live-e2e-agent-decision-request-${runId}-01-discovery.json`);
+    const expectedDecisionFile = path.join(reportsRoot, `live-e2e-operator-decision-${runId}-01-discovery.json`);
+
+    fs.writeFileSync(
+      controllerFile,
+      `${JSON.stringify(
+        {
+          run_id: runId,
+          current_step: "discovery",
+          completed_steps: ["bootstrap"],
+          pending_decision: {
+            action: "continue",
+            reason: "Controller decision is required before continuation.",
+            next_step: "discovery",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          request_id: `${runId}.discovery.operator-decision-request`,
+          run_id: runId,
+          step_id: "discovery",
+          deterministic_analysis: {
+            status: "pass",
+            recommendation: "continue",
+          },
+          decision_rubric: {
+            required_checks: ["inspect-controller-state", "inspect-run-health"],
+            required_evidence_refs: [controllerFile, healthFile],
+          },
+          expected_response_shape: {
+            action: "continue|diagnose|block",
+            evidence_refs: [requestFile],
+          },
+          operator_decision_expected_ref: expectedDecisionFile,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      expectedDecisionFile,
+      `${JSON.stringify(
+        {
+          request_id: `${runId}.discovery.operator-decision-request`,
+          step_id: "discovery",
+          status: "accepted",
+          action: "continue",
+          source_agent_decision_request_ref: requestFile,
+          semantic_analysis: {
+            status: "pass",
+            findings: ["Required public evidence refs were inspected."],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      healthFile,
+      `${JSON.stringify(
+        {
+          report_id: `${runId}.live-e2e-run-health.v1`,
+          run_id: runId,
+          profile_id: "live-e2e.test.profile",
+          generated_at: "2026-07-09T10:10:10.000Z",
+          overall_status: "blocked",
+          lifecycle_completion: {
+            pending_steps: ["discovery"],
+            missing_operator_decision_steps: ["discovery"],
+            blocked_step_id: "discovery",
+          },
+          controller_health: {
+            status: "blocked",
+            controller_state_ref: controllerFile,
+            missing_phase_evidence: [],
+            missing_operator_decision_steps: ["discovery"],
+          },
+          evidence_health: {
+            status: "pass",
+            missing_evidence_refs: [],
+          },
+          failure_summary: {
+            owner: "operator",
+            phase: "controller_decision",
+            class: "controller_incomplete",
+            summary: "Controller requires a terminal controller decision.",
+          },
+          resume_interaction_health: {
+            status: "blocked",
+            pending_interaction_count: 0,
+            pending_decision_count: 1,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const projectState = readProjectState({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
+    assert.equal(projectState.run_health.status, "blocked");
+    assert.equal(projectState.run_health.pending_decision.action, "continue");
+    assert.equal(projectState.run_health.pending_decision.request_ref, requestFile);
+    assert.equal(projectState.run_health.pending_decision.expected_decision_ref, expectedDecisionFile);
+    assert.equal(projectState.run_health.pending_decision.operator_decision_ref, expectedDecisionFile);
+    assert.equal(projectState.run_health.pending_decision.operator_decision_status, "accepted");
+    assert.equal(projectState.run_health.pending_decision.semantic_status, "pass");
+    assert.equal(projectState.run_health.pending_decision.decision_rubric_summary.recommended_action, "continue");
+    const acceptedContinueSummary = projectState.artifact_display_summaries.find(
+      (summary) => summary.label === "Discovery operator decision request" && summary.status === "accepted",
+    );
+    assert.ok(acceptedContinueSummary);
+    assert.match(acceptedContinueSummary.description, /continue decision was recorded/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
