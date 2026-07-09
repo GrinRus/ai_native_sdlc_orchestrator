@@ -123,8 +123,13 @@ The packaged SPA now treats the flow as the primary object:
   details or copy/debug affordances instead of competing with the primary CTA.
 - Blocking run-health evidence takes priority over the selected-flow next
   action. When the latest run-health projection is blocked, the active cockpit,
-  stage rail, right rail, and top-bar action show the run blocker and route the
-  operator to the Operator Decision workbench before normal flow actions resume.
+  stage rail, right rail, and top-bar action show the concrete recovery state
+  before normal flow actions resume. A substantive run failure uses blocker
+  language such as `Execution blocked` and `Review blocker`; a pending
+  controller request without a substantive failure uses decision language such
+  as `Run decision needed` and `Decision needed`; a product-change step-quality
+  gate uses assessment language such as `Run assessment needed` and
+  `Assessment needed`.
 - The stage rail and active cockpit render `provider_step_status` from public
   control-plane read models. `silent-running` states explicitly say the provider
   has no output yet but is still running, without exposing raw process commands

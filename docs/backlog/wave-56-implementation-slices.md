@@ -171,3 +171,48 @@ orchestration, delivery modes, or live E2E acceptance policy.
 - Broad visual redesign or full-file design-system cleanup.
 - Committing `.aor/` runtime evidence, temp targets, screenshots, or ad hoc
   audit notes.
+
+## 2026-07-09 live E2E UX audit addendum
+
+This addendum records the first iterative UX/UI pass after W56 closure. The
+pass used HTTPX medium live E2E runs and rendered browser checks to inspect the
+operator console as a first-time user would see it when the run stops for a
+human gate or a real environment failure.
+
+### Evidence reviewed
+
+- `live-e2e.full-journey.regress.httpx.medium.openai.ux-rerun-1e655bd`
+  stopped at the Discovery controller decision gate.
+- `live-e2e.full-journey.regress.httpx.medium.openai.ux-rerun-8a8354e`
+  stopped at the Discovery product-change step-quality assessment gate.
+- `live-e2e.full-journey.regress.httpx.medium.openai.ux-rerun-d0e97bd`
+  reached an Execution target setup failure with
+  `failure_owner=environment`, `failure_phase=target_setup`, and
+  `failure_class=environment_disk_space_exhausted`.
+- Rendered desktop and mobile checks covered the generic decision gate, the
+  step-quality assessment gate, and the real target setup blocker screen.
+
+### UX quality report
+
+| Surface | Finding | Remediation |
+|---|---|---|
+| Discovery controller decision gate | Generic pending decisions looked too similar to failures because the UI reused blocker language. | The cockpit, risk label, flow inventory, and external run panel now use decision-specific copy and avoid `Blocked` for a generic pending controller decision. |
+| Step-quality assessment gate | The assessment pause looked like an operator decision or blocker even though the required action is evaluator assessment. | The gate now uses assessment-specific labels, workbench copy, status chips, and test coverage. |
+| Execution target setup failure | The main cockpit correctly explained the environment-owned blocker, but the topbar action still said `Decision needed`. | The topbar now says `Review blocker` for substantive run failures while preserving `Decision needed` and `Assessment needed` for their separate gates. |
+| Responsive readability | The inspected desktop and mobile states had no horizontal overflow or clipped primary blocker/decision copy. | Keep the current compact recovery labels as the baseline for the next live E2E pass. |
+
+### Follow-up plan
+
+1. Resume the HTTPX medium live E2E flow after environment setup is usable, then
+   inspect the diagnose, retry, and public-step recovery surfaces from the same
+   first-time-user perspective.
+2. Advance past the step-quality assessment gate with evaluator-authored
+   assessment evidence and inspect execution, review/QA, delivery/release, and
+   learning closure screens.
+3. Add or verify non-happy-path rendered coverage for rejected operator
+   decisions, missing assessment evidence, failed required verification groups,
+   repair-request loops, completed-flow read-only state, and follow-up flow
+   creation.
+4. Keep future UI changes scoped to `apps/web/**`, product/backlog source docs,
+   tests, and packaged dist unless a finding proves a contract or control-plane
+   read-model gap.
