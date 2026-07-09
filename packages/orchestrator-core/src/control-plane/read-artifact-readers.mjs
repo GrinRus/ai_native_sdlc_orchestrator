@@ -477,14 +477,82 @@ function commandGroupIndex(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isFailedStatus(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "failed" || normalized === "fail" || normalized === "error" || normalized === "not_pass";
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} ref
+ * @returns {string | null}
+ */
+function localArtifactPathForRef(init, ref) {
+  const normalized = asString(ref);
+  if (!normalized) return null;
+  if (path.isAbsolute(normalized)) return normalized;
+  if (normalized.startsWith("evidence://")) {
+    const evidencePath = normalized.slice("evidence://".length);
+    const projectPath = path.resolve(init.projectRoot, evidencePath);
+    if (fs.existsSync(projectPath)) return projectPath;
+    const runtimePath = path.resolve(init.runtimeLayout.projectRuntimeRoot, evidencePath);
+    if (fs.existsSync(runtimePath)) return runtimePath;
+    return projectPath;
+  }
+  return null;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string[]} refs
+ * @returns {{ failedStepResultRefs: string[], blockedNextStep: string | null }}
+ */
+function verificationFailureStepResultSurface(init, refs) {
+  const failedStepResultRefs = [];
+  let blockedNextStep = null;
+  for (const ref of refs) {
+    const filePath = localArtifactPathForRef(init, ref);
+    if (!filePath) continue;
+    const document = readJsonObject(filePath);
+    if (!document || !isFailedStatus(document.status)) continue;
+    failedStepResultRefs.push(ref);
+    blockedNextStep ??= asString(document.blocked_next_step);
+  }
+  return { failedStepResultRefs, blockedNextStep };
+}
+
+/**
  * @param {Record<string, unknown>} group
  * @param {Record<string, unknown> | null} latestGroup
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {Record<string, unknown>}
  */
-function verificationPlanCommandGroupSurface(group, latestGroup) {
+function verificationPlanCommandGroupSurface(group, latestGroup, init) {
   const latestStatus = asString(latestGroup?.status);
   const status = latestStatus ?? asString(group.status) ?? "planned";
   const skipPolicy = asRecord(group.skip_policy);
+  const stepResultRefs =
+    Array.isArray(latestGroup?.step_result_refs)
+      ? latestGroup.step_result_refs
+      : Array.isArray(group.step_result_refs)
+        ? group.step_result_refs
+        : [];
+  const failureSurface = verificationFailureStepResultSurface(init, asStringArray(stepResultRefs));
+  const failedStepResultRefs =
+    asStringArray(latestGroup?.failed_step_result_refs).length > 0
+      ? asStringArray(latestGroup?.failed_step_result_refs)
+      : asStringArray(group.failed_step_result_refs).length > 0
+        ? asStringArray(group.failed_step_result_refs)
+        : failureSurface.failedStepResultRefs;
+  const failedCommandCount =
+    Number.isFinite(Number(latestGroup?.failed_command_count))
+      ? Number(latestGroup.failed_command_count)
+      : Number.isFinite(Number(group.failed_command_count))
+        ? Number(group.failed_command_count)
+        : failedStepResultRefs.length;
   return {
     id: asString(group.id) ?? "command-group",
     repo_id: asString(group.repo_id) ?? "main",
@@ -505,13 +573,14 @@ function verificationPlanCommandGroupSurface(group, latestGroup) {
       asString(group.outcome) ??
       asString(group.command_group_outcome) ??
       asString(skipPolicy.outcome),
+    failed_command_count: failedCommandCount,
+    failed_step_result_refs: failedStepResultRefs,
+    blocked_next_step:
+      asString(latestGroup?.blocked_next_step) ??
+      asString(group.blocked_next_step) ??
+      failureSurface.blockedNextStep,
     command_source: asString(group.command_source),
-    step_result_refs:
-      Array.isArray(latestGroup?.step_result_refs)
-        ? latestGroup.step_result_refs
-        : Array.isArray(group.step_result_refs)
-          ? group.step_result_refs
-          : [],
+    step_result_refs: stepResultRefs,
   };
 }
 
@@ -536,7 +605,7 @@ function readVerificationPlanSurface(init) {
   const commandGroups = sourceGroups.map((entry) => {
     const group = asRecord(entry);
     const id = asString(group.id);
-    return verificationPlanCommandGroupSurface(group, id ? summaryGroups.get(id) ?? null : null);
+    return verificationPlanCommandGroupSurface(group, id ? summaryGroups.get(id) ?? null : null, init);
   });
   return {
     status: asString(planDocument.status) ?? (commandGroups.length > 0 ? "planned" : "no-tests"),

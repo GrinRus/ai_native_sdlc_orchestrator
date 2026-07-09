@@ -213,10 +213,20 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "materializedQualityRepairCompletion",
     "materializedQualityRepairRunId",
     "completedQualityRepairAction",
+    "verificationGroupFailureDetail",
+    "firstFailedStepResultRef",
+    "latestRequiredVerificationFailed",
+    "verificationFailureSummary",
+    "failed_step_result_refs",
+    "failed_command_count",
     "isQualityRepairPrimaryAction",
     "Continue repair run",
     "Repair run completed",
     "Continue with post-run verification",
+    "Verification failed after completed repair",
+    "Post-run verification failed",
+    "Repair failed verification",
+    "Post-run verification repair path",
     "Repair implementation has completed. Rerun required verification before QA or delivery.",
     "Run the ${stepLabel} repair path through public AOR controls",
     'normalized.toLowerCase() === "qa"',
@@ -678,18 +688,29 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /verificationFailureBlocker/u);
   assert.match(source, /verificationFailurePrimaryAction/u);
   assert.match(source, /verificationFailureRecoveryPlan/u);
+  assert.match(source, /verificationGroupFailureDetail/u);
+  assert.match(source, /firstFailedStepResultRef/u);
+  assert.match(source, /latestRequiredVerificationFailed/u);
+  assert.match(source, /verificationFailureSummary/u);
+  assert.match(source, /failed_step_result_refs/u);
   assert.match(source, /Fix failed required verification, then rerun/u);
   assert.match(source, /Held downstream action/u);
   assert.match(source, /Verification rerun/u);
   assert.match(source, /VerificationFailureBanner/u);
   assert.match(source, /Required verification failed/u);
   assert.match(source, /Review is blocked by failed post-run evidence/u);
+  assert.match(source, /Verification failed after completed repair/u);
+  assert.match(source, /Failed verification evidence/u);
+  assert.match(source, /Post-run verification failed/u);
   assert.match(source, /Verification failure recovery path/u);
   assert.match(source, /Fix failed verification first/u);
+  assert.match(source, /Repair failed verification/u);
   assert.match(source, /AOR is holding the downstream action/u);
   assert.match(source, /Rerun required verification/u);
   assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} heldAction=\{resolverPrimary\} \/>/u);
-  assert.match(source, /\.\.\.verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\),/u);
+  assert.match(source, /verificationBlockers = verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\)/u);
+  assert.match(source, /verificationFailures\.length > 0\s*\? \[\.\.\.verificationBlockers, \.\.\.presentedActionBlockers\]/u);
+  assert.match(source, /completedRepairActionActive/u);
   assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary\)/u);
   assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
   assert.match(css, /\.verification-recovery-path\s*\{/u);

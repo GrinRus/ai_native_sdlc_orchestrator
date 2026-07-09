@@ -1460,7 +1460,7 @@
             "anyOf": [
               {
                 "type": "object",
-                "description": "Latest verification-plan read model with generated command groups, discovery candidates, per-group status, outcome, and evidence refs.",
+                "description": "Latest verification-plan read model with generated command groups, discovery candidates, per-group status, outcome, failed command count, failed step-result refs, blocked next step, and evidence refs.",
                 "additionalProperties": true
               },
               {

@@ -800,11 +800,41 @@ function verificationGroupTitle(group) {
   return `${role} / ${phase}`;
 }
 
+function verificationGroupFailureDetail(group) {
+  const failedCount = Number(group?.failed_command_count ?? 0);
+  const commandCount = Number(group?.command_count ?? 0);
+  if (failedCount > 0 && commandCount > 0) return `${failedCount} failed of ${commandCount} commands`;
+  if (failedCount > 0) return `${failedCount} failed command${failedCount === 1 ? "" : "s"}`;
+  return `${group?.id ?? "verification group"} / ${commandCount || 0} commands`;
+}
+
+function firstFailedStepResultRef(group) {
+  const failedRefs = Array.isArray(group?.failed_step_result_refs) ? group.failed_step_result_refs : [];
+  if (failedRefs.length > 0) return failedRefs[0];
+  const refs = Array.isArray(group?.step_result_refs) ? group.step_result_refs : [];
+  return refs[0] ?? "";
+}
+
+function latestRequiredVerificationFailed(plan, failures = null) {
+  const failureRows = Array.isArray(failures) ? failures : failedRequiredVerificationGroups(plan);
+  return failureRows.length > 0 && isFailedVerificationStatus(plan?.latest_verify_status ?? plan?.status);
+}
+
+function verificationFailureSummary(plan, failures) {
+  if (!latestRequiredVerificationFailed(plan, failures)) return null;
+  const firstFailure = failures[0];
+  const detail = firstFailure ? verificationGroupFailureDetail(firstFailure) : "required verification failed";
+  const blockedNextStep = firstFailure?.blocked_next_step;
+  return blockedNextStep
+    ? `Post-run verification failed: ${detail}. ${blockedNextStep}`
+    : `Post-run verification failed: ${detail}. Inspect failed step-result evidence before repair, review, QA, or delivery.`;
+}
+
 function verificationFailureBlocker(group, index) {
   const title = verificationGroupTitle(group);
   return {
     code: group?.id ?? `required-verification-${index + 1}`,
-    summary: `Required verification failed: ${title}`,
+    summary: `Required verification failed: ${title} (${verificationGroupFailureDetail(group)})`,
   };
 }
 
@@ -820,9 +850,11 @@ function verificationFailurePrimaryAction(plan, failures, heldAction) {
   const failureCount = failures.length;
   const groupLabel = `${failureCount} required command group${failureCount === 1 ? "" : "s"}`;
   const summaryRef = plan?.latest_summary_ref ?? plan?.latest_summary_file;
+  const failedRef = firstFailedStepResultRef(firstFailure);
   const evidenceCopy = summaryRef
-    ? "Inspect the verify summary and failed step-result logs"
+    ? "Inspect the verify summary and failed step-result evidence"
     : "Inspect the failed step-result logs";
+  const blockedNextStep = firstFailure?.blocked_next_step;
   return {
     action_id: "resolve-required-verification-failure",
     action_label: "Blocked next step",
@@ -830,7 +862,7 @@ function verificationFailurePrimaryAction(plan, failures, heldAction) {
     dry_run_label: "Verification rerun",
     dry_run_command: verificationFailureRerunCommand(plan),
     held_action_label: heldAction?.command ? actionCommandTitle(heldAction) : null,
-    reason: `${groupLabel} failed (${firstTitle}). ${evidenceCopy}, fix the target change or command prerequisite, then rerun verification before review, QA, or delivery.`,
+    reason: `${groupLabel} failed (${firstTitle}). ${evidenceCopy}${failedRef ? ` (${compactVisibleValue(failedRef)})` : ""}. ${blockedNextStep ?? "Fix the target change or command prerequisite, then rerun verification before review, QA, or delivery."}`,
   };
 }
 
@@ -1253,7 +1285,10 @@ function isQualityRepairPrimaryAction(action) {
     || (/aor\s+run\s+start/u.test(command) && /\.repair(?:\s|$)/u.test(command));
 }
 
-function materializedQualityRepairSummary(nextAction, repairCompletion = null) {
+function materializedQualityRepairSummary(nextAction, repairCompletion = null, verificationPlan = null) {
+  const verificationFailures = failedRequiredVerificationGroups(verificationPlan);
+  const failedVerificationSummary = verificationFailureSummary(verificationPlan, verificationFailures);
+  if (repairCompletion?.runId && failedVerificationSummary) return failedVerificationSummary;
   if (repairCompletion?.runId) {
     return repairCompletion.recommendedAction
       ? `Repair run completed. ${repairCompletion.recommendedAction}`
@@ -1421,9 +1456,9 @@ function providerFocusTitle(status, externalRunHealth = null) {
   return "Provider run in progress";
 }
 
-function providerFocusDescription(status, externalRunHealth = null, nextAction = null, repairCompletion = null) {
+function providerFocusDescription(status, externalRunHealth = null, nextAction = null, repairCompletion = null, verificationPlan = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
-    return materializedQualityRepairSummary(nextAction, repairCompletion) ?? externalRunHealthUserSummary(externalRunHealth);
+    return materializedQualityRepairSummary(nextAction, repairCompletion, verificationPlan) ?? externalRunHealthUserSummary(externalRunHealth);
   }
   if (status?.status === "completed") {
     return "Provider execution finished before a flow could be selected. Review validation, review, and QA evidence before delivery.";
@@ -1827,39 +1862,47 @@ function executionRecoveryAction(actions, evidence) {
     .find((action) => action?.enabled) ?? actionList.find((action) => action?.enabled) ?? actionList[0] ?? null;
 }
 
-function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null, projectContext = null, latestNextAction = null, repairCompletion = null) {
+function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null, projectContext = null, latestNextAction = null, repairCompletion = null, verificationPlan = null) {
   if (externalRunRecoveryPathActive(externalRunHealth)) {
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
     const healthBlockers = externalRunHealthBlockers(externalRunHealth);
+    const verificationFailures = failedRequiredVerificationGroups(verificationPlan);
+    const failedVerificationSummary = verificationFailureSummary(verificationPlan, verificationFailures);
     const repairAction = materializedQualityRepairAction(latestNextAction, repairCompletion);
     const repairCommand = repairAction?.command
       || externalRunExecutableRepairCommand(externalRunHealth, projectContext)
       || externalRunRepairCommand(externalRunHealth.pending_decision);
     return {
-      headingTitle: `${stepLabel} repair path`,
-      headingDetail: repairAction
+      headingTitle: failedVerificationSummary ? "Post-run verification repair path" : `${stepLabel} repair path`,
+      headingDetail: failedVerificationSummary
+        ? "The repair run completed, but required verification failed; inspect failed verification evidence before continuing."
+        : repairAction
         ? repairCompletion
           ? "Repair implementation has completed; preserve status and continue with post-run verification."
           : "Run the latest repair next-action before retrying or continuing the lifecycle."
         : repairCommand
         ? "Run the public repair command before retrying or continuing the lifecycle."
         : "Use public recovery controls before retrying or continuing the lifecycle.",
-      stateTitle: `${stepLabel} repair required`,
+      stateTitle: failedVerificationSummary ? "Post-run verification failed" : `${stepLabel} repair required`,
       stateDetail:
-        materializedQualityRepairSummary(latestNextAction, repairCompletion) ??
+        materializedQualityRepairSummary(latestNextAction, repairCompletion, verificationPlan) ??
         externalRunRecoveryPathUserSummary(externalRunHealth) ??
         externalRunHealthUserSummary(externalRunHealth) ??
         "Repair is required before delivery or release can continue.",
-      evidenceTitle: healthBlockers.length > 0
+      evidenceTitle: failedVerificationSummary
+        ? `${verificationFailures.length} failed verification group${verificationFailures.length === 1 ? "" : "s"}`
+        : healthBlockers.length > 0
         ? `${healthBlockers.length} recovery check${healthBlockers.length === 1 ? "" : "s"}`
         : "Run-health recovery evidence",
-      evidenceDetail: repairAction
+      evidenceDetail: failedVerificationSummary
+        ? firstFailedStepResultRef(verificationFailures[0]) || "Inspect the failed verify summary and step-result evidence."
+        : repairAction
         ? repairCompletion
           ? "The completed repair run is preserved as public run evidence."
           : "Failed verification and repair evidence explain why this repair run is needed."
         : healthBlockers[0]?.summary ?? "Review run-health and verification evidence before applying repair.",
-      actionTitle: repairCompletion ? "Inspect completed repair run" : repairAction ? "Run repair implementation" : repairCommand ? "Run public repair command" : "Inspect recovery evidence",
-      actionCommand: repairCommand || "aor run status --json",
+      actionTitle: failedVerificationSummary ? "Repair failed verification" : repairCompletion ? "Inspect completed repair run" : repairAction ? "Run repair implementation" : repairCommand ? "Run public repair command" : "Inspect recovery evidence",
+      actionCommand: failedVerificationSummary ? verificationFailureRerunCommand(verificationPlan) : repairCommand || "aor run status --json",
       actionDetail: repairCommand
         ? repairAction
           ? repairCompletion
@@ -2641,7 +2684,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
   );
 }
 
-function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null, externalRunHealth = null, repairCompletion = null }) {
+function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null, externalRunHealth = null, repairCompletion = null, verificationPlan = null }) {
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
   const currentStageEntry = STAGES[currentIndex] ?? STAGES[0];
   const completed = isCompletedFlow(flow);
@@ -2662,7 +2705,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
         : flow
         ? "Navigation is scoped to the selected flow."
         : projectLevelProviderFocus
-          ? providerFocusDescription(providerStepStatus, externalRunHealth, null, repairCompletion)
+          ? providerFocusDescription(providerStepStatus, externalRunHealth, null, repairCompletion, verificationPlan)
           : "Readiness prepares the runtime before a flow is created.";
   return (
     <aside className={`stage-rail ${firstRunFocus ? "compact-first-run" : ""}`}>
@@ -3205,8 +3248,9 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
 function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
   if (failures.length === 0) return null;
   const recoveryPlan = verificationFailureRecoveryPlan(plan, failures, heldAction);
-  const repairActionActive = isQualityRepairPrimaryAction(heldAction);
   const repairRunCompleted = heldAction?.action_id === "quality-repair-run-completed";
+  const postRepairVerificationFailed = repairRunCompleted && latestRequiredVerificationFailed(plan, failures);
+  const repairActionActive = isQualityRepairPrimaryAction(heldAction) && !postRepairVerificationFailed;
   return (
     <div className="verification-hold-banner" role="alert" aria-label="Required verification failure">
       <Icon name="alert" />
@@ -3214,18 +3258,22 @@ function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
         <div className="verification-hold-heading">
           <div>
             <span>Required verification failed</span>
-            <h3>{repairActionActive ? "Repair is driven by failed post-run evidence" : "Review is blocked by failed post-run evidence"}</h3>
+            <h3>{postRepairVerificationFailed ? "Verification failed after completed repair" : repairActionActive ? "Repair is driven by failed post-run evidence" : "Review is blocked by failed post-run evidence"}</h3>
           </div>
           <StatusPill state={plan?.latest_verify_status ?? "failed"} />
         </div>
-        <p>{repairActionActive
+        <p>{postRepairVerificationFailed
+          ? "The completed repair remains evidence, but the latest required verification failed. Use the failed step-result evidence as the next repair input."
+          : repairActionActive
           ? "Use the failed required command group as repair input, then rerun verification after the repair run."
           : "Resolve the failed required command group before treating review, QA, or delivery as low risk."}</p>
         <div className="verification-recovery-path" aria-label="Verification failure recovery path">
           <div className="verification-recovery-heading">
             <span>Recovery path</span>
-            <strong>{repairActionActive ? "Run repair from failed verification" : "Fix failed verification first"}</strong>
-            <p>{repairActionActive
+            <strong>{postRepairVerificationFailed ? "Repair failed verification" : repairActionActive ? "Run repair from failed verification" : "Fix failed verification first"}</strong>
+            <p>{postRepairVerificationFailed
+              ? "Do not continue from the completed repair status; inspect failed step-result refs and start the next repair loop."
+              : repairActionActive
               ? "AOR has already materialized a repair next-action; verification stays as the evidence to fix."
               : "AOR is holding the downstream action until required verification passes."}</p>
           </div>
@@ -3245,17 +3293,19 @@ function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
               )}
             </li>
             <li>
-            <span>{repairActionActive ? "Repair condition" : "Unlock condition"}</span>
-              <strong>{repairRunCompleted ? "Repair completed; rerun verification" : repairActionActive ? "Repair, then rerun verification" : "Rerun required verification"}</strong>
+              <span>{repairActionActive ? "Repair condition" : "Unlock condition"}</span>
+              <strong>{postRepairVerificationFailed ? "Repair, then rerun verification" : repairRunCompleted ? "Repair completed; rerun verification" : repairActionActive ? "Repair, then rerun verification" : "Rerun required verification"}</strong>
               <CompactInlineValue value={repairActionActive ? actionCommandTitle(heldAction) : recoveryPlan.rerunCommand} kind="command" />
             </li>
           </ol>
         </div>
         <div className="verification-hold-grid">
           <div>
-            <span>{repairRunCompleted ? "Completed repair status" : repairActionActive ? "Repair next action" : "Held downstream action"}</span>
-            <strong>{recoveryPlan.heldActionLabel}</strong>
-            <p>{repairRunCompleted
+            <span>{postRepairVerificationFailed ? "Failed verification evidence" : repairRunCompleted ? "Completed repair status" : repairActionActive ? "Repair next action" : "Held downstream action"}</span>
+            <strong>{postRepairVerificationFailed ? "Post-run verification failed" : recoveryPlan.heldActionLabel}</strong>
+            <p>{postRepairVerificationFailed
+              ? "Completed repair evidence is preserved, but the latest required verification must be repaired before QA or delivery."
+              : repairRunCompleted
               ? "Repair implementation has completed. Rerun required verification before QA or delivery."
               : repairActionActive
               ? "Start this repair loop from the latest next-action report."
@@ -3265,7 +3315,9 @@ function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
             <div key={group.id ?? `${group.role}-${group.phase}-${index}`}>
               <span>{group.enforcement ?? "required"}</span>
               <strong>{verificationGroupTitle(group)}</strong>
-              <p>{group.id ?? "verification group"} / {group.command_count ?? 0} commands</p>
+              <p>{verificationGroupFailureDetail(group)}</p>
+              {firstFailedStepResultRef(group) ? <CompactInlineValue value={firstFailedStepResultRef(group)} kind="path" /> : null}
+              {group.blocked_next_step ? <p>{group.blocked_next_step}</p> : null}
               <StatusPill state={groupStatusValue(group)} />
             </div>
           ))}
@@ -3684,18 +3736,18 @@ function FlowCockpit({
     : Array.isArray(nextAction?.blockers) && !completed
       ? nextAction.blockers
       : [];
+  const verificationPlan = projectState?.verification_plan ?? null;
+  const verificationFailures = completed ? [] : failedRequiredVerificationGroups(verificationPlan);
   const repairNextActionSummary = providerFocusActive && externalRunRecoveryPathActive(externalRunHealth)
-    ? materializedQualityRepairSummary(nextAction, repairCompletion)
+    ? materializedQualityRepairSummary(nextAction, repairCompletion, verificationPlan)
     : null;
   const presentedActionBlockers = repairNextActionSummary && actionBlockers.length > 0
     ? actionBlockers.map((blocker, index) => index === 0 ? { ...blocker, summary: repairNextActionSummary } : blocker)
     : actionBlockers;
-  const verificationPlan = projectState?.verification_plan ?? null;
-  const verificationFailures = completed ? [] : failedRequiredVerificationGroups(verificationPlan);
-  const blockers = [
-    ...presentedActionBlockers,
-    ...verificationFailures.map((group, index) => verificationFailureBlocker(group, index)),
-  ];
+  const verificationBlockers = verificationFailures.map((group, index) => verificationFailureBlocker(group, index));
+  const blockers = verificationFailures.length > 0
+    ? [...verificationBlockers, ...presentedActionBlockers]
+    : [...presentedActionBlockers, ...verificationBlockers];
   const evidenceRefs = Array.isArray(flow?.evidence_refs) && flow.evidence_refs.length > 0
     ? flow.evidence_refs
     : Array.isArray(nextAction?.evidence_refs)
@@ -3729,7 +3781,8 @@ function FlowCockpit({
         command: "aor next",
         reason: "Resolve the next deterministic action for the selected flow.",
       };
-  const verificationPrimary = completed || isQualityRepairPrimaryAction(resolverPrimary)
+  const completedRepairActionActive = resolverPrimary?.action_id === "quality-repair-run-completed";
+  const verificationPrimary = completed || (isQualityRepairPrimaryAction(resolverPrimary) && !completedRepairActionActive)
     ? null
     : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
   const nextPrimary = verificationPrimary ?? resolverPrimary;
@@ -3757,30 +3810,38 @@ function FlowCockpit({
       icon: "play",
       onClick: onResolveNext,
       disabled: busy || completed,
-    };
+  };
   const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
-  const cockpitTitle = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
+  const cockpitVerificationFailureCopy = verificationFailureSummary(verificationPlan, verificationFailures);
+  const cockpitTitle = verificationPrimary
+    ? "Post-run verification failed"
+    : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusTitle(providerStepStatus, externalRunHealth)
     : completed ? "Learning / Closure" : stage.label;
-  const cockpitStatus = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
+  const cockpitStatus = verificationPrimary
+    ? "failed"
+    : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? externalRunDerivedEvidenceStatus(externalRunHealth)
     : stageRuntimeState;
-  const cockpitCopy = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
-    ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion)
-    : stageRuntimeCopy;
+  const cockpitCopy = cockpitVerificationFailureCopy
+    ?? (providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
+    ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion, verificationPlan)
+    : stageRuntimeCopy);
+  const recommendedActionStatus = verificationPrimary
+    ? "failed"
+    : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
+      ? externalRunDerivedEvidenceStatus(externalRunHealth)
+      : blockers.length > 0
+        ? "blocked"
+        : completed
+          ? "read-only"
+          : "ready";
   const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
   const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
   const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
   const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
-  const recommendedActionStatus = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
-    ? externalRunDerivedEvidenceStatus(externalRunHealth)
-    : blockers.length > 0
-      ? "blocked"
-      : completed
-        ? "read-only"
-        : "ready";
   const openAdvancedWorkbench = (tabId = "evidence") => {
     if (typeof document === "undefined") return;
     const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
@@ -4108,19 +4169,24 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   }
   const verificationPlan = projectState?.verification_plan ?? null;
   const verificationFailures = completed ? [] : failedRequiredVerificationGroups(verificationPlan);
+  const completedRepairActionActive = nextPrimary?.action_id === "quality-repair-run-completed";
+  const verificationPrimary = completed || (isQualityRepairPrimaryAction(nextPrimary) && !completedRepairActionActive)
+    ? null
+    : verificationFailurePrimaryAction(verificationPlan, verificationFailures, nextPrimary);
+  nextPrimary = verificationPrimary ?? nextPrimary;
   const actionBlockers = providerFocusActive && externalRunHealth
     ? externalRunHealthBlockers(externalRunHealth)
     : Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
   const repairNextActionSummary = providerFocusActive && externalRunRecoveryPathActive(externalRunHealth)
-    ? materializedQualityRepairSummary(nextAction, repairCompletion)
+    ? materializedQualityRepairSummary(nextAction, repairCompletion, verificationPlan)
     : null;
   const presentedActionBlockers = repairNextActionSummary && actionBlockers.length > 0
     ? actionBlockers.map((blocker, index) => index === 0 ? { ...blocker, summary: repairNextActionSummary } : blocker)
     : actionBlockers;
-  const blockers = [
-    ...presentedActionBlockers,
-    ...verificationFailures.map((group, index) => verificationFailureBlocker(group, index)),
-  ];
+  const verificationBlockers = verificationFailures.map((group, index) => verificationFailureBlocker(group, index));
+  const blockers = verificationFailures.length > 0
+    ? [...verificationBlockers, ...presentedActionBlockers]
+    : [...presentedActionBlockers, ...verificationBlockers];
   const evidenceRefs = Array.isArray(selectedFlow?.evidence_refs) && selectedFlow.evidence_refs.length > 0
     ? selectedFlow.evidence_refs
     : Array.isArray(nextAction?.evidence_refs)
@@ -4952,14 +5018,14 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   );
 }
 
-function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null, projectContext = null, nextAction = null, repairCompletion = null }) {
+function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null, projectContext = null, nextAction = null, repairCompletion = null, verificationPlan = null }) {
   const hasVisibleExecutionEvidence = Boolean(evidence || externalRunHealth);
   const statusRows = executionStatusRows(evidence, externalRunHealth);
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
   const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
   const recoveryPlan = hasVisibleExecutionEvidence
-    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth, projectContext, nextAction, repairCompletion)
+    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth, projectContext, nextAction, repairCompletion, verificationPlan)
     : null;
   return (
     <section className="work-card execution-evidence-panel">
@@ -5303,6 +5369,7 @@ function FlowAdvancedWorkbench({
   projectContext,
   nextAction,
   repairCompletion,
+  verificationPlan,
   busy,
 }) {
   const [expanded, setExpanded] = useState(defaultAdvancedWorkbenchOpen);
@@ -5357,6 +5424,7 @@ function FlowAdvancedWorkbench({
         projectContext={projectContext}
         nextAction={nextAction}
         repairCompletion={repairCompletion}
+        verificationPlan={verificationPlan}
       />
     ) : selected.id === "graph" ? (
       <EvidenceGraphPanel graph={evidenceGraph} />
@@ -6772,6 +6840,7 @@ function App() {
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
           repairCompletion={qualityRepairCompletion}
+          verificationPlan={projectState?.verification_plan ?? null}
         />
 
       <main className="main">
@@ -6877,6 +6946,7 @@ function App() {
           }}
           nextAction={nextAction}
           repairCompletion={qualityRepairCompletion}
+          verificationPlan={projectState?.verification_plan ?? null}
           busy={busy}
         />
       )}
