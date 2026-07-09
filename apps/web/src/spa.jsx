@@ -1920,6 +1920,7 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
 }
 
 function projectStatusLabel(project) {
+  if (!project) return "Loading";
   const onboarding = project?.onboarding_summary ?? {};
   const flowSummary = project?.active_flow_summary ?? {};
   if (flowSummary.status === "active-flow") return "Active flow";

@@ -311,6 +311,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "clearResult: false",
     "Add at least one target ref",
     "Initialize Project Runtime",
+    "Loading",
     "First launch",
     "This does not create a flow",
     "if (!flow) return \"readiness\"",
