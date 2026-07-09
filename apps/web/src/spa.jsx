@@ -1057,7 +1057,7 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
     case "continue":
       return `Accept the ${stepLabel} operator decision before continuing.`;
     case "diagnose":
-      return `Review the ${stepLabel} decision request and record the operator diagnosis before continuing.`;
+      return `Open the ${stepLabel} decision request and record the operator diagnosis before continuing.`;
     case "frontend_interact":
       return `Complete the ${stepLabel} browser evidence check before continuing.`;
     case "retry_public_step":
@@ -1170,7 +1170,7 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
     const pending = externalRunHealth.pending_decision ?? {};
     return {
-      action_label: `Review ${stepLabel} blocker`,
+      action_label: `Open ${stepLabel} blocker`,
       command: "aor run status --json",
       dry_run_label: "Run-health",
       dry_run_command: "aor run status --json",
