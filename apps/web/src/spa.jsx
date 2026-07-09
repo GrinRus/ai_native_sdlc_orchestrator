@@ -1110,8 +1110,14 @@ function isGenericExternalRunFailureSummary(summary) {
   const lower = normalized.toLowerCase();
   return !normalized
     || GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES.has(normalized)
+    || isStepQualityAssessmentCompletionSummary(normalized)
     || lower.includes(`${EXTERNAL_RUN_PRIVATE_DISPLAY_LABEL.toLowerCase()} observation is still in progress`)
     || lower.includes("requires a terminal controller decision");
+}
+
+function isStepQualityAssessmentCompletionSummary(summary) {
+  const normalized = String(summary ?? "").trim();
+  return /^[a-z0-9_-]+ product-change step[- ]quality was assessed from \d+ public evaluator input refs?\.$/iu.test(normalized);
 }
 
 function externalRunStepQualityAssessmentPendingSummary(health) {
@@ -1392,7 +1398,7 @@ function externalRunContinuationDecisionCopy(health, stepLabel) {
 function isGenericExternalRunPendingDecisionReason(reason) {
   const normalized = String(reason ?? "").trim();
   return GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(normalized)
-    || /^[a-z0-9_-]+ product-change step quality was assessed from \d+ public evaluator input refs\.$/iu.test(normalized);
+    || isStepQualityAssessmentCompletionSummary(normalized);
 }
 
 function externalRunActionableDecisionUserSummary(health) {
@@ -1778,7 +1784,22 @@ function isDeliveryStageId(value) {
   return String(value ?? "").trim().toLowerCase() === "delivery";
 }
 
-function providerStatusCopy(status, stage = null, verificationFailureActive = false) {
+function externalRunProviderGateCopy(health) {
+  if (!isBlockingExternalRunHealth(health)) return "";
+  const stepLabel = externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  if (isStepQualityAssessmentPendingRunHealth(health)) {
+    return `Provider execution finished, but ${stepLabel} is waiting for step-quality assessment evidence before review, QA, delivery, or release.`;
+  }
+  if (isControllerDecisionPendingRunHealth(health)) {
+    return `Provider execution finished, but ${stepLabel} is waiting for an operator decision before verification, review, QA, delivery, or release.`;
+  }
+  if (externalRunRecoveryPathActive(health)) {
+    return `Provider execution finished, but ${stepLabel} recovery is still required before verification, review, QA, delivery, or release.`;
+  }
+  return `Provider execution finished, but ${stepLabel} run-health is blocked. Resolve the blocker before review, QA, delivery, or release.`;
+}
+
+function providerStatusCopy(status, stage = null, verificationFailureActive = false, externalRunHealth = null) {
   if (!status) return "No active provider step.";
   const progressLabel = status.last_progress_label ?? status.last_progress_kind ?? "stream event";
   if (status.status === "silent-running" && status.last_progress_at) {
@@ -1794,6 +1815,8 @@ function providerStatusCopy(status, stage = null, verificationFailureActive = fa
   if (status.last_output_at) return "Provider output observed; step is still running.";
   if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
   if (status.status === "completed") {
+    const runGateCopy = externalRunProviderGateCopy(externalRunHealth);
+    if (runGateCopy) return runGateCopy;
     if (verificationFailureActive) {
       return "Provider execution finished, but required verification failed. Repair the failed verification before review, QA, delivery, or release.";
     }
@@ -1825,11 +1848,13 @@ function providerCommandDisplayLabel(status) {
   return "Provider CLI session";
 }
 
-function providerCommandDetail(status, stage = null, verificationFailureActive = false) {
+function providerCommandDetail(status, stage = null, verificationFailureActive = false, externalRunHealth = null) {
   const rawLabel = String(status?.current_command_label ?? "").trim();
   if (!isGenericProviderCommandLabel(rawLabel)) return status?.recommended_action ?? "Track this command through provider evidence.";
   const adapter = status?.adapter ?? "configured provider adapter";
   if (status?.status === "completed") {
+    const runGateCopy = externalRunProviderGateCopy(externalRunHealth);
+    if (runGateCopy) return `The ${adapter} process finished, but the current run gate remains active. ${runGateCopy.replace(/^Provider execution finished, but\s*/u, "")}`;
     if (verificationFailureActive) {
       return `The ${adapter} process finished, but required verification failed. Repair failed verification before review, QA, delivery, or release.`;
     }
@@ -2879,7 +2904,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
             <em>{providerStepStatus.adapter ?? providerStepStatus.route_id ?? "provider adapter"}</em>
           </div>
           <StatusPill state={providerStepStatus.status} />
-          <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)}</p>
+          <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</p>
           <small>
             {formatDurationMs(providerStepStatus.elapsed_ms)}
             {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
@@ -4083,7 +4108,7 @@ function FlowCockpit({
         </div>
         <StatusPill state={providerStepStatus.status} />
       </div>
-      <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)}</p>
+      <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</p>
       <div className="provider-heartbeat-grid">
         <div>
           <span>Adapter</span>
@@ -4127,7 +4152,7 @@ function FlowCockpit({
       </div>
       <div className="provider-heartbeat-action">
         <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
-        <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary)}</strong>
+        <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</strong>
         {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? (
           <small>Raw runner label: external-provider-runner</small>
         ) : null}
