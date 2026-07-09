@@ -16,6 +16,7 @@ openapi_contract:
     - ProjectStateResponse
     - ArtifactDisplaySummary
     - ExecutionEvidenceSummary
+    - ExternalRunHealthProjection
     - FlowListResponse
     - FlowDetailResponse
     - RunsResponse
@@ -565,6 +566,34 @@ artifact_display_summary_contract:
     raw_ref_primary_ui: false
     copy_raw_ref_action: required
     missing_refs_render_as: status=missing
+
+run_health_projection_contract:
+  owning_slice: W35-S06
+  status: implemented-read-baseline
+  source_of_truth:
+    contract: docs/contracts/control-plane-api.md
+    openapi: docs/contracts/control-plane-api.openapi.json
+    runner_contracts: internal external-runner observation and run-health artifacts
+  read_payload_fields:
+    - ProjectStateResponse.run_health
+    - RunSummary.run_health
+    - ProjectStateResponse.artifact_display_summaries
+    - RunSummary.artifact_display_summaries
+  query_safe_fields:
+    - status
+    - current_step
+    - blocked_step_id
+    - missing_operator_decision_steps
+    - missing_evidence_refs
+    - failure_summary
+    - pending_decision
+    - blockers
+  forbidden_payloads:
+    - raw provider prompts
+    - raw command args
+    - file contents
+    - environment variables
+    - auth tokens
 
 execution_evidence_summary_contract:
   owning_slice: W35-S04

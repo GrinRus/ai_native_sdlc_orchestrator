@@ -1720,6 +1720,39 @@ function startGuidedBrowserTaskAppSurface(options) {
 }
 
 /**
+ * @param {number} pid
+ * @returns {boolean}
+ */
+function terminateDetachedProcessGroup(pid) {
+  if (process.platform === "win32" || !Number.isInteger(pid) || pid <= 0) return false;
+  for (const target of [-pid, pid]) {
+    try {
+      process.kill(target, "SIGTERM");
+      return true;
+    } catch {
+      // Try the direct child PID when process group termination is unavailable.
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {Record<string, unknown>} browserTaskAppSurface
+ * @returns {Record<string, unknown> | null}
+ */
+function cleanupGuidedBrowserTaskAppSurface(browserTaskAppSurface) {
+  const rawPid = browserTaskAppSurface.pid;
+  const pid = typeof rawPid === "number" ? rawPid : Number(rawPid);
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const terminated = terminateDetachedProcessGroup(pid);
+  return {
+    status: terminated ? "terminated" : "not_running",
+    pid,
+    terminated_at: nowIso(),
+  };
+}
+
+/**
  * @param {string} command
  * @param {Record<string, string | undefined>} env
  * @returns {string | null}
@@ -2410,6 +2443,10 @@ export function runGuidedWebSmoke(options) {
     taskPassed &&
     (browserTaskStatus === "pass" || browserTaskStatus === "warn") &&
     (browserTaskScreenshotFiles.length > 0 || asNonEmptyString(browserTaskProof.visual_guardrail_file));
+  const browserTaskAppServerCleanup =
+    options.keepBrowserTaskAppSurface === false
+      ? cleanupGuidedBrowserTaskAppSurface(browserTaskAppSurface)
+      : null;
   summary.summary_file = summaryFile;
   summary.rendered_html_file =
     asNonEmptyString(browserTaskProof.rendered_html_file) ||
@@ -2438,6 +2475,7 @@ export function runGuidedWebSmoke(options) {
   summary.browser_task_app_server_pid = browserTaskAppSurface.pid ?? null;
   summary.browser_task_app_server_stdout_file = asNonEmptyString(browserTaskAppSurface.stdout_file) || null;
   summary.browser_task_app_server_stderr_file = asNonEmptyString(browserTaskAppSurface.stderr_file) || null;
+  summary.browser_task_app_server_cleanup = browserTaskAppServerCleanup;
   summary.screenshot_files = browserTaskScreenshotFiles;
   summary.keyboard_focus_sequence = Array.isArray(browserTaskProof.keyboard_focus_sequence)
     ? browserTaskProof.keyboard_focus_sequence
@@ -2477,6 +2515,7 @@ export function runGuidedWebSmoke(options) {
     visualGuardrailFile: visualSnapshotFile,
     browserTaskProofRequestFile,
     browserTaskProofFile: Object.keys(browserTaskProof).length > 0 ? browserTaskProofFile : null,
+    browserTaskAppServerCleanup,
     summary,
   };
 }
@@ -5608,6 +5647,39 @@ export function executeFullJourneyFlow(options) {
       ]);
       artifacts.next_action_report_file = getStringField(guidedNextAfterMission.payload, "next_action_report_file");
       artifacts.guided_next_after_mission_transcript_file = guidedNextAfterMission.transcriptFile;
+
+      const guidedJourneyProfile = asRecord(options.profile.guided_journey);
+      const guidedBrowserTaskProofProfile = asRecord(guidedJourneyProfile.browser_task_proof);
+      const guidedBrowserTaskProofRequired =
+        asNonEmptyString(asRecord(options.profile.live_e2e).frontend_capability) === "browser-task-proof" ||
+        asStringArray(guidedJourneyProfile.proof_requirements).includes("browser-task-proof") ||
+        guidedBrowserTaskProofProfile.required === true;
+      const existingEarlyGuidedWebSmokeSummaryFile = asNonEmptyString(artifacts.early_guided_web_smoke_summary_file);
+      if (
+        guidedBrowserTaskProofRequired &&
+        (!existingEarlyGuidedWebSmokeSummaryFile || !fileExists(existingEarlyGuidedWebSmokeSummaryFile))
+      ) {
+        const earlyWebSmoke = runGuidedWebSmoke({
+          aorLaunch: options.aorLaunch,
+          targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+          runId: `${options.runId}.early-ui`,
+          reportsRoot: options.layout.reportsRoot,
+          env,
+          projectProfileFile: generatedProfile.generatedProjectProfileFile,
+          autoCollectBrowserTaskProof: guidedBrowserTaskProofProfile.auto_collect === true,
+          keepBrowserTaskAppSurface: false,
+        });
+        artifacts.early_guided_web_smoke_summary_file = earlyWebSmoke.summaryFile;
+        artifacts.early_guided_web_smoke_html_file = earlyWebSmoke.htmlFile;
+        artifacts.early_guided_web_dom_snapshot_file = earlyWebSmoke.domSnapshotFile;
+        artifacts.early_guided_web_accessibility_summary_file = earlyWebSmoke.accessibilitySummaryFile;
+        artifacts.early_guided_web_screenshot_files = earlyWebSmoke.screenshotFiles;
+        artifacts.early_guided_web_visual_guardrail_file = earlyWebSmoke.visualGuardrailFile;
+        artifacts.early_guided_browser_task_proof_request_file = earlyWebSmoke.browserTaskProofRequestFile;
+        artifacts.early_guided_browser_task_proof_file = earlyWebSmoke.browserTaskProofFile;
+        artifacts.early_guided_browser_task_app_server_cleanup = earlyWebSmoke.browserTaskAppServerCleanup;
+        artifacts.early_guided_web_smoke = earlyWebSmoke.summary;
+      }
     }
     recordArtifactReadinessSnapshot("mission");
 
@@ -6503,7 +6575,9 @@ export function executeFullJourneyFlow(options) {
               ? "QA or post-run diagnostic evidence did not pass."
               : qaDiagnosticStatus === "deferred"
                 ? "Evaluation passed; non-blocking diagnostic QA evidence was deferred until guided UI proof materializes."
-                : "Evaluation and diagnostic QA evidence passed.",
+                : qaEvaluationStatus === "skipped"
+                  ? "No evaluator QA suite is configured for this profile; required diagnostic QA evidence passed."
+                  : "Evaluation and diagnostic QA evidence passed.",
           canRepair
             ? {
                 iteration,
@@ -6516,10 +6590,17 @@ export function executeFullJourneyFlow(options) {
             : { iteration },
         );
       } else if (!canRepair && !terminalCycleFailure) {
-        qaOverallStatus = "skipped";
+        qaOverallStatus = "pass";
         artifacts.evaluation_status = "skipped";
         artifacts.post_run_diagnostic_status = "pass";
-        markStage(stageMap, "qa", "skipped", [], "Profile quality-cycle policy excludes QA.", { iteration });
+        markStage(
+          stageMap,
+          "qa",
+          "pass",
+          qaEvidenceRefs,
+          "Profile quality-cycle policy excludes evaluator QA; required flow-health QA evidence passed.",
+          { iteration },
+        );
       }
 
       if (terminalCycleFailure) {

@@ -8,6 +8,10 @@ import {
 } from "../artifact-display-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "../project-init.mjs";
+import {
+  listExternalRunHealthArtifactDisplaySummariesForRuntime,
+  readLatestExternalRunHealthProjectionForRuntime,
+} from "./external-run-health-read-model.mjs";
 import { buildOnboardingSummary } from "./onboarding-summary.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
@@ -263,12 +267,23 @@ function loadJsonDocuments(options) {
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {string[]}
  */
-function listRunControlStateFiles(init) {
+export function listRunControlStateFiles(init) {
   const rootStateFiles = listJsonFiles(init.runtimeLayout.stateRoot)
     .filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)));
+  const currentProjectRuntimeRoot = path.resolve(init.runtimeLayout.projectRuntimeRoot);
+  const siblingStateFiles = fs.existsSync(init.runtimeLayout.projectsRoot)
+    ? fs.readdirSync(init.runtimeLayout.projectsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((projectEntry) => {
+        const projectRuntimeRoot = path.join(init.runtimeLayout.projectsRoot, projectEntry.name);
+        if (path.resolve(projectRuntimeRoot) === currentProjectRuntimeRoot) return [];
+        const stateRoot = path.join(projectRuntimeRoot, "state");
+        return listJsonFiles(stateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)));
+      })
+    : [];
   const targetCheckoutsRoot = path.join(init.runtimeLayout.projectRuntimeRoot, "target-checkouts");
   if (!fs.existsSync(targetCheckoutsRoot)) {
-    return rootStateFiles;
+    return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles]);
   }
 
   const nestedStateFiles = fs.readdirSync(targetCheckoutsRoot, { withFileTypes: true })
@@ -284,7 +299,7 @@ function listRunControlStateFiles(init) {
         });
     });
 
-  return sortFilesByFreshness([...rootStateFiles, ...nestedStateFiles]);
+  return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles, ...nestedStateFiles]);
 }
 
 /**
@@ -382,15 +397,18 @@ function listReadableEvidenceSidecarSummaries(options = {}) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ runId?: string | null }} [options]
  * @returns {Record<string, unknown> | null}
  */
-function readLatestProviderStepStatus(init) {
+function readLatestProviderStepStatus(init, options = {}) {
+  const requestedRunId = asString(options.runId);
   const runControlStatuses = listRunControlStateFiles(init)
     .flatMap((filePath) => {
       try {
         const state = JSON.parse(fs.readFileSync(filePath, "utf8"));
         const normalized = normalizeProviderStepStatus(asRecord(state).provider_step_status);
-        return normalized ? [{ status: normalized, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
+        const runId = asString(asRecord(state).run_id);
+        return normalized ? [{ status: normalized, runId, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
       } catch {
         return [];
       }
@@ -402,7 +420,10 @@ function readLatestProviderStepStatus(init) {
       const rightUpdated = Date.parse(String(right.status.updated_at ?? "")) || right.updatedMs;
       return rightUpdated - leftUpdated;
     });
-  return statuses[0]?.status ?? null;
+  const matchingStatuses = requestedRunId
+    ? statuses.filter((entry) => entry.runId === requestedRunId)
+    : statuses;
+  return (matchingStatuses[0] ?? statuses[0])?.status ?? null;
 }
 
 /**
@@ -456,14 +477,82 @@ function commandGroupIndex(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isFailedStatus(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "failed" || normalized === "fail" || normalized === "error" || normalized === "not_pass";
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} ref
+ * @returns {string | null}
+ */
+function localArtifactPathForRef(init, ref) {
+  const normalized = asString(ref);
+  if (!normalized) return null;
+  if (path.isAbsolute(normalized)) return normalized;
+  if (normalized.startsWith("evidence://")) {
+    const evidencePath = normalized.slice("evidence://".length);
+    const projectPath = path.resolve(init.projectRoot, evidencePath);
+    if (fs.existsSync(projectPath)) return projectPath;
+    const runtimePath = path.resolve(init.runtimeLayout.projectRuntimeRoot, evidencePath);
+    if (fs.existsSync(runtimePath)) return runtimePath;
+    return projectPath;
+  }
+  return null;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string[]} refs
+ * @returns {{ failedStepResultRefs: string[], blockedNextStep: string | null }}
+ */
+function verificationFailureStepResultSurface(init, refs) {
+  const failedStepResultRefs = [];
+  let blockedNextStep = null;
+  for (const ref of refs) {
+    const filePath = localArtifactPathForRef(init, ref);
+    if (!filePath) continue;
+    const document = readJsonObject(filePath);
+    if (!document || !isFailedStatus(document.status)) continue;
+    failedStepResultRefs.push(ref);
+    blockedNextStep ??= asString(document.blocked_next_step);
+  }
+  return { failedStepResultRefs, blockedNextStep };
+}
+
+/**
  * @param {Record<string, unknown>} group
  * @param {Record<string, unknown> | null} latestGroup
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {Record<string, unknown>}
  */
-function verificationPlanCommandGroupSurface(group, latestGroup) {
+function verificationPlanCommandGroupSurface(group, latestGroup, init) {
   const latestStatus = asString(latestGroup?.status);
   const status = latestStatus ?? asString(group.status) ?? "planned";
   const skipPolicy = asRecord(group.skip_policy);
+  const stepResultRefs =
+    Array.isArray(latestGroup?.step_result_refs)
+      ? latestGroup.step_result_refs
+      : Array.isArray(group.step_result_refs)
+        ? group.step_result_refs
+        : [];
+  const failureSurface = verificationFailureStepResultSurface(init, asStringArray(stepResultRefs));
+  const failedStepResultRefs =
+    asStringArray(latestGroup?.failed_step_result_refs).length > 0
+      ? asStringArray(latestGroup?.failed_step_result_refs)
+      : asStringArray(group.failed_step_result_refs).length > 0
+        ? asStringArray(group.failed_step_result_refs)
+        : failureSurface.failedStepResultRefs;
+  const failedCommandCount =
+    Number.isFinite(Number(latestGroup?.failed_command_count))
+      ? Number(latestGroup.failed_command_count)
+      : Number.isFinite(Number(group.failed_command_count))
+        ? Number(group.failed_command_count)
+        : failedStepResultRefs.length;
   return {
     id: asString(group.id) ?? "command-group",
     repo_id: asString(group.repo_id) ?? "main",
@@ -484,13 +573,14 @@ function verificationPlanCommandGroupSurface(group, latestGroup) {
       asString(group.outcome) ??
       asString(group.command_group_outcome) ??
       asString(skipPolicy.outcome),
+    failed_command_count: failedCommandCount,
+    failed_step_result_refs: failedStepResultRefs,
+    blocked_next_step:
+      asString(latestGroup?.blocked_next_step) ??
+      asString(group.blocked_next_step) ??
+      failureSurface.blockedNextStep,
     command_source: asString(group.command_source),
-    step_result_refs:
-      Array.isArray(latestGroup?.step_result_refs)
-        ? latestGroup.step_result_refs
-        : Array.isArray(group.step_result_refs)
-          ? group.step_result_refs
-          : [],
+    step_result_refs: stepResultRefs,
   };
 }
 
@@ -515,7 +605,7 @@ function readVerificationPlanSurface(init) {
   const commandGroups = sourceGroups.map((entry) => {
     const group = asRecord(entry);
     const id = asString(group.id);
-    return verificationPlanCommandGroupSurface(group, id ? summaryGroups.get(id) ?? null : null);
+    return verificationPlanCommandGroupSurface(group, id ? summaryGroups.get(id) ?? null : null, init);
   });
   return {
     status: asString(planDocument.status) ?? (commandGroups.length > 0 ? "planned" : "no-tests"),
@@ -565,6 +655,7 @@ export function readProjectState(options = {}) {
       state_file: null,
       onboarding_summary: buildOnboardingSummary(preview),
       provider_step_status: null,
+      run_health: null,
       verification_plan: null,
       artifact_display_summaries: [],
     };
@@ -576,6 +667,7 @@ export function readProjectState(options = {}) {
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
   });
+  const runHealth = readLatestExternalRunHealthProjectionForRuntime(init);
   return {
     project_id: init.projectId,
     display_name: init.displayName,
@@ -585,7 +677,8 @@ export function readProjectState(options = {}) {
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
     onboarding_summary: buildOnboardingSummary(initializedPreview),
-    provider_step_status: readLatestProviderStepStatus(init),
+    provider_step_status: readLatestProviderStepStatus(init, { runId: asString(runHealth?.run_id) }),
+    run_health: runHealth,
     verification_plan: readVerificationPlanSurface(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };
@@ -875,6 +968,7 @@ export function listArtifactDisplaySummaries(options = {}) {
     ...listStepResults(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listQualityArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listOperatorRequests(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...listExternalRunHealthArtifactDisplaySummariesForRuntime(initializeProjectRuntime(options), options),
     ...(nextActionReport?.artifact_display_summaries ?? []),
   ];
   return applyReadModelLimit(uniqueArtifactDisplaySummaries(summaries), options.limit);

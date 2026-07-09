@@ -1866,7 +1866,13 @@ export function verifyProjectRuntime(options = {}) {
       status,
       command_count: group.commands.length,
       failed_command_count: failedSteps.length,
+      failed_step_result_refs: failedSteps
+        .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)
+        .filter((entry) => typeof entry === "string" && entry.length > 0),
       skipped_command_count: skippedSteps.length,
+      blocked_next_step:
+        failedSteps.find((result) => typeof result.blocked_next_step === "string" && result.blocked_next_step.length > 0)
+          ?.blocked_next_step ?? null,
       outcome: typeof outcomeStep?.command_group_outcome === "string" ? outcomeStep.command_group_outcome : null,
       step_result_refs: groupSteps
         .map((result) => stepResultFiles[stepResults.indexOf(result)] ?? null)

@@ -123,6 +123,13 @@ repair request is `requested`, `in-progress`, `review-required`, `qa-required`,
 or `budget-exhausted` without operator approval. After any repair attempt, the
 next action must return through review; when QA is in scope, a passing
 post-repair review must be followed by QA before delivery can become ready.
+`quality_repair.flow_state` is a derived runtime state, not only a copy of the
+latest repair-request file status. If public run-control evidence shows the
+matching `<source-run-id>.repair` run completed while the repair request still
+records `requested` or `in-progress`, `next-action-report` must treat the flow
+as `review-required`, include the repair run state in evidence refs, and select
+review rerun as the single safe primary action rather than repeating the
+completed repair command.
 
 ## Flow projection usage (W34-S01)
 

@@ -1260,6 +1260,78 @@ test("local app project index and add-project action keep project runtimes isola
   });
 });
 
+test("local app add-project action accepts an explicit project profile", async () => {
+  await withTempRepo(async (profiledProjectRoot) => {
+    const profiledRuntimeRoot = path.join(profiledProjectRoot, ".aor-explicit");
+    const explicitProjectProfile = path.join(profiledProjectRoot, "explicit-project.aor.yaml");
+    const explicitProjectProfileText = fs.readFileSync(path.join(workspaceRoot, "examples/project.aor.yaml"), "utf8")
+      .replace("project_id: aor-core", "project_id: explicit-profile-target")
+      .replace("display_name: AOR Core", "display_name: Explicit Profile Target")
+      .replace("routes: examples/routes", `routes: ${path.join(workspaceRoot, "examples/routes")}`)
+      .replace("wrappers: examples/wrappers", `wrappers: ${path.join(workspaceRoot, "examples/wrappers")}`)
+      .replace("prompts: examples/prompts", `prompts: ${path.join(workspaceRoot, "examples/prompts")}`)
+      .replace("policies: examples/policies", `policies: ${path.join(workspaceRoot, "examples/policies")}`)
+      .replace("adapters: examples/adapters", `adapters: ${path.join(workspaceRoot, "examples/adapters")}`)
+      .replace("evaluation: examples", `evaluation: ${path.join(workspaceRoot, "examples")}`)
+      .replace("skills: examples/skills", `skills: ${path.join(workspaceRoot, "examples/skills")}`)
+      .replace("context_docs: examples/context/docs", `context_docs: ${path.join(workspaceRoot, "examples/context/docs")}`)
+      .replace("context_rules: examples/context/rules", `context_rules: ${path.join(workspaceRoot, "examples/context/rules")}`)
+      .replace("context_skills: examples/context/skills", `context_skills: ${path.join(workspaceRoot, "examples/context/skills")}`)
+      .replace("context_bundles: examples/context/bundles", `context_bundles: ${path.join(workspaceRoot, "examples/context/bundles")}`);
+    fs.writeFileSync(explicitProjectProfile, explicitProjectProfileText, "utf8");
+    const initialized = initializeProjectRuntime({
+      cwd: workspaceRoot,
+      projectRef: profiledProjectRoot,
+      projectProfile: explicitProjectProfile,
+      runtimeRoot: profiledRuntimeRoot,
+    });
+    assert.equal(initialized.projectId, "explicit-profile-target");
+    const transport = await createControlPlaneHttpServer({
+      cwd: profiledProjectRoot,
+      projectRef: profiledProjectRoot,
+      runtimeRoot: profiledRuntimeRoot,
+      host: "127.0.0.1",
+      port: 0,
+      app: {
+        staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+        packageVersion: "0.0.0-test",
+      },
+    });
+
+    try {
+      const initialIndexResponse = await getJson(`${transport.baseUrl}/api/projects`);
+      assert.equal(initialIndexResponse.status, 200);
+      const initialIndex = await initialIndexResponse.json();
+      assert.equal(initialIndex.projects.length, 1);
+      assert.equal(initialIndex.projects[0].onboarding_summary.initialized, false);
+      assert.deepEqual(initialIndex.projects[0].onboarding_summary.profile_mismatch_candidate_project_ids, ["explicit-profile-target"]);
+      assert.match(initialIndex.projects[0].onboarding_summary.blockers[0], /matching project profile/u);
+
+      const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
+        action: "add",
+        project_ref: profiledProjectRoot,
+        project_profile: explicitProjectProfile,
+        runtime_root: profiledRuntimeRoot,
+        label: "Profiled target",
+      });
+      assert.equal(addResponse.status, 200);
+      const added = await addResponse.json();
+      assert.equal(added.projects.length, 2);
+      assert.equal(added.project.label, "Profiled target");
+      assert.equal(added.project.runtime_project_id, "explicit-profile-target");
+      assert.equal(added.project.project_profile_ref, "explicit-project.aor.yaml");
+      assert.equal(added.project.project_profile_source, "explicit");
+      assert.equal(added.project.runtime_root, profiledRuntimeRoot);
+      assert.equal(added.project.onboarding_summary.initialized, true);
+      assert.equal(added.project.active_flow_summary.status, "no-flows");
+      assert.notEqual(added.project.project_id, initialIndex.projects[0].project_id);
+      assert.equal(fs.existsSync(profiledRuntimeRoot), true, "explicit profile evidence fixture should already exist");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("production-hardened transport enforces authz and redacts configured secrets from denials and logs", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.production-hardening.v1";

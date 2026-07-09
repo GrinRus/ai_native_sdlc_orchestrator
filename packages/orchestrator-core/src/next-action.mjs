@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
@@ -53,6 +54,63 @@ function uniqueStrings(values) {
  */
 function shellQuote(value) {
   return /^[A-Za-z0-9_./:@=-]+$/u.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function isHandoffEvidenceRef(ref) {
+  const normalized = ref.toLowerCase();
+  return normalized.includes("handoff") && (normalized.includes("/artifacts/") || normalized.includes("artifact"));
+}
+
+/**
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function isPrioritizedPromotionEvidenceRef(ref) {
+  const normalized = ref.toLowerCase();
+  return (
+    normalized.includes("execution-readiness") ||
+    (normalized.includes("step-result") && normalized.includes("implement")) ||
+    normalized.startsWith("packet://spec@")
+  );
+}
+
+/**
+ * @param {string[]} evidenceRefs
+ * @returns {string | null}
+ */
+function selectApprovedHandoffRef(evidenceRefs) {
+  const candidates = evidenceRefs.filter((ref) => isHandoffEvidenceRef(ref));
+  return candidates.find((ref) => path.isAbsolute(ref)) ?? candidates[0] ?? null;
+}
+
+/**
+ * @param {string[]} evidenceRefs
+ * @param {string | null} approvedHandoffRef
+ * @returns {string[]}
+ */
+function selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef) {
+  const nonHandoffRefs = evidenceRefs.filter((ref) => ref !== approvedHandoffRef);
+  const prioritized = nonHandoffRefs.filter((ref) => isPrioritizedPromotionEvidenceRef(ref));
+  return (prioritized.length > 0 ? uniqueStrings(prioritized) : uniqueStrings(nonHandoffRefs)).slice(0, 6);
+}
+
+/**
+ * @param {{ projectRoot: string, runId: string, targetStep: string, evidenceRefs: string[] }} options
+ * @returns {string}
+ */
+function runStartCommand(options) {
+  const evidenceRefs = uniqueStrings(options.evidenceRefs);
+  const approvedHandoffRef = selectApprovedHandoffRef(evidenceRefs);
+  const promotionEvidenceRefs = selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef);
+  return [
+    `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(options.runId)} --target-step ${shellQuote(options.targetStep)}`,
+    approvedHandoffRef ? `--approved-handoff-ref ${shellQuote(approvedHandoffRef)}` : null,
+    promotionEvidenceRefs.length > 0 ? `--promotion-evidence-refs ${shellQuote(promotionEvidenceRefs.join(","))}` : null,
+  ].filter(Boolean).join(" ");
 }
 
 /**
@@ -277,11 +335,39 @@ function isDeliveryReadyStatus(status) {
 }
 
 /**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @returns {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+function findRunControlState(init, runId) {
+  for (const filePath of listRunControlStateFiles(init)) {
+    const document = readJsonFile(filePath);
+    if (asString(document?.run_id) !== runId) continue;
+    return {
+      file: filePath,
+      artifact_ref: toEvidenceRef(init.projectRoot, filePath),
+      document,
+    };
+  }
+  return null;
+}
+
+/**
+ * @param {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null} repairRunState
+ * @returns {boolean}
+ */
+function isCompletedRepairRunState(repairRunState) {
+  const status = asString(repairRunState?.document.status);
+  return status === "completed" || status === "pass";
+}
+
+/**
  * @param {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null} entry
  * @param {boolean} approved
+ * @param {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null} repairRunState
  * @returns {Record<string, unknown>}
  */
-function buildQualityRepairState(entry, approved) {
+function buildQualityRepairState(entry, approved, repairRunState = null) {
   if (!entry) {
     return {
       status: "not-started",
@@ -307,6 +393,7 @@ function buildQualityRepairState(entry, approved) {
   const attemptBudget = asRecord(document.attempt_budget);
   const operatorOverrideRef = asString(document.operator_override_ref);
   const blockers = asStringArray(document.blockers);
+  const completedRepairRun = isCompletedRepairRunState(repairRunState);
   const blocksDownstream =
     status !== "closed" &&
     !(status === "budget-exhausted" && operatorOverrideRef);
@@ -318,6 +405,8 @@ function buildQualityRepairState(entry, approved) {
       ? blocksDownstream
         ? "repair-cycle-exhausted"
         : "delivery-ready"
+      : completedRepairRun
+        ? "review-required"
       : status === "in-progress"
         ? "repair-running"
         : status === "review-required"
@@ -327,7 +416,7 @@ function buildQualityRepairState(entry, approved) {
             : sourceStage === "qa"
               ? "qa-repair-requested"
               : "review-repair-requested";
-  const evidenceRefs = uniqueStrings([entry.artifact_ref, ...asStringArray(document.evidence_refs)]);
+  const evidenceRefs = uniqueStrings([entry.artifact_ref, repairRunState?.artifact_ref, ...asStringArray(document.evidence_refs)]);
   const lineage = {
     request_ref: entry.artifact_ref,
     cycle_id: asString(document.cycle_id) ?? "quality-cycle.unknown",
@@ -430,6 +519,7 @@ function buildClosureState(options) {
     QUALITY_REPAIR_REQUEST_REGEX,
     "reports",
   );
+  const repairRunState = findRunControlState(options.init, `${runId}.repair`);
   const deliveryPlan = findLatestRunDocument(
     options.init,
     runId,
@@ -474,7 +564,7 @@ function buildClosureState(options) {
     decision === "approve" &&
     deliveryGateStatus === "pass" &&
     blocksDownstream !== true;
-  const qualityRepair = buildQualityRepairState(qualityRepairRequest, approved);
+  const qualityRepair = buildQualityRepairState(qualityRepairRequest, approved, repairRunState);
   const reviewStatus = !reviewReport && !runtimeHarnessReport
     ? "missing"
     : !reviewDecision
@@ -603,9 +693,19 @@ function resolveQualityRepairAction(options) {
   const requestRef = asString(options.qualityRepair.request_ref);
   const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.qualityRepair.evidence_refs)]);
   const repairRunId = `${options.runId}.repair`;
-  const implementCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(repairRunId)} --target-step implement`;
+  const implementCommand = runStartCommand({
+    projectRoot: options.projectRoot,
+    runId: repairRunId,
+    targetStep: "implement",
+    evidenceRefs,
+  });
   const reviewCommand = `${projectCommand("review run", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
-  const qaCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${repairRunId}.qa`)} --target-step qa`;
+  const qaCommand = runStartCommand({
+    projectRoot: options.projectRoot,
+    runId: `${repairRunId}.qa`,
+    targetStep: "qa",
+    evidenceRefs,
+  });
   const statusCommand = `${projectCommand("run status", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
   const holdCommand = `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision hold`;
 
@@ -797,7 +897,12 @@ function resolveClosureAction(options) {
   }
 
   if (reviewStatus === "repair-requested") {
-    const nextCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${options.runId}.repair`)} --target-step implement`;
+    const nextCommand = runStartCommand({
+      projectRoot: options.projectRoot,
+      runId: `${options.runId}.repair`,
+      targetStep: "implement",
+      evidenceRefs,
+    });
     return {
       status: "blocked",
       stage: "review",

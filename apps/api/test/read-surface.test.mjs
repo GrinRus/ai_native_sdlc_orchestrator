@@ -384,9 +384,28 @@ test("project state exposes verification plan and per-group status surface", () 
           command_groups: groups.map((group) => ({
             id: group.id,
             status: group.latest_status,
+            failed_command_count: group.id === "required-failed" ? 1 : 0,
             ...(group.skip_policy ? { outcome: group.skip_policy.outcome } : {}),
             step_result_refs: [`evidence://reports/step-result-${group.id}.json`],
           })),
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "step-result-required-failed.json"),
+      `${JSON.stringify(
+        {
+          step_result_id: `${init.projectId}.verify.post-run-primary.v1.step.1`,
+          run_id: `${init.projectId}.verify.post-run-primary.v1`,
+          step_id: "verify.post-run-primary.required-failed",
+          step_class: "runner",
+          status: "failed",
+          summary: "Post-change verification failed.",
+          evidence_refs: ["evidence://reports/verify-command-required-failed.log"],
+          blocked_next_step: "Inspect failed post-change step-result files, fix target changes or command prerequisites, then rerun verify.",
         },
         null,
         2,
@@ -404,6 +423,13 @@ test("project state exposes verification plan and per-group status surface", () 
     assert.equal(
       projectState.verification_plan.command_groups.find((group) => group.id === "not-applicable-group").outcome,
       "not-applicable",
+    );
+    const failedGroup = projectState.verification_plan.command_groups.find((group) => group.id === "required-failed");
+    assert.equal(failedGroup.failed_command_count, 1);
+    assert.deepEqual(failedGroup.failed_step_result_refs, ["evidence://reports/step-result-required-failed.json"]);
+    assert.equal(
+      failedGroup.blocked_next_step,
+      "Inspect failed post-change step-result files, fix target changes or command prerequisites, then rerun verify.",
     );
     assert.equal(projectState.verification_plan.discovered_command_groups[0].confidence, "high");
   });

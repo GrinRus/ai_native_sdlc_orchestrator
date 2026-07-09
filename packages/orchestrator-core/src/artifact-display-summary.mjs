@@ -80,6 +80,7 @@ const FAMILY_TYPE = Object.freeze({
   "evaluation-report": "evaluation",
   "review-report": "review-report",
   "review-decision": "review-decision",
+  "quality-repair-request": "quality-repair-request",
   "runtime-harness-report": "runtime-harness-report",
   "multirepo-coordination-status": "delivery",
   "compiler-revision-status": "learning",
@@ -106,6 +107,7 @@ const FAMILY_STAGE = Object.freeze({
   "evaluation-report": "verification",
   "review-report": "review",
   "review-decision": "review",
+  "quality-repair-request": "runtime-harness",
   "runtime-harness-report": "runtime-harness",
   "multirepo-coordination-status": "delivery",
   "compiler-revision-status": "learning",
@@ -117,6 +119,61 @@ const FAMILY_STAGE = Object.freeze({
   "run-control-state": "execution",
   "next-action-report": "planning",
   "operator-request": "planning",
+});
+
+const FAMILY_LABEL = Object.freeze({
+  "artifact-packet": "Artifact Packet",
+  "wave-ticket": "Wave Ticket",
+  "handoff-packet": "Handoff Packet",
+  "delivery-plan": "Delivery Plan",
+  "delivery-manifest": "Delivery Manifest",
+  "release-packet": "Release Packet",
+  "promotion-decision": "Promotion Decision",
+  "step-result": "Routed Step Result",
+  "validation-report": "Validation Report",
+  "evaluation-report": "Evaluation Report",
+  "review-report": "Review Report",
+  "review-decision": "Review Decision",
+  "quality-repair-request": "Repair Request",
+  "runtime-harness-report": "Runtime Harness Report",
+  "multirepo-coordination-status": "Multirepo Coordination Status",
+  "compiler-revision-status": "Compiler Revision Status",
+  "incident-report": "Incident Report",
+  "incident-backfill-proposal": "Incident Backfill Proposal",
+  "learning-loop-scorecard": "Learning Scorecard",
+  "learning-loop-handoff": "Learning Handoff",
+  "run-control-audit": "Command Trace",
+  "run-control-state": "Run Control State",
+  "next-action-report": "Next Action Report",
+  "operator-request": "Operator Request",
+});
+
+const TYPE_LABEL = Object.freeze({
+  packet: "Artifact Packet",
+  planning: "Planning Artifact",
+  handoff: "Handoff Packet",
+  "delivery-plan": "Delivery Plan",
+  "delivery-manifest": "Delivery Manifest",
+  "release-packet": "Release Packet",
+  "promotion-decision": "Promotion Decision",
+  "routed-step-result": "Routed Step Result",
+  verification: "Verification Summary",
+  evaluation: "Evaluation Report",
+  "review-report": "Review Report",
+  "review-decision": "Review Decision",
+  "quality-repair-request": "Repair Request",
+  "runtime-harness-report": "Runtime Harness Report",
+  delivery: "Delivery Artifact",
+  learning: "Learning Artifact",
+  "learning-handoff": "Learning Handoff",
+  "command-trace": "Command Trace",
+  "step-observation": "Step Observation",
+  "next-action": "Next Action Report",
+  "operator-request": "Operator Request",
+  "provider-raw-evidence": "Provider Evidence",
+  "target-diff": "Target Diff",
+  evidence: "Evidence Artifact",
+  file: "Evidence Artifact",
 });
 
 /**
@@ -145,11 +202,14 @@ function severityForStatus(status) {
 function inferType(family, rawRef) {
   if (family && FAMILY_TYPE[family]) return FAMILY_TYPE[family];
   const normalized = normalizeRef(rawRef).toLowerCase();
+  if (normalized.includes("next-action")) return "next-action";
   if (normalized.includes("command-trace") || normalized.includes("transcript")) return "command-trace";
   if (normalized.includes("step-observation") || normalized.includes("observation-report")) return "step-observation";
+  if (normalized.includes("agent-decision-request") || normalized.includes("operator-decision-request")) return "operator-request";
   if (normalized.includes("runtime-harness-report")) return "runtime-harness-report";
+  if (normalized.includes("quality-repair-request")) return "quality-repair-request";
   if (normalized.includes("step-result")) return "routed-step-result";
-  if (normalized.includes("provider") && (normalized.includes("raw") || normalized.includes("evidence"))) return "provider-raw-evidence";
+  if (normalized.includes("adapter-live") || (normalized.includes("provider") && (normalized.includes("raw") || normalized.includes("evidence")))) return "provider-raw-evidence";
   if (normalized.includes("verify-summary") || normalized.includes("verification-summary")) return "verification";
   if (normalized.includes("target-diff") || normalized.includes("diff-summary") || normalized.includes("target-cleanliness")) return "target-diff";
   if (normalized.includes("delivery-manifest")) return "delivery-manifest";
@@ -169,8 +229,9 @@ function inferType(family, rawRef) {
 function inferStage(family, type, rawRef) {
   if (family && FAMILY_STAGE[family]) return FAMILY_STAGE[family];
   const normalized = normalizeRef(rawRef).toLowerCase();
+  if (type === "next-action") return "planning";
   if (["provider-raw-evidence", "command-trace", "step-observation", "routed-step-result"].includes(type)) return "execution";
-  if (["runtime-harness-report", "review-report", "review-decision"].includes(type)) return "review";
+  if (["runtime-harness-report", "review-report", "review-decision", "quality-repair-request"].includes(type)) return "review";
   if (["verification", "target-diff"].includes(type)) return "verification";
   if (["delivery-manifest", "release-packet", "delivery"].includes(type)) return "delivery";
   if (["learning", "learning-handoff"].includes(type)) return "learning";
@@ -211,27 +272,62 @@ function timestampFromDocument(document) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function looksLikeTechnicalIdentifier(value) {
+  const text = asString(value);
+  if (!text) return false;
+  return (
+    text.length > 72 ||
+    /(?:^\/|\.aor\/|evidence:\/\/|packet:\/\/|\.json$|run[._-]|\.v\d+$|[a-f0-9]{7,})/iu.test(text) ||
+    /[a-z0-9]+[._-][a-z0-9]+[._-][a-z0-9]+[._-][a-z0-9]+/iu.test(text)
+  );
+}
+
+/**
+ * @param {unknown[]} values
+ * @returns {string | null}
+ */
+function firstHumanLabel(values) {
+  for (const value of values) {
+    const label = asString(value);
+    if (label && !looksLikeTechnicalIdentifier(label)) {
+      return label;
+    }
+  }
+  return null;
+}
+
+/**
  * @param {Record<string, unknown>} document
  * @param {string | null} family
  * @param {string} rawRef
  * @returns {string}
  */
 function labelFromDocument(document, family, rawRef) {
-  return (
-    asString(document.packet_id) ??
-    asString(document.request_id) ??
-    asString(document.step_result_id) ??
-    asString(document.report_id) ??
-    asString(document.review_report_id) ??
-    asString(document.decision_id) ??
-    asString(document.manifest_id) ??
-    asString(document.plan_id) ??
-    asString(document.handoff_id) ??
-    asString(document.scorecard_id) ??
-    asString(document.event_id) ??
-    (family ? titleFromSlug(family) : null) ??
-    titleFromSlug(refBasename(rawRef))
-  );
+  const explicitLabel = firstHumanLabel([document.title, document.name, document.label]);
+  if (explicitLabel) return explicitLabel;
+
+  if (family && FAMILY_LABEL[family]) return FAMILY_LABEL[family];
+
+  const inferredType = inferType(family, rawRef);
+  if (TYPE_LABEL[inferredType]) return TYPE_LABEL[inferredType];
+
+  const documentIdentifier = firstHumanLabel([
+    document.packet_id,
+    document.request_id,
+    document.step_result_id,
+    document.report_id,
+    document.review_report_id,
+    document.decision_id,
+    document.manifest_id,
+    document.plan_id,
+    document.handoff_id,
+    document.scorecard_id,
+    document.event_id,
+  ]);
+  return documentIdentifier ?? titleFromSlug(refBasename(rawRef));
 }
 
 /**

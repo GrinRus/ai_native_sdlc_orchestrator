@@ -108,7 +108,7 @@ Project bootstrap baseline:
 - `project verify` accepts `verification_label` plus repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs. Labels separate baseline diagnostics, primary post-run gates, and diagnostic full-suite evidence while preserving command source in the verify summary. Legacy command inputs are normalized into generic command groups before execution.
 - `project verify --plan` writes `verification-plan.json` or `verification-plan-<label>.json` under the runtime reports root without executing target commands. CLI JSON returns `verification_plan_file`, `verification_plan`, generated command groups, discovery candidates, confidence, and source refs.
 - `project verify` summaries include per-group `role`, `phase`, `enforcement`, `timeout_class`, status, and step-result refs. `required` failures fail the verify summary, `warn` failures produce warning evidence, and `observe` failures remain non-blocking evidence.
-- `GET /api/projects/:projectId/state` exposes `verification_plan` when a plan or verify summary exists. The read model includes per-group role, phase, enforcement, timeout class, working directory, status, last result status, outcome, and step-result refs so the web console can distinguish failed, warn, observed, skipped, and not-applicable groups.
+- `GET /api/projects/:projectId/state` exposes `verification_plan` when a plan or verify summary exists. The read model includes per-group role, phase, enforcement, timeout class, working directory, status, last result status, outcome, failed command count, failed step-result refs, blocked next step, and step-result refs so the web console can distinguish failed, warn, observed, skipped, and not-applicable groups without reading private process state.
 - `project verify` enforces a bounded per-command timeout derived from the project profile and records command evidence through `command_timeout_ms`, `timed_out`, `started_at`, `finished_at`, `duration_ms`, `exit_code`, `signal`, `error_code`, bounded output excerpts, transcripts, and `timed_out_commands`.
 - `project verify` treats high-signal warning output in stderr as a failed command even when the process exits 0. Step results record bounded `output_quality_findings[]`, and verify summaries aggregate `output_quality_failed_commands[]` plus the active `output_quality_warning_patterns[]`.
 - `project verify` accepts repeatable `output_quality_baseline` inputs that point to previous verify summaries. Matching warning classes remain in `output_quality_findings[]` with `baseline_status=pre_existing` and are aggregated under `output_quality_baseline_matches[]`, but only non-baseline warning findings fail the current verify. Matching failed baseline commands are reported through `baseline_failure_status=pre_existing` on the current step-result and aggregated under `verification_failure_baseline_matches[]`, allowing read models to separate broken-baseline evidence from new post-change regressions.
@@ -231,6 +231,49 @@ event snapshots follow the same redaction and normalization rules as project
 state and run summaries; raw commands, args, prompts, file contents, and secrets
 remain out of the event payload.
 
+## External run-health projection (W35-S06)
+
+When a project is opened from an external runner target checkout, the
+controller may write public observation and run-health artifacts in the parent
+external runner project runtime rather than inside the target checkout `.aor`
+tree. The control-plane read surface exposes a compact, query-safe
+`run_health` projection so the web console and CLI/API consumers do not show
+completed provider execution as delivery-ready while the declared external
+flow is blocked.
+
+`run_health` is additive on:
+- `GET /api/projects/:projectId/state` as the latest external run-health
+  projection visible from the selected project runtime;
+- `GET /api/projects/:projectId/runs` as the run summary projection whose
+  `run_id` matches the external run-health report.
+
+The projection may include:
+- `run_id`, `profile_id`, `status`, `report_status`, `generated_at`;
+- `current_step`, `blocked_step_id`, `pending_steps`, and `completed_steps`;
+- `missing_operator_decision_steps[]` and `missing_evidence_refs[]`;
+- `failure_summary` with `owner`, `phase`, `class`, and `summary`;
+- `pending_decision` with action, reason, next step, decision-request ref,
+  expected decision ref, and materialized operator-decision ref/status when a
+  decision file already exists;
+- compact `controller_health` and `resume_interaction_health` fields;
+- `blockers[]` suitable for operator-facing next-action/readiness surfaces;
+- `artifact_display_summaries[]` for the run-health, observation, and linked
+  operator-decision request refs, including closed requests that remain needed
+  to explain a blocked external-run state.
+
+Open operator-decision request summaries may include additive
+`decision_rubric_summary` metadata with required-check counts, required
+evidence-ref counts, short required-check labels, and short evidence-ref labels
+plus copyable refs. This summary must stay query-safe: it may expose evidence
+refs and operator-facing rubric labels, but not raw provider prompts, command
+args, file contents, secrets, auth material, or private operator identity.
+
+This projection is a read model over public runner artifacts only. It must not
+read private process state, raw provider prompts, command args, file contents,
+environment variables, bearer tokens, auth tokens, or provider secrets. It does
+not judge product outcome quality; final code, artifact, accessibility, UI, or
+UX quality remains owned by the external quality-assessment report family.
+
 ## Execution evidence summaries (W35-S04)
 
 Run summaries expose additive `execution_evidence` for operator-facing
@@ -290,6 +333,11 @@ Each artifact display summary includes:
 - `label`, `status`, `severity`, `description`, and optional `timestamp`;
 - `source_ref` and `raw_ref` for audit/debug use;
 - `actions[]`, including `copy_raw_ref` for explicit debug copying.
+
+Artifact summaries may include type-specific additive metadata. For open
+operator-decision request summaries, `decision_rubric_summary` lets web and
+CLI/API consumers explain which evidence should be inspected before accepting,
+diagnosing, blocking, retrying, or answering a decision request.
 
 Missing or unreadable refs are represented as summaries with
 `status=missing` and `severity=critical` rather than disappearing from the
@@ -578,7 +626,7 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 Local app project summary baseline:
 - `project_id` as the local app route key, `runtime_project_id` as the underlying runtime contract identity, `label`, `project_ref`, `project_profile_ref`, and `runtime_root`;
 - `project_id` remains equal to `runtime_project_id` for the default single-project case; duplicate local profiles in one app session get a stable app-scoped `project_id` suffix so their runtime/evidence chains do not mix;
-- `onboarding_summary` with `status`, `initialized`, `can_initialize`, `recommended_action`, and user-facing blockers;
+- `onboarding_summary` with `status`, `initialized`, `can_initialize`, `recommended_action`, user-facing blockers, and optional `profile_mismatch_candidate_project_ids` when the runtime root already contains initialized evidence for a different project profile id;
 - `active_flow_summary` with active/completed flow counts and selected flow id when runtime state already exists;
 - `read_only=true` because project-list reads must not initialize `.aor/`.
 

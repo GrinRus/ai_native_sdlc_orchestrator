@@ -10,6 +10,7 @@ const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
   const source = fs.readFileSync(path.join(webRoot, "src/spa.jsx"), "utf8");
   const css = fs.readFileSync(path.join(webRoot, "src/spa.css"), "utf8");
+  const stageSubtitleRule = css.match(/\.stage-copy em\s*\{[\s\S]*?\}/u)?.[0] ?? "";
 
   for (const stage of ["readiness", "mission", "discovery", "implement", "review", "delivery", "learning"]) {
     assert.match(source, new RegExp(`id: "${stage}"`, "u"));
@@ -22,7 +23,14 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /One Recommended Action/u);
   assert.match(source, /EvidenceGraphPanel/u);
   assert.match(source, /RuntimeTracePanel/u);
+  assert.match(source, /EvidenceReadinessPath/u);
+  assert.match(source, /Refresh the selected flow after a lifecycle command/u);
+  assert.match(source, /Refresh run status or open Execution Evidence/u);
   assert.match(source, /targetRefsMissing/u);
+  assert.match(source, /requestReadinessItems/u);
+  assert.match(source, /Ask AOR request readiness/u);
+  assert.match(source, /Complete required fields first/u);
+  assert.match(source, /Ready to create request evidence/u);
   assert.match(source, /draftFollowUpHandoffRef/u);
   assert.match(source, /follow-up-source-handoff-ref/u);
   assert.match(source, /Create follow-up from learning handoff/u);
@@ -40,7 +48,7 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /topbar-ask-button/u);
   assert.match(source, /draft: newFlowDraft/u);
   assert.match(source, /draftSurface/u);
-  assert.match(source, /currentStage = draftSurface \? "mission"/u);
+  assert.match(source, /currentStage = draftSurface\s*\?\s*"mission"/u);
   assert.match(source, /Draft flow has no artifacts yet/u);
   assert.match(source, /New Flow Preview/u);
   assert.match(source, /Completeness Checklist/u);
@@ -71,6 +79,13 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /support-table-grid/u);
   assert.match(source, /shortPathLabel/u);
   assert.match(source, /compactVisibleValue/u);
+  assert.match(source, /Show runtime root path details/u);
+  assert.match(source, /Copy runtime root path/u);
+  assert.match(source, /conciseArtifactLabel/u);
+  assert.match(source, /artifactActionLabel/u);
+  assert.match(source, /Open evidence artifact/u);
+  assert.match(source, /Copy raw ref for/u);
+  assert.match(source, /Attach as request target:/u);
   assert.match(source, /CompactInlineValue/u);
   assert.match(source, /CompactDetailValue/u);
   assert.match(source, /topbar-status-strip/u);
@@ -83,8 +98,20 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Project Context/u);
   assert.match(source, /Runtime Readiness/u);
   assert.match(source, /Project switcher/u);
+  assert.match(source, /activeProjectDisplay/u);
+  assert.match(source, /projectOptionsForSwitcher/u);
+  assert.match(source, /statePreviewRoute/u);
+  assert.match(source, /projectsWithLiveState/u);
+  assert.match(source, /projectWithObservedRuntime/u);
+  assert.match(source, /activeRuntimeReady/u);
+  assert.match(source, /activeProjectStatusRuntimeReady/u);
+  assert.match(source, /externalRunSignalState/u);
+  assert.match(source, /deterministicRunEvidenceStatus/u);
+  assert.match(source, /signal-state/u);
   assert.match(source, /Add local project/u);
   assert.match(source, /Runtime root preview/u);
+  assert.match(source, /Project profile/u);
+  assert.match(source, /project_profile/u);
   assert.match(source, /Add and initialize/u);
   assert.match(source, /No active flow/u);
   assert.match(source, /Readiness prepares the runtime before a flow is created/u);
@@ -95,13 +122,23 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Flow inventory/u);
   assert.match(source, /stage-status-badge/u);
   assert.match(source, /Interaction Detail/u);
+  assert.match(source, /interactionRecoveryPlan/u);
+  assert.match(source, /Interaction answer recovery path/u);
+  assert.match(source, /Resolve runtime question first/u);
+  assert.match(source, /Submit Answer writes an audit ref/u);
   assert.match(source, /interactions-layout/u);
+  assert.match(source, /Submit runtime interaction answer/u);
+  assert.match(source, /htmlFor=\{decisionFieldId\}/u);
+  assert.match(source, /htmlFor=\{answerFieldId\}/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);
   assert.match(source, /No upstream writes/u);
   assert.match(source, /Create Flow & Resolve Next Action/u);
   assert.match(source, /Available after completed flow/u);
   assert.match(source, /Requires selected active flow/u);
   assert.match(source, /Evidence & Documents/u);
+  assert.match(source, /qualityClosurePlan/u);
+  assert.match(source, /Quality closure path/u);
+  assert.match(source, /Run-health is factual status/u);
   assert.match(source, /Verification plan/u);
   assert.match(source, /verification_plan/u);
   assert.match(source, /group\.outcome/u);
@@ -141,15 +178,49 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Latest run/u);
   assert.match(source, /Attach as request target/u);
   assert.match(css, /button:focus-visible/u);
-  assert.match(css, /--control-height: 38px/u);
+  assert.match(css, /--control-height: 40px/u);
   assert.match(css, /--touch-control-height: 44px/u);
   assert.match(css, /\.flow-active-mode \.stage-rail \.stage-progress-strip/u);
+  assert.match(stageSubtitleRule, /white-space: normal/u);
+  assert.doesNotMatch(stageSubtitleRule, /text-overflow:\s*ellipsis/u);
   assert.match(css, /\.advanced-workbench-disclosure/u);
   assert.match(css, /\.advanced-workbench-tabs/u);
+  assert.match(css, /\.request-readiness-path\s*\{/u);
+  assert.match(css, /\.request-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.request-readiness-path li\.ready\s*\{/u);
+  assert.match(css, /\.interaction-recovery-path\s*\{/u);
+  assert.match(css, /\.interaction-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.evidence-readiness-path\s*\{/u);
+  assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.quality-closure-path\s*\{/u);
+  assert.match(css, /\.quality-closure-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.interaction-row label\s*\{/u);
   assert.match(css, /\.compact-inline-value/u);
   assert.match(css, /\.compact-detail-value/u);
   assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions/u);
+  assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;/u);
+  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u);
   assert.match(css, /\.verification-plan-card/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.interaction-recovery-path ol,[\s\S]*?\.interaction-row,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Runtime interaction answer path should collapse on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.evidence-readiness-path ol,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Graph and trace readiness path should collapse on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.quality-closure-path ol,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Quality closure path should collapse on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.request-readiness-path ol,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Ask AOR request readiness should collapse on mobile",
+  );
   assert.match(css, /\.decision-action-grid button:focus-visible/u);
   assert.match(css, /\.execution-action-grid button:focus-visible/u);
   assert.match(css, /\.flow-active-mode \.advanced-workbench-row\s*\{[\s\S]*?grid-row: 3;/u);

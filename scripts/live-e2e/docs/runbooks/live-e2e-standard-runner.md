@@ -715,8 +715,13 @@ Guided full-journey summaries also carry:
 - `artifacts.target_git_status_without_runtime`
 
 If the guided profile requires `browser-task-proof`, a missing `guided_browser_task_proof_file` or non-passing
-`frontend_interactions[].task_outcome.status` must make run-health non-passing with
+`frontend_interactions[]` entry with `interaction_id: guided-web-smoke` must make run-health non-passing with
 `failure_summary.phase: ui_validation`. The deterministic web smoke remains factual render evidence only.
+The runner may collect early guided UI proof immediately after the first guided
+mission and next-action surfaces are created. That early proof is useful for UX
+diagnosis when a long implementation/review loop blocks before learning, but it
+must be recorded as `early-guided-ui-proof` and must not satisfy the required
+full `guided-web-smoke` browser-task proof.
 The browser proof must be captured against the live app surface recorded in
 `artifacts.guided_browser_task_proof_request_file` as `app_url`/`control_plane`.
 The request also preserves `smoke_app_url` as guardrail history, but that smoke
@@ -803,6 +808,9 @@ not write target files, provide a private patch, inject a rewritten spec, or
 replace handoff artifacts directly.
 
 For guided installed-user runs, deterministic web smoke is only a render guardrail. `frontend_interactions[]` must carry HTML, DOM, accessibility, screenshot or visual-guardrail evidence as factual AOR operator UI proof. AOR operator UI/UX quality is assessed later in `live-e2e-quality-assessment-report`; checked-repository frontend behavior belongs to implementation and verification evidence when the mission requires it. The guided proof must also include `flow_loop.first_flow_id`, `flow_loop.first_flow_status=completed`, `flow_loop.completed_flow_read_only=true`, a distinct `flow_loop.second_flow_id`, `flow_loop.follow_up_source_handoff_ref`, fresh second-flow intake/next-action files, and `flow_loop.operator_request.target_flow_id` pointing at the second flow.
+Early guided UI proof may appear before that full flow loop completes. Treat it
+as diagnostic browser evidence for UI/UX review only; final run-health still
+requires the post-flow-loop `guided-web-smoke` browser-task proof.
 When `browser-task-proof` is required, open the `app_url` from
 `guided_browser_task_proof_request_file`; the runner starts that additional live
 surface specifically for skill-agent/browser inspection. Do not rely on the

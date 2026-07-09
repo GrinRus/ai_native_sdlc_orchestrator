@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 
 import { previewProjectRuntime } from "../project-init.mjs";
@@ -107,6 +108,28 @@ function readActiveFlowSummary(runtimeOptions, preview) {
 }
 
 /**
+ * @param {{ runtimeRoot: string, projectId: string }} preview
+ * @returns {string[]}
+ */
+function detectProfileMismatchCandidateProjectIds(preview) {
+  const projectsRoot = path.join(preview.runtimeRoot, "projects");
+  if (!fs.existsSync(projectsRoot)) return [];
+  try {
+    return fs.readdirSync(projectsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((projectId) => projectId !== preview.projectId)
+      .filter((projectId) => (
+        fs.existsSync(path.join(projectsRoot, projectId, "state", "project-init-state.json"))
+        || fs.existsSync(path.join(projectsRoot, projectId, "reports", "onboarding-report.json"))
+      ))
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
@@ -150,7 +173,12 @@ function resolveRegistryProjectId(context, contexts) {
   }
 
   const base = normalizeId(path.basename(context.resolvedProjectRoot)) || normalizeId(context.runtimeProjectId);
-  const suffix = shortHash(`${context.resolvedProjectRoot}\0${context.resolvedRuntimeRoot}\0${context.runtimeProjectId}`);
+  const suffix = shortHash([
+    context.resolvedProjectRoot,
+    context.resolvedRuntimeRoot,
+    context.runtimeProjectId,
+    projectProfileIdentity(context),
+  ].join("\0"));
   let candidate = `${base}-${suffix}`;
   let collision = 1;
   while (contexts.has(candidate)) {
@@ -161,12 +189,25 @@ function resolveRegistryProjectId(context, contexts) {
 }
 
 /**
+ * @param {ReturnType<typeof createProjectContext>} context
+ * @returns {string}
+ */
+function projectProfileIdentity(context) {
+  const projectProfile = optionalString(context.runtimeOptions.projectProfile);
+  return projectProfile ? path.resolve(context.runtimeOptions.cwd ?? process.cwd(), projectProfile) : "";
+}
+
+/**
  * @param {ReturnType<typeof createProjectContext>} left
  * @param {ReturnType<typeof createProjectContext>} right
  * @returns {boolean}
  */
 function isSameRegisteredTarget(left, right) {
-  return left.resolvedProjectRoot === right.resolvedProjectRoot && left.resolvedRuntimeRoot === right.resolvedRuntimeRoot;
+  return (
+    left.resolvedProjectRoot === right.resolvedProjectRoot
+    && left.resolvedRuntimeRoot === right.resolvedRuntimeRoot
+    && projectProfileIdentity(left) === projectProfileIdentity(right)
+  );
 }
 
 /**
@@ -176,8 +217,15 @@ export function summarizeProjectContext(context) {
   const preview = previewProjectRuntime(context.runtimeOptions);
   const activeFlowSummary = readActiveFlowSummary(context.runtimeOptions, preview);
   const onboardingSummary = buildOnboardingSummary(preview);
+  const profileMismatchCandidateProjectIds = preview.stateExists
+    ? []
+    : detectProfileMismatchCandidateProjectIds(preview);
+  const profileMismatchBlocker = profileMismatchCandidateProjectIds.length > 0
+    ? `Runtime root already contains AOR evidence for '${profileMismatchCandidateProjectIds[0]}'. Add this project with the matching project profile before initializing a new runtime.`
+    : null;
   const blockers = [
     ...(Array.isArray(onboardingSummary.blockers) ? onboardingSummary.blockers : []),
+    ...(profileMismatchBlocker ? [profileMismatchBlocker] : []),
     ...(activeFlowSummary.blocker ? [activeFlowSummary.blocker] : []),
   ];
   return {
@@ -191,6 +239,9 @@ export function summarizeProjectContext(context) {
     runtime_root: preview.runtimeRoot,
     onboarding_summary: {
       ...onboardingSummary,
+      ...(profileMismatchCandidateProjectIds.length > 0
+        ? { profile_mismatch_candidate_project_ids: profileMismatchCandidateProjectIds }
+        : {}),
       blockers,
     },
     active_flow_summary: activeFlowSummary,

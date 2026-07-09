@@ -106,10 +106,81 @@ The packaged SPA now treats the flow as the primary object:
   only through `mission create` followed by `next`.
 - Active flows render an active cockpit with one recommended action, blockers,
   evidence artifacts, runtime root, write-back mode, and safety status.
+- When the operator has not manually selected a completed or future stage for
+  inspection, the stage rail, compact stage strip, active cockpit heading, and
+  next-action context must agree on the current runtime stage.
+- Live-run step names that are more granular than the seven UI stages must map
+  to the owning grouped stage before rendering progress. For example, `spec`
+  and `handoff` stay under `Discovery / Spec / Plan`, while `eval` and
+  `harness` stay under `Review / QA`; they must not fall through to
+  `Delivery / Release`.
+- When run-health is blocked on a granular live-run step, the context cards and
+  stage-specific panel must explain that step's concrete evidence boundary. A
+  `handoff` blocker should mention handoff packet, wave ticket, and execution
+  scope evidence instead of generic discovery outputs.
+- The active cockpit explains the single recommended action as an operator
+  outcome first; raw lifecycle commands stay available through technical
+  details or copy/debug affordances instead of competing with the primary CTA.
+- Blocking run-health evidence takes priority over the selected-flow next
+  action. When the latest run-health projection is blocked, the active cockpit,
+  stage rail, right rail, and top-bar action show the concrete recovery state
+  before normal flow actions resume. A substantive run failure uses blocker
+  language such as `Execution blocked` and `Review blocker`; a pending
+  controller request without a substantive failure uses decision language such
+  as `Run decision needed` and `Decision needed`; a product-change step-quality
+  gate uses assessment language such as `Run assessment needed` and
+  `Assessment needed`. The cockpit primary CTA opens the matching workbench
+  surface (`Decision Request`, `Assessment Evidence`, `Recovery Path`, or
+  `Review Blocker`); refresh remains secondary while the run is waiting on
+  operator or evaluator action. Repair-required states with an accepted
+  diagnosis, public repair command, retry intent, or target verification
+  failure use recovery language such as `Recovery needed`, `Recovery Path`,
+  and `<step> repair required`. If a substantive blocker also includes a
+  materialized `pending_decision.request_ref`, `Decision Request` remains the
+  primary CTA so the operator can record the required diagnosis before retry or
+  repair.
+- During the first project snapshot load, the console shows a non-actionable
+  `Syncing project state` card and disables flow actions until active-flow,
+  run-health, and evidence state are known. It must not briefly show
+  `Configure First Flow` for an initialized project with an active run. Once
+  the base snapshot is known, the active cockpit is shown even if advanced
+  evidence graph or runtime trace hydration is still finishing.
 - The stage rail and active cockpit render `provider_step_status` from public
   control-plane read models. `silent-running` states explicitly say the provider
   has no output yet but is still running, without exposing raw process commands
   or secrets.
+- Provider execution status takes priority over a previously accepted
+  `continue` gate for the same live-run step while provider output is running
+  or has just completed. The console must show provider monitoring copy,
+  elapsed/remaining budget, and the latest run-control status instead of a
+  stale accepted decision reason such as a completed handoff step-quality gate.
+  Once run-health includes a materialized `request_ref` or
+  `expected_decision_ref`, that operator decision request becomes the primary
+  workbench action.
+- Accepted non-continue decisions remain explainable. When an operator records
+  `diagnose`, `retry_public_step`, or `block`, the console must keep the source
+  request, accepted decision ref, and any linked step-quality repair status
+  visible, and must describe the safe next public control path instead of
+  implying that the same decision still needs to be recorded. The primary CTA
+  must move to the repair or blocker workbench after the decision request is
+  accepted.
+- Repair next actions must be executable as shown. If a review- or QA-origin
+  repair requires approved handoff or promotion evidence, the generated
+  `aor run start ...repair` command must carry those refs so first-time users do
+  not hit an avoidable terminal guardrail failure. After `request-repair`
+  materializes a quality repair `next-action-report`, that repair next-action
+  takes precedence over stale blocked run-health diagnosis copy in the cockpit,
+  right rail, and Execution Evidence recovery path. Failed required
+  verification remains visible as repair input, but it must not hide the
+  materialized repair run behind a generic "rerun verification first" action.
+  If the public runs list already contains the matching completed `.repair`
+  run, the UI must not offer the same repair command again; it should preserve
+  the completed repair evidence, show completed repair status, and point the
+  operator at run status or post-run verification. If the latest required
+  post-run verification fails after that repair completion, the failed
+  verification overrides completed-repair guidance: the cockpit, right rail,
+  and verification banner must show the failed command-group count, failed
+  step-result refs, and blocked next step as the next repair input.
 - Evidence lists render `artifact_display_summaries[]` as user-facing
   artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
   paths, packet URIs, and evidence URIs are not primary visible text; raw refs
@@ -117,15 +188,44 @@ The packaged SPA now treats the flow as the primary object:
 - The Operator Decision drawer is action-first: `Continue`, `Diagnose`,
   `Block`, `Retry public step`, `Answer`, and `Frontend interact` prepare the
   same manual installed-user decision-helper path from `agent_decision_request_ref`.
-  Rejection reasons are shown as readable copy, while raw request refs and
-  helper command text remain behind copy/debug actions.
+  Rejection reasons are shown as readable copy, and pending decisions expose
+  copy actions for a selected-action handoff bundle, action note, and expected
+  operator-decision file. Rejected decisions render a correction-required
+  recovery panel with the rejected reason, rubric coverage, expected file
+  availability, and copyable correction payload. Raw request refs and handoff
+  payloads remain behind copy/debug actions.
 - The Execution Evidence panel renders `RunSummary.execution_evidence` for the
   selected flow: provider status, Runtime Harness decision, real-code-change
   status, post-run verification, review, delivery readiness,
   no-upstream-write status, changed-path relevance groups, blockers, and public
-  stop/save/diagnose/retry controls. Scratch-only output is explicitly
-  non-passing, while `.qwen/`, `.codex/`, `.claude/`, and `.opencode/` target
-  checkout state is shown as blocking runner-owned leakage.
+  stop/save/diagnose/retry controls. The panel shows an execution recovery path
+  before raw controls so interrupted or blocked runs name the current state,
+  provider evidence to preserve, and the next public control to use. When
+  run-health exposes a repair-required blocker and
+  `pending_decision.public_repair_command`, the panel promotes that public
+  repair command with the current `--project-ref`, `--project-profile`,
+  `--runtime-root`, and `--run-id` context instead of falling back to generic
+  diagnose/retry controls. When the latest `next-action-report` already points
+  at the follow-up repair run, the panel promotes the `aor run start ...repair`
+  next-action instead of re-showing the earlier `review decide` command. When
+  that repair run is already completed in the public runs list, the panel shows
+  `Repair run completed` guidance and a safe `aor run status --json --run-id`
+  command instead of asking the operator to start the same repair run again.
+  When a later `post-run-primary` verify summary is failed, the panel must stop
+  using the completed repair run as the primary action and promote the failed
+  verification evidence for the next repair loop.
+  Scratch-only output is explicitly non-passing, while `.qwen/`, `.codex/`,
+  `.claude/`, and `.opencode/` target checkout state is shown as blocking
+  runner-owned leakage.
+- Active review/QA repair gates render as recovery paths before raw gate
+  details: the panel shows the current repair step, compact next command,
+  linked repair evidence summaries from the flow projection, blocker count, and
+  delivery/release exit condition so first-time operators can see why delivery
+  remains blocked and what closes the loop.
+- Required verification failures render as alert-level recovery paths before
+  raw failed group details: the panel shows failed required command group count,
+  the held downstream action, verify summary evidence, rerun command, and the
+  review/QA/delivery unlock condition.
 - Completed flows render as read-only closure/evidence views with mutation
   controls disabled or replaced by no-write inspection actions.
 - Ask AOR submissions include `target_flow_id` for the selected flow; completed
@@ -136,19 +236,33 @@ The packaged SPA now treats the flow as the primary object:
 
 The advanced workbench is flow-scoped:
 
+- Evidence & Documents renders a quality closure path before raw artifact
+  tables. The path separates factual run-health status from outcome-quality
+  judgement and shows whether review/QA evidence, deterministic gate or
+  delivery evidence, and assessment evidence are visible before the operator
+  treats a flow as quality-closed.
 - Evidence Graph reads use
   `GET /api/projects/:projectId/flows/:flowId/evidence-graph` and render only
   selected-flow refs plus sanitized operator requests that target the selected
-  flow.
+  flow. Empty or partial graph states render a readiness path that names the
+  selected-flow scope, loaded node count, and refresh/create-evidence recovery
+  step before the operator treats traceability as missing.
 - Runtime Trace reads use
   `GET /api/projects/:projectId/flows/:flowId/runtime-trace` and link run
   events, step results, Runtime Harness decisions, delivery/release artifacts,
-  learning artifacts, and operator requests for the selected flow.
+  learning artifacts, and operator requests for the selected flow. Empty trace
+  states use the same readiness pattern so the operator can refresh run status
+  or preserve execution evidence before judging outcome quality.
 - Ask AOR requires a selected flow and target refs before creating a request;
   request creation sends `target_flow_id`, target stage, intent, delivery mode,
-  allowed paths, and target refs.
+  allowed paths, and target refs. The drawer renders a request-readiness path
+  so blocked submission states name the missing flow, request text, target refs,
+  scope, or read-only-compatible mode before the operator tries to submit.
 - Runtime-requested interactions remain in the Interactions Inbox and continue
-  through the public `/interactions/answers` control-plane mutation.
+  through the public `/interactions/answers` control-plane mutation. The
+  detail panel renders an answer recovery path with the selected runtime
+  question, step-result evidence, answer type/reason fields, and the audit-ref
+  refresh condition that unlocks continuation.
 - Sanitized read payloads omit raw operator request text while preserving
   summaries and refs.
 
@@ -201,7 +315,9 @@ contract:
   `operator_request.target_flow_id`.
 - Frontend evidence records rendered HTML, DOM snapshot, accessibility summary,
   screenshot or visual guardrail refs, task outcome, UX findings, and a
-  browser-task proof ref.
+  browser-task proof ref. Current UI checks include horizontal overflow,
+  keyboard focus, and interactive target sizing: desktop controls keep at least
+  a 40px shared target and mobile controls keep the 44px touch target.
 - Acceptance remains fail-closed when browser-task proof, flow-loop fields,
   run-health evidence, required assessment refs, inspected refs, or no-upstream-write
   assertions are missing.

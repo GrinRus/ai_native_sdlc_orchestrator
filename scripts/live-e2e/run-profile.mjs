@@ -687,59 +687,74 @@ function writeExistingProofRunnerOutput(options) {
  * @param {Record<string, unknown>} artifacts
  * @param {{ reportsRoot: string, runId: string }} options
  */
-function hydrateGuidedUiArtifactsFromReports(artifacts, options) {
+function hydrateGuidedUiArtifactGroup(artifacts, options) {
+  const keys = guidedUiArtifactKeys(options.scope);
   const normalizedRunId = normalizeId(options.runId);
   const webSmokeSummaryFile =
-    asNonEmptyString(artifacts.guided_web_smoke_summary_file) ||
+    asNonEmptyString(artifacts[keys.summaryFile]) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.json`);
   const webSmoke =
-    Object.keys(asRecord(artifacts.guided_web_smoke)).length > 0
-      ? asRecord(artifacts.guided_web_smoke)
+    Object.keys(asRecord(artifacts[keys.webSmoke])).length > 0
+      ? asRecord(artifacts[keys.webSmoke])
       : readJsonIfPresent(webSmokeSummaryFile);
-  if (webSmokeSummaryFile) artifacts.guided_web_smoke_summary_file = webSmokeSummaryFile;
+  if (webSmokeSummaryFile) artifacts[keys.summaryFile] = webSmokeSummaryFile;
   if (Object.keys(webSmoke).length > 0) {
-    artifacts.guided_web_smoke = webSmoke;
+    artifacts[keys.webSmoke] = webSmoke;
   }
   const htmlFile =
-    asNonEmptyString(artifacts.guided_web_smoke_html_file) ||
+    asNonEmptyString(artifacts[keys.htmlFile]) ||
     asNonEmptyString(webSmoke.rendered_html_file) ||
     asNonEmptyString(webSmoke.html_ref) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`);
   const domSnapshotFile =
-    asNonEmptyString(artifacts.guided_web_dom_snapshot_file) ||
+    asNonEmptyString(artifacts[keys.domSnapshotFile]) ||
     asNonEmptyString(webSmoke.dom_snapshot_file) ||
     asNonEmptyString(webSmoke.dom_snapshot_ref) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`);
   const accessibilitySummaryFile =
-    asNonEmptyString(artifacts.guided_web_accessibility_summary_file) ||
+    asNonEmptyString(artifacts[keys.accessibilitySummaryFile]) ||
     asNonEmptyString(webSmoke.accessibility_summary_file) ||
     asNonEmptyString(webSmoke.accessibility_summary_ref) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`);
   const visualGuardrailFile =
-    asNonEmptyString(artifacts.guided_web_visual_guardrail_file) ||
+    asNonEmptyString(artifacts[keys.visualGuardrailFile]) ||
     asNonEmptyString(webSmoke.visual_guardrail_file) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`);
   const browserTaskProofRequestFile =
-    asNonEmptyString(artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(artifacts[keys.browserTaskProofRequestFile]) ||
     asNonEmptyString(webSmoke.browser_task_proof_request_file) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`);
   const browserTaskProofFile =
-    asNonEmptyString(artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(artifacts[keys.browserTaskProofFile]) ||
     asNonEmptyString(webSmoke.browser_task_proof_file) ||
     existingReportFile(options.reportsRoot, `installed-user-guided-browser-task-proof-${normalizedRunId}.json`);
 
-  if (htmlFile) artifacts.guided_web_smoke_html_file = htmlFile;
-  if (domSnapshotFile) artifacts.guided_web_dom_snapshot_file = domSnapshotFile;
-  if (accessibilitySummaryFile) artifacts.guided_web_accessibility_summary_file = accessibilitySummaryFile;
-  if (visualGuardrailFile) artifacts.guided_web_visual_guardrail_file = visualGuardrailFile;
-  if (browserTaskProofRequestFile) artifacts.guided_browser_task_proof_request_file = browserTaskProofRequestFile;
-  if (browserTaskProofFile) artifacts.guided_browser_task_proof_file = browserTaskProofFile;
+  if (htmlFile) artifacts[keys.htmlFile] = htmlFile;
+  if (domSnapshotFile) artifacts[keys.domSnapshotFile] = domSnapshotFile;
+  if (accessibilitySummaryFile) artifacts[keys.accessibilitySummaryFile] = accessibilitySummaryFile;
+  if (visualGuardrailFile) artifacts[keys.visualGuardrailFile] = visualGuardrailFile;
+  if (browserTaskProofRequestFile) artifacts[keys.browserTaskProofRequestFile] = browserTaskProofRequestFile;
+  if (browserTaskProofFile) artifacts[keys.browserTaskProofFile] = browserTaskProofFile;
 
-  const mergedWebSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
+  const scopedArtifacts = buildScopedGuidedUiArtifacts(artifacts, options.scope);
+  const mergedWebSmoke = mergeBrowserTaskProofIntoWebSmoke(scopedArtifacts, asRecord(artifacts[keys.webSmoke]));
   if (Object.keys(mergedWebSmoke).length > 0) {
-    artifacts.guided_web_smoke = mergedWebSmoke;
+    artifacts[keys.webSmoke] = mergedWebSmoke;
     if (webSmokeSummaryFile) writeJson(webSmokeSummaryFile, mergedWebSmoke);
   }
+}
+
+function hydrateGuidedUiArtifactsFromReports(artifacts, options) {
+  hydrateGuidedUiArtifactGroup(artifacts, {
+    ...options,
+    scope: "guided",
+    runId: options.runId,
+  });
+  hydrateGuidedUiArtifactGroup(artifacts, {
+    ...options,
+    scope: "early",
+    runId: `${options.runId}.early-ui`,
+  });
 }
 
 /**
@@ -1295,31 +1310,97 @@ function resolveInteractiveFinalStepVerdict(requestedInteraction, deterministicF
 }
 
 /**
- * @param {Record<string, unknown>} artifacts
- * @param {Array<Record<string, unknown>>} stepJournal
- * @returns {Array<Record<string, unknown>>}
+ * @param {"guided" | "early"} scope
+ * @returns {Record<string, string>}
  */
-function buildFrontendInteractions(artifacts, stepJournal = []) {
-  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
-  const summaryFile = asNonEmptyString(artifacts.guided_web_smoke_summary_file);
+function guidedUiArtifactKeys(scope) {
+  if (scope === "early") {
+    return {
+      webSmoke: "early_guided_web_smoke",
+      summaryFile: "early_guided_web_smoke_summary_file",
+      htmlFile: "early_guided_web_smoke_html_file",
+      domSnapshotFile: "early_guided_web_dom_snapshot_file",
+      accessibilitySummaryFile: "early_guided_web_accessibility_summary_file",
+      visualGuardrailFile: "early_guided_web_visual_guardrail_file",
+      screenshotFiles: "early_guided_web_screenshot_files",
+      browserTaskProofRequestFile: "early_guided_browser_task_proof_request_file",
+      browserTaskProofFile: "early_guided_browser_task_proof_file",
+    };
+  }
+  return {
+    webSmoke: "guided_web_smoke",
+    summaryFile: "guided_web_smoke_summary_file",
+    htmlFile: "guided_web_smoke_html_file",
+    domSnapshotFile: "guided_web_dom_snapshot_file",
+    accessibilitySummaryFile: "guided_web_accessibility_summary_file",
+    visualGuardrailFile: "guided_web_visual_guardrail_file",
+    screenshotFiles: "guided_web_screenshot_files",
+    browserTaskProofRequestFile: "guided_browser_task_proof_request_file",
+    browserTaskProofFile: "guided_browser_task_proof_file",
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {"guided" | "early"} scope
+ * @returns {Record<string, unknown>}
+ */
+function buildScopedGuidedUiArtifacts(artifacts, scope) {
+  if (scope === "guided") return artifacts;
+  const keys = guidedUiArtifactKeys(scope);
+  return {
+    ...artifacts,
+    guided_web_smoke: artifacts[keys.webSmoke],
+    guided_web_smoke_summary_file: artifacts[keys.summaryFile],
+    guided_web_smoke_html_file: artifacts[keys.htmlFile],
+    guided_web_dom_snapshot_file: artifacts[keys.domSnapshotFile],
+    guided_web_accessibility_summary_file: artifacts[keys.accessibilitySummaryFile],
+    guided_web_visual_guardrail_file: artifacts[keys.visualGuardrailFile],
+    guided_web_screenshot_files: artifacts[keys.screenshotFiles],
+    guided_browser_task_proof_request_file: artifacts[keys.browserTaskProofRequestFile],
+    guided_browser_task_proof_file: artifacts[keys.browserTaskProofFile],
+  };
+}
+
+/**
+ * @param {{
+ *   artifacts: Record<string, unknown>,
+ *   stepJournal: Array<Record<string, unknown>>,
+ *   scope: "guided" | "early",
+ *   stepId: string,
+ *   interactionId: string,
+ *   requireOperatorDecision: boolean,
+ *   summary: string,
+ * }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function buildGuidedWebSmokeInteraction(options) {
+  const keys = guidedUiArtifactKeys(options.scope);
+  const scopedArtifacts = buildScopedGuidedUiArtifacts(options.artifacts, options.scope);
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(scopedArtifacts, asRecord(options.artifacts[keys.webSmoke]));
+  const summaryFile =
+    asNonEmptyString(options.artifacts[keys.summaryFile]) ||
+    asNonEmptyString(webSmoke.summary_file);
   const htmlFile =
     asNonEmptyString(webSmoke.rendered_html_file) ||
-    asNonEmptyString(artifacts.guided_web_smoke_html_file);
+    asNonEmptyString(options.artifacts[keys.htmlFile]);
   const domSnapshotFile =
     asNonEmptyString(webSmoke.dom_snapshot_file) ||
-    asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
+    asNonEmptyString(options.artifacts[keys.domSnapshotFile]);
   const accessibilitySummaryFile =
     asNonEmptyString(webSmoke.accessibility_summary_file) ||
-    asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
+    asNonEmptyString(options.artifacts[keys.accessibilitySummaryFile]);
   const visualGuardrailFile =
     asNonEmptyString(webSmoke.visual_guardrail_file) ||
-    asNonEmptyString(artifacts.guided_web_visual_guardrail_file);
-  const browserTaskProofRequestFile = asNonEmptyString(artifacts.guided_browser_task_proof_request_file);
+    asNonEmptyString(options.artifacts[keys.visualGuardrailFile]);
+  const browserTaskProofRequestFile =
+    asNonEmptyString(options.artifacts[keys.browserTaskProofRequestFile]) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
   const browserTaskProofFile =
     asNonEmptyString(webSmoke.browser_task_proof_file) ||
-    asNonEmptyString(artifacts.guided_browser_task_proof_file);
+    asNonEmptyString(options.artifacts[keys.browserTaskProofFile]);
   const screenshotRefs = uniqueStrings([
-    ...asStringArray(artifacts.guided_web_screenshot_files),
+    ...asStringArray(options.artifacts[keys.screenshotFiles]),
     ...asStringArray(webSmoke.screenshot_files),
     ...asStringArray(webSmoke.screenshot_refs),
   ]);
@@ -1335,54 +1416,82 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
     !visualGuardrailFile &&
     !browserTaskProofFile &&
     screenshotRefs.length === 0
-  ) return [];
+  ) return null;
   const taskOutcome = asRecord(webSmoke.task_outcome);
   const status = toObservationStatus(asNonEmptyString(taskOutcome.status) || "pass");
-  const learningVerdict = stepJournal.find(
-    (entry) =>
-      asNonEmptyString(asRecord(entry).step_id) === "learning" &&
-      asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
-      asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
-  );
+  const learningVerdict = options.requireOperatorDecision
+    ? options.stepJournal.find(
+        (entry) =>
+          asNonEmptyString(asRecord(entry).step_id) === "learning" &&
+          asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
+          asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
+      )
+    : null;
   const operatorDecisionRef =
     asNonEmptyString(webSmoke.operator_decision_ref) ||
     asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) ||
     null;
-  const interactionStatus = operatorDecisionRef ? status : "blocked";
-  return [
-    {
-      step_id: "learning",
-      interaction_id: "guided-web-smoke",
-      surface: "web",
-      evidence_refs: uniqueStrings([
-        summaryFile,
-        htmlFile,
-        domSnapshotFile,
-        accessibilitySummaryFile,
-        visualGuardrailFile,
-        browserTaskProofRequestFile,
-        browserTaskProofFile,
-        ...screenshotRefs,
-      ]),
-      html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
-      screenshot_refs: screenshotRefs,
-      keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
-      visual_guardrail_refs: uniqueStrings([visualGuardrailFile]),
-      browser_task_proof_ref: browserTaskProofFile || null,
-      dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
-      accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
-      accessibility_checks: accessibilityChecks,
-      task_outcome: {
-        status,
-        checked_tasks: asStringArray(taskOutcome.checked_tasks),
-        findings: asStringArray(taskOutcome.findings),
-      },
-      ux_findings: asStringArray(webSmoke.ux_findings),
-      operator_decision_ref: operatorDecisionRef,
-      status: interactionStatus,
-      summary: "Guided AOR operator UI interaction completed through the installed-user web surface.",
+  const interactionStatus = options.requireOperatorDecision ? (operatorDecisionRef ? status : "blocked") : status;
+  return {
+    step_id: options.stepId,
+    interaction_id: options.interactionId,
+    surface: "web",
+    evidence_refs: uniqueStrings([
+      summaryFile,
+      htmlFile,
+      domSnapshotFile,
+      accessibilitySummaryFile,
+      visualGuardrailFile,
+      browserTaskProofRequestFile,
+      browserTaskProofFile,
+      ...screenshotRefs,
+    ]),
+    html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
+    screenshot_refs: screenshotRefs,
+    keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
+    visual_guardrail_refs: uniqueStrings([visualGuardrailFile]),
+    browser_task_proof_ref: browserTaskProofFile || null,
+    dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
+    accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
+    accessibility_checks: accessibilityChecks,
+    task_outcome: {
+      status,
+      checked_tasks: asStringArray(taskOutcome.checked_tasks),
+      findings: asStringArray(taskOutcome.findings),
     },
-  ];
+    ux_findings: asStringArray(webSmoke.ux_findings),
+    operator_decision_ref: operatorDecisionRef,
+    status: interactionStatus,
+    summary: options.summary,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Array<Record<string, unknown>>} stepJournal
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildFrontendInteractions(artifacts, stepJournal = []) {
+  return [
+    buildGuidedWebSmokeInteraction({
+      artifacts,
+      stepJournal,
+      scope: "early",
+      stepId: "mission",
+      interactionId: "early-guided-ui-proof",
+      requireOperatorDecision: false,
+      summary: "Early guided AOR operator UI proof collected before the implementation loop.",
+    }),
+    buildGuidedWebSmokeInteraction({
+      artifacts,
+      stepJournal,
+      scope: "guided",
+      stepId: "learning",
+      interactionId: "guided-web-smoke",
+      requireOperatorDecision: true,
+      summary: "Guided AOR operator UI interaction completed through the installed-user web surface.",
+    }),
+  ].filter(Boolean);
 }
 
 /**
@@ -1396,6 +1505,12 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
 function buildGuidedUiEvidence(options) {
   const required = expectsGuidedBrowserTaskProof(options.profile, options.artifacts);
   const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
+  const earlyKeys = guidedUiArtifactKeys("early");
+  const earlyScopedArtifacts = buildScopedGuidedUiArtifacts(options.artifacts, "early");
+  const earlyWebSmoke = mergeBrowserTaskProofIntoWebSmoke(
+    earlyScopedArtifacts,
+    asRecord(options.artifacts[earlyKeys.webSmoke]),
+  );
   const frontendInteractions = Array.isArray(options.frontendInteractions)
     ? options.frontendInteractions.map((entry) => asRecord(entry))
     : [];
@@ -1420,10 +1535,46 @@ function buildGuidedUiEvidence(options) {
   const visualGuardrailFile =
     asNonEmptyString(options.artifacts.guided_web_visual_guardrail_file) ||
     asNonEmptyString(webSmoke.visual_guardrail_file);
+  const earlyBrowserTaskProofFile =
+    asNonEmptyString(options.artifacts[earlyKeys.browserTaskProofFile]) ||
+    asNonEmptyString(earlyWebSmoke.browser_task_proof_file);
+  const earlyBrowserTaskProofRequestFile =
+    asNonEmptyString(options.artifacts[earlyKeys.browserTaskProofRequestFile]) ||
+    asNonEmptyString(earlyWebSmoke.browser_task_proof_request_file);
+  const earlyRenderedHtmlFile =
+    asNonEmptyString(options.artifacts[earlyKeys.htmlFile]) ||
+    asNonEmptyString(earlyWebSmoke.rendered_html_file) ||
+    asNonEmptyString(earlyWebSmoke.html_ref);
+  const earlyDomSnapshotFile =
+    asNonEmptyString(options.artifacts[earlyKeys.domSnapshotFile]) ||
+    asNonEmptyString(earlyWebSmoke.dom_snapshot_file) ||
+    asNonEmptyString(earlyWebSmoke.dom_snapshot_ref);
+  const earlyAccessibilitySummaryFile =
+    asNonEmptyString(options.artifacts[earlyKeys.accessibilitySummaryFile]) ||
+    asNonEmptyString(earlyWebSmoke.accessibility_summary_file) ||
+    asNonEmptyString(earlyWebSmoke.accessibility_summary_ref);
+  const earlyVisualGuardrailFile =
+    asNonEmptyString(options.artifacts[earlyKeys.visualGuardrailFile]) ||
+    asNonEmptyString(earlyWebSmoke.visual_guardrail_file);
   const screenshotRefs = uniqueStrings([
     ...asStringArray(options.artifacts.guided_web_screenshot_files),
     ...asStringArray(webSmoke.screenshot_files),
     ...asStringArray(webSmoke.screenshot_refs),
+  ]);
+  const earlyScreenshotRefs = uniqueStrings([
+    ...asStringArray(options.artifacts[earlyKeys.screenshotFiles]),
+    ...asStringArray(earlyWebSmoke.screenshot_files),
+    ...asStringArray(earlyWebSmoke.screenshot_refs),
+  ]);
+  const earlyEvidenceRefs = uniqueStrings([
+    asNonEmptyString(options.artifacts[earlyKeys.summaryFile]),
+    earlyRenderedHtmlFile,
+    earlyDomSnapshotFile,
+    earlyAccessibilitySummaryFile,
+    earlyVisualGuardrailFile,
+    earlyBrowserTaskProofRequestFile,
+    earlyBrowserTaskProofFile,
+    ...earlyScreenshotRefs,
   ]);
   const evidenceRefs = uniqueStrings([
     asNonEmptyString(options.artifacts.guided_web_smoke_summary_file),
@@ -1434,9 +1585,11 @@ function buildGuidedUiEvidence(options) {
     browserTaskProofRequestFile,
     browserTaskProofFile,
     ...screenshotRefs,
+    ...earlyEvidenceRefs,
     ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
   ]);
   const browserProofExists = Boolean(browserTaskProofFile && fileExists(browserTaskProofFile));
+  const earlyBrowserProofExists = Boolean(earlyBrowserTaskProofFile && fileExists(earlyBrowserTaskProofFile));
   const proofGaps = required
     ? buildGuidedUiEvidenceGaps({
         profile: options.profile,
@@ -1457,6 +1610,26 @@ function buildGuidedUiEvidence(options) {
     guided_browser_task_proof_request_file: browserTaskProofRequestFile || null,
     guided_browser_task_proof_file: browserTaskProofFile || null,
     browser_task_proof_present: browserProofExists,
+    early_guided_web_smoke_summary_file: asNonEmptyString(options.artifacts[earlyKeys.summaryFile]) || null,
+    early_guided_web_smoke_html_file: earlyRenderedHtmlFile || null,
+    early_guided_web_dom_snapshot_file: earlyDomSnapshotFile || null,
+    early_guided_web_accessibility_summary_file: earlyAccessibilitySummaryFile || null,
+    early_guided_web_visual_guardrail_file: earlyVisualGuardrailFile || null,
+    early_guided_browser_task_proof_request_file: earlyBrowserTaskProofRequestFile || null,
+    early_guided_browser_task_proof_file: earlyBrowserTaskProofFile || null,
+    early_browser_task_proof_present: earlyBrowserProofExists,
+    early_screenshot_refs: earlyScreenshotRefs,
+    early_keyboard_focus_sequence: earlyEvidenceRefs.length > 0
+      ? normalizeKeyboardFocusSequence(earlyWebSmoke.keyboard_focus_sequence)
+      : [],
+    early_accessibility_checks: earlyEvidenceRefs.length > 0
+      ? buildAorOperatorAccessibilityChecks(earlyWebSmoke.accessibility_checks, [
+          earlyAccessibilitySummaryFile,
+          earlyBrowserTaskProofFile,
+          ...earlyScreenshotRefs,
+        ])
+      : [],
+    early_evidence_refs: earlyEvidenceRefs,
     screenshot_refs: screenshotRefs,
     keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
     accessibility_checks: buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
@@ -1525,16 +1698,14 @@ function buildGuidedUiEvidenceGaps(options) {
   if (asNonEmptyString(taskOutcome.status) && asNonEmptyString(taskOutcome.status) !== "pass") {
     gaps.push("guided-web-smoke.task_outcome");
   }
-  if (frontendInteractions.length === 0) {
+  const fullGuidedInteraction = frontendInteractions.find(
+    (interaction) => asNonEmptyString(interaction.interaction_id) === "guided-web-smoke",
+  );
+  if (!fullGuidedInteraction) {
     gaps.push("frontend_interactions.guided-web-smoke");
   }
-  for (const interaction of frontendInteractions) {
-    if (
-      asNonEmptyString(interaction.interaction_id) === "guided-web-smoke" &&
-      asNonEmptyString(interaction.status) !== "pass"
-    ) {
-      gaps.push("frontend_interactions.guided-web-smoke.status");
-    }
+  if (fullGuidedInteraction && asNonEmptyString(fullGuidedInteraction.status) !== "pass") {
+    gaps.push("frontend_interactions.guided-web-smoke.status");
   }
   return uniqueStrings(gaps);
 }
@@ -1844,6 +2015,16 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "guided_web_screenshot_files",
     "guided_browser_task_proof_request_file",
     "guided_browser_task_proof_file",
+    "early_guided_web_smoke",
+    "early_guided_web_smoke_summary_file",
+    "early_guided_web_smoke_html_file",
+    "early_guided_web_dom_snapshot_file",
+    "early_guided_web_accessibility_summary_file",
+    "early_guided_web_visual_guardrail_file",
+    "early_guided_web_screenshot_files",
+    "early_guided_browser_task_proof_request_file",
+    "early_guided_browser_task_proof_file",
+    "early_guided_browser_task_app_server_cleanup",
     "guided_journey_proof_file",
     "guided_journey_proof",
     "new_flow_mission_artifact_packet_file",
@@ -3764,6 +3945,25 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.guided_browser_task_app_server_cleanup === "object" &&
       options.flowResult.artifacts.guided_browser_task_app_server_cleanup
         ? options.flowResult.artifacts.guided_browser_task_app_server_cleanup
+        : null,
+    early_guided_web_smoke_summary_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_web_smoke_summary_file) || null,
+    early_guided_web_smoke_html_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_web_smoke_html_file) || null,
+    early_guided_web_dom_snapshot_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_web_dom_snapshot_file) || null,
+    early_guided_web_accessibility_summary_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_web_accessibility_summary_file) || null,
+    early_guided_web_visual_guardrail_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_web_visual_guardrail_file) || null,
+    early_guided_browser_task_proof_request_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_browser_task_proof_request_file) || null,
+    early_guided_browser_task_proof_file:
+      asNonEmptyString(options.flowResult.artifacts.early_guided_browser_task_proof_file) || null,
+    early_guided_browser_task_app_server_cleanup:
+      typeof options.flowResult.artifacts.early_guided_browser_task_app_server_cleanup === "object" &&
+      options.flowResult.artifacts.early_guided_browser_task_app_server_cleanup
+        ? options.flowResult.artifacts.early_guided_browser_task_app_server_cleanup
         : null,
     guided_ui_evidence:
       typeof observationReport.guided_ui_evidence === "object" && observationReport.guided_ui_evidence

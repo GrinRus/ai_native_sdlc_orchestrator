@@ -123,6 +123,11 @@ When browser-task proof is produced after the deterministic smoke summary, final
 report assembly should hydrate `frontend_interactions[]` from the proof file so
 the observation links the proof ref, screenshot refs, structured accessibility
 checks, and task outcome.
+The runner may also preserve an early `frontend_interactions[]` entry with
+`interaction_id: early-guided-ui-proof` after the first guided mission and
+next-action surfaces are materialized. Early proof is factual diagnostic UI
+evidence for blocked or long-running runs; it must not satisfy the required
+`interaction_id: guided-web-smoke` proof for the complete guided flow loop.
 
 `guided_ui_evidence` may summarize the same factual refs for consumers that do
 not want to traverse `frontend_interactions[]`. For browser-task guided
@@ -131,6 +136,10 @@ refs, browser-task request/proof refs, screenshot refs, keyboard focus
 sequence, structured accessibility checks, weak evidence refs, and all
 supporting evidence refs. This section is still factual run evidence, not a UI
 or accessibility quality judgement.
+When early proof exists, this section may additionally include
+`early_guided_*`, `early_screenshot_refs`, `early_keyboard_focus_sequence`,
+`early_accessibility_checks`, and `early_evidence_refs`. Those fields are
+diagnostic and do not remove full guided proof gaps from `weak_evidence_refs`.
 
 `frontend_interactions[].accessibility_checks[]` must include one entry for each
 AOR operator accessibility check:

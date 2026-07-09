@@ -31,17 +31,39 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Create Follow-up Flow & Resolve Next Action",
     "Mission intake",
     "Flow selector",
+    "ProjectSnapshotLoading",
+    "Syncing project state",
+    "Project state is loading.",
     "Active flows",
     "Completed flows (read-only)",
     "Flow completed - evidence locked",
+    "Inspect Evidence",
+    "Inspect locked evidence before starting follow-up work",
+    "Completed evidence locked",
+    "Create Follow-up",
     "Start New Flow",
     "Create follow-up from learning handoff",
     "Duplicate mission settings",
     "follow-up-source-handoff-ref",
+    "deliveryMode: followUp ? \"no-write\"",
     "Evidence Graph",
     "Runtime Trace",
+    "EvidenceReadinessPath",
+    "Readiness path",
+    "needs flow evidence",
+    "Refresh the selected flow after a lifecycle command",
+    "Refresh run status or open Execution Evidence",
     "Next action",
     "Evidence artifacts",
+    "qualityClosurePlan",
+    "qualityClosureContext",
+    "Quality closure path",
+    "Quality closure still needs evidence",
+    "Quality closure is blocked by repair",
+    "The current safe step is the public repair decision",
+    "Held until repair",
+    "Run-health is factual status",
+    "Run or attach the outcome assessment",
     "Verification plan",
     "verification_plan",
     "group.outcome",
@@ -61,10 +83,25 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "latestRequestForFlow",
     "flowScopedInteractions",
     "actionCommandLabel",
+    "actionOutcomeTitle",
+    "actionOutcomeDetail",
+    "What happens next",
+    "Show CLI command",
+    "Materialize discovery evidence",
     "topbar-ask-button",
     "draft: newFlowDraft",
     "draftSurface",
-    "currentStage = draftSurface ? \"mission\"",
+    "currentStage = draftSurface",
+    "providerFocusStageId(providerStepStatus, externalRunHealth)",
+    "spec: \"discovery\"",
+    "handoff: \"discovery\"",
+    "eval: \"review\"",
+    "harness: \"review\"",
+    "EXTERNAL_RUN_STEP_CONTEXT",
+    "externalRunStepContext(externalRunHealth)",
+    "Execution handoff readiness",
+    "Approved handoff packet",
+    "Planning -> Execution handoff",
     "Draft flow has no artifacts yet",
     "No visible artifacts yet",
     "workbenchEvidenceRows",
@@ -73,14 +110,71 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "compactVisibleValue",
     "CompactInlineValue",
     "CompactDetailValue",
+    "shellQuoteCommandArg",
+    "appendCommandFlag",
     "New Flow Preview",
     "Completeness Checklist",
     "Cancel New Flow",
     "flow.new-draft-cancelled",
     "flowSelectionVersion",
+    "projectSnapshotLoaded",
+    "snapshot-loading-grid",
     "selectionVersion",
     "selectionApplied",
+    "selectionStillCurrent && !didChooseStage.current",
+    "setSelectedStage(\"discovery\");",
     "refresh({ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion })",
+    "ADVANCED_WORKBENCH_FOCUS_EVENT",
+    "ADVANCED_WORKBENCH_TAB_IDS",
+    "hasOpenDecisionRequest",
+    "Decision Request",
+    "openAdvancedWorkbench(workbenchAction.tabId)",
+    "setSelectedTab(nextTab)",
+    "preferredOperatorDecisionAction",
+    "externalRunHealth?.pending_decision?.action",
+    "preferredOperatorDecisionAction(externalRunHealth, supportedActions, selectedRequest)",
+    "requestStatus === \"rejected\" && actions.includes(rubricRecommendedAction)",
+    "isStepQualityAssessmentCompletionSummary",
+    "product-change step[- ]quality was assessed from \\d+ public evaluator input refs?",
+    "setSelectedAction(preferredAction)",
+    "operatorDecisionChecklistItems",
+    "normalizeDecisionRubricSummary",
+    "decisionRubricSummary",
+    "Evidence rubric",
+    "Required checks",
+    "Required evidence",
+    "Decision evidence rubric",
+    "Decision checklist",
+    "operatorDecisionRecordPlan",
+    "Decision record",
+    "Copy expected decision ref",
+    "Decision record destination",
+    "operatorDecisionHelperPlan",
+    "operatorDecisionCorrectionPlan",
+    "operator_decision_rejection_reason",
+    "rejectionReason: normalized.rejection_reason",
+    "Correction required",
+    "Rejected decision correction plan",
+    "Copy correction JSON",
+    "write the replacement decision file, and refresh run status",
+    "Copy rejected reason",
+    "Decision handoff",
+    "Copy handoff JSON",
+    "Copy action note",
+    "Copy expected file ref",
+    "Decision handoff bundle",
+    "Selected action handoff",
+    "operatorDecisionResumePath",
+    "Resume path",
+    "Decision resume path",
+    "Copy decision file ref",
+    "Resume after write",
+    "Inspect the decision request",
+    "Confirm evidence coverage",
+    "Record selected action",
+    "Refresh run status",
+    "Record a diagnosis as a stop state; repair or retry must happen through public controls before continuation.",
+    "externalRunHealth={externalRunHealth}",
     "delivery-mode-card",
     "request-intent-segment",
     "request-scope-card",
@@ -88,6 +182,13 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "StageSpecificPanel",
     "artifact-readiness-grid",
     "artifact_readiness",
+    "qualityGateEvidenceRows",
+    "gate?.evidence_summaries",
+    "qualityGateRecoveryPlan",
+    "Quality gate recovery path",
+    "Recovery path",
+    "Run repair implementation",
+    "Delivery stays blocked",
     "Review Gate Matrix",
     "Delivery / Release Finalization",
     "Learning Closure / Start New Flow",
@@ -95,15 +196,154 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Trace timeline",
     "Provider heartbeat",
     "provider_step_status",
+    "activeProviderSupersedesExternalRunBlocker",
+    "externalRunHealthHasMaterializedDecisionRequest",
+    "externalRunHealthHasOpenDecisionRequest",
+    "isProviderStepDisplayStatus",
+    "providerStepSupersedesRunHealth",
+    "displayExternalRunHealth(rawExternalRunHealth, providerStepStatus)",
+    "providerWorkbenchFocus",
+    "RUN_HEALTH_FIELD",
+    "[\"run\", \"health\"].join(\"_\")",
+    "resolveExternalRunHealth",
+    "isBlockingExternalRunHealth",
+    "externalRunFailureUserSummary",
+    "externalRunHealthUserSummary",
+    "acceptedExternalRunDiagnosis",
+    "Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls",
+    "isGenericExternalRunPendingDecisionReason",
+    "isStepQualityAssessmentCompletionSummary(normalized)",
+    "externalRunActionableDecisionUserSummary",
+    "Target setup or target verification failed during the run.",
+    "Retry the ${stepLabel} public step after reviewing the blocker.",
+    "Run the ${stepLabel} repair path through public AOR controls before continuing.",
+    "externalRunPendingDecisionUserReason",
+    "externalRunHealthBlockers",
+    "externalRunRecoveryPathActive",
+    "externalRunRecoveryPathUserSummary",
+    "externalRunExecutableRepairCommand",
+    "materializedQualityRepairAction",
+    "materializedQualityRepairSummary",
+    "materializedQualityRepairCompletion",
+    "materializedQualityRepairRunId",
+    "completedQualityRepairAction",
+    "verificationGroupFailureDetail",
+    "firstFailedStepResultRef",
+    "latestRequiredVerificationFailed",
+    "verificationFailureSummary",
+    "failed_step_result_refs",
+    "failed_command_count",
+    "isQualityRepairPrimaryAction",
+    "Continue repair run",
+    "Repair run completed",
+    "Continue with post-run verification",
+    "Verification failed after completed repair",
+    "Post-run verification failed",
+    "Repair failed verification",
+    "Post-run verification repair path",
+    "Repair implementation has completed. Rerun required verification before QA or delivery.",
+    "Run the ${stepLabel} repair path through public AOR controls",
+    'normalized.toLowerCase() === "qa"',
+    "Review evidence did not connect the provider change to verification results.",
+    "Accept the ${stepsLabel} operator decision",
+    "missingRunHealthEvidenceSentence",
+    "Run-health has ${count} unresolved evidence ${noun}",
+    "Review and repair ${count} missing run-health evidence ${noun}",
+    "Diagnosis moved ${stepLabel} into repair.",
+    "Use the public repair path before QA, delivery, or continuation.",
+    "Open the ${stepLabel} decision request",
+    "record the operator diagnosis before continuing.",
+    "externalRunPendingDecisionUserReason(externalRunHealth, pending)",
+    "externalRunHasFailureSummary",
+    "isControllerDecisionPendingRunHealth",
+    "externalRunStepQualityAssessmentPendingSummary",
+    "isStepQualityAssessmentPendingRunHealth",
+    "if (isStepQualityAssessmentPendingRunHealth(health)) return false;",
+    "externalRunHasSubstantiveFailureSummary",
+    "acceptedExternalRunContinueDecision",
+    "externalRunContinuationDecisionCopy",
+    "AOR has the ${stepLabel} continue decision.",
+    "externalRunAttentionLabel",
+    "externalRunDerivedEvidenceStatus",
+    "decision-recorded",
+    "externalRunRiskLevel",
+    "Decision recorded",
+    "externalRunWorkbenchAction",
+    "Record the ${stepLabel} blocker decision before retrying or continuing.",
+    "Open the ${stepLabel} decision request and record the operator decision before continuing.",
+    "hasOpenDecisionRequest\n      ? { label: \"Decision Request\", icon: \"target\", tabId: \"decisions\" }",
+    "${stepLabel} decision request",
+    "${stepLabel} assessment request",
+    "Assessment Evidence",
+    "Decision Evidence",
+    "Review Blocker",
+    "Recovery Path",
+    "Run assessment needed",
+    "Assessment checks",
+    "awaiting-assessment",
+    "Run decision recorded",
+    "Decision evidence",
+    "Recovery needed",
+    "Recovery checks",
+    "repair-required",
+    "externalRunNewFlowBlockedReason",
+    "Resolve the current Recovery Path before starting a new flow.",
+    "newFlowBlockedByRunHealthReason",
+    "newFlowDisabledReason",
+    "Review blocker",
+    "Run decision needed",
+    "Decision checks",
+    "awaiting-decision",
+    "Open ${stepLabel} blocker",
+    "projectRunEvidenceSelectorLabel",
+    "projectRunEvidenceStatus",
+    "projectRunEvidenceIdentity",
+    "blocker evidence",
+    "Run evidence blocked",
+    "Refresh Run Status",
+    "Ask AOR needs a selectable flow",
+    "Ask AOR needs a flow",
+    "delivery_readiness_status: isBlockingExternalRunHealth(externalRunHealth)",
+    "externalRunDerivedEvidenceStatus(externalRunHealth, \"blocked\")",
+    "externalRunHealth={externalRunHealth}",
     "Provider is still running",
     "No output or progress has been observed yet; provider still running",
     "Provider progress was observed earlier",
     "Provider output was observed earlier",
     "Provider was stopped by the operator",
+    "No streamed output captured",
+    "No progress events captured",
+    "Not reported",
+    "providerLastOutputLabel",
+    "providerActivityLabel",
+    "providerCommandDisplayLabel",
+    "Provider CLI session",
+    "Review / QA gate ready",
+    "Provider execution finished before a flow could be selected.",
+    "Delivery artifacts are ready for final operator acceptance and closure.",
+    "Inspect delivery artifacts and record the final operator decision before closure.",
+    "externalRunProviderGateCopy",
+    "Provider execution finished, but ${stepLabel} is waiting for an operator decision before verification, review, QA, delivery, or release.",
+    "Provider execution finished and ${stepLabel} has a recorded continue decision.",
+    "current run gate remains active",
+    "providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)",
+    "providerCommandDetail(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)",
+    "Review QA gate evidence",
+    "Provider execution is done. Inspect validation warnings, review findings, and QA evidence before deciding delivery readiness.",
+    "Provider run in progress",
+    "Live execution is running from project-level evidence before a flow can be selected.",
+    "Monitor provider run",
+    "Ask AOR needs a selectable flow; use run evidence controls for this blocker.",
+    "Use the Decision Request workbench before asking for another flow action.",
+    "projectLevelProviderFocus",
+    "evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}",
+    "providerCommandDetail",
+    "Raw runner label: external-provider-runner",
     "interruption_owner",
     "Interruption owner",
     "Interruption status",
     "isActiveProviderStepStatus",
+    "isTerminalProviderStepStatus",
     "window.setInterval(poll, 5000)",
     "silent: true",
     "Last progress",
@@ -126,7 +366,15 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Workbench",
     "support-table-grid",
     "shortPathLabel",
+    "projectDisplayLabel",
     "runtimeRootLabel",
+    "Show runtime root path details",
+    "Copy runtime root path",
+    "conciseArtifactLabel",
+    "artifactActionLabel",
+    "Open evidence artifact",
+    "Copy raw ref for",
+    "Attach as request target:",
     "topbar-status-strip",
     "first-run-next-action-grid",
     "stage-progress-strip",
@@ -148,6 +396,12 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     'aria-label="Project switcher"',
     "Add local project",
     "Runtime root preview",
+    "Project profile",
+    "projectProfile",
+    "project_profile",
+    "profile_mismatch_candidate_project_ids",
+    "Profile mismatch detected",
+    "Add Matching Project Profile",
     "Add and initialize",
     "/api/projects/actions",
     "/runs",
@@ -164,7 +418,10 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "clearResult: false",
     "Add at least one target ref",
     "Initialize Project Runtime",
+    "Loading",
     "First launch",
+    'onboarding.status === "not-initialized"',
+    "onboarding.can_initialize === true",
     "This does not create a flow",
     "if (!flow) return \"readiness\"",
     "newFlowDisabled",
@@ -182,6 +439,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "selectedStageRuntimeState",
     "Upcoming stage. The current recommended action remains scoped",
     "Recommended action context",
+    "aria-current={current ? \"step\" : undefined}",
+    "aria-pressed={active}",
+    "Selected view",
     "Expected outputs",
     "Command provenance",
     "Dry-run preview",
@@ -195,6 +455,23 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "normalizeArtifactSummary",
     "artifactFilterMatches",
     "artifact-filter-bar",
+    "aria-pressed={filter === entry.id}",
+    "compactDisclosureLabel",
+    "Show full ${type}${context}",
+    "summary aria-label={disclosureLabel} title={disclosureLabel}",
+    "Show recommended CLI command: ${compactVisibleValue(actionCommand, \"command\")}",
+    "summary aria-label={actionCommandDisclosureLabel} title={actionCommandDisclosureLabel}",
+    "ARTIFACT_REF_LABELS",
+    "semanticArtifactTitleFromRef",
+    "Next Action Report",
+    "Provider Evidence",
+    "Operator Decision Request",
+    "Repair Decision",
+    "publicRepairDecisionAction",
+    "publicRepairDecision={publicRepairDecision}",
+    "Public repair decision required",
+    "No separate agent request file is pending for this repair loop.",
+    "Copy repair decision command",
     "filteredRows.find",
     "No evidence matches the selected filter.",
     "Copy raw ref",
@@ -202,6 +479,10 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Evidence artifacts",
     "Operator Decision",
     "operatorDecisionRequestsForFlow",
+    "operatorDecisionRequestsFromExternalRunHealth",
+    "mergeOperatorDecisionRequests",
+    "blockingExternalRunHealth",
+    "providerFocusActive",
     "isOperatorDecisionRequestRef",
     "normalizeOperatorDecisionStatus",
     "isOpenOperatorDecisionStatus",
@@ -228,6 +509,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "delivery_release_blocked",
     "Next safe action",
     "executionEvidenceForFlow",
+    "executionRecoveryPlan",
     "strongestExecutionEvidenceRun",
     "executionEvidenceScore",
     "selectedFlowRuntimeTrace",
@@ -248,6 +530,20 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Save partial evidence",
     "Diagnose current step",
     "Retry public step",
+    "Run public repair command",
+    "Run repair implementation",
+    "Inspect completed repair run",
+    "Repair is driven by failed post-run evidence",
+    "Run repair from failed verification",
+    "--project-profile",
+    "--run-id",
+    "nextAction={nextAction}",
+    "repairCompletion={qualityRepairCompletion}",
+    "Execution evidence recovery path",
+    "Stabilize execution evidence first",
+    "${stepLabel} repair path",
+    "externalRunHealth={externalRunHealth}",
+    "Next public control",
     "aor run cancel",
     "aor run status --run-id",
     "delivery-mode={selectedDeliveryMode}",
@@ -256,7 +552,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
   }
   assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
-  assert.ok(css.includes("--control-height: 38px"), "SPA CSS should define a desktop control height token");
+  assert.ok(css.includes("--control-height: 40px"), "SPA CSS should define a desktop control height token");
   assert.ok(css.includes("--touch-control-height: 44px"), "SPA CSS should define a mobile touch target token");
   assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
@@ -268,6 +564,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
+  assert.ok(css.includes(".provider-heartbeat-action small"), "Provider heartbeat should demote raw runner labels to secondary debug copy");
   assert.ok(css.includes(".quality-gate-card"), "SPA CSS should define active quality gate layout");
   assert.ok(css.includes(".quality-gate-card.operator-hold"), "SPA CSS should distinguish exhausted repair budgets");
   assert.ok(css.includes(".verification-plan-card"), "SPA CSS should define compact verification plan layout");
@@ -276,14 +573,19 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".advanced-workbench-tabs"), "SPA CSS should define active advanced workbench tabs");
   assert.ok(css.includes(".compact-inline-value"), "SPA CSS should define compact inline value layout");
   assert.ok(css.includes(".compact-detail-value"), "SPA CSS should define compact detail value layout");
+  assert.ok(css.includes(".next-step-panel"), "Active cockpit should present the recommended action as an operator outcome");
+  assert.ok(css.includes(".action-command-details"), "Active cockpit should keep raw lifecycle commands behind technical details");
   assert.match(css, /\.form-actions \.form-primary-action\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Safe first-flow submit action should stay in the first mission form action row");
   assert.match(css, /\.safe-template-summary\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u, "Safe first-flow summary should remain a compact information grid");
   assert.match(css, /\.mission-detail-fields summary\s*\{[\s\S]*?min-height: var\(--touch-control-height\);/u, "Mission detail disclosure should meet mobile touch target size");
   assert.match(css, /summary:focus-visible/u, "SPA CSS should expose keyboard focus on disclosure controls");
   assert.match(css, /\.debug-ref-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Debug disclosure controls should meet the shared target size");
   assert.match(css, /\.runtime-path-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Runtime path disclosure controls should meet the shared target size");
-  assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
+  assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);[\s\S]*?min-width: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
+  assert.match(css, /\.artifact-summary-button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact summary rows should meet the shared target size");
   assert.match(css, /\.row-actions \.icon-button\s*\{[\s\S]*?width: var\(--control-height\);[\s\S]*?height: var\(--control-height\);/u, "Artifact row icon actions should meet the shared target size");
+  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u, "First-run primary action should stay above supporting readiness details");
+  assert.match(css, /\.first-run-wizard \.first-run-next-action-grid\s*\{[\s\S]*?order: 2;/u, "First-run next-action summary should follow the primary action");
   assert.ok(css.includes(".support-table-grid"), "SPA CSS should hide first-run support tables behind disclosure");
   assert.equal(
     source.includes("candidates.at(-1)"),
@@ -291,9 +593,48 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "SPA should not show the last trace run when a stronger implementation execution evidence run exists",
   );
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
+  assert.ok(css.includes(".quality-closure-path"), "SPA CSS should define quality closure path layout");
+  assert.match(css, /\.quality-closure-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.quality-closure-path li\.blocked\s*\{/u);
+  assert.ok(css.includes(".execution-recovery-path"), "SPA CSS should define execution recovery path layout");
+  assert.match(css, /\.execution-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.execution-recovery-path li\.ready\s*\{/u);
+  assert.ok(css.includes(".decision-resume-path"), "SPA CSS should define operator decision resume path layout");
+  assert.match(css, /\.decision-resume-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(148px, 1fr\)\);/u);
+  assert.match(css, /\.decision-resume-path li\.blocked\s*\{/u);
+  assert.match(css, /\.decision-resume-path button\s*\{[\s\S]*?min-height: var\(--control-height\);/u);
+  assert.match(
+    source,
+    /decisionCorrectionPlan\.expectedDecisionRef[\s\S]*?Copy decision file ref/u,
+    "Rejected decision correction should expose the replacement decision destination in the first correction block",
+  );
+  assert.ok(css.includes(".evidence-readiness-path"), "SPA CSS should define graph and trace readiness path layout");
+  assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.evidence-readiness-path li\.blocked\s*\{/u);
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes(".flow-active-mode .recommended-action .cockpit-actions"), "SPA CSS should place active mobile cockpit actions before stacked details");
+  assert.ok(
+    source.indexOf('className="cockpit-actions"') < source.indexOf('className="action-grid"'),
+    "Active cockpit primary actions should precede detail disclosures in DOM focus order",
+  );
+  assert.ok(source.includes("const showCockpitHeadingAction = !providerFocusActive"), "Provider run-health focus should not add a duplicate heading refresh before the recommended action");
+  assert.match(source, /\{showCockpitHeadingAction \? \([\s\S]*?<button className="secondary" type="button" onClick=\{onAsk\}/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.flow-active-mode \.recommended-action \.cockpit-actions\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?width: 100%;/u,
+    "Active mobile cockpit actions should use a bounded two-column grid",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?width: 100%;/u,
+    "Active mobile cockpit primary action should span the full action row",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.recommended-action \.cockpit-actions \.secondary\s*\{[\s\S]*?width: 100%;[\s\S]*?min-width: 0;/u,
+    "Active mobile cockpit secondary actions should fit within the viewport",
+  );
   assert.match(
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-focus-mode \.topbar\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: minmax\(0, 1fr\) max-content max-content;/u,
@@ -335,6 +676,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-next-action-grid,[\s\S]*?\.active-flow-handoff,[\s\S]*?\.advanced-evidence-summary-grid,[\s\S]*?grid-template-columns: 1fr;/u,
     "SPA CSS should collapse first-run focus grids on mobile",
   );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.compact-inline-value > code,\s*\.compact-detail-value > span\s*\{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;/u,
+    "SPA CSS should wrap compact command and path values on mobile",
+  );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
   assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");
   assert.match(
@@ -344,6 +690,160 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   );
   assert.ok(css.includes(".trace-table table"), "SPA CSS should make runtime trace tables responsive on mobile");
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
+});
+
+test("project preview state keeps project-level live run evidence visible", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+
+  assert.match(
+    source,
+    /if \(!shouldReadProjectState\) \{[\s\S]*?readJson\(`\/api\/projects\/\$\{encodeURIComponent\(effectiveProjectId\)\}\/runs`\)\.catch\(\(\) => \[\]\)/u,
+    "Project preview/profile-mismatch state should still read project-level runs.",
+  );
+  assert.match(
+    source,
+    /setRuns\(Array\.isArray\(previewRunList\) \? previewRunList : \[\]\);/u,
+    "Project preview/profile-mismatch state should preserve live run evidence for the operator console.",
+  );
+});
+
+test("active quality gate blockers preserve structured recovery details", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
+
+  assert.match(source, /normalizeQualityGateBlockerRow/u);
+  assert.match(source, /normalizedBlockerField/u);
+  assert.match(source, /qualityGateBlockerForActionContext/u);
+  assert.match(source, /qualityGateEvidenceRows/u);
+  assert.match(source, /qualityGateRecoveryPlan/u);
+  assert.match(source, /"next_command"/u);
+  assert.match(source, /record\.evidence_refs/u);
+  assert.match(source, /gate\?\.evidence_summaries/u);
+  assert.match(source, /Quality gate recovery path/u);
+  assert.match(source, /Recovery path/u);
+  assert.match(source, /Delivery stays blocked/u);
+  assert.match(source, /quality-blocker-list/u);
+  assert.match(source, /quality-blocker-meta/u);
+  assert.match(css, /\.quality-recovery-path\s*\{/u);
+  assert.match(css, /\.quality-recovery-path ol\s*\{/u);
+  assert.match(css, /\.quality-recovery-path li\.active\s*\{/u);
+  assert.doesNotMatch(
+    source,
+    /qualityGateBlockers\.map\(\(blocker\) => \(\{ code: blocker, summary: blocker \}\)\)/u,
+    "Active quality gate blockers should not be collapsed into opaque string-only rows",
+  );
+  assert.match(css, /\.quality-blocker-list li\s*\{[\s\S]*?display: grid;/u);
+  assert.match(css, /\.quality-blocker-meta\s*\{[\s\S]*?flex-wrap: wrap;/u);
+  assert.match(css, /\.quality-blocker-meta code,\s*\.quality-blocker-meta em\s*\{[\s\S]*?overflow-wrap: anywhere;/u);
+});
+
+test("required verification failures surface as active cockpit blockers", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
+
+  assert.match(source, /failedRequiredVerificationGroups/u);
+  assert.match(source, /verificationFailureBlocker/u);
+  assert.match(source, /verificationFailurePrimaryAction/u);
+  assert.match(source, /verificationFailureRecoveryPlan/u);
+  assert.match(source, /verificationGroupFailureDetail/u);
+  assert.match(source, /firstFailedStepResultRef/u);
+  assert.match(source, /latestRequiredVerificationFailed/u);
+  assert.match(source, /verificationFailureSummary/u);
+  assert.match(source, /failed_step_result_refs/u);
+  assert.match(source, /Keep the failed verification step-result evidence linked below/u);
+  assert.match(source, /evidenceRefLabel/u);
+  assert.match(source, /<CompactInlineValue value=\{recoveryPlan\.evidenceRef\} kind="path" \/>/u);
+  assert.match(source, /execution-recovery-evidence-ref/u);
+  assert.match(source, /postRunVerificationStatus/u);
+  assert.match(source, /executionStatusRows\(evidence, externalRunHealth, verificationPlan\)/u);
+  assert.match(source, /heldActionIsCompletedRepair/u);
+  assert.match(source, /action_label: "Fix failed verification first"/u);
+  assert.match(source, /command: verificationFailureRerunCommand\(plan\)/u);
+  assert.doesNotMatch(source, /Fix failed required verification, then rerun/u);
+  assert.match(source, /Held downstream action/u);
+  assert.match(source, /Verification rerun after fix/u);
+  assert.match(source, /VerificationFailureBanner/u);
+  assert.match(source, /Required verification failed/u);
+  assert.match(source, /Review is blocked by failed post-run evidence/u);
+  assert.match(source, /Verification failed after completed repair/u);
+  assert.match(source, /Failed verification evidence/u);
+  assert.match(source, /Post-run verification failed/u);
+  assert.match(source, /qualityGateVerificationFailureRecoveryPlan/u);
+  assert.match(source, /qualityVerificationFailureActive/u);
+  assert.match(source, /Repair failed verification/u);
+  assert.match(source, /Required verification must pass before post-repair review/u);
+  assert.match(source, /qualityGateSourceDetail/u);
+  assert.match(source, /qualityGateAttemptDetail/u);
+  assert.match(source, /Required verification must pass before the review rerun/u);
+  assert.match(source, /No automatic repair attempts remain; use failed verification evidence before requesting more repair/u);
+  assert.match(source, /qualityGateRepairAttemptsExhausted/u);
+  assert.match(source, /verificationFailureRepairDecisionCommand/u);
+  assert.match(source, /aor review decide --decision request-repair --repair-context-file <repair-context\.json>/u);
+  assert.match(source, /Request repair with new evidence/u);
+  assert.match(source, /repeated repair context without new evidence must stay blocked/u);
+  assert.match(source, /Rerun required verification only after the next repair completes/u);
+  assert.match(source, /Provider execution finished, but required verification failed/u);
+  assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
+  assert.match(source, /verificationPrimary\.action_id === "request-repair-after-verification-failure"/u);
+  assert.match(source, /\{ label: "Repair Decision", icon: "target", tabId: "decisions" \}/u);
+  assert.match(source, /\{ label: "Recovery Path", icon: "target", tabId: "execution" \}/u);
+  assert.match(source, /label: workbenchAction\.label,[\s\S]*?onClick: \(\) => openAdvancedWorkbench\(workbenchAction\.tabId\),/u);
+  assert.match(source, /!verificationPrimary && !isBlockingExternalRunHealth\(externalRunHealth\)/u);
+  assert.match(source, /newFlowBlockedByVerificationReason/u);
+  assert.match(source, /Resolve the current failed verification Recovery Path before starting a new flow\./u);
+  assert.match(source, /providerEvidenceStripSummary/u);
+  assert.match(source, /counts\.missing > 0 \? `\$\{counts\.missing\} missing`/u);
+  assert.match(source, /counts\.unreadable > 0 \? `\$\{counts\.unreadable\} unreadable`/u);
+  assert.match(source, /providerEvidenceStripSummary\(providerEvidenceRows\)/u);
+  assert.match(source, /label\.replace\(\/\\s\+missing\$\/iu, ""\)/u);
+  assert.match(source, /run_id: evidence\?\.run_id \?\? externalRunHealth\?\.run_id/u);
+  assert.doesNotMatch(source, /run_id: evidence\.run_id/u);
+  assert.match(source, /headingRepeatsStatus\(heading, status\)/u);
+  assert.match(source, /const showCockpitStatus = !headingRepeatsStatus\(cockpitTitle, cockpitStatus\)/u);
+  assert.match(source, /\{showCockpitStatus \? <StatusPill state=\{cockpitStatus\} \/> : null\}/u);
+  const recommendedActionRenderIndex = source.indexOf('<div className="recommended-action">');
+  const providerHeartbeatRenderIndex = source.indexOf("{providerHeartbeatPanel}");
+  assert.ok(recommendedActionRenderIndex >= 0, "Active cockpit should render the recommended action block.");
+  assert.ok(providerHeartbeatRenderIndex >= 0, "Active cockpit should render provider heartbeat from a reusable panel.");
+  assert.ok(
+    recommendedActionRenderIndex < providerHeartbeatRenderIndex,
+    "Provider heartbeat telemetry should stay below the primary recommended action.",
+  );
+  assert.match(source, /Verification failure recovery path/u);
+  assert.match(source, /Fix failed verification first/u);
+  assert.match(source, /Repair failed verification/u);
+  assert.match(source, /AOR is holding the downstream action/u);
+  assert.match(source, /Rerun required verification/u);
+  assert.ok(
+    source.indexOf("<span>Next public control</span>") < source.indexOf("<span>Evidence to keep</span>"),
+    "Execution recovery should show the public control before evidence details on mobile.",
+  );
+  assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} heldAction=\{resolverPrimary\} \/>/u);
+  assert.match(source, /verificationBlockers = verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\)/u);
+  assert.match(source, /verificationFailures\.length > 0\s*\? \[\.\.\.verificationBlockers, \.\.\.presentedActionBlockers\]/u);
+  assert.match(source, /completedRepairActionActive/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary, qualityGate\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextAction, gate\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextPrimary, qualityGate\)/u);
+  assert.match(source, /publicRepairDecisionAction\(nextAction, qualityGate, verificationPlan\)/u);
+  assert.match(source, /decisionTabLabel = publicRepairDecision \? "Repair Decision" : "Operator Decision"/u);
+  assert.match(source, /decisionTabCount = publicRepairDecision && decisionRequests\.length === 0 \? "needed" : decisionRequests\.length/u);
+  assert.match(source, /verificationPlan=\{verificationPlan\}/u);
+  assert.match(source, /verificationFailures=\{verificationFailures\}/u);
+  assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
+  assert.match(css, /\.verification-recovery-path\s*\{/u);
+  assert.match(css, /\.verification-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.verification-recovery-path li\.active\s*\{/u);
+  assert.match(css, /\.public-repair-decision-plan\s*\{/u);
+  assert.match(css, /\.public-repair-decision-actions\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\);/u);
+  assert.match(css, /\.held-action-note\s*\{/u);
+  assert.match(css, /\.execution-recovery-evidence-ref\s*\{/u);
+  assert.match(css, /\.verification-hold-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.verification-recovery-path ol,[\s\S]*?\.verification-hold-grid,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Required verification failure cards should collapse on mobile",
+  );
 });
 
 test("web package no longer exports static operator snapshot modules", () => {

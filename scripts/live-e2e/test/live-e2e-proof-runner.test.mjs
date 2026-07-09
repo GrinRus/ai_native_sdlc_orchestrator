@@ -2462,6 +2462,7 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
 
     const runId = "guided-ui-proof-missing";
     const normalizedRunId = "guided-ui-proof-missing";
+    const earlyNormalizedRunId = `${normalizedRunId}.early-ui`;
     const webSmokeSummaryFile = writeJsonFixture(
       path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.json`),
       {
@@ -2495,6 +2496,79 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
         detached: true,
       },
     );
+    const earlyBrowserTaskProofFile = path.join(
+      reportsRoot,
+      `installed-user-guided-browser-task-proof-${earlyNormalizedRunId}.json`,
+    );
+    const earlyScreenshotFile = path.join(
+      reportsRoot,
+      `installed-user-guided-browser-task-proof-${earlyNormalizedRunId}.png`,
+    );
+    fs.writeFileSync(earlyScreenshotFile, "png", "utf8");
+    const earlyKeyboardFocusSequence = [
+      { index: 1, role: "button", label: "New Flow", selector: "button.new-flow-button" },
+      { index: 2, role: "button", label: "Ask AOR", selector: "button.topbar-ask-button" },
+    ];
+    const earlyWebSmokeSummaryFile = writeJsonFixture(
+      path.join(reportsRoot, `installed-user-guided-web-smoke-${earlyNormalizedRunId}.json`),
+      {
+        summary_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${earlyNormalizedRunId}.json`),
+        rendered_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${earlyNormalizedRunId}.html`),
+        dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${earlyNormalizedRunId}.json`),
+        accessibility_summary_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-accessibility-${earlyNormalizedRunId}.json`,
+        ),
+        visual_guardrail_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-visual-guardrail-${earlyNormalizedRunId}.json`,
+        ),
+        browser_task_proof_request_file: path.join(
+          reportsRoot,
+          `installed-user-guided-browser-task-proof-request-${earlyNormalizedRunId}.json`,
+        ),
+        browser_task_proof_file: earlyBrowserTaskProofFile,
+        screenshot_files: [earlyScreenshotFile],
+        keyboard_focus_sequence: earlyKeyboardFocusSequence,
+        accessibility_checks: buildAccessibilityChecks(earlyScreenshotFile),
+        task_outcome: {
+          status: "pass",
+          checked_tasks: ["early browser-task evidence capture"],
+          findings: [],
+        },
+        ux_findings: ["Initial AOR mission and next-action UI was inspectable before implementation."],
+        html_loaded: true,
+        flow_selector_loaded: true,
+        new_flow_action_loaded: true,
+        guided_lifecycle_state: "smoke-pass",
+        detached: true,
+      },
+    );
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-browser-task-proof-request-${earlyNormalizedRunId}.json`), {
+      expected_browser_task_proof_file: earlyBrowserTaskProofFile,
+    });
+    writeJsonFixture(earlyBrowserTaskProofFile, {
+      status: "pass",
+      rendered_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${earlyNormalizedRunId}.html`),
+      dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${earlyNormalizedRunId}.json`),
+      accessibility_summary_file: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-accessibility-${earlyNormalizedRunId}.json`,
+      ),
+      visual_guardrail_file: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-visual-guardrail-${earlyNormalizedRunId}.json`,
+      ),
+      screenshot_files: [earlyScreenshotFile],
+      keyboard_focus_sequence: earlyKeyboardFocusSequence,
+      accessibility_checks: buildAccessibilityChecks(earlyScreenshotFile),
+      task_outcome: {
+        status: "pass",
+        checked_tasks: ["early browser-task evidence capture"],
+        findings: [],
+      },
+      ux_findings: ["Initial AOR mission and next-action UI was inspectable before implementation."],
+    });
     const files = Object.fromEntries(
       [
         "controller-state.json",
@@ -2584,6 +2658,10 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`));
     writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`));
     writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`));
+    fs.writeFileSync(path.join(reportsRoot, `installed-user-guided-web-smoke-${earlyNormalizedRunId}.html`), "<main>AOR early</main>\n", "utf8");
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${earlyNormalizedRunId}.json`));
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-accessibility-${earlyNormalizedRunId}.json`));
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${earlyNormalizedRunId}.json`));
     writeJsonFixture(path.join(reportsRoot, `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`), {
       expected_browser_task_proof_file: path.join(
         reportsRoot,
@@ -2673,6 +2751,29 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
           `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`,
         ),
         guided_browser_task_proof_file: null,
+        early_guided_web_smoke: JSON.parse(fs.readFileSync(earlyWebSmokeSummaryFile, "utf8")),
+        early_guided_web_smoke_summary_file: earlyWebSmokeSummaryFile,
+        early_guided_web_smoke_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${earlyNormalizedRunId}.html`),
+        early_guided_web_dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${earlyNormalizedRunId}.json`),
+        early_guided_web_accessibility_summary_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-accessibility-${earlyNormalizedRunId}.json`,
+        ),
+        early_guided_web_visual_guardrail_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-visual-guardrail-${earlyNormalizedRunId}.json`,
+        ),
+        early_guided_web_screenshot_files: [earlyScreenshotFile],
+        early_guided_browser_task_proof_request_file: path.join(
+          reportsRoot,
+          `installed-user-guided-browser-task-proof-request-${earlyNormalizedRunId}.json`,
+        ),
+        early_guided_browser_task_proof_file: earlyBrowserTaskProofFile,
+        early_guided_browser_task_app_server_cleanup: {
+          status: "terminated",
+          pid: 12345,
+          terminated_at: "2026-06-09T00:00:00.500Z",
+        },
         feature_mission_id: "ky-header-regression",
         feature_size: "small",
       },
@@ -2755,14 +2856,27 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(written.summary.run_control_state_file, written.runControlStateFile);
 
     const observationReport = JSON.parse(fs.readFileSync(written.summary.live_e2e_observation_report_file, "utf8"));
-    assert.equal(observationReport.frontend_interactions.length, 1);
-    assert.equal(observationReport.frontend_interactions[0].task_outcome.status, "not_pass");
+    const earlyInteraction = observationReport.frontend_interactions.find(
+      (entry) => entry.interaction_id === "early-guided-ui-proof",
+    );
+    const fullInteraction = observationReport.frontend_interactions.find(
+      (entry) => entry.interaction_id === "guided-web-smoke",
+    );
+    assert.equal(observationReport.frontend_interactions.length, 2);
+    assert.equal(earlyInteraction.task_outcome.status, "pass");
+    assert.equal(earlyInteraction.browser_task_proof_ref, earlyBrowserTaskProofFile);
+    assert.equal(fullInteraction.task_outcome.status, "not_pass");
     assert.equal(written.summary.feature_request_file, files["feature-request.json"]);
     assert.equal(written.summary.guided_web_smoke_summary_file, webSmokeSummaryFile);
     assert.equal(written.summary.guided_browser_task_proof_file, null);
+    assert.equal(written.summary.early_guided_web_smoke_summary_file, earlyWebSmokeSummaryFile);
+    assert.equal(written.summary.early_guided_browser_task_proof_file, earlyBrowserTaskProofFile);
+    assert.equal(written.summary.guided_ui_evidence.early_guided_browser_task_proof_file, earlyBrowserTaskProofFile);
+    assert.equal(written.summary.guided_ui_evidence.early_browser_task_proof_present, true);
     assert.equal(written.runHealthReport.overall_status, "blocked");
     assert.equal(written.runHealthReport.evidence_health.status, "blocked");
     assert.equal(written.runHealthReport.evidence_health.weak_evidence_refs.includes("guided-browser-task-proof"), true);
+    assert.equal(written.runHealthReport.guided_ui_evidence.early_guided_browser_task_proof_file, earlyBrowserTaskProofFile);
     assert.equal(written.runHealthReport.failure_summary.owner, "operator");
     assert.equal(written.runHealthReport.failure_summary.phase, "ui_validation");
     assert.equal(written.runHealthReport.failure_summary.class, "guided_browser_task_proof_missing");
@@ -2824,19 +2938,29 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
 
     const hydrated = writeProofRunnerArtifacts(writeOptions);
     const hydratedObservation = JSON.parse(fs.readFileSync(hydrated.summary.live_e2e_observation_report_file, "utf8"));
+    const hydratedEarlyInteraction = hydratedObservation.frontend_interactions.find(
+      (entry) => entry.interaction_id === "early-guided-ui-proof",
+    );
+    const hydratedFullInteraction = hydratedObservation.frontend_interactions.find(
+      (entry) => entry.interaction_id === "guided-web-smoke",
+    );
     const hydratedWebSmoke = JSON.parse(fs.readFileSync(webSmokeSummaryFile, "utf8"));
+    assert.equal(hydratedObservation.frontend_interactions.length, 2);
     assert.equal(hydrated.summary.guided_browser_task_proof_file, browserTaskProofFile);
     assert.equal(hydrated.summary.guided_ui_evidence.status, "pass");
     assert.equal(hydrated.summary.guided_ui_evidence.guided_browser_task_proof_file, browserTaskProofFile);
-    assert.equal(hydratedObservation.frontend_interactions[0].task_outcome.status, "pass");
-    assert.equal(hydratedObservation.frontend_interactions[0].browser_task_proof_ref, browserTaskProofFile);
+    assert.equal(hydrated.summary.guided_ui_evidence.early_guided_browser_task_proof_file, earlyBrowserTaskProofFile);
+    assert.equal(hydratedEarlyInteraction.browser_task_proof_ref, earlyBrowserTaskProofFile);
+    assert.equal(hydratedFullInteraction.task_outcome.status, "pass");
+    assert.equal(hydratedFullInteraction.browser_task_proof_ref, browserTaskProofFile);
     assert.equal(hydratedObservation.guided_ui_evidence.status, "pass");
     assert.equal(hydratedObservation.guided_ui_evidence.guided_browser_task_proof_file, browserTaskProofFile);
-    assert.deepEqual(hydratedObservation.frontend_interactions[0].screenshot_refs, [screenshotFile]);
-    assert.equal(hydratedObservation.frontend_interactions[0].keyboard_focus_sequence.length, 2);
+    assert.equal(hydratedObservation.guided_ui_evidence.early_guided_browser_task_proof_file, earlyBrowserTaskProofFile);
+    assert.deepEqual(hydratedFullInteraction.screenshot_refs, [screenshotFile]);
+    assert.equal(hydratedFullInteraction.keyboard_focus_sequence.length, 2);
     assert.equal(hydratedWebSmoke.keyboard_focus_sequence.length, 2);
     assert.deepEqual(
-      hydratedObservation.frontend_interactions[0].accessibility_checks.map((entry) => entry.check_id),
+      hydratedFullInteraction.accessibility_checks.map((entry) => entry.check_id),
       aorOperatorAccessibilityCheckIds,
     );
     assert.equal(hydratedWebSmoke.task_outcome.status, "pass");
@@ -3133,6 +3257,7 @@ test("guided browser-task proof request points at a live app surface, not the sh
       runId: "guided-live-surface",
       reportsRoot,
       env: process.env,
+      keepBrowserTaskAppSurface: false,
     });
     const request = JSON.parse(fs.readFileSync(result.browserTaskProofRequestFile, "utf8"));
     assert.equal(request.smoke_app_url, "http://127.0.0.1:61001/");
@@ -3165,11 +3290,8 @@ test("guided browser-task proof request points at a live app surface, not the sh
     assert.match(request.instructions.join("\n"), /Open app_url, not smoke_app_url/u);
     assert.ok(Number.isInteger(request.app_server_pid));
     assert.equal(result.summary.browser_task_app_url, "http://127.0.0.1:61002/");
-    try {
-      process.kill(request.app_server_pid, "SIGTERM");
-    } catch {
-      // Test cleanup only.
-    }
+    assert.equal(result.summary.browser_task_app_server_cleanup.status, "terminated");
+    assert.equal(result.browserTaskAppServerCleanup.status, "terminated");
   });
 });
 
@@ -3336,6 +3458,17 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
   assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
   assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 120/u);
+});
+
+test("flow-health regress profiles report policy-excluded QA as passing evidence", () => {
+  const flowSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+
+  assert.match(flowSource, /qaOverallStatus = "pass";\s*\n\s*artifacts\.evaluation_status = "skipped";/u);
+  assert.match(
+    flowSource,
+    /markStage\(\s*\n\s*stageMap,\s*\n\s*"qa",\s*\n\s*"pass",\s*\n\s*qaEvidenceRefs,\s*\n\s*"Profile quality-cycle policy excludes evaluator QA; required flow-health QA evidence passed\."/u,
+  );
+  assert.doesNotMatch(flowSource, /markStage\(stageMap, "qa", "skipped", \[\], "Profile quality-cycle policy excludes QA\."/u);
 });
 
 test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {

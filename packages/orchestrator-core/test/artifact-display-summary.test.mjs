@@ -70,6 +70,39 @@ test("artifact display summary classifies refs without making raw refs the label
   assert.equal(missing.type, "target-diff");
 });
 
+test("artifact display summary uses readable family labels instead of run-scoped ids", () => {
+  const nextAction = buildArtifactDisplaySummary({
+    family: "next-action-report",
+    artifactRef: "evidence://reports/next-action-report-ux-ui-guided-c99655b-20260708-1.json",
+    document: {
+      report_id: "github-sandbox.run.ux-ui-guided-c99655b-20260708-1.next-action.v1",
+      status: "ready",
+    },
+  });
+  assert.equal(nextAction.label, "Next Action Report");
+  assert.equal(nextAction.type, "next-action");
+  assert.equal(nextAction.stage, "planning");
+  assert.equal(nextAction.raw_ref, "evidence://reports/next-action-report-ux-ui-guided-c99655b-20260708-1.json");
+
+  const repairRequest = buildArtifactDisplaySummary({
+    family: "quality-repair-request",
+    artifactRef: "evidence://reports/quality-repair-request-ux-ui-guided-c99655b-review-708132350868.json",
+    document: {
+      request_id: "github-sandbox.run.ux-ui-guided-c99655b-20260708-1.quality-repair-request.review.v1",
+      status: "repair",
+    },
+  });
+  assert.equal(repairRequest.label, "Repair Request");
+  assert.equal(repairRequest.type, "quality-repair-request");
+
+  const providerEvidence = buildArtifactDisplaySummary({
+    rawRef: "evidence://reports/adapter-live-codex-cli-raw-ux-ui-guided-c99655b.json",
+    status: "ready",
+  });
+  assert.equal(providerEvidence.label, "Provider Evidence");
+  assert.equal(providerEvidence.type, "provider-raw-evidence");
+});
+
 test("control-plane read surfaces expose artifact display summaries for packet and step refs", () => {
   withCleanRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
