@@ -1931,12 +1931,14 @@ function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions
         ? `${healthBlockers.length} recovery check${healthBlockers.length === 1 ? "" : "s"}`
         : "Run-health recovery evidence",
       evidenceDetail: failedVerificationSummary
-        ? firstFailedStepResultRef(verificationFailures[0]) || "Inspect the failed verify summary and step-result evidence."
+        ? "Keep the failed verification step-result evidence linked below; use it as repair context before requesting another repair."
         : repairAction
         ? repairCompletion
           ? "The completed repair run is preserved as public run evidence."
           : "Failed verification and repair evidence explain why this repair run is needed."
         : healthBlockers[0]?.summary ?? "Review run-health and verification evidence before applying repair.",
+      evidenceRefLabel: failedVerificationSummary ? "Failed step-result evidence" : "",
+      evidenceRef: failedVerificationSummary ? firstFailedStepResultRef(verificationFailures[0]) : "",
       actionTitle: failedVerificationSummary
         ? verificationRecovery?.repairAttemptsExhausted
           ? "Request repair with new evidence"
@@ -5164,6 +5166,12 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy,
                 <span>Evidence to keep</span>
                 <strong>{recoveryPlan.evidenceTitle}</strong>
                 <p>{recoveryPlan.evidenceDetail}</p>
+                {recoveryPlan.evidenceRef ? (
+                  <div className="execution-recovery-evidence-ref">
+                    <span>{recoveryPlan.evidenceRefLabel || "Evidence ref"}</span>
+                    <CompactInlineValue value={recoveryPlan.evidenceRef} kind="path" />
+                  </div>
+                ) : null}
               </li>
               <li className={recoveryPlan.actionCommand ? "ready" : "blocked"}>
                 <span>Next public control</span>

@@ -2508,6 +2508,21 @@ th {
   min-width: 0;
 }
 
+.execution-recovery-evidence-ref {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.execution-recovery-evidence-ref > span {
+  font-weight: 700;
+  color: var(--color-text-soft);
+}
+
 .execution-blockers {
   display: grid;
   gap: 6px;

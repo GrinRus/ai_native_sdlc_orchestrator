@@ -693,6 +693,10 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /latestRequiredVerificationFailed/u);
   assert.match(source, /verificationFailureSummary/u);
   assert.match(source, /failed_step_result_refs/u);
+  assert.match(source, /Keep the failed verification step-result evidence linked below/u);
+  assert.match(source, /evidenceRefLabel/u);
+  assert.match(source, /<CompactInlineValue value=\{recoveryPlan\.evidenceRef\} kind="path" \/>/u);
+  assert.match(source, /execution-recovery-evidence-ref/u);
   assert.match(source, /heldActionIsCompletedRepair/u);
   assert.match(source, /Fix failed required verification, then rerun/u);
   assert.match(source, /Held downstream action/u);
@@ -738,6 +742,7 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(css, /\.verification-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.verification-recovery-path li\.active\s*\{/u);
   assert.match(css, /\.held-action-note\s*\{/u);
+  assert.match(css, /\.execution-recovery-evidence-ref\s*\{/u);
   assert.match(css, /\.verification-hold-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
   assert.match(
     css,
