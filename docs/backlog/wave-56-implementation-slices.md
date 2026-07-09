@@ -189,6 +189,10 @@ human gate or a real environment failure.
   reached an Execution target setup failure with
   `failure_owner=environment`, `failure_phase=target_setup`, and
   `failure_class=environment_disk_space_exhausted`.
+- `live-e2e.full-journey.regress.httpx.medium.openai.ux-rerun-2648ca0`
+  was rerun after temp-workspace cleanup. Target readiness returned to `pass`,
+  the Discovery controller decision was accepted with `continue`, and the run
+  then stopped at the Discovery step-quality assessment gate as expected.
 - Rendered desktop and mobile checks covered the generic decision gate, the
   step-quality assessment gate, and the real target setup blocker screen.
 
@@ -199,16 +203,18 @@ human gate or a real environment failure.
 | Discovery controller decision gate | Generic pending decisions looked too similar to failures because the UI reused blocker language. | The cockpit, risk label, flow inventory, and external run panel now use decision-specific copy and avoid `Blocked` for a generic pending controller decision. |
 | Step-quality assessment gate | The assessment pause looked like an operator decision or blocker even though the required action is evaluator assessment. | The gate now uses assessment-specific labels, workbench copy, status chips, and test coverage. |
 | Execution target setup failure | The main cockpit correctly explained the environment-owned blocker, but the topbar action still said `Decision needed`. | The topbar now says `Review blocker` for substantive run failures while preserving `Decision needed` and `Assessment needed` for their separate gates. |
+| Run-gate primary action | The cockpit's primary action still refreshed the run even when a first-time user needed to open a pending decision or assessment workbench. | Blocking run-health now promotes the matching workbench action (`Decision Request`, `Assessment Evidence`, or `Review Blocker`) as the primary CTA and keeps refresh secondary. The generic Discovery decision now defaults to `Continue` when deterministic evidence is pass. |
 | Responsive readability | The inspected desktop and mobile states had no horizontal overflow or clipped primary blocker/decision copy. | Keep the current compact recovery labels as the baseline for the next live E2E pass. |
 
 ### Follow-up plan
 
-1. Resume the HTTPX medium live E2E flow after environment setup is usable, then
-   inspect the diagnose, retry, and public-step recovery surfaces from the same
-   first-time-user perspective.
-2. Advance past the step-quality assessment gate with evaluator-authored
-   assessment evidence and inspect execution, review/QA, delivery/release, and
-   learning closure screens.
+1. Advance the current HTTPX medium live E2E flow past the Discovery
+   step-quality assessment gate with evaluator-authored assessment evidence,
+   then inspect execution, review/QA, delivery/release, and learning closure
+   screens.
+2. Inspect diagnose, retry, and public-step recovery surfaces from the same
+   first-time-user perspective when a later step produces a substantive
+   provider, target, or validation blocker.
 3. Add or verify non-happy-path rendered coverage for rejected operator
    decisions, missing assessment evidence, failed required verification groups,
    repair-request loops, completed-flow read-only state, and follow-up flow

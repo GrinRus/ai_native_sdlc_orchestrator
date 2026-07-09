@@ -1345,6 +1345,21 @@ function projectRunEvidenceStatus(status, externalRunHealth = null) {
   return "No active flow";
 }
 
+function externalRunWorkbenchAction(health, hasOpenDecisionRequest = false) {
+  if (isStepQualityAssessmentPendingRunHealth(health)) {
+    return { label: "Assessment Evidence", icon: "target", tabId: "evidence" };
+  }
+  if (isControllerDecisionPendingRunHealth(health)) {
+    return { label: hasOpenDecisionRequest ? "Decision Request" : "Decision Evidence", icon: "target", tabId: "decisions" };
+  }
+  if (isBlockingExternalRunHealth(health)) {
+    return { label: "Review Blocker", icon: "target", tabId: "execution" };
+  }
+  return hasOpenDecisionRequest
+    ? { label: "Decision Request", icon: "target", tabId: "decisions" }
+    : { label: "Workbench", icon: "target", tabId: "evidence" };
+}
+
 function externalRunAttentionLabel(health) {
   if (isStepQualityAssessmentPendingRunHealth(health)) return "Assessment checks";
   return isControllerDecisionPendingRunHealth(health) ? "Decision checks" : "Blockers";
@@ -3414,11 +3429,20 @@ function FlowCockpit({
       };
   const verificationPrimary = completed ? null : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
   const nextPrimary = verificationPrimary ?? resolverPrimary;
+  const hasOpenDecisionRequest = providerFocusActive && visibleEvidence.some((row) => {
+    return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
+  });
+  const workbenchAction = externalRunWorkbenchAction(
+    providerFocusActive ? externalRunHealth : null,
+    hasOpenDecisionRequest,
+  );
   const primaryActionButton = providerFocusActive
     ? {
-      label: "Refresh Run Status",
-      icon: "refresh",
-      onClick: onRefresh,
+      label: isBlockingExternalRunHealth(externalRunHealth) ? workbenchAction.label : "Refresh Run Status",
+      icon: isBlockingExternalRunHealth(externalRunHealth) ? workbenchAction.icon : "refresh",
+      onClick: isBlockingExternalRunHealth(externalRunHealth)
+        ? () => openAdvancedWorkbench(workbenchAction.tabId)
+        : onRefresh,
       disabled: busy,
     }
     : {
@@ -3441,12 +3465,6 @@ function FlowCockpit({
     : stageRuntimeCopy;
   const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
   const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
-  const hasOpenDecisionRequest = providerFocusActive && visibleEvidence.some((row) => {
-    return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
-  });
-  const workbenchAction = hasOpenDecisionRequest
-    ? { label: "Decision Request", icon: "target", tabId: "decisions" }
-    : { label: "Workbench", icon: "target", tabId: "evidence" };
   const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
   const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
   const recommendedActionStatus = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
@@ -3595,13 +3613,15 @@ function FlowCockpit({
             <Icon name={primaryActionButton.icon} />
             {primaryActionButton.label}
           </button>
-          <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
-            <Icon name={workbenchAction.icon} />
-            {workbenchAction.label}
-          </button>
+          {!isBlockingExternalRunHealth(externalRunHealth) ? (
+            <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
+              <Icon name={workbenchAction.icon} />
+              {workbenchAction.label}
+            </button>
+          ) : null}
           <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
             <Icon name="refresh" />
-            Refresh
+            {providerFocusActive ? "Refresh Run Status" : "Refresh"}
           </button>
         </div>
       </div>
@@ -4140,6 +4160,7 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
 
 function preferredOperatorDecisionAction(externalRunHealth, supportedActions) {
   const actions = Array.isArray(supportedActions) ? supportedActions : [];
+  if (isControllerDecisionPendingRunHealth(externalRunHealth) && actions.includes("continue")) return "continue";
   const pendingAction = String(externalRunHealth?.pending_decision?.action ?? "").trim();
   if (pendingAction && actions.includes(pendingAction)) return pendingAction;
   if (actions.includes("continue")) return "continue";
@@ -6301,6 +6322,12 @@ function App() {
       : projectLevelProviderFocus
         ? "Ask AOR needs a flow"
         : "Ask AOR for selected flow";
+  const topbarRunWorkbenchAction = blockingExternalRunHealth
+    ? externalRunWorkbenchAction(
+      externalRunHealth,
+      operatorDecisionRequests.some((request) => isOpenOperatorDecisionStatus(request.status)),
+    )
+    : null;
   const runtimeRoot = projectState?.runtime_root ?? activeProjectDisplay?.runtime_root ?? config?.runtime_root ?? ".aor";
   const activeProjectStatusRuntimeReady =
     activeProjectRuntimeReady ||
@@ -6350,7 +6377,7 @@ function App() {
         <button
           className="utility-button topbar-ask-button"
           type="button"
-          onClick={() => (blockingExternalRunHealth ? focusAdvancedWorkbench("decisions") : openRequestDrawer())}
+          onClick={() => (blockingExternalRunHealth ? focusAdvancedWorkbench(topbarRunWorkbenchAction?.tabId ?? "evidence") : openRequestDrawer())}
           disabled={busy || (!selectedFlow && !blockingExternalRunHealth)}
           title={topbarAskReason}
           aria-label={topbarAskReason}

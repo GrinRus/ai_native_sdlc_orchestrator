@@ -129,7 +129,10 @@ The packaged SPA now treats the flow as the primary object:
   controller request without a substantive failure uses decision language such
   as `Run decision needed` and `Decision needed`; a product-change step-quality
   gate uses assessment language such as `Run assessment needed` and
-  `Assessment needed`.
+  `Assessment needed`. The cockpit primary CTA opens the matching workbench
+  surface (`Decision Request`, `Assessment Evidence`, or `Review Blocker`);
+  refresh remains secondary while the run is waiting on operator or evaluator
+  action.
 - The stage rail and active cockpit render `provider_step_status` from public
   control-plane read models. `silent-running` states explicitly say the provider
   has no output yet but is still running, without exposing raw process commands
