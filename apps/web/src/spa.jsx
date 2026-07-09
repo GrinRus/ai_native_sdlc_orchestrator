@@ -5188,7 +5188,19 @@ function App() {
     projectOptions.find((project) => project.project_id === config?.project_id) ??
     projectOptions[0] ??
     null;
-  const activeProjectOnboarding = activeProject?.onboarding_summary ?? {};
+  const activeProjectDisplay = activeProject && projectState?.onboarding_summary
+    ? {
+        ...activeProject,
+        runtime_root: projectState.runtime_root ?? activeProject.runtime_root,
+        onboarding_summary: projectState.onboarding_summary,
+      }
+    : activeProject;
+  const projectOptionsForSwitcher = activeProjectDisplay
+    ? projectOptions.map((project) => (
+        project.project_id === activeProjectDisplay.project_id ? activeProjectDisplay : project
+      ))
+    : projectOptions;
+  const activeProjectOnboarding = activeProjectDisplay?.onboarding_summary ?? {};
   const activeProjectRuntimeReady =
     Boolean(projectState?.state_file)
     || activeProjectOnboarding.initialized === true
@@ -5378,16 +5390,36 @@ function App() {
       appConfig.project_id;
     const selectedProject = projects.find((project) => project.project_id === selectedProjectId) ?? projects[0] ?? null;
     const effectiveProjectId = selectedProject?.project_id ?? selectedProjectId;
+    const statePreviewRoute = effectiveProjectId ? `/api/projects/${encodeURIComponent(effectiveProjectId)}/state` : null;
+    const onboarding = selectedProject?.onboarding_summary ?? {};
+    const needsStatePreview = statePreviewRoute && onboarding.initialized !== true && onboarding.state_exists !== true;
+    const statePreview = needsStatePreview ? await readJson(statePreviewRoute).catch(() => null) : null;
+    const statePreviewOnboarding = statePreview?.onboarding_summary ?? {};
+    const projectsWithLiveState = statePreview?.onboarding_summary && effectiveProjectId
+      ? projects.map((project) => (
+          project.project_id === effectiveProjectId
+            ? {
+                ...project,
+                runtime_root: statePreview.runtime_root ?? project.runtime_root,
+                onboarding_summary: statePreview.onboarding_summary,
+              }
+            : project
+        ))
+      : projects;
     setProjectIndex({
       ...projectPayload,
       default_project_id: projectPayload.default_project_id ?? appConfig.default_project_id ?? appConfig.project_id,
-      projects,
+      projects: projectsWithLiveState,
     });
     if (effectiveProjectId && activeProjectId !== effectiveProjectId) {
       setActiveProjectId(effectiveProjectId);
     }
-    const onboarding = selectedProject?.onboarding_summary ?? {};
-    const shouldReadProjectState = onboarding.initialized === true || onboarding.state_exists === true;
+    const shouldReadProjectState =
+      onboarding.initialized === true
+      || onboarding.state_exists === true
+      || Boolean(statePreview?.state_file)
+      || statePreviewOnboarding.initialized === true
+      || statePreviewOnboarding.state_exists === true;
     if (!shouldReadProjectState) {
       const previewRunList = effectiveProjectId
         ? await readJson(`/api/projects/${encodeURIComponent(effectiveProjectId)}/runs`).catch(() => [])
@@ -5420,7 +5452,7 @@ function App() {
     }
     const base = `/api/projects/${encodeURIComponent(effectiveProjectId)}`;
     const [state, next, flowPayload, selectedFlowPayload, packetList, stepList, runList, requestList] = await Promise.all([
-      readJson(`${base}/state`),
+      statePreview ? Promise.resolve(statePreview) : readJson(`${base}/state`),
       readJson(`${base}/next-action-report`).catch(() => null),
       readJson(`${base}/flows`).catch(() => ({ flows: [], selected_flow_id: null })),
       readJson(`${base}/flows/selected`).catch(() => null),
@@ -5998,7 +6030,7 @@ function App() {
       ? "Ask AOR needs a selectable flow; use run evidence controls for this blocker."
       : "Ask AOR requires a selected active flow";
   const topbarAskLabel = blockingExternalRunHealth ? "Decision needed" : selectedFlow ? "Ask AOR for selected flow" : projectLevelProviderFocus ? "Ask AOR needs a flow" : "Ask AOR for selected flow";
-  const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
+  const runtimeRoot = projectState?.runtime_root ?? activeProjectDisplay?.runtime_root ?? config?.runtime_root ?? ".aor";
 
   return (
     <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
@@ -6011,8 +6043,8 @@ function App() {
           </div>
         </div>
         <ProjectSwitcher
-          projects={projectOptions}
-          activeProjectId={activeProject?.project_id ?? activeProjectId ?? config?.project_id}
+          projects={projectOptionsForSwitcher}
+          activeProjectId={activeProjectDisplay?.project_id ?? activeProjectId ?? config?.project_id}
           onSelectProject={selectProject}
           onOpenAddProject={openAddProjectDrawer}
           busy={busy}
@@ -6119,7 +6151,7 @@ function App() {
             onCreateFollowUp={() => startNewFlow({ sourceFlow: selectedFlow, followUp: true })}
             onDuplicateMission={() => startNewFlow({ sourceFlow: selectedFlow, duplicate: true })}
             initializeProject={initializeProject}
-            activeProject={activeProject}
+            activeProject={activeProjectDisplay}
             onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
             externalRunHealth={externalRunHealth}
@@ -6134,7 +6166,7 @@ function App() {
           selectedFlow={selectedFlow}
           projectState={projectState}
           config={config}
-          activeProject={activeProject}
+          activeProject={activeProjectDisplay}
           operatorRequests={operatorRequests}
           flows={flowOptions}
           evidenceRows={workbenchEvidenceRows}
