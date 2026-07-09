@@ -127,6 +127,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "setSelectedTab(nextTab)",
     "preferredOperatorDecisionAction",
     "externalRunHealth?.pending_decision?.action",
+    "preferredOperatorDecisionAction(externalRunHealth, supportedActions, selectedRequest)",
+    "requestStatus === \"rejected\" && actions.includes(rubricRecommendedAction)",
     "setSelectedAction(preferredAction)",
     "operatorDecisionChecklistItems",
     "normalizeDecisionRubricSummary",

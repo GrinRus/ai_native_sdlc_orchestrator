@@ -4765,8 +4765,11 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
   );
 }
 
-function preferredOperatorDecisionAction(externalRunHealth, supportedActions) {
+function preferredOperatorDecisionAction(externalRunHealth, supportedActions, selectedRequest = null) {
   const actions = Array.isArray(supportedActions) ? supportedActions : [];
+  const requestStatus = normalizeOperatorDecisionStatus(selectedRequest?.status, "");
+  const rubricRecommendedAction = String(selectedRequest?.decisionRubricSummary?.recommended_action ?? "").trim();
+  if (requestStatus === "rejected" && actions.includes(rubricRecommendedAction)) return rubricRecommendedAction;
   if (isControllerDecisionPendingRunHealth(externalRunHealth) && actions.includes("continue")) return "continue";
   const pendingAction = String(externalRunHealth?.pending_decision?.action ?? "").trim();
   if (pendingAction && actions.includes(pendingAction)) return pendingAction;
@@ -4984,7 +4987,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   const selectedRequest = decisionRequests[0] ?? null;
   const hasPublicRepairDecision = !selectedRequest && Boolean(publicRepairDecision?.command);
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
-  const preferredAction = preferredOperatorDecisionAction(externalRunHealth, supportedActions);
+  const preferredAction = preferredOperatorDecisionAction(externalRunHealth, supportedActions, selectedRequest);
   const [selectedAction, setSelectedAction] = useState(preferredAction);
   const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
   const decisionChecklist = operatorDecisionChecklistItems(selectedRequest, selectedActionEntry);

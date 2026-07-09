@@ -117,6 +117,7 @@ test("control-plane read model projects sibling live E2E run-health for target c
             missing_phase_evidence: [],
             missing_operator_decision_steps: ["delivery"],
             rejected_operator_decision_steps: [],
+            rejection_reason: "Decision draft omitted required public evidence refs.",
           },
           evidence_health: {
             status: "warn",
@@ -183,6 +184,7 @@ test("control-plane read model projects sibling live E2E run-health for target c
     assert.equal(projectState.run_health.status, "blocked");
     assert.equal(projectState.run_health.current_step, "delivery");
     assert.equal(projectState.run_health.failure_summary.class, "verification_mapping_gap");
+    assert.equal(projectState.run_health.controller_health.rejection_reason, "Decision draft omitted required public evidence refs.");
     assert.equal(projectState.run_health.pending_decision.request_ref, requestFile);
     assert.equal(projectState.run_health.pending_decision.decision_rubric_summary.required_check_count, 2);
     assert.equal(projectState.run_health.pending_decision.decision_rubric_summary.required_evidence_ref_count, 3);

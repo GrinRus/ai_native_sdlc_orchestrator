@@ -584,6 +584,7 @@ export function listExternalRunHealthProjectionsForRuntime(init, options = {}) {
           controller_state_ref: controllerRef,
           missing_phase_evidence: asStringArray(controllerHealth.missing_phase_evidence),
           rejected_operator_decision_steps: asStringArray(controllerHealth.rejected_operator_decision_steps),
+          rejection_reason: asString(controllerHealth.rejection_reason),
         },
         report_ref: healthFile,
         source_observation_report_ref: observationRef,
