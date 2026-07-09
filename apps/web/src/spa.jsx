@@ -3092,6 +3092,19 @@ function qualityGateEvidenceRows(gate, evidenceRows = []) {
   return evidenceRefs.length > 0 ? evidenceRefs.map(rowForRef) : summaryRows;
 }
 
+function qualityGateVerificationFailureRecoveryPlan(verificationPlan, verificationFailures) {
+  const failures = Array.isArray(verificationFailures) ? verificationFailures : [];
+  const firstFailure = failures[0];
+  const failureCount = failures.length;
+  return {
+    currentStep: "Repair failed verification",
+    nextCommand: verificationFailureRerunCommand(verificationPlan),
+    evidenceStep: `${failureCount} required command group${failureCount === 1 ? "" : "s"} failed.`,
+    blockerStep: firstFailure?.blocked_next_step ?? "Inspect failed step-result evidence before review, QA, or delivery.",
+    closureStep: "Required verification must pass before post-repair review, QA, or delivery.",
+  };
+}
+
 function qualityGateRecoveryPlan(gate, blockers, evidenceCount) {
   const flowState = String(gate?.flow_state ?? gate?.status ?? "").trim();
   const sourceStage = String(gate?.source_stage ?? "").trim();
@@ -3124,30 +3137,44 @@ function qualityGateRecoveryPlan(gate, blockers, evidenceCount) {
   };
 }
 
-function QualityGatePanel({ gate, evidenceRows = [] }) {
+function QualityGatePanel({ gate, evidenceRows = [], verificationPlan = null, verificationFailures = [] }) {
   if (!gate) return null;
   const nextAction = gate.next_action ?? {};
   const blockers = qualityGateBlockerRows(gate);
   const evidence = qualityGateEvidenceRows(gate, evidenceRows).slice(0, 4);
   const sourceLabel = qualityGateSourceLabel(gate.source_stage);
   const hold = gate.operator_hold === true;
-  const recoveryPlan = qualityGateRecoveryPlan(gate, blockers, evidence.length);
+  const qualityVerificationFailureActive = latestRequiredVerificationFailed(verificationPlan, verificationFailures);
+  const recoveryPlan = qualityVerificationFailureActive
+    ? qualityGateVerificationFailureRecoveryPlan(verificationPlan, verificationFailures)
+    : qualityGateRecoveryPlan(gate, blockers, evidence.length);
+  const displayedNextAction = qualityVerificationFailureActive
+    ? verificationFailurePrimaryAction(verificationPlan, verificationFailures, nextAction)
+    : nextAction;
   return (
     <div className={`quality-gate-card ${gate.flow_state ?? "requested"} ${hold ? "operator-hold" : ""}`} aria-label="Active quality gate">
       <div className="quality-gate-heading">
         <div>
           <span>Active Quality Gate</span>
           <h3>{hold ? "Budget Exhausted Hold" : sourceLabel}</h3>
-          <p>{hold ? "Delivery and release stay blocked until an explicit operator decision is recorded." : "Repair must close through implementation, review, and required QA evidence before delivery."}</p>
+          <p>{qualityVerificationFailureActive
+            ? "Required verification failed after the repair attempt; keep review, QA, and delivery blocked until it is repaired."
+            : hold
+            ? "Delivery and release stay blocked until an explicit operator decision is recorded."
+            : "Repair must close through implementation, review, and required QA evidence before delivery."}</p>
         </div>
-        <StatusPill state={gate.status ?? gate.flow_state ?? "requested"} />
+        <StatusPill state={qualityVerificationFailureActive ? "failed" : gate.status ?? gate.flow_state ?? "requested"} />
       </div>
 
       <div className="quality-recovery-path" aria-label="Quality gate recovery path">
         <div className="quality-recovery-heading">
           <span>Recovery path</span>
           <strong>{recoveryPlan.currentStep}</strong>
-          <p>{hold ? "Automatic repair is exhausted; an operator must explicitly decide how to proceed." : "Keep delivery and release blocked until the repair loop proves closure."}</p>
+          <p>{qualityVerificationFailureActive
+            ? "Use the failed verification evidence as the current repair input before running post-repair review."
+            : hold
+            ? "Automatic repair is exhausted; an operator must explicitly decide how to proceed."
+            : "Keep delivery and release blocked until the repair loop proves closure."}</p>
         </div>
         <ol>
           <li className="active">
@@ -3203,8 +3230,8 @@ function QualityGatePanel({ gate, evidenceRows = [] }) {
 
       <div className="quality-next-action">
         <span>Next safe action</span>
-        <code title={nextAction.command ?? ""}>{actionCommandLabel(nextAction, hold ? "aor review decide" : "aor run start")}</code>
-        <p>{nextAction.reason ?? "Follow the resolver primary action for this repair state."}</p>
+        <code title={displayedNextAction?.command ?? ""}>{actionCommandLabel(displayedNextAction, hold ? "aor review decide" : "aor run start")}</code>
+        <p>{displayedNextAction?.reason ?? "Follow the resolver primary action for this repair state."}</p>
       </div>
 
       <div className="quality-gate-evidence">
@@ -4022,7 +4049,12 @@ function FlowCockpit({
 
       <FlowTimeline currentStage={currentStage} completed={completed} />
 
-      <QualityGatePanel gate={qualityGate} evidenceRows={evidenceRows} />
+      <QualityGatePanel
+        gate={qualityGate}
+        evidenceRows={evidenceRows}
+        verificationPlan={verificationPlan}
+        verificationFailures={verificationFailures}
+      />
       <VerificationFailureBanner plan={verificationPlan} failures={verificationFailures} heldAction={resolverPrimary} />
 
       {completed ? (

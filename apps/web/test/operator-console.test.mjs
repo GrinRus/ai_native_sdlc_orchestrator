@@ -703,6 +703,10 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /Verification failed after completed repair/u);
   assert.match(source, /Failed verification evidence/u);
   assert.match(source, /Post-run verification failed/u);
+  assert.match(source, /qualityGateVerificationFailureRecoveryPlan/u);
+  assert.match(source, /qualityVerificationFailureActive/u);
+  assert.match(source, /Repair failed verification/u);
+  assert.match(source, /Required verification must pass before post-repair review/u);
   assert.match(source, /Verification failure recovery path/u);
   assert.match(source, /Fix failed verification first/u);
   assert.match(source, /Repair failed verification/u);
@@ -713,6 +717,9 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /verificationFailures\.length > 0\s*\? \[\.\.\.verificationBlockers, \.\.\.presentedActionBlockers\]/u);
   assert.match(source, /completedRepairActionActive/u);
   assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextAction\)/u);
+  assert.match(source, /verificationPlan=\{verificationPlan\}/u);
+  assert.match(source, /verificationFailures=\{verificationFailures\}/u);
   assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
   assert.match(css, /\.verification-recovery-path\s*\{/u);
   assert.match(css, /\.verification-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
