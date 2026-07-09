@@ -1062,6 +1062,8 @@ function missingRunHealthEvidenceSentence(missingEvidenceRefs) {
 }
 
 function externalRunFailureUserSummary(health) {
+  const recoverySummary = externalRunRecoveryPathUserSummary(health);
+  if (recoverySummary) return recoverySummary;
   if (acceptedExternalRunDiagnosis(health)) {
     return externalRunPendingDecisionUserReason(health);
   }
@@ -1145,6 +1147,20 @@ function externalRunRecoveryPathActive(health, pendingDecision = health?.pending
   const failureClass = String(failure.class ?? "").trim();
   return externalRunHasSubstantiveFailureSummary(health)
     && (failurePhase === "target_verification" || failureClass === "target_verification_failed" || failureClass === "verification_mapping_gap");
+}
+
+function externalRunRecoveryPathUserSummary(health, pendingDecision = health?.pending_decision) {
+  if (!externalRunRecoveryPathActive(health, pendingDecision)) return null;
+  const stepLabel = externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  const repairCommand = externalRunRepairCommand(pendingDecision);
+  if (repairCommand) {
+    return `Run the ${stepLabel} repair path through public AOR controls (${repairCommand}) before retrying or continuing.`;
+  }
+  const action = String(pendingDecision?.action ?? "").trim();
+  if (action === "retry" || action === "retry_public_step") {
+    return `Retry the ${stepLabel} public step after reviewing the blocker and preserving evidence.`;
+  }
+  return `Use the ${stepLabel} recovery path to fix failed verification, preserve evidence, and rerun required checks before continuing.`;
 }
 
 function externalRunContinuationDecisionCopy(health, stepLabel) {
@@ -1641,7 +1657,7 @@ function executionEvidenceScore(run, index) {
   return score;
 }
 
-function executionStatusRows(evidence) {
+function executionStatusRows(evidence, externalRunHealth = null) {
   const rows = [
     { label: "Provider execution", value: evidence?.provider_execution_status ?? "unknown" },
     { label: "Runtime Harness", value: evidence?.runtime_harness_decision ?? "unknown" },
@@ -1667,6 +1683,12 @@ function executionStatusRows(evidence) {
         evidence.provider_interruption_status ??
         evidence.provider_step_status?.interruption_status ??
         "unknown",
+    });
+  }
+  if (isBlockingExternalRunHealth(externalRunHealth)) {
+    rows.unshift({
+      label: "Run health",
+      value: externalRunDerivedEvidenceStatus(externalRunHealth, externalRunHealth.status ?? "blocked"),
     });
   }
   return rows;
@@ -1700,7 +1722,32 @@ function executionRecoveryAction(actions, evidence) {
     .find((action) => action?.enabled) ?? actionList.find((action) => action?.enabled) ?? actionList[0] ?? null;
 }
 
-function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions) {
+function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null) {
+  if (externalRunRecoveryPathActive(externalRunHealth)) {
+    const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
+    const healthBlockers = externalRunHealthBlockers(externalRunHealth);
+    const repairCommand = externalRunRepairCommand(externalRunHealth.pending_decision);
+    return {
+      headingTitle: `${stepLabel} repair path`,
+      headingDetail: repairCommand
+        ? "Run the public repair command before retrying or continuing the lifecycle."
+        : "Use public recovery controls before retrying or continuing the lifecycle.",
+      stateTitle: `${stepLabel} repair required`,
+      stateDetail:
+        externalRunRecoveryPathUserSummary(externalRunHealth) ??
+        externalRunHealthUserSummary(externalRunHealth) ??
+        "Repair is required before delivery or release can continue.",
+      evidenceTitle: healthBlockers.length > 0
+        ? `${healthBlockers.length} recovery check${healthBlockers.length === 1 ? "" : "s"}`
+        : "Run-health recovery evidence",
+      evidenceDetail: healthBlockers[0]?.summary ?? "Review run-health and verification evidence before applying repair.",
+      actionTitle: repairCommand ? "Run public repair command" : "Inspect recovery evidence",
+      actionCommand: repairCommand || "aor run status --json",
+      actionDetail: repairCommand
+        ? "Copy this command into the public AOR repair path, then refresh run status."
+        : "Inspect public run-health evidence before choosing retry or continuation.",
+    };
+  }
   const providerStatus = evidence?.provider_execution_status ?? evidence?.provider_step_status?.status ?? "unknown";
   const runStatus = evidence?.status ?? providerStatus;
   const blockerCount = Array.isArray(blockers) ? blockers.length : 0;
@@ -1708,6 +1755,8 @@ function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions
   const nextAction = executionRecoveryAction(actions, evidence);
   const actionEnabled = nextAction?.enabled === true;
   return {
+    headingTitle: "Stabilize execution evidence first",
+    headingDetail: "Use public run controls to preserve evidence, diagnose blockers, or retry before treating delivery as safe.",
     stateTitle: `${providerStatus} / ${runStatus}`,
     stateDetail: blockerCount > 0
       ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"} must be cleared before delivery or release.`
@@ -4739,12 +4788,15 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   );
 }
 
-function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy }) {
-  const statusRows = executionStatusRows(evidence);
+function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null }) {
+  const hasVisibleExecutionEvidence = Boolean(evidence || externalRunHealth);
+  const statusRows = executionStatusRows(evidence, externalRunHealth);
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
   const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
-  const recoveryPlan = evidence ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions) : null;
+  const recoveryPlan = hasVisibleExecutionEvidence
+    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth)
+    : null;
   return (
     <section className="work-card execution-evidence-panel">
       <div className="work-heading compact-heading">
@@ -4752,17 +4804,17 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy 
           <h3>Execution Evidence</h3>
           <p>Provider status, Runtime Harness decision, diff relevance, verification, and public recovery controls.</p>
         </div>
-        <StatusPill state={evidence?.status ?? "no evidence"} />
+        <StatusPill state={externalRunDerivedEvidenceStatus(externalRunHealth, evidence?.status ?? "no evidence")} />
       </div>
-      {!evidence ? (
+      {!hasVisibleExecutionEvidence ? (
         <p className="empty-state">No execution evidence visible yet.</p>
       ) : (
         <>
           <div className="execution-recovery-path" aria-label="Execution evidence recovery path">
             <div className="execution-recovery-heading">
               <span>Recovery path</span>
-              <strong>Stabilize execution evidence first</strong>
-              <p>Use public run controls to preserve evidence, diagnose blockers, or retry before treating delivery as safe.</p>
+              <strong>{recoveryPlan.headingTitle}</strong>
+              <p>{recoveryPlan.headingDetail}</p>
             </div>
             <ol>
               <li className={blockers.length > 0 ? "blocked" : "ready"}>
@@ -5129,7 +5181,13 @@ function FlowAdvancedWorkbench({
   const selected = tabs.find((tab) => tab.id === selectedTab) ?? tabs[0];
   const panel =
     selected.id === "execution" ? (
-      <ExecutionEvidencePanel evidence={executionEvidence} providerEvidenceRows={providerEvidenceRows} copyRef={copyRef} busy={busy} />
+      <ExecutionEvidencePanel
+        evidence={executionEvidence}
+        providerEvidenceRows={providerEvidenceRows}
+        copyRef={copyRef}
+        busy={busy}
+        externalRunHealth={externalRunHealth}
+      />
     ) : selected.id === "graph" ? (
       <EvidenceGraphPanel graph={evidenceGraph} />
     ) : selected.id === "trace" ? (

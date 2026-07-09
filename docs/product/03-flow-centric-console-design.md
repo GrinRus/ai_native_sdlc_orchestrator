@@ -187,7 +187,10 @@ The packaged SPA now treats the flow as the primary object:
   no-upstream-write status, changed-path relevance groups, blockers, and public
   stop/save/diagnose/retry controls. The panel shows an execution recovery path
   before raw controls so interrupted or blocked runs name the current state,
-  provider evidence to preserve, and the next public control to use.
+  provider evidence to preserve, and the next public control to use. When
+  run-health exposes a repair-required blocker and
+  `pending_decision.public_repair_command`, the panel promotes that public
+  repair command instead of falling back to generic diagnose/retry controls.
   Scratch-only output is explicitly non-passing, while `.qwen/`, `.codex/`,
   `.claude/`, and `.opencode/` target checkout state is shown as blocking
   runner-owned leakage.
