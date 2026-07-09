@@ -139,6 +139,10 @@ The packaged SPA now treats the flow as the primary object:
   request, accepted decision ref, and any linked step-quality repair status
   visible, and must describe the safe next public control path instead of
   implying that the same decision still needs to be recorded.
+- Repair next actions must be executable as shown. If a review- or QA-origin
+  repair requires approved handoff or promotion evidence, the generated
+  `aor run start ...repair` command must carry those refs so first-time users do
+  not hit an avoidable terminal guardrail failure.
 - Evidence lists render `artifact_display_summaries[]` as user-facing
   artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
   paths, packet URIs, and evidence URIs are not primary visible text; raw refs

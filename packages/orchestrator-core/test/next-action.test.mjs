@@ -292,6 +292,7 @@ function writeReviewDecision(init, runId, decision) {
  *   remainingAttempts?: number,
  *   blockers?: string[],
  *   operatorOverrideRef?: string | null,
+ *   evidenceRefs?: string[],
  * }} [options]
  */
 function writeQualityRepairRequest(init, runId, options = {}) {
@@ -335,7 +336,10 @@ function writeQualityRepairRequest(init, runId, options = {}) {
         : status === "closed"
           ? []
           : [sourceStage === "qa" ? "delivery-blocked-until-post-repair-review-and-qa" : "delivery-blocked-until-post-repair-review"]),
-    evidence_refs: [sourceRef],
+    evidence_refs: [
+      sourceRef,
+      ...(Array.isArray(options.evidenceRefs) ? options.evidenceRefs.filter((ref) => typeof ref === "string") : []),
+    ],
     status_history: [
       {
         status,
@@ -627,6 +631,32 @@ test("resolveNextAction returns one safe primary action for quality repair reque
     assert.equal(report.closure_state.quality_repair.flow_state, "review-repair-requested");
     assert.equal(report.closure_state.delivery.status, "blocked-quality-repair");
     assert.equal(report.quality_repair_lineage.request_ref, report.closure_state.quality_repair.request_ref);
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    const runId = "run.quality.guarded-repair";
+    const handoffEvidenceRef = `evidence://.aor/projects/${init.projectId}/artifacts/${init.projectId}.handoff.bootstrap.v1.json`;
+    const handoffFile = path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.handoff.bootstrap.v1.json`);
+    const readinessRef = `/tmp/live-e2e-execution-readiness-${runId}.json`;
+    const implementRef = `evidence://.aor/projects/${init.projectId}/reports/step-result-routed-${runId}.routed.implement.implement.attempt.1.json`;
+    writeMission(init);
+    writeExecutionEvidence(init, runId);
+    writeReviewEvidence(init, runId);
+    writeQualityRepairRequest(init, runId, {
+      sourceStage: "review",
+      status: "requested",
+      evidenceRefs: [handoffEvidenceRef, handoffFile, readinessRef, implementRef],
+    });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.primary_action.action_id, "run-review-quality-repair");
+    assert.match(report.primary_action.command, /--approved-handoff-ref/u);
+    assert.match(report.primary_action.command, /--promotion-evidence-refs/u);
+    assert.match(report.primary_action.command, new RegExp(handoffFile.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+    assert.match(report.primary_action.command, new RegExp(readinessRef.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+    assert.match(report.primary_action.command, new RegExp(implementRef.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+    assert.equal(report.blockers[0].next_command, report.primary_action.command);
   });
 
   withCleanRepo((tempRoot) => {

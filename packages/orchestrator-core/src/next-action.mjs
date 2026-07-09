@@ -56,6 +56,63 @@ function shellQuote(value) {
 }
 
 /**
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function isHandoffEvidenceRef(ref) {
+  const normalized = ref.toLowerCase();
+  return normalized.includes("handoff") && (normalized.includes("/artifacts/") || normalized.includes("artifact"));
+}
+
+/**
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function isPrioritizedPromotionEvidenceRef(ref) {
+  const normalized = ref.toLowerCase();
+  return (
+    normalized.includes("execution-readiness") ||
+    (normalized.includes("step-result") && normalized.includes("implement")) ||
+    normalized.startsWith("packet://spec@")
+  );
+}
+
+/**
+ * @param {string[]} evidenceRefs
+ * @returns {string | null}
+ */
+function selectApprovedHandoffRef(evidenceRefs) {
+  const candidates = evidenceRefs.filter((ref) => isHandoffEvidenceRef(ref));
+  return candidates.find((ref) => path.isAbsolute(ref)) ?? candidates[0] ?? null;
+}
+
+/**
+ * @param {string[]} evidenceRefs
+ * @param {string | null} approvedHandoffRef
+ * @returns {string[]}
+ */
+function selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef) {
+  const nonHandoffRefs = evidenceRefs.filter((ref) => ref !== approvedHandoffRef);
+  const prioritized = nonHandoffRefs.filter((ref) => isPrioritizedPromotionEvidenceRef(ref));
+  return (prioritized.length > 0 ? uniqueStrings(prioritized) : uniqueStrings(nonHandoffRefs)).slice(0, 6);
+}
+
+/**
+ * @param {{ projectRoot: string, runId: string, targetStep: string, evidenceRefs: string[] }} options
+ * @returns {string}
+ */
+function runStartCommand(options) {
+  const evidenceRefs = uniqueStrings(options.evidenceRefs);
+  const approvedHandoffRef = selectApprovedHandoffRef(evidenceRefs);
+  const promotionEvidenceRefs = selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef);
+  return [
+    `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(options.runId)} --target-step ${shellQuote(options.targetStep)}`,
+    approvedHandoffRef ? `--approved-handoff-ref ${shellQuote(approvedHandoffRef)}` : null,
+    promotionEvidenceRefs.length > 0 ? `--promotion-evidence-refs ${shellQuote(promotionEvidenceRefs.join(","))}` : null,
+  ].filter(Boolean).join(" ");
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -603,9 +660,19 @@ function resolveQualityRepairAction(options) {
   const requestRef = asString(options.qualityRepair.request_ref);
   const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.qualityRepair.evidence_refs)]);
   const repairRunId = `${options.runId}.repair`;
-  const implementCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(repairRunId)} --target-step implement`;
+  const implementCommand = runStartCommand({
+    projectRoot: options.projectRoot,
+    runId: repairRunId,
+    targetStep: "implement",
+    evidenceRefs,
+  });
   const reviewCommand = `${projectCommand("review run", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
-  const qaCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${repairRunId}.qa`)} --target-step qa`;
+  const qaCommand = runStartCommand({
+    projectRoot: options.projectRoot,
+    runId: `${repairRunId}.qa`,
+    targetStep: "qa",
+    evidenceRefs,
+  });
   const statusCommand = `${projectCommand("run status", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
   const holdCommand = `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision hold`;
 
@@ -797,7 +864,12 @@ function resolveClosureAction(options) {
   }
 
   if (reviewStatus === "repair-requested") {
-    const nextCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${options.runId}.repair`)} --target-step implement`;
+    const nextCommand = runStartCommand({
+      projectRoot: options.projectRoot,
+      runId: `${options.runId}.repair`,
+      targetStep: "implement",
+      evidenceRefs,
+    });
     return {
       status: "blocked",
       stage: "review",
