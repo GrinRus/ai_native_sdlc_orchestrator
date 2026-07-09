@@ -5244,8 +5244,8 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
         <div className="public-repair-decision-plan" aria-label="Public repair decision plan">
           <div>
             <span>Decision source</span>
-            <strong>No agent request file is pending</strong>
-            <p>This is a public repair decision from failed verification evidence, so use the command below instead of looking for an operator-request packet.</p>
+            <strong>Public repair decision required</strong>
+            <p>No separate agent request file is pending for this repair loop. Use the command below with the failed verification evidence and new repair context.</p>
           </div>
           <div>
             <span>Repair decision</span>
