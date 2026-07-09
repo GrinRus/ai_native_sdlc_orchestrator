@@ -337,6 +337,8 @@ const ARTIFACT_REF_LABELS = [
   { tokens: ["next-action-report", "next-action"], label: "Next Action Report" },
   { tokens: ["project-analysis-report"], label: "Project Analysis Report" },
   { tokens: ["discovery-research-report"], label: "Discovery Research Report" },
+  { tokens: ["wave-ticket"], label: "Wave Ticket" },
+  { tokens: ["handoff-packet", "handoff.bootstrap"], label: "Handoff Packet" },
   { tokens: ["runtime-harness-report"], label: "Runtime Harness Report" },
   { tokens: ["quality-repair-request"], label: "Repair Request" },
   { tokens: ["quality-assessment-report"], label: "Quality Assessment Report" },
@@ -1715,6 +1717,76 @@ function evidenceGateStatus(refs, tokens, fallback = "Pending") {
   return evidenceRefForTokens(refs, tokens) ? "Ready" : fallback;
 }
 
+function externalRunEvidenceRefs(health) {
+  const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
+  const rubric = pending.decision_rubric_summary && typeof pending.decision_rubric_summary === "object" ? pending.decision_rubric_summary : {};
+  const rubricRefs = Array.isArray(rubric.evidence_refs)
+    ? rubric.evidence_refs.map((entry) => (typeof entry === "string" ? entry : entry?.ref)).filter(Boolean)
+    : [];
+  return [
+    health?.report_ref,
+    health?.source_observation_report_ref,
+    pending.request_ref,
+    pending.expected_decision_ref,
+    pending.operator_decision_ref,
+    pending.quality_assessment_report_ref,
+    health?.controller_health?.controller_state_ref,
+    ...rubricRefs,
+  ].filter((ref, index, refs) => typeof ref === "string" && ref.trim() && refs.indexOf(ref) === index);
+}
+
+function deterministicRunEvidenceStatus(health) {
+  const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
+  const rubric = pending.decision_rubric_summary && typeof pending.decision_rubric_summary === "object" ? pending.decision_rubric_summary : {};
+  return String(rubric.deterministic_status ?? health?.deterministic_analysis?.status ?? "").trim().toLowerCase();
+}
+
+function externalRunSignalState(signal, visibleEvidence, health) {
+  const rows = (Array.isArray(visibleEvidence) ? visibleEvidence : []).filter((row) =>
+    evidenceRefMatchesTokens(`${row.ref} ${row.rawRef} ${row.sourceRef} ${row.kind} ${row.label}`, signal.tokens),
+  );
+  if (rows.length > 0) {
+    return {
+      value: String(rows.length),
+      tone: "ready",
+      detail: `${rows.length} visible artifact${rows.length === 1 ? "" : "s"} in the workbench.`,
+      title: rows.map((row) => row.rawRef ?? row.ref).filter(Boolean).join("\n"),
+    };
+  }
+  const linkedRefs = externalRunEvidenceRefs(health).filter((ref) => evidenceRefMatchesTokens(ref, signal.tokens));
+  if (linkedRefs.length > 0) {
+    return {
+      value: "linked",
+      tone: "ready",
+      detail: `${titleFromRef(linkedRefs[0])} is linked in run evidence.`,
+      title: linkedRefs.join("\n"),
+    };
+  }
+  const deterministicStatus = deterministicRunEvidenceStatus(health);
+  if (deterministicStatus === "pass") {
+    return {
+      value: "ready",
+      tone: "ready",
+      detail: "Covered by passed run guardrails; inspect the decision request for refs.",
+      title: "Deterministic run evidence passed.",
+    };
+  }
+  if (deterministicStatus === "warn" || deterministicStatus === "warning") {
+    return {
+      value: "review",
+      tone: "review",
+      detail: "Guardrails warned; inspect the run evidence before continuing.",
+      title: "Deterministic run evidence returned a warning.",
+    };
+  }
+  return {
+    value: "missing",
+    tone: "missing",
+    detail: "No visible or linked run evidence found for this signal.",
+    title: "Run evidence not found.",
+  };
+}
+
 function evidenceRowsForFlow(flow, rows, { draft = false } = {}) {
   if (draft) return [];
   if (!flow?.flow_id) return [];
@@ -2772,12 +2844,16 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows
           <StatusPill state={blockers.length > 0 ? "blocked" : "ready"} />
         </div>
         <div className="stage-signal-grid">
-          {signals.map((signal) => (
-            <div key={signal.label}>
-              <span>{signal.label}</span>
-              <strong>{visibleEvidence.filter((row) => evidenceRefMatchesTokens(`${row.ref} ${row.kind} ${row.label}`, signal.tokens)).length}</strong>
-            </div>
-          ))}
+          {signals.map((signal) => {
+            const state = externalRunSignalState(signal, visibleEvidence, externalRunHealth);
+            return (
+              <div key={signal.label} title={state.title}>
+                <span>{signal.label}</span>
+                <strong className={`signal-state ${state.tone}`}>{state.value}</strong>
+                <p>{state.detail}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     );

@@ -1386,6 +1386,30 @@ p {
   text-transform: uppercase;
 }
 
+.stage-signal-grid strong {
+  overflow-wrap: anywhere;
+}
+
+.stage-signal-grid p {
+  margin: 0;
+  color: #65717d;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.signal-state.ready {
+  color: #0f766e;
+}
+
+.signal-state.review {
+  color: #8a5f14;
+}
+
+.signal-state.missing {
+  color: #b42318;
+}
+
 .artifact-readiness-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
