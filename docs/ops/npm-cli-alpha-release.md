@@ -79,8 +79,8 @@ TMP="$(mktemp -d)"
 mkdir -p "$TMP/target" "$TMP/runner"
 git -C "$TMP/target" init
 cd "$TMP/runner"
-npm exec --yes --package @grinrus/aor@0.1.0-alpha.14 -- aor --help
-npm exec --yes --package @grinrus/aor@0.1.0-alpha.14 -- \
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.15 -- aor --help
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.15 -- \
   aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
 ```
 

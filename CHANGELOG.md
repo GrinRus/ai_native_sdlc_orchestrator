@@ -7,6 +7,19 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.15] - 2026-07-09
+
+- Hardened the installed-user web console first-run, project switcher, active
+  cockpit, workbench, and mobile/focus states around flow-centric operation.
+- Added live run-health read-model surfaces so decision gates, assessment gates,
+  target/setup blockers, provider telemetry, and materialized decisions stay
+  factual across CLI, API, and web projections.
+- Improved operator recovery paths for pending/rejected decisions, failed
+  required verification, exhausted repair loops, public repair decisions,
+  completed repair runs, and completed-flow follow-up creation.
+- Documented the W56 rendered UX audit findings and updated control-plane and
+  runtime recovery contracts/runbooks for the new recovery-state evidence.
+
 ## [0.1.0-alpha.14] - 2026-07-07
 
 - Added generic verification command groups and verification authoring flows for
