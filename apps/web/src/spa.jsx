@@ -4004,6 +4004,7 @@ function FlowCockpit({
     ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion, verificationPlan)
     : stageRuntimeCopy);
   const showCockpitStatus = !headingRepeatsStatus(cockpitTitle, cockpitStatus);
+  const showCockpitHeadingAction = !providerFocusActive;
   const recommendedActionStatus = verificationPrimary
     ? "failed"
     : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
@@ -4107,10 +4108,12 @@ function FlowCockpit({
           </div>
           <p>{cockpitCopy}</p>
         </div>
-        <button className="secondary" type="button" onClick={providerFocusActive ? onRefresh : onAsk}>
-          <Icon name={providerFocusActive ? "refresh" : completed ? "eye" : "target"} />
-          {providerFocusActive ? "Refresh" : completed ? "Inspect" : "Ask AOR"}
-        </button>
+        {showCockpitHeadingAction ? (
+          <button className="secondary" type="button" onClick={onAsk}>
+            <Icon name={completed ? "eye" : "target"} />
+            {completed ? "Inspect" : "Ask AOR"}
+          </button>
+        ) : null}
       </div>
 
       <div className="recommended-action">

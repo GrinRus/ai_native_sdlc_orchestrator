@@ -583,6 +583,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     source.indexOf('className="cockpit-actions"') < source.indexOf('className="action-grid"'),
     "Active cockpit primary actions should precede detail disclosures in DOM focus order",
   );
+  assert.ok(source.includes("const showCockpitHeadingAction = !providerFocusActive"), "Provider run-health focus should not add a duplicate heading refresh before the recommended action");
+  assert.match(source, /\{showCockpitHeadingAction \? \([\s\S]*?<button className="secondary" type="button" onClick=\{onAsk\}/u);
   assert.match(
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.flow-active-mode \.recommended-action \.cockpit-actions\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?width: 100%;/u,
