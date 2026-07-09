@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "source_hash": "8d8d86100e64b22b81cef512cc796f66b4479006063883b4efea0a0942c0c270",
+  "source_hash": "7ea9233a9b0703944376858e5633663ca5114b168804e2ee05cbce4594f1fa9f",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -10,7 +10,7 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-CSvL1RK1.css",
-    "apps/web/dist/assets/index-iXXvfRDz.js",
+    "apps/web/dist/assets/index-CjR42MKZ.js",
     "apps/web/dist/index.html"
   ]
 }

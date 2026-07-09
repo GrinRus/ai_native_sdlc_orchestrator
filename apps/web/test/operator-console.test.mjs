@@ -257,6 +257,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "isControllerDecisionPendingRunHealth",
     "externalRunStepQualityAssessmentPendingSummary",
     "isStepQualityAssessmentPendingRunHealth",
+    "if (isStepQualityAssessmentPendingRunHealth(health)) return false;",
     "externalRunHasSubstantiveFailureSummary",
     "acceptedExternalRunContinueDecision",
     "externalRunContinuationDecisionCopy",

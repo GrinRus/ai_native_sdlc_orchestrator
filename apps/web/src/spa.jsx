@@ -1010,6 +1010,7 @@ function externalRunHealthHasOpenDecisionRequest(health) {
 
 function activeProviderSupersedesExternalRunBlocker(health, status) {
   if (!isProviderStepDisplayStatus(status) || !isBlockingExternalRunHealth(health)) return false;
+  if (isStepQualityAssessmentPendingRunHealth(health)) return false;
   const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
   if (String(pending.action ?? "").trim() !== "continue") return false;
   if (isTerminalProviderStepStatus(status) && externalRunHealthHasMaterializedDecisionRequest(health)) return false;

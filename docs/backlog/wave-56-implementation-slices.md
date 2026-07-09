@@ -202,6 +202,9 @@ human gate or a real environment failure.
   learning handoff, read-only closure state, and follow-up draft creation. The
   draft selected `No-Write (Safe)` and did not reselect the completed flow's
   prior patch-only delivery mode.
+- Rendered desktop and mobile checks covered a missing step-quality assessment
+  fixture with a selected active flow, completed provider status, blocked
+  `run_health`, and no materialized operator decision request.
 
 ### UX quality report
 
@@ -246,6 +249,7 @@ human gate or a real environment failure.
 | Stale assessment text in execution blocker | In the medium `ky` run, an Execution decision gate could lead with stale `handoff product-change step quality was assessed...` copy from the previous step, making the current blocker sound like a completed handoff assessment instead of the next operator action. | Step-quality completion notes are now treated as generic run-health summaries whether they appear on `failure_summary` or pending-decision reason, and completed-provider copy now honors active run-health gates, so the cockpit, blocker cards, and provider heartbeat promote the current Execution operator decision guidance. |
 | Materialized continue decision visibility | After a controller decision request wrote the expected `continue` decision file, the read model could hide both the request and the decision status because `continue` decisions were excluded from materialized-decision lookup. A first-time operator could see stale `Decision needed` copy even though the public decision artifact existed. | Materialized `continue` decisions are now linked back to their source request, exposed with operator-decision ref/status and rubric metadata, and rendered as `decision recorded` / `refresh run status` guidance instead of asking the operator to repeat an accepted decision. |
 | Completed-flow read-only follow-up | A completed flow still showed disabled `Resolve Next Action`, `patch-only`, and explicit-review copy in the recommended action area, while follow-up creation inherited the completed flow's prior delivery mode. | Completed flows now promote `Inspect Evidence` and `Create Follow-up`, render `read-only` / `Completed evidence locked` safety context, and default follow-up drafts from learning handoff guidance to `No-Write (Safe)` while keeping the source flow locked. |
+| Missing assessment evidence with completed provider | When a selected active flow had terminal provider status plus blocked `run_health` for missing step-quality assessment evidence, the terminal provider heartbeat suppressed the assessment gate. The cockpit showed `Resolve Next Action`, `New Flow` stayed enabled, and the user could miss that evaluator-authored assessment was the next required step. | Step-quality assessment blockers now always keep `run_health` primary over terminal provider status, so the topbar/cockpit show `Assessment needed`, the primary action opens `Assessment Evidence`, provider copy explains the active gate, and `New Flow` is disabled until the assessment is complete. |
 | Responsive readability | The inspected desktop and mobile states had no horizontal overflow or clipped primary blocker/decision copy. | Keep the current compact recovery labels as the baseline for the next live E2E pass. |
 
 ### Follow-up plan
@@ -258,8 +262,7 @@ human gate or a real environment failure.
    first-time-user perspective when a later step produces a substantive
    provider, target, or validation blocker.
 3. Add or verify non-happy-path rendered coverage for rejected operator
-   decisions, missing assessment evidence, failed required verification groups,
-   and repair-request loops.
+   decisions, failed required verification groups, and repair-request loops.
 4. Keep future UI changes scoped to `apps/web/**`, product/backlog source docs,
    tests, and packaged dist unless a finding proves a contract or control-plane
    read-model gap.
