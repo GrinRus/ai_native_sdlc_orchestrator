@@ -133,6 +133,10 @@ The packaged SPA now treats the flow as the primary object:
   surface (`Decision Request`, `Assessment Evidence`, or `Review Blocker`);
   refresh remains secondary while the run is waiting on operator or evaluator
   action.
+- During the first project snapshot load, the console shows a non-actionable
+  `Syncing project state` card and disables flow actions until active-flow,
+  run-health, and evidence state are known. It must not briefly show
+  `Configure First Flow` for an initialized project with an active run.
 - The stage rail and active cockpit render `provider_step_status` from public
   control-plane read models. `silent-running` states explicitly say the provider
   has no output yet but is still running, without exposing raw process commands

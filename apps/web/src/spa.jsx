@@ -2179,6 +2179,31 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
   );
 }
 
+function ProjectSnapshotLoading({ runtimeRoot }) {
+  return (
+    <section className="work-card project-snapshot-loading" aria-label="Project state loading">
+      <div className="work-heading">
+        <div>
+          <span className="eyebrow">Loading project</span>
+          <h2>Syncing project state</h2>
+          <p>Reading active flow, run health, and evidence before showing the next action.</p>
+        </div>
+        <StatusPill state="loading" />
+      </div>
+      <div className="snapshot-loading-grid" aria-label="Project state loading checks">
+        <div>
+          <span>Runtime root</span>
+          <strong><CompactInlineValue value={runtimeRoot} kind="path" /></strong>
+        </div>
+        <div>
+          <span>Action state</span>
+          <strong>Waiting for snapshot</strong>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function projectStatusLabel(project) {
   if (!project) return "Loading";
   const onboarding = project?.onboarding_summary ?? {};
@@ -5416,6 +5441,7 @@ function App() {
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const [newFlowDraft, setNewFlowDraft] = useState(false);
+  const [projectSnapshotLoaded, setProjectSnapshotLoaded] = useState(false);
   const [draftSourceFlow, setDraftSourceFlow] = useState(null);
   const [draftFollowUpHandoffRef, setDraftFollowUpHandoffRef] = useState(null);
   const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
@@ -5721,6 +5747,7 @@ function App() {
       if (!options.silent) {
         pushActivity("control-plane.project-preview", selectedProject?.label ?? selectedProject?.project_id ?? "project pending");
       }
+      setProjectSnapshotLoaded(true);
       return {
         projectState: null,
         nextAction: null,
@@ -5782,6 +5809,7 @@ function App() {
     if (!options.silent) {
       pushActivity("control-plane.connected", activityFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
     }
+    setProjectSnapshotLoaded(true);
     return {
       projectState: state,
       nextAction: nextReport?.primary_action ? nextReport : null,
@@ -5843,6 +5871,7 @@ function App() {
     setStepResults([]);
     setRuns([]);
     setOperatorRequests([]);
+    setProjectSnapshotLoaded(false);
     setSelectedRef("");
     setAnswers({});
     setActivity([]);
@@ -6292,15 +6321,20 @@ function App() {
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
-  const firstRunFocusMode = draftSurface || (!selectedFlow && !providerWorkbenchFocus);
+  const projectSnapshotPending = !projectSnapshotLoaded && !String(error ?? "").trim();
+  const firstRunFocusMode = !projectSnapshotPending && (draftSurface || (!selectedFlow && !providerWorkbenchFocus));
   const topbarFlowStatus = blockingExternalRunHealth
     ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
     : activeProviderStep
     ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
+    : projectSnapshotPending
+    ? "Loading project"
     : draftSurface
     ? "Draft flow"
     : selectedFlow?.status ?? (projectLevelProviderFocus ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth) : "No active flow");
-  const topbarAskReason = blockingExternalRunHealth
+  const topbarAskReason = projectSnapshotPending
+    ? "Project state is loading."
+    : blockingExternalRunHealth
     ? isStepQualityAssessmentPendingRunHealth(externalRunHealth)
       ? "Use the assessment evidence workbench before asking for another flow action."
       : isControllerDecisionPendingRunHealth(externalRunHealth)
@@ -6311,7 +6345,9 @@ function App() {
     : projectLevelProviderFocus
       ? "Ask AOR needs a selectable flow; use run evidence controls for this blocker."
       : "Ask AOR requires a selected active flow";
-  const topbarAskLabel = blockingExternalRunHealth
+  const topbarAskLabel = projectSnapshotPending
+    ? "Loading"
+    : blockingExternalRunHealth
     ? isStepQualityAssessmentPendingRunHealth(externalRunHealth)
       ? "Assessment needed"
       : isControllerDecisionPendingRunHealth(externalRunHealth)
@@ -6359,7 +6395,7 @@ function App() {
           newFlowDraft={draftSurface}
           onSelectFlow={selectFlow}
           onNewFlow={startNewFlow}
-          newFlowDisabled={!activeProjectRuntimeReady || busy}
+          newFlowDisabled={projectSnapshotPending || !activeProjectRuntimeReady || busy}
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
         />
@@ -6378,7 +6414,7 @@ function App() {
           className="utility-button topbar-ask-button"
           type="button"
           onClick={() => (blockingExternalRunHealth ? focusAdvancedWorkbench(topbarRunWorkbenchAction?.tabId ?? "evidence") : openRequestDrawer())}
-          disabled={busy || (!selectedFlow && !blockingExternalRunHealth)}
+          disabled={projectSnapshotPending || busy || (!selectedFlow && !blockingExternalRunHealth)}
           title={topbarAskReason}
           aria-label={topbarAskReason}
         >
@@ -6419,7 +6455,9 @@ function App() {
 
       <main className="main">
         {error ? <div className="alert" role="alert">{error}</div> : null}
-        {draftSurface ? (
+        {projectSnapshotPending ? (
+          <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
+        ) : draftSurface ? (
           <section className="work-card">
             <MissionForm
               form={form}
