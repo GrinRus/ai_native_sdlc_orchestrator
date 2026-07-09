@@ -3711,6 +3711,54 @@ tr.selected td {
   white-space: normal;
 }
 
+.public-repair-decision-plan {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.public-repair-decision-plan > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dce9e8;
+  border-radius: 6px;
+  background: #f7fcfb;
+}
+
+.public-repair-decision-plan span {
+  color: #65717d;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.public-repair-decision-plan strong,
+.public-repair-decision-plan p,
+.public-repair-decision-plan code,
+.public-repair-decision-plan button {
+  overflow-wrap: anywhere;
+}
+
+.public-repair-decision-plan p {
+  margin: 0;
+  color: #64717d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.public-repair-decision-actions {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  background: #ffffff;
+}
+
+.public-repair-decision-actions button {
+  justify-content: center;
+  min-height: var(--control-height);
+  white-space: normal;
+}
+
 .decision-correction-plan {
   display: grid;
   gap: 10px;

@@ -920,6 +920,15 @@ function verificationFailurePrimaryAction(plan, failures, heldAction, qualityGat
   };
 }
 
+function publicRepairDecisionAction(nextAction, qualityGate = null, verificationPlan = null) {
+  const verificationFailures = failedRequiredVerificationGroups(verificationPlan);
+  const heldAction = nextAction?.primary_action && typeof nextAction.primary_action === "object"
+    ? nextAction.primary_action
+    : nextAction;
+  const action = verificationFailurePrimaryAction(verificationPlan, verificationFailures, heldAction, qualityGate);
+  return action?.action_id === "request-repair-after-verification-failure" ? action : null;
+}
+
 function verificationFailureRecoveryPlan(plan, failures, heldAction, qualityGate = null) {
   const firstFailure = Array.isArray(failures) ? failures[0] : null;
   const failureCount = Array.isArray(failures) ? failures.length : 0;
@@ -4904,8 +4913,9 @@ function operatorDecisionCorrectionPlan(selectedRequest, selectedActionEntry, de
   };
 }
 
-function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null }) {
+function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null, publicRepairDecision = null }) {
   const selectedRequest = decisionRequests[0] ?? null;
+  const hasPublicRepairDecision = !selectedRequest && Boolean(publicRepairDecision?.command);
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
   const preferredAction = preferredOperatorDecisionAction(externalRunHealth, supportedActions);
   const [selectedAction, setSelectedAction] = useState(preferredAction);
@@ -4924,10 +4934,10 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
     <section className="work-card operator-decision-drawer">
       <div className="work-heading compact-heading">
         <div>
-          <h3>Operator Decision</h3>
-          <p>Review the runtime decision request and choose the bounded operator action.</p>
+          <h3>{hasPublicRepairDecision ? "Repair Decision" : "Operator Decision"}</h3>
+          <p>{hasPublicRepairDecision ? "Prepare the public repair decision from failed verification evidence." : "Review the runtime decision request and choose the bounded operator action."}</p>
         </div>
-        <StatusPill state={selectedRequest ? selectedRequest.status : "no request"} />
+        <StatusPill state={selectedRequest ? selectedRequest.status : hasPublicRepairDecision ? "repair needed" : "no request"} />
       </div>
       {selectedRequest ? (
         <>
@@ -5163,6 +5173,37 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
             <code>{selectedRequest.ref}</code>
           </details>
         </>
+      ) : hasPublicRepairDecision ? (
+        <div className="public-repair-decision-plan" aria-label="Public repair decision plan">
+          <div>
+            <span>Decision source</span>
+            <strong>No agent request file is pending</strong>
+            <p>This is a public repair decision from failed verification evidence, so use the command below instead of looking for an operator-request packet.</p>
+          </div>
+          <div>
+            <span>Repair decision</span>
+            <strong>{publicRepairDecision.action_label ?? "Operator repair decision"}</strong>
+            <CompactInlineValue value={publicRepairDecision.command} kind="command" />
+            <p>{publicRepairDecision.reason}</p>
+          </div>
+          {publicRepairDecision.dry_run_command ? (
+            <div>
+              <span>{publicRepairDecision.dry_run_label ?? "Post-repair unlock check"}</span>
+              <CompactInlineValue value={publicRepairDecision.dry_run_command} kind="command" />
+              <p>Run this only after the next repair completes.</p>
+            </div>
+          ) : null}
+          <div className="public-repair-decision-actions">
+            <button className="secondary compact" type="button" onClick={() => copyRef(publicRepairDecision.command)} disabled={busy}>
+              Copy repair decision command
+            </button>
+            {publicRepairDecision.dry_run_command ? (
+              <button className="secondary compact" type="button" onClick={() => copyRef(publicRepairDecision.dry_run_command)} disabled={busy}>
+                Copy post-repair check
+              </button>
+            ) : null}
+          </div>
+        </div>
       ) : (
         <p className="empty-state">No pending agent decision request for this flow.</p>
       )}
@@ -5568,13 +5609,18 @@ function FlowAdvancedWorkbench({
 
   const traceCount = Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items.length : 0;
   const graphCount = Array.isArray(evidenceGraph?.nodes) ? evidenceGraph.nodes.length : 0;
+  const publicRepairDecision = decisionRequests.length === 0
+    ? publicRepairDecisionAction(nextAction, qualityGate, verificationPlan)
+    : null;
+  const decisionTabLabel = publicRepairDecision ? "Repair Decision" : "Operator Decision";
+  const decisionTabCount = publicRepairDecision && decisionRequests.length === 0 ? "needed" : decisionRequests.length;
   const tabs = [
     { id: "evidence", label: "Evidence / Documents", count: evidenceRows.length },
     { id: "execution", label: "Execution", count: executionEvidence ? 1 : 0 },
     { id: "graph", label: "Graph", count: graphCount },
     { id: "trace", label: "Runtime Trace", count: traceCount },
     { id: "interactions", label: "Interactions Inbox", count: interactions.length },
-    { id: "decisions", label: "Operator Decision", count: decisionRequests.length },
+    { id: "decisions", label: decisionTabLabel, count: decisionTabCount },
   ];
   const selected = tabs.find((tab) => tab.id === selectedTab) ?? tabs[0];
   const panel =
@@ -5598,7 +5644,13 @@ function FlowAdvancedWorkbench({
     ) : selected.id === "interactions" ? (
       <InteractionsInbox interactions={interactions} answers={answers} setAnswers={setAnswers} submitAnswer={submitAnswer} busy={busy} />
     ) : selected.id === "decisions" ? (
-      <OperatorDecisionDrawer decisionRequests={decisionRequests} copyRef={copyRef} busy={busy} externalRunHealth={externalRunHealth} />
+      <OperatorDecisionDrawer
+        decisionRequests={decisionRequests}
+        copyRef={copyRef}
+        busy={busy}
+        externalRunHealth={externalRunHealth}
+        publicRepairDecision={publicRepairDecision}
+      />
     ) : (
       <EvidenceWorkbench rows={evidenceRows} selectedRef={selectedRef} setSelectedRef={setSelectedRef} attachTarget={attachTarget} copyRef={copyRef} />
     );
@@ -5613,7 +5665,7 @@ function FlowAdvancedWorkbench({
         <summary>
           <div>
             <h3>Advanced evidence workbench</h3>
-            <p>Flow-scoped Evidence / Documents, Runtime Trace, Interactions Inbox, and Operator Decision surfaces stay grouped below the cockpit.</p>
+            <p>Flow-scoped Evidence / Documents, Runtime Trace, Interactions Inbox, and decision surfaces stay grouped below the cockpit.</p>
           </div>
           <StatusPill state={expanded ? selected.label : `${evidenceRows.length} artifacts`} />
         </summary>

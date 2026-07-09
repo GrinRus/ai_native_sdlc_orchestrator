@@ -428,6 +428,12 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Next Action Report",
     "Provider Evidence",
     "Operator Decision Request",
+    "Repair Decision",
+    "publicRepairDecisionAction",
+    "publicRepairDecision={publicRepairDecision}",
+    "No agent request file is pending",
+    "public repair decision from failed verification evidence",
+    "Copy repair decision command",
     "filteredRows.find",
     "No evidence matches the selected filter.",
     "Copy raw ref",
@@ -757,12 +763,17 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary, qualityGate\)/u);
   assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextAction, gate\)/u);
   assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextPrimary, qualityGate\)/u);
+  assert.match(source, /publicRepairDecisionAction\(nextAction, qualityGate, verificationPlan\)/u);
+  assert.match(source, /decisionTabLabel = publicRepairDecision \? "Repair Decision" : "Operator Decision"/u);
+  assert.match(source, /decisionTabCount = publicRepairDecision && decisionRequests\.length === 0 \? "needed" : decisionRequests\.length/u);
   assert.match(source, /verificationPlan=\{verificationPlan\}/u);
   assert.match(source, /verificationFailures=\{verificationFailures\}/u);
   assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
   assert.match(css, /\.verification-recovery-path\s*\{/u);
   assert.match(css, /\.verification-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.verification-recovery-path li\.active\s*\{/u);
+  assert.match(css, /\.public-repair-decision-plan\s*\{/u);
+  assert.match(css, /\.public-repair-decision-actions\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\);/u);
   assert.match(css, /\.held-action-note\s*\{/u);
   assert.match(css, /\.execution-recovery-evidence-ref\s*\{/u);
   assert.match(css, /\.verification-hold-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
