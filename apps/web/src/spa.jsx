@@ -3022,6 +3022,27 @@ function qualityGateAttemptLabel(gate) {
   return `${attempt}/${max} (${remaining} remaining)`;
 }
 
+function qualityGateSourceDetail(gate, verificationFailureActive = false) {
+  if (verificationFailureActive) {
+    return "Required verification must pass before the review rerun.";
+  }
+  return gate?.source_stage === "qa" ? "QA rerun required after repair." : "Review rerun required after repair.";
+}
+
+function qualityGateAttemptDetail(gate, hold = false, verificationFailureActive = false) {
+  if (hold) return "No automatic repair attempt remains.";
+  const remaining = Number(gate?.attempt_budget?.remaining_attempts);
+  if (Number.isFinite(remaining) && remaining <= 0) {
+    return verificationFailureActive
+      ? "No automatic repair attempts remain; use failed verification evidence before requesting more repair."
+      : "No automatic repair attempts remain; continue through the required review gate.";
+  }
+  if (verificationFailureActive) {
+    return "Repair budget is bounded; failed verification is the current gate.";
+  }
+  return "Repair attempt budget is still bounded.";
+}
+
 function normalizedBlockerField(record, keys) {
   for (const key of keys) {
     const value = record[key];
@@ -3209,12 +3230,12 @@ function QualityGatePanel({ gate, evidenceRows = [], verificationPlan = null, ve
         <div>
           <span>Source stage</span>
           <strong>{sourceLabel}</strong>
-          <p>{gate.source_stage === "qa" ? "QA rerun required after repair." : "Review rerun required after repair."}</p>
+          <p>{qualityGateSourceDetail(gate, qualityVerificationFailureActive)}</p>
         </div>
         <div>
           <span>Attempt budget</span>
           <strong>{qualityGateAttemptLabel(gate)}</strong>
-          <p>{hold ? "No automatic repair attempt remains." : "Repair attempt budget is still bounded."}</p>
+          <p>{qualityGateAttemptDetail(gate, hold, qualityVerificationFailureActive)}</p>
         </div>
         <div>
           <span>Delivery / release</span>

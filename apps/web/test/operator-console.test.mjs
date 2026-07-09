@@ -707,6 +707,10 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /qualityVerificationFailureActive/u);
   assert.match(source, /Repair failed verification/u);
   assert.match(source, /Required verification must pass before post-repair review/u);
+  assert.match(source, /qualityGateSourceDetail/u);
+  assert.match(source, /qualityGateAttemptDetail/u);
+  assert.match(source, /Required verification must pass before the review rerun/u);
+  assert.match(source, /No automatic repair attempts remain; use failed verification evidence before requesting more repair/u);
   assert.match(source, /Verification failure recovery path/u);
   assert.match(source, /Fix failed verification first/u);
   assert.match(source, /Repair failed verification/u);
