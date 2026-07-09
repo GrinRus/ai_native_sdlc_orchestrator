@@ -2694,16 +2694,29 @@ function compactVisibleValue(value, kind = "auto") {
   return text.length > 72 ? `${text.slice(0, 68)}...` : text;
 }
 
+function compactDisclosureLabel(value, kind = "auto") {
+  const text = String(value ?? "").trim();
+  const visible = compactVisibleValue(text, kind);
+  const type = kind === "command" || /^aor\s+/u.test(text) || text.includes(" --project-ref ") || text.includes(" --runtime-root ")
+    ? "command"
+    : kind === "path" || text.startsWith("/") || text.startsWith("~/") || /^[A-Za-z]:[\\/]/u.test(text)
+      ? "path"
+      : "value";
+  const context = visible && visible !== "pending" ? `: ${visible}` : "";
+  return `Show full ${type}${context}`;
+}
+
 function CompactInlineValue({ value, kind = "auto", className = "" }) {
   const fullValue = String(value ?? "").trim();
   const label = compactVisibleValue(fullValue, kind);
   const truncated = fullValue.length > 0 && label !== fullValue;
+  const disclosureLabel = compactDisclosureLabel(fullValue, kind);
   return (
     <span className={`compact-inline-value ${className}`.trim()} title={fullValue}>
       <code>{label}</code>
       {truncated ? (
         <details className="debug-ref-details compact-value-details">
-          <summary>Details</summary>
+          <summary aria-label={disclosureLabel} title={disclosureLabel}>Details</summary>
           <code>{fullValue}</code>
         </details>
       ) : null}
@@ -2715,6 +2728,7 @@ function CompactDetailValue({ value, copyValue = null, kind = "auto" }) {
   const fullValue = String(value ?? "").trim();
   const label = compactVisibleValue(fullValue, kind);
   const truncated = fullValue.length > 0 && label !== fullValue;
+  const disclosureLabel = compactDisclosureLabel(fullValue, kind);
   return (
     <div className="compact-detail-value">
       <span title={fullValue}>{label}</span>
@@ -2725,7 +2739,7 @@ function CompactDetailValue({ value, copyValue = null, kind = "auto" }) {
       ) : null}
       {truncated ? (
         <details className="debug-ref-details compact-value-details">
-          <summary>Debug full value</summary>
+          <summary aria-label={disclosureLabel} title={disclosureLabel}>Debug full value</summary>
           <code>{fullValue}</code>
         </details>
       ) : null}
