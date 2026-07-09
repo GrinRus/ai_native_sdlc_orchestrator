@@ -732,6 +732,9 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /label\.replace\(\/\\s\+missing\$\/iu, ""\)/u);
   assert.match(source, /run_id: evidence\?\.run_id \?\? externalRunHealth\?\.run_id/u);
   assert.doesNotMatch(source, /run_id: evidence\.run_id/u);
+  assert.match(source, /headingRepeatsStatus\(heading, status\)/u);
+  assert.match(source, /const showCockpitStatus = !headingRepeatsStatus\(cockpitTitle, cockpitStatus\)/u);
+  assert.match(source, /\{showCockpitStatus \? <StatusPill state=\{cockpitStatus\} \/> : null\}/u);
   const recommendedActionRenderIndex = source.indexOf('<div className="recommended-action">');
   const providerHeartbeatRenderIndex = source.indexOf("{providerHeartbeatPanel}");
   assert.ok(recommendedActionRenderIndex >= 0, "Active cockpit should render the recommended action block.");

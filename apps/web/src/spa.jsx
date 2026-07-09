@@ -801,6 +801,14 @@ function StatusPill({ state }) {
   return <span className={`status-pill ${statusTone(state)}`}>{state}</span>;
 }
 
+function headingRepeatsStatus(heading, status) {
+  const title = String(heading ?? "").trim().toLowerCase();
+  const value = String(status ?? "").trim().toLowerCase().replace(/[_-]+/gu, " ");
+  if (!title || !value) return false;
+  const normalizedStatus = value === "fail" ? "failed" : value;
+  return title === normalizedStatus || title.endsWith(` ${normalizedStatus}`);
+}
+
 function groupStatusValue(group) {
   return group?.outcome ?? group?.status ?? group?.last_result_status ?? "planned";
 }
@@ -3961,6 +3969,7 @@ function FlowCockpit({
     ?? (providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion, verificationPlan)
     : stageRuntimeCopy);
+  const showCockpitStatus = !headingRepeatsStatus(cockpitTitle, cockpitStatus);
   const recommendedActionStatus = verificationPrimary
     ? "failed"
     : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
@@ -4060,7 +4069,7 @@ function FlowCockpit({
         <div>
           <div className="heading-line">
             <h2>{cockpitTitle}</h2>
-            <StatusPill state={cockpitStatus} />
+            {showCockpitStatus ? <StatusPill state={cockpitStatus} /> : null}
           </div>
           <p>{cockpitCopy}</p>
         </div>
