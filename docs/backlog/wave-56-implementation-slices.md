@@ -211,6 +211,10 @@ human gate or a real environment failure.
 - Rendered desktop and mobile checks covered an exhausted repair-request loop
   where required verification failed after the automatic repair budget reached
   zero and the next public action was a new `request-repair` decision.
+- Rendered desktop and mobile checks covered a rejected operator-decision
+  fixture where the previous decision failed validation and the operator needed
+  the replacement action, rejection reason, decision destination, and refresh
+  step in the first correction block.
 
 ### UX quality report
 
@@ -252,6 +256,7 @@ human gate or a real environment failure.
 | Recovery workbench command below fold | Tapping `Recovery Path` opened the Execution workbench, but the mobile viewport showed current state and evidence first while `NEXT PUBLIC CONTROL` and the public repair command sat below the fold. | Execution recovery cards now render `Current state`, then `Next public control`, then `Evidence to keep`, so the public command appears before supporting evidence details in the mobile workbench flow. |
 | Repair decision source contradiction | In `Repair Decision needed`, the first card said `No agent request file is pending`, which sounded like no decision was needed even though the tab and run state required a public repair decision. | The public repair decision card now leads with `Public repair decision required` and moves the missing request-file fact into explanatory copy tied to failed verification evidence and new repair context. |
 | Rejected decision replacement default | In a rendered rejected-decision state, the correction panel defaulted the replacement to the previously rejected `Block / blocked` action even though the decision rubric recommended `continue`, and the concrete rejection reason was not carried into the console. | Rejected decision requests now preserve the controller rejection reason in the read model and default the replacement action to the rubric-recommended supported action, so the first correction JSON reflects the action AOR expects after the validation gap is fixed. |
+| Rejected decision correction destination | In the same rejected-decision state, the first correction block showed the replacement JSON and rejection reason but did not expose the decision-file destination or explicitly tell the operator to refresh run status after writing the replacement. | The rejected-decision correction block now says to write the replacement decision file and refresh run status, and it includes a `Copy decision file ref` action next to the correction JSON. |
 | Stale assessment text in execution blocker | In the medium `ky` run, an Execution decision gate could lead with stale `handoff product-change step quality was assessed...` copy from the previous step, making the current blocker sound like a completed handoff assessment instead of the next operator action. | Step-quality completion notes are now treated as generic run-health summaries whether they appear on `failure_summary` or pending-decision reason, and completed-provider copy now honors active run-health gates, so the cockpit, blocker cards, and provider heartbeat promote the current Execution operator decision guidance. |
 | Materialized continue decision visibility | After a controller decision request wrote the expected `continue` decision file, the read model could hide both the request and the decision status because `continue` decisions were excluded from materialized-decision lookup. A first-time operator could see stale `Decision needed` copy even though the public decision artifact existed. | Materialized `continue` decisions are now linked back to their source request, exposed with operator-decision ref/status and rubric metadata, and rendered as `decision recorded` / `refresh run status` guidance instead of asking the operator to repeat an accepted decision. |
 | Completed-flow read-only follow-up | A completed flow still showed disabled `Resolve Next Action`, `patch-only`, and explicit-review copy in the recommended action area, while follow-up creation inherited the completed flow's prior delivery mode. | Completed flows now promote `Inspect Evidence` and `Create Follow-up`, render `read-only` / `Completed evidence locked` safety context, and default follow-up drafts from learning handoff guidance to `No-Write (Safe)` while keeping the source flow locked. |
@@ -269,9 +274,10 @@ human gate or a real environment failure.
 2. Inspect diagnose, retry, and public-step recovery surfaces from the same
    first-time-user perspective when a later step produces a substantive
    provider, target, or validation blocker.
-3. Add or verify non-happy-path rendered coverage for rejected operator
-   decisions; failed required verification and exhausted repair-request loop
-   coverage are now represented in the rendered fixtures above.
+3. Inspect additional non-happy-path rendered coverage for retry and
+   public-step recovery surfaces; rejected operator decisions, failed required
+   verification, and exhausted repair-request loops are now represented in the
+   rendered fixtures above.
 4. Keep future UI changes scoped to `apps/web/**`, product/backlog source docs,
    tests, and packaged dist unless a finding proves a contract or control-plane
    read-model gap.

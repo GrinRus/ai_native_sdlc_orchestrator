@@ -156,6 +156,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Correction required",
     "Rejected decision correction plan",
     "Copy correction JSON",
+    "write the replacement decision file, and refresh run status",
     "Copy rejected reason",
     "Decision handoff",
     "Copy handoff JSON",
@@ -602,6 +603,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.decision-resume-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(148px, 1fr\)\);/u);
   assert.match(css, /\.decision-resume-path li\.blocked\s*\{/u);
   assert.match(css, /\.decision-resume-path button\s*\{[\s\S]*?min-height: var\(--control-height\);/u);
+  assert.match(
+    source,
+    /decisionCorrectionPlan\.expectedDecisionRef[\s\S]*?Copy decision file ref/u,
+    "Rejected decision correction should expose the replacement decision destination in the first correction block",
+  );
   assert.ok(css.includes(".evidence-readiness-path"), "SPA CSS should define graph and trace readiness path layout");
   assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.evidence-readiness-path li\.blocked\s*\{/u);

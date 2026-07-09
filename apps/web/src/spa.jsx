@@ -5116,7 +5116,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
                 <div>
                   <span>Correction required</span>
                   <strong>{decisionCorrectionPlan.actionLabel} / {decisionCorrectionPlan.semanticStatus}</strong>
-                  <p>The previous decision was rejected. Reuse this request, fix the validation gap, and record a replacement action.</p>
+                  <p>The previous decision was rejected. Reuse this request, fix the validation gap, write the replacement decision file, and refresh run status.</p>
                 </div>
                 <StatusPill state="rejected" />
               </div>
@@ -5138,6 +5138,11 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
                 <button className="secondary compact" type="button" onClick={() => copyRef(decisionCorrectionPlan.correctionJson)} disabled={busy}>
                   Copy correction JSON
                 </button>
+                {decisionCorrectionPlan.expectedDecisionRef ? (
+                  <button className="secondary compact" type="button" onClick={() => copyRef(decisionCorrectionPlan.expectedDecisionRef)} disabled={busy} title={decisionCorrectionPlan.expectedDecisionRef}>
+                    Copy decision file ref
+                  </button>
+                ) : null}
                 <button className="secondary compact" type="button" onClick={() => copyRef(decisionCorrectionPlan.rejectionReason)} disabled={busy}>
                   Copy rejected reason
                 </button>
