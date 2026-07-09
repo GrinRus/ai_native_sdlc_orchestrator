@@ -858,14 +858,28 @@ function isTerminalProviderStepStatus(status) {
   return Boolean(status && ["completed", "failed", "interrupted"].includes(status.status));
 }
 
+function isProviderStepDisplayStatus(status) {
+  return isActiveProviderStepStatus(status) || isTerminalProviderStepStatus(status);
+}
+
 function isBlockingExternalRunHealth(health) {
   return Boolean(health && ["blocked", "fail", "failed", "not_pass"].includes(String(health.status ?? "").toLowerCase()));
 }
 
+function externalRunHealthHasMaterializedDecisionRequest(health) {
+  const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
+  return Boolean(
+    String(pending.request_ref ?? "").trim()
+    || String(pending.expected_decision_ref ?? "").trim()
+    || String(health?.agent_decision_request_ref ?? "").trim()
+  );
+}
+
 function activeProviderSupersedesExternalRunBlocker(health, status) {
-  if (!isActiveProviderStepStatus(status) || !isBlockingExternalRunHealth(health)) return false;
+  if (!isProviderStepDisplayStatus(status) || !isBlockingExternalRunHealth(health)) return false;
   const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
   if (String(pending.action ?? "").trim() !== "continue") return false;
+  if (isTerminalProviderStepStatus(status) && externalRunHealthHasMaterializedDecisionRequest(health)) return false;
   const currentStep = String(health?.current_step ?? health?.blocked_step_id ?? "").trim();
   const nextStep = String(pending.next_step ?? "").trim();
   if (!currentStep || !nextStep) return true;
@@ -3230,6 +3244,7 @@ function FlowCockpit({
   onOpenAddProject = null,
   providerStepStatus = null,
   externalRunHealth = null,
+  providerFocus = false,
   evidenceRows = [],
 }) {
   const projectLevelProviderFocus = !flow && Boolean(providerStepStatus || externalRunHealth);
@@ -3400,7 +3415,7 @@ function FlowCockpit({
 
   const completed = isCompletedFlow(flow);
   const blockingExternalRunHealth = !completed && isBlockingExternalRunHealth(externalRunHealth);
-  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth || isActiveProviderStepStatus(providerStepStatus);
+  const providerFocusActive = providerFocus || projectLevelProviderFocus || blockingExternalRunHealth;
   const followUpEligible = flow?.closure_state?.follow_up_eligible === true;
   const qualityGate = !completed && flow?.active_quality_gate ? flow.active_quality_gate : null;
   const qualityGateBlockers = qualityGateBlockerRows(qualityGate);
@@ -3789,11 +3804,11 @@ function DraftFlowRail({ form }) {
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null, externalRunHealth = null }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null, externalRunHealth = null, providerFocus = false }) {
   const completed = isCompletedFlow(selectedFlow);
   const projectLevelProviderFocus = !selectedFlow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
   const blockingExternalRunHealth = !completed && !newFlowDraft && isBlockingExternalRunHealth(externalRunHealth);
-  const providerFocusActive = projectLevelProviderFocus || blockingExternalRunHealth || isActiveProviderStepStatus(providerStepStatus);
+  const providerFocusActive = providerFocus || projectLevelProviderFocus || blockingExternalRunHealth;
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
@@ -5585,12 +5600,17 @@ function App() {
     () => resolveExternalRunHealth(projectState, runs),
     [projectState, runs],
   );
+  const providerStepSupersedesRunHealth = activeProviderSupersedesExternalRunBlocker(rawExternalRunHealth, providerStepStatus);
   const externalRunHealth = useMemo(
     () => displayExternalRunHealth(rawExternalRunHealth, providerStepStatus),
     [rawExternalRunHealth, providerStepStatus],
   );
-  const activeProviderStep = isActiveProviderStepStatus(providerStepStatus);
   const blockingExternalRunHealth = !draftSurface && isBlockingExternalRunHealth(externalRunHealth);
+  const activeProviderStep = !draftSurface && (
+    isActiveProviderStepStatus(providerStepStatus)
+    || providerStepSupersedesRunHealth
+    || (!selectedFlow && isProviderStepDisplayStatus(providerStepStatus))
+  );
   const workbenchEvidenceRows = useMemo(
     () => (blockingExternalRunHealth ? evidenceRows : scopedWorkbenchEvidenceRows),
     [blockingExternalRunHealth, evidenceRows, scopedWorkbenchEvidenceRows],
@@ -5790,17 +5810,21 @@ function App() {
     setProjectState(state);
     setNextAction(nextReport?.primary_action ? nextReport : null);
     setFlowList({ ...flowPayload, flows });
-    if (!draftMode && selectionStillCurrent) {
-      setSelectedFlow(refreshedSelectedFlow);
-      setSelectedFlowId(refreshedSelectedFlow?.flow_id ?? null);
-      await loadFlowWorkbench(base, refreshedSelectedFlow);
-    } else if (draftMode && selectionStillCurrent) {
-      await loadFlowWorkbench(base, null);
-    }
     setPackets(Array.isArray(packetList) ? packetList : []);
     setStepResults(Array.isArray(stepList) ? stepList : []);
     setRuns(Array.isArray(runList) ? runList : []);
     setOperatorRequests(Array.isArray(requestList) ? requestList : []);
+    if (!draftMode && selectionStillCurrent) {
+      setSelectedFlow(refreshedSelectedFlow);
+      setSelectedFlowId(refreshedSelectedFlow?.flow_id ?? null);
+      setProjectSnapshotLoaded(true);
+      await loadFlowWorkbench(base, refreshedSelectedFlow);
+    } else if (draftMode && selectionStillCurrent) {
+      setProjectSnapshotLoaded(true);
+      await loadFlowWorkbench(base, null);
+    } else if (selectionStillCurrent) {
+      setProjectSnapshotLoaded(true);
+    }
     if (selectionStillCurrent && !didChooseStage.current) {
       setSelectedStage(draftMode ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
       didAutoSelectStage.current = true;
@@ -6497,6 +6521,7 @@ function App() {
             onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
             externalRunHealth={externalRunHealth}
+            providerFocus={providerWorkbenchFocus}
             evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}
           />
         )}
@@ -6514,6 +6539,7 @@ function App() {
           evidenceRows={workbenchEvidenceRows}
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
+          providerFocus={providerWorkbenchFocus}
         />
       ) : null}
 

@@ -136,16 +136,21 @@ The packaged SPA now treats the flow as the primary object:
 - During the first project snapshot load, the console shows a non-actionable
   `Syncing project state` card and disables flow actions until active-flow,
   run-health, and evidence state are known. It must not briefly show
-  `Configure First Flow` for an initialized project with an active run.
+  `Configure First Flow` for an initialized project with an active run. Once
+  the base snapshot is known, the active cockpit is shown even if advanced
+  evidence graph or runtime trace hydration is still finishing.
 - The stage rail and active cockpit render `provider_step_status` from public
   control-plane read models. `silent-running` states explicitly say the provider
   has no output yet but is still running, without exposing raw process commands
   or secrets.
-- Active provider heartbeat takes priority over a previously accepted
-  `continue` gate for the same live-run step. The console must show provider
-  monitoring copy, elapsed/remaining budget, and the latest run-control status
-  instead of a stale accepted decision reason such as a completed handoff
-  step-quality gate.
+- Provider execution status takes priority over a previously accepted
+  `continue` gate for the same live-run step while provider output is running
+  or has just completed. The console must show provider monitoring copy,
+  elapsed/remaining budget, and the latest run-control status instead of a
+  stale accepted decision reason such as a completed handoff step-quality gate.
+  Once run-health includes a materialized `request_ref` or
+  `expected_decision_ref`, that operator decision request becomes the primary
+  workbench action.
 - Accepted non-continue decisions remain explainable. When an operator records
   `diagnose`, `retry_public_step`, or `block`, the console must keep the source
   request, accepted decision ref, and any linked step-quality repair status
