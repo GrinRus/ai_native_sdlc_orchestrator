@@ -223,6 +223,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "externalRunWorkbenchAction",
     "Record the ${stepLabel} blocker decision before retrying or continuing.",
     "Open the ${stepLabel} decision request and record the operator decision before continuing.",
+    "hasOpenDecisionRequest\n      ? { label: \"Decision Request\", icon: \"target\", tabId: \"decisions\" }",
     "${stepLabel} decision request",
     "${stepLabel} assessment request",
     "Assessment Evidence",

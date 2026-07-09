@@ -132,7 +132,9 @@ The packaged SPA now treats the flow as the primary object:
   `Assessment needed`. The cockpit primary CTA opens the matching workbench
   surface (`Decision Request`, `Assessment Evidence`, or `Review Blocker`);
   refresh remains secondary while the run is waiting on operator or evaluator
-  action.
+  action. If a substantive blocker also includes a materialized
+  `pending_decision.request_ref`, `Decision Request` remains the primary CTA so
+  the operator can record the required diagnosis before retry or repair.
 - During the first project snapshot load, the console shows a non-actionable
   `Syncing project state` card and disables flow actions until active-flow,
   run-health, and evidence state are known. It must not briefly show

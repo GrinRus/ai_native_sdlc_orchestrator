@@ -1367,7 +1367,9 @@ function externalRunWorkbenchAction(health, hasOpenDecisionRequest = false) {
     return { label: hasOpenDecisionRequest ? "Decision Request" : "Decision Evidence", icon: "target", tabId: "decisions" };
   }
   if (isBlockingExternalRunHealth(health)) {
-    return { label: "Review Blocker", icon: "target", tabId: "execution" };
+    return hasOpenDecisionRequest
+      ? { label: "Decision Request", icon: "target", tabId: "decisions" }
+      : { label: "Review Blocker", icon: "target", tabId: "execution" };
   }
   return hasOpenDecisionRequest
     ? { label: "Decision Request", icon: "target", tabId: "decisions" }
@@ -3469,9 +3471,12 @@ function FlowCockpit({
       };
   const verificationPrimary = completed ? null : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
   const nextPrimary = verificationPrimary ?? resolverPrimary;
-  const hasOpenDecisionRequest = providerFocusActive && visibleEvidence.some((row) => {
-    return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
-  });
+  const hasOpenDecisionRequest = providerFocusActive && (
+    externalRunHealthHasMaterializedDecisionRequest(externalRunHealth)
+    || visibleEvidence.some((row) => {
+      return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
+    })
+  );
   const workbenchAction = externalRunWorkbenchAction(
     providerFocusActive ? externalRunHealth : null,
     hasOpenDecisionRequest,
