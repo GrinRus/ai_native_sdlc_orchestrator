@@ -977,9 +977,20 @@ function externalRunHealthRecoverySentences(health) {
     sentences.push(`Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`);
   }
   if (missingEvidenceRefs.length > 0) {
-    sentences.push(`Attach or restore ${missingEvidenceRefs.length} required evidence artifact${missingEvidenceRefs.length === 1 ? "" : "s"}.`);
+    sentences.push(missingRunHealthEvidenceSentence(missingEvidenceRefs));
   }
   return sentences;
+}
+
+function missingRunHealthEvidenceSentence(missingEvidenceRefs) {
+  const refs = Array.isArray(missingEvidenceRefs) ? missingEvidenceRefs : [];
+  const count = refs.length || 1;
+  const noun = count === 1 ? "reference" : "references";
+  const syntheticCount = refs.filter((ref) => /^missing-ref-\d+$/u.test(String(ref ?? "").trim())).length;
+  if (syntheticCount === count) {
+    return `Run-health has ${count} unresolved evidence ${noun}; inspect the run-health report before continuing.`;
+  }
+  return `Review and repair ${count} missing run-health evidence ${noun} before continuing.`;
 }
 
 function externalRunFailureUserSummary(health) {
@@ -1083,8 +1094,7 @@ function externalRunHealthBlockerSummary(health, blocker, index) {
   }
   if (code === "run_health.missing_evidence") {
     const missingEvidenceRefs = Array.isArray(health?.missing_evidence_refs) ? health.missing_evidence_refs : [];
-    const count = missingEvidenceRefs.length || 1;
-    return `Attach or restore ${count} required evidence artifact${count === 1 ? "" : "s"}.`;
+    return missingRunHealthEvidenceSentence(missingEvidenceRefs);
   }
   return summary || code;
 }
