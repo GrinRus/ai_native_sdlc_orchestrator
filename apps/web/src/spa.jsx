@@ -967,7 +967,26 @@ function isGenericExternalRunFailureSummary(summary) {
     || lower.includes("requires a terminal controller decision");
 }
 
+function externalRunStepQualityAssessmentPendingSummary(health) {
+  const pendingReason = typeof health?.pending_decision?.reason === "string" ? health.pending_decision.reason.trim() : "";
+  const findingSummaries = Array.isArray(health?.run_findings)
+    ? health.run_findings.map((finding) => typeof finding?.summary === "string" ? finding.summary.trim() : "")
+    : [];
+  return [pendingReason, ...findingSummaries].find((summary) => {
+    const lower = summary.toLowerCase();
+    return lower.includes("step-quality assessment")
+      || lower.includes("step quality assessment")
+      || lower.includes("evaluator-authored step-quality")
+      || lower.includes("evaluator authored step quality");
+  }) ?? "";
+}
+
+function isStepQualityAssessmentPendingRunHealth(health) {
+  return Boolean(externalRunStepQualityAssessmentPendingSummary(health));
+}
+
 function isControllerDecisionPendingRunHealth(health) {
+  if (isStepQualityAssessmentPendingRunHealth(health)) return false;
   const failure = health?.failure_summary && typeof health.failure_summary === "object" ? health.failure_summary : {};
   const failureClass = String(failure.class ?? "").trim();
   const failureOwner = String(failure.owner ?? "").trim();
@@ -1015,6 +1034,8 @@ function externalRunFailureUserSummary(health) {
   if (acceptedExternalRunDiagnosis(health)) {
     return externalRunPendingDecisionUserReason(health);
   }
+  const assessmentSummary = externalRunStepQualityAssessmentPendingSummary(health);
+  if (assessmentSummary) return assessmentSummary;
   const failure = health?.failure_summary ?? {};
   const rawSummary = typeof failure.summary === "string" ? failure.summary.trim() : "";
   const actionableDecisionSummary = externalRunActionableDecisionUserSummary(health);
@@ -1066,7 +1087,9 @@ function externalRunHasFailureSummary(health) {
 }
 
 function externalRunHasSubstantiveFailureSummary(health) {
-  return externalRunHasFailureSummary(health) && !isControllerDecisionPendingRunHealth(health);
+  return externalRunHasFailureSummary(health)
+    && !isControllerDecisionPendingRunHealth(health)
+    && !isStepQualityAssessmentPendingRunHealth(health);
 }
 
 function externalRunContinuationDecisionCopy(health, stepLabel) {
@@ -1114,6 +1137,9 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
     case "answer":
       return `Answer the ${stepLabel} operator question before continuing.`;
     case "block":
+      if (isStepQualityAssessmentPendingRunHealth(health)) {
+        return `Prepare the ${stepLabel} step-quality assessment before continuing.`;
+      }
       return `Record the ${stepLabel} block decision before continuing.`;
     case "continue":
       return externalRunContinuationDecisionCopy(health, stepLabel);
@@ -1209,6 +1235,9 @@ function providerFocusTitle(status, externalRunHealth = null) {
     if (acceptedExternalRunDiagnosis(externalRunHealth)) {
       return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} repair required`;
     }
+    if (isStepQualityAssessmentPendingRunHealth(externalRunHealth)) {
+      return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} assessment needed`;
+    }
     if (isControllerDecisionPendingRunHealth(externalRunHealth)) {
       return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} decision needed`;
     }
@@ -1241,15 +1270,22 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
     const pending = externalRunHealth.pending_decision ?? {};
     const pendingControllerDecision = isControllerDecisionPendingRunHealth(externalRunHealth);
+    const pendingStepAssessment = isStepQualityAssessmentPendingRunHealth(externalRunHealth);
     return {
-      action_label: pendingControllerDecision ? `${stepLabel} decision request` : `Open ${stepLabel} blocker`,
+      action_label: pendingStepAssessment
+        ? `${stepLabel} assessment request`
+        : pendingControllerDecision
+          ? `${stepLabel} decision request`
+          : `Open ${stepLabel} blocker`,
       command: "aor run status --json",
       dry_run_label: "Run-health",
       dry_run_command: "aor run status --json",
       reason:
         externalRunPendingDecisionUserReason(externalRunHealth, pending) ??
         externalRunHealthUserSummary(externalRunHealth) ??
-        (pendingControllerDecision
+        (pendingStepAssessment
+          ? `${stepLabel} is waiting for step-quality assessment evidence.`
+          : pendingControllerDecision
           ? `${stepLabel} is waiting for an operator decision.`
           : `${stepLabel} is blocked by run-health evidence.`),
     };
@@ -1286,6 +1322,9 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
 
 function projectRunEvidenceSelectorLabel(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
+    if (isStepQualityAssessmentPendingRunHealth(externalRunHealth)) {
+      return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} assessment evidence`;
+    }
     if (isControllerDecisionPendingRunHealth(externalRunHealth)) {
       return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} decision evidence`;
     }
@@ -1298,6 +1337,7 @@ function projectRunEvidenceSelectorLabel(status, externalRunHealth = null) {
 
 function projectRunEvidenceStatus(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
+    if (isStepQualityAssessmentPendingRunHealth(externalRunHealth)) return "Run assessment needed";
     return isControllerDecisionPendingRunHealth(externalRunHealth) ? "Run decision needed" : "Run evidence blocked";
   }
   if (externalRunHealth?.status) return `Run evidence ${externalRunHealth.status}`;
@@ -1306,21 +1346,27 @@ function projectRunEvidenceStatus(status, externalRunHealth = null) {
 }
 
 function externalRunAttentionLabel(health) {
+  if (isStepQualityAssessmentPendingRunHealth(health)) return "Assessment checks";
   return isControllerDecisionPendingRunHealth(health) ? "Decision checks" : "Blockers";
 }
 
 function externalRunAttentionEmptyCopy(health) {
+  if (isStepQualityAssessmentPendingRunHealth(health)) {
+    return "No assessment checks for the visible next step.";
+  }
   return isControllerDecisionPendingRunHealth(health)
     ? "No decision checks for the visible next step."
     : "No blockers for the visible next step.";
 }
 
 function externalRunDerivedEvidenceStatus(health, fallback = "blocked") {
+  if (isStepQualityAssessmentPendingRunHealth(health)) return "awaiting-assessment";
   return isControllerDecisionPendingRunHealth(health) ? "awaiting-decision" : fallback;
 }
 
 function externalRunRiskLevel(health, blockers, deliveryMode) {
   if (Array.isArray(blockers) && blockers.length > 0) {
+    if (isStepQualityAssessmentPendingRunHealth(health)) return "Assessment needed";
     return isControllerDecisionPendingRunHealth(health) ? "Decision needed" : "Blocked";
   }
   return deliveryMode === "no-write" ? "Low" : "Gated";
