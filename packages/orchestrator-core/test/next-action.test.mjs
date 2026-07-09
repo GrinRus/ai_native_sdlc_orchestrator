@@ -358,6 +358,26 @@ function writeQualityRepairRequest(init, runId, options = {}) {
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
+ * @param {string} status
+ */
+function writeSiblingRunControlState(init, runId, status = "completed") {
+  const siblingProjectRoot = path.join(init.runtimeLayout.projectsRoot, `${init.projectId}.execution`);
+  const filePath = path.join(siblingProjectRoot, "state", `run-control-state-${runId}.json`);
+  writeRuntimeJson(filePath, {
+    run_id: runId,
+    status,
+    current_step: "implement",
+    last_action: "start",
+    started_at: "2026-07-04T14:21:00.000Z",
+    updated_at: "2026-07-04T14:25:00.000Z",
+    action_sequence: 1,
+  });
+  return filePath;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
  * @param {{ status?: string, blockingReasons?: string[] }} [options]
  */
 function writeDeliveryPlan(init, runId, options = {}) {
@@ -688,6 +708,33 @@ test("resolveNextAction returns one safe primary action for quality repair reque
     assert.equal(report.primary_action.action_id, "review-quality-repair");
     assert.match(report.primary_action.command, /aor review run/u);
     assert.equal(report.closure_state.quality_repair.flow_state, "review-required");
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    const runId = "run.quality.completed-repair";
+    writeMission(init);
+    writeExecutionEvidence(init, runId);
+    writeReviewEvidence(init, runId);
+    writeQualityRepairRequest(init, runId, {
+      sourceStage: "review",
+      status: "requested",
+      remainingAttempts: 0,
+    });
+    const repairStateFile = writeSiblingRunControlState(init, `${runId}.repair`, "completed");
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(report.status, "ready");
+    assert.equal(report.project_state.stage, "review");
+    assert.equal(report.primary_action.action_id, "review-quality-repair");
+    assert.match(report.primary_action.command, new RegExp(`--run-id ${runId}\\.repair`, "u"));
+    assert.equal(report.closure_state.quality_repair.status, "requested");
+    assert.equal(report.closure_state.quality_repair.flow_state, "review-required");
+    assert.ok(
+      report.closure_state.quality_repair.evidence_refs.some((ref) =>
+        ref.endsWith(path.relative(tempRoot, repairStateFile).replace(/\\/gu, "/")),
+      ),
+    );
   });
 
   withCleanRepo((tempRoot) => {
