@@ -643,7 +643,7 @@ function qualityClosureStep(rows, options) {
   };
 }
 
-function qualityClosurePlan(rows) {
+function qualityClosurePlan(rows, context = {}) {
   const steps = [
     qualityClosureStep(rows, {
       id: "review",
@@ -673,6 +673,24 @@ function qualityClosurePlan(rows) {
       missingDetail: "Run or attach the outcome assessment before claiming product-quality closure.",
     }),
   ];
+  if (context?.publicRepairDecision) {
+    const heldSteps = steps.map((step) => (
+      step.id === "assessment"
+        ? {
+          ...step,
+          status: "blocked",
+          title: "Held until repair",
+          detail: "Request repair with failed verification evidence, then rerun required verification before outcome assessment.",
+        }
+        : step
+    ));
+    return {
+      status: "blocked",
+      heading: "Quality closure is blocked by repair",
+      detail: "The current safe step is the public repair decision; assessment comes after repair and required verification pass.",
+      steps: heldSteps,
+    };
+  }
   const readyCount = steps.filter((step) => step.status === "ready").length;
   return {
     status: readyCount === steps.length ? "ready" : "blocked",
@@ -4483,9 +4501,9 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   );
 }
 
-function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef }) {
+function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef, qualityClosureContext = null }) {
   const [filter, setFilter] = useState("all");
-  const qualityPlan = qualityClosurePlan(rows);
+  const qualityPlan = qualityClosurePlan(rows, qualityClosureContext);
   const filteredRows = rows.filter((row) => artifactFilterMatches(row, filter));
   const selected = filteredRows.find((row) => row.ref === selectedRef) ?? filteredRows[0] ?? null;
   const groupedRows = filteredRows.reduce((groups, row) => {
@@ -5652,7 +5670,14 @@ function FlowAdvancedWorkbench({
         publicRepairDecision={publicRepairDecision}
       />
     ) : (
-      <EvidenceWorkbench rows={evidenceRows} selectedRef={selectedRef} setSelectedRef={setSelectedRef} attachTarget={attachTarget} copyRef={copyRef} />
+      <EvidenceWorkbench
+        rows={evidenceRows}
+        selectedRef={selectedRef}
+        setSelectedRef={setSelectedRef}
+        attachTarget={attachTarget}
+        copyRef={copyRef}
+        qualityClosureContext={{ publicRepairDecision }}
+      />
     );
 
   return (
