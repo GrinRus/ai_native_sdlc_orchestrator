@@ -2876,6 +2876,9 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
               key={stage.id}
               className={`stage-row ${active ? "active" : ""} ${done ? "done" : ""} ${current ? "current" : ""}`}
               type="button"
+              aria-current={current ? "step" : undefined}
+              aria-pressed={active}
+              aria-label={`${index + 1}. ${stage.label}. ${stage.hint}. ${statusLabel}${active ? ". Selected view" : ""}`}
               onClick={() => onSelect(stage.id)}
             >
               <span className="stage-index">{index + 1}</span>
@@ -4538,7 +4541,13 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
       </div>
       <div className="artifact-filter-bar" aria-label="Artifact filters">
         {ARTIFACT_FILTERS.map((entry) => (
-          <button key={entry.id} className={filter === entry.id ? "selected" : ""} type="button" onClick={() => setFilter(entry.id)}>
+          <button
+            key={entry.id}
+            className={filter === entry.id ? "selected" : ""}
+            type="button"
+            aria-pressed={filter === entry.id}
+            onClick={() => setFilter(entry.id)}
+          >
             {entry.label}
           </button>
         ))}
