@@ -188,6 +188,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls",
     "externalRunPendingDecisionUserReason",
     "externalRunHealthBlockers",
+    'normalized.toLowerCase() === "qa"',
     "Review evidence did not connect the provider change to verification results.",
     "Accept the ${stepsLabel} operator decision",
     "missingRunHealthEvidenceSentence",

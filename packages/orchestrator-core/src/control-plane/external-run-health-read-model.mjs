@@ -153,6 +153,7 @@ function severityForStatus(status) {
 function stageLabel(step) {
   const normalized = String(step ?? "").trim();
   if (!normalized) return "Controller";
+  if (normalized.toLowerCase() === "qa") return "QA";
   return normalized
     .replace(/[-_]+/gu, " ")
     .replace(/\b\w/gu, (match) => match.toUpperCase());

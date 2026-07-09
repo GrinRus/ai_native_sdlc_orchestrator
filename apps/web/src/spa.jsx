@@ -893,6 +893,7 @@ function displayExternalRunHealth(health, status) {
 function externalRunStepLabel(step) {
   const normalized = String(step ?? "").trim();
   if (!normalized) return "Controller";
+  if (normalized.toLowerCase() === "qa") return "QA";
   return normalized
     .replace(/[-_]+/g, " ")
     .replace(/\b\w/g, (match) => match.toUpperCase());
