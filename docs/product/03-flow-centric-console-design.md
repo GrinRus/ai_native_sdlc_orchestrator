@@ -173,6 +173,10 @@ The packaged SPA now treats the flow as the primary object:
   right rail, and Execution Evidence recovery path. Failed required
   verification remains visible as repair input, but it must not hide the
   materialized repair run behind a generic "rerun verification first" action.
+  If the public runs list already contains the matching completed `.repair`
+  run, the UI must not offer the same repair command again; it should preserve
+  the completed repair evidence, show completed repair status, and point the
+  operator at run status or post-run verification.
 - Evidence lists render `artifact_display_summaries[]` as user-facing
   artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
   paths, packet URIs, and evidence URIs are not primary visible text; raw refs
@@ -199,7 +203,10 @@ The packaged SPA now treats the flow as the primary object:
   `--runtime-root`, and `--run-id` context instead of falling back to generic
   diagnose/retry controls. When the latest `next-action-report` already points
   at the follow-up repair run, the panel promotes the `aor run start ...repair`
-  next-action instead of re-showing the earlier `review decide` command.
+  next-action instead of re-showing the earlier `review decide` command. When
+  that repair run is already completed in the public runs list, the panel shows
+  `Repair run completed` guidance and a safe `aor run status --json --run-id`
+  command instead of asking the operator to start the same repair run again.
   Scratch-only output is explicitly non-passing, while `.qwen/`, `.codex/`,
   `.claude/`, and `.opencode/` target checkout state is shown as blocking
   runner-owned leakage.

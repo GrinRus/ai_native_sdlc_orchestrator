@@ -1174,7 +1174,55 @@ function externalRunExecutableRepairCommand(health, projectContext = null) {
   return command;
 }
 
-function materializedQualityRepairAction(nextAction) {
+function shellCommandFlagValue(command, flag) {
+  const normalizedFlag = String(flag ?? "").trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!normalizedFlag) return "";
+  const match = String(command ?? "").match(new RegExp(`${normalizedFlag}\\s+(?:"([^"]*)"|'([^']*)'|(\\S+))`, "u"));
+  return String(match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function materializedQualityRepairRunId(nextAction) {
+  const primary = nextAction?.primary_action && typeof nextAction.primary_action === "object"
+    ? nextAction.primary_action
+    : null;
+  if (!isQualityRepairPrimaryAction(primary)) return "";
+  return shellCommandFlagValue(primary.command, "--run-id");
+}
+
+function materializedQualityRepairCompletion(nextAction, runs = []) {
+  const repairRunId = materializedQualityRepairRunId(nextAction);
+  if (!repairRunId || !Array.isArray(runs)) return null;
+  const run = runs.find((candidate) => String(candidate?.run_id ?? "").trim() === repairRunId);
+  if (!run) return null;
+  const runStatus = String(run?.run_control_state?.status ?? run?.status ?? "").trim().toLowerCase();
+  const providerStatus = String(run?.provider_step_status?.status ?? run?.run_control_state?.provider_step_status?.status ?? "").trim().toLowerCase();
+  const completed = runStatus === "completed" || providerStatus === "completed";
+  if (!completed) return null;
+  return {
+    run,
+    runId: repairRunId,
+    runStatus,
+    providerStatus,
+    recommendedAction: String(run?.provider_step_status?.recommended_action ?? run?.run_control_state?.provider_step_status?.recommended_action ?? "").trim(),
+  };
+}
+
+function completedQualityRepairAction(repairCompletion) {
+  if (!repairCompletion?.runId) return null;
+  const statusCommand = `aor run status --json --run-id ${shellQuoteCommandArg(repairCompletion.runId)}`;
+  return {
+    action_id: "quality-repair-run-completed",
+    action_label: "Repair run completed",
+    low_level_command: "run status",
+    command: statusCommand,
+    dry_run_label: "Completed repair status",
+    dry_run_command: statusCommand,
+    reason: repairCompletion.recommendedAction || "Repair implementation completed. Continue with post-run verification, then refresh run status.",
+    completed_repair_run_id: repairCompletion.runId,
+  };
+}
+
+function materializedQualityRepairAction(nextAction, repairCompletion = null) {
   const primary = nextAction?.primary_action && typeof nextAction.primary_action === "object"
     ? nextAction.primary_action
     : null;
@@ -1185,6 +1233,8 @@ function materializedQualityRepairAction(nextAction) {
   const isRepairAction = isQualityRepairPrimaryAction(primary)
     || projectStage === "repair";
   if (!hasRepairLineage && !isRepairAction) return null;
+  const completedAction = completedQualityRepairAction(repairCompletion);
+  if (completedAction) return completedAction;
   return {
     ...primary,
     action_label: primary.action_label ?? "Continue repair run",
@@ -1197,12 +1247,18 @@ function materializedQualityRepairAction(nextAction) {
 function isQualityRepairPrimaryAction(action) {
   const actionId = String(action?.action_id ?? "").trim();
   const command = String(action?.command ?? "").trim();
-  return /(^|-)quality-repair$/u.test(actionId)
+  return actionId === "quality-repair-run-completed"
+    || /(^|-)quality-repair$/u.test(actionId)
     || /^run-.+-quality-repair$/u.test(actionId)
     || (/aor\s+run\s+start/u.test(command) && /\.repair(?:\s|$)/u.test(command));
 }
 
-function materializedQualityRepairSummary(nextAction) {
+function materializedQualityRepairSummary(nextAction, repairCompletion = null) {
+  if (repairCompletion?.runId) {
+    return repairCompletion.recommendedAction
+      ? `Repair run completed. ${repairCompletion.recommendedAction}`
+      : "Repair run completed. Continue with post-run verification, then refresh run status.";
+  }
   const repairAction = materializedQualityRepairAction(nextAction);
   if (!repairAction) return null;
   return repairAction.reason ?? "Repair request is recorded. Start the repair run from the latest next-action report, then refresh run status.";
@@ -1365,9 +1421,9 @@ function providerFocusTitle(status, externalRunHealth = null) {
   return "Provider run in progress";
 }
 
-function providerFocusDescription(status, externalRunHealth = null, nextAction = null) {
+function providerFocusDescription(status, externalRunHealth = null, nextAction = null, repairCompletion = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
-    return materializedQualityRepairSummary(nextAction) ?? externalRunHealthUserSummary(externalRunHealth);
+    return materializedQualityRepairSummary(nextAction, repairCompletion) ?? externalRunHealthUserSummary(externalRunHealth);
   }
   if (status?.status === "completed") {
     return "Provider execution finished before a flow could be selected. Review validation, review, and QA evidence before delivery.";
@@ -1381,10 +1437,10 @@ function providerFocusDescription(status, externalRunHealth = null, nextAction =
   return "Live execution is running from project-level evidence before a flow can be selected.";
 }
 
-function providerFocusPrimaryAction(status, externalRunHealth = null, nextAction = null) {
+function providerFocusPrimaryAction(status, externalRunHealth = null, nextAction = null, repairCompletion = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
     if (externalRunRecoveryPathActive(externalRunHealth)) {
-      const repairAction = materializedQualityRepairAction(nextAction);
+      const repairAction = materializedQualityRepairAction(nextAction, repairCompletion);
       if (repairAction) return repairAction;
     }
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
@@ -1771,24 +1827,26 @@ function executionRecoveryAction(actions, evidence) {
     .find((action) => action?.enabled) ?? actionList.find((action) => action?.enabled) ?? actionList[0] ?? null;
 }
 
-function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null, projectContext = null, latestNextAction = null) {
+function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null, projectContext = null, latestNextAction = null, repairCompletion = null) {
   if (externalRunRecoveryPathActive(externalRunHealth)) {
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
     const healthBlockers = externalRunHealthBlockers(externalRunHealth);
-    const repairAction = materializedQualityRepairAction(latestNextAction);
+    const repairAction = materializedQualityRepairAction(latestNextAction, repairCompletion);
     const repairCommand = repairAction?.command
       || externalRunExecutableRepairCommand(externalRunHealth, projectContext)
       || externalRunRepairCommand(externalRunHealth.pending_decision);
     return {
       headingTitle: `${stepLabel} repair path`,
       headingDetail: repairAction
-        ? "Run the latest repair next-action before retrying or continuing the lifecycle."
+        ? repairCompletion
+          ? "Repair implementation has completed; preserve status and continue with post-run verification."
+          : "Run the latest repair next-action before retrying or continuing the lifecycle."
         : repairCommand
         ? "Run the public repair command before retrying or continuing the lifecycle."
         : "Use public recovery controls before retrying or continuing the lifecycle.",
       stateTitle: `${stepLabel} repair required`,
       stateDetail:
-        materializedQualityRepairSummary(latestNextAction) ??
+        materializedQualityRepairSummary(latestNextAction, repairCompletion) ??
         externalRunRecoveryPathUserSummary(externalRunHealth) ??
         externalRunHealthUserSummary(externalRunHealth) ??
         "Repair is required before delivery or release can continue.",
@@ -1796,13 +1854,17 @@ function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions
         ? `${healthBlockers.length} recovery check${healthBlockers.length === 1 ? "" : "s"}`
         : "Run-health recovery evidence",
       evidenceDetail: repairAction
-        ? "Failed verification and repair evidence explain why this repair run is needed."
+        ? repairCompletion
+          ? "The completed repair run is preserved as public run evidence."
+          : "Failed verification and repair evidence explain why this repair run is needed."
         : healthBlockers[0]?.summary ?? "Review run-health and verification evidence before applying repair.",
-      actionTitle: repairAction ? "Run repair implementation" : repairCommand ? "Run public repair command" : "Inspect recovery evidence",
+      actionTitle: repairCompletion ? "Inspect completed repair run" : repairAction ? "Run repair implementation" : repairCommand ? "Run public repair command" : "Inspect recovery evidence",
       actionCommand: repairCommand || "aor run status --json",
       actionDetail: repairCommand
         ? repairAction
-          ? "Copy this repair next-action command, then refresh run status."
+          ? repairCompletion
+            ? "Copy this status command, then continue with post-run verification."
+            : "Copy this repair next-action command, then refresh run status."
           : "Copy this command into the public AOR repair path, then refresh run status."
         : "Inspect public run-health evidence before choosing retry or continuation.",
     };
@@ -2579,7 +2641,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
   );
 }
 
-function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null, externalRunHealth = null }) {
+function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null, externalRunHealth = null, repairCompletion = null }) {
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
   const currentStageEntry = STAGES[currentIndex] ?? STAGES[0];
   const completed = isCompletedFlow(flow);
@@ -2600,7 +2662,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
         : flow
         ? "Navigation is scoped to the selected flow."
         : projectLevelProviderFocus
-          ? providerFocusDescription(providerStepStatus, externalRunHealth)
+          ? providerFocusDescription(providerStepStatus, externalRunHealth, null, repairCompletion)
           : "Readiness prepares the runtime before a flow is created.";
   return (
     <aside className={`stage-rail ${firstRunFocus ? "compact-first-run" : ""}`}>
@@ -3144,6 +3206,7 @@ function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
   if (failures.length === 0) return null;
   const recoveryPlan = verificationFailureRecoveryPlan(plan, failures, heldAction);
   const repairActionActive = isQualityRepairPrimaryAction(heldAction);
+  const repairRunCompleted = heldAction?.action_id === "quality-repair-run-completed";
   return (
     <div className="verification-hold-banner" role="alert" aria-label="Required verification failure">
       <Icon name="alert" />
@@ -3182,17 +3245,19 @@ function VerificationFailureBanner({ plan, failures = [], heldAction = null }) {
               )}
             </li>
             <li>
-              <span>{repairActionActive ? "Repair condition" : "Unlock condition"}</span>
-              <strong>{repairActionActive ? "Repair, then rerun verification" : "Rerun required verification"}</strong>
+            <span>{repairActionActive ? "Repair condition" : "Unlock condition"}</span>
+              <strong>{repairRunCompleted ? "Repair completed; rerun verification" : repairActionActive ? "Repair, then rerun verification" : "Rerun required verification"}</strong>
               <CompactInlineValue value={repairActionActive ? actionCommandTitle(heldAction) : recoveryPlan.rerunCommand} kind="command" />
             </li>
           </ol>
         </div>
         <div className="verification-hold-grid">
           <div>
-            <span>{repairActionActive ? "Repair next action" : "Held downstream action"}</span>
+            <span>{repairRunCompleted ? "Completed repair status" : repairActionActive ? "Repair next action" : "Held downstream action"}</span>
             <strong>{recoveryPlan.heldActionLabel}</strong>
-            <p>{repairActionActive
+            <p>{repairRunCompleted
+              ? "Repair implementation has completed. Rerun required verification before QA or delivery."
+              : repairActionActive
               ? "Start this repair loop from the latest next-action report."
               : "Hidden until required verification returns to passing."}</p>
           </div>
@@ -3436,6 +3501,7 @@ function FlowCockpit({
   externalRunHealth = null,
   providerFocus = false,
   evidenceRows = [],
+  repairCompletion = null,
 }) {
   const projectLevelProviderFocus = !flow && Boolean(providerStepStatus || externalRunHealth);
   if (!flow && !projectLevelProviderFocus) {
@@ -3619,7 +3685,7 @@ function FlowCockpit({
       ? nextAction.blockers
       : [];
   const repairNextActionSummary = providerFocusActive && externalRunRecoveryPathActive(externalRunHealth)
-    ? materializedQualityRepairSummary(nextAction)
+    ? materializedQualityRepairSummary(nextAction, repairCompletion)
     : null;
   const presentedActionBlockers = repairNextActionSummary && actionBlockers.length > 0
     ? actionBlockers.map((blocker, index) => index === 0 ? { ...blocker, summary: repairNextActionSummary } : blocker)
@@ -3649,7 +3715,7 @@ function FlowCockpit({
     "no-write";
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
   const resolverPrimary = providerFocusActive
-    ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction)
+    ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction, repairCompletion)
     : completed
     ? nextAction?.primary_action?.action_id === "start-new-flow"
       ? nextAction.primary_action
@@ -3702,7 +3768,7 @@ function FlowCockpit({
     ? externalRunDerivedEvidenceStatus(externalRunHealth)
     : stageRuntimeState;
   const cockpitCopy = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
-    ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction)
+    ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion)
     : stageRuntimeCopy;
   const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
   const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
@@ -4005,7 +4071,7 @@ function DraftFlowRail({ form }) {
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null, externalRunHealth = null, providerFocus = false }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null, externalRunHealth = null, providerFocus = false, repairCompletion = null }) {
   const completed = isCompletedFlow(selectedFlow);
   const projectLevelProviderFocus = !selectedFlow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
   const blockingExternalRunHealth = !completed && !newFlowDraft && isBlockingExternalRunHealth(externalRunHealth);
@@ -4016,10 +4082,10 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   const runtimeReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
   let nextPrimary = nextAction?.primary_action ?? {};
   if (providerFocusActive) {
-    nextPrimary = providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction);
+    nextPrimary = providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction, repairCompletion);
   } else if (!selectedFlow && !newFlowDraft) {
     nextPrimary = projectLevelProviderFocus
-      ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction)
+      ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction, repairCompletion)
       : runtimeReady
       ? {
         low_level_command: "mission create",
@@ -4046,7 +4112,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
     ? externalRunHealthBlockers(externalRunHealth)
     : Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
   const repairNextActionSummary = providerFocusActive && externalRunRecoveryPathActive(externalRunHealth)
-    ? materializedQualityRepairSummary(nextAction)
+    ? materializedQualityRepairSummary(nextAction, repairCompletion)
     : null;
   const presentedActionBlockers = repairNextActionSummary && actionBlockers.length > 0
     ? actionBlockers.map((blocker, index) => index === 0 ? { ...blocker, summary: repairNextActionSummary } : blocker)
@@ -4886,14 +4952,14 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   );
 }
 
-function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null, projectContext = null, nextAction = null }) {
+function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null, projectContext = null, nextAction = null, repairCompletion = null }) {
   const hasVisibleExecutionEvidence = Boolean(evidence || externalRunHealth);
   const statusRows = executionStatusRows(evidence, externalRunHealth);
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
   const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
   const recoveryPlan = hasVisibleExecutionEvidence
-    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth, projectContext, nextAction)
+    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth, projectContext, nextAction, repairCompletion)
     : null;
   return (
     <section className="work-card execution-evidence-panel">
@@ -5236,6 +5302,7 @@ function FlowAdvancedWorkbench({
   externalRunHealth,
   projectContext,
   nextAction,
+  repairCompletion,
   busy,
 }) {
   const [expanded, setExpanded] = useState(defaultAdvancedWorkbenchOpen);
@@ -5289,6 +5356,7 @@ function FlowAdvancedWorkbench({
         externalRunHealth={externalRunHealth}
         projectContext={projectContext}
         nextAction={nextAction}
+        repairCompletion={repairCompletion}
       />
     ) : selected.id === "graph" ? (
       <EvidenceGraphPanel graph={evidenceGraph} />
@@ -5824,6 +5892,10 @@ function App() {
   const externalRunHealth = useMemo(
     () => displayExternalRunHealth(rawExternalRunHealth, providerStepStatus),
     [rawExternalRunHealth, providerStepStatus],
+  );
+  const qualityRepairCompletion = useMemo(
+    () => materializedQualityRepairCompletion(nextAction, runs),
+    [nextAction, runs],
   );
   const blockingExternalRunHealth = !draftSurface && isBlockingExternalRunHealth(externalRunHealth);
   const activeProviderStep = !draftSurface && (
@@ -6691,15 +6763,16 @@ function App() {
         </section>
       ) : null}
 
-      <StageRail
-        selectedStage={selectedStage}
-        currentStage={currentStage}
-        onSelect={chooseStage}
-        flow={selectedFlow}
-        newFlowDraft={draftSurface}
-        providerStepStatus={providerStepStatus}
-        externalRunHealth={externalRunHealth}
-      />
+        <StageRail
+          selectedStage={selectedStage}
+          currentStage={currentStage}
+          onSelect={chooseStage}
+          flow={selectedFlow}
+          newFlowDraft={draftSurface}
+          providerStepStatus={providerStepStatus}
+          externalRunHealth={externalRunHealth}
+          repairCompletion={qualityRepairCompletion}
+        />
 
       <main className="main">
         {error ? <div className="alert" role="alert">{error}</div> : null}
@@ -6747,6 +6820,7 @@ function App() {
             externalRunHealth={externalRunHealth}
             providerFocus={providerWorkbenchFocus}
             evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}
+            repairCompletion={qualityRepairCompletion}
           />
         )}
       </main>
@@ -6764,6 +6838,7 @@ function App() {
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
           providerFocus={providerWorkbenchFocus}
+          repairCompletion={qualityRepairCompletion}
         />
       ) : null}
 
@@ -6801,6 +6876,7 @@ function App() {
             runtimeRoot,
           }}
           nextAction={nextAction}
+          repairCompletion={qualityRepairCompletion}
           busy={busy}
         />
       )}
