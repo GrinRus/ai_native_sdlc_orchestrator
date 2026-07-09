@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "source_hash": "3d66154bbb0553229a20a09fc7dfd600464d2997d7ab3d35bfa1b061cd5b0472",
+  "source_hash": "3d06a7199f19c7861b1f640f7b7202fc9bb64ed6c9c5341c32c3b047c35ce85b",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -9,8 +9,8 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-CVac80cn.js",
     "apps/web/dist/assets/index-DSDXR4qW.css",
+    "apps/web/dist/assets/index-aewOETIJ.js",
     "apps/web/dist/index.html"
   ]
 }

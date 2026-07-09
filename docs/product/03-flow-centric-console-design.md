@@ -130,11 +130,15 @@ The packaged SPA now treats the flow as the primary object:
   as `Run decision needed` and `Decision needed`; a product-change step-quality
   gate uses assessment language such as `Run assessment needed` and
   `Assessment needed`. The cockpit primary CTA opens the matching workbench
-  surface (`Decision Request`, `Assessment Evidence`, or `Review Blocker`);
-  refresh remains secondary while the run is waiting on operator or evaluator
-  action. If a substantive blocker also includes a materialized
-  `pending_decision.request_ref`, `Decision Request` remains the primary CTA so
-  the operator can record the required diagnosis before retry or repair.
+  surface (`Decision Request`, `Assessment Evidence`, `Recovery Path`, or
+  `Review Blocker`); refresh remains secondary while the run is waiting on
+  operator or evaluator action. Repair-required states with an accepted
+  diagnosis, public repair command, retry intent, or target verification
+  failure use recovery language such as `Recovery needed`, `Recovery Path`,
+  and `<step> repair required`. If a substantive blocker also includes a
+  materialized `pending_decision.request_ref`, `Decision Request` remains the
+  primary CTA so the operator can record the required diagnosis before retry or
+  repair.
 - During the first project snapshot load, the console shows a non-actionable
   `Syncing project state` card and disables flow actions until active-flow,
   run-health, and evidence state are known. It must not briefly show
