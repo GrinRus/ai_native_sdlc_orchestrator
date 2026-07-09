@@ -134,6 +134,11 @@ The packaged SPA now treats the flow as the primary object:
   monitoring copy, elapsed/remaining budget, and the latest run-control status
   instead of a stale accepted decision reason such as a completed handoff
   step-quality gate.
+- Accepted non-continue decisions remain explainable. When an operator records
+  `diagnose`, `retry_public_step`, or `block`, the console must keep the source
+  request, accepted decision ref, and any linked step-quality repair status
+  visible, and must describe the safe next public control path instead of
+  implying that the same decision still needs to be recorded.
 - Evidence lists render `artifact_display_summaries[]` as user-facing
   artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
   paths, packet URIs, and evidence URIs are not primary visible text; raw refs

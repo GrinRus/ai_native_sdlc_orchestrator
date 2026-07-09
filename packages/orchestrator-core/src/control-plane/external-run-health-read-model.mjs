@@ -10,6 +10,8 @@ const INTERNAL_RUNNER_PREFIX = ["live", "e2e"].join("-");
 const RUN_HEALTH_REPORT_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-run-health-report-.+\\.json$`, "u");
 const OBSERVATION_REPORT_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-observation-report-.+\\.json$`, "u");
 const AGENT_DECISION_REQUEST_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-agent-decision-request-.+\\.json$`, "u");
+const OPERATOR_DECISION_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-operator-decision-.+\\.json$`, "u");
+const QUALITY_ASSESSMENT_REPORT_REGEX = new RegExp(`^${INTERNAL_RUNNER_PREFIX}-step-quality-assessment-report-.+\\.json$`, "u");
 const DECISION_RUBRIC_REF_LIMIT = 5;
 const DECISION_RUBRIC_CHECK_LIMIT = 5;
 
@@ -91,6 +93,18 @@ function listJsonFilesByFreshness(dirPath) {
       const mtimeDelta = rightStat.mtimeMs - leftStat.mtimeMs;
       return mtimeDelta !== 0 ? mtimeDelta : path.basename(right).localeCompare(path.basename(left));
     });
+}
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function comparableFilePath(filePath) {
+  try {
+    return fs.realpathSync.native(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
 }
 
 /**
@@ -216,6 +230,67 @@ function readPendingDecisionRequest(reportsRoot, runId, currentStep) {
 }
 
 /**
+ * @param {string} reportsRoot
+ * @param {string} runId
+ * @param {string | null} currentStep
+ * @param {Record<string, unknown>} pendingDecision
+ * @returns {{ file: string, document: Record<string, unknown>, request: { file: string, document: Record<string, unknown> } | null } | null}
+ */
+function readMaterializedOperatorDecision(reportsRoot, runId, currentStep, pendingDecision) {
+  const action = asString(pendingDecision.action);
+  if (!action || action === "continue") return null;
+  const candidates = listJsonFilesByFreshness(reportsRoot)
+    .filter((filePath) => OPERATOR_DECISION_REGEX.test(path.basename(filePath)))
+    .flatMap((filePath) => {
+      const document = readJsonObject(filePath);
+      if (!document) return [];
+      if (asString(document.action) !== action) return [];
+      const sourceRequestRef = asString(document.source_agent_decision_request_ref);
+      const sourceRequest = sourceRequestRef ? readJsonObject(sourceRequestRef) : null;
+      const sourceRunId = asString(sourceRequest?.run_id);
+      if (sourceRunId && sourceRunId !== runId) return [];
+      if (!sourceRunId && !path.basename(filePath).includes(runId)) return [];
+      const decisionStep = asString(document.step_id) ?? asString(sourceRequest?.step_id);
+      if (currentStep && decisionStep && decisionStep !== currentStep) return [];
+      if (currentStep && !decisionStep && !path.basename(filePath).includes(currentStep)) return [];
+      return [{
+        file: filePath,
+        document,
+        request: sourceRequestRef && sourceRequest ? { file: sourceRequestRef, document: sourceRequest } : null,
+      }];
+    });
+  return candidates[0] ?? null;
+}
+
+/**
+ * @param {string} reportsRoot
+ * @param {string} runId
+ * @param {string | null} currentStep
+ * @param {string | null} operatorDecisionRef
+ * @returns {{ file: string, document: Record<string, unknown> } | null}
+ */
+function readLatestQualityAssessmentReport(reportsRoot, runId, currentStep, operatorDecisionRef) {
+  const candidates = listJsonFilesByFreshness(reportsRoot)
+    .filter((filePath) => QUALITY_ASSESSMENT_REPORT_REGEX.test(path.basename(filePath)))
+    .flatMap((filePath) => {
+      const document = readJsonObject(filePath);
+      if (!document) return [];
+      if (asString(document.run_id) !== runId) return [];
+      if (currentStep && asString(document.step_id) !== currentStep) return [];
+      const sourceOperatorDecisionFile = asString(document.source_operator_decision_file);
+      if (
+        operatorDecisionRef &&
+        sourceOperatorDecisionFile &&
+        comparableFilePath(sourceOperatorDecisionFile) !== comparableFilePath(operatorDecisionRef)
+      ) {
+        return [];
+      }
+      return [{ file: filePath, document }];
+    });
+  return candidates[0] ?? null;
+}
+
+/**
  * @param {Record<string, unknown> | null} health
  * @param {Record<string, unknown> | null} controller
  * @returns {string | null}
@@ -261,17 +336,45 @@ function sanitizeResumeInteractionHealth(resumeInteractionHealth) {
 }
 
 /**
- * @param {Record<string, unknown>} pendingDecision
- * @param {{ file: string, document: Record<string, unknown> } | null} request
+ * @param {{ file: string, document: Record<string, unknown> } | null} report
  * @returns {Record<string, unknown> | null}
  */
-function sanitizePendingDecision(pendingDecision, request) {
+function sanitizeQualityAssessmentSummary(report) {
+  if (!report) return null;
+  const document = asRecord(report.document);
+  const status = asString(document.status);
+  const decision = asString(document.decision);
+  const repairLineage = asRecord(document.repair_lineage);
+  const summary = {
+    report_ref: report.file,
+    status,
+    decision,
+    public_repair_command: asString(repairLineage.public_repair_command),
+    repair_instructions: asStringArray(document.repair_instructions),
+    findings: asStringArray(document.findings).slice(0, 3),
+  };
+  return status || decision || summary.public_repair_command || summary.repair_instructions.length > 0
+    ? summary
+    : null;
+}
+
+/**
+ * @param {Record<string, unknown>} pendingDecision
+ * @param {{ file: string, document: Record<string, unknown> } | null} request
+ * @param {{ operatorDecision?: { file: string, document: Record<string, unknown> } | null, qualityAssessmentReport?: { file: string, document: Record<string, unknown> } | null }} [options]
+ * @returns {Record<string, unknown> | null}
+ */
+function sanitizePendingDecision(pendingDecision, request, options = {}) {
   const action = asString(pendingDecision.action);
   const reason = asString(pendingDecision.reason);
   const nextStep = asString(pendingDecision.next_step);
   const requestRef = request?.file ?? null;
   const expectedDecisionRef = asString(request?.document.operator_decision_expected_ref);
-  if (!action && !reason && !nextStep && !requestRef && !expectedDecisionRef) return null;
+  const operatorDecision = options.operatorDecision ?? null;
+  const operatorDecisionDocument = asRecord(operatorDecision?.document);
+  const operatorDecisionRef = operatorDecision?.file ?? null;
+  const qualityAssessment = sanitizeQualityAssessmentSummary(options.qualityAssessmentReport ?? null);
+  if (!action && !reason && !nextStep && !requestRef && !expectedDecisionRef && !operatorDecisionRef && !qualityAssessment) return null;
   const sanitized = {
     action,
     reason,
@@ -279,6 +382,21 @@ function sanitizePendingDecision(pendingDecision, request) {
     request_ref: requestRef,
     expected_decision_ref: expectedDecisionRef,
   };
+  const operatorDecisionStatus = asString(operatorDecisionDocument.status);
+  if (operatorDecisionRef) sanitized.operator_decision_ref = operatorDecisionRef;
+  if (operatorDecisionStatus) {
+    sanitized.operator_decision_status = operatorDecisionStatus;
+    sanitized.status = operatorDecisionStatus;
+  }
+  const semanticStatus = asString(asRecord(operatorDecisionDocument.semantic_analysis).status);
+  if (semanticStatus) sanitized.semantic_status = semanticStatus;
+  if (qualityAssessment) {
+    sanitized.quality_assessment = qualityAssessment;
+    sanitized.quality_assessment_status = qualityAssessment.status;
+    sanitized.quality_assessment_decision = qualityAssessment.decision;
+    sanitized.quality_assessment_report_ref = qualityAssessment.report_ref;
+    sanitized.public_repair_command = qualityAssessment.public_repair_command;
+  }
   const rubricSummary = request ? sanitizeDecisionRubricSummary(request.document) : null;
   if (rubricSummary) {
     sanitized.decision_rubric_summary = rubricSummary;
@@ -372,6 +490,12 @@ function buildDisplaySummaries(projection, files) {
     }));
   }
   if (files.decisionRequest) {
+    const pendingDecision = asRecord(projection.pending_decision);
+    const action = asString(pendingDecision.action);
+    const decisionStatus = asString(pendingDecision.operator_decision_status) ?? asString(pendingDecision.status) ?? "awaiting-decision";
+    const description = decisionStatus === "accepted" && action && action !== "continue"
+      ? `${stageLabel(currentStep)} ${action} decision was recorded; use linked repair or retry evidence before continuing.`
+      : `${stageLabel(currentStep)} requires an accepted operator decision before the run can continue.`;
     const decisionSummary = buildArtifactDisplaySummary({
       file: files.decisionRequest.file,
       artifactRef: `run-health://operator-decision-request/${projection.run_id}/${currentStep ?? "current"}`,
@@ -380,8 +504,8 @@ function buildDisplaySummaries(projection, files) {
       type: "operator-request",
       stage: currentStep ?? "delivery",
       label: `${stageLabel(currentStep)} operator decision request`,
-      description: `${stageLabel(currentStep)} requires an accepted operator decision before the run can continue.`,
-      status: "awaiting-decision",
+      description,
+      status: decisionStatus,
       timestamp: asString(projection.generated_at),
     });
     const rubricSummary = sanitizeDecisionRubricSummary(files.decisionRequest.document);
@@ -413,11 +537,25 @@ export function listExternalRunHealthProjectionsForRuntime(init, options = {}) {
         ? readJsonObject(observationRef)
         : null;
       const currentStep = resolveCurrentStep(health, controller);
-      const decisionRequest = readPendingDecisionRequest(reportsRoot, runId, currentStep);
+      const controllerPendingDecision = asRecord(controller?.pending_decision);
+      const pendingDecisionRequest = readPendingDecisionRequest(reportsRoot, runId, currentStep);
+      const materializedOperatorDecision = pendingDecisionRequest
+        ? null
+        : readMaterializedOperatorDecision(reportsRoot, runId, currentStep, controllerPendingDecision);
+      const decisionRequest = pendingDecisionRequest ?? materializedOperatorDecision?.request ?? null;
+      const qualityAssessmentReport = readLatestQualityAssessmentReport(
+        reportsRoot,
+        runId,
+        currentStep,
+        materializedOperatorDecision?.file ?? null,
+      );
       const lifecycle = asRecord(health.lifecycle_completion);
       const controllerHealth = asRecord(health.controller_health);
       const evidenceHealth = asRecord(health.evidence_health);
-      const pendingDecision = sanitizePendingDecision(asRecord(controller?.pending_decision), decisionRequest);
+      const pendingDecision = sanitizePendingDecision(controllerPendingDecision, decisionRequest, {
+        operatorDecision: materializedOperatorDecision,
+        qualityAssessmentReport,
+      });
       const failureSummary = sanitizeFailureSummary(asRecord(health.failure_summary));
       const missingOperatorDecisionSteps = Array.from(new Set([
         ...asStringArray(lifecycle.missing_operator_decision_steps),

@@ -983,6 +983,9 @@ function externalRunHealthRecoverySentences(health) {
 }
 
 function externalRunFailureUserSummary(health) {
+  if (acceptedExternalRunDiagnosis(health)) {
+    return externalRunPendingDecisionUserReason(health);
+  }
   const failure = health?.failure_summary ?? {};
   const rawSummary = typeof failure.summary === "string" ? failure.summary.trim() : "";
   if (!isGenericExternalRunFailureSummary(rawSummary)) return rawSummary;
@@ -1006,13 +1009,35 @@ function externalRunHealthUserSummary(health) {
   ].filter(Boolean).join(" ");
 }
 
+function acceptedExternalRunDecisionStatus(pendingDecision) {
+  const status = String(pendingDecision?.operator_decision_status ?? pendingDecision?.status ?? "").trim().toLowerCase();
+  return status === "accepted" || status === "answered" || status === "completed" || status === "resolved";
+}
+
+function externalRunRepairCommand(pendingDecision) {
+  return String(pendingDecision?.public_repair_command ?? pendingDecision?.quality_assessment?.public_repair_command ?? "").trim();
+}
+
+function acceptedExternalRunDiagnosis(health, pendingDecision = health?.pending_decision) {
+  return String(pendingDecision?.action ?? "").trim() === "diagnose" && acceptedExternalRunDecisionStatus(pendingDecision);
+}
+
 function externalRunPendingDecisionUserReason(health, pendingDecision = health?.pending_decision) {
   if (!pendingDecision || typeof pendingDecision !== "object") return null;
   const rawReason = typeof pendingDecision.reason === "string" ? pendingDecision.reason.trim() : "";
-  if (rawReason && !GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(rawReason)) return rawReason;
   const action = String(pendingDecision.action ?? "").trim();
   if (!action) return null;
   const stepLabel = externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  if (acceptedExternalRunDecisionStatus(pendingDecision) && action === "diagnose") {
+    const repairCommand = externalRunRepairCommand(pendingDecision);
+    if (String(pendingDecision.quality_assessment_status ?? "").trim() === "request_repair") {
+      return repairCommand
+        ? `Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls (${repairCommand}) before retrying or continuing.`
+        : `Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls before retrying or continuing.`;
+    }
+    return "Diagnosis accepted for " + stepLabel + ". Keep the run blocked until repair or retry evidence is recorded through public controls.";
+  }
+  if (rawReason && !GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(rawReason)) return rawReason;
   switch (action) {
     case "answer":
       return `Answer the ${stepLabel} operator question before continuing.`;
@@ -1103,6 +1128,9 @@ function providerFocusStageId(status, externalRunHealth = null) {
 
 function providerFocusTitle(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
+    if (acceptedExternalRunDiagnosis(externalRunHealth)) {
+      return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} repair required`;
+    }
     return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} blocked`;
   }
   if (status?.status === "completed") return "Review / QA gate ready";
@@ -3817,7 +3845,7 @@ function operatorDecisionActionOutcomeCopy(actionId) {
     case "continue":
       return "Continue only after the required checks pass or remain bounded warnings.";
     case "diagnose":
-      return "Record a diagnosis after the required evidence confirms the blocker.";
+      return "Record a diagnosis as a stop state; repair or retry must happen through public controls before continuation.";
     case "block":
       return "Record a blocker decision when continuation is unsafe or evidence is incomplete.";
     case "retry_public_step":

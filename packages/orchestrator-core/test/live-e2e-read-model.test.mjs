@@ -197,6 +197,59 @@ test("control-plane read model projects sibling live E2E run-health for target c
     assert.ok(decisionSummary.decision_rubric_summary.evidence_refs.some((entry) => entry.label === "Decision request"));
     assert.ok(decisionSummary.decision_rubric_summary.evidence_refs.some((entry) => entry.label === "Step plan"));
 
+    fs.writeFileSync(
+      expectedDecisionFile,
+      `${JSON.stringify(
+        {
+          request_id: `${runId}.delivery.operator-decision-request`,
+          step_id: "delivery",
+          status: "accepted",
+          action: "diagnose",
+          source_agent_decision_request_ref: requestFile,
+          semantic_analysis: {
+            status: "not_pass",
+            judge_source: "skill-agent",
+            findings: ["Post-change verification failed; route repair through public controls."],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const qualityAssessmentReportFile = path.join(reportsRoot, `live-e2e-step-quality-assessment-report-${runId}-15-delivery.json`);
+    fs.writeFileSync(
+      qualityAssessmentReportFile,
+      `${JSON.stringify(
+        {
+          run_id: runId,
+          step_id: "delivery",
+          status: "request_repair",
+          decision: "request-repair",
+          source_operator_decision_file: expectedDecisionFile,
+          repair_instructions: ["Run repair only through the public AOR review/repair loop."],
+          repair_lineage: {
+            public_repair_command: "aor review decide --decision request-repair",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const diagnosedProjectState = readProjectState({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
+    assert.equal(diagnosedProjectState.run_health.pending_decision.request_ref, requestFile);
+    assert.equal(diagnosedProjectState.run_health.pending_decision.operator_decision_ref, expectedDecisionFile);
+    assert.equal(diagnosedProjectState.run_health.pending_decision.operator_decision_status, "accepted");
+    assert.equal(diagnosedProjectState.run_health.pending_decision.quality_assessment_status, "request_repair");
+    assert.equal(diagnosedProjectState.run_health.pending_decision.public_repair_command, "aor review decide --decision request-repair");
+    const acceptedDecisionSummary = diagnosedProjectState.artifact_display_summaries.find(
+      (summary) => summary.label === "Delivery operator decision request" && summary.status === "accepted",
+    );
+    assert.ok(acceptedDecisionSummary);
+    assert.match(acceptedDecisionSummary.description, /repair or retry/u);
+
     const runs = listRuns({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
     const runSummary = runs.find((run) => run.run_id === runId);
     assert.ok(runSummary);
