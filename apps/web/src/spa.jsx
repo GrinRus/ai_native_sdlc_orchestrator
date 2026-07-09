@@ -4121,6 +4121,22 @@ function FlowCockpit({
           </div>
           <StatusPill state={recommendedActionStatus} />
         </div>
+        <div className="cockpit-actions">
+          <button className="primary" type="button" onClick={primaryActionButton.onClick} disabled={primaryActionButton.disabled}>
+            <Icon name={primaryActionButton.icon} />
+            {primaryActionButton.label}
+          </button>
+          {!isBlockingExternalRunHealth(externalRunHealth) ? (
+            <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
+              <Icon name={workbenchAction.icon} />
+              {workbenchAction.label}
+            </button>
+          ) : null}
+          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
+            <Icon name="refresh" />
+            {providerFocusActive ? "Refresh Run Status" : "Refresh"}
+          </button>
+        </div>
         <div className="action-grid">
           <div className="next-step-panel">
             <span>What happens next</span>
@@ -4149,22 +4165,6 @@ function FlowCockpit({
             <span>Safety status</span>
             <strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit review required"}</strong>
           </div>
-        </div>
-        <div className="cockpit-actions">
-          <button className="primary" type="button" onClick={primaryActionButton.onClick} disabled={primaryActionButton.disabled}>
-            <Icon name={primaryActionButton.icon} />
-            {primaryActionButton.label}
-          </button>
-          {!isBlockingExternalRunHealth(externalRunHealth) ? (
-            <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
-              <Icon name={workbenchAction.icon} />
-              {workbenchAction.label}
-            </button>
-          ) : null}
-          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
-            <Icon name="refresh" />
-            {providerFocusActive ? "Refresh Run Status" : "Refresh"}
-          </button>
         </div>
       </div>
 
