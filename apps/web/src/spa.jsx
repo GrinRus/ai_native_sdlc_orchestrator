@@ -1927,7 +1927,10 @@ function projectStatusLabel(project) {
   if (flowSummary.status === "completed-only") return "Completed flows";
   if (onboarding.status === "initialized") return "Initialized";
   if (onboarding.status === "runtime-ready") return "Runtime ready";
-  return "First launch";
+  if (onboarding.status === "not-initialized" || onboarding.initialized === false || onboarding.state_exists === false || flowSummary.status === "not-initialized") {
+    return "First launch";
+  }
+  return "Loading";
 }
 
 function shortPathLabel(value) {
