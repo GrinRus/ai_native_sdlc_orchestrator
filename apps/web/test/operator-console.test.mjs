@@ -693,6 +693,7 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /latestRequiredVerificationFailed/u);
   assert.match(source, /verificationFailureSummary/u);
   assert.match(source, /failed_step_result_refs/u);
+  assert.match(source, /heldActionIsCompletedRepair/u);
   assert.match(source, /Fix failed required verification, then rerun/u);
   assert.match(source, /Held downstream action/u);
   assert.match(source, /Verification rerun/u);

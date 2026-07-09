@@ -855,13 +855,14 @@ function verificationFailurePrimaryAction(plan, failures, heldAction) {
     ? "Inspect the verify summary and failed step-result evidence"
     : "Inspect the failed step-result logs";
   const blockedNextStep = firstFailure?.blocked_next_step;
+  const heldActionIsCompletedRepair = heldAction?.action_id === "quality-repair-run-completed";
   return {
     action_id: "resolve-required-verification-failure",
     action_label: "Blocked next step",
     command: `Fix failed required verification, then rerun ${verificationFailureRerunCommand(plan)}`,
     dry_run_label: "Verification rerun",
     dry_run_command: verificationFailureRerunCommand(plan),
-    held_action_label: heldAction?.command ? actionCommandTitle(heldAction) : null,
+    held_action_label: heldAction?.command && !heldActionIsCompletedRepair ? actionCommandTitle(heldAction) : null,
     reason: `${groupLabel} failed (${firstTitle}). ${evidenceCopy}${failedRef ? ` (${compactVisibleValue(failedRef)})` : ""}. ${blockedNextStep ?? "Fix the target change or command prerequisite, then rerun verification before review, QA, or delivery."}`,
   };
 }
