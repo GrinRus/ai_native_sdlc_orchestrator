@@ -711,6 +711,12 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /qualityGateAttemptDetail/u);
   assert.match(source, /Required verification must pass before the review rerun/u);
   assert.match(source, /No automatic repair attempts remain; use failed verification evidence before requesting more repair/u);
+  assert.match(source, /qualityGateRepairAttemptsExhausted/u);
+  assert.match(source, /verificationFailureRepairDecisionCommand/u);
+  assert.match(source, /aor review decide --decision request-repair --repair-context-file <repair-context\.json>/u);
+  assert.match(source, /Request repair with new evidence/u);
+  assert.match(source, /repeated repair context without new evidence must stay blocked/u);
+  assert.match(source, /Rerun required verification only after the next repair completes/u);
   assert.match(source, /Provider execution finished, but required verification failed/u);
   assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
   assert.match(source, /Verification failure recovery path/u);
@@ -722,8 +728,9 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /verificationBlockers = verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\)/u);
   assert.match(source, /verificationFailures\.length > 0\s*\? \[\.\.\.verificationBlockers, \.\.\.presentedActionBlockers\]/u);
   assert.match(source, /completedRepairActionActive/u);
-  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary\)/u);
-  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextAction\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary, qualityGate\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextAction, gate\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextPrimary, qualityGate\)/u);
   assert.match(source, /verificationPlan=\{verificationPlan\}/u);
   assert.match(source, /verificationFailures=\{verificationFailures\}/u);
   assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
