@@ -1954,7 +1954,7 @@ function projectStatusLabel(project) {
   if (onboarding.status === "initialized") return "Initialized";
   if (onboarding.status === "runtime-ready") return "Runtime ready";
   if (onboarding.status === "not-initialized" || onboarding.initialized === false || onboarding.state_exists === false || flowSummary.status === "not-initialized") {
-    return "First launch";
+    return onboarding.can_initialize === true ? "First launch" : "Loading";
   }
   return "Loading";
 }

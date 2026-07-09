@@ -320,6 +320,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Loading",
     "First launch",
     'onboarding.status === "not-initialized"',
+    "onboarding.can_initialize === true",
     "This does not create a flow",
     "if (!flow) return \"readiness\"",
     "newFlowDisabled",
