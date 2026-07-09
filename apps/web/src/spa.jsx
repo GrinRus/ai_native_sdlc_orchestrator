@@ -1677,7 +1677,7 @@ function isDeliveryStageId(value) {
   return String(value ?? "").trim().toLowerCase() === "delivery";
 }
 
-function providerStatusCopy(status, stage = null) {
+function providerStatusCopy(status, stage = null, verificationFailureActive = false) {
   if (!status) return "No active provider step.";
   const progressLabel = status.last_progress_label ?? status.last_progress_kind ?? "stream event";
   if (status.status === "silent-running" && status.last_progress_at) {
@@ -1693,6 +1693,9 @@ function providerStatusCopy(status, stage = null) {
   if (status.last_output_at) return "Provider output observed; step is still running.";
   if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
   if (status.status === "completed") {
+    if (verificationFailureActive) {
+      return "Provider execution finished, but required verification failed. Repair the failed verification before review, QA, delivery, or release.";
+    }
     return isDeliveryStageId(stage)
       ? "Provider execution finished. Delivery artifacts are ready for final operator acceptance and closure."
       : "Provider execution finished. Review validation, review, and QA evidence before delivery.";
@@ -1721,11 +1724,14 @@ function providerCommandDisplayLabel(status) {
   return "Provider CLI session";
 }
 
-function providerCommandDetail(status, stage = null) {
+function providerCommandDetail(status, stage = null, verificationFailureActive = false) {
   const rawLabel = String(status?.current_command_label ?? "").trim();
   if (!isGenericProviderCommandLabel(rawLabel)) return status?.recommended_action ?? "Track this command through provider evidence.";
   const adapter = status?.adapter ?? "configured provider adapter";
   if (status?.status === "completed") {
+    if (verificationFailureActive) {
+      return `The ${adapter} process finished, but required verification failed. Repair failed verification before review, QA, delivery, or release.`;
+    }
     return isDeliveryStageId(stage)
       ? `The ${adapter} process finished. Inspect delivery artifacts and record the final operator decision before closure.`
       : `The ${adapter} process finished. Continue with verification, review, or the next quality gate.`;
@@ -2692,6 +2698,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
   const projectLevelProviderFocus = !flow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
   const blockingExternalRun = isBlockingExternalRunHealth(externalRunHealth);
   const firstRunFocus = (!flow && !projectLevelProviderFocus) || newFlowDraft;
+  const verificationPrimary = latestRequiredVerificationFailed(verificationPlan);
   const railTitle = newFlowDraft
     ? "New flow draft"
     : flow
@@ -2727,7 +2734,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
             <em>{providerStepStatus.adapter ?? providerStepStatus.route_id ?? "provider adapter"}</em>
           </div>
           <StatusPill state={providerStepStatus.status} />
-          <p>{providerStatusCopy(providerStepStatus, currentStage)}</p>
+          <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)}</p>
           <small>
             {formatDurationMs(providerStepStatus.elapsed_ms)}
             {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
@@ -3936,7 +3943,7 @@ function FlowCockpit({
             </div>
             <StatusPill state={providerStepStatus.status} />
           </div>
-          <p>{providerStatusCopy(providerStepStatus, currentStage)}</p>
+          <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)}</p>
           <div className="provider-heartbeat-grid">
             <div>
               <span>Adapter</span>
@@ -3980,7 +3987,7 @@ function FlowCockpit({
           </div>
           <div className="provider-heartbeat-action">
             <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
-            <strong>{providerCommandDetail(providerStepStatus, currentStage)}</strong>
+            <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary)}</strong>
             {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? (
               <small>Raw runner label: external-provider-runner</small>
             ) : null}

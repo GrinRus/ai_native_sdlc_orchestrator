@@ -295,8 +295,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Provider execution finished before a flow could be selected.",
     "Delivery artifacts are ready for final operator acceptance and closure.",
     "Inspect delivery artifacts and record the final operator decision before closure.",
-    "providerStatusCopy(providerStepStatus, currentStage)",
-    "providerCommandDetail(providerStepStatus, currentStage)",
+    "providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)",
+    "providerCommandDetail(providerStepStatus, currentStage, verificationPrimary)",
     "Review QA gate evidence",
     "Provider execution is done. Inspect validation warnings, review findings, and QA evidence before deciding delivery readiness.",
     "Provider run in progress",
@@ -711,6 +711,8 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /qualityGateAttemptDetail/u);
   assert.match(source, /Required verification must pass before the review rerun/u);
   assert.match(source, /No automatic repair attempts remain; use failed verification evidence before requesting more repair/u);
+  assert.match(source, /Provider execution finished, but required verification failed/u);
+  assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
   assert.match(source, /Verification failure recovery path/u);
   assert.match(source, /Fix failed verification first/u);
   assert.match(source, /Repair failed verification/u);
