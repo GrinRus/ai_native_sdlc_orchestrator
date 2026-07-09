@@ -434,6 +434,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "compactDisclosureLabel",
     "Show full ${type}${context}",
     "summary aria-label={disclosureLabel} title={disclosureLabel}",
+    "Show recommended CLI command: ${compactVisibleValue(actionCommand, \"command\")}",
+    "summary aria-label={actionCommandDisclosureLabel} title={actionCommandDisclosureLabel}",
     "ARTIFACT_REF_LABELS",
     "semanticArtifactTitleFromRef",
     "Next Action Report",

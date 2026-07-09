@@ -4032,6 +4032,8 @@ function FlowCockpit({
   const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
   const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
   const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
+  const actionCommand = actionCommandTitle(nextPrimary);
+  const actionCommandDisclosureLabel = `Show recommended CLI command: ${compactVisibleValue(actionCommand, "command")}`;
   const openAdvancedWorkbench = (tabId = "evidence") => {
     if (typeof document === "undefined") return;
     const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
@@ -4160,8 +4162,8 @@ function FlowCockpit({
             <strong>{actionOutcome}</strong>
             <p>{actionDetail}</p>
             <details className="debug-ref-details action-command-details">
-              <summary>Show CLI command</summary>
-              <CompactInlineValue value={actionCommandTitle(nextPrimary)} kind="command" />
+              <summary aria-label={actionCommandDisclosureLabel} title={actionCommandDisclosureLabel}>Show CLI command</summary>
+              <CompactInlineValue value={actionCommand} kind="command" />
             </details>
             {nextPrimary.held_action_label ? (
               <div className="held-action-note">
@@ -4199,7 +4201,7 @@ function FlowCockpit({
           </div>
           <div>
             <span>Next action</span>
-            <strong title={actionCommandTitle(nextPrimary)}>{compactVisibleValue(actionCommandTitle(nextPrimary), "command")}</strong>
+            <strong title={actionCommand}>{compactVisibleValue(actionCommand, "command")}</strong>
           </div>
           <div>
             <span>No-write safety</span>
