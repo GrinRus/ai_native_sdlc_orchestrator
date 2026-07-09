@@ -1163,6 +1163,17 @@ function externalRunRecoveryPathUserSummary(health, pendingDecision = health?.pe
   return `Use the ${stepLabel} recovery path to fix failed verification, preserve evidence, and rerun required checks before continuing.`;
 }
 
+function externalRunExecutableRepairCommand(health, projectContext = null) {
+  const repairCommand = externalRunRepairCommand(health?.pending_decision);
+  if (!repairCommand) return "";
+  let command = repairCommand;
+  command = appendCommandFlag(command, "--project-ref", projectContext?.projectRef);
+  command = appendCommandFlag(command, "--project-profile", projectContext?.projectProfileRef);
+  command = appendCommandFlag(command, "--runtime-root", projectContext?.runtimeRoot);
+  command = appendCommandFlag(command, "--run-id", health?.run_id);
+  return command;
+}
+
 function externalRunContinuationDecisionCopy(health, stepLabel) {
   return externalRunHasSubstantiveFailureSummary(health)
     ? `Record the ${stepLabel} blocker decision before retrying or continuing.`
@@ -1722,11 +1733,12 @@ function executionRecoveryAction(actions, evidence) {
     .find((action) => action?.enabled) ?? actionList.find((action) => action?.enabled) ?? actionList[0] ?? null;
 }
 
-function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null) {
+function executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth = null, projectContext = null) {
   if (externalRunRecoveryPathActive(externalRunHealth)) {
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
     const healthBlockers = externalRunHealthBlockers(externalRunHealth);
-    const repairCommand = externalRunRepairCommand(externalRunHealth.pending_decision);
+    const repairCommand = externalRunExecutableRepairCommand(externalRunHealth, projectContext)
+      || externalRunRepairCommand(externalRunHealth.pending_decision);
     return {
       headingTitle: `${stepLabel} repair path`,
       headingDetail: repairCommand
@@ -2377,10 +2389,28 @@ function compactCommandLabel(value) {
   if (!text) return "pending";
   const parts = text.split(/\s+/u).filter(Boolean);
   const commandPrefix = parts[0] === "aor" ? parts.slice(0, 3).join(" ") : parts.slice(0, 2).join(" ");
-  const flagNames = ["--project-ref", "--runtime-root", "--allowed-path", "--delivery-mode"]
+  const flagNames = ["--project-ref", "--project-profile", "--runtime-root", "--run-id", "--allowed-path", "--delivery-mode"]
     .filter((flag) => parts.includes(flag));
   if (flagNames.length > 0) return `${commandPrefix} (${flagNames.join(", ")})`;
   return text.length > 72 ? `${text.slice(0, 68)}...` : text;
+}
+
+function shellQuoteCommandArg(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) return text;
+  return `'${text.replace(/'/gu, "'\"'\"'")}'`;
+}
+
+function commandHasFlag(command, flag) {
+  const escaped = flag.replace(/[\\^$*+?.()|[\]{}]/gu, "\\$&");
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|=|$)`, "u").test(String(command ?? ""));
+}
+
+function appendCommandFlag(command, flag, value) {
+  const quoted = shellQuoteCommandArg(value);
+  if (!quoted || commandHasFlag(command, flag)) return command;
+  return `${command} ${flag} ${quoted}`;
 }
 
 function compactVisibleValue(value, kind = "auto") {
@@ -4788,14 +4818,14 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   );
 }
 
-function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null }) {
+function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null, projectContext = null }) {
   const hasVisibleExecutionEvidence = Boolean(evidence || externalRunHealth);
   const statusRows = executionStatusRows(evidence, externalRunHealth);
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
   const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
   const recoveryPlan = hasVisibleExecutionEvidence
-    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth)
+    ? executionRecoveryPlan(evidence, providerEvidenceRows, blockers, actions, externalRunHealth, projectContext)
     : null;
   return (
     <section className="work-card execution-evidence-panel">
@@ -5136,6 +5166,7 @@ function FlowAdvancedWorkbench({
   submitAnswer,
   decisionRequests,
   externalRunHealth,
+  projectContext,
   busy,
 }) {
   const [expanded, setExpanded] = useState(defaultAdvancedWorkbenchOpen);
@@ -5187,6 +5218,7 @@ function FlowAdvancedWorkbench({
         copyRef={copyRef}
         busy={busy}
         externalRunHealth={externalRunHealth}
+        projectContext={projectContext}
       />
     ) : selected.id === "graph" ? (
       <EvidenceGraphPanel graph={evidenceGraph} />
@@ -6693,6 +6725,11 @@ function App() {
           submitAnswer={submitAnswer}
           decisionRequests={operatorDecisionRequests}
           externalRunHealth={externalRunHealth}
+          projectContext={{
+            projectRef: activeProjectDisplay?.project_root ?? projectState?.project_root ?? config?.project_root,
+            projectProfileRef: activeProjectDisplay?.project_profile_ref ?? projectState?.project_profile_ref ?? config?.project_profile_ref,
+            runtimeRoot,
+          }}
           busy={busy}
         />
       )}

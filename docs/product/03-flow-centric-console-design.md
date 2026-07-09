@@ -190,7 +190,9 @@ The packaged SPA now treats the flow as the primary object:
   provider evidence to preserve, and the next public control to use. When
   run-health exposes a repair-required blocker and
   `pending_decision.public_repair_command`, the panel promotes that public
-  repair command instead of falling back to generic diagnose/retry controls.
+  repair command with the current `--project-ref`, `--project-profile`,
+  `--runtime-root`, and `--run-id` context instead of falling back to generic
+  diagnose/retry controls.
   Scratch-only output is explicitly non-passing, while `.qwen/`, `.codex/`,
   `.claude/`, and `.opencode/` target checkout state is shown as blocking
   runner-owned leakage.
