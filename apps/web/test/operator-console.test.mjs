@@ -219,6 +219,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Run assessment needed",
     "Assessment checks",
     "awaiting-assessment",
+    "Review blocker",
     "Run decision needed",
     "Decision checks",
     "awaiting-decision",

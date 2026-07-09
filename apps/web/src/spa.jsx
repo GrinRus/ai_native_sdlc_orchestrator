@@ -6280,13 +6280,27 @@ function App() {
     ? "Draft flow"
     : selectedFlow?.status ?? (projectLevelProviderFocus ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth) : "No active flow");
   const topbarAskReason = blockingExternalRunHealth
-    ? "Use the Decision Request workbench before asking for another flow action."
+    ? isStepQualityAssessmentPendingRunHealth(externalRunHealth)
+      ? "Use the assessment evidence workbench before asking for another flow action."
+      : isControllerDecisionPendingRunHealth(externalRunHealth)
+        ? "Use the Decision Request workbench before asking for another flow action."
+        : "Review the run blocker evidence before asking for another flow action."
     : selectedFlow
     ? "Ask AOR for selected flow"
     : projectLevelProviderFocus
       ? "Ask AOR needs a selectable flow; use run evidence controls for this blocker."
       : "Ask AOR requires a selected active flow";
-  const topbarAskLabel = blockingExternalRunHealth ? "Decision needed" : selectedFlow ? "Ask AOR for selected flow" : projectLevelProviderFocus ? "Ask AOR needs a flow" : "Ask AOR for selected flow";
+  const topbarAskLabel = blockingExternalRunHealth
+    ? isStepQualityAssessmentPendingRunHealth(externalRunHealth)
+      ? "Assessment needed"
+      : isControllerDecisionPendingRunHealth(externalRunHealth)
+        ? "Decision needed"
+        : "Review blocker"
+    : selectedFlow
+      ? "Ask AOR for selected flow"
+      : projectLevelProviderFocus
+        ? "Ask AOR needs a flow"
+        : "Ask AOR for selected flow";
   const runtimeRoot = projectState?.runtime_root ?? activeProjectDisplay?.runtime_root ?? config?.runtime_root ?? ".aor";
   const activeProjectStatusRuntimeReady =
     activeProjectRuntimeReady ||
