@@ -725,6 +725,14 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /Rerun required verification only after the next repair completes/u);
   assert.match(source, /Provider execution finished, but required verification failed/u);
   assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
+  const recommendedActionRenderIndex = source.indexOf('<div className="recommended-action">');
+  const providerHeartbeatRenderIndex = source.indexOf("{providerHeartbeatPanel}");
+  assert.ok(recommendedActionRenderIndex >= 0, "Active cockpit should render the recommended action block.");
+  assert.ok(providerHeartbeatRenderIndex >= 0, "Active cockpit should render provider heartbeat from a reusable panel.");
+  assert.ok(
+    recommendedActionRenderIndex < providerHeartbeatRenderIndex,
+    "Provider heartbeat telemetry should stay below the primary recommended action.",
+  );
   assert.match(source, /Verification failure recovery path/u);
   assert.match(source, /Fix failed verification first/u);
   assert.match(source, /Repair failed verification/u);

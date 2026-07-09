@@ -3969,6 +3969,66 @@ function FlowCockpit({
       focusWorkbench();
     }
   };
+  const providerHeartbeatPanel = providerStepStatus ? (
+    <div className={`provider-heartbeat-card ${providerStepStatus.status}`}>
+      <div className="provider-heartbeat-header">
+        <div>
+          <span>Provider heartbeat</span>
+          <h3>{providerStepStatus.provider ?? "External provider"}</h3>
+        </div>
+        <StatusPill state={providerStepStatus.status} />
+      </div>
+      <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)}</p>
+      <div className="provider-heartbeat-grid">
+        <div>
+          <span>Adapter</span>
+          <strong>{providerStepStatus.adapter ?? "unknown"}</strong>
+        </div>
+        <div>
+          <span>Route</span>
+          <strong>{providerStepStatus.route_id ?? "unknown"}</strong>
+        </div>
+        <div>
+          <span>Elapsed / budget</span>
+          <strong>
+            {formatDurationMs(providerStepStatus.elapsed_ms)}
+            {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
+          </strong>
+        </div>
+        <div>
+          <span>Remaining</span>
+          <strong>{formatDurationMs(providerStepStatus.remaining_budget_ms)}</strong>
+        </div>
+        <div>
+          <span>Last output</span>
+          <strong>{providerLastOutputLabel(providerStepStatus)}</strong>
+        </div>
+        <div>
+          <span>Last progress</span>
+          <strong>{providerLastProgressLabel(providerStepStatus)}</strong>
+        </div>
+        <div>
+          <span>Activity</span>
+          <strong>{providerActivityLabel(providerStepStatus)}</strong>
+        </div>
+        <div>
+          <span>Last artifact</span>
+          <strong>{formatProviderTimestamp(providerStepStatus.last_artifact_update_at)}</strong>
+        </div>
+        <div>
+          <span>Output mode</span>
+          <strong>{providerOutputModeLabel(providerStepStatus)}</strong>
+        </div>
+      </div>
+      <div className="provider-heartbeat-action">
+        <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
+        <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary)}</strong>
+        {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? (
+          <small>Raw runner label: external-provider-runner</small>
+        ) : null}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <section className={`work-card flow-cockpit ${completed ? "read-only" : "active"}`}>
@@ -3985,67 +4045,6 @@ function FlowCockpit({
           {providerFocusActive ? "Refresh" : completed ? "Inspect" : "Ask AOR"}
         </button>
       </div>
-
-      {providerStepStatus ? (
-        <div className={`provider-heartbeat-card ${providerStepStatus.status}`}>
-          <div className="provider-heartbeat-header">
-            <div>
-              <span>Provider heartbeat</span>
-              <h3>{providerStepStatus.provider ?? "External provider"}</h3>
-            </div>
-            <StatusPill state={providerStepStatus.status} />
-          </div>
-          <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary)}</p>
-          <div className="provider-heartbeat-grid">
-            <div>
-              <span>Adapter</span>
-              <strong>{providerStepStatus.adapter ?? "unknown"}</strong>
-            </div>
-            <div>
-              <span>Route</span>
-              <strong>{providerStepStatus.route_id ?? "unknown"}</strong>
-            </div>
-            <div>
-              <span>Elapsed / budget</span>
-              <strong>
-                {formatDurationMs(providerStepStatus.elapsed_ms)}
-                {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
-              </strong>
-            </div>
-            <div>
-              <span>Remaining</span>
-              <strong>{formatDurationMs(providerStepStatus.remaining_budget_ms)}</strong>
-            </div>
-            <div>
-              <span>Last output</span>
-              <strong>{providerLastOutputLabel(providerStepStatus)}</strong>
-            </div>
-            <div>
-              <span>Last progress</span>
-              <strong>{providerLastProgressLabel(providerStepStatus)}</strong>
-            </div>
-            <div>
-              <span>Activity</span>
-              <strong>{providerActivityLabel(providerStepStatus)}</strong>
-            </div>
-            <div>
-              <span>Last artifact</span>
-              <strong>{formatProviderTimestamp(providerStepStatus.last_artifact_update_at)}</strong>
-            </div>
-            <div>
-              <span>Output mode</span>
-              <strong>{providerOutputModeLabel(providerStepStatus)}</strong>
-            </div>
-          </div>
-          <div className="provider-heartbeat-action">
-            <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
-            <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary)}</strong>
-            {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? (
-              <small>Raw runner label: external-provider-runner</small>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
       <div className="recommended-action">
         <div className="action-header">
@@ -4101,6 +4100,8 @@ function FlowCockpit({
           </button>
         </div>
       </div>
+
+      {providerHeartbeatPanel}
 
       {!completed ? (
         <div className="active-flow-handoff" aria-label="Active flow status summary">
