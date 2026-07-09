@@ -2055,8 +2055,31 @@ function CompactDetailValue({ value, copyValue = null, kind = "auto" }) {
   );
 }
 
-function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAddProject, busy }) {
-  const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
+function projectWithObservedRuntime(project) {
+  if (!project) return project;
+  const onboarding = project.onboarding_summary ?? {};
+  if (onboarding.initialized === true || onboarding.state_exists === true || onboarding.status === "initialized" || onboarding.status === "runtime-ready") {
+    return project;
+  }
+  return {
+    ...project,
+    onboarding_summary: {
+      ...onboarding,
+      status: "initialized",
+      initialized: true,
+      state_exists: true,
+      can_initialize: false,
+      recommended_action: onboarding.recommended_action ?? "start-or-select-flow",
+    },
+  };
+}
+
+function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAddProject, busy, activeRuntimeReady = false }) {
+  const activeProjectBase = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
+  const activeProject = activeRuntimeReady ? projectWithObservedRuntime(activeProjectBase) : activeProjectBase;
+  const displayProjects = activeRuntimeReady && activeProject
+    ? projects.map((project) => (project.project_id === activeProject.project_id ? activeProject : project))
+    : projects;
   const runtimeRoot = activeProject?.runtime_root ?? "runtime pending";
   const runtimeRootLabel = shortPathLabel(runtimeRoot);
   const activeProjectLabel = projectDisplayLabel(activeProject);
@@ -2075,9 +2098,9 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
           title={activeProjectTitle}
           value={activeProject?.project_id ?? ""}
           onChange={(event) => onSelectProject(event.target.value)}
-          disabled={busy || projects.length === 0}
+          disabled={busy || displayProjects.length === 0}
         >
-          {projects.map((project) => (
+          {displayProjects.map((project) => (
             <option key={project.project_id} value={project.project_id} title={project.label ?? project.display_name ?? project.project_id}>
               {projectDisplayLabel(project)}
             </option>
@@ -6031,6 +6054,11 @@ function App() {
       : "Ask AOR requires a selected active flow";
   const topbarAskLabel = blockingExternalRunHealth ? "Decision needed" : selectedFlow ? "Ask AOR for selected flow" : projectLevelProviderFocus ? "Ask AOR needs a flow" : "Ask AOR for selected flow";
   const runtimeRoot = projectState?.runtime_root ?? activeProjectDisplay?.runtime_root ?? config?.runtime_root ?? ".aor";
+  const activeProjectStatusRuntimeReady =
+    activeProjectRuntimeReady ||
+    providerWorkbenchFocus ||
+    Boolean(providerStepStatus || externalRunHealth) ||
+    (Array.isArray(runs) && runs.length > 0);
 
   return (
     <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
@@ -6048,6 +6076,7 @@ function App() {
           onSelectProject={selectProject}
           onOpenAddProject={openAddProjectDrawer}
           busy={busy}
+          activeRuntimeReady={activeProjectStatusRuntimeReady}
         />
         <FlowSelector
           flows={flowOptions}
