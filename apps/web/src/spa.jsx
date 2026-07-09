@@ -1387,14 +1387,18 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
   const action = String(pendingDecision.action ?? "").trim();
   if (!action) return null;
   const stepLabel = externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  const qualityAssessmentStatus = String(pendingDecision.quality_assessment_status ?? "").trim().toLowerCase().replace(/_/gu, "-");
+  const repairCommand = externalRunRepairCommand(pendingDecision);
   if (acceptedExternalRunDecisionStatus(pendingDecision) && action === "diagnose") {
-    const repairCommand = externalRunRepairCommand(pendingDecision);
-    if (String(pendingDecision.quality_assessment_status ?? "").trim() === "request_repair") {
+    if (qualityAssessmentStatus === "request-repair") {
       return repairCommand
         ? `Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls (${repairCommand}) before retrying or continuing.`
         : `Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls before retrying or continuing.`;
     }
     return "Diagnosis accepted for " + stepLabel + ". Keep the run blocked until repair or retry evidence is recorded through public controls.";
+  }
+  if (action === "diagnose" && (qualityAssessmentStatus === "request-repair" || repairCommand)) {
+    return `Diagnosis moved ${stepLabel} into repair. Use the public repair path before QA, delivery, or continuation.`;
   }
   if (rawReason && !isGenericExternalRunPendingDecisionReason(rawReason)) return rawReason;
   switch (action) {

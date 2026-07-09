@@ -235,6 +235,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "missingRunHealthEvidenceSentence",
     "Run-health has ${count} unresolved evidence ${noun}",
     "Review and repair ${count} missing run-health evidence ${noun}",
+    "Diagnosis moved ${stepLabel} into repair.",
+    "Use the public repair path before QA, delivery, or continuation.",
     "Open the ${stepLabel} decision request",
     "record the operator diagnosis before continuing.",
     "externalRunPendingDecisionUserReason(externalRunHealth, pending)",
