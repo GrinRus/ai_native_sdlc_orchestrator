@@ -205,6 +205,9 @@ human gate or a real environment failure.
 - Rendered desktop and mobile checks covered a missing step-quality assessment
   fixture with a selected active flow, completed provider status, blocked
   `run_health`, and no materialized operator decision request.
+- Rendered desktop and mobile checks covered a failed required verification
+  fixture where the next-action still pointed at review but post-run
+  verification was the active recovery gate.
 
 ### UX quality report
 
@@ -250,6 +253,7 @@ human gate or a real environment failure.
 | Materialized continue decision visibility | After a controller decision request wrote the expected `continue` decision file, the read model could hide both the request and the decision status because `continue` decisions were excluded from materialized-decision lookup. A first-time operator could see stale `Decision needed` copy even though the public decision artifact existed. | Materialized `continue` decisions are now linked back to their source request, exposed with operator-decision ref/status and rubric metadata, and rendered as `decision recorded` / `refresh run status` guidance instead of asking the operator to repeat an accepted decision. |
 | Completed-flow read-only follow-up | A completed flow still showed disabled `Resolve Next Action`, `patch-only`, and explicit-review copy in the recommended action area, while follow-up creation inherited the completed flow's prior delivery mode. | Completed flows now promote `Inspect Evidence` and `Create Follow-up`, render `read-only` / `Completed evidence locked` safety context, and default follow-up drafts from learning handoff guidance to `No-Write (Safe)` while keeping the source flow locked. |
 | Missing assessment evidence with completed provider | When a selected active flow had terminal provider status plus blocked `run_health` for missing step-quality assessment evidence, the terminal provider heartbeat suppressed the assessment gate. The cockpit showed `Resolve Next Action`, `New Flow` stayed enabled, and the user could miss that evaluator-authored assessment was the next required step. | Step-quality assessment blockers now always keep `run_health` primary over terminal provider status, so the topbar/cockpit show `Assessment needed`, the primary action opens `Assessment Evidence`, provider copy explains the active gate, and `New Flow` is disabled until the assessment is complete. |
+| Failed verification command and escape hatch | A failed required verification state without an external run-health blocker still showed `Resolve Next Action`, exposed prose as the recommended CLI command, and left `New Flow` available even though review, QA, delivery, and release were blocked. | Failed required verification now promotes `Recovery Path` as the primary cockpit action, keeps the command disclosure to the executable `aor project verify ...` rerun command, preserves the held downstream review action separately, and disables `New Flow` until the recovery path is resolved. |
 | Responsive readability | The inspected desktop and mobile states had no horizontal overflow or clipped primary blocker/decision copy. | Keep the current compact recovery labels as the baseline for the next live E2E pass. |
 
 ### Follow-up plan
@@ -262,7 +266,8 @@ human gate or a real environment failure.
    first-time-user perspective when a later step produces a substantive
    provider, target, or validation blocker.
 3. Add or verify non-happy-path rendered coverage for rejected operator
-   decisions, failed required verification groups, and repair-request loops.
+   decisions and repair-request loops; failed required verification command and
+   escape-hatch coverage is now represented in the rendered fixture above.
 4. Keep future UI changes scoped to `apps/web/**`, product/backlog source docs,
    tests, and packaged dist unless a finding proves a contract or control-plane
    read-model gap.

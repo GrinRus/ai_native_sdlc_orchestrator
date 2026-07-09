@@ -929,12 +929,12 @@ function verificationFailurePrimaryAction(plan, failures, heldAction, qualityGat
   }
   return {
     action_id: "resolve-required-verification-failure",
-    action_label: "Blocked next step",
-    command: `Fix failed required verification, then rerun ${verificationFailureRerunCommand(plan)}`,
-    dry_run_label: "Verification rerun",
+    action_label: "Fix failed verification first",
+    command: verificationFailureRerunCommand(plan),
+    dry_run_label: "Verification rerun after fix",
     dry_run_command: verificationFailureRerunCommand(plan),
     held_action_label: heldAction?.command && !heldActionIsCompletedRepair ? actionCommandTitle(heldAction) : null,
-    reason: `${groupLabel} failed (${firstTitle}). ${evidenceCopy}${failedRef ? ` (${compactVisibleValue(failedRef)})` : ""}. ${blockedNextStep ?? "Fix the target change or command prerequisite, then rerun verification before review, QA, or delivery."}`,
+    reason: `${groupLabel} failed (${firstTitle}). ${evidenceCopy}${failedRef ? ` (${compactVisibleValue(failedRef)})` : ""}. ${blockedNextStep ?? "Fix the target change or command prerequisite first, then rerun verification before review, QA, or delivery."}`,
   };
 }
 
@@ -4064,10 +4064,12 @@ function FlowCockpit({
       return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
     })
   );
-  const workbenchAction = externalRunWorkbenchAction(
-    providerFocusActive ? externalRunHealth : null,
-    hasOpenDecisionRequest,
-  );
+  const workbenchAction = verificationPrimary
+    ? { label: "Recovery Path", icon: "target", tabId: "execution" }
+    : externalRunWorkbenchAction(
+      providerFocusActive ? externalRunHealth : null,
+      hasOpenDecisionRequest,
+    );
   const primaryActionButton = completed
     ? {
         label: "Inspect Evidence",
@@ -4075,6 +4077,13 @@ function FlowCockpit({
         onClick: () => openAdvancedWorkbench("evidence"),
         disabled: busy,
       }
+    : verificationPrimary
+    ? {
+      label: workbenchAction.label,
+      icon: workbenchAction.icon,
+      onClick: () => openAdvancedWorkbench(workbenchAction.tabId),
+      disabled: busy,
+    }
     : providerFocusActive
     ? {
       label: isBlockingExternalRunHealth(externalRunHealth) ? workbenchAction.label : "Refresh Run Status",
@@ -4241,7 +4250,7 @@ function FlowCockpit({
               <Icon name={followUpEligible ? "target" : "plus"} />
               {followUpEligible ? "Create Follow-up" : "Start New Flow"}
             </button>
-          ) : !isBlockingExternalRunHealth(externalRunHealth) ? (
+          ) : !verificationPrimary && !isBlockingExternalRunHealth(externalRunHealth) ? (
             <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
               <Icon name={workbenchAction.icon} />
               {workbenchAction.label}
@@ -6336,6 +6345,12 @@ function App() {
   );
   const blockingExternalRunHealth = !draftSurface && isBlockingExternalRunHealth(externalRunHealth);
   const newFlowBlockedByRunHealthReason = blockingExternalRunHealth ? externalRunNewFlowBlockedReason(externalRunHealth) : "";
+  const selectedFlowVerificationFailures = !draftSurface && selectedFlow && !isCompletedFlow(selectedFlow)
+    ? failedRequiredVerificationGroups(projectState?.verification_plan)
+    : [];
+  const newFlowBlockedByVerificationReason = selectedFlowVerificationFailures.length > 0
+    ? "Resolve the current failed verification Recovery Path before starting a new flow."
+    : "";
   const activeProviderStep = !draftSurface && (
     isActiveProviderStepStatus(providerStepStatus)
     || providerStepSupersedesRunHealth
@@ -6718,6 +6733,12 @@ function App() {
         operatorDecisionRequests.some((request) => isOpenOperatorDecisionStatus(request.status)),
       ).tabId);
       pushActivity("flow.new-blocked", newFlowBlockedByRunHealthReason || "Resolve the current run blocker before starting a new flow.");
+      return;
+    }
+    if (newFlowBlockedByVerificationReason) {
+      setSelectedStage(toUiStageId(nextAction?.project_state?.stage ?? selectedFlow?.selected_stage ?? "review"));
+      focusAdvancedWorkbench("execution");
+      pushActivity("flow.new-blocked", newFlowBlockedByVerificationReason);
       return;
     }
     flowSelectionVersion.current += 1;
@@ -7147,8 +7168,8 @@ function App() {
       ? "Wait for the current console action to finish before starting a new flow."
       : !activeProjectRuntimeReady
         ? "Initialize the project runtime before starting a flow."
-        : newFlowBlockedByRunHealthReason;
-  const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason);
+        : newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason;
+  const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
 
   return (
     <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>

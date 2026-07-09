@@ -751,9 +751,11 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /postRunVerificationStatus/u);
   assert.match(source, /executionStatusRows\(evidence, externalRunHealth, verificationPlan\)/u);
   assert.match(source, /heldActionIsCompletedRepair/u);
-  assert.match(source, /Fix failed required verification, then rerun/u);
+  assert.match(source, /action_label: "Fix failed verification first"/u);
+  assert.match(source, /command: verificationFailureRerunCommand\(plan\)/u);
+  assert.doesNotMatch(source, /Fix failed required verification, then rerun/u);
   assert.match(source, /Held downstream action/u);
-  assert.match(source, /Verification rerun/u);
+  assert.match(source, /Verification rerun after fix/u);
   assert.match(source, /VerificationFailureBanner/u);
   assert.match(source, /Required verification failed/u);
   assert.match(source, /Review is blocked by failed post-run evidence/u);
@@ -776,6 +778,11 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /Rerun required verification only after the next repair completes/u);
   assert.match(source, /Provider execution finished, but required verification failed/u);
   assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
+  assert.match(source, /const workbenchAction = verificationPrimary\s*\?\s*\{ label: "Recovery Path", icon: "target", tabId: "execution" \}/u);
+  assert.match(source, /label: workbenchAction\.label,[\s\S]*?onClick: \(\) => openAdvancedWorkbench\(workbenchAction\.tabId\),/u);
+  assert.match(source, /!verificationPrimary && !isBlockingExternalRunHealth\(externalRunHealth\)/u);
+  assert.match(source, /newFlowBlockedByVerificationReason/u);
+  assert.match(source, /Resolve the current failed verification Recovery Path before starting a new flow\./u);
   assert.match(source, /providerEvidenceStripSummary/u);
   assert.match(source, /counts\.missing > 0 \? `\$\{counts\.missing\} missing`/u);
   assert.match(source, /counts\.unreadable > 0 \? `\$\{counts\.unreadable\} unreadable`/u);
