@@ -209,6 +209,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "externalRunContinuationDecisionCopy",
     "externalRunAttentionLabel",
     "externalRunDerivedEvidenceStatus",
+    "externalRunRiskLevel",
     "Record the ${stepLabel} blocker decision before retrying or continuing.",
     "Open the ${stepLabel} decision request and record the operator decision before continuing.",
     "${stepLabel} decision request",

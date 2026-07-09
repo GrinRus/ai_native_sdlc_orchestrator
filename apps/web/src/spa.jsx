@@ -1319,6 +1319,13 @@ function externalRunDerivedEvidenceStatus(health, fallback = "blocked") {
   return isControllerDecisionPendingRunHealth(health) ? "awaiting-decision" : fallback;
 }
 
+function externalRunRiskLevel(health, blockers, deliveryMode) {
+  if (Array.isArray(blockers) && blockers.length > 0) {
+    return isControllerDecisionPendingRunHealth(health) ? "Decision needed" : "Blocked";
+  }
+  return deliveryMode === "no-write" ? "Low" : "Gated";
+}
+
 function projectRunEvidenceIdentity(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
     return providerFocusTitle(status, externalRunHealth);
@@ -2572,7 +2579,7 @@ function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blo
       ? "No upstream writes. Analysis and evidence only."
       : "Explicit allowed paths and review gates required."
   );
-  const riskLevel = blockers.length > 0 ? "Blocked" : deliveryMode === "no-write" ? "Low" : "Gated";
+  const riskLevel = externalRunRiskLevel(projectLevelProviderFocus ? externalRunHealth : null, blockers, deliveryMode);
   const visibleEvidence = evidenceRefs.length > 0
     ? artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id)
     : projectLevelProviderFocus
@@ -2935,7 +2942,7 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows
             <h3>{runStepContext.title}</h3>
             <p>{runStepContext.description}</p>
           </div>
-          <StatusPill state={blockers.length > 0 ? "blocked" : "ready"} />
+          <StatusPill state={externalRunDerivedEvidenceStatus(externalRunHealth, blockers.length > 0 ? "blocked" : "ready")} />
         </div>
         <div className="stage-signal-grid">
           {signals.map((signal) => {
@@ -3856,7 +3863,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
         ) : providerFocusActive ? (
           <div className="flow-inventory-row selected">
             <strong>{providerFocusTitle(providerStepStatus, externalRunHealth)}</strong>
-            <span>{externalRunHealth?.status ?? providerStepStatus?.status}</span>
+            <span>{isBlockingExternalRunHealth(externalRunHealth) ? externalRunDerivedEvidenceStatus(externalRunHealth) : externalRunHealth?.status ?? providerStepStatus?.status}</span>
           </div>
         ) : (
           <p>No active flow selected.</p>
