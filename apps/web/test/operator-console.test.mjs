@@ -725,6 +725,13 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /Rerun required verification only after the next repair completes/u);
   assert.match(source, /Provider execution finished, but required verification failed/u);
   assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
+  assert.match(source, /providerEvidenceStripSummary/u);
+  assert.match(source, /counts\.missing > 0 \? `\$\{counts\.missing\} missing`/u);
+  assert.match(source, /counts\.unreadable > 0 \? `\$\{counts\.unreadable\} unreadable`/u);
+  assert.match(source, /providerEvidenceStripSummary\(providerEvidenceRows\)/u);
+  assert.match(source, /label\.replace\(\/\\s\+missing\$\/iu, ""\)/u);
+  assert.match(source, /run_id: evidence\?\.run_id \?\? externalRunHealth\?\.run_id/u);
+  assert.doesNotMatch(source, /run_id: evidence\.run_id/u);
   const recommendedActionRenderIndex = source.indexOf('<div className="recommended-action">');
   const providerHeartbeatRenderIndex = source.indexOf("{providerHeartbeatPanel}");
   assert.ok(recommendedActionRenderIndex >= 0, "Active cockpit should render the recommended action block.");

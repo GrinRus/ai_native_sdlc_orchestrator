@@ -431,7 +431,12 @@ function looksLikeTechnicalRef(value) {
 
 function conciseArtifactLabel(row) {
   const label = String(row?.label ?? "").trim();
-  if (label && !looksLikeTechnicalRef(label)) return label;
+  const status = String(row?.status ?? "").toLowerCase();
+  if (label && !looksLikeTechnicalRef(label)) {
+    if (status === "missing") return label.replace(/\s+missing$/iu, "") || label;
+    if (status === "unreadable") return label.replace(/\s+unreadable$/iu, "") || label;
+    return label;
+  }
 
   const semanticTitle = semanticArtifactTitleFromRef(row?.rawRef ?? row?.ref ?? row?.sourceRef ?? "");
   if (semanticTitle) return semanticTitle;
@@ -441,10 +446,29 @@ function conciseArtifactLabel(row) {
 
   const stage = humanizeToken(row?.stage);
   const kind = humanizeToken(row?.kind);
-  const status = String(row?.status ?? "").toLowerCase();
   if (status === "missing") return `${stage ? `${stage} ` : ""}Evidence Missing`.trim();
   if (stage && kind && stage.toLowerCase() !== kind.toLowerCase()) return `${stage} ${kind}`;
   return kind || stage || "Evidence Artifact";
+}
+
+function providerEvidenceStripSummary(rows) {
+  const items = Array.isArray(rows) ? rows : [];
+  if (items.length === 0) return "No linked refs";
+  const counts = items.reduce(
+    (current, row) => {
+      const status = String(row?.status ?? "ready").toLowerCase();
+      if (status === "missing") return { ...current, missing: current.missing + 1 };
+      if (status === "unreadable") return { ...current, unreadable: current.unreadable + 1 };
+      return { ...current, readable: current.readable + 1 };
+    },
+    { readable: 0, missing: 0, unreadable: 0 },
+  );
+  const parts = [
+    counts.readable > 0 ? `${counts.readable} readable` : "",
+    counts.missing > 0 ? `${counts.missing} missing` : "",
+    counts.unreadable > 0 ? `${counts.unreadable} unreadable` : "",
+  ].filter(Boolean);
+  return `${parts.join(", ")} ref${items.length === 1 ? "" : "s"}`;
 }
 
 function artifactActionLabel(action, row) {
@@ -5225,7 +5249,7 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy,
           <div className="provider-evidence-strip">
             <div>
               <span>Provider raw evidence</span>
-              <strong>{providerEvidenceRows.length} readable refs</strong>
+              <strong>{providerEvidenceStripSummary(providerEvidenceRows)}</strong>
             </div>
             {providerEvidenceRows.length > 0 ? providerEvidenceRows.slice(0, 4).map((row) => (
               <button className="artifact-chip-button" type="button" key={row.ref} onClick={() => copyRef(row.rawRef ?? row.ref)} disabled={busy}>
@@ -5255,7 +5279,11 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy,
           </div>
           <details className="debug-ref-details execution-debug">
             <summary>Debug execution payload</summary>
-            <code>{JSON.stringify({ run_id: evidence.run_id, status: evidence.status, required_path_prefixes: evidence.required_path_prefixes ?? [] })}</code>
+            <code>{JSON.stringify({
+              run_id: evidence?.run_id ?? externalRunHealth?.run_id ?? externalRunHealth?.blocked_run_id ?? null,
+              status: evidence?.status ?? externalRunHealth?.status ?? null,
+              required_path_prefixes: evidence?.required_path_prefixes ?? externalRunHealth?.required_path_prefixes ?? [],
+            })}</code>
           </details>
         </>
       )}
