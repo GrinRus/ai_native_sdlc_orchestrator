@@ -182,6 +182,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "provider_step_status",
     "activeProviderSupersedesExternalRunBlocker",
     "externalRunHealthHasMaterializedDecisionRequest",
+    "externalRunHealthHasOpenDecisionRequest",
     "isProviderStepDisplayStatus",
     "providerStepSupersedesRunHealth",
     "displayExternalRunHealth(rawExternalRunHealth, providerStepStatus)",

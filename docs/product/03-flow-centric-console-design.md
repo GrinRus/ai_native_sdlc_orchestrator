@@ -157,7 +157,9 @@ The packaged SPA now treats the flow as the primary object:
   `diagnose`, `retry_public_step`, or `block`, the console must keep the source
   request, accepted decision ref, and any linked step-quality repair status
   visible, and must describe the safe next public control path instead of
-  implying that the same decision still needs to be recorded.
+  implying that the same decision still needs to be recorded. The primary CTA
+  must move to the repair or blocker workbench after the decision request is
+  accepted.
 - Repair next actions must be executable as shown. If a review- or QA-origin
   repair requires approved handoff or promotion evidence, the generated
   `aor run start ...repair` command must carry those refs so first-time users do

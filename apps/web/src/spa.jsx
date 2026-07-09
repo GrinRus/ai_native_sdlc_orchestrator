@@ -875,6 +875,16 @@ function externalRunHealthHasMaterializedDecisionRequest(health) {
   );
 }
 
+function externalRunHealthHasOpenDecisionRequest(health) {
+  if (!externalRunHealthHasMaterializedDecisionRequest(health)) return false;
+  const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
+  const status = normalizeOperatorDecisionStatus(
+    pending.status ?? pending.operator_decision_status ?? health?.resume_interaction_health?.status ?? "awaiting-decision",
+    "awaiting-decision",
+  );
+  return isOpenOperatorDecisionStatus(status);
+}
+
 function activeProviderSupersedesExternalRunBlocker(health, status) {
   if (!isProviderStepDisplayStatus(status) || !isBlockingExternalRunHealth(health)) return false;
   const pending = health?.pending_decision && typeof health.pending_decision === "object" ? health.pending_decision : {};
@@ -3472,7 +3482,7 @@ function FlowCockpit({
   const verificationPrimary = completed ? null : verificationFailurePrimaryAction(verificationPlan, verificationFailures, resolverPrimary);
   const nextPrimary = verificationPrimary ?? resolverPrimary;
   const hasOpenDecisionRequest = providerFocusActive && (
-    externalRunHealthHasMaterializedDecisionRequest(externalRunHealth)
+    externalRunHealthHasOpenDecisionRequest(externalRunHealth)
     || visibleEvidence.some((row) => {
       return isOperatorDecisionRequestRow(row) && isOpenOperatorDecisionStatus(row.status);
     })
