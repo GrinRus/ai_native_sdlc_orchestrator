@@ -208,6 +208,9 @@ human gate or a real environment failure.
 - Rendered desktop and mobile checks covered a failed required verification
   fixture where the next-action still pointed at review but post-run
   verification was the active recovery gate.
+- Rendered desktop and mobile checks covered an exhausted repair-request loop
+  where required verification failed after the automatic repair budget reached
+  zero and the next public action was a new `request-repair` decision.
 
 ### UX quality report
 
@@ -254,6 +257,7 @@ human gate or a real environment failure.
 | Completed-flow read-only follow-up | A completed flow still showed disabled `Resolve Next Action`, `patch-only`, and explicit-review copy in the recommended action area, while follow-up creation inherited the completed flow's prior delivery mode. | Completed flows now promote `Inspect Evidence` and `Create Follow-up`, render `read-only` / `Completed evidence locked` safety context, and default follow-up drafts from learning handoff guidance to `No-Write (Safe)` while keeping the source flow locked. |
 | Missing assessment evidence with completed provider | When a selected active flow had terminal provider status plus blocked `run_health` for missing step-quality assessment evidence, the terminal provider heartbeat suppressed the assessment gate. The cockpit showed `Resolve Next Action`, `New Flow` stayed enabled, and the user could miss that evaluator-authored assessment was the next required step. | Step-quality assessment blockers now always keep `run_health` primary over terminal provider status, so the topbar/cockpit show `Assessment needed`, the primary action opens `Assessment Evidence`, provider copy explains the active gate, and `New Flow` is disabled until the assessment is complete. |
 | Failed verification command and escape hatch | A failed required verification state without an external run-health blocker still showed `Resolve Next Action`, exposed prose as the recommended CLI command, and left `New Flow` available even though review, QA, delivery, and release were blocked. | Failed required verification now promotes `Recovery Path` as the primary cockpit action, keeps the command disclosure to the executable `aor project verify ...` rerun command, preserves the held downstream review action separately, and disables `New Flow` until the recovery path is resolved. |
+| Exhausted repair loop primary CTA | When required verification failed after automatic repair attempts were exhausted, the cockpit showed the correct `aor review decide --decision request-repair` next command but the primary button still said `Recovery Path` and opened Execution instead of the repair decision surface. | Exhausted verification repair states now promote `Repair Decision` as the primary cockpit action and open the `Repair Decision needed` workbench tab, where the public repair command and post-repair verification check are visible together. |
 | Responsive readability | The inspected desktop and mobile states had no horizontal overflow or clipped primary blocker/decision copy. | Keep the current compact recovery labels as the baseline for the next live E2E pass. |
 
 ### Follow-up plan
@@ -266,8 +270,8 @@ human gate or a real environment failure.
    first-time-user perspective when a later step produces a substantive
    provider, target, or validation blocker.
 3. Add or verify non-happy-path rendered coverage for rejected operator
-   decisions and repair-request loops; failed required verification command and
-   escape-hatch coverage is now represented in the rendered fixture above.
+   decisions; failed required verification and exhausted repair-request loop
+   coverage are now represented in the rendered fixtures above.
 4. Keep future UI changes scoped to `apps/web/**`, product/backlog source docs,
    tests, and packaged dist unless a finding proves a contract or control-plane
    read-model gap.

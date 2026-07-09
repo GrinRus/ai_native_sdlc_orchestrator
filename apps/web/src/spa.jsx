@@ -4065,7 +4065,9 @@ function FlowCockpit({
     })
   );
   const workbenchAction = verificationPrimary
-    ? { label: "Recovery Path", icon: "target", tabId: "execution" }
+    ? verificationPrimary.action_id === "request-repair-after-verification-failure"
+      ? { label: "Repair Decision", icon: "target", tabId: "decisions" }
+      : { label: "Recovery Path", icon: "target", tabId: "execution" }
     : externalRunWorkbenchAction(
       providerFocusActive ? externalRunHealth : null,
       hasOpenDecisionRequest,

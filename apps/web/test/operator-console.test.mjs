@@ -778,7 +778,9 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /Rerun required verification only after the next repair completes/u);
   assert.match(source, /Provider execution finished, but required verification failed/u);
   assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
-  assert.match(source, /const workbenchAction = verificationPrimary\s*\?\s*\{ label: "Recovery Path", icon: "target", tabId: "execution" \}/u);
+  assert.match(source, /verificationPrimary\.action_id === "request-repair-after-verification-failure"/u);
+  assert.match(source, /\{ label: "Repair Decision", icon: "target", tabId: "decisions" \}/u);
+  assert.match(source, /\{ label: "Recovery Path", icon: "target", tabId: "execution" \}/u);
   assert.match(source, /label: workbenchAction\.label,[\s\S]*?onClick: \(\) => openAdvancedWorkbench\(workbenchAction\.tabId\),/u);
   assert.match(source, /!verificationPrimary && !isBlockingExternalRunHealth\(externalRunHealth\)/u);
   assert.match(source, /newFlowBlockedByVerificationReason/u);
