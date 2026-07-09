@@ -1276,11 +1276,41 @@ function formatDurationMs(value) {
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
 }
 
-function formatProviderTimestamp(value) {
-  if (typeof value !== "string" || value.trim().length === 0) return "No update yet";
+function isProviderTerminalStatus(status) {
+  return ["completed", "failed", "interrupted"].includes(String(status?.status ?? "").toLowerCase());
+}
+
+function formatProviderTimestamp(value, fallback = "No update yet") {
+  if (typeof value !== "string" || value.trim().length === 0) return fallback;
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return value;
   return new Date(parsed).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function providerLastOutputLabel(status) {
+  return formatProviderTimestamp(
+    status?.last_output_at,
+    isProviderTerminalStatus(status) ? "No streamed output captured" : "No update yet",
+  );
+}
+
+function providerLastProgressLabel(status) {
+  return formatProviderTimestamp(
+    status?.last_progress_at,
+    isProviderTerminalStatus(status) ? "No progress events captured" : "No update yet",
+  );
+}
+
+function providerActivityLabel(status) {
+  return (
+    status?.last_progress_label ??
+    status?.last_progress_kind ??
+    (isProviderTerminalStatus(status) ? "No progress events captured" : "No progress yet")
+  );
+}
+
+function providerOutputModeLabel(status) {
+  return status?.output_mode ?? "Not reported";
 }
 
 function isDeliveryStageId(value) {
@@ -3370,15 +3400,15 @@ function FlowCockpit({
             </div>
             <div>
               <span>Last output</span>
-              <strong>{formatProviderTimestamp(providerStepStatus.last_output_at)}</strong>
+              <strong>{providerLastOutputLabel(providerStepStatus)}</strong>
             </div>
             <div>
               <span>Last progress</span>
-              <strong>{formatProviderTimestamp(providerStepStatus.last_progress_at)}</strong>
+              <strong>{providerLastProgressLabel(providerStepStatus)}</strong>
             </div>
             <div>
               <span>Activity</span>
-              <strong>{providerStepStatus.last_progress_label ?? providerStepStatus.last_progress_kind ?? "No progress yet"}</strong>
+              <strong>{providerActivityLabel(providerStepStatus)}</strong>
             </div>
             <div>
               <span>Last artifact</span>
@@ -3386,7 +3416,7 @@ function FlowCockpit({
             </div>
             <div>
               <span>Output mode</span>
-              <strong>{providerStepStatus.output_mode ?? "unknown"}</strong>
+              <strong>{providerOutputModeLabel(providerStepStatus)}</strong>
             </div>
           </div>
           <div className="provider-heartbeat-action">
