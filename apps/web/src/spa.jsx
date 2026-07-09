@@ -1828,12 +1828,16 @@ function executionEvidenceScore(run, index) {
   return score;
 }
 
-function executionStatusRows(evidence, externalRunHealth = null) {
+function executionStatusRows(evidence, externalRunHealth = null, verificationPlan = null) {
+  const verificationFailures = failedRequiredVerificationGroups(verificationPlan);
+  const postRunVerificationStatus = latestRequiredVerificationFailed(verificationPlan, verificationFailures)
+    ? "failed"
+    : evidence?.post_run_verification_status ?? "unknown";
   const rows = [
     { label: "Provider execution", value: evidence?.provider_execution_status ?? "unknown" },
     { label: "Runtime Harness", value: evidence?.runtime_harness_decision ?? "unknown" },
     { label: "Real code change", value: evidence?.real_code_change_status ?? "unknown" },
-    { label: "Post-run verification", value: evidence?.post_run_verification_status ?? "unknown" },
+    { label: "Post-run verification", value: postRunVerificationStatus },
     { label: "Review", value: evidence?.review_status ?? "unknown" },
     { label: "Delivery readiness", value: evidence?.delivery_readiness_status ?? "unknown" },
     { label: "No upstream writes", value: evidence?.no_upstream_write_status ?? "unknown" },
@@ -5130,7 +5134,7 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
 
 function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy, externalRunHealth = null, projectContext = null, nextAction = null, repairCompletion = null, verificationPlan = null, qualityGate = null }) {
   const hasVisibleExecutionEvidence = Boolean(evidence || externalRunHealth);
-  const statusRows = executionStatusRows(evidence, externalRunHealth);
+  const statusRows = executionStatusRows(evidence, externalRunHealth, verificationPlan);
   const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
   const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
   const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];

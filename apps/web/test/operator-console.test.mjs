@@ -697,6 +697,8 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /evidenceRefLabel/u);
   assert.match(source, /<CompactInlineValue value=\{recoveryPlan\.evidenceRef\} kind="path" \/>/u);
   assert.match(source, /execution-recovery-evidence-ref/u);
+  assert.match(source, /postRunVerificationStatus/u);
+  assert.match(source, /executionStatusRows\(evidence, externalRunHealth, verificationPlan\)/u);
   assert.match(source, /heldActionIsCompletedRepair/u);
   assert.match(source, /Fix failed required verification, then rerun/u);
   assert.match(source, /Held downstream action/u);
