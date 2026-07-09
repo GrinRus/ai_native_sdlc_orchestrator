@@ -1670,6 +1670,20 @@ function externalRunWorkbenchAction(health, hasOpenDecisionRequest = false) {
     : { label: "Workbench", icon: "target", tabId: "evidence" };
 }
 
+function externalRunNewFlowBlockedReason(health) {
+  const stepLabel = externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
+  if (isStepQualityAssessmentPendingRunHealth(health)) {
+    return `Complete the current ${stepLabel} assessment before starting a new flow.`;
+  }
+  if (isControllerDecisionPendingRunHealth(health)) {
+    return `Record the current ${stepLabel} decision before starting a new flow.`;
+  }
+  if (externalRunRecoveryPathActive(health)) {
+    return "Resolve the current Recovery Path before starting a new flow.";
+  }
+  return `Resolve the current ${stepLabel} blocker before starting a new flow.`;
+}
+
 function externalRunAttentionLabel(health) {
   if (isStepQualityAssessmentPendingRunHealth(health)) return "Assessment checks";
   if (externalRunRecoveryPathActive(health)) return "Recovery checks";
@@ -2534,11 +2548,17 @@ function mergeOperatorDecisionRequests(...requestLists) {
     });
 }
 
-function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false, providerStepStatus = null, externalRunHealth = null }) {
+function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false, newFlowDisabledReason = "", providerStepStatus = null, externalRunHealth = null }) {
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const value = newFlowDraft ? "__new__" : selectedFlowId ?? "";
   const projectLevelProviderFocus = !newFlowDraft && flows.length === 0 && Boolean(providerStepStatus || externalRunHealth);
+  const newFlowTitle = newFlowDisabled
+    ? newFlowDisabledReason || "Initialize the project runtime before starting a flow."
+    : "Start a new flow";
+  const newFlowAccessibleLabel = newFlowDisabled
+    ? `${newFlowTitle} New Flow is unavailable.`
+    : "Start a new flow";
   return (
     <div className="flow-selector">
       <label htmlFor="flow-selector-control">
@@ -2571,7 +2591,8 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
         type="button"
         onClick={onNewFlow}
         disabled={newFlowDisabled}
-        title={newFlowDisabled ? "Initialize the project runtime before starting a flow." : undefined}
+        title={newFlowTitle}
+        aria-label={newFlowAccessibleLabel}
       >
         <Icon name="plus" />
         New Flow
@@ -6236,6 +6257,7 @@ function App() {
     [nextAction, runs],
   );
   const blockingExternalRunHealth = !draftSurface && isBlockingExternalRunHealth(externalRunHealth);
+  const newFlowBlockedByRunHealthReason = blockingExternalRunHealth ? externalRunNewFlowBlockedReason(externalRunHealth) : "";
   const activeProviderStep = !draftSurface && (
     isActiveProviderStepStatus(providerStepStatus)
     || providerStepSupersedesRunHealth
@@ -6609,6 +6631,15 @@ function App() {
     if (!activeProjectRuntimeReady) {
       setSelectedStage("readiness");
       pushActivity("flow.new-blocked", "Initialize the project runtime before starting a flow.");
+      return;
+    }
+    if (blockingExternalRunHealth) {
+      setSelectedStage(providerFocusStageId(providerStepStatus, externalRunHealth));
+      focusAdvancedWorkbench(externalRunWorkbenchAction(
+        externalRunHealth,
+        operatorDecisionRequests.some((request) => isOpenOperatorDecisionStatus(request.status)),
+      ).tabId);
+      pushActivity("flow.new-blocked", newFlowBlockedByRunHealthReason || "Resolve the current run blocker before starting a new flow.");
       return;
     }
     flowSelectionVersion.current += 1;
@@ -7028,6 +7059,14 @@ function App() {
     providerWorkbenchFocus ||
     Boolean(providerStepStatus || externalRunHealth) ||
     (Array.isArray(runs) && runs.length > 0);
+  const newFlowDisabledReason = projectSnapshotPending
+    ? "Project state is loading."
+    : busy
+      ? "Wait for the current console action to finish before starting a new flow."
+      : !activeProjectRuntimeReady
+        ? "Initialize the project runtime before starting a flow."
+        : newFlowBlockedByRunHealthReason;
+  const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason);
 
   return (
     <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
@@ -7053,7 +7092,8 @@ function App() {
           newFlowDraft={draftSurface}
           onSelectFlow={selectFlow}
           onNewFlow={startNewFlow}
-          newFlowDisabled={projectSnapshotPending || !activeProjectRuntimeReady || busy}
+          newFlowDisabled={newFlowDisabled}
+          newFlowDisabledReason={newFlowDisabledReason}
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
         />
