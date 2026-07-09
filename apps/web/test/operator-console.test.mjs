@@ -779,6 +779,10 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /Repair failed verification/u);
   assert.match(source, /AOR is holding the downstream action/u);
   assert.match(source, /Rerun required verification/u);
+  assert.ok(
+    source.indexOf("<span>Next public control</span>") < source.indexOf("<span>Evidence to keep</span>"),
+    "Execution recovery should show the public control before evidence details on mobile.",
+  );
   assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} heldAction=\{resolverPrimary\} \/>/u);
   assert.match(source, /verificationBlockers = verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\)/u);
   assert.match(source, /verificationFailures\.length > 0\s*\? \[\.\.\.verificationBlockers, \.\.\.presentedActionBlockers\]/u);

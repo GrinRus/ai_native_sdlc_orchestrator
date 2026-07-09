@@ -5312,6 +5312,12 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy,
                 <strong>{recoveryPlan.stateTitle}</strong>
                 <p>{recoveryPlan.stateDetail}</p>
               </li>
+              <li className={recoveryPlan.actionCommand ? "ready" : "blocked"}>
+                <span>Next public control</span>
+                <strong>{recoveryPlan.actionTitle}</strong>
+                {recoveryPlan.actionCommand ? <CompactInlineValue value={recoveryPlan.actionCommand} kind="command" /> : null}
+                {recoveryPlan.actionDetail ? <p>{recoveryPlan.actionDetail}</p> : null}
+              </li>
               <li>
                 <span>Evidence to keep</span>
                 <strong>{recoveryPlan.evidenceTitle}</strong>
@@ -5322,12 +5328,6 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, copyRef, busy,
                     <CompactInlineValue value={recoveryPlan.evidenceRef} kind="path" />
                   </div>
                 ) : null}
-              </li>
-              <li className={recoveryPlan.actionCommand ? "ready" : "blocked"}>
-                <span>Next public control</span>
-                <strong>{recoveryPlan.actionTitle}</strong>
-                {recoveryPlan.actionCommand ? <CompactInlineValue value={recoveryPlan.actionCommand} kind="command" /> : null}
-                {recoveryPlan.actionDetail ? <p>{recoveryPlan.actionDetail}</p> : null}
               </li>
             </ol>
           </div>
