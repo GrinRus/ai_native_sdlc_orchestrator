@@ -978,7 +978,9 @@ function externalRunHealthRecoverySentences(health) {
   const sentences = [];
   if (missingDecisionSteps.length > 0) {
     const stepsLabel = missingDecisionSteps.map(externalRunStepLabel).join(", ");
-    sentences.push(`Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`);
+    sentences.push(externalRunHasFailureSummary(health)
+      ? `Record the ${stepsLabel} blocker decision${missingDecisionSteps.length === 1 ? "" : "s"} before retrying or continuing.`
+      : `Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`);
   }
   if (missingEvidenceRefs.length > 0) {
     sentences.push(missingRunHealthEvidenceSentence(missingEvidenceRefs));
@@ -1041,6 +1043,22 @@ function acceptedExternalRunDiagnosis(health, pendingDecision = health?.pending_
   return String(pendingDecision?.action ?? "").trim() === "diagnose" && acceptedExternalRunDecisionStatus(pendingDecision);
 }
 
+function externalRunHasFailureSummary(health) {
+  const failure = health?.failure_summary && typeof health.failure_summary === "object" ? health.failure_summary : {};
+  return Boolean(
+    String(failure.summary ?? "").trim() ||
+    String(failure.class ?? "").trim() ||
+    String(failure.owner ?? "").trim() ||
+    String(failure.phase ?? "").trim(),
+  );
+}
+
+function externalRunContinuationDecisionCopy(health, stepLabel) {
+  return externalRunHasFailureSummary(health)
+    ? `Record the ${stepLabel} blocker decision before retrying or continuing.`
+    : `Accept the ${stepLabel} operator decision before continuing.`;
+}
+
 function isGenericExternalRunPendingDecisionReason(reason) {
   const normalized = String(reason ?? "").trim();
   return GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(normalized)
@@ -1055,7 +1073,9 @@ function externalRunActionableDecisionUserSummary(health) {
     : [];
   if (missingDecisionSteps.length === 0) return null;
   const stepsLabel = missingDecisionSteps.map(externalRunStepLabel).join(", ");
-  return `Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`;
+  return externalRunHasFailureSummary(health)
+    ? `Record the ${stepsLabel} blocker decision${missingDecisionSteps.length === 1 ? "" : "s"} before retrying or continuing.`
+    : `Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`;
 }
 
 function externalRunPendingDecisionUserReason(health, pendingDecision = health?.pending_decision) {
@@ -1080,7 +1100,7 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
     case "block":
       return `Record the ${stepLabel} block decision before continuing.`;
     case "continue":
-      return `Accept the ${stepLabel} operator decision before continuing.`;
+      return externalRunContinuationDecisionCopy(health, stepLabel);
     case "diagnose":
       return `Open the ${stepLabel} decision request and record the operator diagnosis before continuing.`;
     case "frontend_interact":
@@ -1107,7 +1127,7 @@ function externalRunHealthBlockerSummary(health, blocker, index) {
   if (isFailureBlocker) return externalRunFailureUserSummary(health);
   const missingDecisionMatch = code.match(/^run_health\.(.+)\.operator_decision_missing$/u);
   if (missingDecisionMatch) {
-    return `Accept the ${externalRunStepLabel(missingDecisionMatch[1])} operator decision before continuing.`;
+    return externalRunContinuationDecisionCopy(health, externalRunStepLabel(missingDecisionMatch[1]));
   }
   const pendingDecisionMatch = code.match(/^run_health\.(.+)\.pending_(.+)$/u);
   if (pendingDecisionMatch) {
