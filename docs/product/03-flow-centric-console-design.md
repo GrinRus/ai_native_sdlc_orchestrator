@@ -167,7 +167,12 @@ The packaged SPA now treats the flow as the primary object:
 - Repair next actions must be executable as shown. If a review- or QA-origin
   repair requires approved handoff or promotion evidence, the generated
   `aor run start ...repair` command must carry those refs so first-time users do
-  not hit an avoidable terminal guardrail failure.
+  not hit an avoidable terminal guardrail failure. After `request-repair`
+  materializes a quality repair `next-action-report`, that repair next-action
+  takes precedence over stale blocked run-health diagnosis copy in the cockpit,
+  right rail, and Execution Evidence recovery path. Failed required
+  verification remains visible as repair input, but it must not hide the
+  materialized repair run behind a generic "rerun verification first" action.
 - Evidence lists render `artifact_display_summaries[]` as user-facing
   artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
   paths, packet URIs, and evidence URIs are not primary visible text; raw refs
@@ -192,7 +197,9 @@ The packaged SPA now treats the flow as the primary object:
   `pending_decision.public_repair_command`, the panel promotes that public
   repair command with the current `--project-ref`, `--project-profile`,
   `--runtime-root`, and `--run-id` context instead of falling back to generic
-  diagnose/retry controls.
+  diagnose/retry controls. When the latest `next-action-report` already points
+  at the follow-up repair run, the panel promotes the `aor run start ...repair`
+  next-action instead of re-showing the earlier `review decide` command.
   Scratch-only output is explicitly non-passing, while `.qwen/`, `.codex/`,
   `.claude/`, and `.opencode/` target checkout state is shown as blocking
   runner-owned leakage.
