@@ -967,6 +967,18 @@ function isGenericExternalRunFailureSummary(summary) {
     || lower.includes("requires a terminal controller decision");
 }
 
+function isControllerDecisionPendingRunHealth(health) {
+  const failure = health?.failure_summary && typeof health.failure_summary === "object" ? health.failure_summary : {};
+  const failureClass = String(failure.class ?? "").trim();
+  const failureOwner = String(failure.owner ?? "").trim();
+  const failurePhase = String(failure.phase ?? "").trim();
+  const rawSummary = typeof failure.summary === "string" ? failure.summary.trim() : "";
+  return failureClass === "controller_incomplete"
+    && failureOwner === "operator"
+    && failurePhase === "controller_decision"
+    && isGenericExternalRunFailureSummary(rawSummary);
+}
+
 function externalRunHealthRecoverySentences(health) {
   if (!health) return [];
   const missingDecisionSteps = Array.isArray(health.missing_operator_decision_steps)
@@ -978,7 +990,7 @@ function externalRunHealthRecoverySentences(health) {
   const sentences = [];
   if (missingDecisionSteps.length > 0) {
     const stepsLabel = missingDecisionSteps.map(externalRunStepLabel).join(", ");
-    sentences.push(externalRunHasFailureSummary(health)
+    sentences.push(externalRunHasSubstantiveFailureSummary(health)
       ? `Record the ${stepsLabel} blocker decision${missingDecisionSteps.length === 1 ? "" : "s"} before retrying or continuing.`
       : `Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`);
   }
@@ -1053,8 +1065,12 @@ function externalRunHasFailureSummary(health) {
   );
 }
 
+function externalRunHasSubstantiveFailureSummary(health) {
+  return externalRunHasFailureSummary(health) && !isControllerDecisionPendingRunHealth(health);
+}
+
 function externalRunContinuationDecisionCopy(health, stepLabel) {
-  return externalRunHasFailureSummary(health)
+  return externalRunHasSubstantiveFailureSummary(health)
     ? `Record the ${stepLabel} blocker decision before retrying or continuing.`
     : `Accept the ${stepLabel} operator decision before continuing.`;
 }
@@ -1073,7 +1089,7 @@ function externalRunActionableDecisionUserSummary(health) {
     : [];
   if (missingDecisionSteps.length === 0) return null;
   const stepsLabel = missingDecisionSteps.map(externalRunStepLabel).join(", ");
-  return externalRunHasFailureSummary(health)
+  return externalRunHasSubstantiveFailureSummary(health)
     ? `Record the ${stepsLabel} blocker decision${missingDecisionSteps.length === 1 ? "" : "s"} before retrying or continuing.`
     : `Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`;
 }
@@ -1102,6 +1118,9 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
     case "continue":
       return externalRunContinuationDecisionCopy(health, stepLabel);
     case "diagnose":
+      if (isControllerDecisionPendingRunHealth(health)) {
+        return `Open the ${stepLabel} decision request and record the operator decision before continuing.`;
+      }
       return `Open the ${stepLabel} decision request and record the operator diagnosis before continuing.`;
     case "frontend_interact":
       return `Complete the ${stepLabel} browser evidence check before continuing.`;
@@ -1190,6 +1209,9 @@ function providerFocusTitle(status, externalRunHealth = null) {
     if (acceptedExternalRunDiagnosis(externalRunHealth)) {
       return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} repair required`;
     }
+    if (isControllerDecisionPendingRunHealth(externalRunHealth)) {
+      return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} decision needed`;
+    }
     return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} blocked`;
   }
   if (status?.status === "completed") return "Review / QA gate ready";
@@ -1218,15 +1240,18 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
     const stepLabel = externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id);
     const pending = externalRunHealth.pending_decision ?? {};
+    const pendingControllerDecision = isControllerDecisionPendingRunHealth(externalRunHealth);
     return {
-      action_label: `Open ${stepLabel} blocker`,
+      action_label: pendingControllerDecision ? `${stepLabel} decision request` : `Open ${stepLabel} blocker`,
       command: "aor run status --json",
       dry_run_label: "Run-health",
       dry_run_command: "aor run status --json",
       reason:
         externalRunPendingDecisionUserReason(externalRunHealth, pending) ??
         externalRunHealthUserSummary(externalRunHealth) ??
-        `${stepLabel} is blocked by run-health evidence.`,
+        (pendingControllerDecision
+          ? `${stepLabel} is waiting for an operator decision.`
+          : `${stepLabel} is blocked by run-health evidence.`),
     };
   }
   if (status?.status === "completed") {
@@ -1261,6 +1286,9 @@ function providerFocusPrimaryAction(status, externalRunHealth = null) {
 
 function projectRunEvidenceSelectorLabel(status, externalRunHealth = null) {
   if (isBlockingExternalRunHealth(externalRunHealth)) {
+    if (isControllerDecisionPendingRunHealth(externalRunHealth)) {
+      return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} decision evidence`;
+    }
     return `${externalRunStepLabel(externalRunHealth.current_step ?? externalRunHealth.blocked_step_id)} blocker evidence`;
   }
   if (externalRunHealth?.status) return "Run evidence";
@@ -1269,10 +1297,26 @@ function projectRunEvidenceSelectorLabel(status, externalRunHealth = null) {
 }
 
 function projectRunEvidenceStatus(status, externalRunHealth = null) {
-  if (isBlockingExternalRunHealth(externalRunHealth)) return "Run evidence blocked";
+  if (isBlockingExternalRunHealth(externalRunHealth)) {
+    return isControllerDecisionPendingRunHealth(externalRunHealth) ? "Run decision needed" : "Run evidence blocked";
+  }
   if (externalRunHealth?.status) return `Run evidence ${externalRunHealth.status}`;
   if (status?.status) return `Provider ${status.status}`;
   return "No active flow";
+}
+
+function externalRunAttentionLabel(health) {
+  return isControllerDecisionPendingRunHealth(health) ? "Decision checks" : "Blockers";
+}
+
+function externalRunAttentionEmptyCopy(health) {
+  return isControllerDecisionPendingRunHealth(health)
+    ? "No decision checks for the visible next step."
+    : "No blockers for the visible next step.";
+}
+
+function externalRunDerivedEvidenceStatus(health, fallback = "blocked") {
+  return isControllerDecisionPendingRunHealth(health) ? "awaiting-decision" : fallback;
 }
 
 function projectRunEvidenceIdentity(status, externalRunHealth = null) {
@@ -3337,7 +3381,7 @@ function FlowCockpit({
     ? providerFocusTitle(providerStepStatus, externalRunHealth)
     : completed ? "Learning / Closure" : stage.label;
   const cockpitStatus = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
-    ? "blocked"
+    ? externalRunDerivedEvidenceStatus(externalRunHealth)
     : stageRuntimeState;
   const cockpitCopy = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusDescription(providerStepStatus, externalRunHealth)
@@ -3352,6 +3396,13 @@ function FlowCockpit({
     : { label: "Workbench", icon: "target", tabId: "evidence" };
   const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
   const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
+  const recommendedActionStatus = providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
+    ? externalRunDerivedEvidenceStatus(externalRunHealth)
+    : blockers.length > 0
+      ? "blocked"
+      : completed
+        ? "read-only"
+        : "ready";
   const openAdvancedWorkbench = (tabId = "evidence") => {
     if (typeof document === "undefined") return;
     const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
@@ -3455,7 +3506,7 @@ function FlowCockpit({
             <h3>One Recommended Action</h3>
             <p>{completed ? "Single read-only action" : "Single safest next step"}</p>
           </div>
-          <StatusPill state={blockers.length > 0 ? "blocked" : completed ? "read-only" : "ready"} />
+          <StatusPill state={recommendedActionStatus} />
         </div>
         <div className="action-grid">
           <div className="next-step-panel">
@@ -3568,9 +3619,9 @@ function FlowCockpit({
 
       <div className="flow-snapshot-grid">
         <div>
-          <span>Blockers</span>
+          <span>{providerFocusActive && externalRunHealth ? externalRunAttentionLabel(externalRunHealth) : "Blockers"}</span>
           <strong>{blockers.length}</strong>
-          <p>{blockers.length === 0 ? "No blockers for the visible next step." : blockers[0]?.summary ?? blockers[0]?.code}</p>
+          <p>{blockers.length === 0 ? externalRunAttentionEmptyCopy(externalRunHealth) : blockers[0]?.summary ?? blockers[0]?.code}</p>
         </div>
         <div>
           <span>Evidence artifacts</span>
@@ -3715,7 +3766,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
       </section>
       {newFlowDraft ? <DraftFlowRail form={missionDraft} /> : null}
       <section className="rail-card">
-        <h3>Blockers <span>{blockers.length}</span></h3>
+        <h3>{providerFocusActive && externalRunHealth ? externalRunAttentionLabel(externalRunHealth) : "Blockers"} <span>{blockers.length}</span></h3>
         <ul>
           {blockers.length === 0 ? <li>None</li> : blockers.slice(0, 4).map((blocker, index) => <li key={`${blocker.code}-${index}`}>{blocker.summary ?? blocker.code}</li>)}
         </ul>
@@ -5479,13 +5530,17 @@ function App() {
     const healthStatus = externalRunHealth?.status ?? "pending";
     return {
       run_id: externalRunHealth?.run_id ?? providerStepStatus?.route_id ?? providerStepStatus?.step_id ?? "provider-step",
-      status: isBlockingExternalRunHealth(externalRunHealth) ? "blocked" : providerStepStatus?.status ?? healthStatus,
+      status: isBlockingExternalRunHealth(externalRunHealth)
+        ? externalRunDerivedEvidenceStatus(externalRunHealth)
+        : providerStepStatus?.status ?? healthStatus,
       provider_execution_status: providerStepStatus?.status ?? "unknown",
       runtime_harness_decision: "pending",
       real_code_change_status: "pending",
       post_run_verification_status: "pending",
       review_status: healthFailurePhase === "review" ? healthStatus : "pending",
-      delivery_readiness_status: isBlockingExternalRunHealth(externalRunHealth) ? "blocked" : "pending",
+      delivery_readiness_status: isBlockingExternalRunHealth(externalRunHealth)
+        ? externalRunDerivedEvidenceStatus(externalRunHealth, "blocked")
+        : "pending",
       no_upstream_write_status: "enforced",
       changed_path_groups: [],
       blockers: healthBlockers.map((blocker) => blocker.summary ?? blocker.code).filter(Boolean),
