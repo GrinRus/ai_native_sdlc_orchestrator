@@ -1746,6 +1746,7 @@ function externalRunRiskLevel(health, blockers, deliveryMode) {
     if (acceptedExternalRunContinueDecision(health)) return "Decision recorded";
     return isControllerDecisionPendingRunHealth(health) ? "Decision needed" : "Blocked";
   }
+  if (deliveryMode === "read-only") return "Read-only";
   return deliveryMode === "no-write" ? "Low" : "Gated";
 }
 
@@ -2266,7 +2267,7 @@ function formFromFlowSettings(flow, { followUp = false } = {}) {
     constraints: Array.isArray(settings.constraints) ? settings.constraints.join("\n") : "",
     kpi: Array.isArray(settings.kpis) ? settings.kpis.map(formatKpiForForm).filter(Boolean).join("\n") : "",
     dod: Array.isArray(settings.definition_of_done) ? settings.definition_of_done.join("\n") : "",
-    deliveryMode: settings.delivery_mode ?? flow?.writeback_policy?.mode ?? "no-write",
+    deliveryMode: followUp ? "no-write" : settings.delivery_mode ?? flow?.writeback_policy?.mode ?? "no-write",
     allowedPaths: Array.isArray(settings.allowed_paths) ? settings.allowed_paths.join(",") : "",
   };
 }
@@ -4029,6 +4030,12 @@ function FlowCockpit({
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
+  const displayedDeliveryMode = completed ? "read-only" : deliveryMode;
+  const displayedSafetyStatus = completed
+    ? "Completed evidence locked"
+    : deliveryMode === "no-write"
+      ? "No upstream writes"
+      : "Explicit review required";
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
   const resolverPrimary = providerFocusActive
     ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction, repairCompletion)
@@ -4060,7 +4067,14 @@ function FlowCockpit({
     providerFocusActive ? externalRunHealth : null,
     hasOpenDecisionRequest,
   );
-  const primaryActionButton = providerFocusActive
+  const primaryActionButton = completed
+    ? {
+        label: "Inspect Evidence",
+        icon: "eye",
+        onClick: () => openAdvancedWorkbench("evidence"),
+        disabled: busy,
+      }
+    : providerFocusActive
     ? {
       label: isBlockingExternalRunHealth(externalRunHealth) ? workbenchAction.label : "Refresh Run Status",
       icon: isBlockingExternalRunHealth(externalRunHealth) ? workbenchAction.icon : "refresh",
@@ -4073,7 +4087,7 @@ function FlowCockpit({
       label: "Resolve Next Action",
       icon: "play",
       onClick: onResolveNext,
-      disabled: busy || completed,
+      disabled: busy,
   };
   const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
@@ -4212,7 +4226,7 @@ function FlowCockpit({
         <div className="action-header">
           <div>
             <h3>One Recommended Action</h3>
-            <p>{completed ? "Single read-only action" : "Single safest next step"}</p>
+            <p>{completed ? "Inspect locked evidence before starting follow-up work" : "Single safest next step"}</p>
           </div>
           <StatusPill state={recommendedActionStatus} />
         </div>
@@ -4221,7 +4235,12 @@ function FlowCockpit({
             <Icon name={primaryActionButton.icon} />
             {primaryActionButton.label}
           </button>
-          {!isBlockingExternalRunHealth(externalRunHealth) ? (
+          {completed ? (
+            <button className="secondary workbench-jump" type="button" onClick={followUpEligible ? onCreateFollowUp : onStartNewFlow} disabled={busy}>
+              <Icon name={followUpEligible ? "target" : "plus"} />
+              {followUpEligible ? "Create Follow-up" : "Start New Flow"}
+            </button>
+          ) : !isBlockingExternalRunHealth(externalRunHealth) ? (
             <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
               <Icon name={workbenchAction.icon} />
               {workbenchAction.label}
@@ -4254,11 +4273,11 @@ function FlowCockpit({
           </div>
           <div>
             <span>Write-back mode</span>
-            <code>{deliveryMode}</code>
+            <code>{displayedDeliveryMode}</code>
           </div>
           <div>
             <span>Safety status</span>
-            <strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit review required"}</strong>
+            <strong>{displayedSafetyStatus}</strong>
           </div>
         </div>
       </div>
@@ -4305,7 +4324,7 @@ function FlowCockpit({
           <Icon name="lock" />
           <div>
             <strong>Flow completed - evidence locked</strong>
-            <p>Mutation controls are replaced by no-write inspection actions. Start New Flow to continue work.</p>
+            <p>{followUpEligible ? "Mutation controls are replaced by no-write inspection actions. Create a follow-up from the learning handoff to continue with closure guidance." : "Mutation controls are replaced by no-write inspection actions. Start New Flow to continue work."}</p>
           </div>
           <div className="closure-actions">
             <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
@@ -4328,7 +4347,7 @@ function FlowCockpit({
         evidenceRefs={evidenceRefs}
         evidenceRows={evidenceRows}
         blockers={blockers}
-        deliveryMode={deliveryMode}
+        deliveryMode={displayedDeliveryMode}
         artifactReadiness={artifactReadiness}
         projectLevelProviderFocus={providerFocusActive}
         externalRunHealth={externalRunHealth}
@@ -4363,7 +4382,7 @@ function FlowCockpit({
         evidenceRefs={evidenceRefs}
         evidenceRows={evidenceRows}
         blockers={blockers}
-        deliveryMode={deliveryMode}
+        deliveryMode={displayedDeliveryMode}
         projectLevelProviderFocus={providerFocusActive}
         externalRunHealth={externalRunHealth}
       />
