@@ -5336,6 +5336,9 @@ function App() {
     const onboarding = selectedProject?.onboarding_summary ?? {};
     const shouldReadProjectState = onboarding.initialized === true || onboarding.state_exists === true;
     if (!shouldReadProjectState) {
+      const previewRunList = effectiveProjectId
+        ? await readJson(`/api/projects/${encodeURIComponent(effectiveProjectId)}/runs`).catch(() => [])
+        : [];
       const selectionStillCurrent = refreshSelectionVersion === flowSelectionVersion.current;
       setProjectState(null);
       setNextAction(null);
@@ -5344,7 +5347,7 @@ function App() {
       setSelectedFlowId(null);
       setPackets([]);
       setStepResults([]);
-      setRuns([]);
+      setRuns(Array.isArray(previewRunList) ? previewRunList : []);
       setOperatorRequests([]);
       setFlowEvidenceGraph(null);
       setFlowRuntimeTrace(null);

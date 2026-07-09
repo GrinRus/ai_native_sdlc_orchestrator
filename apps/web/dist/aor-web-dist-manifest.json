@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "source_hash": "7eb0224459f9cd4230393dfe00c262634e3d18754db6d6b5b587a13cf85a892f",
+  "source_hash": "6df741e5cc84f4b60fa84823665bf7dad4bae12db0f51cf295760364a72aed3a",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -10,7 +10,7 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-CT_laMKD.css",
-    "apps/web/dist/assets/index-X6eyB8Ql.js",
+    "apps/web/dist/assets/index-D0O4oyAw.js",
     "apps/web/dist/index.html"
   ]
 }

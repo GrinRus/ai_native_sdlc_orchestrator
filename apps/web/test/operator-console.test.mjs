@@ -537,6 +537,21 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });
 
+test("project preview state keeps project-level live run evidence visible", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+
+  assert.match(
+    source,
+    /if \(!shouldReadProjectState\) \{[\s\S]*?readJson\(`\/api\/projects\/\$\{encodeURIComponent\(effectiveProjectId\)\}\/runs`\)\.catch\(\(\) => \[\]\)/u,
+    "Project preview/profile-mismatch state should still read project-level runs.",
+  );
+  assert.match(
+    source,
+    /setRuns\(Array\.isArray\(previewRunList\) \? previewRunList : \[\]\);/u,
+    "Project preview/profile-mismatch state should preserve live run evidence for the operator console.",
+  );
+});
+
 test("active quality gate blockers preserve structured recovery details", () => {
   const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
   const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
