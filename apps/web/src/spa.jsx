@@ -901,6 +901,7 @@ function externalRunStepLabel(step) {
 
 const GENERIC_EXTERNAL_RUN_FAILURE_SUMMARIES = new Set([
   "Run artifacts declared a primary failure owner, phase, or class.",
+  "Target setup or target verification failed during the run.",
 ]);
 
 const EXTERNAL_RUN_PRIVATE_DISPLAY_LABEL = ["Live", "E2E"].join(" ");
@@ -1000,6 +1001,10 @@ function externalRunFailureUserSummary(health) {
   }
   const failure = health?.failure_summary ?? {};
   const rawSummary = typeof failure.summary === "string" ? failure.summary.trim() : "";
+  const actionableDecisionSummary = externalRunActionableDecisionUserSummary(health);
+  if (actionableDecisionSummary && isGenericExternalRunFailureSummary(rawSummary)) {
+    return actionableDecisionSummary;
+  }
   if (!isGenericExternalRunFailureSummary(rawSummary)) return rawSummary;
   const phase = failure.phase ? externalRunStepLabel(failure.phase) : externalRunStepLabel(health?.current_step ?? health?.blocked_step_id);
   const owner = externalRunFailureOwnerLabel(failure.owner);
@@ -1015,10 +1020,10 @@ function externalRunFailureUserSummary(health) {
 }
 
 function externalRunHealthUserSummary(health) {
-  return [
+  return [...new Set([
     externalRunFailureUserSummary(health),
     ...externalRunHealthRecoverySentences(health),
-  ].filter(Boolean).join(" ");
+  ].filter(Boolean))].join(" ");
 }
 
 function acceptedExternalRunDecisionStatus(pendingDecision) {
@@ -1032,6 +1037,23 @@ function externalRunRepairCommand(pendingDecision) {
 
 function acceptedExternalRunDiagnosis(health, pendingDecision = health?.pending_decision) {
   return String(pendingDecision?.action ?? "").trim() === "diagnose" && acceptedExternalRunDecisionStatus(pendingDecision);
+}
+
+function isGenericExternalRunPendingDecisionReason(reason) {
+  const normalized = String(reason ?? "").trim();
+  return GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(normalized)
+    || /^[a-z0-9_-]+ product-change step quality was assessed from \d+ public evaluator input refs\.$/iu.test(normalized);
+}
+
+function externalRunActionableDecisionUserSummary(health) {
+  const pendingReason = externalRunPendingDecisionUserReason(health);
+  if (pendingReason) return pendingReason;
+  const missingDecisionSteps = Array.isArray(health?.missing_operator_decision_steps)
+    ? health.missing_operator_decision_steps
+    : [];
+  if (missingDecisionSteps.length === 0) return null;
+  const stepsLabel = missingDecisionSteps.map(externalRunStepLabel).join(", ");
+  return `Accept the ${stepsLabel} operator decision${missingDecisionSteps.length === 1 ? "" : "s"} before continuing.`;
 }
 
 function externalRunPendingDecisionUserReason(health, pendingDecision = health?.pending_decision) {
@@ -1049,7 +1071,7 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
     }
     return "Diagnosis accepted for " + stepLabel + ". Keep the run blocked until repair or retry evidence is recorded through public controls.";
   }
-  if (rawReason && !GENERIC_EXTERNAL_RUN_PENDING_DECISION_REASONS.has(rawReason)) return rawReason;
+  if (rawReason && !isGenericExternalRunPendingDecisionReason(rawReason)) return rawReason;
   switch (action) {
     case "answer":
       return `Answer the ${stepLabel} operator question before continuing.`;
@@ -1061,6 +1083,10 @@ function externalRunPendingDecisionUserReason(health, pendingDecision = health?.
       return `Open the ${stepLabel} decision request and record the operator diagnosis before continuing.`;
     case "frontend_interact":
       return `Complete the ${stepLabel} browser evidence check before continuing.`;
+    case "request-repair":
+    case "request_repair":
+      return `Run the ${stepLabel} repair path through public AOR controls before continuing.`;
+    case "retry":
     case "retry_public_step":
       return `Retry the ${stepLabel} public step after reviewing the blocker.`;
     default:
