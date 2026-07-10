@@ -495,5 +495,40 @@ This is the master index for the implementation slices across all defined waves.
 | W56-S02 | Rendered cockpit UX hardening | EPIC-1, EPIC-6 | done | `apps/web/**`, `docs/backlog/**`, tests | W56-S01 |
 | W56-S03 | Rendered UX audit closure | EPIC-1, EPIC-6 | done | `apps/web/**`, `docs/backlog/**`, tests | W56-S02 |
 
+## W57 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W57-S01 | Audit disposition, release hold, and local-app threat model | EPIC-0, EPIC-6 | ready | architecture/contracts/ops docs, README, production-readiness gate | W56-S03 |
+| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | blocked | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S01 |
+| W57-S03 | True workspace isolation and no-write enforcement | EPIC-1, EPIC-3, EPIC-5 | blocked | workspace isolation, step execution, delivery plan, adapter SDK | W57-S02 |
+| W57-S04 | Structural runtime permission enforcement | EPIC-3 | blocked | permission contracts/policy, step execution, adapter tests | W57-S02, W57-S03 |
+| W57-S05 | Exact-diff delivery and resolvable authorization evidence | EPIC-4, EPIC-5 | blocked | delivery/Harness contracts, delivery runtime, CLI/tests | W57-S02, W57-S03, W57-S04 |
+| W57-S06 | Transactional initialization and runtime-root containment | EPIC-1, EPIC-2 | blocked | project init, artifact store, asset roots, tests | W57-S02 |
+| W57-S07 | Atomic attempts, run control, and event identity | EPIC-2, EPIC-3, EPIC-6 | blocked | attempt/result store, run control, observability journal | W57-S06 |
+| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | blocked | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07 |
+
+## W58 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | blocked | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
+| W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | blocked | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
+| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | blocked | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
+| W58-S04 | Real evaluation, Harness lineage, and replay compatibility | EPIC-4 | blocked | eval/Harness contracts, scorer, certification, replay | W57-S05, W58-S02, W58-S03 |
+| W58-S05 | Asynchronous run jobs and durable live-event delivery | EPIC-3, EPIC-6 | blocked | lifecycle worker, process supervision, journal, SSE/CLI follow | W57-S08 |
+| W58-S06 | Canonical API, OpenAPI, CLI, and service boundary | EPIC-0, EPIC-6 | blocked | API/CLI/control-plane services, OpenAPI, readiness tests | W58-S01, W58-S05 |
+| W58-S07 | Loopback-only local app transport boundary | EPIC-6 | blocked | local-console ADR, app launcher, HTTP transport/config/tests | W58-S01, W58-S06 |
+| W58-S08 | Runtime-quality acceptance proof | EPIC-0, EPIC-7 | blocked | integration proof, package smoke, audit/readiness evidence | W58-S02, W58-S03, W58-S04, W58-S05, W58-S06, W58-S07 |
+
+## W59 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W59-S01 | Executable browser and component behavior gate | EPIC-0, EPIC-6, EPIC-7 | blocked | web browser/component tests, package smoke, CI | W58-S08 |
+| W59-S02 | Local console live-state and interaction correctness | EPIC-1, EPIC-6 | blocked | web client/state/queues, shared read models, fixtures | W59-S01 |
+| W59-S03 | Accessible local dialogs and web state decomposition | EPIC-0, EPIC-6 | blocked | web components/styles/state modules, browser tests | W59-S01, W59-S02 |
+| W59-S04 | Code-quality, dependency, and dead-code ratchet | EPIC-0 | blocked | root quality gates, ESLint/typecheck, dependency/dead-code baselines | W58-S08 |
+| W59-S05 | Core, CLI, and control-plane decomposition | EPIC-0, EPIC-3, EPIC-6 | blocked | execution services, CLI handlers, lifecycle/control-plane modules | W58-S08, W59-S04 |
+| W59-S06 | Adapter/live-E2E decomposition and contract-kernel parity | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | blocked | adapter SDK, live E2E stages, public/private contract kernels | W58-S08, W59-S04 |
+| W59-S07 | Independent audit closure and readiness decision | EPIC-0, EPIC-5, EPIC-7 | blocked | audit ledger/report, story/readiness/release sources, full gates | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

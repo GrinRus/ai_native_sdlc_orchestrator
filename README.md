@@ -13,12 +13,13 @@ researchers. The repository remains docs-first and includes implemented CLI,
 API, web, and runtime baselines, but it is not a production-ready
 general-purpose orchestrator runtime.
 
-The current production-candidate claim is intentionally bounded: AOR has a
-self-hosted CLI/API production candidate for the documented mode in
-`docs/ops/self-hosted-release.md`. Repository checks such as `pnpm check` and
-`pnpm production:ready` prove source integrity and documented readiness gates;
-they do not mean unattended production automation is safe for arbitrary
-projects.
+The previous bounded verdict, labeled a self-hosted CLI/API production candidate,
+is under an audit release hold. The July 2026 baseline review found confirmed execution,
+permission, delivery, evidence, and quality-gate failures, so AOR is not ready
+for production or unattended write-capable runs. The W57-W59 remediation queue
+owns requalification. Until W57-S01 encodes the hold in the machine-readable
+gate, a green legacy `pnpm production:ready` result proves only the pre-audit
+W25/W26 evidence checks and is not release clearance.
 
 The first package channel is the npm CLI alpha package `@grinrus/aor`. Internal
 workspace apps and packages remain private implementation modules and are not
@@ -350,9 +351,11 @@ production runtime for arbitrary repositories.
 `pnpm production:ready --json` is a maintainer-facing gate for the bounded
 self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
-and are intentionally not part of the README workflow.
+and are intentionally not part of the README workflow. Until W57-S01 encodes
+the July 2026 audit disposition, a green result is legacy pre-audit evidence and
+does not lift the audit release hold.
 
-The current roadmap source of truth extends through W56 in
+The current roadmap source of truth extends through W59 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -464,7 +467,8 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W56` and focuses on:
+The current alpha distribution and audit-remediation queue are tracked through
+`W59` and focus on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -487,6 +491,13 @@ The current alpha distribution is tracked through `W56` and focuses on:
   guardrail follow-up from the latest `ky` large/xlarge control findings.
 - First-run local console focus and action clarity so the next safe action stays
   primary while advanced evidence remains available.
+- Restoring no-write, workspace, permission, path/scope, delivery, and evidence
+  trust boundaries before credentialed or write-capable use.
+- Keeping the packaged web console loopback-only and same-origin; hosted web,
+  browser authentication, SSO, tenant isolation, and remote UI connectivity
+  remain outside the current product scope.
+- Replacing marker-based readiness with executable API, browser, concurrency,
+  package, and independent audit-closure evidence.
 - Verification-plan authoring, stack discovery, profile generation, and
   operator-visible command-group status for arbitrary project shapes.
 - Maintainer-facing product-quality cycles with QA-origin public repair and

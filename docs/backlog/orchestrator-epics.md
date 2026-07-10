@@ -35,6 +35,9 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W53:** `W53-S04` AOR/live E2E leak guards
 - **W54:** `W54-S08` Boundary regression expansion
 - **W55:** `W55-S01` Backlog intake and control finding disposition; `W55-S05` Control rerun and findings report
+- **W57:** `W57-S01` Audit disposition, release hold, and local-app threat model; `W57-S08` Trust-boundary regression proof and release disposition
+- **W58:** `W58-S06` Canonical API, OpenAPI, CLI, and service boundary; `W58-S08` Runtime-quality acceptance proof
+- **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S03` Accessible local dialogs and web state decomposition; `W59-S04` Code-quality, dependency, and dead-code ratchet; `W59-S05` Core, CLI, and control-plane decomposition; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity; `W59-S07` Independent audit closure and readiness decision
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -52,6 +55,9 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W44:** `W44-S03` Artifact readiness state machine and stale transitions
 - **W54:** `W54-S02` Stack discovery engine; `W54-S03` Project init profile materialization
 - **W56:** `W56-S01` First-run console focus and action clarity; `W56-S02` Rendered cockpit UX hardening; `W56-S03` Rendered UX audit closure
+- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S03` True workspace isolation and no-write enforcement; `W57-S06` Transactional initialization and runtime-root containment
+- **W58:** `W58-S01` Non-materializing read-model contract and runtime; `W58-S02` Effective context and unique asset identity
+- **W59:** `W59-S02` Local console live-state and interaction correctness
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -60,6 +66,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
 - **W19:** `W19-S02` Product intake source and KPI/DoD model
 - **W21:** `W21-S04` Guided mission intake and next-action resolver
+- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S06` Transactional initialization and runtime-root containment; `W57-S07` Atomic attempts, run control, and event identity
 
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
@@ -75,6 +82,9 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W20:** `W20-S03` OpenCode candidate evidence and downgrade follow-up
 - **W22:** `W22-S03` OpenCode maturity downgrade
 - **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S02` Discovery/research/spec prompt bundle split; `W44-S04` Context, skill, and policy overlays from evidence
+- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S03` True workspace isolation and no-write enforcement; `W57-S04` Structural runtime permission enforcement; `W57-S07` Atomic attempts, run control, and event identity
+- **W58:** `W58-S02` Effective context and unique asset identity; `W58-S03` Executable route fallback, retry, repair, and adapter semantics; `W58-S05` Asynchronous run jobs and durable live-event delivery
+- **W59:** `W59-S05` Core, CLI, and control-plane decomposition; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -103,6 +113,9 @@ Implement validation, eval, harness, certification, and promotion.
 - **W53:** `W53-S01` Generic verification command-group contract; `W53-S02` AOR project verify command-group execution; `W53-S05` Generic verification archetype fixtures
 - **W54:** `W54-S01` Verification group authoring contract; `W54-S02` Stack discovery engine; `W54-S04` Verifier execution semantics hardening; `W54-S06` Migration and examples; `W54-S07` Real archetype smoke matrix
 - **W55:** `W55-S02` Actionable verification failure repair evidence
+- **W57:** `W57-S05` Exact-diff delivery and resolvable authorization evidence
+- **W58:** `W58-S02` Effective context and unique asset identity; `W58-S03` Executable route fallback, retry, repair, and adapter semantics; `W58-S04` Real evaluation, Harness lineage, and replay compatibility
+- **W59:** `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -119,6 +132,8 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W29:** `W29-S01` npm CLI alpha release channel
 - **W30:** `W30-S06` Alpha release and onboarding proof refresh
 - **W42:** `W42-S01` Alpha.9 release prep for W41 fixes
+- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S03` True workspace isolation and no-write enforcement; `W57-S05` Exact-diff delivery and resolvable authorization evidence
+- **W59:** `W59-S07` Independent audit closure and readiness decision
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -156,6 +171,9 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W48:** `W48-S03` Structured repair context and convergence classification
 - **W54:** `W54-S05` CLI/API/UI verification plan surfaces
 - **W56:** `W56-S01` First-run console focus and action clarity; `W56-S02` Rendered cockpit UX hardening; `W56-S03` Rendered UX audit closure
+- **W57:** `W57-S01` Audit disposition, release hold, and local-app threat model; `W57-S07` Atomic attempts, run control, and event identity
+- **W58:** `W58-S01` Non-materializing read-model contract and runtime; `W58-S05` Asynchronous run jobs and durable live-event delivery; `W58-S06` Canonical API, OpenAPI, CLI, and service boundary; `W58-S07` Loopback-only local app transport boundary
+- **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S02` Local console live-state and interaction correctness; `W59-S03` Accessible local dialogs and web state decomposition; `W59-S05` Core, CLI, and control-plane decomposition
 
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
@@ -206,3 +224,6 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W53:** `W53-S01` Generic verification command-group contract; `W53-S03` Live E2E adapter boundary mapping; `W53-S04` AOR/live E2E leak guards; `W53-S05` Generic verification archetype fixtures
 - **W54:** `W54-S01` Verification group authoring contract; `W54-S07` Real archetype smoke matrix; `W54-S08` Boundary regression expansion
 - **W55:** `W55-S01` Backlog intake and control finding disposition; `W55-S02` Actionable verification failure repair evidence; `W55-S03` `ky` xlarge primary verification alignment; `W55-S04` Claude xlarge context guardrails; `W55-S05` Control rerun and findings report
+- **W57:** `W57-S08` Trust-boundary regression proof and release disposition
+- **W58:** `W58-S03` Executable route fallback, retry, repair, and adapter semantics; `W58-S08` Runtime-quality acceptance proof
+- **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity; `W59-S07` Independent audit closure and readiness decision

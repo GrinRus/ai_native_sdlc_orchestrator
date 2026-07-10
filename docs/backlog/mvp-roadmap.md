@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-56-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-59-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -67,6 +67,9 @@ The authoritative planning model for implementation lives in:
 | W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
 | W55 | Turn `ky` large/xlarge control findings into actionable repair evidence, target-catalog alignment, Claude guardrails, and rerun reporting. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-55-implementation-slices.md` |
 | W56 | Harden the installed-user console so first-run setup and active-flow cockpit work stay primary while advanced evidence remains progressively disclosed. | 3 | EPIC-1, EPIC-6 | `docs/backlog/wave-56-implementation-slices.md` |
+| W57 | Restore execution, filesystem, permission, delivery, and evidence trust boundaries from the July 2026 codebase audit before credentialed or write-capable use. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-57-implementation-slices.md` |
+| W58 | Make read models, context, routing, evaluation, jobs, live events, APIs, and the loopback local-app transport truthful and executable. | 8 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-58-implementation-slices.md` |
+| W59 | Replace source-marker confidence with browser behavior, harden the local console, ratchet code quality, decompose hotspots, and independently close the audit. | 7 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-59-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -226,6 +229,29 @@ The authoritative planning model for implementation lives in:
 | W56-S01 | first-run console UX hardening target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W56-S02 | rendered cockpit UX hardening target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W56-S03 | rendered UX audit closure target: PBO-09, OPS-01, OPS-10, OPS-11 |
+| W57-S01 | audit disposition and local-app threat-model target: EMP-05, DEV-07, AIP-06, OPS-02, OPS-06, OPS-10, SEC-04, SEC-06, PBO-09, DTX-05, FIN-03 |
+| W57-S02 | identifier/path/scope contract repair target: ARC-01, PBO-01, PBO-05, OPS-02, SEC-04, DTX-01, DTX-02, DTX-03, DTX-05, FIN-03 |
+| W57-S03 | no-write and workspace-isolation repair target: DEV-01, DEV-09, PBO-01, SEC-04, DTX-05 |
+| W57-S04 | structural permission enforcement target: ARC-01, DEV-09, OPS-03, SEC-01, SEC-04, SEC-05 |
+| W57-S05 | exact delivery and resolvable evidence target: PSO-05, RQA-02, RQA-06, OPS-04, SEC-04, DTX-01, DTX-02, DTX-03, DTX-04, DTX-07, FIN-03 |
+| W57-S06 | transactional initialization target: PBO-01, PBO-05, PBO-09, FIN-03 |
+| W57-S07 | atomic execution/run/event identity target: EMP-03, EMP-05, EMP-06, DEV-01, OPS-01, OPS-02, OPS-04, OPS-09, SEC-03, FIN-03, FIN-04 |
+| W57-S08 | W57 safety and release-disposition proof target: OPS-06, OPS-07, SEC-04, FIN-03 |
+| W58-S01 | non-materializing read-model target: PBO-05, PBO-09, OPS-01 |
+| W58-S02 | effective context and unique asset target: DIS-02, ARC-02, ARC-04, DEV-07, AIP-01, AIP-02, PBO-06, SEC-04 |
+| W58-S03 | executable routing/policy/adapter target: ARC-02, DEV-01, DEV-05, EMP-07, AIP-03, AIP-04, OPS-03, SEC-04 |
+| W58-S04 | real eval/Harness/replay target: PSO-05, ARC-03, ARC-04, RQA-03, RQA-04, AIP-05, AIP-06, AIP-07, OPS-05 |
+| W58-S05 | asynchronous run and durable live-event target: EMP-05, DEV-01, OPS-01, OPS-02, OPS-04, OPS-10 |
+| W58-S06 | canonical API/OpenAPI/CLI target: ARC-06, OPS-01, OPS-02, OPS-04, OPS-09, OPS-11, SEC-02, SEC-06, FIN-04 |
+| W58-S07 | loopback-only local transport target: ARC-06, PBO-09, OPS-04, OPS-10, OPS-11, SEC-06 |
+| W58-S08 | W58 runtime-quality acceptance target: OPS-06, OPS-07, FIN-03 |
+| W59-S01 | executable browser behavior-gate target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-07, OPS-11 |
+| W59-S02 | local console live-state and interaction target: ARC-06, PBO-09, EMP-05, OPS-01, OPS-02, OPS-04, OPS-10, OPS-11 |
+| W59-S03 | accessible dialog and web decomposition target: PBO-09, OPS-01, OPS-10, OPS-11 |
+| W59-S04 | repository code-quality/dependency ratchet (no direct story closure) |
+| W59-S05 | core/CLI/control-plane decomposition target: ARC-06, DEV-01, DEV-05, OPS-01, OPS-06, OPS-10 |
+| W59-S06 | adapter/live-E2E decomposition and contract parity target: DEV-01, DEV-07, AIP-02, AIP-03, AIP-04, OPS-06, OPS-07 |
+| W59-S07 | independent audit closure and readiness-decision target: OPS-06, OPS-07, PSO-06, FIN-03 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1041,6 +1067,73 @@ evidence/debug surfaces stay available through progressive disclosure.
   workbench content.
 
 **Detailed slices:** `docs/backlog/wave-56-implementation-slices.md`
+
+## W57 - execution trust and data-integrity recovery
+**Goal:** Convert the July 2026 codebase audit into contract-first repairs for
+release honesty, identifiers and scope, no-write/workspace isolation, runtime
+permissions, exact delivery authorization, transactional initialization, and
+concurrent evidence identity.
+
+**Current lane:** W57-S01 is the only ready slice. Credentialed live execution
+and write-capable delivery remain outside the supported release claim until W57
+closure evidence exists.
+
+**Exit criteria:**
+- The local app threat model is loopback-only and same-origin; hosted frontend
+  security remains an explicit future ADR scope.
+- No-write execution cannot modify the primary checkout and all execution roots
+  have independent Git metadata.
+- Identifiers, roots, scopes, permission grants, and delivery evidence fail
+  closed for traversal, collision, malformed, stale, cross-run, and extra-path
+  cases.
+- Initialization and concurrent attempt/run/event writes preserve complete,
+  immutable, idempotent evidence.
+- All tracked tests are discovered and W57 safety regressions are stable on the
+  supported Node 22 environment.
+
+**Detailed slices:** `docs/backlog/wave-57-implementation-slices.md`
+
+## W58 - runtime, quality, and loopback control-plane truthfulness
+**Goal:** Make queries non-materializing, context/evaluation evidence effective,
+routing and policy semantics executable, run lifecycle asynchronous, live events
+cross-process, API/CLI/OpenAPI surfaces canonical, and the local loopback HTTP
+boundary safe without introducing hosted frontend scope.
+
+**Exit criteria:**
+- Every read/query operation leaves a clean project unchanged until an explicit
+  initialization mutation.
+- Effective context content and hashes reach the provider; real evaluation,
+  run-owned Harness lineage, and replay compatibility fail closed.
+- Route fallback/retry/repair and adapter semantic normalization execute the
+  declared policy instead of descriptive metadata only.
+- Active runs leave HTTP/SSE/CLI controls responsive and deliver durable events
+  between worker, server, CLI, and local SPA processes.
+- API exports, OpenAPI fixtures, CLI flags, limits, redaction, and lifecycle
+  dependencies agree.
+- `aor app` rejects non-loopback, hostile Host/Origin, wrong media type, and
+  oversized body requests without requiring browser login or hosted auth.
+
+**Detailed slices:** `docs/backlog/wave-58-implementation-slices.md`
+
+## W59 - local operator correctness, maintainability, and audit closure
+**Goal:** Replace marker-based web confidence with executable browser behavior,
+fix local console state/queue/accessibility defects, introduce code-quality and
+dependency ratchets, decompose proven hotspots, enforce public/private contract
+parity, and independently close the audit.
+
+**Exit criteria:**
+- The installed SPA is tested through clean first load, live/reconnect, project
+  race, partial failure, multi-item queue, responsive, and keyboard scenarios.
+- The local console uses one same-origin client and atomic snapshot state without
+  remote/hosted frontend assumptions.
+- Scoped lint/type/dependency/dead-code/complexity/duplication gates prevent new
+  debt while supporting incremental cleanup.
+- Core, CLI, control-plane, adapter, web, and live-E2E hotspots are decomposed
+  behind characterization tests and contract-parity guards.
+- Every AUD-001 through AUD-055 item has independent evidence or an explicit
+  accepted/open disposition, and readiness/story/release claims match the result.
+
+**Detailed slices:** `docs/backlog/wave-59-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

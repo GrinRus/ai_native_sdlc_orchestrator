@@ -2,7 +2,7 @@
 
 ## Status
 
-AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode. W30 adds alpha-hardening evidence around ADRs, OpenAPI route drift checks, self-hosted operations runbooks, readiness checks, and installed-user release smoke coverage. W31 adds a packaged local UI launch path for installed users while preserving the headless boundary. W32 adds runtime-owned operator requests for bounded analysis and proposal/patch evidence from CLI, API, and web surfaces. W33 aligns local-alpha console proof around `aor app` and removes the obsolete static snapshot surface without expanding hosted, security, or production-hardening claims. W34 refactors the packaged local app around runtime-owned flows, strengthens app smoke with flow selector and `New Flow` markers, and proves the installed-user flow loop through browser-task guided evidence without broadening the production-candidate claim beyond self-hosted CLI/API mode.
+The historical **self-hosted CLI/API production candidate** verdict is under an audit release hold and is not the current AOR status. W22-W34 evidence remains useful as a historical bounded baseline, but the July 2026 audit found confirmed execution, permission, delivery, evidence, and quality-gate failures that invalidate the previous readiness verdict. W57-W59 own remediation and independent requalification. Until W57-S01 adds the audit disposition to the machine-readable gate, a green legacy `pnpm production:ready` result proves only the pre-audit W25/W26 checks and must not be treated as release clearance.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -26,9 +26,12 @@ Production readiness requires:
 
 | Blocker | Owning slice | Required evidence |
 |---|---|---|
-| None for the W22-W26 self-hosted CLI/API production-candidate scope. | none | Remaining non-goals are outside this release mode, not blockers. |
+| Release/readiness sources and gates do not yet encode the July 2026 audit hold. | `W57-S01` | Threat-model boundary, story-gap disposition, blocked readiness fixture, and default unsafe-mode denial. |
+| No-write, workspace, path/scope, permission, delivery, and evidence trust boundaries are not reliable. | `W57-S02` through `W57-S08` | Adversarial regression evidence and an independently reviewable W57 disposition. |
+| Runtime context, evaluation, routing, control, event, API, and local HTTP behavior are not yet truthful end to end. | `W58-S01` through `W58-S08` | Cross-process and installed-package runtime-quality acceptance proof. |
+| Browser behavior, maintainability ratchets, hotspot decomposition, and independent audit closure remain open. | `W59-S01` through `W59-S07` | Executable browser evidence, quality baselines, finding-by-finding closure ledger, and a new readiness decision. |
 
-## Closed hardening and release prerequisites
+## Historical hardening and release evidence
 
 | Closed prerequisite | Owning slice | Evidence |
 |---|---|---|
@@ -57,7 +60,7 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-As of W34-S06, the matrix records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. W34 strengthens installed-user UI and proof evidence but does not change evidence strength counts. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+The last accepted W34-S06 snapshot records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. Those values predate the July 2026 audit and are not a current release verdict. W57-S01 must reopen the directly invalidated outcomes and bind them to W57-W59 gap slices before machine-readable readiness can be reconsidered. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
 
 The current sanitized production proof fixture is configured by `pnpm production:ready`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
@@ -65,19 +68,14 @@ The current sanitized production proof fixture is configured by `pnpm production
 
 OpenCode is extended candidate coverage after W22-S03. It is not a required or certified baseline provider until a future real live certification proof promotes it. Future promotion must keep permission-policy validation strict and must not use mock-backed production proof.
 
-## Release criteria
+## Requalification criteria
 
-The final verdict is **self-hosted production candidate** for the bounded CLI/API mode because:
-1. W23 contract, auth, and lifecycle boundary slices are accepted.
-2. W24 run-level harness, interactive continuation, and strict delivery gates are accepted.
-3. W25 real external-runner full-journey proof passes with code-changing evidence and no upstream write.
-4. W26 production-readiness gate (`pnpm production:ready`) passes.
-5. W26 maintainability stabilization is accepted for production-touched hotspots.
-6. W26 release documentation states the supported mode, rollback procedure, auth configuration, no-write/write-back policy, proof evidence, and non-goals.
-7. W30 alpha-hardening checks pass for ADRs, OpenAPI route coverage, self-hosted operations docs, and release smoke boundaries.
-8. W31 installed-user local app smoke passes without making the web UI mandatory.
-9. W32 operator-request checks pass without turning request text into query/live payload content or bypassing delivery-mode scope.
-10. W33 console alignment checks pass with app-smoke proof from `aor app` and no generated static HTML console dependency.
-11. W34 flow-centric console and guided proof checks pass with selected-flow boundaries, `New Flow` release smoke markers, browser-task evidence, accepted skill-agent decisions, and no upstream write.
+The historical W22-W34 evidence does not by itself restore the production-candidate verdict. Requalification requires:
 
-This verdict does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.
+1. W57 closes every execution, filesystem, scope, permission, delivery, and concurrent-evidence trust blocker with adversarial proof.
+2. W58 proves non-materializing reads, effective context, real evaluation, executable routing, asynchronous control, durable events, canonical public surfaces, and the loopback HTTP boundary.
+3. W59 replaces marker checks with browser behavior, lands maintainability ratchets and bounded decomposition, and independently disposes every `AUD-001` through `AUD-055` finding.
+4. `W59-S07` updates the readiness, release, story, and roadmap sources only after all remaining S1 findings are resolved or an explicit narrower release claim is approved.
+5. A new production-readiness decision passes the full discovered test set, package/install smoke, no-upstream-write checks, and the audit closure ledger.
+
+Requalification still does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.
