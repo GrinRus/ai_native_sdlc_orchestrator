@@ -10,6 +10,13 @@ accessibility, tests, and maintainability. It does not add login, remote bearer
 token handling, multi-user authorization, public deployment, or frontend-owned
 orchestration.
 
+W59 does not claim broad UX/UI maturity. The post-execution product work for
+complete Mission intake, truthful action affordances, cockpit hierarchy,
+adaptive lifecycle navigation, semantic design-system contracts, and task-based
+UX/UI proof is tracked in W63. W63 starts only after W62-S06 and must reuse the
+browser harness, local client/state model, queue mechanics, accessible dialog
+primitive, module boundaries, and quality ratchets established here.
+
 Priorities use the audit remediation scale (`P0` release blocker, `P1` next
 repair lane, `P2` planned). Effort estimates use `XS/S/M/L/XL` and include
 implementation, characterization/regression tests, metrics, and documentation.

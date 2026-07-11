@@ -558,6 +558,17 @@ This is the master index for the implementation slices across all defined waves.
 | W62-S05 | Coordinated delivery and execution UX | EPIC-5, EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, `docs/product/**`, tests | W62-S04, W20-S01, W24-S03 |
 | W62-S06 | Monorepo and bounded multirepo full-flow proof | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W62-S05, W60-S05, W61-S05 |
 
+## W63 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W63-S01 | Operator journey, action semantics, and scenario baseline | EPIC-0, EPIC-6 | blocked | product/architecture/contracts docs, web scenario fixtures | W62-S06 |
+| W63-S02 | Semantic design system and component contracts | EPIC-0, EPIC-6 | blocked | `apps/web/src/**`, UI foundation docs/tests | W63-S01 |
+| W63-S03 | Guided Mission intake and resumable first-flow creation | EPIC-1, EPIC-2, EPIC-6 | blocked | intake/scope contracts, Mission UI, lifecycle responses, browser tests | W63-S01, W63-S02 |
+| W63-S04 | Truthful action-first cockpit and recovery controls | EPIC-3, EPIC-4, EPIC-6 | blocked | next-action/control-plane contracts, cockpit/recovery UI, browser tests | W63-S01, W63-S02 |
+| W63-S05 | Adaptive shell and lifecycle navigation | EPIC-6 | blocked | app shell, responsive navigation, accessibility/browser tests | W63-S03, W63-S04 |
+| W63-S06 | Attention queue, evidence workbench, and cockpit hierarchy | EPIC-1, EPIC-4, EPIC-6 | blocked | queue/workbench projections, responsive UI, browser tests | W63-S03, W63-S04, W63-S05 |
+| W63-S07 | Installed-console UX/UI acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | blocked | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
+
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work

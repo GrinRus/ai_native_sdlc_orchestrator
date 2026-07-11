@@ -314,6 +314,13 @@ graph TD
   W62S04[W62-S04 Integration, stale-task invalidation, and bounded repair]
   W62S05[W62-S05 Coordinated delivery and execution UX]
   W62S06[W62-S06 Monorepo and bounded multirepo full-flow proof]
+  W63S01[W63-S01 Operator journey, action semantics, and scenario baseline]
+  W63S02[W63-S02 Semantic design system and component contracts]
+  W63S03[W63-S03 Guided Mission intake and resumable first-flow creation]
+  W63S04[W63-S04 Truthful action-first cockpit and recovery controls]
+  W63S05[W63-S05 Adaptive shell and lifecycle navigation]
+  W63S06[W63-S06 Attention queue, evidence workbench, and cockpit hierarchy]
+  W63S07[W63-S07 Installed-console UX/UI acceptance and story closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -774,6 +781,22 @@ graph TD
   W62S05 --> W62S06
   W60S05 --> W62S06
   W61S05 --> W62S06
+  W62S06 --> W63S01
+  W63S01 --> W63S02
+  W63S01 --> W63S03
+  W63S02 --> W63S03
+  W63S01 --> W63S04
+  W63S02 --> W63S04
+  W63S03 --> W63S05
+  W63S04 --> W63S05
+  W63S03 --> W63S06
+  W63S04 --> W63S06
+  W63S05 --> W63S06
+  W63S02 --> W63S07
+  W63S03 --> W63S07
+  W63S04 --> W63S07
+  W63S05 --> W63S07
+  W63S06 --> W63S07
 ```
 
 ## W0 hard dependencies
@@ -1341,6 +1364,17 @@ own the stricter terminal control proof evidence for this lane.
 | W62-S04 | W62-S03, W45-S02 |
 | W62-S05 | W62-S04, W20-S01, W24-S03 |
 | W62-S06 | W62-S05, W60-S05, W61-S05 |
+
+## W63 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W63-S01 | W62-S06 |
+| W63-S02 | W63-S01 |
+| W63-S03 | W63-S01, W63-S02 |
+| W63-S04 | W63-S01, W63-S02 |
+| W63-S05 | W63-S03, W63-S04 |
+| W63-S06 | W63-S03, W63-S04, W63-S05 |
+| W63-S07 | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1652,6 +1686,13 @@ own the stricter terminal control proof evidence for this lane.
 308. W62-S04
 309. W62-S05
 310. W62-S06
+311. W63-S01
+312. W63-S02
+313. W63-S03
+314. W63-S04
+315. W63-S05
+316. W63-S06
+317. W63-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

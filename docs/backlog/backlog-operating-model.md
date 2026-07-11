@@ -155,7 +155,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W62`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W63`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, and concurrent evidence integrity. W58
 continues with non-materializing reads, effective context/evaluation, asynchronous
@@ -167,8 +167,12 @@ independent closure of AUD-001 through AUD-055.
 After W57-W59 audit remediation closes, W60 adds structured task planning and
 the plan workbench, W61 adds portable topology plus machine-local binding
 management, and W62 adds repo-aware workspace sets, bounded concurrency,
-integration, repair, and coordinated delivery proof. W59-S07 is the explicit
-entry dependency for that later product-maturity program.
+integration, repair, and coordinated delivery proof. W63 then consolidates
+Mission intake, action semantics, adaptive navigation, attention/evidence work,
+and visual-system contracts across the installed operator console. W59-S07 is
+the explicit entry dependency for that later product-maturity program; W63-S01
+waits for W62-S06 so its UI contract covers the delivered planning, topology,
+and execution surfaces.
 
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for
