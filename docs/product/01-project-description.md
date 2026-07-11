@@ -110,6 +110,17 @@ AOR does **not** target unbounded organization-wide orchestration in MVP.
 
 The MVP proof path for bounded multirepo support is intentionally narrow: one profile, explicit `repos[]`, explicit `repo_graph[]`, deterministic per-repo and integration validation refs, coordination evidence before non-`no-write` delivery, and repo-level changed-path lineage in the delivery manifest and release packet.
 
+W60-W62 plan the post-audit maturity boundary. W60 makes planning tasks structured,
+versioned, acceptance-traceable, and evidence-derived. W61 separates portable
+project/repository/component topology from machine-local repository bindings and
+adds explicit installed-user management. W62 provisions run-scoped workspace
+sets and coordinates task DAG execution, integration, repair, and per-repository
+delivery under one parent mission. These waves do not add portfolio
+orchestration across independent AOR project IDs.
+
+The operator experience for this boundary is defined in
+`docs/product/04-project-topology-and-task-planning-ux.md`.
+
 ## Product intake source model
 AOR intake preserves product acceptance evidence as a durable `intake-request-body` attached to the `intake-request` artifact packet.
 

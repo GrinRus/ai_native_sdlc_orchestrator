@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-59-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-62-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -70,6 +70,9 @@ The authoritative planning model for implementation lives in:
 | W57 | Restore execution, filesystem, permission, delivery, and evidence trust boundaries from the July 2026 codebase audit before credentialed or write-capable use. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-57-implementation-slices.md` |
 | W58 | Make read models, context, routing, evaluation, jobs, live events, APIs, and the loopback local-app transport truthful and executable. | 8 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-58-implementation-slices.md` |
 | W59 | Replace source-marker confidence with browser behavior, harden the local console, ratchet code quality, decompose hotspots, and independently close the audit. | 7 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-59-implementation-slices.md` |
+| W60 | Replace generic task lists with structured, versioned, execution-ready plans and an operator Plan workbench. | 5 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-60-implementation-slices.md` |
+| W61 | Add portable project/repository/component topology, persistent local bindings, and installed-user Project Structure management. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-61-implementation-slices.md` |
+| W62 | Execute approved task DAGs through isolated workspace sets, bounded concurrency, integration, repair, and coordinated delivery. | 6 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-62-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -252,6 +255,22 @@ The authoritative planning model for implementation lives in:
 | W59-S05 | core/CLI/control-plane decomposition target: ARC-06, DEV-01, DEV-05, OPS-01, OPS-06, OPS-10 |
 | W59-S06 | adapter/live-E2E decomposition and contract parity target: DEV-01, DEV-07, AIP-02, AIP-03, AIP-04, OPS-06, OPS-07 |
 | W59-S07 | independent audit closure and readiness-decision target: OPS-06, OPS-07, PSO-06, FIN-03 |
+| W60-S01 | structured task contract and backlog detail target: EMP-01, EMP-02, ARC-05, PSO-07, OPS-10 |
+| W60-S02 | planner decomposition and task quality target: EMP-01, EMP-02, DIS-05, ARC-05, PSO-07 |
+| W60-S03 | execution plan and task-progress target: EMP-02, EMP-03, EMP-07, DEV-05, OPS-01, OPS-10 |
+| W60-S04 | Plan workbench and approval UX target: EMP-01, EMP-02, EMP-03, PSO-04, PSO-07, OPS-01, OPS-02, OPS-10 |
+| W60-S05 | structured planning proof target: EMP-02, EMP-03, OPS-06, OPS-10, FIN-03 |
+| W61-S01 | project topology and binding contract target: RMO-01, RMO-02, PBO-01, PBO-07, PBO-08, ARC-01 |
+| W61-S02 | persistent local registry and discovery target: PBO-01, PBO-03, PBO-07, PBO-08, RMO-01, RMO-02 |
+| W61-S03 | topology CLI/API management target: RMO-01, RMO-02, PBO-03, PBO-04, PBO-05, OPS-01, OPS-10 |
+| W61-S04 | Add Project and Project Structure UX target: PBO-01, PBO-03, PBO-08, PBO-09, RMO-01, RMO-02, OPS-01, OPS-10 |
+| W61-S05 | topology onboarding proof target: PBO-08, PBO-09, RMO-01, RMO-02, OPS-06, OPS-10 |
+| W62-S01 | workspace-set and repo-change evidence target: RMO-01, RMO-04, DEV-01, DTX-05, SEC-04 |
+| W62-S02 | impact scope and execution DAG target: EMP-02, EMP-03, ARC-01, RMO-02, RMO-04, PSO-07 |
+| W62-S03 | parent/child scheduler target: EMP-03, EMP-04, EMP-05, DEV-01, DEV-05, OPS-01, OPS-07 |
+| W62-S04 | integration, stale invalidation, and repair target: DEV-05, RQA-02, RQA-05, RMO-04, DTX-06, OPS-04 |
+| W62-S05 | coordinated delivery and execution UX target: EMP-03, RMO-03, RMO-04, RMO-05, RMO-06, DTX-04, DTX-08, OPS-01, OPS-10 |
+| W62-S06 | monorepo/multirepo full-flow proof target: EMP-03, DEV-05, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, OPS-06, OPS-10, FIN-03 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -995,7 +1014,7 @@ semantics outside orchestrator core.
   and broken-baseline archetypes without depending on the live E2E target
   matrix.
 
-**Detailed slices:** `docs/backlog/wave-53-implementation-slices.md`
+**Detailed slices:** `docs/backlog/wave-60-implementation-slices.md`
 
 ## W54 - generic verification authoring and discovery
 **Goal:** Make W53 command groups practical for arbitrary projects by adding
@@ -1027,7 +1046,7 @@ W44/W45 remain valid deferred backlog tracks and are not W54 prerequisites.
 - Boundary guards cover production source, public docs/examples, and AOR
   artifact shapes.
 
-**Detailed slices:** `docs/backlog/wave-54-implementation-slices.md`
+**Detailed slices:** `docs/backlog/wave-61-implementation-slices.md`
 
 ## W55 - actionable repair evidence and hard-target control stability
 **Goal:** Convert the latest `ky` large/xlarge control findings into generic
@@ -1046,7 +1065,7 @@ without reopening W45 or W54.
 - Control reruns distinguish known-good medium regression signal, `ky` large
   product/provider outcomes, and manual xlarge observation evidence.
 
-**Detailed slices:** `docs/backlog/wave-55-implementation-slices.md`
+**Detailed slices:** `docs/backlog/wave-62-implementation-slices.md`
 
 ## W56 - first-run console focus and cockpit action clarity
 **Goal:** Make the installed-user local console first-run and active-flow paths
@@ -1135,5 +1154,66 @@ parity, and independently close the audit.
 
 **Detailed slices:** `docs/backlog/wave-59-implementation-slices.md`
 
+## W60 - structured task planning and operator workbench
+**Goal:** Replace generic task lists with structured, versioned, and
+execution-ready plans whose scope, dependencies, acceptance coverage,
+verification, evidence, attempts, and completion remain inspectable through
+headless and web surfaces.
+
+**Exit criteria:**
+- medium+ wave tickets and handoffs carry complete structured tasks while old
+  compact task records remain compatible;
+- deterministic completeness and traceability validation runs before semantic
+  task-quality evaluation or approval;
+- planner output is mission-specific instead of the same generic implementation,
+  verification, and lineage task trio;
+- execution plans distinguish stable tasks, grouped units, and repeated attempts;
+- the Plan workbench exposes details, dependencies, criteria coverage, revisions,
+  approval, progress, and recovery without UI-owned state;
+- public proof covers revision, approval, task-to-unit mapping, retry under one
+  task ID, and evidence-derived completion.
+
+**Detailed slices:** `docs/backlog/wave-53-implementation-slices.md`
+
+## W61 - project topology, bindings, and management UX
+**Goal:** Make single-repo, monorepo, and bounded multirepo projects explicitly
+configurable through portable topology plus machine-local bindings, with
+headless management and an installed-user Project Structure experience.
+
+**Exit criteria:**
+- product and architecture distinguish Local Workspace, AOR Project,
+  Repository, Component, Project Binding, and Workspace Set;
+- portable profiles never require machine-local absolute paths and monorepo
+  packages remain components of one physical repository;
+- explicitly connected projects and bindings persist across app restart without
+  filesystem scanning or implicit runtime initialization;
+- CLI/API/UI support topology create/import, add/edit/rebind/disable,
+  reanalysis, validation, and recoverable blocker states;
+- single-project no-settings launch and current profiles stay compatible;
+- installed-user proof covers all supported topologies, persistence, rebind,
+  accessibility, responsive behavior, and project isolation.
+
+**Detailed slices:** `docs/backlog/wave-54-implementation-slices.md`
+
+## W62 - repo-aware execution and coordinated delivery
+**Goal:** Execute approved task DAGs through exact run-scoped repository
+workspaces, bounded parent/child concurrency, aggregate integration and repair,
+and truthful per-repository coordinated delivery.
+
+**Exit criteria:**
+- delivery-capable runs provision workspace sets with stable mounts, refs,
+  commits, cleanup, and per-repository Git/change evidence;
+- approved tasks map to a validated execution DAG with deterministic conflict
+  and concurrency decisions;
+- child attempts use normal Runtime Harness execution and never make partial
+  parent success look complete;
+- failed child or integration work preserves accepted evidence, invalidates only
+  affected downstream work, and reuses bounded W45 repair semantics;
+- integration, review, QA, locks, delivery plan, and delivery manifest close one
+  aggregate mission with explicit partial-delivery recovery;
+- monorepo and bounded multirepo proof covers sequential, parallel, serialized
+  conflict, failure/repair, integration, operator UX, and no-upstream-write truth.
+
+**Detailed slices:** `docs/backlog/wave-55-implementation-slices.md`
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.
