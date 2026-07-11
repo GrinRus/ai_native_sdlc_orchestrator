@@ -39,6 +39,9 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W58:** `W58-S06` Canonical API, OpenAPI, CLI, and service boundary; `W58-S08` Runtime-quality acceptance proof
 - **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S03` Accessible local dialogs and web state decomposition; `W59-S04` Code-quality, dependency, and dead-code ratchet; `W59-S05` Core, CLI, and control-plane decomposition; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity; `W59-S07` Independent audit closure and readiness decision
 
+- **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S05` Structured planning proof and documentation closure
+- **W61:** `W61-S05` Topology onboarding proof and documentation closure
+- **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
@@ -59,6 +62,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W58:** `W58-S01` Non-materializing read-model contract and runtime; `W58-S02` Effective context and unique asset identity
 - **W59:** `W59-S02` Local console live-state and interaction correctness
 
+- **W61:** `W61-S01` Project topology and local binding contract baseline; `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
@@ -68,6 +72,9 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 - **W21:** `W21-S04` Guided mission intake and next-action resolver
 - **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S06` Transactional initialization and runtime-root containment; `W57-S07` Atomic attempts, run control, and event identity
 
+- **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
+- **W61:** `W61-S01` Project topology and local binding contract baseline
+- **W62:** `W62-S02` Impact scope and execution DAG planning
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
 
@@ -86,6 +93,8 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W58:** `W58-S02` Effective context and unique asset identity; `W58-S03` Executable route fallback, retry, repair, and adapter semantics; `W58-S05` Asynchronous run jobs and durable live-event delivery
 - **W59:** `W59-S05` Core, CLI, and control-plane decomposition; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity
 
+- **W60:** `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
+- **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
 
@@ -117,6 +126,8 @@ Implement validation, eval, harness, certification, and promotion.
 - **W58:** `W58-S02` Effective context and unique asset identity; `W58-S03` Executable route fallback, retry, repair, and adapter semantics; `W58-S04` Real evaluation, Harness lineage, and replay compatibility
 - **W59:** `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity
 
+- **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate
+- **W62:** `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
 
@@ -135,6 +146,8 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S03` True workspace isolation and no-write enforcement; `W57-S05` Exact-diff delivery and resolvable authorization evidence
 - **W59:** `W59-S07` Independent audit closure and readiness decision
 
+- **W61:** `W61-S01` Project topology and local binding contract baseline
+- **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
 
@@ -175,6 +188,9 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W58:** `W58-S01` Non-materializing read-model contract and runtime; `W58-S05` Asynchronous run jobs and durable live-event delivery; `W58-S06` Canonical API, OpenAPI, CLI, and service boundary; `W58-S07` Loopback-only local app transport boundary
 - **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S02` Local console live-state and interaction correctness; `W59-S03` Accessible local dialogs and web state decomposition; `W59-S05` Core, CLI, and control-plane decomposition
 
+- **W60:** `W60-S03` Execution plan and evidence-derived task progress; `W60-S04` Plan workbench UX and approval flow
+- **W61:** `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S04` Add Project and Project Structure UX
+- **W62:** `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
 
@@ -227,3 +243,6 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W57:** `W57-S08` Trust-boundary regression proof and release disposition
 - **W58:** `W58-S03` Executable route fallback, retry, repair, and adapter semantics; `W58-S08` Runtime-quality acceptance proof
 - **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity; `W59-S07` Independent audit closure and readiness decision
+- **W60:** `W60-S05` Structured planning proof and documentation closure
+- **W61:** `W61-S05` Topology onboarding proof and documentation closure
+- **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof

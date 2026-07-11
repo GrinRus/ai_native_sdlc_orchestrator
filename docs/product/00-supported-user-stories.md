@@ -61,6 +61,11 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 ### Engineering manager / planner
 - Convert approved scope into wave tickets and handoff packets.
 - Split work into bounded sequential or parallel steps.
+- Review task purpose, concrete work items, repository/component scope,
+  dependencies, acceptance coverage, verification, evidence, and risks before
+  approving a plan.
+- Preserve stable task identity across execution-unit grouping, retries, repair,
+  and evidence-derived completion.
 - Manage budgets, pause/resume, and execution steering.
 - Track clean-close, retry, repair, and blocker rates.
 
@@ -106,11 +111,21 @@ W18 closes the connected operator-surface path for runner-requested questions: s
 
 ### Repository / multirepo owner
 - Describe monolith or bounded multirepo topology in one project profile.
+- Distinguish physical repositories from apps, services, and packages inside a
+  monorepo.
+- Bind portable repository identity to explicit machine-local checkouts without
+  committing absolute local paths.
 - Track repo graph, ownership, and cross-repo dependencies.
 - Use scoped locks and cross-repo validation.
 - Produce coordinated delivery manifests for bounded multirepo work.
 
 Bounded multirepo means one AOR project profile can coordinate several explicit repositories, such as backend services, mobile, and frontend repos. It does not mean MVP portfolio orchestration across multiple independent AOR `project_id` profiles. W36 adds a local app workspace that can switch between explicitly added projects, but each project still owns separate runtime state, flows, and evidence.
+
+W60-W62 track the remaining detailed-plan, project-management, workspace-set,
+safe-concurrency, integration, and recovery gaps. Until those slices close,
+current topology and parallel-step coverage remains a bounded contract/proof
+baseline rather than the full operator workflow in
+`docs/product/04-project-topology-and-task-planning-ux.md`.
 
 ### Incident / improvement owner
 - Open incident reports from failed releases or production feedback.

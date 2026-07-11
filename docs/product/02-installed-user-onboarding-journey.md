@@ -56,6 +56,13 @@ boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped evidence
 views, flow-targeted Ask AOR, and browser-task installed-user proof coverage with
 post-run UI/UX quality assessment when UI/UX quality is claimed.
 
+The planned project-topology and detailed-task extension is defined in
+`docs/product/04-project-topology-and-task-planning-ux.md`. W60-W62 preserve the
+flow-centric shell while adding Project Structure, a Flow Plan workbench,
+parent/child execution visibility, integration recovery, and coordinated
+delivery. These are planned surfaces and must not be described as implemented
+until their owning slices close.
+
 A flow is a runtime/control-plane projection over mission/intake, next-action,
 operator-request, run, review, delivery, release, and learning evidence.
 Active flows can invoke runtime-owned lifecycle mutations. Completed flows are

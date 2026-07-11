@@ -530,5 +530,37 @@ This is the master index for the implementation slices across all defined waves.
 | W59-S06 | Adapter/live-E2E decomposition and contract-kernel parity | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | blocked | adapter SDK, live E2E stages, public/private contract kernels | W58-S08, W59-S04 |
 | W59-S07 | Independent audit closure and readiness decision | EPIC-0, EPIC-5, EPIC-7 | blocked | audit ledger/report, story/readiness/release sources, full gates | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
 
+## W60 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W60-S01 | Structured task contract and backlog detail baseline | EPIC-0, EPIC-2, EPIC-4 | blocked | `docs/product/**`, `docs/contracts/**`, `docs/backlog/**`, `packages/contracts/**`, `examples/packets/**`, `.agents/skills/backlog-workflow/**`, tests | W59-S07 |
+| W60-S02 | Planner decomposition and task quality gate | EPIC-2, EPIC-3, EPIC-4 | blocked | `examples/prompts/**`, `examples/context/**`, `packages/orchestrator-core/src/handoff-packets.mjs`, `packages/contracts/**`, planning tests | W60-S01, W44-S03 |
+| W60-S03 | Execution plan and evidence-derived task progress | EPIC-2, EPIC-3, EPIC-6 | blocked | `docs/contracts/**`, `packages/contracts/**`, `packages/orchestrator-core/**`, `packages/observability/**`, `examples/reports/**`, tests | W60-S02 |
+| W60-S04 | Plan workbench UX and approval flow | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, control-plane tests | W60-S03 |
+| W60-S05 | Structured planning proof and documentation closure | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W60-S04 |
+
+## W61 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W61-S01 | Project topology and local binding contract baseline | EPIC-1, EPIC-2, EPIC-5 | blocked | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, tests | W60-S01 |
+| W61-S02 | Persistent local workspace registry and topology discovery | EPIC-1, EPIC-6 | blocked | `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, local registry and project-analysis tests | W61-S01 |
+| W61-S03 | Project topology CLI/API management and validation | EPIC-1, EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, OpenAPI/examples, tests | W61-S02 |
+| W61-S04 | Add Project and Project Structure UX | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, browser tests | W61-S03 |
+| W61-S05 | Topology onboarding proof and documentation closure | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W61-S04 |
+
+## W62 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W62-S01 | Workspace-set provisioner and repository change evidence | EPIC-3, EPIC-5 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, workspace and Git tests | W61-S03, W4-S01 |
+| W62-S02 | Impact scope and execution DAG planning | EPIC-2, EPIC-3, EPIC-4 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `examples/packets/**`, planner/scope tests | W60-S03, W61-S03 |
+| W62-S03 | Parent/child Runtime Harness scheduler and bounded concurrency | EPIC-3, EPIC-4, EPIC-6 | blocked | `packages/orchestrator-core/**`, `packages/observability/**`, `apps/cli/**`, `apps/api/**`, scheduler tests | W62-S01, W62-S02, W24-S01 |
+| W62-S04 | Integration, stale-task invalidation, and bounded repair | EPIC-4, EPIC-5, EPIC-6 | blocked | `packages/orchestrator-core/**`, `packages/observability/**`, `docs/contracts/**`, integration/repair tests | W62-S03, W45-S02 |
+| W62-S05 | Coordinated delivery and execution UX | EPIC-5, EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, `docs/product/**`, tests | W62-S04, W20-S01, W24-S03 |
+| W62-S06 | Monorepo and bounded multirepo full-flow proof | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W62-S05, W60-S05, W61-S05 |
+
 ## Planning note
-Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
+Every wave document includes a starter local-task outline for each slice. New
+medium+ slices carry Purpose, concrete Changes, and Validation for each work
+package. Agents should normally implement one slice at a time and refine only
+the local tasks inside that slice unless the shared backlog truly needs a new
+independently acceptable outcome.

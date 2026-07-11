@@ -298,6 +298,22 @@ graph TD
   W59S05[W59-S05 Core CLI and control-plane decomposition]
   W59S06[W59-S06 Adapter live-E2E decomposition and contract-kernel parity]
   W59S07[W59-S07 Independent audit closure and readiness decision]
+  W60S01[W60-S01 Structured task contract and backlog detail baseline]
+  W60S02[W60-S02 Planner decomposition and task quality gate]
+  W60S03[W60-S03 Execution plan and evidence-derived task progress]
+  W60S04[W60-S04 Plan workbench UX and approval flow]
+  W60S05[W60-S05 Structured planning proof and documentation closure]
+  W61S01[W61-S01 Project topology and local binding contract baseline]
+  W61S02[W61-S02 Persistent local workspace registry and topology discovery]
+  W61S03[W61-S03 Project topology CLI/API management and validation]
+  W61S04[W61-S04 Add Project and Project Structure UX]
+  W61S05[W61-S05 Topology onboarding proof and documentation closure]
+  W62S01[W62-S01 Workspace-set provisioner and repository change evidence]
+  W62S02[W62-S02 Impact scope and execution DAG planning]
+  W62S03[W62-S03 Parent/child Runtime Harness scheduler and bounded concurrency]
+  W62S04[W62-S04 Integration, stale-task invalidation, and bounded repair]
+  W62S05[W62-S05 Coordinated delivery and execution UX]
+  W62S06[W62-S06 Monorepo and bounded multirepo full-flow proof]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -732,6 +748,32 @@ graph TD
   W59S04 --> W59S07
   W59S05 --> W59S07
   W59S06 --> W59S07
+  W59S07 --> W60S01
+  W60S01 --> W60S02
+  W44S03 --> W60S02
+  W60S02 --> W60S03
+  W60S03 --> W60S04
+  W60S04 --> W60S05
+  W60S01 --> W61S01
+  W61S01 --> W61S02
+  W61S02 --> W61S03
+  W61S03 --> W61S04
+  W61S04 --> W61S05
+  W61S03 --> W62S01
+  W4S01 --> W62S01
+  W60S03 --> W62S02
+  W61S03 --> W62S02
+  W62S01 --> W62S03
+  W62S02 --> W62S03
+  W24S01 --> W62S03
+  W62S03 --> W62S04
+  W45S02 --> W62S04
+  W62S04 --> W62S05
+  W20S01 --> W62S05
+  W24S03 --> W62S05
+  W62S05 --> W62S06
+  W60S05 --> W62S06
+  W61S05 --> W62S06
 ```
 
 ## W0 hard dependencies
@@ -1272,6 +1314,33 @@ own the stricter terminal control proof evidence for this lane.
 | W59-S06 | W58-S08, W59-S04 |
 | W59-S07 | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
 
+## W60 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W60-S01 | W59-S07 |
+| W60-S02 | W60-S01, W44-S03 |
+| W60-S03 | W60-S02 |
+| W60-S04 | W60-S03 |
+| W60-S05 | W60-S04 |
+
+## W61 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W61-S01 | W60-S01 |
+| W61-S02 | W61-S01 |
+| W61-S03 | W61-S02 |
+| W61-S04 | W61-S03 |
+| W61-S05 | W61-S04 |
+
+## W62 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W62-S01 | W61-S03, W4-S01 |
+| W62-S02 | W60-S03, W61-S03 |
+| W62-S03 | W62-S01, W62-S02, W24-S01 |
+| W62-S04 | W62-S03, W45-S02 |
+| W62-S05 | W62-S04, W20-S01, W24-S03 |
+| W62-S06 | W62-S05, W60-S05, W61-S05 |
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1567,6 +1636,22 @@ own the stricter terminal control proof evidence for this lane.
 292. W59-S05
 293. W59-S06
 294. W59-S07
+295. W60-S01
+296. W60-S02
+297. W60-S03
+298. W60-S04
+299. W60-S05
+300. W61-S01
+301. W61-S02
+302. W61-S03
+303. W61-S04
+304. W61-S05
+305. W62-S01
+306. W62-S02
+307. W62-S03
+308. W62-S04
+309. W62-S05
+310. W62-S06
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
