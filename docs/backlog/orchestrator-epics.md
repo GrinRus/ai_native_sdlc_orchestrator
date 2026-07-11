@@ -42,6 +42,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S05` Structured planning proof and documentation closure
 - **W61:** `W61-S05` Topology onboarding proof and documentation closure
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
+- **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S07` Installed-console UX/UI acceptance and story closure
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
@@ -63,6 +64,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W59:** `W59-S02` Local console live-state and interaction correctness
 
 - **W61:** `W61-S01` Project topology and local binding contract baseline; `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation
+- **W63:** `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
@@ -75,6 +77,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
 - **W61:** `W61-S01` Project topology and local binding contract baseline
 - **W62:** `W62-S02` Impact scope and execution DAG planning
+- **W63:** `W63-S03` Guided Mission intake and resumable first-flow creation
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
 
@@ -95,6 +98,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 
 - **W60:** `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
 - **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency
+- **W63:** `W63-S04` Truthful action-first cockpit and recovery controls
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
 
@@ -128,6 +132,7 @@ Implement validation, eval, harness, certification, and promotion.
 
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate
 - **W62:** `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair
+- **W63:** `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
 
@@ -191,6 +196,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W60:** `W60-S03` Execution plan and evidence-derived task progress; `W60-S04` Plan workbench UX and approval flow
 - **W61:** `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S04` Add Project and Project Structure UX
 - **W62:** `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
+- **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S05` Adaptive shell and lifecycle navigation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy; `W63-S07` Installed-console UX/UI acceptance and story closure
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
 
@@ -246,3 +252,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W60:** `W60-S05` Structured planning proof and documentation closure
 - **W61:** `W61-S05` Topology onboarding proof and documentation closure
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
+- **W63:** `W63-S07` Installed-console UX/UI acceptance and story closure

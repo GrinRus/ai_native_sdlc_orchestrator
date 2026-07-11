@@ -355,7 +355,7 @@ and are intentionally not part of the README workflow. Until W57-S01 encodes
 the July 2026 audit disposition, a green result is legacy pre-audit evidence and
 does not lift the audit release hold.
 
-The current roadmap source of truth extends through W62 in
+The current roadmap source of truth extends through W63 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -468,7 +468,7 @@ The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
 The current alpha distribution, audit-remediation queue, and planned post-audit
-delivery program are tracked through `W62` and focus on:
+delivery program are tracked through `W63` and focus on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -505,6 +505,9 @@ delivery program are tracked through `W62` and focus on:
 - Planned repo-aware workspace sets, bounded parent/child concurrency,
   integration and stale-work recovery, and truthful coordinated multirepo
   delivery.
+- Post-execution operator-console UX/UI maturity: guided Mission intake,
+  truthful recovery actions, adaptive navigation, attention/evidence work, a
+  semantic design system, and installed-package acceptance proof.
 - Verification-plan authoring, stack discovery, profile generation, and
   operator-visible command-group status for arbitrary project shapes.
 - Maintainer-facing product-quality cycles with QA-origin public repair and
