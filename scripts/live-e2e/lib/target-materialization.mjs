@@ -234,6 +234,7 @@ export function materializeTargetCheckout(options) {
  * @param {{
  *   examplesRoot: string,
  *   generatedAssetsRoot: string,
+ *   providerVariant?: Record<string, unknown>,
  * }} options
  */
 export function materializeHostLiveE2eAssets(options) {
@@ -241,10 +242,85 @@ export function materializeHostLiveE2eAssets(options) {
   fs.rmSync(assetsRoot, { recursive: true, force: true });
   fs.mkdirSync(assetsRoot, { recursive: true });
   fs.cpSync(options.examplesRoot, assetsRoot, { recursive: true });
+  const liveE2eAdapterDefaults = materializeSelectedAdapterLiveE2eDefaults({
+    assetsRoot,
+    providerVariant: asRecord(options.providerVariant),
+  });
   return {
     assetsRoot,
     routesRoot: path.join(assetsRoot, "routes"),
     contextRoot: path.join(assetsRoot, "context"),
+    liveE2eAdapterDefaults,
+  };
+}
+
+/**
+ * @param {{ assetsRoot: string, providerVariant: Record<string, unknown> }} options
+ */
+function materializeSelectedAdapterLiveE2eDefaults(options) {
+  const adapterId = asNonEmptyString(options.providerVariant.primary_adapter);
+  if (!adapterId) {
+    return {
+      adapter_id: null,
+      applied_args: [],
+      applied_permission_modes: [],
+    };
+  }
+
+  const adapterProfileFile = path.join(options.assetsRoot, "adapters", `${normalizeId(adapterId)}.yaml`);
+  const loaded = loadContractFile({
+    filePath: adapterProfileFile,
+    family: "adapter-capability-profile",
+  });
+  if (!loaded.ok) {
+    const issues = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Live E2E adapter profile '${adapterId}' failed validation: ${issues}`);
+  }
+
+  const adapterProfile = asRecord(JSON.parse(JSON.stringify(loaded.document)));
+  const execution = asRecord(adapterProfile.execution);
+  const externalRuntime = asRecord(execution.external_runtime);
+  const defaultArgs = asStringArray(externalRuntime.live_e2e_default_args);
+  if (defaultArgs.length === 0) {
+    return {
+      adapter_id: adapterId,
+      applied_args: [],
+      applied_permission_modes: [],
+    };
+  }
+
+  const permissionPolicy = asRecord(externalRuntime.permission_policy);
+  const modes = asRecord(permissionPolicy.modes);
+  const modeEntries = Object.entries(modes);
+  if (modeEntries.length === 0) {
+    throw new Error(`Live E2E adapter profile '${adapterId}' declares default args without permission policy modes.`);
+  }
+  for (const [modeId, modeEntry] of modeEntries) {
+    const mode = asRecord(modeEntry);
+    modes[modeId] = {
+      ...mode,
+      args: [...defaultArgs, ...asStringArray(mode.args)],
+    };
+  }
+  permissionPolicy.modes = modes;
+  externalRuntime.permission_policy = permissionPolicy;
+  execution.external_runtime = externalRuntime;
+  adapterProfile.execution = execution;
+
+  const validation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: adapterProfile,
+    source: `runtime://live-e2e-adapter-defaults/${normalizeId(adapterId)}`,
+  });
+  if (!validation.ok) {
+    const issues = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Live E2E adapter defaults for '${adapterId}' failed validation: ${issues}`);
+  }
+  fs.writeFileSync(adapterProfileFile, stringifyYaml(adapterProfile), "utf8");
+  return {
+    adapter_id: adapterId,
+    applied_args: defaultArgs,
+    applied_permission_modes: modeEntries.map(([modeId]) => modeId),
   };
 }
 

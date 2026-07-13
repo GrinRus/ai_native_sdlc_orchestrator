@@ -1064,6 +1064,13 @@ function validateAdapterCapabilityProfile(document, source) {
   });
   if (!externalRuntime) return issues;
 
+  validateOptionalStringArrayField({
+    record: externalRuntime,
+    source,
+    field: "execution.external_runtime.live_e2e_default_args",
+    issues,
+  });
+
   const requestTransport =
     typeof externalRuntime.request_transport === "string" && externalRuntime.request_transport.length > 0
       ? externalRuntime.request_transport

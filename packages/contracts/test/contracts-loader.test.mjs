@@ -602,6 +602,39 @@ test("adapter capability profile rejects unrestricted stdin-json for external-pr
   assert.equal(validValidation.ok, true);
 });
 
+test("adapter capability profile validates live E2E default invocation args", () => {
+  const validProfile = {
+    adapter_id: "test-live-defaults",
+    version: 1,
+    capabilities: {},
+    constraints: {},
+    execution: {
+      external_runtime: {
+        live_e2e_default_args: ["--model", "gpt-5.5"],
+      },
+    },
+  };
+  const validValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: validProfile,
+    source: "test://adapter-live-e2e-defaults",
+  });
+  assert.equal(validValidation.ok, true);
+
+  const invalidProfile = structuredClone(validProfile);
+  invalidProfile.execution.external_runtime.live_e2e_default_args = ["--model", 5];
+  const invalidValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: invalidProfile,
+    source: "test://adapter-live-e2e-defaults-invalid",
+  });
+  assertValidationIssue(
+    invalidValidation,
+    "field_type_mismatch",
+    "execution.external_runtime.live_e2e_default_args[1]",
+  );
+});
+
 test("runtime harness report example loads through the shared contract path", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"),
