@@ -20,6 +20,7 @@ import {
 import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
+  materializeHostLiveE2eAssets,
   materializeProviderPinnedPolicyOverrides,
   materializeProviderPinnedRouteOverrides,
   materializeTargetCheckout,
@@ -1208,6 +1209,49 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
       assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
       assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+    }
+  });
+});
+
+test("host assets pin Codex model defaults without changing other provider defaults", () => {
+  withTempRoot((tempRoot) => {
+    const sourceCodex = loadContractFile({
+      filePath: path.join(repoRoot, "examples/adapters/codex-cli.yaml"),
+      family: "adapter-capability-profile",
+    });
+    assert.equal(sourceCodex.ok, true);
+    const sourceModes = sourceCodex.document.execution.external_runtime.permission_policy.modes;
+    for (const mode of Object.values(sourceModes)) {
+      assert.equal(mode.args.includes("--model"), false, "source adapter remains unchanged outside asset materialization");
+    }
+
+    const cases = [
+      {
+        adapterId: "codex-cli",
+        expectedPrefix: ["--model", "gpt-5.5", "-c", 'model_reasoning_effort="xhigh"'],
+      },
+      { adapterId: "claude-code", expectedPrefix: null },
+      { adapterId: "qwen-code", expectedPrefix: null },
+    ];
+    for (const current of cases) {
+      const hostAssets = materializeHostLiveE2eAssets({
+        examplesRoot: path.join(repoRoot, "examples"),
+        generatedAssetsRoot: path.join(tempRoot, current.adapterId),
+        providerVariant: { primary_adapter: current.adapterId },
+      });
+      const copied = loadContractFile({
+        filePath: path.join(hostAssets.assetsRoot, "adapters", `${current.adapterId}.yaml`),
+        family: "adapter-capability-profile",
+      });
+      assert.equal(copied.ok, true);
+      const modes = copied.document.execution.external_runtime.permission_policy.modes;
+      for (const mode of Object.values(modes)) {
+        if (current.expectedPrefix) {
+          assert.deepEqual(mode.args.slice(0, current.expectedPrefix.length), current.expectedPrefix);
+        } else {
+          assert.equal(mode.args.includes("--model"), false, `${current.adapterId} keeps its CLI model default`);
+        }
+      }
     }
   });
 });

@@ -5454,8 +5454,10 @@ export function executeFullJourneyFlow(options) {
     const hostAssets = materializeHostLiveE2eAssets({
       examplesRoot: options.examplesRoot,
       generatedAssetsRoot: path.join(options.layout.stateRoot, "live-e2e-assets", normalizeId(options.runId)),
+      providerVariant: options.providerVariant,
     });
     artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
+    artifacts.live_e2e_adapter_defaults = hostAssets.liveE2eAdapterDefaults;
 
     const generatedProfile = materializeGeneratedProjectProfile({
       hostRoot: options.hostRoot,
