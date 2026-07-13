@@ -1213,7 +1213,7 @@ test("generated live E2E profile allows selected guided provider adapters", () =
   });
 });
 
-test("live E2E host assets pin Codex model defaults without changing other provider defaults", () => {
+test("host assets pin Codex model defaults without changing other provider defaults", () => {
   withTempRoot((tempRoot) => {
     const sourceCodex = loadContractFile({
       filePath: path.join(repoRoot, "examples/adapters/codex-cli.yaml"),
@@ -1222,7 +1222,7 @@ test("live E2E host assets pin Codex model defaults without changing other provi
     assert.equal(sourceCodex.ok, true);
     const sourceModes = sourceCodex.document.execution.external_runtime.permission_policy.modes;
     for (const mode of Object.values(sourceModes)) {
-      assert.equal(mode.args.includes("--model"), false, "source adapter remains unchanged outside live E2E");
+      assert.equal(mode.args.includes("--model"), false, "source adapter remains unchanged outside asset materialization");
     }
 
     const cases = [

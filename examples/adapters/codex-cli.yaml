@@ -23,7 +23,7 @@ execution:
   evidence_namespace: evidence://adapter-live/codex-cli
   external_runtime:
     command: codex
-    live_e2e_default_args:
+    default_args:
       - --model
       - gpt-5.5
       - -c

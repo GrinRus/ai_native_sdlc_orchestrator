@@ -1067,7 +1067,7 @@ function validateAdapterCapabilityProfile(document, source) {
   validateOptionalStringArrayField({
     record: externalRuntime,
     source,
-    field: "execution.external_runtime.live_e2e_default_args",
+    field: "execution.external_runtime.default_args",
     issues,
   });
 

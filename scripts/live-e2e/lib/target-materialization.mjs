@@ -280,7 +280,7 @@ function materializeSelectedAdapterLiveE2eDefaults(options) {
   const adapterProfile = asRecord(JSON.parse(JSON.stringify(loaded.document)));
   const execution = asRecord(adapterProfile.execution);
   const externalRuntime = asRecord(execution.external_runtime);
-  const defaultArgs = asStringArray(externalRuntime.live_e2e_default_args);
+  const defaultArgs = asStringArray(externalRuntime.default_args);
   if (defaultArgs.length === 0) {
     return {
       adapter_id: adapterId,

@@ -26,13 +26,13 @@ External-process adapter baselines can add optional execution metadata without c
 
 `execution.external_runtime.env` is optional and should only carry safe, non-secret runner overrides. Installed-user rehearsals should inherit host CLI authentication by default instead of encoding auth paths or secrets in adapter profiles.
 
-`execution.external_runtime.live_e2e_default_args[]` is optional. It declares
-adapter-owned invocation arguments that the internal live E2E runner prepends
-to every selected permission-mode argument list in its run-scoped copied asset
+`execution.external_runtime.default_args[]` is optional. It declares
+adapter-owned invocation arguments that a run-scoped asset materializer
+prepends to every selected permission-mode argument list in its copied asset
 registry. It is intended for deterministic rehearsal settings such as a pinned
 model and reasoning level. The source adapter profile and ordinary AOR runtime
 invocations remain unchanged; an adapter that omits this field uses the
-external CLI's own model defaults during live E2E.
+external CLI's own model defaults.
 
 `execution.external_runtime.env_from` is optional and maps target environment variable names to source host environment variable names. AOR applies each mapping only when the target variable is unset and the source variable exists, records only the variable names in evidence, and never records the secret value. Use this for runner-specific host auth aliases, for example `ANTHROPIC_API_KEY: ANTHROPIC_AUTH_TOKEN` when a local Qwen Code host setup stores the reusable credential under the Codex/Anthropic token name but Qwen requires the API-key variable name.
 
