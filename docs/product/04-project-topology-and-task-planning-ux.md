@@ -11,6 +11,13 @@ topology, review an execution-ready task plan, approve bounded scope, observe
 sequential or parallel execution, and recover from partial failure without
 reading or editing raw runtime JSON.
 
+The adopted console target in `05-quiet-cockpit-console-design.md` places the
+Plan, Execution, Integration, and coordinated-delivery content from this
+document inside the flow-scoped Journey mode. Quiet Cockpit remains the default
+home and shows only the current state and one safe action. Journey graphs remain
+specialist inspection views: the dense task table, dependency list, and
+accessible status/recovery alternatives defined here are still required.
+
 ## Product brief
 
 - **Product type:** local developer and SDLC operations tool.

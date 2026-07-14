@@ -44,6 +44,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
 - **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S07` Installed-console UX/UI acceptance and story closure
 - **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition; `W64-S03` Operator decision projection decomposition
+- **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
@@ -66,6 +67,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 
 - **W61:** `W61-S01` Project topology and local binding contract baseline; `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation
 - **W63:** `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
+- **W65:** `W65-S03` Mission and Quiet Cockpit pilot activation
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
@@ -79,6 +81,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 - **W61:** `W61-S01` Project topology and local binding contract baseline
 - **W62:** `W62-S02` Impact scope and execution DAG planning
 - **W63:** `W63-S03` Guided Mission intake and resumable first-flow creation
+- **W65:** `W65-S03` Mission and Quiet Cockpit pilot activation; `W65-S04` Attention, Journey, and Evidence pilot activation
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
 
@@ -100,6 +103,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W60:** `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
 - **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency
 - **W63:** `W63-S04` Truthful action-first cockpit and recovery controls
+- **W65:** `W65-S04` Attention, Journey, and Evidence pilot activation
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
 
@@ -135,6 +139,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W62:** `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair
 - **W63:** `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
 - **W64:** `W64-S03` Operator decision projection decomposition
+- **W65:** `W65-S04` Attention, Journey, and Evidence pilot activation
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
 
@@ -201,6 +206,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W62:** `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
 - **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S05` Adaptive shell and lifecycle navigation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy; `W63-S07` Installed-console UX/UI acceptance and story closure
 - **W64:** `W64-S03` Operator decision projection decomposition
+- **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S03` Mission and Quiet Cockpit pilot activation; `W65-S04` Attention, Journey, and Evidence pilot activation; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
 
@@ -257,3 +263,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W61:** `W61-S05` Topology onboarding proof and documentation closure
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
 - **W63:** `W63-S07` Installed-console UX/UI acceptance and story closure
+- **W65:** `W65-S07` Post-cutover installed-console acceptance and story closure

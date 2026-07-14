@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-64-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-65-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -75,6 +75,7 @@ The authoritative planning model for implementation lives in:
 | W62 | Execute approved task DAGs through isolated workspace sets, bounded concurrency, integration, repair, and coordinated delivery. | 6 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-62-implementation-slices.md` |
 | W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, and a reusable visual system. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
+| W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -284,6 +285,13 @@ The authoritative planning model for implementation lives in:
 | W64-S01 | recoverable alpha-release transaction enablement: DTX-07, OPS-06, FIN-03 |
 | W64-S02 | verification/delivery maintainability target: DEV-06, DTX-01, DTX-02, DTX-03, DTX-04 |
 | W64-S03 | operator decision-projection maintainability target: ARC-04, DEV-05, OPS-01, OPS-04 |
+| W65-S01 | cutover contract and parity enablement: PBO-09, OPS-01, OPS-04, OPS-10, OPS-11 |
+| W65-S02 | reversible selector and navigation compatibility target: PBO-09, OPS-01, OPS-10, OPS-11 |
+| W65-S03 | Mission/Cockpit pilot target: PSO-01, PSO-02, PSO-07, PBO-05, PBO-09, OPS-01, OPS-04, OPS-11 |
+| W65-S04 | specialist-mode pilot target: EMP-01, EMP-02, EMP-03, ARC-05, OPS-01, OPS-02, OPS-03, OPS-04, OPS-10, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
+| W65-S05 | default-on and rollback target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-10, SEC-02, SEC-04 |
+| W65-S06 | legacy retirement and compatibility target: PBO-09, OPS-01, OPS-10, OPS-11 |
+| W65-S07 | post-cutover installed acceptance target: PBO-09, OPS-01, OPS-02, OPS-04, OPS-06, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1255,6 +1263,13 @@ topology, and repo-aware delivery land, so an operator can create or resume a
 Mission, take one truthful next action, recover safely, and inspect evidence on
 desktop or mobile without terminal-only ambiguity.
 
+**Adopted target design:** `docs/product/05-quiet-cockpit-console-design.md`
+defines Quiet Cockpit as the eventual installed default with flow-scoped
+Attention, Journey, and Evidence modes. W63 implements and accepts the target
+under an explicit reversible selector while W34 remains the packaged default;
+W65 owns cutover and retirement. The concept does not change W63 dependencies,
+slice states, or implementation/readiness claims.
+
 **Exit criteria:**
 - the operator journey, action taxonomy, deterministic scenario catalog, and
   contract ownership are explicit before UI changes land;
@@ -1268,7 +1283,9 @@ desktop or mobile without terminal-only ambiguity.
   from compact mobile widths through desktop, with keyboard and zoom/reflow
   coverage;
 - installed-package browser, accessibility, screenshot, and story evidence
-  proves the completed journey without creating upstream writes.
+  proves the opt-in completed journey without creating upstream writes;
+- the accepted selector, scenario, and evidence handoff is ready for W65 while
+  default-on activation and legacy removal remain out of W63 scope.
 
 **Detailed slices:** `docs/backlog/wave-63-implementation-slices.md`
 
@@ -1279,8 +1296,8 @@ recoverable alpha publication, verification-to-delivery decomposition, and
 operator decision-projection decomposition.
 
 **Current lane:** Every W64 slice depends on W59-S07 and may execute in parallel
-with W60-W63 once the audit closure baseline is stable. W64 does not delay those
-product waves through an artificial dependency.
+with W60-W63 and the later W65 cutover once their own dependencies are stable.
+W64 does not delay those product waves through an artificial dependency.
 
 **Exit criteria:**
 - Alpha publication classifies absent, partial, complete, and conflicting remote
@@ -1294,5 +1311,42 @@ product waves through an artificial dependency.
   behavior or weakening safety policy.
 
 **Detailed slices:** `docs/backlog/wave-64-implementation-slices.md`
+
+## W65 - Quiet Cockpit installed-console migration and cutover
+
+**Goal:** Move installed users from the accepted W34 default to the W63 Quiet
+Cockpit experience through a reversible presentation boundary, outcome parity
+pilots, default-on activation, explicit rollback rehearsal, legacy retirement,
+and single-renderer package proof.
+
+**Ownership boundary:** W63 owns Quiet Cockpit product behavior and acceptance
+under an explicit selector. W65 starts only after W63-S07 and owns migration;
+it may not reimplement lifecycle logic, invent a second client/evidence store,
+or hide projection changes inside cutover work. W64 remains independent and
+behavior-preserving.
+
+**Exit criteria:**
+
+- every W34 user outcome maps to a Quiet Cockpit destination, canonical
+  contract/route, observable side effect, and durable readback;
+- one shared client/snapshot/action boundary supports both temporary renderers,
+  presentation navigation survives refresh/history, and failures never trigger
+  silent legacy fallback;
+- Mission/Cockpit and Attention/Journey/Evidence pilots pass parity, partial
+  state, keyboard, responsive, accessibility, and no-write checks;
+- the installed default changes to Quiet Cockpit only after a deterministic
+  rollback path is rehearsed against the same Project/Flow/evidence identity;
+- legacy source, CSS, fixtures, and bundle paths are removed in a later slice,
+  while W34 screenshots remain historical before-state evidence;
+- final installed-package proof passes with Quiet Cockpit as the only renderer
+  and product, story, roadmap, package, and runbook claims aligned.
+
+**Normative comparison set:** The W65 wave document links the Quiet Cockpit
+design and six target screens, W34 before-state, product journeys, architecture,
+contracts, examples, source/tests, runbooks, and current official external
+console benchmarks.
+
+**Detailed slices:** `docs/backlog/wave-65-implementation-slices.md`
+
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

@@ -13,6 +13,21 @@ The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns
 orchestration state.
 
+## Status and successor direction
+
+This document remains the implemented W34 product baseline and preserves the
+history needed to explain the current packaged console. It must not be rewritten
+as though a later visual concept already shipped.
+
+The adopted W63 target successor is
+`05-quiet-cockpit-console-design.md`: Quiet Cockpit is the eventual installed
+default shell, with flow-scoped Attention, Journey, and Evidence modes. That target keeps the Flow
+semantics in this document, but changes information hierarchy, action
+semantics, responsive navigation, and the visual system. W34 remains the
+installed default while W63 implements and accepts the successor behind an
+explicit selector. W65 owns the packaged-default cutover, rollback rehearsal,
+legacy removal, and final installed-package acceptance.
+
 ## Baseline
 
 - Design name: AOR Flow-Centric Operator Console v1.

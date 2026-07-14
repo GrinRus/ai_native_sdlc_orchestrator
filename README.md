@@ -355,7 +355,7 @@ and are intentionally not part of the README workflow. Until W57-S01 encodes
 the July 2026 audit disposition, a green result is legacy pre-audit evidence and
 does not lift the audit release hold.
 
-The current roadmap source of truth extends through W64 in
+The current roadmap source of truth extends through W65 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -385,10 +385,16 @@ Start here when you need deeper context:
   wrappers, and scorecards.
 - `docs/contracts/control-plane-api.openapi.json` - OpenAPI 3.1 contract for
   the implemented detached HTTP/SSE control-plane routes.
+- `docs/product/05-quiet-cockpit-console-design.md` - adopted W63 target design
+  for the Quiet Cockpit shell and Attention, Journey, and Evidence modes, with
+  W65 owning installed-default cutover and legacy retirement; not yet an
+  implemented package claim.
 - `docs/architecture/14-cli-command-catalog.md` - implemented and planned CLI
   command surface.
 - `docs/backlog/backlog-operating-model.md` - planning and delivery workflow.
 - `docs/backlog/mvp-roadmap.md` - roadmap and readiness story.
+- `docs/backlog/wave-65-implementation-slices.md` - detailed Quiet Cockpit
+  migration, rollback, legacy-retirement, and comparison-reference plan.
 - `docs/ops/self-hosted-release.md` - bounded self-hosted release operating
   model.
 - `docs/ops/self-hosted-environment-matrix.md` - supported alpha operating
@@ -468,7 +474,7 @@ The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
 The current alpha distribution, audit-remediation queue, and planned post-audit
-delivery program are tracked through `W64` and focus on:
+delivery program are tracked through `W65` and focus on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -510,9 +516,12 @@ delivery program are tracked through `W64` and focus on:
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a
   semantic design system, and installed-package acceptance proof.
+- Reversible Quiet Cockpit migration with outcome parity, explicit selector and
+  rollback proof, default-on cutover, legacy renderer retirement, and final
+  single-renderer installed-package acceptance.
 - Recoverable npm alpha publication plus bounded verification/delivery and
   operator-projection refactors after audit closure, tracked independently from
-  W60-W63 product work.
+  W60-W63 product work and the W65 cutover.
 - Verification-plan authoring, stack discovery, profile generation, and
   operator-visible command-group status for arbitrary project shapes.
 - Maintainer-facing product-quality cycles with QA-origin public repair and
