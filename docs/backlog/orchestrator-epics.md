@@ -35,7 +35,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W53:** `W53-S04` AOR/live E2E leak guards
 - **W54:** `W54-S08` Boundary regression expansion
 - **W55:** `W55-S01` Backlog intake and control finding disposition; `W55-S05` Control rerun and findings report
-- **W57:** `W57-S01` Audit disposition, release hold, and local-app threat model; `W57-S08` Trust-boundary regression proof and release disposition
+- **W57:** `W57-S01` Audit disposition, release hold, and local-app threat model; `W57-S09` Complete test discovery and deterministic safety-gate baseline; `W57-S08` Trust-boundary regression proof and release disposition
 - **W58:** `W58-S06` Canonical API, OpenAPI, CLI, and service boundary; `W58-S08` Runtime-quality acceptance proof
 - **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S03` Accessible local dialogs and web state decomposition; `W59-S04` Code-quality, dependency, and dead-code ratchet; `W59-S05` Core, CLI, and control-plane decomposition; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity; `W59-S07` Independent audit closure and readiness decision
 
@@ -43,6 +43,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W61:** `W61-S05` Topology onboarding proof and documentation closure
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
 - **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S07` Installed-console UX/UI acceptance and story closure
+- **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition; `W64-S03` Operator decision projection decomposition
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
@@ -133,6 +134,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate
 - **W62:** `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair
 - **W63:** `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
+- **W64:** `W64-S03` Operator decision projection decomposition
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
 
@@ -153,6 +155,7 @@ Support bounded delivery modes, manifests, and release evidence.
 
 - **W61:** `W61-S01` Project topology and local binding contract baseline
 - **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
+- **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
 
@@ -197,6 +200,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W61:** `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S04` Add Project and Project Structure UX
 - **W62:** `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
 - **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S05` Adaptive shell and lifecycle navigation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy; `W63-S07` Installed-console UX/UI acceptance and story closure
+- **W64:** `W64-S03` Operator decision projection decomposition
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
 

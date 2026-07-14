@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-63-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-64-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -67,16 +67,17 @@ The authoritative planning model for implementation lives in:
 | W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
 | W55 | Turn `ky` large/xlarge control findings into actionable repair evidence, target-catalog alignment, Claude guardrails, and rerun reporting. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-55-implementation-slices.md` |
 | W56 | Harden the installed-user console so first-run setup and active-flow cockpit work stay primary while advanced evidence remains progressively disclosed. | 3 | EPIC-1, EPIC-6 | `docs/backlog/wave-56-implementation-slices.md` |
-| W57 | Restore execution, filesystem, permission, delivery, and evidence trust boundaries from the July 2026 codebase audit before credentialed or write-capable use. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-57-implementation-slices.md` |
+| W57 | Restore execution, filesystem, permission, delivery, and evidence trust boundaries from the July 2026 codebase audit before credentialed or write-capable use. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-57-implementation-slices.md` |
 | W58 | Make read models, context, routing, evaluation, jobs, live events, APIs, and the loopback local-app transport truthful and executable. | 8 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-58-implementation-slices.md` |
 | W59 | Replace source-marker confidence with browser behavior, harden the local console, ratchet code quality, decompose hotspots, and independently close the audit. | 7 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-59-implementation-slices.md` |
 | W60 | Replace generic task lists with structured, versioned, execution-ready plans and an operator Plan workbench. | 5 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-60-implementation-slices.md` |
 | W61 | Add portable project/repository/component topology, persistent local bindings, and installed-user Project Structure management. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-61-implementation-slices.md` |
 | W62 | Execute approved task DAGs through isolated workspace sets, bounded concurrency, integration, repair, and coordinated delivery. | 6 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-62-implementation-slices.md` |
 | W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, and a reusable visual system. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
+| W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 
 ## Post-MVP story allocation
-| Slice ID | Story IDs closed |
+| Slice ID | Story allocation / closure target |
 |---|---|
 | W6-S01 | enablement slice (no direct story closure) |
 | W6-S02 | PSO-07, DIS-07, PBO-06, PBO-07 |
@@ -234,6 +235,7 @@ The authoritative planning model for implementation lives in:
 | W56-S02 | rendered cockpit UX hardening target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W56-S03 | rendered UX audit closure target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W57-S01 | audit disposition and local-app threat-model target: EMP-05, DEV-07, AIP-06, OPS-02, OPS-06, OPS-10, SEC-04, SEC-06, PBO-09, DTX-05, FIN-03 |
+| W57-S09 | complete repository-gate and dependency-safety enablement (no direct story closure) |
 | W57-S02 | identifier/path/scope contract repair target: ARC-01, PBO-01, PBO-05, OPS-02, SEC-04, DTX-01, DTX-02, DTX-03, DTX-05, FIN-03 |
 | W57-S03 | no-write and workspace-isolation repair target: DEV-01, DEV-09, PBO-01, SEC-04, DTX-05 |
 | W57-S04 | structural permission enforcement target: ARC-01, DEV-09, OPS-03, SEC-01, SEC-04, SEC-05 |
@@ -274,11 +276,14 @@ The authoritative planning model for implementation lives in:
 | W62-S06 | monorepo/multirepo full-flow proof target: EMP-03, DEV-05, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, OPS-06, OPS-10, FIN-03 |
 | W63-S01 | operator journey, action semantics, and scenario enablement (no direct story closure) |
 | W63-S02 | semantic design-system enablement (no direct story closure) |
-| W63-S03 | guided Mission intake target: PBO-01, PBO-05, PBO-09, OPS-01, OPS-10 |
-| W63-S04 | truthful cockpit action and recovery target: OPS-01, OPS-02, OPS-04, OPS-10, OPS-11 |
+| W63-S03 | guided Mission intake target: PSO-01, PSO-02, PBO-09, OPS-11 |
+| W63-S04 | truthful cockpit action and recovery target: OPS-01, OPS-04, OPS-11, RQA-02, RQA-06 |
 | W63-S05 | adaptive shell and lifecycle navigation target: PBO-09, OPS-01, OPS-10, OPS-11 |
-| W63-S06 | attention queue and evidence workbench target: PBO-09, OPS-01, OPS-04, OPS-10, OPS-11 |
+| W63-S06 | attention queue and evidence workbench target: OPS-01, OPS-02, OPS-04, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06 |
 | W63-S07 | installed-console UX/UI acceptance target: PBO-09, OPS-01, OPS-02, OPS-04, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06 |
+| W64-S01 | recoverable alpha-release transaction enablement: DTX-07, OPS-06, FIN-03 |
+| W64-S02 | verification/delivery maintainability target: DEV-06, DTX-01, DTX-02, DTX-03, DTX-04 |
+| W64-S03 | operator decision-projection maintainability target: ARC-04, DEV-05, OPS-01, OPS-04 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -876,6 +881,25 @@ operator-visible next actions, and replayable proof.
 
 **Detailed slices:** `docs/backlog/wave-45-implementation-slices.md`
 
+## W46 - complex product live E2E black-box assessment
+**Goal:** Turn live E2E from flow-smoke evidence into installed-user product
+assessment on curated public repositories through public CLI/API/UI surfaces.
+
+**Exit criteria:**
+- Small missions remain flow-regression canaries, while medium, large, and
+  xlarge missions are product-change assessments with separated agent-visible
+  requests and evaluator/final-code rubrics.
+- The target catalog rejects legacy `xl`, raw repository/objective profiles,
+  and generated matrix cells.
+- Step-quality assessment requests and reports are contract-valid, linked, and
+  required before medium+ continuation.
+- Medium+ product acceptance requires final all-pass quality rather than flow
+  completion alone.
+- Current catalog cells are migrated or removed and hard targets have runnable
+  profiles with classified evidence.
+
+**Detailed slices:** `docs/backlog/wave-46-implementation-slices.md`
+
 ## W47 - product internal installed-user rehearsal acceptance closure
 **Goal:** Keep the W46 black-box product-quality policy intact while removing
 the concrete blockers that prevented all-pass product acceptance: AOR operator
@@ -1101,9 +1125,10 @@ release honesty, identifiers and scope, no-write/workspace isolation, runtime
 permissions, exact delivery authorization, transactional initialization, and
 concurrent evidence identity.
 
-**Current lane:** W57-S01 is the only ready slice. Credentialed live execution
-and write-capable delivery remain outside the supported release claim until W57
-closure evidence exists.
+**Current lane:** W57-S01 is the only ready slice. W57-S09 follows it to make the
+repository gate complete before contract/runtime remediation starts.
+Credentialed live execution and write-capable delivery remain outside the
+supported release claim until W57 closure evidence exists.
 
 **Exit criteria:**
 - The local app threat model is loopback-only and same-origin; hosted frontend
@@ -1246,5 +1271,28 @@ desktop or mobile without terminal-only ambiguity.
   proves the completed journey without creating upstream writes.
 
 **Detailed slices:** `docs/backlog/wave-63-implementation-slices.md`
+
+## W64 - post-audit release and service-boundary hardening
+**Goal:** Close the maintenance findings that are independently acceptable
+outcomes but should not be mixed into W57 security repairs or W59 audit closure:
+recoverable alpha publication, verification-to-delivery decomposition, and
+operator decision-projection decomposition.
+
+**Current lane:** Every W64 slice depends on W59-S07 and may execute in parallel
+with W60-W63 once the audit closure baseline is stable. W64 does not delay those
+product waves through an artificial dependency.
+
+**Exit criteria:**
+- Alpha publication classifies absent, partial, complete, and conflicting remote
+  state and safely converges matching reruns without destructive cleanup.
+- Project verification, delivery planning/driving, and fork-first behavior are
+  split behind characterization tests that preserve no-write, exact-diff,
+  rollback, and compatibility semantics.
+- Next-action, readiness/closure, run-list, and certification projections use
+  focused pure boundaries with golden behavior fixtures.
+- All extracted modules satisfy the W59 quality ratchet without adding public
+  behavior or weakening safety policy.
+
+**Detailed slices:** `docs/backlog/wave-64-implementation-slices.md`
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

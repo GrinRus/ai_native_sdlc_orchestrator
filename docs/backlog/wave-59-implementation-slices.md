@@ -21,6 +21,11 @@ Priorities use the audit remediation scale (`P0` release blocker, `P1` next
 repair lane, `P2` planned). Effort estimates use `XS/S/M/L/XL` and include
 implementation, characterization/regression tests, metrics, and documentation.
 
+Commit `392f94c` landed a provisional W60 structured-planning baseline after the
+July audit baseline but before W57-W59 acceptance. W59 quality, clone, browser,
+and module baselines must include that code; its presence neither bypasses W60
+hard dependencies nor makes any W60 slice done.
+
 ## W59-S01 — Executable browser and component behavior gate
 
 - **Outcome:** Web acceptance executes the packaged SPA and asserts user-visible
@@ -50,7 +55,9 @@ implementation, characterization/regression tests, metrics, and documentation.
 5. Add desktop, tablet, mobile, and keyboard-only fixtures with deterministic
    project/evidence state.
 6. Integrate the focused browser gate into CI/release acceptance with bounded
-   timeouts and actionable artifacts outside Git.
+   timeouts and actionable artifacts outside Git; prove tracked `dist` freshness
+   through content hashes or a clean temporary rebuild comparison, not filenames
+   and source hash alone.
 
 ### Acceptance criteria
 1. The tests fail when GET/first load creates `.aor`, SSE stops updating, a stale
@@ -63,6 +70,8 @@ implementation, characterization/regression tests, metrics, and documentation.
 4. Failure output identifies the user flow, request, visible state, and retained
    browser/runtime evidence.
 5. Marker tests remain explicitly labeled packaging-only.
+6. Modifying an existing tracked HTML/JS/CSS bundle file without a matching
+   source rebuild fails the package-freshness gate.
 
 ### Done evidence
 - component/browser harness and deterministic fixtures
@@ -151,7 +160,8 @@ implementation, characterization/regression tests, metrics, and documentation.
 2. Apply it to Add Project, request, decision, and other modal-like local flows;
    replace custom radio/tab behavior with native or APG-compliant controls.
 3. Extract the control-plane client, project snapshot reducer/hooks, queue state,
-   dialog state, and feature views from the monolithic SPA.
+   dialog state, Plan workbench, and feature views from the monolithic SPA; include
+   all provisional W60 web modules in the characterization baseline.
 4. Split touched styles by feature/semantic token while preserving responsive
    behavior and installed package output.
 5. Add characterization tests before each move; require extracted functions to
@@ -167,9 +177,10 @@ implementation, characterization/regression tests, metrics, and documentation.
 3. Project/client/queue/dialog state transitions have isolated unit tests and no
    feature view owns orchestration logic.
 4. The built SPA preserves all W59-S01 behavior and responsive fixtures.
-5. `FlowCockpit` and `App` no longer exceed complexity 19, nesting depth 4, or
-   100 physical lines after extraction; every extracted production file stays at
-   or below 1,000 physical lines, with no unbounded compatibility facade.
+5. `FlowCockpit`, `App`, and `PlanWorkbench` no longer exceed complexity 19,
+   nesting depth 4, or 100 physical lines after extraction; every extracted
+   production file stays at or below 1,000 physical lines, with no unbounded
+   compatibility facade.
 
 ### Done evidence
 - shared dialog primitive and APG/native control tests
@@ -185,8 +196,9 @@ implementation, characterization/regression tests, metrics, and documentation.
 
 ## W59-S04 — Code-quality, dependency, and dead-code ratchet
 
-- **Outcome:** CI discovers all tests and prevents new lint/type/dependency/dead
-  code debt while allowing the recorded baseline to decrease incrementally.
+- **Outcome:** CI preserves the complete W57-S09 test baseline and prevents new
+  lint/type/dependency/dead-code debt while allowing the recorded baseline to
+  decrease incrementally.
 - **Epic:** EPIC-0
 - **State:** blocked
 - **Remediation priority:** P1
@@ -196,39 +208,52 @@ implementation, characterization/regression tests, metrics, and documentation.
 - **Hard dependencies:** W58-S08
 - **Primary user story surfaces:** OPS-06, OPS-07, FIN-07; repository-quality
   enablement without direct product-story closure.
-- **Audit findings:** AUD-022, AUD-047, AUD-051, AUD-053, AUD-055.
+- **Audit findings:** Remaining quality-ratchet portions of AUD-047, AUD-051,
+  AUD-053, and AUD-055; preservation proof for W57-S09/AUD-022.
 
 ### Local tasks
-1. Upgrade Vite to a patched supported version and record a production/dev
-   dependency audit policy with frozen-install enforcement.
-2. Add scoped ESLint and JavaScript type checking with an explicit current
-   baseline and changed-module ratchet.
-3. Fail new duplicate keys, unused imports/locals, dependency cycles, and
-   undiscovered test files.
-4. Record per-hotspot baselines and enforce named ceilings: new or extracted
+1. Starting from the patched W57-S09 baseline, enforce frozen install plus
+   production/dev dependency, license-inventory, and advisory policy without
+   treating every non-breaking update as an ad hoc backlog item; inventory
+   cross-package relative imports and explicitly choose/enforce either real
+   private workspace dependencies or the documented root-monolith package model.
+2. Activate the existing JavaScript typecheck baseline, add scoped ESLint, and
+   make one canonical stage pipeline report lint, type, test, build, audit, and
+   package results without `slice:gate` executing the root stages twice.
+3. Fail new duplicate keys, unused imports/locals, dependency cycles, or drift
+   from the complete W57-S09 test manifest; keep CI/job and private-suite timeout
+   budgets compatible with actionable diagnostics.
+4. Re-scan the current HEAD, including provisional W60 modules, record diagnostic
+   coverage plus per-hotspot baselines, and enforce named ceilings: new or extracted
    functions must stay below complexity 20, nesting depth 5, and 101 physical
    lines; new or extracted production files must stay below 1,001 physical lines;
    no new clone of 30 or more lines is permitted.
 5. Remove confirmed dead internal symbols/imports/overwritten fields in bounded
-   modules and add public export compatibility checks before removal.
+   modules, beginning with the recorded loader/constants/helpers, stale SPA
+   fields, and redundant React imports; add public export compatibility checks
+   before removal.
 6. Eliminate the duplicate example parse in reference integrity and add a bounded
    performance regression fixture.
 7. Keep raw analyzer outputs under ignored `.aor` runtime evidence.
 
 ### Acceptance criteria
-1. Frozen install resolves Vite at a version unaffected by both recorded
-   advisories and audit reports no corresponding finding.
-2. All tracked tests are discovered; new undiscovered tests fail CI.
-3. Changed production modules cannot add lint/type/duplicate-key/dead-import debt.
+1. The patched Vite baseline remains unaffected by both recorded advisories and
+   frozen dependency/license policy reports actionable drift by stage; workspace
+   manifests and the documented package model no longer contradict the measured
+   internal import graph.
+2. All tracked tests remain discovered through W57-S09; manifest drift or a new
+   undiscovered test fails CI.
+3. Changed production modules cannot add lint/type/duplicate-key/dead-import
+   debt, and each canonical quality stage executes once per gate.
 4. Complexity and duplication baselines cannot regress silently, and CI reports
    the exact symbol/file/clone that exceeds the named ceiling.
 5. Internal dead-code removal preserves documented exports/package contents.
 6. Reference integrity parses each example once with identical diagnostics.
 
 ### Done evidence
-- dependency upgrade/audit and package smoke
+- dependency/license/import-graph policy, audit, and package smoke
 - ESLint/checkJs or equivalent scoped gate
-- test-discovery and dead-export guards
+- W57-S09 discovery-preservation and dead-export guards
 - complexity/duplication baseline and ratchet
 - reference-integrity performance fixture
 
@@ -251,7 +276,8 @@ implementation, characterization/regression tests, metrics, and documentation.
 - **Hard dependencies:** W58-S08, W59-S04
 - **Primary user story surfaces:** ARC-06, DEV-01, DEV-05, OPS-01, OPS-06,
   OPS-10.
-- **Audit findings:** AUD-048 and core/CLI/control-plane portions of AUD-049.
+- **Audit findings:** Core/CLI/control-plane portions of AUD-049; preservation of
+  the zero-cycle boundary closed by W58-S06/W58-S08 for AUD-048.
 
 ### Local tasks
 1. Characterize routed execution, permission, repair, review-report
@@ -259,8 +285,9 @@ implementation, characterization/regression tests, metrics, and documentation.
 2. Split attempt allocation, route/policy decision, adapter invocation,
    permission mediation, repair control, and result persistence into focused
    services.
-3. Split CLI command handlers from the command-runtime mega-barrel and import only
-   actual dependencies.
+3. Split every affected CLI command handler from the command-runtime mega-barrel,
+   import only actual dependencies, and partition the oversized CLI regression
+   suite into focused command-family fixtures without reducing coverage.
 4. Preserve the transport-neutral lifecycle boundary and keep CLI, HTTP, API, and
    app launcher as one-way adapters.
 5. Remove the ESM cycle and introduce architecture/import guards.
@@ -272,8 +299,9 @@ implementation, characterization/regression tests, metrics, and documentation.
 1. No CLI/API/app transport imports another transport and madge reports no cycle.
 2. Routed execution and run-control characterization suites remain behaviorally
    identical.
-3. Handler modules import only used symbols and the command-runtime mega-barrel no
-   longer owns unrelated domain behavior.
+3. Handler modules import only used symbols, focused CLI suites preserve current
+   behavior, and the command-runtime mega-barrel no longer owns unrelated domain
+   behavior.
 4. Attempt, permission, adapter, repair, and persistence services have explicit
    inputs/outputs and focused tests.
 5. `executeRoutedStep`, `handleOperationsCommand`, and
@@ -307,8 +335,9 @@ implementation, characterization/regression tests, metrics, and documentation.
 - **Hard dependencies:** W58-S08, W59-S04
 - **Primary user story surfaces:** DEV-01, DEV-07, AIP-02, AIP-03, AIP-04,
   OPS-06, OPS-07.
-- **Audit findings:** adapter/live-E2E portions of AUD-049, AUD-050, AUD-052,
-  AUD-053, AUD-055.
+- **Audit findings:** Adapter/live-E2E portions of AUD-049 and AUD-050, plus the
+  private-helper/parity portion of AUD-053. AUD-052 remains owned by W57-S06 and
+  W58-S02; AUD-055 remains owned by W59-S04.
 
 ### Local tasks
 1. Characterize adapter process supervision, provider parsing, permission
@@ -317,10 +346,12 @@ implementation, characterization/regression tests, metrics, and documentation.
    evidence modules while keeping provider-specific behavior at the boundary.
 3. Split full-journey live-E2E execution into bounded stage executors and isolate
    setup, browser, assessment, delivery, and closure responsibilities.
-4. Replace unmanaged public/private contract copies with generated pinned input or
-   a pure versioned kernel that preserves the black-box runner boundary.
-5. Add content-hash and behavior-fixture parity tests; require explicit version
-   changes for intentional divergence.
+4. Replace unmanaged public/private contract copies, including loader, reference
+   registry, and example-reference validation families, with generated pinned
+   input or a pure versioned kernel that preserves the black-box runner boundary.
+5. Add content-hash and behavior-fixture parity tests, including the provisional
+   W60 structured-task families; require explicit version changes for intentional
+   divergence.
 6. Remove confirmed dead private helpers/fields only after profile, loader, and
    package-surface compatibility checks.
 7. Publish before/after clone, complexity, and boundary metrics.
@@ -369,8 +400,10 @@ implementation, characterization/regression tests, metrics, and documentation.
 - **Audit findings:** AUD-001 through AUD-055 final disposition.
 
 ### Local tasks
-1. Re-run every original safe repro/invariant probe against the remediated code and
-   preserve exact versions, commands, and limitations.
+1. Re-run every original safe repro/invariant probe against the remediated code,
+   inventory the code/backlog delta from audit baseline `db995171` through closure
+   (including provisional W60), and preserve exact versions, commands, and
+   limitations.
 2. Require an independent second review of every original S1 finding and any
    public compatibility removal.
 3. Repeat concurrency, clean-first-load, loopback HTTP, browser, package,
@@ -378,21 +411,26 @@ implementation, characterization/regression tests, metrics, and documentation.
 4. Record each finding as resolved, accepted risk, superseded, or still open with
    evidence, compatibility impact, and follow-up owner.
 5. Reconcile README, roadmap, story coverage, production-readiness, release
-   runbooks, and package claims to the verified result.
+   runbooks, and package claims to the verified result; require every roadmap
+   summary wave to have a detailed section/file, every slice count/allocation to
+   match its owner, current version claims to match package metadata, and landed
+   provisional implementation to remain distinct from accepted/done state.
 6. Preserve explicit gaps for Windows, credentialed providers, paid calls, real
    upstream writes, and hosted web.
 7. Make a release/readiness decision separately from audit closure; do not publish
    or push as part of the slice.
 
 ### Acceptance criteria
-1. The closure ledger contains all 55 IDs, no duplicate root causes, and direct
-   evidence for every resolved bug/dead-code claim.
+1. The closure ledger contains all 55 IDs, no duplicate root causes, direct
+   evidence for every resolved bug/dead-code claim, and an explicit disposition
+   for each post-baseline delta finding.
 2. Every original S1 has an independent passing regression or remains an explicit
    release blocker.
 3. Root, package, browser, concurrency, audit, license, and dependency gates pass
    on the supported Node 22 environment.
 4. Story/readiness claims do not exceed the verified surfaces or hide excluded
-   hosted/credentialed/Windows gaps.
+   hosted/credentialed/Windows gaps; roadmap wave/detail/count/allocation and
+   provisional-versus-accepted implementation claims are structurally consistent.
 5. The tracked tree contains only approved source/docs/tests; raw runtime evidence
    remains ignored under `.aor`.
 

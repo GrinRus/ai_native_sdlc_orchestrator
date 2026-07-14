@@ -427,8 +427,10 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 2. Missing evidence, changed content, unlisted failure classes, and foreign-origin
    requests each fail for the expected reason.
 3. API, CLI, SSE, worker, and SPA observe one durable run consistently.
-4. Package smoke exercises the built SPA behavior rather than bundle marker text
-   alone.
+4. Package smoke proves the installed SPA assets, app config, loopback routes,
+   first read, and one explicit same-origin mutation; reusable browser state,
+   accessibility, reconnect, and failure certification remains assigned to
+   W59-S01 rather than being inferred from marker text.
 5. The closure report maps every W58 audit ID to reproducible evidence and leaves
    maintainability/UI work explicitly assigned to W59.
 
@@ -442,4 +444,5 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 ### Out of scope
 - Credentialed provider certification or real upstream delivery.
 - Hosted frontend deployment proof.
+- Broad browser/component behavior certification, owned by W59-S01.
 - Broad decomposition/maintainability work owned by W59.
