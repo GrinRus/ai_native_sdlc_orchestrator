@@ -9,9 +9,9 @@
 6. discovery packet
 7. discovery research / ADR-readiness report
 8. spec packet
-9. wave ticket
-10. handoff packet and approval
-11. execution run
+9. structured task plan, deterministic validation, and semantic evaluation
+10. exact plan approval, handoff packet, and immutable execution plan
+11. execution-unit attempts and evidence-derived task progress
 12. review and QA
 13. delivery manifest
 14. release packet
@@ -31,8 +31,14 @@ same public runtime reports that guide operators:
 - `aor spec build` emits a routed step-result whose compiled-context artifact
   records the selected spec prompt bundle, required packet refs, context bundle
   refs, skill refs, and compiler provenance.
-- `aor wave create` materializes the wave ticket and handoff packet that make
-  planning readiness inspectable.
+- `aor plan create` invokes the runner-agnostic planning route, validates the
+  candidate, materializes the structured `wave-ticket` and `handoff-packet`,
+  then runs semantic evaluation only after structural validation passes.
+- `aor wave create` and `aor handoff prepare` are compatibility reads over the
+  latest deterministically valid structured plan. They return
+  `structured-plan-required` instead of inventing tasks.
+- `aor plan approve` binds approval to the exact plan version and digest and
+  materializes `execution-plan` plus the initial `task-progress-report`.
 
 Maintainer rehearsal summaries may copy a compact proof from those public
 reports, but they must not become a second owner of readiness decisions. The

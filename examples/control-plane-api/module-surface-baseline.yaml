@@ -96,6 +96,44 @@ read_operations:
       - runtime-harness-report
       - delivery-manifest
       - release-packet
+  - operation_id: read.flow-plan
+    operation_family: read
+    output_contract_families:
+      - wave-ticket
+      - handoff-packet
+  - operation_id: read.flow-plan-progress
+    operation_family: read
+    output_contract_families:
+      - execution-plan
+      - task-progress-report
+
+structured_plan_operations:
+  owning_wave: W60
+  status: implemented
+  routes:
+    - operation_id: read.flow-plan
+      method: GET
+      route: /api/projects/:projectId/flows/:flowId/plan
+      materializes_artifacts: false
+    - operation_id: read.flow-plan-progress
+      method: GET
+      route: /api/projects/:projectId/flows/:flowId/plan/progress
+      materializes_artifacts: false
+    - operation_id: mutate.flow-plan
+      method: POST
+      route: /api/projects/:projectId/flows/:flowId/plan/actions
+      actions:
+        create: 202
+        request_revision: 202
+        approve: 200
+  blocker_http_status: 409
+  contract_families:
+    - wave-ticket
+    - handoff-packet
+    - validation-report
+    - evaluation-report
+    - execution-plan
+    - task-progress-report
 
 run_control_operations:
   - operation_id: run.start
@@ -375,6 +413,18 @@ lifecycle_command_operations:
       command: discovery run
     - operation_id: spec.build
       command: spec build
+    - operation_id: plan.create
+      command: plan create
+    - operation_id: plan.show
+      command: plan show
+    - operation_id: plan.diff
+      command: plan diff
+    - operation_id: plan.revise
+      command: plan revise
+    - operation_id: plan.approve
+      command: plan approve
+    - operation_id: plan.status
+      command: plan status
     - operation_id: wave.create
       command: wave create
     - operation_id: handoff.prepare

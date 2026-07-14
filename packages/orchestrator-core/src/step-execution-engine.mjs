@@ -1014,6 +1014,11 @@ function writeRuntimeRepairInput(options) {
  *   runtimeEvidenceRefs?: string[],
  *   operatorRequestRef?: string,
  *   providerStepStatusStateFile?: string,
+ *   executionPlanRef?: string,
+ *   executionUnitId?: string,
+ *   taskRefs?: string[],
+ *   planDigest?: string,
+ *   taskDigests?: Record<string, string>,
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -1566,6 +1571,9 @@ export function executeRoutedStep(options) {
     step_class: resultStepClass,
     status,
     summary,
+    task_refs: asStringArray(options.taskRefs),
+    plan_digest: asString(options.planDigest),
+    task_digests: asRecord(options.taskDigests),
     evidence_refs: evidenceRefs,
     routed_execution: {
       mode: dryRun ? "dry-run" : "execute",
@@ -1588,6 +1596,8 @@ export function executeRoutedStep(options) {
       adapter_request: adapterRequest,
       adapter_response: adapterResponse,
       operator_request_ref: asString(options.operatorRequestRef),
+      execution_plan_ref: asString(options.executionPlanRef),
+      execution_unit_id: asString(options.executionUnitId),
       context_compilation: {
         compiled_context_ref: compiledContextRef,
         compiled_context_file: compiledContextArtifactPath,

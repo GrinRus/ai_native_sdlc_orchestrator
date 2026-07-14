@@ -1,4 +1,5 @@
 import { readQueryInteger, sendError, sendJson } from "./http-utils.mjs";
+import { getTaskPlanStatus, showTaskPlan } from "../../task-plan-service.mjs";
 import {
   listCompilerRevisionStatuses,
   listDeliveryManifests,
@@ -117,6 +118,39 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
         return;
       }
       sendJson(response, 200, trace);
+      return;
+    }
+    case "flow-plan":
+    case "flow-plan-progress": {
+      const flow = readFlowProjection({ ...runtimeOptions, flowId: params.flowId });
+      if (!flow) {
+        sendError(response, 404, "flow.not_found", `Flow '${params.flowId}' was not found.`);
+        return;
+      }
+      try {
+        const result = routeId === "flow-plan"
+          ? showTaskPlan({ ...runtimeOptions, flowId: params.flowId, planRef: requestUrl.searchParams.get("plan_ref") ?? undefined })
+          : getTaskPlanStatus({ ...runtimeOptions, flowId: params.flowId, planRef: requestUrl.searchParams.get("plan_ref") ?? undefined });
+        sendJson(response, 200, routeId === "flow-plan"
+          ? {
+              flow_id: params.flowId,
+              plan_ref: result.planRef,
+              plan: result.plan,
+              handoff_packet: result.handoffPacket,
+              read_only: true,
+            }
+          : {
+              flow_id: params.flowId,
+              plan_ref: result.planRef,
+              plan: result.plan,
+              execution_plan: result.executionPlan,
+              task_progress: result.taskProgress,
+              read_only: true,
+            });
+      } catch (error) {
+        const code = typeof error?.code === "string" ? error.code : "plan-read-failed";
+        sendError(response, code === "plan-flow-mismatch" ? 409 : 404, code, error instanceof Error ? error.message : String(error));
+      }
       return;
     }
     case "flow-detail": {

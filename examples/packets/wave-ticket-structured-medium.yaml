@@ -1,0 +1,184 @@
+ticket_id: WAVE-CHECKOUT-PLAN-001
+project_id: checkout-platform
+objective: Improve checkout error clarity without changing settlement behavior.
+scope:
+  repo_scopes:
+    - main
+  allowed_paths:
+    - apps/web/**
+    - packages/payments/**
+dependencies:
+  - checkout-platform.artifact.intake.checkout-errors.v1
+risk_tier: medium
+status: ready-for-handoff
+task_model_version: 1
+plan_id: checkout-platform.plan.checkout-errors
+plan_version: 1
+plan_status: proposed
+plan_size: medium
+plan_digest: sha256:fixture-checkout-plan-v1
+previous_plan_ref: null
+revision_summary:
+  reason: Initial structured plan.
+  material_change: true
+  added_task_ids:
+    - task.error-contract
+    - task.error-ui
+    - task.checkout-verification
+criteria_catalog:
+  - criterion_id: goal.actionable-errors
+    kind: goal
+    text: Payment failures show an actionable reason.
+    source_ref: packet://intake-request-body@checkout-errors
+  - criterion_id: dod.regression
+    kind: definition-of-done
+    text: Existing checkout and payment regression tests pass.
+    source_ref: packet://intake-request-body@checkout-errors
+  - criterion_id: acceptance.no-settlement-change
+    kind: acceptance
+    text: Settlement behavior and settlement package files remain unchanged.
+    source_ref: packet://spec@checkout-errors
+local_tasks:
+  - task_id: task.error-contract
+    title: Define actionable checkout error states
+    type: design
+    objective: Define the bounded error-state contract consumed by checkout UI.
+    rationale: UI copy cannot be implemented safely until payment failure states have stable meanings.
+    scope:
+      repo_ids:
+        - main
+      component_ids: []
+      allowed_paths:
+        - packages/payments/**
+      forbidden_paths:
+        - packages/settlement/**
+    depends_on: []
+    work_items:
+      - Enumerate user-actionable payment failure states.
+      - Preserve existing settlement-facing behavior.
+    criteria_refs:
+      - goal.actionable-errors
+      - acceptance.no-settlement-change
+    verification:
+      command_group_refs:
+        - post-change-test
+      validators:
+        - contract-shape
+        - repo-scope
+      manual_checks: []
+      success_conditions:
+        - Error states remain exhaustive for current checkout failures.
+    expected_evidence:
+      - review-report
+    risks:
+      - Existing consumers may depend on generic error values.
+    stop_conditions:
+      - A required failure state cannot be represented without settlement changes.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+  - task_id: task.error-ui
+    title: Render actionable checkout error guidance
+    type: implementation
+    objective: Map approved error states to concise user guidance in checkout.
+    rationale: Users need a recovery action without exposing internal provider details.
+    scope:
+      repo_ids:
+        - main
+      component_ids: []
+      allowed_paths:
+        - apps/web/**
+      forbidden_paths:
+        - packages/settlement/**
+    depends_on:
+      - task.error-contract
+    work_items:
+      - Render guidance for every approved error state.
+      - Preserve loading, retry, and accessibility behavior.
+    criteria_refs:
+      - goal.actionable-errors
+    verification:
+      command_group_refs:
+        - post-change-test
+      validators:
+        - repo-scope
+      manual_checks:
+        - Inspect keyboard and screen-reader error announcements.
+      success_conditions:
+        - Every error state exposes one safe recovery action.
+    expected_evidence:
+      - review-report
+    risks:
+      - Long localized guidance can overflow compact checkout layouts.
+    stop_conditions:
+      - Required copy cannot fit the existing accessible error region.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+  - task_id: task.checkout-verification
+    title: Verify checkout behavior and scope
+    type: verification
+    objective: Prove the new guidance and unchanged settlement boundary.
+    rationale: Completion requires executable regression and scope evidence.
+    scope:
+      repo_ids:
+        - main
+      component_ids: []
+      allowed_paths:
+        - apps/web/**
+        - packages/payments/**
+      forbidden_paths:
+        - packages/settlement/**
+    depends_on:
+      - task.error-contract
+      - task.error-ui
+    work_items:
+      - Run checkout and payment regression checks.
+      - Confirm no settlement files changed.
+    criteria_refs:
+      - dod.regression
+      - acceptance.no-settlement-change
+    verification:
+      command_group_refs:
+        - post-change-test
+      validators:
+        - repo-scope
+        - evidence-complete
+      manual_checks: []
+      success_conditions:
+        - Required regression checks pass.
+        - No forbidden path is changed.
+    expected_evidence:
+      - verify-summary
+      - review-report
+    risks:
+      - Pre-existing checkout failures may obscure regressions.
+    stop_conditions:
+      - Required verification cannot run in the bounded environment.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+acceptance_criteria:
+  - Payment failures show an actionable reason.
+  - Existing checkout and payment regression tests pass.
+  - Settlement behavior and settlement package files remain unchanged.
+expected_evidence:
+  - verify-summary
+  - review-report
+verification_plan:
+  command_groups:
+    - id: post-change-test
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - pnpm test
+approved_input_ref: evidence://artifacts/checkout-platform.artifact.intake.checkout-errors.v1
+source_refs:
+  artifact_packet_ref: evidence://artifacts/checkout-platform.artifact.intake.checkout-errors.v1
+  spec_ref: evidence://steps/spec-checkout-errors.json
+  project_analysis_ref: evidence://reports/project-analysis-checkout-platform.json

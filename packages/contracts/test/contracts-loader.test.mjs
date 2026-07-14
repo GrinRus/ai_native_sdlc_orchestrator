@@ -84,6 +84,110 @@ test("loads all examples through the shared contracts path", () => {
   assert.equal(loaded.ok, true, "batch example loading should pass");
 });
 
+test("structured task plans load while legacy compact plans remain compatible", () => {
+  for (const [fileName, family] of [
+    ["wave-ticket-bootstrap.yaml", "wave-ticket"],
+    ["wave-ticket-structured-medium.yaml", "wave-ticket"],
+    ["handoff-wave-004.yaml", "handoff-packet"],
+    ["handoff-structured-medium.yaml", "handoff-packet"],
+  ]) {
+    const loaded = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples/packets", fileName),
+      family,
+    });
+    assert.equal(loaded.ok, true, `${fileName} should remain contract-valid`);
+  }
+});
+
+test("structured task validation rejects dependency, scope, coverage, and verification gaps", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/packets/wave-ticket-structured-medium.yaml"),
+    family: "wave-ticket",
+  });
+  assert.equal(loaded.ok, true);
+
+  const invalidDependency = structuredClone(loaded.document);
+  invalidDependency.local_tasks[0].depends_on = ["task.unknown"];
+  assert.equal(validateContractDocument({ family: "wave-ticket", document: invalidDependency }).ok, false);
+
+  const duplicateId = structuredClone(loaded.document);
+  duplicateId.local_tasks[1].task_id = duplicateId.local_tasks[0].task_id;
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: duplicateId }).issues.some(
+    (problem) => problem.message.includes("Duplicate task id"),
+  ));
+
+  const dependencyCycle = structuredClone(loaded.document);
+  dependencyCycle.local_tasks[0].depends_on = [dependencyCycle.local_tasks.at(-1).task_id];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: dependencyCycle }).issues.some(
+    (problem) => problem.message.includes("contains a cycle"),
+  ));
+
+  const invalidScope = structuredClone(loaded.document);
+  invalidScope.local_tasks[0].scope.allowed_paths = ["packages/settlement/**"];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidScope }).issues.some(
+    (problem) => problem.message.includes("widens the approved plan scope"),
+  ));
+
+  const invalidRepoScope = structuredClone(loaded.document);
+  invalidRepoScope.local_tasks[0].scope.repo_ids = ["unknown-repo"];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidRepoScope }).issues.some(
+    (problem) => problem.message.includes("Task repository 'unknown-repo' widens the approved plan scope"),
+  ));
+
+  const invalidCoverage = structuredClone(loaded.document);
+  invalidCoverage.local_tasks.forEach((task) => {
+    task.criteria_refs = task.criteria_refs.filter((criterionId) => criterionId !== "goal.actionable-errors");
+  });
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidCoverage }).issues.some(
+    (problem) => problem.message.includes("is not owned by any task"),
+  ));
+
+  const invalidVerification = structuredClone(loaded.document);
+  invalidVerification.local_tasks[0].verification.command_group_refs = [];
+  invalidVerification.local_tasks[0].verification.validators = [];
+  invalidVerification.local_tasks[0].verification.manual_checks = [];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidVerification }).issues.some(
+    (problem) => problem.message.includes("has no executable or reviewable verification"),
+  ));
+
+  const unownedEvidence = structuredClone(loaded.document);
+  unownedEvidence.expected_evidence.push("delivery-manifest");
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: unownedEvidence }).issues.some(
+    (problem) => problem.message.includes("is not owned by any task"),
+  ));
+
+  const invalidGrouping = structuredClone(loaded.document);
+  invalidGrouping.local_tasks[0].execution_hints.group_key = "solo-group";
+  invalidGrouping.local_tasks[0].execution_hints.group_reason = "Try to group one task.";
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidGrouping }).issues.some(
+    (problem) => problem.message.includes("has only one task"),
+  ));
+
+  const readableIncompleteMedium = structuredClone(loaded.document);
+  readableIncompleteMedium.plan_status = "revision-required";
+  readableIncompleteMedium.local_tasks = readableIncompleteMedium.local_tasks.slice(0, 1);
+  assert.equal(validateContractDocument({ family: "wave-ticket", document: readableIncompleteMedium }).ok, true);
+
+  const invalidMultirepoSmall = structuredClone(loaded.document);
+  invalidMultirepoSmall.plan_size = "small";
+  invalidMultirepoSmall.scope.repo_scopes.push("secondary");
+  invalidMultirepoSmall.local_tasks = invalidMultirepoSmall.local_tasks.slice(0, 2);
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidMultirepoSmall }).issues.some(
+    (problem) => problem.message.includes("Bounded multirepo plans cannot"),
+  ));
+
+  const splitRequired = structuredClone(loaded.document);
+  splitRequired.plan_size = "xlarge";
+  splitRequired.local_tasks = Array.from({ length: 8 }, (_, index) => ({
+    ...structuredClone(loaded.document.local_tasks[0]),
+    task_id: `task.xlarge-${index + 1}`,
+    depends_on: [],
+  }));
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: splitRequired }).issues.some(
+    (problem) => problem.message.includes("mission-split-required"),
+  ));
+});
+
 test("loads monorepo and bounded multirepo profiles through the same project-profile contract path", () => {
   for (const profileName of ["project.aor.yaml", "project.bounded-multirepo.aor.yaml"]) {
     const loaded = loadContractFile({
@@ -1199,6 +1303,11 @@ test("control-plane API baseline documents interactive continuation target metad
       (entry) => entry.command === "mission create",
     ),
     "expected lifecycle command subset to include guided mission create",
+  );
+  assert.equal(loaded.document.structured_plan_operations?.status, "implemented");
+  assert.ok(
+    loaded.document.read_operations?.some((operation) => operation.operation_id === "read.flow-plan-progress"),
+    "expected structured plan progress read operation",
   );
   assert.ok(
     loaded.document.deferred_transport?.implemented_mappings?.includes(

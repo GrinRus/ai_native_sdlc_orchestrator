@@ -10,6 +10,7 @@
 - `intake-request-body.md`
 - `wave-ticket.md`
 - `handoff-packet.md`
+- `execution-plan.md`
 - `release-packet.md`
 - `delivery-plan.md`
 - `delivery-manifest.md`
@@ -30,6 +31,7 @@
 - `promotion-decision.md`
 - `compiled-context-artifact.md`
 - `operator-request.md`
+- `task-progress-report.md`
 
 Compiled-context and external-runner contracts include context-budget evidence for routed steps. Runtime Harness reports consume those facts as deterministic run-quality signals, while product quality remains owned by validation, review, evaluation, delivery, and learning-loop artifacts.
 

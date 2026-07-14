@@ -8,6 +8,7 @@
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
 ## Run control
+- `structured-task-plan-lifecycle.md` — create, inspect, revise, approve, execute, and recover versioned structured task plans.
 - `run-control-lifecycle.md` — start/pause/resume/steer/cancel commands, guardrails, audit checks, and the boundary between `run steer` and operator requests.
 - `incident-audit-operations.md` — incident open/show and audit runs command flow with run-linked evidence checks.
 - `operator-strategic-visibility.md` — sponsor/planner wave progress and run-risk snapshots from operator surfaces.

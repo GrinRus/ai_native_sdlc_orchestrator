@@ -295,12 +295,16 @@ which locks remain active, and the recovery or rollback action.
 
 ## Backlog and contract handoff
 
-- W60 owns structured task plans, completeness, evidence-derived progress, and
-  the Flow Plan workbench.
+- W60 implements structured task plans, completeness, semantic evaluation,
+  exact-version approval, evidence-derived progress, and the Flow Plan
+  workbench.
 - W61 owns project/repository/component/binding contracts, local persistence,
   topology management, and Project Structure UX.
 - W62 owns workspace sets, impact DAGs, parent/child execution, integration,
   repair, coordinated delivery, and end-to-end proof.
-- W59 audit closure is the entry dependency for planner materialization.
+- W59 audit closure remains the declared entry dependency for planner
+  materialization. The current W60 implementation was performed under an
+  explicit dependency override; it does not mark W57-W59 complete or remove
+  their release-readiness blockers.
 - W45 quality repair state is reused for failed or stale execution units rather
   than replaced by a second repair model.

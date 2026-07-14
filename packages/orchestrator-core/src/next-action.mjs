@@ -1854,7 +1854,7 @@ export function resolveNextAction(options = {}) {
             const planningReadiness = artifactReadinessStage(artifactReadiness, "planning");
             const discoveryCommand = `${projectCommand("discovery run", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`;
             const specCommand = `${projectCommand("spec build", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`;
-            const handoffPrepareCommand = `${projectCommand("handoff prepare", projectRoot)} --approved-artifact ${shellQuote(intake.packetFile)}`;
+            const planCreateCommand = `${projectCommand("plan create", projectRoot)} --approved-artifact ${shellQuote(intake.packetFile)}`;
             const discoveryStatus = asString(discoveryReadiness.status);
             const researchStatus = asString(researchReadiness.status);
             const specStatus = asString(specReadiness.status);
@@ -1922,10 +1922,10 @@ export function resolveNextAction(options = {}) {
               status = planningStatus === "pending" ? "ready" : "blocked";
               stage = "planning";
               primaryAction = {
-                action_id: "handoff-prepare",
-                command: handoffPrepareCommand,
-                reason: asString(planningReadiness.reason) ?? "Spec evidence is ready; prepare bounded planning handoff evidence next.",
-                low_level_command: "handoff prepare",
+                action_id: "plan-create",
+                command: planCreateCommand,
+                reason: asString(planningReadiness.reason) ?? "Spec evidence is ready; create and validate a structured task plan next.",
+                low_level_command: "plan create",
                 evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(planningReadiness)]),
               };
               blockers = planningStatus === "pending"
@@ -1935,7 +1935,7 @@ export function resolveNextAction(options = {}) {
                       projectRoot,
                       stageName: "planning",
                       stage: planningReadiness,
-                      nextCommand: handoffPrepareCommand,
+                      nextCommand: planCreateCommand,
                     }),
                   ];
             } else {

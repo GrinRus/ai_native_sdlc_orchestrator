@@ -37,6 +37,12 @@ const TOP_LEVEL_HELP_GROUPS = Object.freeze([
       "discovery run",
       "spec build",
       "wave create",
+      "plan create",
+      "plan show",
+      "plan diff",
+      "plan revise",
+      "plan approve",
+      "plan status",
     ],
   },
   {
@@ -300,7 +306,8 @@ export function formatCommandHelp(definition) {
       : definition.command === "intake create" ||
             definition.command === "discovery run" ||
             definition.command === "spec build" ||
-            definition.command === "wave create"
+            definition.command === "wave create" ||
+            definition.command.startsWith("plan ")
           ? "Status: implemented in intake and planning shell (W6-S02)"
         : definition.command === "review run"
           ? "Status: implemented in review shell (W13-S05)"

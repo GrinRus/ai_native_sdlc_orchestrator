@@ -882,6 +882,108 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
   });
 });
 
+test("flow plan API creates, reads, approves, reports progress, and invalidates approval on revision", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+    try {
+      const lifecycleUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`;
+      const missionResponse = await postJson(lifecycleUrl, {
+        command: "mission create",
+        flags: {
+          mission_id: "structured-plan-api",
+          goal: "Review a complete mission-specific task plan.",
+          kpi: "task-plan:Task plan coverage:Every criterion has a task:API proof",
+          dod: "The approved plan materializes execution units and progress.",
+          allowed_path: "packages/orchestrator-core/**",
+          delivery_mode: "patch-only",
+        },
+      });
+      assert.equal(missionResponse.status, 200);
+
+      const selectedFlowResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows/selected`);
+      assert.equal(selectedFlowResponse.status, 200);
+      const flow = await selectedFlowResponse.json();
+      const planUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(flow.flow_id)}/plan`;
+      const actionUrl = `${planUrl}/actions`;
+
+      const missingResponse = await fetch(planUrl);
+      assert.equal(missingResponse.status, 404);
+      assert.equal((await missingResponse.json()).error.code, "structured-plan-required");
+
+      const createResponse = await postJson(actionUrl, { action: "create" });
+      assert.equal(createResponse.status, 202);
+      const created = await createResponse.json();
+      assert.equal(created.flow_id, flow.flow_id);
+      assert.equal(created.plan_status, "proposed");
+      assert.match(created.planning_run_ref, /^evidence:\/\//u);
+
+      const showResponse = await fetch(planUrl);
+      assert.equal(showResponse.status, 200);
+      const shown = await showResponse.json();
+      assert.equal(shown.read_only, true);
+      assert.equal(shown.plan.plan_status, "proposed");
+      assert.equal(shown.plan.feature_traceability.mission_id, "structured-plan-api");
+
+      const approveResponse = await postJson(actionUrl, {
+        action: "approve",
+        plan_ref: created.plan_ref,
+        approval_ref: "approval://HTTP-W60",
+      });
+      assert.equal(approveResponse.status, 200);
+      const approved = await approveResponse.json();
+      assert.equal(approved.plan_status, "approved");
+      assert.ok(approved.execution_plan.execution_units.length >= 3);
+
+      const progressResponse = await fetch(`${planUrl}/progress`);
+      assert.equal(progressResponse.status, 200);
+      const progress = await progressResponse.json();
+      assert.equal(progress.read_only, true);
+      assert.equal(progress.execution_plan.plan_id, shown.plan.plan_id);
+      assert.equal(progress.task_progress.tasks.length, shown.plan.local_tasks.length);
+
+      const unit = progress.execution_plan.execution_units[0];
+      const runStartResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "start",
+          run_id: "run.http.structured-plan-unit",
+          execution_plan_ref: progress.task_progress.execution_plan_ref,
+          execution_unit_id: unit.unit_id,
+        },
+      );
+      assert.equal(runStartResponse.status, 200);
+      const runStart = await runStartResponse.json();
+      assert.equal(runStart.run_control.state.execution_unit_id, unit.unit_id);
+      assert.deepEqual(runStart.run_control.state.task_refs, unit.task_refs);
+
+      const revisionResponse = await postJson(actionUrl, {
+        action: "request_revision",
+        plan_ref: created.plan_ref,
+        reason: "Clarify verification ownership before execution.",
+      });
+      assert.equal(revisionResponse.status, 202);
+      const revision = await revisionResponse.json();
+      assert.equal(revision.plan_status, "revision-requested");
+      assert.match(revision.planning_run_ref, /^evidence:\/\//u);
+
+      const staleApprovalResponse = await postJson(actionUrl, {
+        action: "approve",
+        plan_ref: created.plan_ref,
+        approval_ref: "approval://HTTP-W60-STALE",
+      });
+      assert.equal(staleApprovalResponse.status, 409);
+      assert.equal((await staleApprovalResponse.json()).error.code, "plan-incomplete");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("detached control-plane transport records interactive continuation answers without streaming raw answer text", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.interaction.v1";

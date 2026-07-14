@@ -44,10 +44,20 @@ test("prepareHandoffArtifacts materializes wave-ticket and pending handoff packe
     assert.ok(result.waveTicket.verification_expectations.primary_commands.length > 0);
     assert.ok(result.waveTicket.verification_plan.command_groups.length > 0);
     assert.ok(result.handoffPacket.verification_plan.command_groups.length > 0);
-    assert.deepEqual(
-      result.waveTicket.local_tasks.find((task) => task.task_id === "local-task.verification").verification_commands,
-      result.handoffPacket.verification_plan.commands,
+    assert.equal(result.waveTicket.task_model_version, 1);
+    assert.equal(result.waveTicket.plan_status, "proposed");
+    assert.ok(result.waveTicket.local_tasks.every((task) => task.task_id.startsWith("task.")));
+    assert.ok(result.waveTicket.local_tasks.every((task) => task.verification.success_conditions.length > 0));
+    assert.equal(
+      result.waveTicket.local_tasks.some((task) => [
+        "local-task.implementation",
+        "local-task.verification",
+        "local-task.lineage",
+      ].includes(task.task_id)),
+      false,
     );
+    assert.equal(result.planValidationReport.status, "pass");
+    assert.equal(fs.existsSync(result.planValidationReportFile), true);
     assert.equal(fs.existsSync(result.waveTicketFile), true);
     assert.equal(fs.existsSync(result.handoffPacketFile), true);
   });

@@ -1,0 +1,49 @@
+report_id: checkout-platform.task-progress.checkout-errors.v1
+project_id: checkout-platform
+plan_id: checkout-platform.plan.checkout-errors
+plan_version: 1
+plan_ref: evidence://artifacts/WAVE-CHECKOUT-PLAN-001.json
+execution_plan_ref: evidence://artifacts/checkout-platform.execution-plan.checkout-errors.v1.json
+overall_status: in-progress
+tasks:
+  - task_id: task.error-contract
+    task_digest: sha256:fixture-task-error-contract
+    status: complete
+    criteria_status: satisfied
+    verification_status: pass
+    evidence_status: complete
+    execution_unit_refs:
+      - unit.task-error-contract
+    attempt_refs:
+      - run://checkout-errors-contract/attempt/1
+    evidence_refs:
+      - evidence://reports/review-checkout-errors-contract.json
+    blocking_findings: []
+    next_action: null
+  - task_id: task.error-ui
+    task_digest: sha256:fixture-task-error-ui
+    status: verification-pending
+    criteria_status: pending
+    verification_status: pending
+    evidence_status: partial
+    execution_unit_refs:
+      - unit.task-error-ui
+    attempt_refs:
+      - run://checkout-errors-ui/attempt/1
+    evidence_refs: []
+    blocking_findings: []
+    next_action: Run required verification and collect review evidence.
+  - task_id: task.checkout-verification
+    task_digest: sha256:fixture-task-checkout-verification
+    status: blocked
+    criteria_status: pending
+    verification_status: pending
+    evidence_status: missing
+    execution_unit_refs:
+      - unit.task-checkout-verification
+    attempt_refs: []
+    evidence_refs: []
+    blocking_findings:
+      - task.error-ui is not complete.
+    next_action: Complete the upstream UI task.
+generated_at: 2026-07-13T10:05:00.000Z

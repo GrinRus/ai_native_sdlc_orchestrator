@@ -24,6 +24,12 @@ Core lifecycle:
   - aor discovery run
   - aor spec build
   - aor wave create
+  - aor plan create
+  - aor plan show
+  - aor plan diff
+  - aor plan revise
+  - aor plan approve
+  - aor plan status
 
 Run control:
   - aor run start

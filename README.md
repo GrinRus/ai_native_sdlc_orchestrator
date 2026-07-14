@@ -442,7 +442,7 @@ Core rules:
 
 ## Command surface status
 
-The CLI command surface currently includes **47 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
+The CLI command surface currently includes **53 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
 
 ## Repository map
 
@@ -498,8 +498,9 @@ delivery program are tracked through `W63` and focus on:
   remain outside the current product scope.
 - Replacing marker-based readiness with executable API, browser, concurrency,
   package, and independent audit-closure evidence.
-- Planned structured task decomposition, evidence-derived task progress, and a
-  flow-scoped Plan workbench instead of generic implementation task lists.
+- Implemented structured task decomposition, deterministic completeness,
+  post-pass semantic evaluation, exact-version approval, evidence-derived task
+  progress, and a flow-scoped Plan workbench instead of generic task lists.
 - Planned portable project/repository/component topology, persistent
   machine-local bindings, and installed-user Project Structure management.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,

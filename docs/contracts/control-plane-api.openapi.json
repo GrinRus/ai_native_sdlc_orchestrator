@@ -528,6 +528,46 @@
         }
       }
     },
+    "/api/projects/{projectId}/flows/{flowId}/plan": {
+      "get": {
+        "operationId": "getFlowPlan",
+        "tags": ["read"],
+        "x-aor-route-id": "flow-plan",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/plan/progress": {
+      "get": {
+        "operationId": "getFlowPlanProgress",
+        "tags": ["read"],
+        "x-aor-route-id": "flow-plan-progress",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
     "/api/projects/{projectId}/flows/{flowId}": {
       "get": {
         "operationId": "getFlow",
@@ -862,6 +902,29 @@
           "403": {
             "$ref": "#/components/responses/AuthError"
           }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/plan/actions": {
+      "post": {
+        "operationId": "flowPlanAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "flow-plan-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
         }
       }
     },
@@ -3346,6 +3409,12 @@
             "type": "string"
           },
           "approval_ref": {
+            "type": "string"
+          },
+          "execution_plan_ref": {
+            "type": "string"
+          },
+          "execution_unit_id": {
             "type": "string"
           }
         },

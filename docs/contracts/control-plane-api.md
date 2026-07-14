@@ -349,6 +349,32 @@ group summaries by flow/stage and may filter them by `Failed`, `Warnings`,
 `Learning`. Raw refs stay available for skill-agent evidence and debugging, but
 the user-facing primary text is the summary label/type.
 
+## Structured plan routes (W60)
+
+Flow-scoped structured planning is headless-first and uses the same core
+services as the CLI:
+
+- `GET /api/projects/:projectId/flows/:flowId/plan` returns the latest
+  structured `wave-ticket`, exact `plan_ref`, and linked handoff without
+  materializing artifacts;
+- `GET /api/projects/:projectId/flows/:flowId/plan/progress` returns the
+  existing immutable `execution-plan` and evidence-derived
+  `task-progress-report`, also without materialization;
+- `POST /api/projects/:projectId/flows/:flowId/plan/actions` accepts
+  `create`, `request_revision`, or `approve`.
+
+`create` and `request_revision` return HTTP `202` plus a planning-run ref.
+`approve` returns HTTP `200`, binds the exact plan version/digest, and returns
+the materialized execution plan and initial progress. Incomplete, stale,
+immutable, unapproved, superseded, or flow-mismatched versions return HTTP
+`409` with stable blocker codes. Missing projects/flows/plans return `404`.
+Auth uses the existing project-scoped `read`/`mutate` permissions.
+
+Create performs deterministic completeness validation before semantic
+evaluation. Semantic warnings are advisory unless the project profile declares
+`structured_plan_policy.semantic_evaluator_blocking=true`. The browser Plan
+workbench is a consumer of these routes; it is not an orchestration owner.
+
 ## Connected lifecycle mutations (W18 baseline)
 
 W18 closes the first connected-web gap between the bounded run-control/UI mutation baseline and a web surface that can drive the approved lifecycle through the control plane. This is a bounded lifecycle subset, not a full CLI-over-HTTP parity claim.
@@ -637,7 +663,10 @@ Detached read-model scale baseline:
 - the alpha filesystem runtime root remains the system of record; no database or storage migration is implied.
 
 Detached mutation payload baseline:
-- run-control payload fields: `action`, `run_id`, `target_step`, `reason`, `approval_ref`;
+- run-control payload fields: `action`, `run_id`, `target_step`, `reason`,
+  `approval_ref`, and optional paired `execution_plan_ref` /
+  `execution_unit_id` for `start`; the pair is resolved against the exact
+  current approved plan and fixes task refs in run state;
 - run-control response reuses module parity fields: `state_file`, `audit_file`, guardrail decision, transition, live event ids;
 - blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
 - ui lifecycle payload fields: `action`, `run_id`, `control_plane`;

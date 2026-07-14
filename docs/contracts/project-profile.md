@@ -106,6 +106,12 @@ declare:
 - `qa_in_scope_stages[]`, the stages whose repair closure must return through
   QA after a passing review.
 
+`structured_plan_policy` is optional. Its
+`semantic_evaluator_blocking` boolean defaults to `false`. Deterministic
+structured-plan validation always blocks incomplete plans; this profile switch
+only decides whether post-structural semantic `evaluation-report` warnings or
+failures also require a planner revision before approval.
+
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 
