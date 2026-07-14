@@ -6,6 +6,13 @@ slice normally contains three to seven local work packages while making each
 runtime task complete enough for another agent, reviewer, or operator to act
 without rediscovering scope and acceptance decisions.
 
+Commit `392f94c` landed a substantial provisional implementation of W60-S01
+through W60-S04 before their W59-S07 entry dependency closed. The code and docs
+are useful characterization input, but every W60 slice remains `blocked`: work
+must requalify the baseline against post-W57/W59 contracts and quality ratchets,
+close residual gaps, and collect the owning slice evidence before any state or
+story claim can advance.
+
 ## Wave objective
 
 Engineering managers, planners, delivery engineers, and reviewers can inspect
@@ -65,17 +72,22 @@ evidence, and completion state remain traceable through execution attempts.
      semantic quality.
    - Changes: specify unique IDs, bounded-scope subset checks, DAG validity,
      Goal/KPI/DoD/criterion coverage, verification coverage, and evidence
-     ownership.
+     ownership; split the provisional structured-task validator into focused
+     shape, scope, DAG, coverage, and evidence checks that satisfy W59 ceilings.
    - Validation: fixtures cover orphan criterion, unknown dependency, cycle,
      scope widening, missing verification, and valid small/medium plans.
-4. **Upgrade the shared backlog task-detail convention.**
+4. **Upgrade task detail and semantic backlog integrity.**
    - Purpose: keep shared slices readable while carrying enough implementation
-     context for handoff.
+     context for handoff and prevent planning sources from agreeing only on IDs.
    - Changes: require three to seven work packages with Purpose, Changes, and
-     Validation for new medium+ slices; update `slice:plan` expectations and the
-     backlog workflow skill without rewriting historical done waves.
-   - Validation: the new W60-W62 wave docs satisfy the convention and backlog
-     helpers still parse their metadata.
+     Validation for new medium+ slices; make `slice:plan` preserve multiline and
+     nested detail losslessly; verify title, epic membership, dependencies,
+     acyclic/topological order, roadmap detail/allocations, and owning-wave
+     metadata across master/roadmap/epic/graph sources; update W63-W64 to the
+     convention without rewriting historical done waves.
+   - Validation: parser round-trip fixtures retain Purpose/Changes/Validation;
+     deliberate title, epic, cycle/order, missing-wave-detail, allocation, and
+     task-shape drift each fail with an actionable source location.
 5. **Register examples, migration notes, and contract validation.**
    - Purpose: make compatibility and adoption reviewable before runtime changes.
    - Changes: add current-minimal, structured-medium, and structured-multirepo
@@ -92,6 +104,8 @@ evidence, and completion state remain traceable through execution attempts.
 4. New backlog slices use detailed work packages without turning subtasks into
    shared slice records.
 5. Validation runs before any optional semantic task-quality evaluation.
+6. Backlog helpers preserve complete local-task detail and fail semantic drift
+   across the master backlog, roadmap, wave docs, epic map, and dependency graph.
 
 ### Done evidence
 
@@ -138,7 +152,9 @@ evidence, and completion state remain traceable through execution attempts.
 3. **Replace hardcoded generic task materialization.**
    - Purpose: make runtime packet output reflect actual mission decomposition.
    - Changes: normalize planner-produced tasks, retain a small-mission fallback,
-     and stop generating the same three tasks for every medium+ mission.
+     stop generating the same three tasks for every medium+ mission, and separate
+     plan candidate/materialization responsibilities from the provisional
+     `handoff-packets.mjs` service behind focused interfaces.
    - Validation: tests cover small fallback, medium task plan, multirepo scope,
      duplicate IDs, invalid dependencies, and missing required content.
 4. **Add task completeness and semantic quality decisions.**
@@ -165,6 +181,8 @@ evidence, and completion state remain traceable through execution attempts.
    approval deterministically.
 4. Task quality evaluation cannot bypass deterministic validation.
 5. Material replanning creates a new version and records a readable diff.
+6. Planning-specific services and extracted functions satisfy the W59-S04 size,
+   complexity, nesting, duplication, and dead-export ratchets.
 
 ### Done evidence
 
@@ -211,19 +229,22 @@ evidence, and completion state remain traceable through execution attempts.
    - Purpose: allow one run to close coupled tasks and separate runs for
      independently verifiable outcomes.
    - Changes: add grouping rationale, dependency preservation, execution hints,
-     and stable task refs to run context and step evidence.
+     and stable task refs to run context and step evidence; extract execution-plan
+     materialization from the provisional task-plan service.
    - Validation: fixtures prove one-to-one, many-tasks-to-one-unit, and repeated
      attempts for one unit.
 4. **Derive task completion from evidence.**
    - Purpose: prevent runner claims or UI actions from marking work complete.
    - Changes: map criteria, verification, expected evidence, blocking findings,
-     and stale state into a task-progress read model.
+     and stale state into a focused task-progress read model rather than one
+     mixed persistence/projection service.
    - Validation: missing evidence, failed verification, or open blockers keep a
      task non-complete even after a successful adapter response.
 5. **Expose headless reads and next-action integration.**
    - Purpose: make UI-independent plan/progress inspection and recovery possible.
    - Changes: add CLI/API/control-plane reads, pagination, unknown-ref handling,
-     and one safe next action for blocked or retryable task state.
+     and one safe next action for blocked or retryable task state; keep internal
+     materializers private unless a documented public consumer requires export.
    - Validation: project/flow isolation and auth tests cover task/progress reads.
 
 ### Acceptance criteria
@@ -234,6 +255,8 @@ evidence, and completion state remain traceable through execution attempts.
 3. Execution units may group tasks but cannot drop dependencies or widen scope.
 4. Plan/task/unit/attempt states remain distinct in contracts and read models.
 5. CLI/API can inspect progress and the next safe action without the web app.
+6. Execution-plan, progress, persistence, and read responsibilities are separated
+   into focused modules that satisfy the W59-S04 ratchets.
 
 ### Done evidence
 
@@ -267,8 +290,9 @@ evidence, and completion state remain traceable through execution attempts.
 1. **Extract a plan-workbench feature boundary.**
    - Purpose: avoid adding task management directly to the existing monolithic
      SPA module.
-   - Changes: introduce focused task table, detail drawer, traceability, and
-     plan-diff modules using existing UI conventions and read models.
+   - Changes: decompose the provisional `PlanWorkbench` into focused task table,
+     detail drawer, traceability, and plan-diff modules using existing UI
+     conventions and read models; satisfy the W59-S03/W59-S04 ceilings.
    - Validation: behavior-preserving web tests pass before feature behavior is
      added.
 2. **Render a scannable task plan.**
@@ -308,6 +332,8 @@ evidence, and completion state remain traceable through execution attempts.
 4. Completion is rendered from control-plane evidence, not browser state.
 5. Keyboard, focus, responsive, loading, empty, error, permission, and
    disconnected states pass targeted UI tests.
+6. The Plan workbench feature boundary meets the W59 complexity/file-size ratchet
+   and does not add state or orchestration back into the SPA monolith.
 
 ### Done evidence
 
@@ -363,9 +389,13 @@ evidence, and completion state remain traceable through execution attempts.
    - Validation: docs do not claim parallel or multirepo execution before W62.
 5. **Close findings and run gates.**
    - Purpose: prevent documentation-only or mock-only closure.
-   - Changes: classify findings by owner/phase, create follow-up slices when
-     needed, run root/slice gates, and verify runtime artifacts stay uncommitted.
-   - Validation: W60 closes only with passing or explicitly non-pass live proof.
+   - Changes: requalify the `392f94c` provisional baseline against the final
+     W57-W59 contracts/ratchets, classify residual findings by owner/phase,
+     reconcile implemented-versus-accepted story/docs claims, create follow-up
+     slices when needed, run root/slice gates, and verify runtime artifacts stay
+     uncommitted.
+   - Validation: W60 closes only with passing or explicitly non-pass live proof
+     collected after its hard dependencies, never from the pre-dependency commit.
 
 ### Acceptance criteria
 
@@ -376,6 +406,8 @@ evidence, and completion state remain traceable through execution attempts.
 3. Existing compact task packets remain compatible.
 4. Documentation matches implementation and does not overclaim W61/W62 behavior.
 5. Root checks and `pnpm slice:gate` pass with no committed runtime state.
+6. Every provisional W60 artifact has a post-W59 compatibility/quality
+   disposition and no source claims landed code as accepted solely because it exists.
 
 ### Done evidence
 

@@ -43,8 +43,10 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    explicit unsafe-development opt-in until W57 closure evidence exists.
 4. Update the self-hosted environment matrix, release runbook, README readiness
    language, rollback guidance, and user-story coverage matrix to match the audit
-   result; downgrade EMP-05, DEV-07, AIP-06, OPS-02, SEC-04, DTX-05, and FIN-03
-   to `partial` with gaps W58-S05, W58-S02, W58-S04, W58-S05,
+   result; derive current alpha/version examples from package metadata, guard
+   against stale current-version claims while exempting labelled historical
+   snapshots, and downgrade EMP-05, DEV-07, AIP-06, OPS-02, SEC-04, DTX-05, and
+   FIN-03 to `partial` with gaps W58-S05, W58-S02, W58-S04, W58-S05,
    W57-S05/W58-S04, W57-S03, and W57-S07/W59-S07 respectively.
 5. Add source-of-truth tests so a release claim cannot silently ignore the audit
    disposition or reclassify the local SPA as hosted-capable.
@@ -76,6 +78,62 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   reverse-proxy trust, TLS, WAF, or internet-facing rate limiting.
 - Credentialed provider or real upstream-write proof.
 
+## W57-S09 — Complete test discovery and deterministic safety-gate baseline
+
+- **Outcome:** Every tracked test is executed by one deterministic repository
+  gate, dependency safety is patched, and later trust-boundary remediation cannot
+  add a test that CI, release, or readiness checks silently omit.
+- **Epic:** EPIC-0
+- **State:** blocked
+- **Remediation priority:** P0
+- **Estimated effort:** M
+- **Primary modules:** `scripts/test.mjs`, test-discovery helpers/manifest,
+  production-readiness evidence, CI/release gates, `package.json`, lockfile, tests
+- **Hard dependencies:** W57-S01
+- **Primary user story surfaces:** OPS-06, OPS-07, FIN-07; repository-gate
+  integrity enablement without direct product-story closure.
+- **Audit findings:** AUD-022, AUD-047.
+
+### Local tasks
+1. Inventory every tracked test candidate and replace partial static file lists
+   with one recursive discovery and deterministic group scheduler; preserve an
+   explicit bounded timeout class for the private proof harness.
+2. Materialize the discovered/excluded manifest used by `check`, CI, readiness,
+   and release gates; every exclusion must carry an owner, reason, and expiry.
+3. Add a manifest-versus-runner self-test so a newly tracked test fails the gate
+   unless it is executed exactly once or has a valid, unexpired exclusion.
+4. Replace source-string inspection as readiness evidence with a machine-readable
+   report of the test files and groups actually executed.
+5. Upgrade Vite to a supported 8.x version patched for GHSA-fx2h-pf6j-xcff and
+   GHSA-v6wh-96g9-6wx3; preserve frozen install, full dependency audit, web build,
+   package dry-run, and installed smoke evidence.
+6. Align phase and CI timeouts, remove load-sensitive wall-clock assumptions, and
+   repeat the full gate on the supported Node 22 environment.
+
+### Acceptance criteria
+1. All 57 currently tracked test files are discovered and the 14 previously
+   omitted files, containing 59 passing tests at intake, run through the root gate.
+2. A new undiscovered test, duplicate execution, or exclusion without owner,
+   reason, and expiry fails CI deterministically.
+3. `pnpm check`, CI, production-readiness evidence, and the release gate consume
+   the same execution manifest rather than source markers or divergent lists.
+4. Frozen install resolves Vite to an unaffected supported version and the full
+   dependency audit contains neither recorded advisory.
+5. Repeated Node 22 runs are stable and leave enough timeout reserve for
+   diagnostics and later gate stages.
+
+### Done evidence
+- complete tracked-test execution manifest and manifest self-test
+- current 57/57 discovery report with the prior 14-file omission closed
+- repeated Node 22 gate results and timeout budget
+- patched Vite lockfile, dependency audit, web/package smoke
+- `pnpm slice:gate`
+
+### Out of scope
+- Browser behavior certification, owned by W59-S01.
+- Broad lint/type/dead-code/coverage ratchets, owned by W59-S04.
+- Credentialed providers, paid calls, or real upstream writes.
+
 ## W57-S02 — Canonical identifier, path, and mission-scope contracts
 
 - **Outcome:** Public contracts reject identifiers and scope descriptions that
@@ -87,7 +145,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`,
   `examples/**`, contract tests
-- **Hard dependencies:** W57-S01
+- **Hard dependencies:** W57-S09
 - **Primary user story surfaces:** ARC-01, PBO-01, PBO-05, OPS-02, SEC-04,
   DTX-01, DTX-02, DTX-03, DTX-05, FIN-03.
 - **Audit findings:** AUD-013, AUD-015, AUD-016.
@@ -411,8 +469,8 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   quality-lineage evidence.
 
 ### Local tasks
-1. Add automatic discovery for all tracked tests and fail when a new test file is
-   omitted without an explicit reason/expiry.
+1. Verify the W57-S09 discovery manifest still executes every tracked test once
+   and that no W57 regression was added through an expired or unexplained exclusion.
 2. Convert W57 safe probes into deterministic regression suites for no-write,
    paths, permissions, delivery evidence, initialization, and concurrency.
 3. Remove load-sensitive wall-clock assumptions from the root gate and preserve
@@ -425,8 +483,8 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    marking the whole audit closed.
 
 ### Acceptance criteria
-1. Test discovery reports every tracked test file and the root gate is stable
-   across repeated Node 22 runs.
+1. The W57-S09 discovery baseline remains complete, and the root gate is stable
+   across repeated Node 22 runs after all W57 regressions are added.
 2. All W57 adversarial regression suites pass without external network writes or
    credentials.
 3. Package smoke proves no-write primary-checkout invariance and exact runtime
@@ -436,7 +494,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 5. Audit IDs and acceptance evidence map one-to-one in the closure report.
 
 ### Done evidence
-- complete test-discovery manifest and repeated Node 22 gate results
+- verified W57-S09 discovery manifest and repeated Node 22 gate results
 - W57 safety/concurrency regression suite
 - package install/no-write smoke transcript
 - updated audit disposition and readiness JSON

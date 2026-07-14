@@ -355,7 +355,7 @@ and are intentionally not part of the README workflow. Until W57-S01 encodes
 the July 2026 audit disposition, a green result is legacy pre-audit evidence and
 does not lift the audit release hold.
 
-The current roadmap source of truth extends through W63 in
+The current roadmap source of truth extends through W64 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -468,7 +468,7 @@ The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
 The current alpha distribution, audit-remediation queue, and planned post-audit
-delivery program are tracked through `W63` and focus on:
+delivery program are tracked through `W64` and focus on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -498,9 +498,10 @@ delivery program are tracked through `W63` and focus on:
   remain outside the current product scope.
 - Replacing marker-based readiness with executable API, browser, concurrency,
   package, and independent audit-closure evidence.
-- Implemented structured task decomposition, deterministic completeness,
-  post-pass semantic evaluation, exact-version approval, evidence-derived task
-  progress, and a flow-scoped Plan workbench instead of generic task lists.
+- A provisional structured-task baseline for decomposition, deterministic
+  completeness, post-pass semantic evaluation, exact-version approval,
+  evidence-derived task progress, and a flow-scoped Plan workbench; W60 remains
+  blocked until post-audit requalification and acceptance evidence close.
 - Planned portable project/repository/component topology, persistent
   machine-local bindings, and installed-user Project Structure management.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,
@@ -509,6 +510,9 @@ delivery program are tracked through `W63` and focus on:
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a
   semantic design system, and installed-package acceptance proof.
+- Recoverable npm alpha publication plus bounded verification/delivery and
+  operator-projection refactors after audit closure, tracked independently from
+  W60-W63 product work.
 - Verification-plan authoring, stack discovery, profile generation, and
   operator-visible command-group status for arbitrary project shapes.
 - Maintainer-facing product-quality cycles with QA-origin public repair and

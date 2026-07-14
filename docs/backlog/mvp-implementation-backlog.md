@@ -499,7 +499,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W57-S01 | Audit disposition, release hold, and local-app threat model | EPIC-0, EPIC-6 | ready | architecture/contracts/ops docs, README, production-readiness gate | W56-S03 |
-| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | blocked | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S01 |
+| W57-S09 | Complete test discovery and deterministic safety-gate baseline | EPIC-0 | blocked | root test discovery, readiness/CI/release gates, dependency baseline | W57-S01 |
+| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | blocked | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S09 |
 | W57-S03 | True workspace isolation and no-write enforcement | EPIC-1, EPIC-3, EPIC-5 | blocked | workspace isolation, step execution, delivery plan, adapter SDK | W57-S02 |
 | W57-S04 | Structural runtime permission enforcement | EPIC-3 | blocked | permission contracts/policy, step execution, adapter tests | W57-S02, W57-S03 |
 | W57-S05 | Exact-diff delivery and resolvable authorization evidence | EPIC-4, EPIC-5 | blocked | delivery/Harness contracts, delivery runtime, CLI/tests | W57-S02, W57-S03, W57-S04 |
@@ -568,6 +569,13 @@ This is the master index for the implementation slices across all defined waves.
 | W63-S05 | Adaptive shell and lifecycle navigation | EPIC-6 | blocked | app shell, responsive navigation, accessibility/browser tests | W63-S03, W63-S04 |
 | W63-S06 | Attention queue, evidence workbench, and cockpit hierarchy | EPIC-1, EPIC-4, EPIC-6 | blocked | queue/workbench projections, responsive UI, browser tests | W63-S03, W63-S04, W63-S05 |
 | W63-S07 | Installed-console UX/UI acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | blocked | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
+
+## W64 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W64-S01 | Idempotent alpha publish transaction and partial-failure recovery | EPIC-0, EPIC-5 | blocked | release workflow/state inspection, release tests, npm alpha runbook | W29-S01, W59-S07 |
+| W64-S02 | Verification-to-delivery transaction decomposition | EPIC-0, EPIC-5 | blocked | project verification, delivery plan/driver, fork-first flow, characterization tests | W59-S07 |
+| W64-S03 | Operator decision projection decomposition | EPIC-0, EPIC-4, EPIC-6 | blocked | next-action/read projections, asset certification, golden fixtures | W59-S07 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New
