@@ -83,7 +83,7 @@ evidence, and completion state remain traceable through execution attempts.
      Validation for new medium+ slices; make `slice:plan` preserve multiline and
      nested detail losslessly; verify title, epic membership, dependencies,
      acyclic/topological order, roadmap detail/allocations, and owning-wave
-     metadata across master/roadmap/epic/graph sources; update W63-W64 to the
+     metadata across master/roadmap/epic/graph sources; update W63-W65 to the
      convention without rewriting historical done waves.
    - Validation: parser round-trip fixtures retain Purpose/Changes/Validation;
      deliberate title, epic, cycle/order, missing-wave-detail, allocation, and

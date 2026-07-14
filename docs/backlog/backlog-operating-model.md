@@ -155,7 +155,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W64`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W65`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, and concurrent evidence integrity. W58
 continues with non-materializing reads, effective context/evaluation, asynchronous
@@ -169,15 +169,20 @@ the plan workbench, W61 adds portable topology plus machine-local binding
 management, and W62 adds repo-aware workspace sets, bounded concurrency,
 integration, repair, and coordinated delivery proof. W63 then consolidates
 Mission intake, action semantics, adaptive navigation, attention/evidence work,
-and visual-system contracts across the installed operator console. W59-S07 is
-the explicit entry dependency for that later product-maturity program; W63-S01
-waits for W62-S06 so its UI contract covers the delivered planning, topology,
-and execution surfaces.
+and visual-system contracts across the installed operator console under an
+explicit reversible presentation selector. W65 starts after W63-S07 and owns
+route/action parity, pilot activation, default-on cutover, rollback rehearsal,
+legacy renderer retirement, and post-cutover package proof. W59-S07 is the
+explicit entry dependency for that later product-maturity program; W63-S01 waits
+for W62-S06 so its UI contract covers the delivered planning, topology, and
+execution surfaces.
 
 W64 is a parallel post-audit maintenance lane, not a successor dependency of
 W63. After W59-S07 it owns idempotent alpha-publish recovery and two independently
 acceptable service-boundary refactors that should not be hidden inside P0 trust
-repairs or the W60-W63 product slices.
+repairs or the W60-W63/W65 product and cutover slices. W65 does not depend on
+W64; any shared projection change must instead be contract-first and explicitly
+sequenced so W64 remains behavior-preserving.
 
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for

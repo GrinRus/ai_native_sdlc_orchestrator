@@ -49,18 +49,29 @@ The optional web console mirrors the same stages with these states:
 
 The web app must not invent separate lifecycle state. It reads control-plane state and invokes runtime-owned mutations. Static generated HTML snapshots are not a product console surface.
 
-The accepted flow-centric console design reference is
+The current implemented flow-centric console design reference is
 `docs/product/03-flow-centric-console-design.md`. W34 promotes and implements
-that direction as the local app target: flow selector, active/completed flow
+that baseline as the local app target: flow selector, active/completed flow
 boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped evidence
 views, flow-targeted Ask AOR, and browser-task installed-user proof coverage with
 post-run UI/UX quality assessment when UI/UX quality is claimed.
 
+The adopted W63 target successor is
+`docs/product/05-quiet-cockpit-console-design.md`. It keeps the same
+runtime-owned Project/Flow boundaries while defining Quiet Cockpit as the
+eventual default shell and adding flow-scoped Attention, Journey, and Evidence
+modes. W63 implements and accepts that experience behind an explicit selector;
+W65 owns default-on cutover, rollback, and legacy removal. The reference screens
+are future target-state illustrations; they are not current package or
+release-readiness claims.
+
 The planned project-topology and detailed-task extension is defined in
 `docs/product/04-project-topology-and-task-planning-ux.md`. W60-W62 preserve the
-flow-centric shell while adding Project Structure, a Flow Plan workbench,
+Flow lifecycle boundary while adding Project Structure, a Flow Plan workbench,
 parent/child execution visibility, integration recovery, and coordinated
-delivery. These are planned surfaces and must not be described as implemented
+delivery. Quiet Cockpit presents those Plan and Execution surfaces through the
+specialist Journey mode, with accessible list/table alternatives to graph
+views. These are planned surfaces and must not be described as implemented
 until their owning slices close.
 
 A flow is a runtime/control-plane projection over mission/intake, next-action,

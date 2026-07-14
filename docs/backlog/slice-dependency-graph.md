@@ -325,6 +325,13 @@ graph TD
   W64S01[W64-S01 Idempotent alpha publish transaction and partial-failure recovery]
   W64S02[W64-S02 Verification-to-delivery transaction decomposition]
   W64S03[W64-S03 Operator decision projection decomposition]
+  W65S01[W65-S01 Cutover contract, parity baseline, and migration ledger]
+  W65S02[W65-S02 Reversible experience selector and navigation compatibility]
+  W65S03[W65-S03 Mission and Quiet Cockpit pilot activation]
+  W65S04[W65-S04 Attention, Journey, and Evidence pilot activation]
+  W65S05[W65-S05 Default-on cutover and explicit rollback rehearsal]
+  W65S06[W65-S06 Legacy console retirement and compatibility cleanup]
+  W65S07[W65-S07 Post-cutover installed-console acceptance and story closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -806,6 +813,14 @@ graph TD
   W59S07 --> W64S01
   W59S07 --> W64S02
   W59S07 --> W64S03
+  W63S07 --> W65S01
+  W65S01 --> W65S02
+  W65S02 --> W65S03
+  W65S02 --> W65S04
+  W65S03 --> W65S05
+  W65S04 --> W65S05
+  W65S05 --> W65S06
+  W65S06 --> W65S07
 ```
 
 ## W0 hard dependencies
@@ -1392,6 +1407,17 @@ own the stricter terminal control proof evidence for this lane.
 | W64-S01 | W29-S01, W59-S07 |
 | W64-S02 | W59-S07 |
 | W64-S03 | W59-S07 |
+
+## W65 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W65-S01 | W63-S07 |
+| W65-S02 | W65-S01 |
+| W65-S03 | W65-S02 |
+| W65-S04 | W65-S02 |
+| W65-S05 | W65-S03, W65-S04 |
+| W65-S06 | W65-S05 |
+| W65-S07 | W65-S06 |
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1714,6 +1740,13 @@ own the stricter terminal control proof evidence for this lane.
 319. W63-S05
 320. W63-S06
 321. W63-S07
+322. W65-S01
+323. W65-S02
+324. W65-S03
+325. W65-S04
+326. W65-S05
+327. W65-S06
+328. W65-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

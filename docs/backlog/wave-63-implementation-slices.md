@@ -17,6 +17,30 @@ safe AOR flow, understand and take one truthful next action, recover from
 partial or blocked states, and inspect durable evidence on desktop or mobile
 without terminal-only ambiguity.
 
+## Adopted target design
+
+`docs/product/05-quiet-cockpit-console-design.md` is the W63 product and UX
+target. Quiet Cockpit is the eventual default selected-Flow shell; Attention,
+Journey, and Evidence are flow-scoped specialist modes over the same
+runtime-owned packets, reports, policies, and mutations. They do not introduce
+new lifecycle owners. The reference screens are design targets, not proof that
+any W63 slice is implemented, active, unblocked, or release-qualified.
+
+W63 implements and accepts the new experience under an explicit reversible
+presentation selector while the W34 renderer remains the packaged default.
+`docs/backlog/wave-65-implementation-slices.md` owns parity proof, pilot
+activation, default-on cutover, rollback rehearsal, legacy removal, and the
+post-cutover installed-package verdict. This boundary keeps W65 from becoming a
+second owner of Quiet Cockpit behavior.
+
+The adopted reading order is `current state -> one safe action -> evidence on
+demand`. Journey consumes the planning, topology, execution, and coordinated
+delivery contracts delivered and requalified through W60-W62. Evidence is a
+presentation over existing artifact lineage, not a new case-file packet.
+Attention is a derived read projection; if existing control-plane reads cannot
+aggregate it deterministically, the projection must be specified contract-first
+before the SPA consumes it.
+
 ## Contract and compatibility order
 
 W63 remains packet-first, contract-first, headless-first, and local-only.
@@ -59,9 +83,10 @@ W57 and the control-plane semantics closed by W58/W59.
    operator/SRE role and the secondary reviewer/QA role; keep sponsor and
    planner summaries secondary rather than forcing all personas into one
    cockpit.
-2. Update the flow-centric console product baseline with the canonical reading
-   order `current state -> one safe action -> evidence on demand`, plus clear
-   boundaries for navigation, attention, and debug surfaces.
+2. Preserve the implemented W34 flow-centric baseline as history and refine the
+   adopted Quiet Cockpit target with the canonical reading order `current state
+   -> one safe action -> evidence on demand`, plus clear boundaries for
+   navigation, attention, Journey, Evidence, and debug surfaces.
 3. Define an action taxonomy for controls that execute a mutation, open an AOR
    workbench, inspect evidence, copy a terminal command, refresh state, or are
    unavailable; visible labels must describe the real effect.
@@ -96,7 +121,7 @@ W57 and the control-plane semantics closed by W58/W59.
 
 ### Done evidence
 
-- updated flow-centric UX/product baseline
+- adopted Quiet Cockpit UX/product target and W34 successor link
 - action-semantics and state-matrix reference
 - contract/route/packet ownership map
 - deterministic UI scenario catalog and fixture loader
@@ -440,8 +465,9 @@ W57 and the control-plane semantics closed by W58/W59.
 ## W63-S07 — Installed-console UX/UI acceptance and story closure
 
 - **Outcome:** W63 closes with executable installed-package evidence that the
-  local console completes its target operator jobs with acceptable visual,
-  responsive, accessibility, recovery, and safety quality.
+  opt-in Quiet Cockpit experience completes its target operator jobs with
+  acceptable visual, responsive, accessibility, recovery, and safety quality
+  while the legacy installed default remains available for W65 cutover.
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
 - **State:** blocked
 - **Delivery priority:** P1
@@ -454,8 +480,10 @@ W57 and the control-plane semantics closed by W58/W59.
 
 ### Local tasks
 
-1. Run the installed/built SPA against the complete deterministic W63 scenario
-   catalog at desktop, tablet, mobile, and keyboard-only profiles.
+1. Run the installed/built SPA through the explicit Quiet Cockpit selector
+   against the complete deterministic W63 scenario catalog at desktop, tablet,
+   mobile, and keyboard-only profiles; keep the legacy renderer available as
+   the installed default for the W65 migration boundary.
 2. Fail acceptance on uncaught console errors, unexpected external requests,
    stale cross-project state, hidden authoritative state, duplicate durable
    artifacts, action/side-effect mismatch, focus leakage, or horizontal page
@@ -477,9 +505,10 @@ W57 and the control-plane semantics closed by W58/W59.
 
 ### Acceptance criteria
 
-1. Every required scenario passes the installed-package browser matrix at all
-   declared viewports and keyboard-only operation, with actionable retained
-   artifacts on failure.
+1. Every required scenario passes the explicit Quiet Cockpit
+   installed-package browser matrix at all declared viewports and keyboard-only
+   operation, with actionable retained artifacts on failure; the omitted
+   selector still resolves to the legacy renderer until W65.
 2. Mission creation, one safe next action, multiple attention items, recovery,
    evidence inspection, completed-flow read-only state, and follow-up creation
    are executable and understandable without editing raw runtime JSON.
@@ -503,12 +532,14 @@ W57 and the control-plane semantics closed by W58/W59.
 - responsive/rendered evidence bundle
 - safe-flow packet/report and no-write readback
 - final UX/UI quality report and finding ledger
+- W65 parity/cutover handoff with selector, scenario, and evidence refs
 - updated product/story/readiness/operator docs
 - `pnpm slice:gate`
 
 ### Out of scope
 
 - Automatic npm/GitHub release publication.
+- Changing the installed default or removing the W34 renderer; W65 owns both.
 - Hosted web, multi-user collaboration, enterprise identity, or public CORS.
 - Credentialed provider matrix expansion, paid external calls, or real
   upstream-write proof.

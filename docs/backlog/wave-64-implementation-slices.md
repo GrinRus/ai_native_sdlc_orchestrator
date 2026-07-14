@@ -6,9 +6,12 @@ outcomes. It does not reopen the W59 audit closure, add product scope, or
 publish a release as part of backlog maintenance.
 
 Every W64 slice is blocked on W59-S07. After W59 closes, W64 can execute in
-parallel with W60-W63, and its three slices can execute in parallel with one
-another. W60-W63 are not hard dependencies for W64; implementations must
-preserve their contract, runtime, and operator-surface compatibility.
+parallel with W60-W63 and the later W65 cutover, and its three slices can
+execute in parallel with one another. W60-W63/W65 are not hard dependencies for
+W64; implementations must preserve their contract, runtime, and
+operator-surface compatibility. W65 likewise does not depend on W64 and must
+sequence any shared projection change explicitly so W64 remains
+behavior-preserving.
 
 ## Wave objective
 
