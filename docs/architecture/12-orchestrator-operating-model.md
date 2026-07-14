@@ -37,6 +37,12 @@ Quality boundaries are explicit:
 - **Project profile** — persistent project defaults.
 - **Project analysis report** — repeatable onboarding knowledge.
 - **Packet chain** — discovery through release.
+- **Structured task plan** — versioned mission-specific tasks, criteria,
+  dependencies, scope, verification, expected evidence, risks, and stop
+  conditions stored in `wave-ticket` and copied into `handoff-packet`.
+- **Execution plan** — immutable approved task-to-unit mapping.
+- **Task progress report** — evidence-derived task, unit, and attempt state;
+  adapter success alone never means task completion.
 - **Flow projection** — control-plane view over one mission/intake lineage,
   latest next action, run/review/delivery/release/learning evidence, and
   operator-request summaries.
@@ -69,20 +75,29 @@ Quality boundaries are explicit:
 3. optionally launch the local packaged UI with `aor app` for readiness, Mission intake, next-action, and evidence inspection;
 4. materialize the next packet boundary and, for W34 flow-centric surfaces,
    derive the selected flow from runtime/control-plane evidence;
-5. request human approval if the policy requires it;
-6. if the operator asks for analysis, document changes, repair, validation, planning, implementation, or review, persist an `operator-request` with target refs, allowed paths, delivery mode, and source surface before any runtime work starts;
-7. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, and compiled context. Operator-request runs add `packet://operator-request@...` to input packet refs and overlay `context-bundle://context.bundle.operator-intervention@v1`;
-8. execute the step through the selected adapter;
-9. classify the adapter/runtime outcome into stable failure classes;
-10. validate mission semantics, including expected evidence, diff scope, delivery lineage, and release lineage;
-11. decide whether to pass, retry, repair, escalate, block, or fail;
-12. run deterministic verification and eval when the step policy requires it;
-13. persist step decision evidence and update the run-level Runtime Harness report;
-14. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
-15. only if the delivery plan is ready and mission semantics are closed, materialize a delivery manifest;
-16. if the flow reaches release, materialize a release packet;
-17. run review, audit, and learning closure surfaces before declaring the run complete;
-18. if the flow fails materially, open or update an incident path.
+5. for planning, invoke the runner-agnostic planning route and accept a
+   structured candidate without allowing provider output to write runtime
+   artifacts directly;
+6. normalize and deterministically validate the candidate, then materialize
+   plan, wave, handoff, and validation evidence; run the semantic evaluator
+   only after structural pass;
+7. request approval for the exact plan version and digest, then materialize an
+   immutable execution plan;
+8. if the operator asks for analysis, document changes, repair, validation, planning, implementation, or review, persist an `operator-request` with target refs, allowed paths, delivery mode, and source surface before any runtime work starts;
+9. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, compiled context, and optional execution-unit/task refs. Operator-request runs add `packet://operator-request@...` to input packet refs and overlay `context-bundle://context.bundle.operator-intervention@v1`;
+10. execute the step through the selected adapter;
+11. classify the adapter/runtime outcome into stable failure classes;
+12. validate mission semantics, including expected evidence, diff scope, delivery lineage, and release lineage;
+13. decide whether to pass, retry, repair, escalate, block, or fail;
+14. run deterministic verification and eval when the step policy requires it;
+15. project task progress from current-plan criteria, verification, evidence,
+   blocking findings, and attempt refs;
+16. persist step decision evidence and update the run-level Runtime Harness report;
+17. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
+18. only if the delivery plan is ready and mission semantics are closed, materialize a delivery manifest;
+19. if the flow reaches release, materialize a release packet;
+20. run review, audit, and learning closure surfaces before declaring the run complete;
+21. if the flow fails materially, open or update an incident path.
 
 The local app path is an operator surface, not a runtime dependency. It serves `/`, `/app-config.json`, and same-origin `/api/projects/:projectId/**` routes from the CLI-launched process, then invokes the same lifecycle-command handlers as the CLI. Stopping the app server must not stop runs or mutate workflow state beyond the explicit commands the operator submitted.
 

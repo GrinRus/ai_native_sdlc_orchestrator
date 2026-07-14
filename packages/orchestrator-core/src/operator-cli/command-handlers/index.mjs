@@ -2,6 +2,7 @@ import { BOOTSTRAP_COMMAND_GROUP, handleBootstrapCommand } from "./bootstrap.mjs
 import { DELIVERY_COMMAND_GROUP, handleDeliveryCommand } from "./delivery.mjs";
 import { GUIDED_COMMAND_GROUP, handleGuidedCommand } from "./guided.mjs";
 import { OPERATIONS_COMMAND_GROUP, handleOperationsCommand } from "./operations.mjs";
+import { PLAN_COMMAND_GROUP, handlePlanCommand } from "./plan.mjs";
 import { QUALITY_COMMAND_GROUP, handleQualityCommand } from "./quality.mjs";
 import { REQUEST_COMMAND_GROUP, handleRequestCommand } from "./request.mjs";
 import { RUN_CONTROL_COMMAND_GROUP, handleRunControlCommand } from "./run-control.mjs";
@@ -9,6 +10,7 @@ import { RUN_CONTROL_COMMAND_GROUP, handleRunControlCommand } from "./run-contro
 export const COMMAND_HANDLER_GROUPS = Object.freeze([
   GUIDED_COMMAND_GROUP,
   BOOTSTRAP_COMMAND_GROUP,
+  PLAN_COMMAND_GROUP,
   QUALITY_COMMAND_GROUP,
   RUN_CONTROL_COMMAND_GROUP,
   REQUEST_COMMAND_GROUP,
@@ -25,6 +27,7 @@ const COMMAND_TO_GROUP = new Map(
 const GROUP_HANDLERS = new Map([
   ["guided-first-run", handleGuidedCommand],
   ["bootstrap", handleBootstrapCommand],
+  ["structured-plans", handlePlanCommand],
   ["quality", handleQualityCommand],
   ["run-control", handleRunControlCommand],
   ["operator-requests", handleRequestCommand],

@@ -544,7 +544,7 @@ test("resolveNextAction routes ready spec evidence to planning instead of closur
 
     assert.equal(report.status, "ready");
     assert.equal(report.project_state.stage, "planning");
-    assert.equal(report.primary_action.action_id, "handoff-prepare");
+    assert.equal(report.primary_action.action_id, "plan-create");
     assert.equal(report.artifact_readiness.stages.spec.status, "ready");
     assert.equal(report.artifact_readiness.stages.planning.status, "pending");
     assert.equal(report.closure_state.run_id, null);

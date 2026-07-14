@@ -1,0 +1,184 @@
+packet_id: HANDOFF-CHECKOUT-PLAN-001
+project_id: checkout-platform
+ticket_id: WAVE-CHECKOUT-PLAN-001
+version: 1
+status: pending-approval
+risk_tier: medium
+approved_objective: Improve checkout error clarity without changing settlement behavior.
+repo_scopes:
+  - repo_id: main
+    paths:
+      - apps/web/**
+      - packages/payments/**
+allowed_paths:
+  - apps/web/**
+  - packages/payments/**
+allowed_commands:
+  - pnpm test
+task_model_version: 1
+plan_id: checkout-platform.plan.checkout-errors
+plan_version: 1
+plan_status: proposed
+plan_size: medium
+plan_digest: sha256:fixture-checkout-plan-v1
+previous_plan_ref: null
+revision_summary:
+  reason: Initial structured plan.
+  material_change: true
+criteria_catalog:
+  - criterion_id: goal.actionable-errors
+    kind: goal
+    text: Payment failures show an actionable reason.
+    source_ref: packet://intake-request-body@checkout-errors
+  - criterion_id: dod.regression
+    kind: definition-of-done
+    text: Existing checkout and payment regression tests pass.
+    source_ref: packet://intake-request-body@checkout-errors
+local_tasks:
+  - task_id: task.error-contract
+    title: Define actionable checkout error states
+    type: design
+    objective: Define the bounded error-state contract consumed by checkout UI.
+    rationale: UI copy depends on stable payment failure meanings.
+    scope:
+      repo_ids:
+        - main
+      component_ids: []
+      allowed_paths:
+        - packages/payments/**
+      forbidden_paths: []
+    depends_on: []
+    work_items:
+      - Enumerate user-actionable payment failure states.
+    criteria_refs:
+      - goal.actionable-errors
+    verification:
+      command_group_refs:
+        - post-change-test
+      validators:
+        - contract-shape
+      manual_checks: []
+      success_conditions:
+        - Error states remain exhaustive.
+    expected_evidence:
+      - review-report
+    risks:
+      - Existing consumers may depend on generic error values.
+    stop_conditions:
+      - Settlement behavior would need to change.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+  - task_id: task.error-ui
+    title: Render actionable checkout error guidance
+    type: implementation
+    objective: Map approved error states to concise user guidance.
+    rationale: Users need a recovery action without internal provider details.
+    scope:
+      repo_ids:
+        - main
+      component_ids: []
+      allowed_paths:
+        - apps/web/**
+      forbidden_paths: []
+    depends_on:
+      - task.error-contract
+    work_items:
+      - Render guidance for every approved error state.
+    criteria_refs:
+      - goal.actionable-errors
+    verification:
+      command_group_refs:
+        - post-change-test
+      validators:
+        - repo-scope
+      manual_checks:
+        - Inspect accessible announcements.
+      success_conditions:
+        - Every error state has one recovery action.
+    expected_evidence:
+      - review-report
+    risks:
+      - Long guidance can overflow compact layouts.
+    stop_conditions:
+      - Accessible rendering cannot be preserved.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+  - task_id: task.checkout-verification
+    title: Verify checkout behavior and scope
+    type: verification
+    objective: Prove the guidance and unchanged settlement boundary.
+    rationale: Completion requires regression and scope evidence.
+    scope:
+      repo_ids:
+        - main
+      component_ids: []
+      allowed_paths:
+        - apps/web/**
+        - packages/payments/**
+      forbidden_paths: []
+    depends_on:
+      - task.error-contract
+      - task.error-ui
+    work_items:
+      - Run checkout and payment regression checks.
+    criteria_refs:
+      - dod.regression
+    verification:
+      command_group_refs:
+        - post-change-test
+      validators:
+        - evidence-complete
+      manual_checks: []
+      success_conditions:
+        - Required regression checks pass.
+    expected_evidence:
+      - verify-summary
+      - review-report
+    risks:
+      - Pre-existing checkout failures may obscure regressions.
+    stop_conditions:
+      - Required checks cannot run.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+acceptance_criteria:
+  - Payment failures show an actionable reason.
+  - Existing checkout and payment regression tests pass.
+expected_evidence:
+  - verify-summary
+  - review-report
+verification_plan:
+  validators:
+    - contract-shape
+    - repo-scope
+    - evidence-complete
+  command_groups:
+    - id: post-change-test
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - pnpm test
+  commands:
+    - pnpm test
+scope_constraints:
+  require_bounded_scope: true
+  max_repo_scopes: 1
+  max_changed_files: 12
+command_policy:
+  owner: project-profile
+  allow_unlisted_commands: false
+writeback_mode: patch-only
+approval_state:
+  required: true
+  state: pending
+  approval_refs: []
+source_refs:
+  wave_ticket_ref: evidence://artifacts/WAVE-CHECKOUT-PLAN-001.json
+  artifact_packet_ref: evidence://artifacts/checkout-platform.artifact.intake.checkout-errors.v1

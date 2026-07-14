@@ -110,6 +110,9 @@ function buildPrimaryPayload(result) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   executionPlanRef?: string,
+ *   executionUnitId?: string,
+ *   taskRefs?: string[],
  *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
  * }} options

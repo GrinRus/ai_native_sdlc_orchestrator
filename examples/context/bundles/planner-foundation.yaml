@@ -14,6 +14,7 @@ context_doc_refs:
   - context-doc://context.doc.repo-map.core@v1
 context_rule_refs:
   - context-rule://context.rule.public-repo-safety@v1
+  - context-rule://context.rule.structured-task-planning@v1
 context_skill_refs: []
 source_refs:
   - docs/architecture/15-platform-assets-and-prompt-lifecycle.md

@@ -1,0 +1,57 @@
+execution_plan_id: checkout-platform.execution-plan.checkout-errors.v1
+project_id: checkout-platform
+plan_id: checkout-platform.plan.checkout-errors
+plan_version: 1
+plan_ref: evidence://artifacts/WAVE-CHECKOUT-PLAN-001.json
+plan_digest: sha256:fixture-checkout-plan-v1
+status: ready
+execution_units:
+  - unit_id: unit.task-error-contract
+    task_refs:
+      - task.error-contract
+    depends_on: []
+    scope:
+      repo_ids:
+        - main
+      allowed_paths:
+        - packages/payments/**
+    required_evidence:
+      - review-report
+    integration_requirements: []
+    grouping_rationale: null
+    parallel_candidate: false
+  - unit_id: unit.task-error-ui
+    task_refs:
+      - task.error-ui
+    depends_on:
+      - unit.task-error-contract
+    scope:
+      repo_ids:
+        - main
+      allowed_paths:
+        - apps/web/**
+    required_evidence:
+      - review-report
+    integration_requirements: []
+    grouping_rationale: null
+    parallel_candidate: false
+  - unit_id: unit.task-checkout-verification
+    task_refs:
+      - task.checkout-verification
+    depends_on:
+      - unit.task-error-contract
+      - unit.task-error-ui
+    scope:
+      repo_ids:
+        - main
+      allowed_paths:
+        - apps/web/**
+        - packages/payments/**
+    required_evidence:
+      - verify-summary
+      - review-report
+    integration_requirements:
+      - All implementation units are terminal before verification.
+    grouping_rationale: null
+    parallel_candidate: false
+created_at: 2026-07-13T10:00:00.000Z

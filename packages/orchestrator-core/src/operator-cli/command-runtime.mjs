@@ -48,6 +48,17 @@ export {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
 } from "../handoff-packets.mjs";
+export {
+  approveTaskPlan,
+  approveTaskPlanFromHandoff,
+  createTaskPlan,
+  diffTaskPlanRefs,
+  getTaskPlanStatus,
+  materializeTaskProgress,
+  requestTaskPlanRevision,
+  resolveExecutionUnitContext,
+  showTaskPlan,
+} from "../task-plan-service.mjs";
 export { certifyAssetPromotion } from "../certification-decision.mjs";
 export {
   materializeCompilerRevisionStatus,

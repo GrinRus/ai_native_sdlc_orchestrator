@@ -8,6 +8,8 @@ export type ContractFamily =
   | "intake-request-body"
   | "wave-ticket"
   | "handoff-packet"
+  | "execution-plan"
+  | "task-progress-report"
   | "release-packet"
   | "delivery-plan"
   | "delivery-manifest"
@@ -148,6 +150,16 @@ export function validateContractDocument(options: {
   document: unknown;
   source?: string;
 }): ContractValidationResult;
+
+export const STRUCTURED_TASK_MODEL_VERSION: 1;
+export const PLAN_STATUS_VALUES: readonly string[];
+export const PLAN_SIZE_VALUES: readonly string[];
+export const TASK_TYPE_VALUES: readonly string[];
+export const CRITERION_KIND_VALUES: readonly string[];
+export function validateStructuredTaskPlan(
+  document: Record<string, unknown>,
+  source: string,
+): ContractValidationIssue[];
 
 export function loadContractFile(options: LoadContractFileOptions): LoadedContractFile;
 

@@ -37,7 +37,9 @@ import {
   verifyProjectRuntime,
   materializeIntakeArtifactPacket,
   materializeReviewReport,
+  materializeTaskProgress,
   executeRuntimeHarnessRun,
+  resolveExecutionUnitContext,
   submitInteractionAnswer,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
@@ -147,6 +149,8 @@ export function handleRunControlCommand(context) {
         ? runAction === "start"
         : resolveOptionalBooleanFlag("require-validation-pass", flags["require-validation-pass"]);
     const approvedHandoffRef = resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]);
+    const executionPlanRef = resolveOptionalStringFlag("execution-plan-ref", flags["execution-plan-ref"]);
+    const executionUnitId = resolveOptionalStringFlag("execution-unit-id", flags["execution-unit-id"]);
     const promotionEvidenceRefs = resolveOptionalCsvFlag(
       "promotion-evidence-refs",
       flags["promotion-evidence-refs"],
@@ -167,6 +171,12 @@ export function handleRunControlCommand(context) {
     if (runAction !== "start" && approvedHandoffRef) {
       throw new CliUsageError(`Flag '--approved-handoff-ref' is only valid for 'aor run start'.`);
     }
+    if (runAction !== "start" && (executionPlanRef || executionUnitId)) {
+      throw new CliUsageError("Flags '--execution-plan-ref' and '--execution-unit-id' are only valid for 'aor run start'.");
+    }
+    if (runAction === "start" && Boolean(executionPlanRef) !== Boolean(executionUnitId)) {
+      throw new CliUsageError("Flags '--execution-plan-ref' and '--execution-unit-id' must be supplied together.");
+    }
     if (runAction !== "start" && promotionEvidenceRefs.length > 0) {
       throw new CliUsageError(`Flag '--promotion-evidence-refs' is only valid for 'aor run start'.`);
     }
@@ -175,6 +185,21 @@ export function handleRunControlCommand(context) {
     }
     if (runAction !== "start" && flags["policy-overrides"] !== undefined) {
       throw new CliUsageError(`Flag '--policy-overrides' is only valid for 'aor run start'.`);
+    }
+
+    let executionContext = null;
+    if (runAction === "start" && executionPlanRef && executionUnitId) {
+      try {
+        executionContext = resolveExecutionUnitContext({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          executionPlanRef,
+          executionUnitId,
+        });
+      } catch (error) {
+        throw new CliUsageError(errorMessage(error));
+      }
     }
 
     if (runAction === "start" && requireValidationPass) {
@@ -249,6 +274,9 @@ export function handleRunControlCommand(context) {
       targetStep,
       reason,
       approvalRef,
+      executionPlanRef: executionContext?.executionPlanRef,
+      executionUnitId: executionContext?.executionUnitId,
+      taskRefs: executionContext?.taskRefs,
     });
 
     populateRunControlOutputState(outputState, controlResult);
@@ -271,6 +299,11 @@ export function handleRunControlCommand(context) {
           routeOverrides,
           policyOverrides,
           providerStepStatusStateFile: controlResult.stateFile,
+          executionPlanRef: executionContext?.executionPlanRef,
+          executionUnitId: executionContext?.executionUnitId,
+          taskRefs: executionContext?.taskRefs,
+          planDigest: executionContext?.planDigest,
+          taskDigests: executionContext?.taskDigests,
         });
       } catch (error) {
         const message = errorMessage(error);
@@ -386,6 +419,18 @@ export function handleRunControlCommand(context) {
               `review run --run-id ${controlResult.runId}`,
               `audit runs --run-id ${controlResult.runId}`,
             ];
+      if (executionContext) {
+        const progress = materializeTaskProgress({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          planRef: executionContext.planFile,
+        });
+        outputState.executionPlan = progress.executionPlan;
+        outputState.executionPlanFile = progress.executionPlanFile;
+        outputState.taskProgress = progress.taskProgress;
+        outputState.taskProgressFile = progress.taskProgressFile;
+      }
     }
   } else if (command === "run answer") {
     ensureRequiredFlags(command, flags);

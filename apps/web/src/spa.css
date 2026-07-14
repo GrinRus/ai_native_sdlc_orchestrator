@@ -1360,6 +1360,229 @@ p {
   background: #ffffff;
 }
 
+.plan-workbench {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.plan-workbench-header,
+.plan-empty-state,
+.plan-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.plan-workbench-header h2,
+.plan-empty-state h3,
+.plan-task-drawer h2 {
+  margin: 2px 0 4px;
+}
+
+.plan-workbench-header p,
+.plan-empty-state p {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.eyebrow,
+.plan-actions label span,
+.plan-version span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.plan-version {
+  display: grid;
+  min-width: 0;
+  justify-items: end;
+  text-align: right;
+}
+
+.plan-version strong {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-state,
+.plan-read-only-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.plan-state.danger,
+.plan-read-only-note.danger {
+  border-left-color: #b42318;
+  background: #fff3f2;
+  color: #8f1d17;
+}
+
+.plan-actions {
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+}
+
+.plan-actions label {
+  display: grid;
+  flex: 1 1 190px;
+  gap: 5px;
+  min-width: 160px;
+}
+
+.plan-actions input {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.plan-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.plan-tabs button {
+  min-height: var(--control-height);
+  padding: 7px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  font-weight: 800;
+}
+
+.plan-tabs button.active {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-heading);
+}
+
+.plan-table-wrap {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.plan-table-wrap table {
+  min-width: 860px;
+  table-layout: auto;
+}
+
+.plan-table-wrap th,
+.plan-table-wrap td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.plan-task-table td:first-child {
+  min-width: 230px;
+}
+
+.plan-task-table td:first-child code,
+.plan-traceability-table td:first-child span {
+  display: block;
+  margin-top: 5px;
+}
+
+.plan-task-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-weight: 850;
+  text-align: left;
+}
+
+.plan-revision-grid,
+.plan-detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.plan-revision-grid > div,
+.plan-detail-list > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-muted);
+}
+
+.plan-revision-grid dt,
+.plan-detail-list dt {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.plan-revision-grid dd,
+.plan-detail-list dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.plan-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--color-overlay);
+}
+
+.plan-task-drawer {
+  width: min(620px, calc(100vw - 24px));
+  height: 100%;
+  padding: 18px;
+  overflow: auto;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: -18px 0 34px var(--color-shadow-panel);
+}
+
+.plan-task-drawer section {
+  margin-top: 18px;
+}
+
+.plan-task-drawer section h3 {
+  margin-bottom: 6px;
+}
+
+.plan-task-drawer code,
+.plan-table-wrap code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.plan-tabs button:focus-visible,
+.plan-task-link:focus-visible,
+.plan-actions input:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .panel-heading {
   display: flex;
   align-items: flex-start;
@@ -4279,6 +4502,37 @@ code {
 @media (max-width: 860px) {
   :root {
     --control-height: var(--touch-control-height);
+  }
+
+  .plan-workbench-header,
+  .plan-empty-state,
+  .plan-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .plan-version {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .plan-version strong {
+    max-width: 100%;
+  }
+
+  .plan-actions label,
+  .plan-actions button {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .plan-revision-grid,
+  .plan-detail-list {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-task-drawer {
+    width: 100%;
   }
 
   .app-shell {

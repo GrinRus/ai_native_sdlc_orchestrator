@@ -11,9 +11,17 @@ import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from 
 import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
 import { summarizeProjectContext } from "../local-project-registry.mjs";
+import { readFlowProjection } from "../flow-projections.mjs";
+import {
+  approveTaskPlan,
+  createTaskPlan,
+  requestTaskPlanRevision,
+  resolveExecutionUnitContext,
+} from "../../task-plan-service.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
 const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
+const PLAN_ACTIONS = new Set(["create", "request_revision", "approve"]);
 
 /**
  * @param {import("node:http").IncomingMessage} request
@@ -55,6 +63,22 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     return;
   }
 
+  const executionPlanRef = asString(payload.execution_plan_ref);
+  const executionUnitId = asString(payload.execution_unit_id);
+  if (Boolean(executionPlanRef) !== Boolean(executionUnitId) || (action !== "start" && (executionPlanRef || executionUnitId))) {
+    sendError(response, 400, "invalid_execution_unit_context", "execution_plan_ref and execution_unit_id are a paired input valid only for run start.");
+    return;
+  }
+  let executionContext = null;
+  if (executionPlanRef && executionUnitId) {
+    try {
+      executionContext = resolveExecutionUnitContext({ ...runtimeOptions, executionPlanRef, executionUnitId });
+    } catch (error) {
+      sendError(response, 409, typeof error?.code === "string" ? error.code : "execution-unit-invalid", error instanceof Error ? error.message : "Execution unit context is invalid.");
+      return;
+    }
+  }
+
   const result = applyRunControlAction({
     ...runtimeOptions,
     action: /** @type {"start" | "pause" | "resume" | "steer" | "cancel"} */ (action),
@@ -62,6 +86,9 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     targetStep: asString(payload.target_step) ?? undefined,
     reason: asString(payload.reason) ?? undefined,
     approvalRef: asString(payload.approval_ref) ?? undefined,
+    executionPlanRef: executionContext?.executionPlanRef,
+    executionUnitId: executionContext?.executionUnitId,
+    taskRefs: executionContext?.taskRefs,
   });
   const runControlPayload = toRunControlResponse(result);
 
@@ -115,6 +142,91 @@ export async function handleUiLifecycleAction({ request, response, runtimeOption
   sendJson(response, 200, {
     ui_lifecycle: toUiLifecycleResponse(result),
   });
+}
+
+/**
+ * @param {{
+ *   request: import("node:http").IncomingMessage,
+ *   response: import("node:http").ServerResponse,
+ *   params: Record<string, string>,
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
+ * }} options
+ */
+export async function handleFlowPlanAction({ request, response, params, runtimeOptions }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+
+  const action = asString(payload.action);
+  if (!action || !PLAN_ACTIONS.has(action)) {
+    sendError(response, 400, "invalid_plan_action", `Unsupported plan action '${action ?? "missing"}'.`);
+    return;
+  }
+  const flow = readFlowProjection({ ...runtimeOptions, flowId: params.flowId });
+  if (!flow) {
+    sendError(response, 404, "flow.not_found", `Flow '${params.flowId}' was not found.`);
+    return;
+  }
+
+  try {
+    if (action === "create") {
+      const result = createTaskPlan({
+        ...runtimeOptions,
+        flowId: params.flowId,
+        approvedArtifactPath: asString(flow.intake_packet_ref) ?? undefined,
+      });
+      sendJson(response, 202, {
+        flow_id: params.flowId,
+        planning_run_ref: result.planningRunRef,
+        plan_ref: result.planRef,
+        plan_status: result.plan.plan_status,
+        validation_report_ref: result.plan.source_refs?.validation_report_ref ?? null,
+        evaluation_report_ref: result.plan.source_refs?.evaluation_report_ref ?? null,
+        semantic_evaluation: result.plan.semantic_evaluation ?? null,
+      });
+      return;
+    }
+    if (action === "request_revision") {
+      const result = requestTaskPlanRevision({
+        ...runtimeOptions,
+        flowId: params.flowId,
+        planRef: asString(payload.plan_ref) ?? undefined,
+        reason: asString(payload.reason) ?? "",
+      });
+      sendJson(response, 202, {
+        flow_id: params.flowId,
+        planning_run_ref: result.planningRunRef,
+        plan_ref: result.planRef,
+        plan_status: result.plan.plan_status,
+        revision_request: result.revisionRequest,
+      });
+      return;
+    }
+    const result = approveTaskPlan({
+      ...runtimeOptions,
+      flowId: params.flowId,
+      planRef: asString(payload.plan_ref) ?? undefined,
+      approvalRef: asString(payload.approval_ref) ?? "",
+    });
+    sendJson(response, 200, {
+      flow_id: params.flowId,
+      plan_ref: result.planRef,
+      plan_status: result.plan.plan_status,
+      execution_plan: result.executionPlan,
+      task_progress: result.taskProgress,
+    });
+  } catch (error) {
+    const code = typeof error?.code === "string" ? error.code : "plan-action-failed";
+    const conflicts = new Set([
+      "structured-plan-required",
+      "plan-incomplete",
+      "plan-stale",
+      "plan-immutable",
+      "plan-unapproved",
+      "plan-flow-mismatch",
+      "planning-route-failed",
+    ]);
+    sendError(response, conflicts.has(code) ? 409 : 400, code, error instanceof Error ? error.message : String(error));
+  }
 }
 
 /**

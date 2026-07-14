@@ -22,7 +22,8 @@ import {
   loadContractFile,
   validateContractDocument,
   approveHandoffArtifacts,
-  prepareHandoffArtifacts,
+  approveTaskPlanFromHandoff,
+  showTaskPlan,
   certifyAssetPromotion,
   runDeliveryDriver,
   materializeDeliveryPlan,
@@ -458,47 +459,53 @@ export function handleBootstrapCommand(context) {
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);
 
-    const prepareResult = prepareHandoffArtifacts({
+    const prepareResult = showTaskPlan({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
-      approvedArtifactPath: resolveOptionalStringFlag("approved-artifact", flags["approved-artifact"]),
     });
+    if (["revision-required", "revision-requested"].includes(String(prepareResult.plan.plan_status)) || !prepareResult.handoffPacket) {
+      const error = new Error("A deterministically valid structured plan is required before preparing a handoff.");
+      error.code = "structured-plan-required";
+      throw error;
+    }
 
     outputState.resolvedProjectRef = prepareResult.projectRoot;
     outputState.resolvedRuntimeRoot = prepareResult.runtimeRoot;
     outputState.runtimeLayout = prepareResult.runtimeLayout;
     outputState.runtimeStateFile = prepareResult.stateFile;
     outputState.projectProfileRef = prepareResult.projectProfileRef;
-    outputState.waveTicketId = prepareResult.waveTicket.ticket_id;
-    outputState.waveTicketFile = prepareResult.waveTicketFile;
+    outputState.waveTicketId = prepareResult.plan.ticket_id;
+    outputState.waveTicketFile = prepareResult.planFile;
     outputState.handoffPacketId = prepareResult.handoffPacket.packet_id;
-    outputState.handoffPacketFile = prepareResult.handoffPacketFile;
+    outputState.handoffPacketFile = prepareResult.handoffFile;
     outputState.handoffStatus = prepareResult.handoffPacket.status;
     outputState.handoffApprovalState = prepareResult.handoffPacket.approval_state;
   } else if (command === "wave create") {
     ensureRequiredFlags(command, flags);
 
-    const waveResult = prepareHandoffArtifacts({
+    const waveResult = showTaskPlan({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
-      approvedArtifactPath: resolveOptionalStringFlag("approved-artifact", flags["approved-artifact"]),
     });
+    if (["revision-required", "revision-requested"].includes(String(waveResult.plan.plan_status)) || !waveResult.handoffPacket) {
+      const error = new Error("A deterministically valid structured plan is required before creating a wave.");
+      error.code = "structured-plan-required";
+      throw error;
+    }
 
     outputState.resolvedProjectRef = waveResult.projectRoot;
     outputState.resolvedRuntimeRoot = waveResult.runtimeRoot;
     outputState.runtimeLayout = waveResult.runtimeLayout;
     outputState.runtimeStateFile = waveResult.stateFile;
     outputState.projectProfileRef = waveResult.projectProfileRef;
-    outputState.waveTicketId = waveResult.waveTicket.ticket_id;
-    outputState.waveTicketFile = waveResult.waveTicketFile;
+    outputState.waveTicketId = waveResult.plan.ticket_id;
+    outputState.waveTicketFile = waveResult.planFile;
     outputState.handoffPacketId = waveResult.handoffPacket.packet_id;
-    outputState.handoffPacketFile = waveResult.handoffPacketFile;
+    outputState.handoffPacketFile = waveResult.handoffFile;
     outputState.handoffStatus = waveResult.handoffPacket.status;
     outputState.handoffApprovalState = waveResult.handoffPacket.approval_state;
   } else if (command === "handoff approve") {
@@ -508,23 +515,29 @@ export function handleBootstrapCommand(context) {
       throw new CliUsageError("Missing required flag '--approval-ref' for 'aor handoff approve'.");
     }
 
-    const approveResult = approveHandoffArtifacts({
+    const approvalOptions = {
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       handoffPacketPath: resolveOptionalStringFlag("handoff-packet", flags["handoff-packet"]),
       approvalRef,
-    });
+    };
+    const approveResult = approveTaskPlanFromHandoff(approvalOptions) ?? approveHandoffArtifacts(approvalOptions);
+    const approvedHandoff = approveResult.handoffPacket ?? approveResult.handoff;
 
     outputState.resolvedProjectRef = approveResult.projectRoot;
     outputState.resolvedRuntimeRoot = approveResult.runtimeRoot;
     outputState.runtimeLayout = approveResult.runtimeLayout;
     outputState.runtimeStateFile = approveResult.stateFile;
     outputState.projectProfileRef = approveResult.projectProfileRef;
-    outputState.handoffPacketId = approveResult.handoffPacket.packet_id;
-    outputState.handoffPacketFile = approveResult.handoffPacketFile;
-    outputState.handoffStatus = approveResult.handoffPacket.status;
-    outputState.handoffApprovalState = approveResult.handoffPacket.approval_state;
+    outputState.handoffPacketId = approvedHandoff.packet_id;
+    outputState.handoffPacketFile = approveResult.handoffPacketFile ?? approveResult.handoffFile;
+    outputState.handoffStatus = approvedHandoff.status;
+    outputState.handoffApprovalState = approvedHandoff.approval_state;
+    outputState.executionPlan = approveResult.executionPlan ?? null;
+    outputState.executionPlanFile = approveResult.executionPlanFile ?? null;
+    outputState.taskProgress = approveResult.taskProgress ?? null;
+    outputState.taskProgressFile = approveResult.taskProgressFile ?? null;
 
   } else {
     return false;

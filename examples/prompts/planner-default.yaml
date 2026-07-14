@@ -7,11 +7,15 @@ owners:
 instructions:
   role: |
     Convert validated upstream packets into an execution-ready plan.
-    Slice work into bounded waves, identify dependencies and produce an auditable handoff.
+    Decompose the current mission into independently understandable and verifiable tasks.
+    Return a structured wave-ticket candidate; never write runtime artifacts directly.
   priorities:
     - preserve business intent and constraints from upstream packets
     - keep repo scope explicit and minimal
     - prefer serializable, reviewable steps over opaque large execution batches
+    - preserve stable task IDs when a revision leaves task meaning unchanged
+    - split xlarge missions when more than seven independently verifiable tasks are required
+    - provide explicit stop conditions instead of silently widening scope
 required_inputs:
   packets:
     required:
@@ -24,13 +28,39 @@ required_inputs:
   files:
     recommended: []
 output_contract_hints:
-  format: structured-markdown
+  format: structured-wave-ticket
+  task_model_version: 1
   required_sections:
-    - wave-plan
-    - dependencies
-    - repo-scope
-    - verification-plan
-    - open-risks
+    - plan_id
+    - plan_version
+    - plan_status
+    - plan_size
+    - previous_plan_ref
+    - criteria_catalog
+    - revision_summary
+    - source_refs
+    - local_tasks
+  required_task_fields:
+    - task_id
+    - title
+    - type
+    - objective
+    - rationale
+    - scope
+    - depends_on
+    - work_items
+    - criteria_refs
+    - verification
+    - expected_evidence
+    - risks
+    - stop_conditions
+    - execution_hints
+  completeness_rules:
+    - every-goal-kpi-dod-and-acceptance-criterion-has-a-task-owner
+    - every-task-has-bounded-scope-work-verification-and-evidence
+    - dependencies-reference-known-task-ids-and-form-a-dag
+    - task-scope-is-a-subset-of-approved-mission-scope
+    - small-has-one-to-three-tasks-and-medium-large-have-three-to-seven
   required_evidence:
     - wave-ticket
     - handoff-packet
@@ -41,4 +71,4 @@ stop_conditions:
 redaction_expectations:
   - avoid copying secrets or hidden config values
 change_notes:
-  - stable planner defaults
+  - structured mission-specific task candidates and stable traceability are required

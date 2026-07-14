@@ -1,0 +1,24 @@
+context_rule_id: context.rule.structured-task-planning
+version: 1
+title: Structured task planning boundary
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - planner
+    - task-model
+applies_to:
+  steps:
+    - planning
+instruction: >-
+  Collect approved intake, discovery, specification, project analysis, mission scope,
+  and verification commands. Return a wave-ticket candidate using task_model_version 1,
+  with stable acyclic task IDs, task scope bounded by the approved mission, and every
+  criterion and required evidence type owned by at least one task. Use one to three
+  tasks for small plans and three to seven for medium or large plans. Stop with
+  mission-split-required when an xlarge mission cannot fit in seven independently
+  verifiable tasks. Do not write wave, handoff, validation, or execution artifacts.
+source_refs:
+  - docs/contracts/wave-ticket.md
+  - docs/contracts/handoff-packet.md
+  - docs/contracts/execution-plan.md

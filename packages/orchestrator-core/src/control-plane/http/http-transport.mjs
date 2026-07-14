@@ -5,6 +5,7 @@ import path from "node:path";
 import { authorizeRequest, normalizeAuthPolicy, sendAuthError } from "./http-auth.mjs";
 import {
   handleInteractionAnswer,
+  handleFlowPlanAction,
   handleLifecycleCommandAction,
   handleOperatorRequestAction,
   handleOperatorRequestCreate,
@@ -173,6 +174,11 @@ export function createControlPlaneHttpServer(options) {
 
       if (route.id === "run-control-actions") {
         await handleRunControlAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
+        return;
+      }
+
+      if (route.id === "flow-plan-actions") {
+        await handleFlowPlanAction({ request, response, params, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
 

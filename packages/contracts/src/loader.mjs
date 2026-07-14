@@ -5,6 +5,7 @@ import { parse as parseYaml } from "yaml";
 import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES } from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
+import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
 
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
@@ -66,6 +67,18 @@ const ARTIFACT_READINESS_STATUS_VALUES = [
   "stale",
 ];
 const ARTIFACT_READINESS_STAGE_KEYS = ["mission", "discovery", "research", "spec", "planning"];
+const EXECUTION_PLAN_STATUS_VALUES = ["ready", "blocked", "superseded", "complete"];
+const TASK_PROGRESS_OVERALL_STATUS_VALUES = ["planned", "in-progress", "blocked", "failed", "stale", "complete"];
+const TASK_PROGRESS_STATUS_VALUES = [
+  "planned",
+  "ready",
+  "blocked",
+  "in-progress",
+  "verification-pending",
+  "failed",
+  "stale",
+  "complete",
+];
 const privateCommandGroupField = (...parts) => parts.join("_");
 const PRIVATE_PROOF_HARNESS_COMMAND_GROUP_FIELDS = [
   privateCommandGroupField("live", "e2e", "profile"),
@@ -234,6 +247,14 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "handoff-packet") {
     issues.push(...validateHandoffPacket(document, source));
+  }
+
+  if (family === "execution-plan") {
+    issues.push(...validateExecutionPlan(document, source));
+  }
+
+  if (family === "task-progress-report") {
+    issues.push(...validateTaskProgressReport(document, source));
   }
 
   if (family === "compiled-context-artifact") {
@@ -525,6 +546,7 @@ function validateWaveTicket(document, source) {
   if (verificationPlan) {
     validateVerificationCommandGroups(verificationPlan, source, "verification_plan.command_groups", issues, false);
   }
+  issues.push(...validateStructuredTaskPlan(document, source));
   return issues;
 }
 
@@ -545,6 +567,68 @@ function validateHandoffPacket(document, source) {
   if (verificationPlan) {
     validateVerificationCommandGroups(verificationPlan, source, "verification_plan.command_groups", issues, false);
   }
+  issues.push(...validateStructuredTaskPlan(document, source));
+  return issues;
+}
+
+function validateExecutionPlan(document, source) {
+  const issues = [];
+  if (!EXECUTION_PLAN_STATUS_VALUES.includes(document.status)) return issues;
+  const units = Array.isArray(document.execution_units) ? document.execution_units : [];
+  const unitIds = new Set();
+  units.forEach((unit, index) => {
+    const field = `execution_units[${index}]`;
+    if (!isPlainObject(unit)) return;
+    validateNestedStringField({ record: unit, source, field: `${field}.unit_id`, issues, required: true });
+    validateNestedArrayField({ record: unit, source, field: `${field}.task_refs`, issues, required: true });
+    validateNestedArrayField({ record: unit, source, field: `${field}.depends_on`, issues, required: true });
+    if (!isPlainObject(unit.scope)) {
+      issues.push(issue({ code: "field_type_mismatch", source, field: `${field}.scope`, expected: "object", actual: describeActualType(unit.scope), message: `Field '${field}.scope' must be an object.` }));
+    }
+    validateNestedArrayField({ record: unit, source, field: `${field}.required_evidence`, issues, required: true });
+    validateNestedArrayField({ record: unit, source, field: `${field}.integration_requirements`, issues, required: true });
+    if (typeof unit.parallel_candidate !== "boolean") {
+      issues.push(issue({ code: "field_type_mismatch", source, field: `${field}.parallel_candidate`, expected: "boolean", actual: describeActualType(unit.parallel_candidate), message: `Field '${field}.parallel_candidate' must be boolean.` }));
+    }
+    if (typeof unit.unit_id === "string") {
+      if (unitIds.has(unit.unit_id)) {
+        issues.push(issue({ code: "enum_value_invalid", source, field: `${field}.unit_id`, expected: "unique unit id", actual: unit.unit_id, message: `Duplicate execution unit id '${unit.unit_id}'.` }));
+      }
+      unitIds.add(unit.unit_id);
+    }
+  });
+  for (const [index, unit] of units.entries()) {
+    if (!isPlainObject(unit)) continue;
+    for (const dependency of Array.isArray(unit.depends_on) ? unit.depends_on : []) {
+      if (typeof dependency === "string" && !unitIds.has(dependency)) {
+        issues.push(issue({ code: "enum_value_invalid", source, field: `execution_units[${index}].depends_on`, expected: "known unit id", actual: dependency, message: `Execution unit depends on unknown unit '${dependency}'.` }));
+      }
+    }
+  }
+  return issues;
+}
+
+function validateTaskProgressReport(document, source) {
+  const issues = [];
+  if (!TASK_PROGRESS_OVERALL_STATUS_VALUES.includes(document.overall_status)) return issues;
+  const tasks = Array.isArray(document.tasks) ? document.tasks : [];
+  const taskIds = new Set();
+  tasks.forEach((task, index) => {
+    const field = `tasks[${index}]`;
+    if (!isPlainObject(task)) return;
+    validateNestedStringField({ record: task, source, field: `${field}.task_id`, issues, required: true });
+    validateNestedStringField({ record: task, source, field: `${field}.task_digest`, issues, required: true });
+    validateNestedEnumStringField({ record: task, source, field: `${field}.status`, allowedValues: TASK_PROGRESS_STATUS_VALUES, issues, required: true });
+    for (const arrayField of ["execution_unit_refs", "attempt_refs", "evidence_refs", "blocking_findings"]) {
+      validateNestedArrayField({ record: task, source, field: `${field}.${arrayField}`, issues, required: true });
+    }
+    if (typeof task.task_id === "string") {
+      if (taskIds.has(task.task_id)) {
+        issues.push(issue({ code: "enum_value_invalid", source, field: `${field}.task_id`, expected: "unique task id", actual: task.task_id, message: `Duplicate task progress id '${task.task_id}'.` }));
+      }
+      taskIds.add(task.task_id);
+    }
+  });
   return issues;
 }
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import { PlanWorkbench } from "./plan-workbench.jsx";
 import "./spa.css";
 
 const STAGES = [
@@ -788,7 +789,10 @@ async function readJson(url, options = {}) {
   const payload = raw.trim().length > 0 ? JSON.parse(raw) : {};
   if (!response.ok) {
     const message = payload?.error?.message ?? response.statusText;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.code = payload?.error?.code ?? "request_failed";
+    throw error;
   }
   return payload;
 }
@@ -6202,6 +6206,13 @@ function App() {
   const [draftFollowUpHandoffRef, setDraftFollowUpHandoffRef] = useState(null);
   const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
   const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null);
+  const [planWorkbenchState, setPlanWorkbenchState] = useState({
+    scopeKey: "none",
+    status: "idle",
+    plan: null,
+    progress: null,
+    error: "",
+  });
   const [packets, setPackets] = useState([]);
   const [stepResults, setStepResults] = useState([]);
   const [runs, setRuns] = useState([]);
@@ -6433,15 +6444,37 @@ function App() {
     if (!flow?.flow_id) {
       setFlowEvidenceGraph(null);
       setFlowRuntimeTrace(null);
+      setPlanWorkbenchState({ scopeKey: `${base}:none`, status: "idle", plan: null, progress: null, error: "" });
       return;
     }
     const encodedFlowId = encodeURIComponent(flow.flow_id);
-    const [graph, trace] = await Promise.all([
+    const scopeKey = `${base}:${flow.flow_id}`;
+    setPlanWorkbenchState({ scopeKey, status: "loading", plan: null, progress: null, error: "" });
+    const [graph, trace, planResult] = await Promise.all([
       readJson(`${base}/flows/${encodedFlowId}/evidence-graph`).catch(() => null),
       readJson(`${base}/flows/${encodedFlowId}/runtime-trace`).catch(() => null),
+      Promise.all([
+        readJson(`${base}/flows/${encodedFlowId}/plan`),
+        readJson(`${base}/flows/${encodedFlowId}/plan/progress`).catch((error) => {
+          if (error.status === 404) return null;
+          throw error;
+        }),
+      ]).then(([plan, progress]) => ({ status: "ready", plan, progress })).catch((error) => ({
+        status: error.status === 404 && error.code === "structured-plan-required"
+          ? "empty"
+          : [401, 403].includes(error.status)
+            ? "permission"
+            : "error",
+        plan: null,
+        progress: null,
+        error: error instanceof Error ? error.message : String(error),
+      })),
     ]);
     setFlowEvidenceGraph(graph);
     setFlowRuntimeTrace(trace);
+    setPlanWorkbenchState((current) => current.scopeKey === scopeKey
+      ? { scopeKey, ...planResult }
+      : current);
   }
 
   async function refresh(options = {}) {
@@ -6512,6 +6545,7 @@ function App() {
       setOperatorRequests([]);
       setFlowEvidenceGraph(null);
       setFlowRuntimeTrace(null);
+      setPlanWorkbenchState({ scopeKey: `${effectiveProjectId ?? "project"}:none`, status: "idle", plan: null, progress: null, error: "" });
       if (selectionStillCurrent && !didChooseStage.current) {
         setSelectedStage("readiness");
         didAutoSelectStage.current = true;
@@ -6643,6 +6677,7 @@ function App() {
     setDraftFollowUpHandoffRef(null);
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null);
+    setPlanWorkbenchState({ scopeKey: "none", status: "idle", plan: null, progress: null, error: "" });
     setPackets([]);
     setStepResults([]);
     setRuns([]);
@@ -6762,6 +6797,7 @@ function App() {
     setDraftFollowUpHandoffRef(sourceHandoffRef);
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null);
+    setPlanWorkbenchState({ scopeKey: `${apiProjectBase ?? "project"}:draft`, status: "idle", plan: null, progress: null, error: "" });
     setSelectedStage("mission");
     setForm(sourceFlow && (followUp || duplicate) ? formFromFlowSettings(sourceFlow, { followUp }) : SAFE_TEMPLATE);
     setRequestDrawerOpen(false);
@@ -6818,6 +6854,7 @@ function App() {
     setSelectedFlowId(flow?.flow_id ?? null);
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null);
+    setPlanWorkbenchState({ scopeKey: `${apiProjectBase ?? "project"}:${flow?.flow_id ?? "none"}`, status: flow ? "loading" : "idle", plan: null, progress: null, error: "" });
     setSelectedStage(flowStageId(flow, nextAction, projectState));
     if (apiProjectBase) {
       loadFlowWorkbench(apiProjectBase, flow).catch((err) => setError(err instanceof Error ? err.message : String(err)));
@@ -6921,6 +6958,35 @@ function App() {
     });
     pushActivity(`lifecycle.${command}`, payload.lifecycle_command?.blocked ? "blocked" : "accepted");
     return payload;
+  }
+
+  async function runPlanAction(action, payload = {}) {
+    if (!apiProjectBase || !selectedFlow?.flow_id || busy) return;
+    const scopeKey = `${apiProjectBase}:${selectedFlow.flow_id}`;
+    setBusy(true);
+    setError("");
+    setPlanWorkbenchState((current) => ({ ...current, scopeKey, status: "loading", error: "" }));
+    try {
+      await readJson(`${apiProjectBase}/flows/${encodeURIComponent(selectedFlow.flow_id)}/plan/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      pushActivity(`plan.${action}`, selectedFlow.flow_id);
+      await loadFlowWorkbench(apiProjectBase, selectedFlow);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPlanWorkbenchState((current) => current.scopeKey === scopeKey
+        ? {
+            ...current,
+            status: [401, 403].includes(err?.status) ? "permission" : "error",
+            error: message,
+          }
+        : current);
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function initializeProject() {
@@ -7288,6 +7354,7 @@ function App() {
             />
           </section>
         ) : (
+          <>
           <FlowCockpit
             flow={selectedFlow}
             stage={activeStage}
@@ -7311,6 +7378,10 @@ function App() {
             evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}
             repairCompletion={qualityRepairCompletion}
           />
+          {selectedStage === "discovery" && selectedFlow ? (
+            <PlanWorkbench state={planWorkbenchState} busy={busy} onAction={runPlanAction} />
+          ) : null}
+          </>
         )}
       </main>
 

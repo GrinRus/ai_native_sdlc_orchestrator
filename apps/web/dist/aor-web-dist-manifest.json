@@ -1,16 +1,17 @@
 {
   "manifest_version": 1,
-  "source_hash": "24cfb3a1dfd206dfb26eb123f0760a67eb76a9fd9af294922c7da0b0eabdb015",
+  "source_hash": "0cf1b0c1f3ca457fe6ea9e790eed893b8d57025b1c50cf6e440326786ce79e31",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
+    "apps/web/src/plan-workbench.jsx",
     "apps/web/src/spa.css",
     "apps/web/src/spa.jsx",
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-CSvL1RK1.css",
-    "apps/web/dist/assets/index-C_kZCy0H.js",
+    "apps/web/dist/assets/index-DPKvTwZn.js",
+    "apps/web/dist/assets/index-bLwKmRV9.css",
     "apps/web/dist/index.html"
   ]
 }

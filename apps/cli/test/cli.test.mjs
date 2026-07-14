@@ -1376,6 +1376,8 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(specStepResult.routed_execution.discovery_research_gate.status, "incomplete");
     assert.equal(specStepResult.routed_execution.architecture_traceability.selected_step.step_class, "spec");
 
+    const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
+    assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
     assert.equal(waveResult.exitCode, 0, waveResult.stderr);
     const wavePayload = JSON.parse(waveResult.stdout);
@@ -3372,6 +3374,8 @@ test("operator commands inspect runs, packets, and evidence through shared contr
     assert.equal(compactRunStatusPayload.run_event_history.total_events, 2);
     assert.equal(Object.prototype.hasOwnProperty.call(compactRunStatusPayload, "validation_report_id"), false);
 
+    const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
+    assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
     assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
 
@@ -4777,6 +4781,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
       assert.equal(specResult.exitCode, 0, specResult.stderr);
 
+      const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
+      assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
       const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
       assert.equal(waveResult.exitCode, 0, waveResult.stderr);
       const wavePayload = JSON.parse(waveResult.stdout);
@@ -5226,6 +5232,8 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
       );
       assert.equal(invokeCli(["spec", "build", "--project-ref", projectRoot]).exitCode, 0);
 
+      const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
+      assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
       const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
       assert.equal(waveResult.exitCode, 0, waveResult.stderr);
       const wavePayload = JSON.parse(waveResult.stdout);
@@ -5552,11 +5560,17 @@ test("project validate writes validation report with deterministic status", () =
   });
 });
 
-test("handoff prepare materializes wave-ticket and pending handoff packet", () => {
+test("handoff prepare reuses the latest validated structured plan", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
 
+    const missingPlan = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
+    assert.equal(missingPlan.exitCode, 1);
+    assert.match(missingPlan.stderr, /aor plan create/u);
+
+    const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
+    assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const result = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
     assert.equal(result.exitCode, 0, result.stderr);
 
@@ -5580,6 +5594,8 @@ test("project validate enforces approved handoff gate when required", () => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
 
+    const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
+    assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
     assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
     const prepared = JSON.parse(prepareResult.stdout);

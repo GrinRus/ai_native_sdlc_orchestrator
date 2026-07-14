@@ -364,6 +364,9 @@ function resolveNextActions(action, state) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   executionPlanRef?: string,
+ *   executionUnitId?: string,
+ *   taskRefs?: string[],
  *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
  * }} options
@@ -386,6 +389,9 @@ export function applyRunControlAction(options) {
   const reason = asString(options.reason);
   const targetStep = asString(options.targetStep);
   const approvalRef = asString(options.approvalRef);
+  const executionPlanRef = asString(options.executionPlanRef);
+  const executionUnitId = asString(options.executionUnitId);
+  const taskRefs = asStringArray(options.taskRefs);
   const init = initializeProjectRuntime({
     cwd,
     projectRef: options.projectRef,
@@ -433,6 +439,9 @@ export function applyRunControlAction(options) {
     requested_scope: {
       target_step: targetStep,
       reason,
+      execution_plan_ref: executionPlanRef,
+      execution_unit_id: executionUnitId,
+      task_refs: taskRefs,
     },
     transition: {
       from_status: normalizeStatus(asString(stateBefore?.status)),
@@ -505,6 +514,9 @@ export function applyRunControlAction(options) {
       approval_refs: approvalRefs,
       audit_refs: auditRefs,
       provider_step_status: providerStepStatus,
+      execution_plan_ref: executionPlanRef ?? asString(stateBefore?.execution_plan_ref),
+      execution_unit_id: executionUnitId ?? asString(stateBefore?.execution_unit_id),
+      task_refs: taskRefs.length > 0 ? taskRefs : asStringArray(stateBefore?.task_refs),
       evidence_root: init.runtimeLayout.reportsRoot,
     };
 
