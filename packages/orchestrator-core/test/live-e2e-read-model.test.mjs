@@ -8,7 +8,7 @@ import { readProjectState, listRuns } from "../src/control-plane/read-surface.mj
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 test("control-plane read model projects sibling live E2E run-health for target checkouts", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-read-model-"));
+  const tempRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-read-model-")));
   try {
     const runId = "live-e2e.test.run";
     const liveProjectRoot = path.join(tempRoot, "runtime", "projects", "aor-core");
@@ -264,7 +264,7 @@ test("control-plane read model projects sibling live E2E run-health for target c
 });
 
 test("control-plane read model keeps materialized continue decisions visible", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-continue-decision-"));
+  const tempRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-continue-decision-")));
   try {
     const runId = "live-e2e.test.continue";
     const liveProjectRoot = path.join(tempRoot, "runtime", "projects", "aor-core");

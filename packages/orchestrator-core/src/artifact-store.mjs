@@ -313,6 +313,9 @@ function buildProductIntake(options) {
  *    reportsRoot: string,
  *    stateRoot: string,
  *  },
+ *  outputRuntimeLayout?: {
+ *    artifactsRoot: string,
+ *  },
  *  command: string,
  * }} options
  */
@@ -321,6 +324,9 @@ export function materializeBootstrapArtifactPacket(options) {
   const packetId = buildPacketId([options.projectId, "artifact", "bootstrap", "v1"]);
   const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
   const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
+  const outputArtifactsRoot = options.outputRuntimeLayout?.artifactsRoot ?? options.runtimeLayout.artifactsRoot;
+  const outputPacketFile = path.join(outputArtifactsRoot, `${packetId}.json`);
+  const outputPacketBodyFile = path.join(outputArtifactsRoot, `${packetId}.body.json`);
 
   const packetBody = {
     generated_from: {
@@ -337,7 +343,7 @@ export function materializeBootstrapArtifactPacket(options) {
     },
   };
 
-  fs.writeFileSync(packetBodyFile, `${JSON.stringify(packetBody, null, 2)}\n`, "utf8");
+  fs.writeFileSync(outputPacketBodyFile, `${JSON.stringify(packetBody, null, 2)}\n`, "utf8");
 
   const packet = {
     packet_id: packetId,
@@ -366,7 +372,7 @@ export function materializeBootstrapArtifactPacket(options) {
     throw new Error(`Generated artifact packet failed contract validation: ${issueSummary}`);
   }
 
-  fs.writeFileSync(packetFile, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
+  fs.writeFileSync(outputPacketFile, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
 
   return {
     packet,

@@ -252,7 +252,7 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
 
     const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
     assert.equal(projectState.project_id, init.projectId);
-    assert.equal(projectState.project_root, repoRoot);
+    assert.equal(projectState.project_root, fs.realpathSync.native(repoRoot));
 
     const packets = listPacketArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(packets.some((packet) => packet.family === "artifact-packet"));

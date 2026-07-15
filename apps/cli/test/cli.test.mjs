@@ -21,7 +21,7 @@ const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../../..");
  * @param {(projectRoot: string) => void} callback
  */
 function withTempProject(callback) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-cli-w1-s01-"));
+  const tempRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-cli-w1-s01-")));
   try {
     callback(tempRoot);
   } finally {
@@ -845,7 +845,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(fs.existsSync(nextPayload.next_action_report_file), true);
     assert.ok(nextPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
 
-    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const customRuntimeRoot = path.join(fs.realpathSync.native(projectRoot), "custom-aor-runtime");
     const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
     const customDoctorHuman = invokeCli(["doctor", "--project-ref", projectRoot, "--runtime-root", customRuntimeRoot]);
     assert.equal(customDoctorHuman.exitCode, 0, customDoctorHuman.stderr);
@@ -890,7 +890,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     ]);
     assert.equal(customNextJson.exitCode, 0, customNextJson.stderr);
     const customNextPayload = JSON.parse(customNextJson.stdout);
-    assert.equal(customNextPayload.resolved_runtime_root, customRuntimeRoot);
+    assert.equal(customNextPayload.resolved_runtime_root, fs.realpathSync.native(customRuntimeRoot));
     assert.ok(customNextPayload.next_action_primary.command.includes(runtimeRootFlag));
     assert.ok(customNextPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
 
@@ -1081,7 +1081,7 @@ test("guided mission create writes intake evidence and next resolves mission sta
 
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
-    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const customRuntimeRoot = path.join(fs.realpathSync.native(projectRoot), "custom-aor-runtime");
     const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
     const incompleteMission = invokeCli([
       "mission",
@@ -1104,7 +1104,7 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.equal(incompleteMission.exitCode, 0, incompleteMission.stderr);
     const incompletePayload = JSON.parse(incompleteMission.stdout);
     assert.equal(incompletePayload.guided_status, "blocked");
-    assert.equal(incompletePayload.resolved_runtime_root, customRuntimeRoot);
+    assert.equal(incompletePayload.resolved_runtime_root, fs.realpathSync.native(customRuntimeRoot));
     assert.deepEqual(incompletePayload.product_intake_completeness.missing_fields, [
       "kpis",
       "definition_of_done",
@@ -2755,7 +2755,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         status: "pass",
       },
     });
-    const promotionDecisionRef = `evidence://${path.relative(projectRoot, promotionDecisionFile).replace(/\\/g, "/")}`;
+    const promotionDecisionRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), promotionDecisionFile).replace(/\\/g, "/")}`;
     const blockedPromotionFile = path.join(
       artifactsRoot,
       `promotion-decision-finance-audit-blocked-${runId.replace(/[^\w.-]+/g, "-")}.json`,
@@ -2784,7 +2784,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         status: "hold",
       },
     });
-    const blockedPromotionRef = `evidence://${path.relative(projectRoot, blockedPromotionFile).replace(/\\/g, "/")}`;
+    const blockedPromotionRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), blockedPromotionFile).replace(/\\/g, "/")}`;
     const rollbackPromotionFile = path.join(
       artifactsRoot,
       `promotion-decision-finance-audit-rollback-${runId.replace(/[^\w.-]+/g, "-")}.json`,
@@ -2820,7 +2820,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         },
       },
     });
-    const rollbackPromotionRef = `evidence://${path.relative(projectRoot, rollbackPromotionFile).replace(/\\/g, "/")}`;
+    const rollbackPromotionRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), rollbackPromotionFile).replace(/\\/g, "/")}`;
     const tiedArtifactTimestamp = new Date("2026-01-01T02:00:10.000Z");
     for (const fixturePath of [promotionDecisionFile, blockedPromotionFile, rollbackPromotionFile]) {
       fs.utimesSync(fixturePath, tiedArtifactTimestamp, tiedArtifactTimestamp);
@@ -3595,8 +3595,8 @@ test("project verify resolves runtime root and contract metadata", () => {
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.command, "project verify");
     assert.equal(parsed.status, "implemented");
-    assert.equal(parsed.resolved_project_ref, projectRoot);
-    assert.equal(parsed.resolved_runtime_root, path.join(projectRoot, ".aor"));
+    assert.equal(parsed.resolved_project_ref, fs.realpathSync.native(projectRoot));
+    assert.equal(parsed.resolved_runtime_root, path.join(fs.realpathSync.native(projectRoot), ".aor"));
     assert.equal(parsed.command_catalog_alignment, "docs/architecture/14-cli-command-catalog.md");
     assert.equal(fs.existsSync(parsed.verify_summary_file), true);
     assert.ok(Array.isArray(parsed.step_result_files));
@@ -4491,8 +4491,8 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     const firstPayload = JSON.parse(firstRun.stdout);
     const secondPayload = JSON.parse(secondRun.stdout);
 
-    assert.equal(firstPayload.resolved_project_ref, projectRoot);
-    assert.equal(secondPayload.resolved_project_ref, projectRoot);
+    assert.equal(firstPayload.resolved_project_ref, fs.realpathSync.native(projectRoot));
+    assert.equal(secondPayload.resolved_project_ref, fs.realpathSync.native(projectRoot));
     assert.equal(firstPayload.project_profile_ref, "examples/project.aor.yaml");
     assert.equal(secondPayload.project_profile_ref, "examples/project.aor.yaml");
     assert.equal(firstPayload.runtime_state_file, secondPayload.runtime_state_file);
@@ -4504,7 +4504,7 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     const runtimeState = JSON.parse(fs.readFileSync(firstPayload.runtime_state_file, "utf8"));
     assert.equal(runtimeState.project_id, "aor-core");
     assert.equal(runtimeState.selected_profile_ref, "examples/project.aor.yaml");
-    assert.equal(runtimeState.project_root, projectRoot);
+    assert.equal(runtimeState.project_root, fs.realpathSync.native(projectRoot));
 
     const artifactPacket = JSON.parse(fs.readFileSync(firstPayload.artifact_packet_file, "utf8"));
     assert.equal(artifactPacket.packet_id, "aor-core.artifact.bootstrap.v1");
@@ -4692,7 +4692,7 @@ test("intake create preserves mission traceability and discovery run consumes ex
     assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
     const discoveryPayload = JSON.parse(discoveryResult.stdout);
     const analysisReport = JSON.parse(fs.readFileSync(discoveryPayload.analysis_report_file, "utf8"));
-    const intakePacketRef = `evidence://${path.relative(projectRoot, intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
+    const intakePacketRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
     assert.equal(discoveryPayload.discovery_research_status, "adr-ready");
     assert.equal(discoveryPayload.discovery_research_adr_ready, true);
     assert.deepEqual(discoveryPayload.discovery_research_open_questions, []);

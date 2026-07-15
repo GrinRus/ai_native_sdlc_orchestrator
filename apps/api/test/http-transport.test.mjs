@@ -368,7 +368,7 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
       assert.equal(stateResponse.status, 200);
       const state = await stateResponse.json();
-      assert.equal(state.project_root, repoRoot);
+      assert.equal(state.project_root, fs.realpathSync.native(repoRoot));
 
       const runsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs`);
       assert.equal(runsResponse.status, 200);
@@ -1345,7 +1345,7 @@ test("local app project index and add-project action keep project runtimes isola
         assert.equal(secondStateResponse.status, 200);
         const secondState = await secondStateResponse.json();
         assert.equal(secondState.project_id, added.project.runtime_project_id);
-        assert.equal(secondState.runtime_root, secondRuntimeRoot);
+        assert.equal(secondState.runtime_root, fs.realpathSync.native(secondRuntimeRoot));
 
         const firstStateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
         assert.equal(firstStateResponse.status, 200);
@@ -1421,7 +1421,7 @@ test("local app add-project action accepts an explicit project profile", async (
       assert.equal(added.projects.length, 2);
       assert.equal(added.project.label, "Profiled target");
       assert.equal(added.project.runtime_project_id, "explicit-profile-target");
-      assert.equal(added.project.project_profile_ref, "explicit-project.aor.yaml");
+      assert.equal(added.project.project_profile_ref, explicitProjectProfile);
       assert.equal(added.project.project_profile_source, "explicit");
       assert.equal(added.project.runtime_root, profiledRuntimeRoot);
       assert.equal(added.project.onboarding_summary.initialized, true);
