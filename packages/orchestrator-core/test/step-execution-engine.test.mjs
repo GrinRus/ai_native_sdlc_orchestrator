@@ -572,7 +572,7 @@ test("runtime harness classifies structured permission denials before strict no-
 
   assert.deepEqual(approvedOutcome, {
     failureClass: "permission-mode-blocked",
-    decision: "retry",
+    decision: "block",
     missionOutcome: "not_satisfied",
   });
 });
@@ -1241,7 +1241,7 @@ test("external-runner zero repair policy preserves terminal evidence without exe
   });
 });
 
-test("orchestrator-mediated permission auto-approval reinvokes a restricted runtime with the resume mode", () => {
+test("orchestrator-mediated permission auto-approval never escalates a coarse adapter to full-bypass", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-permission-auto-approve";
     const fullBypassScript = [
@@ -1282,14 +1282,14 @@ test("orchestrator-mediated permission auto-approval reinvokes a restricted runt
           executionRoot: repoRoot,
         });
 
-        assert.equal(result.stepResult.runtime_harness_decision, "pass");
-        assert.equal(result.stepResult.status, "passed");
+        assert.equal(result.stepResult.runtime_harness_decision, "block");
+        assert.equal(result.stepResult.status, "failed");
         assert.equal(fs.existsSync(path.join(repoRoot, "src/auto-approved.js")), false);
         assert.equal(
           fs.existsSync(path.join(result.stepResult.routed_execution.workspace_isolation.execution_root, "src/auto-approved.js")),
-          true,
+          false,
         );
-        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "full-bypass");
+        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "restricted");
         assert.ok(
           result.stepResult.evidence_refs.some((ref) =>
             String(ref).includes("runtime-permission-decision-runtime-permission-auto-approve"),
@@ -1301,12 +1301,12 @@ test("orchestrator-mediated permission auto-approval reinvokes a restricted runt
           cwd: repoRoot,
           runId,
         });
-        assert.equal(report.report.overall_decision, "pass");
+        assert.equal(report.report.overall_decision, "fail");
         assert.equal(report.report.runtime_permission_summary.decision_counts.auto_approve, 1);
         assert.equal(report.report.runtime_permission_summary.continuation_strategies.includes("reinvoke"), true);
         assert.equal(report.report.runtime_permission_decisions[0].decision, "auto_approve");
         assert.equal(report.report.runtime_permission_decisions[0].operation_type, "file_read");
-        assert.equal(report.report.runtime_permission_decisions[0].approval_resume_mode, "full-bypass");
+        assert.equal(report.report.runtime_permission_decisions[0].approval_resume_mode, "restricted");
         assert.ok(
           report.report.runtime_permission_summary.audit_refs.some((ref) =>
             String(ref).includes("runtime-permission-decision-runtime-permission-auto-approve"),
@@ -1360,11 +1360,11 @@ test("Runtime Harness report aggregates permission decisions from nested live ex
           executionRoot: repoRoot,
         });
 
-        assert.equal(step.stepResult.runtime_harness_decision, "pass");
+        assert.equal(step.stepResult.runtime_harness_decision, "block");
         assert.equal(fs.existsSync(path.join(repoRoot, "src/nested-live-approved.js")), false);
         assert.equal(
           fs.existsSync(path.join(step.stepResult.routed_execution.workspace_isolation.execution_root, "src/nested-live-approved.js")),
-          true,
+          false,
         );
 
         const report = materializeRuntimeHarnessReport({
@@ -1373,7 +1373,7 @@ test("Runtime Harness report aggregates permission decisions from nested live ex
           runId: outerRunId,
         });
 
-        assert.equal(report.report.overall_decision, "pass");
+        assert.equal(report.report.overall_decision, "block");
         assert.equal(report.report.runtime_permission_summary.decision_counts.auto_approve, 1);
         assert.equal(report.report.runtime_permission_decisions[0].decision, "auto_approve");
         assert.equal(report.report.runtime_permission_decisions[0].operation_type, "file_read");
@@ -1384,7 +1384,7 @@ test("Runtime Harness report aggregates permission decisions from nested live ex
   });
 });
 
-test("approve_for_run grants auto-approve later matching permission requests in the same run", () => {
+test("expired legacy approve_for_run evidence cannot authorize a later permission request", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-permission-approve-for-run";
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
@@ -1410,6 +1410,7 @@ test("approve_for_run grants auto-approve later matching permission requests in 
             operator_decision: "approve_for_run",
             approval_scope: "step-coarse",
             approval_resume_mode: "full-bypass",
+            expires_at: "2020-01-01T00:00:00.000Z",
             audit_ref: "evidence://reports/interaction-answer-runtime-permission-grant.json",
           },
         },
@@ -1456,12 +1457,12 @@ test("approve_for_run grants auto-approve later matching permission requests in 
           executionRoot: repoRoot,
         });
 
-        assert.equal(result.stepResult.runtime_harness_decision, "pass");
-        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "full-bypass");
+        assert.equal(result.stepResult.runtime_harness_decision, "block");
+        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "restricted");
         assert.equal(fs.existsSync(path.join(repoRoot, "src/run-grant.js")), false);
         assert.equal(
           fs.existsSync(path.join(result.stepResult.routed_execution.workspace_isolation.execution_root, "src/run-grant.js")),
-          true,
+          false,
         );
         const decisionAudits = fs
           .readdirSync(init.runtimeLayout.reportsRoot)
@@ -1473,7 +1474,7 @@ test("approve_for_run grants auto-approve later matching permission requests in 
               entry.runtime_permission_decision?.rule_id === "runtime-permission.auto-approve.approve-for-run-grant" &&
               entry.runtime_permission_decision?.grant_ref === "evidence://reports/interaction-answer-runtime-permission-grant.json",
           ),
-          true,
+          false,
         );
       },
     );

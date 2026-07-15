@@ -478,12 +478,18 @@ function normalizePermissionComparable(value) {
  * @returns {{ adapterId: string, operationType: string, target: string, command: string, toolName: string }}
  */
 function runtimePermissionSignature(request) {
+  const scope = asRecord(request.requested_scope);
+  const capabilities = asRecord(request.capabilities);
   return {
     adapterId: normalizePermissionComparable(asString(request.adapter_id)),
     operationType: normalizePermissionComparable(asString(request.operation_type)),
-    target: normalizePermissionComparable(asString(request.target) ?? asString(request.target_path)),
-    command: normalizePermissionComparable(asString(request.command)),
-    toolName: normalizePermissionComparable(asString(request.tool_name)),
+    resourceType: normalizePermissionComparable(asString(request.resource_type)),
+    canonicalResource: normalizePermissionComparable(asString(request.canonical_resource)),
+    projectId: normalizePermissionComparable(asString(scope.project_id)),
+    runId: normalizePermissionComparable(asString(scope.run_id)),
+    stepId: normalizePermissionComparable(asString(scope.step_id)),
+    operationId: normalizePermissionComparable(asString(scope.operation_id)),
+    capabilities: JSON.stringify(capabilities),
   };
 }
 
@@ -492,22 +498,29 @@ function runtimePermissionSignature(request) {
  * @param {Record<string, unknown>} grantRequest
  * @returns {boolean}
  */
-function runtimePermissionGrantMatches(request, grantRequest) {
+export function runtimePermissionGrantMatches(request, grantRequest) {
   const current = runtimePermissionSignature(request);
   const granted = runtimePermissionSignature(grantRequest);
   if (current.adapterId && granted.adapterId && current.adapterId !== granted.adapterId) {
     return false;
   }
-  if (!current.operationType || !granted.operationType || current.operationType !== granted.operationType) {
-    return false;
-  }
-  if (current.target || granted.target) {
-    return current.target !== "" && current.target === granted.target;
-  }
-  if (current.command || granted.command) {
-    return current.command !== "" && current.command === granted.command;
-  }
-  return current.toolName !== "" && current.toolName === granted.toolName;
+  return (
+    current.operationType !== "" &&
+    current.operationType === granted.operationType &&
+    current.resourceType !== "" &&
+    current.resourceType === granted.resourceType &&
+    current.canonicalResource !== "" &&
+    current.canonicalResource === granted.canonicalResource &&
+    current.projectId !== "" &&
+    current.projectId === granted.projectId &&
+    current.runId !== "" &&
+    current.runId === granted.runId &&
+    current.stepId !== "" &&
+    current.stepId === granted.stepId &&
+    current.operationId !== "" &&
+    current.operationId === granted.operationId &&
+    current.capabilities === granted.capabilities
+  );
 }
 
 /**
@@ -540,6 +553,10 @@ function resolveRunScopedRuntimePermissionGrant(options) {
       asString(grantDecision.decision) !== "user_approved" ||
       asString(grantDecision.operator_decision) !== "approve_for_run"
     ) {
+      continue;
+    }
+    const expiresAt = asString(grantDecision.expires_at);
+    if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) {
       continue;
     }
     const grantRequest = asRecord(record.runtime_permission_request ?? requestedInteraction.runtime_permission_request);
@@ -586,7 +603,7 @@ function applyRunScopedRuntimePermissionGrant(options) {
     approval_resume_mode:
       asString(grant.grantDecision.approval_resume_mode) ??
       asString(options.runtimePermissionDecision.approval_resume_mode) ??
-      "full-bypass",
+      "restricted",
     grant_ref: grant.grantRef,
   };
 }
@@ -1827,13 +1844,19 @@ export function executeRoutedStep(options) {
           execution_root: executionRoot,
           runtime_agent_interaction_policy: interactionPolicy,
           runtime_agent_auto_approval_profile: autoApprovalProfile,
-          approval_grant_scope: asString(approvalFeatures.approval_grant_scope) ?? "step-coarse",
-          approval_resume_mode: asString(approvalFeatures.approval_resume_mode) ?? "full-bypass",
+          approval_grant_scope: asString(approvalFeatures.approval_grant_scope) ?? "tool-call-scoped",
+          approval_resume_mode: asString(approvalFeatures.approval_resume_mode) ?? "restricted",
+          project_id: init.projectId,
+          run_id: runId,
+          step_id: stepId,
           declared_verification_commands: asStringArray(
             asRecord(asRecord(policyResolution).resolved_bounds).command_constraints?.allowed_commands,
           ),
         },
       });
+      runtimePermissionRequest = asRecord(runtimePermissionDecision.normalized_request);
+      runtimePermissionDecision = { ...runtimePermissionDecision };
+      delete runtimePermissionDecision.normalized_request;
       runtimePermissionDecision = {
         ...runtimePermissionDecision,
         continuation_strategy: asString(approvalFeatures.continuation_strategy) ?? "reinvoke",
@@ -1861,18 +1884,11 @@ export function executeRoutedStep(options) {
         audit_ref: runtimePermissionDecisionAuditRef,
         audit_file: runtimePermissionDecisionAuditFile,
       };
-      runtimeOutcome =
-        runtimePermissionDecision.decision === "auto_approve"
-          ? {
-              failureClass: runtimeOutcome.failureClass,
-              decision: "retry",
-              missionOutcome: "not_satisfied",
-            }
-          : {
-              failureClass: runtimeOutcome.failureClass,
-              decision: "block",
-              missionOutcome: "not_satisfied",
-            };
+      runtimeOutcome = {
+        failureClass: runtimeOutcome.failureClass,
+        decision: "block",
+        missionOutcome: "not_satisfied",
+      };
     }
   }
   stepResult.mission_outcome = runtimeOutcome.missionOutcome;
