@@ -651,6 +651,25 @@ Reconnect and backpressure baseline:
 
 ## Detached HTTP transport baseline (W10-S03)
 
+### Non-materializing read contract (W58-S01)
+
+All module query functions, HTTP `GET` routes, CLI inspection commands, and the
+packaged SPA first-load sequence resolve project and runtime paths through an
+immutable `ProjectReadContext`. They inspect only state that already exists and
+must never call runtime initialization as a success path or as error recovery.
+
+For a clean project, reads return HTTP `200` with deterministic empty models:
+`ProjectStateResponse.initialized=false`, `state_file=null`, empty collection
+responses, `FlowListResponse.initialized=false`, null selected flow/run values,
+and resolved runtime paths. `GET /`, `GET /app-config.json`, and
+`GET /api/projects` follow the same no-write rule. Only explicit onboarding or
+`project init` mutation commands may create `.aor` bootstrap artifacts.
+
+Compatibility note: clients that previously relied on a read to materialize a
+generated profile, onboarding report, or bootstrap packet must invoke the
+initialization mutation first. Operation names and read URLs are unchanged;
+implicit initialization is intentionally removed.
+
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /` for the packaged local SPA when the transport is started with an app static root;
 - `GET /app-config.json` for same-origin app configuration (`project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata);

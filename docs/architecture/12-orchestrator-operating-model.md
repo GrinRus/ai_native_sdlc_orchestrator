@@ -21,6 +21,13 @@ selected project; there is no ambient current project. Compatibility wrappers
 may translate the context to legacy `{cwd, projectRef, runtimeRoot}` arguments
 once, with `cwd` anchored to the project root rather than the launcher.
 
+Query ingress derives an immutable `ProjectReadContext` from that project
+context and a non-materializing runtime preview. It resolves the same canonical
+paths but represents missing runtime state as `initialized=false`; it never
+creates `.aor`, generated profiles, reports, packets, or recovery state. Only
+explicit onboarding and initialization mutations cross the materialization
+boundary.
+
 Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to AOR development workflow only. Runtime AOR flows consume only AOR-owned versioned assets, packets, and project-profile references.
 
 ## Runtime Harness boundary

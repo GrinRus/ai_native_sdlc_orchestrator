@@ -6,7 +6,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
-import { createProjectContext, resolveProjectContextReference } from "../src/control-plane/project-context.mjs";
+import { createProjectContext, createProjectReadContext, resolveProjectContextReference } from "../src/control-plane/project-context.mjs";
 import { createLocalProjectRegistry } from "../src/control-plane/local-project-registry.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -30,6 +30,13 @@ test("project context is immutable and independent from launcher cwd", async () 
       assert.equal(fs.existsSync(path.join(launcherA, ".aor")), false);
       assert.equal(fs.existsSync(path.join(launcherB, ".aor")), false);
       assert.equal(fs.existsSync(externalRuntime), false, "read-only context creation must not materialize runtime");
+
+      const readContext = createProjectReadContext({ cwd: launcherA, projectRef: projectRoot, runtimeRoot: externalRuntime });
+      assert.equal(readContext.initialized, false);
+      assert.equal(readContext.stateFile, null);
+      assert.equal(Object.isFrozen(readContext), true);
+      assert.equal(Object.isFrozen(readContext.state), true);
+      assert.equal(fs.existsSync(externalRuntime), false, "read context must not materialize runtime");
 
       assert.equal(resolveProjectContextReference(first, "src/example.ts", "project-relative"), path.join(first.projectRoot, "src/example.ts"));
       assert.equal(resolveProjectContextReference(first, "evidence://reports/result.json", "evidence-relative"), path.join(first.projectRuntimeRoot, "reports/result.json"));

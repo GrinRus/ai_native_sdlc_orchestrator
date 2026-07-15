@@ -6,6 +6,7 @@ import {
   openLiveRunEventStream,
 } from "../../../observability/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
 
 /**
  * @param {string} runId
@@ -72,7 +73,7 @@ export function appendRunEvent(options) {
  * }} options
  */
 export function readRunEvents(options) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const logFile = resolveRunEventLogFile({
     runtimeLayout: init.runtimeLayout,
     runId: options.runId,
@@ -96,7 +97,7 @@ export function readRunEvents(options) {
  * }} options
  */
 export function openRunEventStream(options) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const logFile = resolveRunEventLogFile({
     runtimeLayout: init.runtimeLayout,
     runId: options.runId,
