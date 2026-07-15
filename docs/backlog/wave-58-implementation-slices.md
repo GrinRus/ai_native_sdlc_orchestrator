@@ -119,8 +119,9 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 ## W58-S03 — Executable route fallback, retry, repair, and adapter semantics
 
 - **Outcome:** Resolved routes preserve fallback and policy references, and
-  retry/repair/adapter decisions execute only for explicitly matched failure
-  classes without erasing structured denial evidence.
+  requested/effective model semantics, retry/repair/adapter decisions, and
+  fallback transitions execute exactly as recorded without erasing structured
+  denial evidence.
 - **Epic:** EPIC-3, EPIC-4, EPIC-7
 - **State:** blocked
 - **Remediation priority:** P1
@@ -129,7 +130,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   step execution, `packages/adapter-sdk/**`, examples/tests
 - **Hard dependencies:** W57-S08
 - **Primary user story surfaces:** ARC-02, DEV-01, DEV-05, EMP-07, AIP-03,
-  AIP-04, OPS-03, SEC-04.
+  AIP-04, PBO-10, OPS-03, SEC-04.
 - **Audit findings:** AUD-024, AUD-025, AUD-026.
 
 ### Local tasks
@@ -144,6 +145,15 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 5. Keep adapter-specific parsing at the adapter boundary while emitting one
    runner-neutral failure vocabulary.
 6. Add failure-class × route × budget × provider-format matrix tests.
+7. Add `requested_model`, `effective_model`, and `model_source` to resolved
+   route and execution evidence, distinguishing an explicit concrete model, a
+   policy-approved alias, and an adapter/runner default.
+8. Pass `effective_model` through the adapter-owned invocation boundary and
+   reject unsupported model/capability combinations before process spawn or
+   budget consumption.
+9. Capture fake-runner argv/config and preserve the exact provider, adapter, and
+   model transition for primary and fallback attempts so durable route evidence
+   can be compared with what actually executed.
 
 ### Acceptance criteria
 1. A transient allowed failure selects the next compatible fallback exactly once
@@ -156,6 +166,13 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    with a stable failure kind while public output remains redacted.
 5. Route, retry, repair, and adapter evidence remains provider-neutral outside
    adapter-owned raw artifacts.
+6. Route resolution records requested/effective model and source without
+   conflating explicit values, aliases, or runner defaults.
+7. The adapter invokes the runner with the recorded effective model; an
+   unsupported model or capability fails before spawn and creates no execution
+   or budget side effect.
+8. Primary and fallback evidence records the exact provider/adapter/model
+   transition and matches the captured runner argv/config.
 
 ### Done evidence
 - route/policy contract and example updates
@@ -163,11 +180,14 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - failure-class policy matrix
 - cross-provider semantic normalization fixtures
 - adapter boundary regression checks
+- requested/effective-model resolution and unsupported-model fixtures
+- fake-runner invocation/evidence parity captures
 
 ### Out of scope
 - Certifying every external provider as production-ready.
 - Provider-owned authentication behavior.
 - Unlimited automatic retry or repair budgets.
+- Raw arbitrary model selection or execution-profile UI, which are owned by W61.
 
 ## W58-S04 — Real evaluation, Harness lineage, and replay compatibility
 
@@ -278,7 +298,8 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 ## W58-S06 — Canonical API, OpenAPI, CLI, and service boundary
 
 - **Outcome:** The module API, detached routes, OpenAPI, CLI flags, lifecycle
-  service, limits, and redaction describe and execute one unambiguous surface.
+  service, limits, redaction, and operator errors describe and execute one
+  unambiguous surface.
 - **Epic:** EPIC-0, EPIC-6
 - **State:** blocked
 - **Remediation priority:** P1
@@ -286,8 +307,8 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Primary modules:** `apps/api/**`, `apps/cli/**`, control-plane services,
   `docs/contracts/control-plane-api.openapi.json`, production-readiness tests
 - **Hard dependencies:** W58-S01, W58-S05
-- **Primary user story surfaces:** ARC-06, OPS-01, OPS-02, OPS-04, OPS-09,
-  OPS-11, SEC-02, SEC-06, FIN-04.
+- **Primary user story surfaces:** ARC-06, PBO-10, OPS-01, OPS-02, OPS-04,
+  OPS-09, OPS-11, OPS-12, SEC-02, SEC-06, FIN-04.
 - **Audit findings:** AUD-032, AUD-035, AUD-036, AUD-037, AUD-038, AUD-045,
   AUD-048.
 
@@ -306,6 +327,15 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    output.
 7. Extract a transport-neutral lifecycle application service so HTTP, CLI, and
    app launcher do not form an ESM cycle.
+8. Define one operator-facing error envelope across module, HTTP, CLI JSON, and
+   app transports with `code`, `title`, `detail`, `operation`, `phase`,
+   `resource`, `consequence`, `retryable`, scoped project/flow/run references,
+   `field_errors[]`, `evidence_refs[]`, and `recovery_actions[]`.
+9. Constrain recovery actions to `retry`, `refresh`, `inspect`,
+   `select_project`, `rebind_repository`, `configure_execution`,
+   `copy_command`, and `continue_in_terminal`; require typed action payloads and
+   prohibit UI recovery logic from parsing shell commands, stack traces, or raw
+   provider text.
 
 ### Acceptance criteria
 1. Every documented operation imports from `apps/api` with no ambiguous export.
@@ -315,18 +345,27 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 5. Configured secret values never appear in app JSON, denials, or errors.
 6. Madge reports no control-plane/app-launcher cycle and transports do not import
    one another.
+7. Captured module, HTTP, CLI JSON, and app errors expose the same required
+   envelope fields, scoped references, redaction, and retry semantics.
+8. Every advertised recovery action belongs to the canonical catalog and is
+   selected from structured failure state rather than inferred from diagnostic
+   text.
 
 ### Done evidence
 - explicit API export-surface tests
 - OpenAPI fixture validation suite
 - limit and unknown-flag tests
 - app JSON redaction tests
+- cross-transport operator-error envelope fixtures
+- recovery-action catalog and diagnostic-text non-inference tests
 - zero-cycle dependency report
 
 ### Out of scope
 - Generating public SDKs for unsupported APIs.
 - Hosted API gateway or enterprise identity integration.
 - Removing documented compatibility wrappers without a migration decision.
+- Visual presentation of recovery cards or lifecycle actions, which is owned by
+  W59 and W63.
 
 ## W58-S07 — Loopback-only local app transport boundary
 

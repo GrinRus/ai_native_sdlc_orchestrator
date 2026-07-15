@@ -29,8 +29,9 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   `docs/ops/**`, `README.md`, `scripts/production-readiness.mjs`, tests
 - **Hard dependencies:** W56-S03
 - **Primary user story surfaces:** EMP-05, DEV-07, AIP-06, OPS-02, OPS-06,
-  OPS-10, SEC-04, SEC-06, PBO-09, DTX-05, FIN-03.
-- **Audit findings:** AUD-001 through AUD-022 disposition baseline.
+  OPS-10, OPS-12, SEC-04, SEC-06, PBO-09, PBO-10, DTX-05, FIN-03.
+- **Audit findings:** AUD-001 through AUD-022 disposition baseline and the
+  post-audit `project-context-cwd-divergence` finding.
 
 ### Local tasks
 1. Amend the packaged-local-console ADR and control-plane contract to separate
@@ -50,6 +51,10 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    W57-S05/W58-S04, W57-S03, and W57-S07/W59-S07 respectively.
 5. Add source-of-truth tests so a release claim cannot silently ignore the audit
    disposition or reclassify the local SPA as hosted-capable.
+6. Register `project-context-cwd-divergence` in the audit ledger, scope PBO-09
+   evidence to repo-attached first-Mission intake, and record that W34/W56 proof
+   does not clear neutral launch, execution/model readiness, or the complete
+   UI-only lifecycle outcomes introduced by PBO-10 and OPS-12.
 
 ### Acceptance criteria
 1. Documentation defines `aor app` as a loopback-only same-origin surface and
@@ -63,11 +68,16 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    execution without the explicit unsafe-development override.
 5. Mock, dry-run, contract, and repository-integrity development paths remain
    usable while the release hold is active.
+6. The audit and story evidence sources expose `project-context-cwd-divergence`,
+   keep PBO-09 proof limited to its demonstrated repo-attached intake flow, and
+   cannot treat W34/W56 evidence as release clearance for PBO-10 or OPS-12.
 
 ### Done evidence
 - updated ADR, contracts, environment matrix, release docs, and README
 - coverage-matrix gaps for the seven audit-invalidated story outcomes
 - production-readiness JSON fixtures for open and closed audit states
+- audit-ledger and story-evidence fixtures for `project-context-cwd-divergence`,
+  PBO-09, PBO-10, and OPS-12
 - command tests for default block and explicit unsafe-development opt-in
 - `pnpm lint`
 - `pnpm test`
@@ -155,7 +165,10 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    event, and artifact identifiers; forbid separators, traversal, control
    characters, drive forms, and lossy normalization.
 2. Define explicit canonical-containment rules for project roots, runtime roots,
-   working directories, evidence paths, and future write targets.
+   working directories, evidence paths, and future write targets; assign every
+   relative or evidence reference exactly one base from the canonical project
+   root, canonical runtime root, or repository binding, and forbid implicit
+   `process.cwd()` fallback once project context has been established.
 3. Make every `allowed_paths` element a validated string with documented glob
    semantics; distinguish absent, explicitly empty, malformed, and unrestricted
    scope without fail-open coercion.
@@ -176,11 +189,16 @@ contracts, implementation, regression tests, and source-of-truth documentation.
    outside the allowed scope.
 5. Every validation error identifies the field, rejected value class, and safe
    migration action.
+6. Every supported relative and evidence reference declares one canonical base,
+   and contract fixtures reject ambiguous bases or post-context launcher-cwd
+   resolution.
 
 ### Done evidence
 - updated identifier, project-profile, delivery, handoff, review, and event
   contract docs
 - aligned contract examples and loaders
+- canonical reference-base matrix covering project, runtime, and repository
+  binding roots
 - property/mutation contract test matrix
 - compatibility and migration note
 - `pnpm test:references`
@@ -399,6 +417,105 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - Automatic repair of already-collided or externally redirected state.
 - Remote project initialization.
 
+## W57-S10 — Project-anchored command and evidence resolution
+
+- **Outcome:** Every project-scoped command and evidence lookup carries one
+  explicit canonical project context, so behavior is independent of the
+  launcher working directory and cannot cross project boundaries.
+- **Epic:** EPIC-1, EPIC-2, EPIC-6
+- **State:** blocked
+- **Remediation priority:** P0
+- **Estimated effort:** L
+- **Primary modules:** selected-project context and local project registry,
+  control-plane mutation handlers, evidence/handoff/artifact resolution, app
+  launcher, CLI/API/app regression tests
+- **Hard dependencies:** W57-S02, W57-S06
+- **Primary user story surfaces:** ARC-06, PBO-09, PBO-10, OPS-02, OPS-11,
+  OPS-12.
+- **Audit findings:** Post-audit `project-context-cwd-divergence` finding and
+  project-context closure for AUD-013, AUD-014, and AUD-052.
+
+### Local tasks
+
+1. **Define and propagate the selected-project execution context.**
+   - Purpose: remove ambient launcher state from project-scoped command and
+     control-plane behavior.
+   - Changes: carry canonical project identity, project root, runtime root, and
+     repository bindings through the shared application-service boundary after
+     project selection; reject handlers that require project context when it is
+     absent.
+   - Validation: CLI, API, and app fixtures prove that the same selected project
+     produces identical context regardless of `process.cwd()`.
+2. **Anchor every project-relative and evidence reference.**
+   - Purpose: ensure packets, reports, assets, and handoffs resolve inside the
+     owning project rather than the app launch directory.
+   - Changes: route `evidence://` and all supported relative references through
+     the W57-S02 canonical reference-base rules; remove post-context cwd
+     fallbacks from resolvers and mutation handlers.
+   - Validation: table-driven fixtures cover project-root, runtime-root, and
+     repository-binding references plus missing, ambiguous, and escaping bases.
+3. **Enforce in-process project isolation.**
+   - Purpose: prevent a long-lived local app serving multiple projects from
+     leaking roots or evidence across selections.
+   - Changes: key caches, requests, and resolution inputs by selected project;
+     abort or reject stale work whose context no longer matches the active
+     project generation.
+   - Validation: two-project concurrency and delayed-response tests prove that
+     neither project can resolve references through the other's roots.
+4. **Cover neutral launch directories and path variants.**
+   - Purpose: make explicit project selection portable across installed-user
+   launch locations and supported Git layouts.
+   - Changes: exercise `aor app --project-ref <repo>` from the target repository,
+     `/tmp`, and the AOR checkout with custom runtime roots,
+     spaces/Unicode, linked worktrees, and symlinked escape attempts.
+   - Validation: all valid cases produce equivalent project-scoped evidence;
+     escaping cases fail before materialization.
+5. **Prove launcher-directory non-materialization.**
+   - Purpose: prevent an unrelated directory from becoming accidental runtime
+     state merely because it launched the local application.
+   - Changes: add pre/post filesystem manifests around CLI, API, and packaged-app
+     flows and include the proof in W57 closure evidence.
+   - Validation: no tested launcher directory gains `.aor` or any other AOR
+     artifact, including on validation failure, retry, or project switch.
+
+### Acceptance criteria
+
+1. `aor app --project-ref <repo>` resolves the same project, runtime, and
+   evidence state when launched from the repository, `/tmp`, or the AOR
+   checkout.
+2. Once project context exists, project-scoped paths and references never use
+   `process.cwd()` as an implicit base.
+3. `evidence://`, packet, report, and asset references resolve through the
+   selected project's canonical project root, runtime root, or repository
+   binding as defined by contract.
+4. The launcher directory receives no `.aor` directory or other runtime
+   artifact on success, failure, retry, or project switch.
+5. Two projects served by one app process cannot resolve references, cache
+   entries, or delayed responses through each other's roots.
+6. Custom runtime roots, spaces/Unicode, linked worktrees, and valid symlink-free
+   paths work; symlink or traversal escapes fail before any write.
+7. A project-scoped CLI command launched outside a repository requires an
+   explicit `--project-ref`; the Workspace registry or current UI selection
+   never supplies implicit CLI project context.
+
+### Done evidence
+
+- selected-project context contract and application-service fixtures
+- canonical evidence/reference-resolution matrix
+- two-project isolation and stale-generation regression tests
+- cross-cwd packaged-app and CLI/API smoke transcripts
+- outside-repository CLI `--project-ref` and no-sticky-context regression tests
+- launcher-directory pre/post filesystem manifests
+- `pnpm slice:gate`
+
+### Out of scope
+
+- Bare `aor app` neutral-workspace behavior and persistent workspace registry,
+  which are owned by W61.
+- Automatic filesystem scanning, implicit initialization, or sticky UI project
+  selection for project-scoped CLI commands.
+- Repository-topology editing, multirepo execution, or execution-profile UI.
+
 ## W57-S07 — Atomic attempts, run control, and event identity
 
 - **Outcome:** Concurrent execution, operator commands, and event writers preserve
@@ -460,19 +577,21 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Estimated effort:** L
 - **Primary modules:** root gates, safety fixtures, package smoke, release docs,
   audit finding ledger
-- **Hard dependencies:** W57-S03, W57-S04, W57-S05, W57-S06, W57-S07
+- **Hard dependencies:** W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10
 - **Primary user story surfaces:** OPS-06, OPS-07, SEC-04, FIN-03.
 - **Audit findings:** W57 closure for AUD-001 through AUD-005, AUD-007,
   AUD-008, AUD-011, AUD-013 through AUD-017, AUD-022, AUD-023, AUD-029
   through AUD-031, and the filesystem/context-foundation portion of AUD-052.
   AUD-009 receives delivery-boundary proof here but closes only with W58-S04
-  quality-lineage evidence.
+  quality-lineage evidence. The post-audit `project-context-cwd-divergence`
+  finding closes here through W57-S10 evidence.
 
 ### Local tasks
 1. Verify the W57-S09 discovery manifest still executes every tracked test once
    and that no W57 regression was added through an expired or unexplained exclusion.
 2. Convert W57 safe probes into deterministic regression suites for no-write,
-   paths, permissions, delivery evidence, initialization, and concurrency.
+   paths, permissions, delivery evidence, initialization, selected-project
+   context, launcher-directory non-materialization, and concurrency.
 3. Remove load-sensitive wall-clock assumptions from the root gate and preserve
    bounded timeout coverage with deterministic fake clocks/process fixtures.
 4. Re-run package install/smoke in a clean temporary project and verify only the
@@ -492,10 +611,14 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 4. Production-readiness can clear only the W57 hold with machine-readable evidence
    while still reporting unresolved W58/W59 limitations.
 5. Audit IDs and acceptance evidence map one-to-one in the closure report.
+6. W57-S10 cross-cwd, reference-resolution, and two-project isolation evidence
+   is present, and no package smoke materializes runtime state in its launcher
+   directory.
 
 ### Done evidence
 - verified W57-S09 discovery manifest and repeated Node 22 gate results
 - W57 safety/concurrency regression suite
+- W57-S10 cross-cwd, project-isolation, and launcher-directory manifests
 - package install/no-write smoke transcript
 - updated audit disposition and readiness JSON
 - `pnpm slice:gate`

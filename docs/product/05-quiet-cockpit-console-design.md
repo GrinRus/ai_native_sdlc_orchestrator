@@ -697,8 +697,13 @@ implemented package.
 - **W63-S07** proves the opt-in installed experience through browser,
   accessibility, responsive, durable-evidence, and safety acceptance while W34
   remains the installed default.
-- **W65-S01 through W65-S04** freeze parity, add a reversible presentation
-  selector, and pilot Mission/Cockpit plus Attention/Journey/Evidence outcomes.
+- **W63-S08** closes browser-operable canonical safe lifecycle parity and the
+  UI-only story evidence through the installed mock/deterministic no-write
+  golden path.
+- After W63-S08, **W65-S01 through W65-S04** freeze parity, add a reversible
+  presentation selector, and pilot Mission/Cockpit plus
+  Attention/Journey/Evidence outcomes without implementing missing lifecycle
+  behavior inside the cutover wave.
 - **W65-S05** changes the packaged default and rehearses the explicit rollback.
 - **W65-S06 through W65-S07** remove the legacy renderer and prove the final
   single-renderer installed package.

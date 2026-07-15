@@ -698,8 +698,8 @@ const userStoryFamilies = [
   {
     prefix: "OPS",
     roleCluster: "Operator / SRE",
-    total: 11,
-    tierCounts: { MVP: 9, "MVP+": 1, Later: 1 },
+    total: 12,
+    tierCounts: { MVP: 10, "MVP+": 1, Later: 1 },
   },
   {
     prefix: "SEC",
@@ -722,8 +722,8 @@ const userStoryFamilies = [
   {
     prefix: "PBO",
     roleCluster: "Project bootstrap / onboarding",
-    total: 9,
-    tierCounts: { MVP: 6, "MVP+": 2, Later: 1 },
+    total: 10,
+    tierCounts: { MVP: 7, "MVP+": 2, Later: 1 },
   },
   {
     prefix: "DTX",

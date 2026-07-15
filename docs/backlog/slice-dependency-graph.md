@@ -283,6 +283,7 @@ graph TD
   W57S05[W57-S05 Exact-diff delivery and resolvable authorization evidence]
   W57S06[W57-S06 Transactional initialization and runtime-root containment]
   W57S07[W57-S07 Atomic attempts run control and event identity]
+  W57S10[W57-S10 Project-anchored command and evidence resolution]
   W57S08[W57-S08 Trust-boundary regression proof and release disposition]
   W58S01[W58-S01 Non-materializing read-model contract and runtime]
   W58S02[W58-S02 Effective context and unique asset identity]
@@ -308,6 +309,8 @@ graph TD
   W61S02[W61-S02 Persistent local workspace registry and topology discovery]
   W61S03[W61-S03 Project topology CLI/API management and validation]
   W61S04[W61-S04 Add Project and Project Structure UX]
+  W61S06[W61-S06 Project execution profile and runner-readiness contract]
+  W61S07[W61-S07 Execution Setup UX and browser proof]
   W61S05[W61-S05 Topology onboarding proof and documentation closure]
   W62S01[W62-S01 Workspace-set provisioner and repository change evidence]
   W62S02[W62-S02 Impact scope and execution DAG planning]
@@ -321,7 +324,8 @@ graph TD
   W63S04[W63-S04 Truthful action-first cockpit and recovery controls]
   W63S05[W63-S05 Adaptive shell and lifecycle navigation]
   W63S06[W63-S06 Attention queue, evidence workbench, and cockpit hierarchy]
-  W63S07[W63-S07 Installed-console UX/UI acceptance and story closure]
+  W63S07[W63-S07 Installed-console UX/UI acceptance]
+  W63S08[W63-S08 Browser-operable canonical lifecycle parity]
   W64S01[W64-S01 Idempotent alpha publish transaction and partial-failure recovery]
   W64S02[W64-S02 Verification-to-delivery transaction decomposition]
   W64S03[W64-S03 Operator decision projection decomposition]
@@ -731,11 +735,14 @@ graph TD
   W57S04 --> W57S05
   W57S02 --> W57S06
   W57S06 --> W57S07
+  W57S02 --> W57S10
+  W57S06 --> W57S10
   W57S03 --> W57S08
   W57S04 --> W57S08
   W57S05 --> W57S08
   W57S06 --> W57S08
   W57S07 --> W57S08
+  W57S10 --> W57S08
   W57S08 --> W58S01
   W57S08 --> W58S02
   W57S08 --> W58S03
@@ -777,7 +784,10 @@ graph TD
   W61S01 --> W61S02
   W61S02 --> W61S03
   W61S03 --> W61S04
-  W61S04 --> W61S05
+  W61S03 --> W61S06
+  W61S04 --> W61S07
+  W61S06 --> W61S07
+  W61S07 --> W61S05
   W61S03 --> W62S01
   W4S01 --> W62S01
   W60S03 --> W62S02
@@ -809,11 +819,12 @@ graph TD
   W63S04 --> W63S07
   W63S05 --> W63S07
   W63S06 --> W63S07
+  W63S07 --> W63S08
   W29S01 --> W64S01
   W59S07 --> W64S01
   W59S07 --> W64S02
   W59S07 --> W64S03
-  W63S07 --> W65S01
+  W63S08 --> W65S01
   W65S01 --> W65S02
   W65S02 --> W65S03
   W65S02 --> W65S04
@@ -1337,7 +1348,8 @@ own the stricter terminal control proof evidence for this lane.
 | W57-S05 | W57-S02, W57-S03, W57-S04 |
 | W57-S06 | W57-S02 |
 | W57-S07 | W57-S06 |
-| W57-S08 | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07 |
+| W57-S10 | W57-S02, W57-S06 |
+| W57-S08 | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10 |
 
 ## W58 hard dependencies
 | Slice ID | Depends on |
@@ -1378,7 +1390,9 @@ own the stricter terminal control proof evidence for this lane.
 | W61-S02 | W61-S01 |
 | W61-S03 | W61-S02 |
 | W61-S04 | W61-S03 |
-| W61-S05 | W61-S04 |
+| W61-S06 | W61-S03 |
+| W61-S07 | W61-S04, W61-S06 |
+| W61-S05 | W61-S07 |
 
 ## W62 hard dependencies
 | Slice ID | Depends on |
@@ -1400,6 +1414,7 @@ own the stricter terminal control proof evidence for this lane.
 | W63-S05 | W63-S03, W63-S04 |
 | W63-S06 | W63-S03, W63-S04, W63-S05 |
 | W63-S07 | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
+| W63-S08 | W63-S07 |
 
 ## W64 hard dependencies
 | Slice ID | Depends on |
@@ -1411,7 +1426,7 @@ own the stricter terminal control proof evidence for this lane.
 ## W65 hard dependencies
 | Slice ID | Depends on |
 |---|---|
-| W65-S01 | W63-S07 |
+| W65-S01 | W63-S08 |
 | W65-S02 | W65-S01 |
 | W65-S03 | W65-S02 |
 | W65-S04 | W65-S02 |
@@ -1698,55 +1713,59 @@ own the stricter terminal control proof evidence for this lane.
 277. W57-S05
 278. W57-S06
 279. W57-S07
-280. W57-S08
-281. W58-S01
-282. W58-S02
-283. W58-S03
-284. W58-S04
-285. W58-S05
-286. W58-S06
-287. W58-S07
-288. W58-S08
-289. W59-S01
-290. W59-S02
-291. W59-S03
-292. W59-S04
-293. W59-S05
-294. W59-S06
-295. W59-S07
-296. W64-S01
-297. W60-S01
-298. W60-S02
-299. W60-S03
-300. W60-S04
-301. W60-S05
-302. W64-S02
-303. W64-S03
-304. W61-S01
-305. W61-S02
-306. W61-S03
-307. W61-S04
-308. W61-S05
-309. W62-S01
-310. W62-S02
-311. W62-S03
-312. W62-S04
-313. W62-S05
-314. W62-S06
-315. W63-S01
-316. W63-S02
-317. W63-S03
-318. W63-S04
-319. W63-S05
-320. W63-S06
-321. W63-S07
-322. W65-S01
-323. W65-S02
-324. W65-S03
-325. W65-S04
-326. W65-S05
-327. W65-S06
-328. W65-S07
+280. W57-S10
+281. W57-S08
+282. W58-S01
+283. W58-S02
+284. W58-S03
+285. W58-S04
+286. W58-S05
+287. W58-S06
+288. W58-S07
+289. W58-S08
+290. W59-S01
+291. W59-S02
+292. W59-S03
+293. W59-S04
+294. W59-S05
+295. W59-S06
+296. W59-S07
+297. W64-S01
+298. W60-S01
+299. W60-S02
+300. W60-S03
+301. W60-S04
+302. W60-S05
+303. W64-S02
+304. W64-S03
+305. W61-S01
+306. W61-S02
+307. W61-S03
+308. W61-S04
+309. W61-S06
+310. W61-S07
+311. W61-S05
+312. W62-S01
+313. W62-S02
+314. W62-S03
+315. W62-S04
+316. W62-S05
+317. W62-S06
+318. W63-S01
+319. W63-S02
+320. W63-S03
+321. W63-S04
+322. W63-S05
+323. W63-S06
+324. W63-S07
+325. W63-S08
+326. W65-S01
+327. W65-S02
+328. W65-S03
+329. W65-S04
+330. W65-S05
+331. W65-S06
+332. W65-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

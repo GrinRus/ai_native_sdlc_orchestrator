@@ -157,25 +157,27 @@ The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
 `W65`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
-permissions, delivery, initialization, and concurrent evidence integrity. W58
-continues with non-materializing reads, effective context/evaluation, asynchronous
-run control, canonical API/CLI/OpenAPI behavior, and the loopback-only local-app
-transport boundary. W59 owns executable browser confidence, local console
-correctness/accessibility, quality ratchets, bounded hotspot decomposition, and
-independent closure of AUD-001 through AUD-055.
+permissions, delivery, initialization, project-context anchoring, and concurrent
+evidence integrity. W58 continues with non-materializing reads, effective
+context/evaluation, executable effective-model routing, asynchronous run control,
+canonical API/CLI/OpenAPI/error behavior, and the loopback-only local-app
+transport boundary. W59 owns executable browser confidence, truthful local
+console correctness/accessibility, quality ratchets, bounded hotspot
+decomposition, and independent closure of AUD-001 through AUD-055.
 
 After W57-W59 audit remediation closes, W60 adds structured task planning and
-the plan workbench, W61 adds portable topology plus machine-local binding
-management, and W62 adds repo-aware workspace sets, bounded concurrency,
-integration, repair, and coordinated delivery proof. W63 then consolidates
-Mission intake, action semantics, adaptive navigation, attention/evidence work,
-and visual-system contracts across the installed operator console under an
-explicit reversible presentation selector. W65 starts after W63-S07 and owns
-route/action parity, pilot activation, default-on cutover, rollback rehearsal,
-legacy renderer retirement, and post-cutover package proof. W59-S07 is the
-explicit entry dependency for that later product-maturity program; W63-S01 waits
-for W62-S06 so its UI contract covers the delivered planning, topology, and
-execution surfaces.
+the plan workbench, W61 adds portable topology, machine-local binding
+management, neutral Workspace launch, and approved execution-route setup, and
+W62 adds repo-aware workspace sets, bounded concurrency, integration, repair,
+and coordinated delivery proof. W63 then consolidates Mission intake, action
+semantics, adaptive navigation, attention/evidence work, visual-system
+contracts, and browser-operable safe lifecycle parity across the installed
+operator console under an explicit reversible presentation selector. W65 starts
+after W63-S08 and owns route/action parity, pilot activation, default-on
+cutover, rollback rehearsal, legacy renderer retirement, and post-cutover
+package proof. W59-S07 is the explicit entry dependency for that later
+product-maturity program; W63-S01 waits for W62-S06 so its UI contract covers
+the delivered planning, topology, and execution surfaces.
 
 W64 is a parallel post-audit maintenance lane, not a successor dependency of
 W63. After W59-S07 it owns idempotent alpha-publish recovery and two independently

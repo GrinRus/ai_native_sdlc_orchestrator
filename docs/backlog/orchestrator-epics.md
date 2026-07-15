@@ -42,7 +42,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S05` Structured planning proof and documentation closure
 - **W61:** `W61-S05` Topology onboarding proof and documentation closure
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
-- **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S07` Installed-console UX/UI acceptance and story closure
+- **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S07` Installed-console UX/UI acceptance; `W63-S08` Browser-operable canonical lifecycle parity
 - **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition; `W64-S03` Operator decision projection decomposition
 - **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
 ## EPIC-1 Bootstrap and onboarding
@@ -61,11 +61,11 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W44:** `W44-S03` Artifact readiness state machine and stale transitions
 - **W54:** `W54-S02` Stack discovery engine; `W54-S03` Project init profile materialization
 - **W56:** `W56-S01` First-run console focus and action clarity; `W56-S02` Rendered cockpit UX hardening; `W56-S03` Rendered UX audit closure
-- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S03` True workspace isolation and no-write enforcement; `W57-S06` Transactional initialization and runtime-root containment
+- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S03` True workspace isolation and no-write enforcement; `W57-S06` Transactional initialization and runtime-root containment; `W57-S10` Project-anchored command and evidence resolution
 - **W58:** `W58-S01` Non-materializing read-model contract and runtime; `W58-S02` Effective context and unique asset identity
 - **W59:** `W59-S02` Local console live-state and interaction correctness
 
-- **W61:** `W61-S01` Project topology and local binding contract baseline; `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation
+- **W61:** `W61-S01` Project topology and local binding contract baseline; `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S06` Project execution profile and runner-readiness contract; `W61-S07` Execution Setup UX and browser proof
 - **W63:** `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
 - **W65:** `W65-S03` Mission and Quiet Cockpit pilot activation
 ## EPIC-2 Packet lifecycle
@@ -75,7 +75,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
 - **W19:** `W19-S02` Product intake source and KPI/DoD model
 - **W21:** `W21-S04` Guided mission intake and next-action resolver
-- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S06` Transactional initialization and runtime-root containment; `W57-S07` Atomic attempts, run control, and event identity
+- **W57:** `W57-S02` Canonical identifier, path, and mission-scope contracts; `W57-S06` Transactional initialization and runtime-root containment; `W57-S07` Atomic attempts, run control, and event identity; `W57-S10` Project-anchored command and evidence resolution
 
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
 - **W61:** `W61-S01` Project topology and local binding contract baseline
@@ -101,8 +101,9 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W59:** `W59-S05` Core, CLI, and control-plane decomposition; `W59-S06` Adapter/live-E2E decomposition and contract-kernel parity
 
 - **W60:** `W60-S02` Planner decomposition and task quality gate; `W60-S03` Execution plan and evidence-derived task progress
+- **W61:** `W61-S06` Project execution profile and runner-readiness contract
 - **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency
-- **W63:** `W63-S04` Truthful action-first cockpit and recovery controls
+- **W63:** `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S08` Browser-operable canonical lifecycle parity
 - **W65:** `W65-S04` Attention, Journey, and Evidence pilot activation
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -137,7 +138,7 @@ Implement validation, eval, harness, certification, and promotion.
 
 - **W60:** `W60-S01` Structured task contract and backlog detail baseline; `W60-S02` Planner decomposition and task quality gate
 - **W62:** `W62-S02` Impact scope and execution DAG planning; `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair
-- **W63:** `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
+- **W63:** `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy; `W63-S08` Browser-operable canonical lifecycle parity
 - **W64:** `W64-S03` Operator decision projection decomposition
 - **W65:** `W65-S04` Attention, Journey, and Evidence pilot activation
 ## EPIC-5 Delivery and release
@@ -197,14 +198,14 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W48:** `W48-S03` Structured repair context and convergence classification
 - **W54:** `W54-S05` CLI/API/UI verification plan surfaces
 - **W56:** `W56-S01` First-run console focus and action clarity; `W56-S02` Rendered cockpit UX hardening; `W56-S03` Rendered UX audit closure
-- **W57:** `W57-S01` Audit disposition, release hold, and local-app threat model; `W57-S07` Atomic attempts, run control, and event identity
+- **W57:** `W57-S01` Audit disposition, release hold, and local-app threat model; `W57-S07` Atomic attempts, run control, and event identity; `W57-S10` Project-anchored command and evidence resolution
 - **W58:** `W58-S01` Non-materializing read-model contract and runtime; `W58-S05` Asynchronous run jobs and durable live-event delivery; `W58-S06` Canonical API, OpenAPI, CLI, and service boundary; `W58-S07` Loopback-only local app transport boundary
 - **W59:** `W59-S01` Executable browser and component behavior gate; `W59-S02` Local console live-state and interaction correctness; `W59-S03` Accessible local dialogs and web state decomposition; `W59-S05` Core, CLI, and control-plane decomposition
 
 - **W60:** `W60-S03` Execution plan and evidence-derived task progress; `W60-S04` Plan workbench UX and approval flow
-- **W61:** `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S04` Add Project and Project Structure UX
+- **W61:** `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S04` Add Project and Project Structure UX; `W61-S06` Project execution profile and runner-readiness contract; `W61-S07` Execution Setup UX and browser proof
 - **W62:** `W62-S03` Parent/child Runtime Harness scheduler and bounded concurrency; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
-- **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S05` Adaptive shell and lifecycle navigation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy; `W63-S07` Installed-console UX/UI acceptance and story closure
+- **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S04` Truthful action-first cockpit and recovery controls; `W63-S05` Adaptive shell and lifecycle navigation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy; `W63-S07` Installed-console UX/UI acceptance; `W63-S08` Browser-operable canonical lifecycle parity
 - **W64:** `W64-S03` Operator decision projection decomposition
 - **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S03` Mission and Quiet Cockpit pilot activation; `W65-S04` Attention, Journey, and Evidence pilot activation; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
 ## EPIC-7 Internal installed-user rehearsal
@@ -262,5 +263,5 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W60:** `W60-S05` Structured planning proof and documentation closure
 - **W61:** `W61-S05` Topology onboarding proof and documentation closure
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
-- **W63:** `W63-S07` Installed-console UX/UI acceptance and story closure
+- **W63:** `W63-S07` Installed-console UX/UI acceptance; `W63-S08` Browser-operable canonical lifecycle parity
 - **W65:** `W65-S07` Post-cutover installed-console acceptance and story closure

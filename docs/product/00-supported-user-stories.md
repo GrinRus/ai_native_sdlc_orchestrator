@@ -1,12 +1,12 @@
 # Supported user stories
 
-This document groups the AOR user-story surface into role clusters. The current working set maps to **114 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
+This document groups the AOR user-story surface into role clusters. The current working set maps to **116 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
 
 The flat, machine-checkable registry lives in `docs/product/user-story-coverage-matrix.md`. It assigns stable story IDs, tiers, implementation evidence, coverage status, and backlog gap references for every story in this working set.
 
 ## Coverage summary
-- Total stories: **114**
-- MVP: **75**
+- Total stories: **116**
+- MVP: **77**
 - MVP+: **24**
 - Later: **15**
 
@@ -20,11 +20,11 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 | Delivery engineer | 10 | 7 | 2 | 1 |
 | Reviewer / QA | 6 | 4 | 1 | 1 |
 | AI platform owner | 12 | 6 | 4 | 2 |
-| Operator / SRE | 11 | 9 | 1 | 1 |
+| Operator / SRE | 12 | 10 | 1 | 1 |
 | Security / compliance | 6 | 4 | 1 | 1 |
 | Repository / multirepo owner | 6 | 4 | 1 | 1 |
 | Incident / improvement owner | 6 | 3 | 2 | 1 |
-| Project bootstrap / onboarding | 9 | 6 | 2 | 1 |
+| Project bootstrap / onboarding | 10 | 7 | 2 | 1 |
 | Delivery transaction / Git / PR | 8 | 5 | 2 | 1 |
 | Finance / audit / hygiene | 8 | 4 | 3 | 1 |
 
@@ -98,10 +98,13 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Track which required matrix cells are still uncovered after each installed-user proof run.
 - Read optional provider qualification by provider, adapter, coverage tier, owner, phase, evidence, and release-blocking status without opening raw provider logs.
 - Ask AOR to analyze or change bounded project artifacts from any flow stage through runtime-owned request evidence.
+- Complete the canonical safe no-write lifecycle through installed runtime-owned UI actions without a required terminal handoff.
 
 W18 closes the connected operator-surface path for runner-requested questions: surface the question from `step-result.requested_interaction`, submit an approved operator answer through the control plane, emit query-safe live events, and keep the answer trail auditable without making the web UI own orchestration.
 
 `W32-S01` adds operator-initiated runtime intervention: CLI, API, and web can create a durable `operator-request`, compile it into the selected runtime step, and materialize proposal/patch evidence while keeping `run steer` as run-control only.
+
+The `OPS-11` baseline is limited to bounded operator-request creation and execution against a selected flow. It does not prove execution-route or model setup, nor does it prove that the complete lifecycle is operable through the installed UI. `OPS-12` remains partial until the current console, truthful action semantics, and browser-operable lifecycle gaps close in W59 and W63.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
@@ -142,12 +145,15 @@ baseline rather than the full operator workflow in
 - Materialize project-analysis reports with commands, service boundaries, risk zones, and runtime-context readiness.
 - Recommend missing AOR-native runtime context assets and project-profile coverage.
 - Block execution if prerequisites are missing.
+- Open the installed app from a neutral directory, select or add an AOR Project, and configure an approved execution route without editing raw profiles or exposing credentials.
 
 `W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
 
 `W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
 
 `W31-S01` closes the installed-user local UI intake story, and `W36-S03`/`W36-S04` make it no-settings and project-aware: a user who installed `@grinrus/aor` can run `cd <repo> && aor app`, confirm project context, initialize the runtime explicitly, apply the safe walkthrough Mission template, submit the first mission, switch between explicitly added local projects, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
+
+That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch, approved execution-route setup, or a complete UI-only lifecycle. `PBO-10` remains partial until project-anchored context resolution, neutral Workspace state, the execution-profile contract, and Execution Setup UX close in W57 and W61.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

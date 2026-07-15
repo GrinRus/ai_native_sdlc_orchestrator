@@ -38,7 +38,7 @@ hard dependencies nor makes any W60 slice done.
   app package smoke, CI/release tests
 - **Hard dependencies:** W58-S08
 - **Primary user story surfaces:** PBO-09, OPS-01, OPS-04, OPS-06, OPS-07,
-  OPS-11.
+  OPS-11, OPS-12.
 - **Audit findings:** AUD-044 and web regression coverage for AUD-019,
   AUD-039 through AUD-043.
 
@@ -58,6 +58,9 @@ hard dependencies nor makes any W60 slice done.
    timeouts and actionable artifacts outside Git; prove tracked `dist` freshness
    through content hashes or a clean temporary rebuild comparison, not filenames
    and source hash alone.
+7. Add explicit label-to-mutation and mutation-to-durable-readback oracles for
+   current console actions, and cover contextual operator errors, retained
+   success results, and selected-project identity across reload and reconnect.
 
 ### Acceptance criteria
 1. The tests fail when GET/first load creates `.aor`, SSE stops updating, a stale
@@ -72,10 +75,16 @@ hard dependencies nor makes any W60 slice done.
 5. Marker tests remain explicitly labeled packaging-only.
 6. Modifying an existing tracked HTML/JS/CSS bundle file without a matching
    source rebuild fails the package-freshness gate.
+7. The gate fails when an action label promises a different side effect from the
+   invoked mutation, an operator error is opaque or rendered as healthy empty
+   state, a successful result disappears after reload, or a request/readback is
+   resolved through the wrong selected-project context.
 
 ### Done evidence
 - component/browser harness and deterministic fixtures
 - clean-first-load and live-state behavior tests
+- action-label/mutation/readback, contextual-error, durable-success, and
+  selected-project behavior fixtures
 - desktop/tablet/mobile/keyboard result matrix
 - package-installed SPA smoke
 - CI/release gate integration
@@ -89,7 +98,8 @@ hard dependencies nor makes any W60 slice done.
 
 - **Outcome:** The same-origin local console consumes one durable control-plane
   client, commits project snapshots atomically, exposes partial failures, and lets
-  the operator handle every pending interaction/decision.
+  the operator handle every pending interaction/decision with truthful action,
+  lifecycle-stage, error, and durable-result presentation.
 - **Epic:** EPIC-1, EPIC-6
 - **State:** blocked
 - **Remediation priority:** P1
@@ -98,7 +108,7 @@ hard dependencies nor makes any W60 slice done.
   shared read models
 - **Hard dependencies:** W59-S01
 - **Primary user story surfaces:** ARC-06, PBO-09, EMP-05, OPS-01, OPS-02,
-  OPS-04, OPS-10, OPS-11.
+  OPS-04, OPS-10, OPS-11, OPS-12.
 - **Audit findings:** AUD-039, AUD-040, AUD-041, AUD-042, AUD-054.
 
 ### Local tasks
@@ -107,7 +117,8 @@ hard dependencies nor makes any W60 slice done.
 2. Close/abort old streams and requests on project/flow switch and commit one
    generation-keyed project snapshot instead of independent stale setters.
 3. Track loading, connected, partial, stale, offline, and per-resource error state
-   separately from authoritative empty data.
+   separately from authoritative empty data; render the W58-S06 error envelope
+   as a contextual recovery card without inferring actions from diagnostic text.
 4. Preserve last-known state on partial failure and disable decisions that depend
    on missing resources.
 5. Add accessible selection and independent draft state for every queued
@@ -115,6 +126,13 @@ hard dependencies nor makes any W60 slice done.
 6. Render package/app-config version and remove stale hard-coded display values.
 7. Remove, reserve, or explicitly document unsupported arbitrary-remote UI config
    fields without breaking the headless detached API.
+8. Rename the current refresh-only `Resolve Next Action` control to
+   `Refresh next action` and `Add local project` to `Add another AOR project` so
+   visible labels match their implemented side effects until W61/W63 replace the
+   corresponding flows.
+9. Persist successful operation results with durable project/flow/run and
+   evidence references, restore them after reload/reconnect, and label the
+   authoritative `Current lifecycle stage` separately from any `Viewing stage`.
 
 ### Acceptance criteria
 1. A separate-process event updates the selected local flow without manual refresh
@@ -127,11 +145,23 @@ hard dependencies nor makes any W60 slice done.
 5. UI and package smoke display the same version from app config.
 6. The SPA works entirely same-origin and contains no browser credential or remote
    control-plane requirement.
+7. Errors appear beside the affected operation with structured consequence,
+   retryability, evidence, and supported recovery actions; an opaque diagnostic
+   is never the only operator-visible state.
+8. `Refresh next action` performs only the next-action refresh, and
+   `Add another AOR project` cannot be mistaken for adding a repository to the
+   current project.
+9. Successful operations retain their durable references across reload and
+   reconnect, and the UI never presents the inspected stage as the current
+   lifecycle stage.
 
 ### Done evidence
 - typed/local control-plane client tests
 - project generation/abort race fixtures
 - partial/offline/error-state browser tests
+- contextual recovery-card and diagnostic-text non-inference tests
+- truthful action-label and lifecycle/viewing-stage fixtures
+- durable operation-result reload/reconnect fixtures
 - multi-item interaction/decision tests
 - version/config compatibility tests
 
@@ -139,6 +169,8 @@ hard dependencies nor makes any W60 slice done.
 - Remote SPA to arbitrary control-plane connectivity.
 - Browser bearer token lifecycle, login, OAuth/SSO, RBAC, or tenant switching.
 - Frontend-owned runtime decisions.
+- Execution Setup and repository-topology editing, which are owned by W61.
+- Full Quiet Cockpit and UI-only lifecycle closure, which are owned by W63.
 
 ## W59-S03 — Accessible local dialogs and web state decomposition
 

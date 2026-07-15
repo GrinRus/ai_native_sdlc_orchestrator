@@ -229,8 +229,9 @@ W57 and the control-plane semantics closed by W58/W59.
    `complete | incomplete` semantics by making incomplete creation an explicit
    acknowledged path that names missing evidence and downstream blockers.
 5. Model `mission create` and the following `next` mutation as a resumable
-   operation with created refs, pending step, partial-success recovery, and
-   idempotent retry behavior.
+   operation with created refs, pending step, partial-success recovery,
+   idempotent retry behavior, and durable operation-result readback after
+   reload or reconnect.
 6. Keep no-write copy precise: AOR may write durable evidence under `.aor/`, but
    must not edit target source files or perform upstream writes.
 7. Add browser tests for invalid, complete, partial-success, retry, keyboard,
@@ -249,7 +250,8 @@ W57 and the control-plane semantics closed by W58/W59.
    offers only the remaining safe step, and cannot create a duplicate Mission
    on retry.
 5. Successful creation ends with a persistent summary containing the new flow,
-   Mission/intake refs, next-action status, blockers, and a direct cockpit link.
+   Mission/intake refs, next-action status, blockers, and a direct cockpit link;
+   the same result is reconstructed after reload or reconnect.
 6. Blank, safe, follow-up, and duplicate paths remain no-upstream-write by
    default and preserve completed-flow immutability.
 
@@ -279,7 +281,8 @@ W57 and the control-plane semantics closed by W58/W59.
 - **Primary modules:** `docs/contracts/**`, next-action and run-health examples,
   control-plane lifecycle mutations, `apps/web/src/**`, browser tests
 - **Hard dependencies:** W63-S01, W63-S02
-- **Primary user story surfaces:** OPS-01, OPS-04, OPS-11, RQA-02, RQA-06.
+- **Primary user story surfaces:** OPS-01, OPS-04, OPS-11, OPS-12, RQA-02,
+  RQA-06.
 
 ### Local tasks
 
@@ -290,14 +293,16 @@ W57 and the control-plane semantics closed by W58/W59.
    deterministically distinguish an executable mutation, workbench action,
    evidence inspection, refresh, or terminal handoff. The SPA must never parse
    a shell command string to decide which mutation to execute.
-3. Make supported lifecycle and recovery actions execute through the canonical
-   same-origin control-plane mutation; label unsupported paths explicitly as
-   `Copy ... command` or `Continue in terminal` and confirm the copy result.
+3. Make every supported action on the safe installed path execute through the
+   canonical same-origin control-plane mutation. Reserve `Copy ... command` or
+   `Continue in terminal` for explicitly excluded risky, credentialed-live, or
+   provider-specific branches and confirm the handoff result.
 4. Remove or rename false affordances such as controls that say Stop, Retry,
    Diagnose, or Resolve while only copying text or refreshing state.
 5. Give each action operation-specific pending, partial, success, blocked, and
    error feedback with `aria-busy`, an accessible live status, durable refs,
-   and a safe retry or inspect path.
+   a safe retry or inspect path, and reconstructed operation results after
+   reload or reconnect.
 6. Make Ask AOR `create -> run -> refresh` resumable and keep its result visible
    after the drawer closes; retries must resume the durable request rather than
    create another one.
@@ -319,6 +324,9 @@ W57 and the control-plane semantics closed by W58/W59.
 5. Completed flows expose inspection and follow-up creation only; no cockpit
    control mutates their evidence chain.
 6. Browser tests fail when an action label and observed side effect diverge.
+7. The deterministic safe path has no required terminal handoff; any remaining
+   terminal continuation is tied to an explicitly excluded risky,
+   credentialed-live, or provider-specific branch.
 
 ### Done evidence
 
@@ -361,7 +369,8 @@ W57 and the control-plane semantics closed by W58/W59.
 4. Define table, artifact list, timeline, form, drawer, and action-toolbar
    behavior for narrow widths, wrapping, overflow, touch, and safe-area spacing.
 5. Align DOM order, visual order, focus order, and the primary action hierarchy;
-   preserve contextual focus names and reduced-motion behavior.
+   preserve contextual focus names, reduced-motion behavior, and durable
+   operation-result access after reload or reconnect.
 6. Add breakpoint regression fixtures at 320px and 390x844, 768x1024,
    1024x768, 1180/1181px, and 1440x900, plus browser reflow/zoom coverage.
 
@@ -381,6 +390,9 @@ W57 and the control-plane semantics closed by W58/W59.
    overflow rather than shrinking content below readability.
 6. Breakpoint, keyboard, focus-order, and overflow browser fixtures pass for
    first-run, active, blocked, and completed scenarios.
+7. Reload or reconnect restores the selected Project/Flow and any durable
+   operation result without conflating the runtime lifecycle stage with the
+   stage currently being inspected.
 
 ### Done evidence
 
@@ -462,12 +474,13 @@ W57 and the control-plane semantics closed by W58/W59.
 - Replacing durable evidence with transient browser notifications.
 - Removing technical inspection paths needed by advanced operators.
 
-## W63-S07 — Installed-console UX/UI acceptance and story closure
+## W63-S07 — Installed-console UX/UI acceptance
 
-- **Outcome:** W63 closes with executable installed-package evidence that the
-  opt-in Quiet Cockpit experience completes its target operator jobs with
-  acceptable visual, responsive, accessibility, recovery, and safety quality
-  while the legacy installed default remains available for W65 cutover.
+- **Outcome:** The opt-in Quiet Cockpit experience has executable
+  installed-package evidence for its target screens, interactions, visual
+  hierarchy, responsive behavior, accessibility, recovery, and safety quality
+  while the legacy installed default remains available; canonical lifecycle
+  story closure remains owned by W63-S08.
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
 - **State:** blocked
 - **Delivery priority:** P1
@@ -475,8 +488,8 @@ W57 and the control-plane semantics closed by W58/W59.
 - **Primary modules:** installed SPA browser suite, package smoke, UX quality
   report, product/story/readiness docs
 - **Hard dependencies:** W63-S02, W63-S03, W63-S04, W63-S05, W63-S06
-- **Primary user story surfaces:** PBO-09, OPS-01, OPS-02, OPS-04, OPS-10,
-  OPS-11, RQA-01, RQA-02, RQA-06.
+- **Primary user story surfaces:** PBO-09, PBO-10, OPS-01, OPS-02, OPS-04,
+  OPS-10, OPS-11, OPS-12, RQA-01, RQA-02, RQA-06.
 
 ### Local tasks
 
@@ -495,13 +508,16 @@ W57 and the control-plane semantics closed by W58/W59.
    provider progress, interaction/decision, failed verification/repair,
    review/QA, completed closure, follow-up flow, partial read, and offline
    recovery states.
-5. Rehearse the safe first-flow and follow-up paths with durable packet/report
-   readback and explicit no-target-source/no-upstream-write assertions.
+5. Rehearse the accepted Mission, action, recovery, evidence, completed, and
+   follow-up scenarios with durable packet/report readback, operation-result
+   restoration after reload/reconnect, and explicit
+   no-target-source/no-upstream-write assertions.
 6. Produce a final UX/UI quality report with finding disposition, inspected
    refs, task outcomes, remaining limitations, and scored dimensions that do
    not substitute visual evidence for runtime/product-quality evidence.
-7. Update product, architecture, story coverage, roadmap, README, and operator
-   guidance only after the executable acceptance matrix passes.
+7. Update product, architecture, roadmap, README, and operator guidance only
+   after the executable acceptance matrix passes; retain explicit story gaps
+   for the end-to-end lifecycle parity owned by W63-S08.
 
 ### Acceptance criteria
 
@@ -511,7 +527,8 @@ W57 and the control-plane semantics closed by W58/W59.
    selector still resolves to the legacy renderer until W65.
 2. Mission creation, one safe next action, multiple attention items, recovery,
    evidence inspection, completed-flow read-only state, and follow-up creation
-   are executable and understandable without editing raw runtime JSON.
+   are executable and understandable without editing raw runtime JSON; this
+   screen/task matrix does not claim full lifecycle parity before W63-S08.
 3. Automated and manual accessibility evidence has no unresolved P1 issue;
    focus, labels, names, roles, state, contrast, target size, and reduced motion
    meet the W63 component and journey contracts.
@@ -521,9 +538,9 @@ W57 and the control-plane semantics closed by W58/W59.
 5. Durable evidence proves no duplicate Mission/request on partial retry, no
    target source edit in no-write mode, no upstream write, and no completed-flow
    mutation.
-6. Story/readiness claims cite executable evidence for the exact supported
-   surface and retain explicit gaps for hosted web, Windows, credentialed
-   provider breadth, and real upstream writes.
+6. Readiness claims cite executable evidence for the exact supported surface
+   and retain explicit gaps for full safe lifecycle parity, hosted web,
+   Windows, credentialed provider breadth, and real upstream writes.
 
 ### Done evidence
 
@@ -532,8 +549,8 @@ W57 and the control-plane semantics closed by W58/W59.
 - responsive/rendered evidence bundle
 - safe-flow packet/report and no-write readback
 - final UX/UI quality report and finding ledger
-- W65 parity/cutover handoff with selector, scenario, and evidence refs
-- updated product/story/readiness/operator docs
+- W63-S08 lifecycle-parity handoff with selector, scenario, and evidence refs
+- updated product/readiness/operator docs with W63-S08 story gaps retained
 - `pnpm slice:gate`
 
 ### Out of scope
@@ -543,3 +560,120 @@ W57 and the control-plane semantics closed by W58/W59.
 - Hosted web, multi-user collaboration, enterprise identity, or public CORS.
 - Credentialed provider matrix expansion, paid external calls, or real
   upstream-write proof.
+- Canonical UI-only lifecycle story closure; W63-S08 owns that proof.
+
+---
+
+## W63-S08 — Browser-operable canonical lifecycle parity
+
+- **Outcome:** An installed local operator can complete the canonical safe
+  no-write lifecycle through the opt-in Quiet Cockpit SPA using runtime-owned
+  actions and durable evidence, with no required terminal handoff on the golden
+  path.
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7
+- **State:** blocked
+- **Delivery priority:** P1
+- **Estimated effort:** XL
+- **Primary modules:** installed SPA scenario suite, canonical control-plane
+  lifecycle routes, mock runner and deterministic validation fixtures,
+  packet/report readback, product/story/readiness docs
+- **Hard dependencies:** W63-S07
+- **Primary user story surfaces:** PBO-09, PBO-10, OPS-01, OPS-02, OPS-04,
+  OPS-10, OPS-11, OPS-12, RQA-01, RQA-02, RQA-06.
+
+### Local tasks
+
+1. **Freeze the golden installed-user lifecycle.**
+   - Purpose: turn separate accepted screens and actions into one reproducible
+     operator outcome.
+   - Changes: define the scenario sequence
+     `Workspace -> Project -> Execution Setup -> Mission -> Discovery -> Spec -> Plan/Approval -> Execution -> Review/QA -> no-write Delivery/Release evidence -> Learning -> Follow-up`
+     with named entry state, authoritative packet/report, mutation, recovery,
+     and success signal at every transition.
+   - Validation: the scenario catalog resolves every step to an existing
+     runtime owner and records any unsupported credentialed-live or risky branch
+     outside the golden path.
+2. **Close every safe-path action through the canonical control plane.**
+   - Purpose: ensure the browser operates AOR instead of presenting terminal
+     instructions as completed work.
+   - Changes: bind each golden-path control to its canonical same-origin
+     mutation and durable read route; remove `Copy command` and
+     `Continue in terminal` from the golden path while preserving explicit
+     handoffs only for excluded provider-specific, credentialed-live, or risky
+     branches.
+   - Validation: browser assertions trace
+     `visible label -> HTTP mutation -> durable packet/report readback` and fail
+     on label/side-effect mismatch or UI-only lifecycle state.
+3. **Build the deterministic no-write execution fixture.**
+   - Purpose: make full lifecycle proof repeatable without credentials, paid
+     calls, external network access, or target-source mutation.
+   - Changes: use an explicitly labelled mock runner plus deterministic
+     validation, bounded disposable project/runtime state, approved route
+     readiness, representative review/QA outcomes, and no-write delivery and
+     release evidence.
+   - Validation: fixture setup and execution make no external request, edit no
+     target source, and write no upstream remote while still producing complete
+     runtime-owned lineage.
+4. **Prove resumability and exactly-once durable outcomes.**
+   - Purpose: keep a long UI journey safe across real browser interruptions.
+   - Changes: inject reload, reconnect, duplicate click, timeout, partial
+     success, stale revision, and safe retry boundaries across Mission,
+     approval, execution, review, delivery, learning, and follow-up operations.
+   - Validation: no retry creates a duplicate Mission, request, decision, run,
+     delivery record, or follow-up Flow; durable operation results reconstruct
+     from server-owned refs.
+5. **Prove closure immutability and evidence continuity.**
+   - Purpose: ensure completing the lifecycle does not turn the browser into an
+     alternate evidence owner.
+   - Changes: verify the completed Flow remains read-only, every stage is
+     inspectable through packet/report lineage, and follow-up creation produces
+     distinct refs without mutating the source Flow.
+   - Validation: pre/post digests, evidence traversal, completed-state mutation
+     denials, and follow-up isolation assertions pass after reload.
+6. **Publish exact story and readiness evidence.**
+   - Purpose: close OPS-12 and related installed-console claims only at the
+     behavior actually proven.
+   - Changes: record installed-package browser traces, durable readback, no-write
+     assertions, accessibility/viewport coverage, finding disposition, and
+     remaining credentialed-live/hosted/upstream-write gaps in product,
+     readiness, and operator guidance.
+   - Validation: story references point to executable evidence for the full
+     golden path and do not reuse W63-S07 visual/task acceptance as lifecycle
+     closure proof.
+
+### Acceptance criteria
+
+1. The full golden lifecycle completes through the installed SPA using an
+   approved mock/deterministic route and no mandatory terminal continuation.
+2. Every golden-path action is a canonical control-plane mutation with durable
+   packet/report readback; no UI-owned lifecycle shortcut exists.
+3. `Copy command` and `Continue in terminal` do not appear on the golden path
+   and remain allowed only for explicitly excluded branches.
+4. Reload, reconnect, partial success, duplicate input, and retry do not create
+   duplicate Mission, request, decision, run, delivery, learning, or follow-up
+   evidence.
+5. The completed Flow is read-only, its evidence chain remains inspectable, and
+   follow-up creation uses distinct refs without mutating the source Flow.
+6. Target source and upstream remotes remain unchanged; credentialed live calls
+   are not required for acceptance.
+7. OPS-12 and related readiness claims close only against the installed-package
+   browser trace and durable golden-path evidence.
+
+### Done evidence
+
+- canonical lifecycle scenario map and fixture manifest
+- installed SPA golden-path browser trace
+- action-label, HTTP mutation, and durable-readback matrix
+- reload/reconnect/retry and duplicate-artifact results
+- completed-flow immutability and follow-up isolation proof
+- no-target-source/no-upstream-write evidence
+- updated story/readiness/operator docs with remaining gaps
+- W65 parity/cutover handoff with golden scenario and evidence refs
+- `pnpm slice:gate`
+
+### Out of scope
+
+- Credentialed provider-matrix expansion or paid external calls.
+- Real upstream writes or public release publication.
+- Hosted web, multi-user collaboration, or enterprise identity.
+- Portfolio orchestration across independent AOR Projects.
