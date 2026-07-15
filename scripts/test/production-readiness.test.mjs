@@ -22,6 +22,22 @@ const proofFixturePath = path.posix.join(
   "w25-s03-production-proof.json",
 );
 
+function writeCurrentPassingTestReport() {
+  const plan = discoverTestExecutionPlan(root);
+  const reportPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aor-readiness-report-")), "test-report.json");
+  fs.writeFileSync(reportPath, `${JSON.stringify({
+    status: "pass",
+    git_head: readGitHead(root),
+    manifest_digest: plan.manifest_digest,
+    discovered_files: plan.candidates,
+    executed_files: plan.candidates,
+    groups: plan.groups.map((group) => ({ ...group, status: "pass" })),
+    duplicate_files: [],
+    missing_files: [],
+  }, null, 2)}\n`);
+  return reportPath;
+}
+
 test("production readiness gate enforces the committed audit hold with healthy internal checks", () => {
   const ledger = JSON.parse(
     fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
@@ -31,13 +47,13 @@ test("production readiness gate enforces the committed audit hold with healthy i
     .filter((findingId) => /^AUD-[0-9]{3}$/u.test(findingId));
   assert.equal(auditIds.length, 55);
   assert.ok(auditIds.includes("AUD-055"));
-  const result = runProductionReadinessGate({ rootDir: root });
+  const result = runProductionReadinessGate({ rootDir: root, testReportPath: writeCurrentPassingTestReport() });
   assert.equal(result.status, "blocked");
   assert.equal(result.gate_execution_status, "pass");
   assert.equal(result.release_disposition, "audit-hold");
   assert.equal(result.release_clearance, false);
   assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-006"));
-  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "project-context-cwd-divergence"));
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
@@ -63,7 +79,7 @@ test("production readiness gate clears only a valid ledger with evidence-backed 
   }));
   fs.writeFileSync(tempLedger, `${JSON.stringify(ledger, null, 2)}\n`);
 
-  const result = runProductionReadinessGate({ rootDir: root, auditLedgerPath: tempLedger });
+  const result = runProductionReadinessGate({ rootDir: root, auditLedgerPath: tempLedger, testReportPath: writeCurrentPassingTestReport() });
   assert.equal(result.status, "pass");
   assert.equal(result.gate_execution_status, "pass");
   assert.equal(result.release_disposition, "cleared");
@@ -87,12 +103,12 @@ test("CI workflow accepts only the explicit healthy audit-hold mode", () => {
   assert.doesNotMatch(workflow, /run: pnpm production:ready\s*$/mu);
 });
 
-test("test discovery maps all 59 tracked candidates exactly once", () => {
+test("test discovery maps all 60 tracked candidates exactly once", () => {
   const plan = discoverTestExecutionPlan(root);
   assert.equal(plan.ok, true, plan.errors.join("\n"));
-  assert.equal(plan.candidate_count, 59);
+  assert.equal(plan.candidate_count, 60);
   assert.equal(plan.excluded.length, 0);
-  assert.equal(plan.groups.flatMap((group) => group.files).length, 59);
+  assert.equal(plan.groups.flatMap((group) => group.files).length, 60);
 });
 
 test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {

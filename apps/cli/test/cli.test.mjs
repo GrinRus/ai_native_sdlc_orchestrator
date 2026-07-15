@@ -4513,6 +4513,30 @@ test("project init discovers repo root from cwd and materializes runtime layout 
   });
 });
 
+test("project init with explicit project-ref is invariant from a neutral launcher", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "examples"), { recursive: true });
+    fs.copyFileSync(path.join(workspaceRoot, "examples/project.aor.yaml"), path.join(projectRoot, "examples/project.aor.yaml"));
+    const launcher = fs.mkdtempSync(path.join(os.tmpdir(), "aor-neutral-launcher-"));
+    try {
+      const args = ["project", "init", "--project-ref", projectRoot];
+      const fromLauncher = invokeCli(args, { cwd: launcher });
+      const fromProject = invokeCli(args, { cwd: projectRoot });
+      assert.equal(fromLauncher.exitCode, 0, fromLauncher.stderr);
+      assert.equal(fromProject.exitCode, 0, fromProject.stderr);
+      const launcherPayload = JSON.parse(fromLauncher.stdout);
+      const projectPayload = JSON.parse(fromProject.stdout);
+      assert.equal(launcherPayload.resolved_project_ref, projectPayload.resolved_project_ref);
+      assert.equal(launcherPayload.resolved_runtime_root, projectPayload.resolved_runtime_root);
+      assert.equal(launcherPayload.runtime_state_file, projectPayload.runtime_state_file);
+      assert.equal(fs.existsSync(path.join(launcher, ".aor")), false);
+    } finally {
+      fs.rmSync(launcher, { recursive: true, force: true });
+    }
+  });
+});
+
 test("project init materializes bundled bootstrap profile and assets idempotently for a clean target repo", () => {
   withTempProject((projectRoot) => {
     runGitChecked({ cwd: projectRoot, args: ["init"] });
