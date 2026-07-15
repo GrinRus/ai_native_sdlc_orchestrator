@@ -325,16 +325,18 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
     );
   }
 
-  const writebackAllowed = deliveryPlan.writeback_allowed;
-  if (writebackAllowed !== true) {
-    throw new Error("Delivery plan does not allow write-back for this run.");
-  }
-
   const mode = asString(deliveryPlan.delivery_mode);
   if (!mode || !SUPPORTED_DELIVERY_MODES.has(mode)) {
     throw new Error(
       `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: no-write, patch-only, local-branch, fork-first-pr.`,
     );
+  }
+
+  if (deliveryPlan.execution_allowed !== true) {
+    throw new Error("Delivery plan does not allow execution for this run.");
+  }
+  if (mode !== "no-write" && deliveryPlan.writeback_allowed !== true) {
+    throw new Error("Delivery plan does not allow write-back for this run.");
   }
 
   if (requestedMode && requestedMode !== mode) {

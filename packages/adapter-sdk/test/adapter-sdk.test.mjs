@@ -1449,6 +1449,14 @@ test("live adapter request-artifact transport sends bounded provider work packet
         compiled_context_file: compiledContextFile,
         instruction_set: { objective: "Implement the bounded request-artifact test." },
         packet_refs: ["packet://handoff"],
+        execution_permissions: {
+          execution_allowed: true,
+          writeback_allowed: true,
+          target_write_allowed: true,
+          direct_edits_allowed: true,
+          meaningful_change_required: true,
+          delivery_mode: "patch-only",
+        },
       },
     });
 
@@ -1482,6 +1490,40 @@ test("live adapter request-artifact transport sends bounded provider work packet
       ),
     );
     assert.ok(response.output.runner_output.execution_contract.output_quality_policy.stderr_warning_tokens.includes("ResourceWarning"));
+
+    const readOnlyResponse = adapter.execute({
+      request_id: "req-request-artifact-read-only",
+      run_id: "run-request-artifact-read-only",
+      step_id: "step-request-artifact-read-only",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      input_packet_refs: ["packet://handoff"],
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.read-only",
+        compiled_context_file: compiledContextFile,
+        instruction_set: { objective: "Inspect without changing the checkout." },
+        execution_permissions: {
+          execution_allowed: true,
+          writeback_allowed: false,
+          target_write_allowed: false,
+          direct_edits_allowed: false,
+          meaningful_change_required: false,
+          delivery_mode: "no-write",
+        },
+      },
+    });
+
+    assert.equal(readOnlyResponse.status, "success");
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.mode, "read-only-inspection");
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.expected_meaningful_change.required, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.target_write_allowed, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.writeback_allowed, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.final_report.require_diff_or_patch_evidence, false);
   });
 });
 

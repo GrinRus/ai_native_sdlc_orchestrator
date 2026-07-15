@@ -1,324 +1,379 @@
+import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+
+import { validatePublicId } from "../../contracts/src/index.mjs";
 
 const SUPPORTED_WORKSPACE_MODES = new Set(["ephemeral", "workspace-clone", "worktree"]);
 const SUPPORTED_CLEANUP_ACTIONS = new Set(["delete", "retain", "none"]);
 
-/**
- * @param {unknown} value
- * @returns {value is Record<string, unknown>}
- */
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * @param {unknown} value
- * @returns {string}
- */
 function normalizeWorkspaceMode(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : "ephemeral";
 }
 
-/**
- * @param {string} value
- * @returns {boolean}
- */
 export function isSupportedWorkspaceMode(value) {
   return SUPPORTED_WORKSPACE_MODES.has(value);
 }
 
-/**
- * @param {"ephemeral" | "workspace-clone" | "worktree"} mode
- * @returns {{ on_success: "delete" | "retain" | "none", on_abort: "delete" | "retain" | "none", on_failure: "delete" | "retain" | "none" }}
- */
-function defaultCleanupPolicy(mode) {
-  if (mode === "ephemeral") {
-    return {
-      on_success: "none",
-      on_abort: "none",
-      on_failure: "none",
-    };
-  }
+function defaultCleanupPolicy() {
+  return { on_success: "delete", on_abort: "delete", on_failure: "retain" };
+}
 
+function resolveCleanupPolicy(runtimeDefaults) {
+  const defaults = defaultCleanupPolicy();
+  const configured = runtimeDefaults.workspace_cleanup;
+  if (!isPlainObject(configured)) return defaults;
+  function action(value, fallback) {
+    return typeof value === "string" && SUPPORTED_CLEANUP_ACTIONS.has(value) ? value : fallback;
+  }
   return {
-    on_success: "delete",
-    on_abort: "delete",
-    on_failure: "retain",
+    on_success: action(configured.on_success, defaults.on_success),
+    on_abort: action(configured.on_abort, defaults.on_abort),
+    on_failure: action(configured.on_failure, defaults.on_failure),
   };
 }
 
-/**
- * @param {Record<string, unknown>} runtimeDefaults
- * @param {"ephemeral" | "workspace-clone" | "worktree"} mode
- * @returns {{ on_success: "delete" | "retain" | "none", on_abort: "delete" | "retain" | "none", on_failure: "delete" | "retain" | "none" }}
- */
-function resolveCleanupPolicy(runtimeDefaults, mode) {
-  const defaults = defaultCleanupPolicy(mode);
-  const configured = /** @type {Record<string, unknown>} */ (runtimeDefaults.workspace_cleanup ?? {});
-  if (!isPlainObject(configured)) {
-    return defaults;
-  }
-
-  /**
-   * @param {unknown} value
-   * @param {"delete" | "retain" | "none"} fallback
-   * @returns {"delete" | "retain" | "none"}
-   */
-  function cleanupAction(value, fallback) {
-    if (typeof value !== "string" || !SUPPORTED_CLEANUP_ACTIONS.has(value)) {
-      return fallback;
-    }
-    return /** @type {"delete" | "retain" | "none"} */ (value);
-  }
-
-  return {
-    on_success: cleanupAction(configured.on_success, defaults.on_success),
-    on_abort: cleanupAction(configured.on_abort, defaults.on_abort),
-    on_failure: cleanupAction(configured.on_failure, defaults.on_failure),
-  };
-}
-
-/**
- * @param {string} candidate
- * @param {string} root
- * @returns {boolean}
- */
 function isPathInsideRoot(candidate, root) {
-  const resolvedCandidate = path.resolve(candidate);
-  const resolvedRoot = path.resolve(root);
-  return (
-    resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`)
-  );
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
 }
 
-/**
- * @param {string} candidate
- * @returns {boolean}
- */
+function canonicalDirectory(candidate, label) {
+  const stat = fs.lstatSync(candidate);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error(`${label} must be a real directory, not a symlink or junction.`);
+  }
+  return fs.realpathSync.native(candidate);
+}
+
+function runGit(cwd, args, allowFailure = false) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  if (result.status !== 0 && !allowFailure) {
+    throw new Error(`Git command failed in '${cwd}': git ${args.join(" ")} (${(result.stderr || result.stdout || "unknown error").trim()})`);
+  }
+  return result;
+}
+
+function gitValue(cwd, args) {
+  const result = runGit(cwd, args, true);
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+export function inspectGitCheckout(root) {
+  const canonicalRoot = canonicalDirectory(root, "Checkout root");
+  if (gitValue(canonicalRoot, ["rev-parse", "--is-inside-work-tree"]) !== "true") return null;
+  const topLevel = gitValue(canonicalRoot, ["rev-parse", "--show-toplevel"]);
+  const gitDirValue = gitValue(canonicalRoot, ["rev-parse", "--absolute-git-dir"]);
+  const commonDirValue = gitValue(canonicalRoot, ["rev-parse", "--git-common-dir"]);
+  if (!topLevel || !gitDirValue || !commonDirValue) return null;
+  const gitDir = fs.realpathSync.native(path.resolve(canonicalRoot, gitDirValue));
+  const commonDirCandidate = path.isAbsolute(commonDirValue)
+    ? commonDirValue
+    : path.resolve(canonicalRoot, commonDirValue);
+  const commonDir = fs.realpathSync.native(commonDirCandidate);
+  return {
+    root: fs.realpathSync.native(topLevel),
+    git_dir: gitDir,
+    common_dir: commonDir,
+    head: gitValue(canonicalRoot, ["rev-parse", "--verify", "HEAD"]),
+    symbolic_head: gitValue(canonicalRoot, ["symbolic-ref", "-q", "HEAD"]),
+  };
+}
+
+function digestFile(filePath) {
+  const hash = crypto.createHash("sha256");
+  if (!fs.existsSync(filePath)) return null;
+  const stat = fs.lstatSync(filePath);
+  hash.update(stat.isSymbolicLink() ? `link:${fs.readlinkSync(filePath)}` : fs.readFileSync(filePath));
+  return hash.digest("hex");
+}
+
+function digestCheckoutFiles(root, gitArgs) {
+  const result = runGit(root, gitArgs, true);
+  if (result.status !== 0) return null;
+  const files = result.stdout.split("\0").filter(Boolean).sort();
+  const hash = crypto.createHash("sha256");
+  for (const relativePath of files) {
+    hash.update(relativePath);
+    hash.update("\0");
+    const filePath = path.join(root, relativePath);
+    const stat = fs.lstatSync(filePath);
+    hash.update(stat.isSymbolicLink() ? `link:${fs.readlinkSync(filePath)}` : fs.readFileSync(filePath));
+    hash.update("\0");
+  }
+  return { count: files.length, digest: hash.digest("hex") };
+}
+
+function digestNonGitTree(root) {
+  const hash = crypto.createHash("sha256");
+  let count = 0;
+  function visit(directory, prefix = "") {
+    for (const entry of fs.readdirSync(directory).sort()) {
+      if (!prefix && (entry === ".aor" || entry === ".git")) continue;
+      const relativePath = prefix ? `${prefix}/${entry}` : entry;
+      const filePath = path.join(directory, entry);
+      const stat = fs.lstatSync(filePath);
+      hash.update(relativePath);
+      hash.update("\0");
+      if (stat.isSymbolicLink()) hash.update(`link:${fs.readlinkSync(filePath)}`);
+      else if (stat.isDirectory()) visit(filePath, relativePath);
+      else if (stat.isFile()) {
+        hash.update(fs.readFileSync(filePath));
+        count += 1;
+      }
+      hash.update("\0");
+    }
+  }
+  visit(root);
+  return { count, digest: hash.digest("hex") };
+}
+
+export function captureCheckoutSnapshot(root) {
+  if (!fs.existsSync(root)) {
+    return { root: path.resolve(root), git_available: false, missing: true };
+  }
+  const git = inspectGitCheckout(root);
+  if (!git) {
+    const canonicalRoot = canonicalDirectory(root, "Checkout root");
+    return { root: canonicalRoot, git_available: false, filesystem: digestNonGitTree(canonicalRoot) };
+  }
+  const indexPathValue = gitValue(git.root, ["rev-parse", "--git-path", "index"]);
+  const indexPath = indexPathValue
+    ? path.isAbsolute(indexPathValue)
+      ? indexPathValue
+      : path.resolve(git.root, indexPathValue)
+    : null;
+  const projectPathspec = ["--", ".", ":(exclude).aor/**"];
+  const status = runGit(
+    git.root,
+    ["status", "--porcelain=v1", "-z", "--untracked-files=all", ...projectPathspec],
+    true,
+  ).stdout ?? "";
+  return {
+    root: git.root,
+    git_available: true,
+    head: git.head,
+    symbolic_head: git.symbolic_head,
+    git_dir: git.git_dir,
+    common_dir: git.common_dir,
+    index_digest: indexPath ? digestFile(indexPath) : null,
+    status_digest: crypto.createHash("sha256").update(status).digest("hex"),
+    tracked: digestCheckoutFiles(git.root, ["ls-files", "-z", "--cached", ...projectPathspec]),
+    untracked: digestCheckoutFiles(git.root, ["ls-files", "-z", "--others", "--exclude-standard", ...projectPathspec]),
+  };
+}
+
+export function compareCheckoutSnapshots(before, after) {
+  const fields = ["root", "git_available", "missing", "head", "symbolic_head", "git_dir", "common_dir", "index_digest", "status_digest", "tracked", "untracked", "filesystem"];
+  const changed_fields = fields.filter((field) => JSON.stringify(before[field]) !== JSON.stringify(after[field]));
+  return { unchanged: changed_fields.length === 0, changed_fields };
+}
+
 function isPythonVirtualEnvironmentRoot(candidate) {
   try {
-    const stats = fs.statSync(candidate);
-    if (!stats.isDirectory()) {
-      return false;
-    }
+    if (!fs.lstatSync(candidate).isDirectory()) return false;
   } catch {
     return false;
   }
-
-  const hasVenvConfig = fs.existsSync(path.join(candidate, "pyvenv.cfg"));
-  const hasPosixPython = fs.existsSync(path.join(candidate, "bin", "python"));
-  const hasWindowsPython = fs.existsSync(path.join(candidate, "Scripts", "python.exe"));
-  return hasVenvConfig && (hasPosixPython || hasWindowsPython);
+  return fs.existsSync(path.join(candidate, "pyvenv.cfg")) &&
+    (fs.existsSync(path.join(candidate, "bin", "python")) || fs.existsSync(path.join(candidate, "Scripts", "python.exe")));
 }
 
-/**
- * @param {{ sourceRoot: string, targetRoot: string, runtimeRoot: string }} options
- */
-function cloneWorkspaceTree(options) {
-  fs.rmSync(options.targetRoot, { recursive: true, force: true });
-  fs.mkdirSync(options.targetRoot, { recursive: true });
-
-  for (const entry of fs.readdirSync(options.sourceRoot)) {
-    const sourceEntry = path.join(options.sourceRoot, entry);
-    if (isPathInsideRoot(sourceEntry, options.runtimeRoot)) {
-      continue;
-    }
-    if (isPythonVirtualEnvironmentRoot(sourceEntry)) {
-      continue;
-    }
-
-    fs.cpSync(sourceEntry, path.join(options.targetRoot, entry), {
+function mirrorProjectTree(sourceRoot, targetRoot, runtimeRoot) {
+  for (const entry of fs.readdirSync(targetRoot)) {
+    if (entry !== ".git") fs.rmSync(path.join(targetRoot, entry), { recursive: true, force: true });
+  }
+  for (const entry of fs.readdirSync(sourceRoot)) {
+    const sourceEntry = path.join(sourceRoot, entry);
+    if (entry === ".git" || isPathInsideRoot(sourceEntry, runtimeRoot) || isPythonVirtualEnvironmentRoot(sourceEntry)) continue;
+    fs.cpSync(sourceEntry, path.join(targetRoot, entry), {
       recursive: true,
-      filter: (sourcePath) =>
-        !isPathInsideRoot(sourcePath, options.runtimeRoot) && !isPythonVirtualEnvironmentRoot(sourcePath),
+      dereference: false,
+      filter: (sourcePath) => !isPathInsideRoot(sourcePath, runtimeRoot) && !isPythonVirtualEnvironmentRoot(sourcePath),
     });
   }
 }
 
-/**
- * @param {string} runId
- * @returns {string}
- */
-function toRunSlug(runId) {
-  return runId.replace(/[^A-Za-z0-9._-]+/g, "-");
+function snapshotNonGitTree(sourceRoot, targetRoot, runtimeRoot) {
+  fs.mkdirSync(targetRoot, { recursive: false });
+  mirrorProjectTree(sourceRoot, targetRoot, runtimeRoot);
+  runGit(targetRoot, ["init"]);
+  return { strategy: "independent-snapshot", ref: "unborn", provisioning: "filesystem-snapshot-with-independent-git" };
 }
 
-/**
- * @param {{
- *   mode: "ephemeral" | "workspace-clone" | "worktree",
- *   projectRoot: string,
- *   runtimeRoot: string,
- *   projectRuntimeRoot: string,
- *   runId: string,
- * }} options
- * @returns {{ executionRoot: string, provisioned: boolean, checkout: { strategy: string, ref: string }, provisioning: string }}
- */
-function provisionWorkspace(options) {
-  if (options.mode === "ephemeral") {
-    return {
-      executionRoot: options.projectRoot,
-      provisioned: false,
-      checkout: {
-        strategy: "primary-checkout",
-        ref: "local-working-copy",
-      },
-      provisioning: "in-place",
-    };
+function verifyIndependentGitDirs(sourceGit, executionRoot) {
+  const executionGit = inspectGitCheckout(executionRoot);
+  if (!executionGit || executionGit.git_dir === sourceGit?.git_dir || executionGit.root === sourceGit?.root) {
+    throw new Error("Disposable workspace must use a distinct checkout root and Git directory.");
   }
-
-  const workspacesRoot = path.join(options.projectRuntimeRoot, "workspaces");
-  const workspaceId = `${options.mode}-${toRunSlug(options.runId)}`;
-  const executionRoot = path.join(workspacesRoot, workspaceId);
-  cloneWorkspaceTree({
-    sourceRoot: options.projectRoot,
-    targetRoot: executionRoot,
-    runtimeRoot: options.runtimeRoot,
-  });
-
-  return {
-    executionRoot,
-    provisioned: true,
-    checkout: {
-      strategy: options.mode,
-      ref: "local-working-copy",
-    },
-    provisioning: "filesystem-copy",
-  };
+  return executionGit;
 }
 
-/**
- * @param {{ executionRoot: string, action: "delete" | "retain" | "none", outcome: "success" | "abort" | "failure" }} options
- * @returns {{ outcome: "success" | "abort" | "failure", action: "delete" | "retain" | "none", status: "deleted" | "retained" | "skipped" | "delete-failed", performed: boolean, exists_after: boolean, error: string | null }}
- */
-function applyWorkspaceCleanup(options) {
-  if (options.action === "none") {
-    return {
-      outcome: options.outcome,
-      action: options.action,
-      status: "skipped",
-      performed: false,
-      exists_after: fs.existsSync(options.executionRoot),
-      error: null,
-    };
+function provisionGitWorkspace({ sourceRoot, executionRoot, requestedMode, sourceGit, runtimeRoot }) {
+  if (!sourceGit?.head) return null;
+  if (requestedMode !== "workspace-clone") {
+    const worktree = runGit(sourceRoot, ["worktree", "add", "--detach", executionRoot, sourceGit.head], true);
+    if (worktree.status === 0) {
+      mirrorProjectTree(sourceRoot, executionRoot, runtimeRoot);
+      return { strategy: "detached-worktree", ref: sourceGit.head, provisioning: "git-worktree" };
+    }
+    fs.rmSync(executionRoot, { recursive: true, force: true });
   }
-
-  if (options.action === "retain") {
-    return {
-      outcome: options.outcome,
-      action: options.action,
-      status: "retained",
-      performed: false,
-      exists_after: fs.existsSync(options.executionRoot),
-      error: null,
-    };
+  const clone = runGit(sourceRoot, ["clone", "--no-hardlinks", "--no-checkout", sourceRoot, executionRoot], true);
+  if (clone.status !== 0) {
+    fs.rmSync(executionRoot, { recursive: true, force: true });
+    return null;
   }
+  runGit(executionRoot, ["checkout", "--detach", sourceGit.head]);
+  mirrorProjectTree(sourceRoot, executionRoot, runtimeRoot);
+  return { strategy: "independent-clone", ref: sourceGit.head, provisioning: "git-clone" };
+}
 
+function cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMarker, strategy, action, outcome }) {
+  if (action === "none" || action === "retain") {
+    return { outcome, action, status: action === "retain" ? "retained" : "skipped", performed: false, exists_after: fs.existsSync(executionRoot), error: null };
+  }
   try {
-    fs.rmSync(options.executionRoot, { recursive: true, force: true });
-    return {
-      outcome: options.outcome,
-      action: options.action,
-      status: "deleted",
-      performed: true,
-      exists_after: fs.existsSync(options.executionRoot),
-      error: null,
-    };
+    const canonicalSource = fs.realpathSync.native(sourceRoot);
+    const canonicalManagedRoot = fs.realpathSync.native(workspacesRoot);
+    const lexicalExecution = path.resolve(executionRoot);
+    if (lexicalExecution === canonicalSource || !isPathInsideRoot(lexicalExecution, canonicalManagedRoot)) {
+      throw new Error("Refusing to delete a workspace outside the managed workspace root or equal to the primary checkout.");
+    }
+    const marker = JSON.parse(fs.readFileSync(ownerMarker, "utf8"));
+    if (marker.execution_root !== lexicalExecution || marker.source_root !== canonicalSource) {
+      throw new Error("Workspace owner marker does not match the cleanup target.");
+    }
+    if (fs.existsSync(executionRoot) && fs.lstatSync(executionRoot).isSymbolicLink()) {
+      throw new Error("Refusing to follow a symlinked workspace during cleanup.");
+    }
+    if (strategy === "detached-worktree" && fs.existsSync(executionRoot)) {
+      runGit(canonicalSource, ["worktree", "remove", "--force", executionRoot], true);
+    }
+    fs.rmSync(executionRoot, { recursive: true, force: true });
+    fs.rmSync(ownerMarker, { force: true });
+    return { outcome, action, status: "deleted", performed: true, exists_after: false, error: null };
   } catch (error) {
-    return {
-      outcome: options.outcome,
-      action: options.action,
-      status: "delete-failed",
-      performed: true,
-      exists_after: fs.existsSync(options.executionRoot),
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return { outcome, action, status: "delete-failed", performed: false, exists_after: fs.existsSync(executionRoot), error: error instanceof Error ? error.message : String(error) };
   }
 }
 
-/**
- * @param {{
- *   projectRoot: string,
- *   runtimeRoot: string,
- *   projectRuntimeRoot: string,
- *   runtimeDefaults: Record<string, unknown>,
- *   runId: string,
- * }} options
- * @returns {{
- *   requestedMode: string,
- *   mode: "ephemeral" | "workspace-clone" | "worktree" | "unsupported",
- *   sourceRoot: string,
- *   executionRoot: string,
- *   checkout: { strategy: string, ref: string },
- *   provisioning: string,
- *   provisioned: boolean,
- *   cleanupPolicy: { on_success: "delete" | "retain" | "none", on_abort: "delete" | "retain" | "none", on_failure: "delete" | "retain" | "none" },
- *   finalize: (outcome: "success" | "abort" | "failure") => { outcome: "success" | "abort" | "failure", action: "delete" | "retain" | "none", status: "deleted" | "retained" | "skipped" | "delete-failed", performed: boolean, exists_after: boolean, error: string | null },
- * }}
- */
 export function prepareWorkspaceIsolation(options) {
   const requestedMode = normalizeWorkspaceMode(options.runtimeDefaults.workspace_mode);
+  const fallbackPolicy = defaultCleanupPolicy();
   if (!isSupportedWorkspaceMode(requestedMode)) {
-    const fallbackPolicy = defaultCleanupPolicy("ephemeral");
     return {
       requestedMode,
       mode: "unsupported",
-      sourceRoot: options.projectRoot,
-      executionRoot: options.projectRoot,
-      checkout: {
-        strategy: "primary-checkout",
-        ref: "local-working-copy",
-      },
+      sourceRoot: fs.realpathSync.native(options.projectRoot),
+      executionRoot: null,
+      checkout: { strategy: "none", ref: "none", source_git_dir: null, execution_git_dir: null },
       provisioning: "unsupported-mode",
       provisioned: false,
       cleanupPolicy: fallbackPolicy,
-      finalize: (outcome) => {
-        const cleanupAction =
-          outcome === "success"
-            ? fallbackPolicy.on_success
-            : outcome === "abort"
-              ? fallbackPolicy.on_abort
-              : fallbackPolicy.on_failure;
-        return applyWorkspaceCleanup({
-          executionRoot: options.projectRoot,
-          action: cleanupAction,
-          outcome,
-        });
-      },
+      cleanup: (outcome, action) => ({ outcome, action, status: "skipped", performed: false, exists_after: false, error: null }),
+      finalize: (outcome) => ({ outcome, action: "none", status: "skipped", performed: false, exists_after: false, error: null }),
     };
   }
-
-  const mode = /** @type {"ephemeral" | "workspace-clone" | "worktree"} */ (requestedMode);
-  const provisionedWorkspace = provisionWorkspace({
-    mode,
-    projectRoot: options.projectRoot,
-    runtimeRoot: options.runtimeRoot,
-    projectRuntimeRoot: options.projectRuntimeRoot,
-    runId: options.runId,
-  });
-  const cleanupPolicy = resolveCleanupPolicy(options.runtimeDefaults, mode);
-
+  const idValidation = validatePublicId(options.runId);
+  if (!idValidation.ok) throw new Error(`Invalid run_id ${JSON.stringify(options.runId)} (${idValidation.value_class}). ${idValidation.migration}`);
+  const sourceRoot = canonicalDirectory(options.projectRoot, "Primary checkout");
+  const runtimeRootCandidate = path.isAbsolute(options.runtimeRoot)
+    ? options.runtimeRoot
+    : path.resolve(sourceRoot, options.runtimeRoot);
+  const runtimeRoot = fs.existsSync(runtimeRootCandidate)
+    ? fs.realpathSync.native(runtimeRootCandidate)
+    : runtimeRootCandidate;
+  const projectRuntimeRoot = canonicalDirectory(options.projectRuntimeRoot, "Project runtime root");
+  const workspacesRoot = path.join(projectRuntimeRoot, "workspaces");
+  fs.mkdirSync(workspacesRoot, { recursive: true });
+  const canonicalWorkspacesRoot = canonicalDirectory(workspacesRoot, "Managed workspaces root");
+  const workspaceId = `${requestedMode}-${options.runId}-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  const executionRoot = path.join(canonicalWorkspacesRoot, workspaceId);
+  const ownerMarker = path.join(canonicalWorkspacesRoot, `.${workspaceId}.owner.json`);
+  const sourceGit = inspectGitCheckout(sourceRoot);
+  let checkout = provisionGitWorkspace({ sourceRoot, executionRoot, requestedMode, sourceGit, runtimeRoot });
+  if (!checkout) checkout = snapshotNonGitTree(sourceRoot, executionRoot, runtimeRoot);
+  const canonicalExecutionRoot = canonicalDirectory(executionRoot, "Disposable execution root");
+  if (canonicalExecutionRoot === sourceRoot || !isPathInsideRoot(canonicalExecutionRoot, canonicalWorkspacesRoot)) {
+    throw new Error("Disposable execution root escaped the managed workspace boundary.");
+  }
+  const executionGit = sourceGit ? verifyIndependentGitDirs(sourceGit, canonicalExecutionRoot) : inspectGitCheckout(canonicalExecutionRoot);
+  fs.writeFileSync(ownerMarker, `${JSON.stringify({ source_root: sourceRoot, execution_root: canonicalExecutionRoot, strategy: checkout.strategy, requested_mode: requestedMode }, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+  const cleanupPolicy = resolveCleanupPolicy(options.runtimeDefaults);
+  let finalized = null;
+  const performCleanup = (outcome, action) => {
+    if (finalized) return finalized;
+    finalized = cleanupWorkspace({ executionRoot: canonicalExecutionRoot, sourceRoot, workspacesRoot: canonicalWorkspacesRoot, ownerMarker, strategy: checkout.strategy, action, outcome });
+    return finalized;
+  };
   return {
     requestedMode,
-    mode,
-    sourceRoot: options.projectRoot,
-    executionRoot: provisionedWorkspace.executionRoot,
-    checkout: provisionedWorkspace.checkout,
-    provisioning: provisionedWorkspace.provisioning,
-    provisioned: provisionedWorkspace.provisioned,
+    mode: checkout.strategy === "detached-worktree" ? "worktree" : "workspace-clone",
+    sourceRoot,
+    executionRoot: canonicalExecutionRoot,
+    checkout: { ...checkout, source_git_dir: sourceGit?.git_dir ?? null, execution_git_dir: executionGit?.git_dir ?? null },
+    provisioning: checkout.provisioning,
+    provisioned: true,
     cleanupPolicy,
+    ownerMarker,
+    cleanup: performCleanup,
     finalize: (outcome) => {
-      const cleanupAction =
-        outcome === "success"
-          ? cleanupPolicy.on_success
-          : outcome === "abort"
-            ? cleanupPolicy.on_abort
-            : cleanupPolicy.on_failure;
-      return applyWorkspaceCleanup({
-        executionRoot: provisionedWorkspace.executionRoot,
-        action: cleanupAction,
-        outcome,
-      });
+      const action = outcome === "success" ? cleanupPolicy.on_success : outcome === "abort" ? cleanupPolicy.on_abort : cleanupPolicy.on_failure;
+      return performCleanup(outcome, action);
+    },
+  };
+}
+
+export function resumeWorkspaceIsolation(options) {
+  const sourceRoot = canonicalDirectory(options.projectRoot, "Primary checkout");
+  const projectRuntimeRoot = canonicalDirectory(options.projectRuntimeRoot, "Project runtime root");
+  const workspacesRoot = canonicalDirectory(path.join(projectRuntimeRoot, "workspaces"), "Managed workspaces root");
+  const executionRoot = canonicalDirectory(options.executionRoot, "Disposable execution root");
+  if (executionRoot === sourceRoot || !isPathInsideRoot(executionRoot, workspacesRoot)) {
+    throw new Error("Only an owned disposable workspace can be resumed.");
+  }
+  const workspaceId = path.basename(executionRoot);
+  const ownerMarker = path.join(workspacesRoot, `.${workspaceId}.owner.json`);
+  const marker = JSON.parse(fs.readFileSync(ownerMarker, "utf8"));
+  if (marker.execution_root !== executionRoot || marker.source_root !== sourceRoot) {
+    throw new Error("Disposable workspace owner marker does not match the requested source and execution roots.");
+  }
+  const sourceGit = inspectGitCheckout(sourceRoot);
+  const executionGit = sourceGit ? verifyIndependentGitDirs(sourceGit, executionRoot) : inspectGitCheckout(executionRoot);
+  const strategy = typeof marker.strategy === "string" ? marker.strategy : "independent-snapshot";
+  const requestedMode = isSupportedWorkspaceMode(marker.requested_mode) ? marker.requested_mode : "ephemeral";
+  const cleanupPolicy = resolveCleanupPolicy(options.runtimeDefaults);
+  let finalized = null;
+  const performCleanup = (outcome, action) => {
+    if (finalized) return finalized;
+    finalized = cleanupWorkspace({ executionRoot, sourceRoot, workspacesRoot, ownerMarker, strategy, action, outcome });
+    return finalized;
+  };
+  return {
+    requestedMode,
+    mode: strategy === "detached-worktree" ? "worktree" : "workspace-clone",
+    sourceRoot,
+    executionRoot,
+    checkout: {
+      strategy,
+      ref: executionGit?.head ?? "unborn",
+      source_git_dir: sourceGit?.git_dir ?? null,
+      execution_git_dir: executionGit?.git_dir ?? null,
+    },
+    provisioning: "resumed-owned-workspace",
+    provisioned: true,
+    cleanupPolicy,
+    ownerMarker,
+    cleanup: performCleanup,
+    finalize: (outcome) => {
+      const action = outcome === "success" ? cleanupPolicy.on_success : outcome === "abort" ? cleanupPolicy.on_abort : cleanupPolicy.on_failure;
+      return performCleanup(outcome, action);
     },
   };
 }

@@ -6,7 +6,12 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
-import { isSupportedWorkspaceMode, prepareWorkspaceIsolation } from "./workspace-isolation.mjs";
+import {
+  captureCheckoutSnapshot,
+  compareCheckoutSnapshots,
+  isSupportedWorkspaceMode,
+  prepareWorkspaceIsolation,
+} from "./workspace-isolation.mjs";
 
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
 const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
@@ -1385,6 +1390,7 @@ export function verifyProjectRuntime(options = {}) {
   const outputQualityBaselineIndex = collectOutputQualityBaselineIndex(outputQualityBaselineFiles);
   const verificationFailureBaselineIndex = collectVerificationFailureBaselineIndex(outputQualityBaselineFiles);
   const runId = `${init.projectId}.verify.${verificationLabel}.v1`;
+  const sourceSnapshotBefore = captureCheckoutSnapshot(init.projectRoot);
   const workspaceIsolation = prepareWorkspaceIsolation({
     projectRoot: init.projectRoot,
     runtimeRoot: init.runtimeRoot,
@@ -1825,6 +1831,34 @@ export function verifyProjectRuntime(options = {}) {
     stepResultFiles.push(stepResultPath);
   }
 
+  const sourceSnapshotAfter = captureCheckoutSnapshot(init.projectRoot);
+  const sourceIntegrity = compareCheckoutSnapshots(sourceSnapshotBefore, sourceSnapshotAfter);
+  if (!sourceIntegrity.unchanged) {
+    const { stepResult, stepResultPath } = materializeStepResult({
+      runtimeLayout: init.runtimeLayout,
+      runId,
+      stepId: "verify.source-checkout.integrity",
+      stepResultId: `${runId}.step.source-checkout-integrity`,
+      status: "failed",
+      summary: `Verification mutated the primary checkout outside runtime evidence (${sourceIntegrity.changed_fields.join(", ")}).`,
+      evidenceRefs: [init.projectProfilePath, init.stateFile],
+      stepResultFileName:
+        verificationLabel === "default"
+          ? "step-result-source-checkout-integrity.json"
+          : `step-result-${verificationLabelFilePart}-source-checkout-integrity.json`,
+      blockedNextStep: "Discard the primary-checkout mutation and keep all verification writes inside the disposable workspace.",
+      commandOwner: "orchestrator-core",
+      commandSource: "runtime-integrity-policy",
+      commandKind: "integrity",
+      verificationLabel,
+      missingPrerequisites: [],
+      executionRoot: workspaceIsolation.executionRoot,
+      isolationMode: workspaceIsolation.mode,
+    });
+    stepResults.push(stepResult);
+    stepResultFiles.push(stepResultPath);
+  }
+
   const requiredFailures = stepResults.filter(
     (result) => result.status === "failed" && result.command_group_enforcement !== "warn" && result.command_group_enforcement !== "observe",
   );
@@ -1934,6 +1968,12 @@ export function verifyProjectRuntime(options = {}) {
       provisioned: workspaceIsolation.provisioned,
       cleanup_policy: workspaceIsolation.cleanupPolicy,
       cleanup: cleanupResult,
+      source_integrity: {
+        unchanged: sourceIntegrity.unchanged,
+        changed_fields: sourceIntegrity.changed_fields,
+        before: sourceSnapshotBefore,
+        after: sourceSnapshotAfter,
+      },
     },
     step_result_refs: stepResultFiles,
     command_timeout_ms: summaryCommandTimeoutMs,

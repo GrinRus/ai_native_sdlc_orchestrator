@@ -121,10 +121,15 @@ failures also require a planner revision before approval.
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 
-`runtime_defaults.workspace_mode` controls execution isolation:
-- `ephemeral` — run inside the primary checkout;
-- `workspace-clone` — run in an isolated filesystem clone;
-- `worktree` — run in an isolated worktree-style root.
+`runtime_defaults.workspace_mode` controls disposable execution isolation:
+- `ephemeral` — prefer a detached Git worktree and use an independent clone or
+  independent snapshot repository as fallback;
+- `workspace-clone` — prefer an independent local clone;
+- `worktree` — use the detached-worktree-first strategy.
+
+No supported mode runs provider or project verification commands in the
+primary checkout. Source and execution checkout roots and Git directories must
+be distinct.
 
 Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
 

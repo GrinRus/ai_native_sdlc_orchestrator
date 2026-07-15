@@ -285,8 +285,10 @@ export function materializeDeliveryPlan(options) {
     );
   }
 
-  const writebackAllowed = blockingReasons.length === 0;
-  const status = writebackAllowed ? "ready" : "blocked";
+  const executionAllowed = blockingReasons.length === 0;
+  const writebackAllowed = nonReadOnlyMode && executionAllowed;
+  const targetWriteAllowed = nonReadOnlyMode && executionAllowed;
+  const status = executionAllowed ? "ready" : "blocked";
 
   const evidenceRefs = [...new Set([...(handoffRef ? [handoffRef] : []), ...promotionEvidenceRefs])];
   const planId = `${options.projectId}.delivery-plan.${normalizeForId(options.stepClass)}.${Date.now()}`;
@@ -342,7 +344,11 @@ export function materializeDeliveryPlan(options) {
       strategy: rerunStrategy,
       blocking_reasons: rerunBlockingReasons,
     },
+    execution_allowed: executionAllowed,
     writeback_allowed: writebackAllowed,
+    target_write_allowed: targetWriteAllowed,
+    direct_edits_allowed: targetWriteAllowed,
+    meaningful_change_required: targetWriteAllowed && options.stepClass === "implement",
     blocking_reasons: blockingReasons,
     status,
     evidence_refs: uniqueStrings([

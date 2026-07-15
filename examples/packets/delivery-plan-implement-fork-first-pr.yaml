@@ -76,7 +76,11 @@ coordination:
     - evidence://reports/multirepo-coordination-status.sample.yaml
   cross_repo_validation_refs:
     - validation://integration/backend-frontend/api-contract
+execution_allowed: true
 writeback_allowed: true
+target_write_allowed: true
+direct_edits_allowed: true
+meaningful_change_required: true
 blocking_reasons: []
 status: ready
 evidence_refs:
