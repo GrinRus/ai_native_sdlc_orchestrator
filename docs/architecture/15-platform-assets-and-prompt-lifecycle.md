@@ -58,7 +58,17 @@ Asset resolution for a step is deterministic and follows this order:
 2. choose wrapper profile (`step override` first, then `project default` by route class);
 3. choose prompt bundle (`step override` first, then `project default` by workflow step);
 4. choose context bundles (`step override` first, then `project default` by workflow step) and expand docs/rules/skills;
-5. emit one asset bundle with route, wrapper, prompt bundle, context bundles, and provenance refs.
+5. reject missing, wrong-family, or conflicting canonical asset identities before execution;
+6. normalize selected UTF-8 content, compute content digests, and emit one ordered
+   effective asset set with route, wrapper, prompt, policy, bundle, document,
+   rule, and skill provenance;
+7. derive the compiled fingerprint from asset content, order, provenance, and
+   compiler revision, then deliver the same bounded content in the provider work
+   packet.
+
+Byte-identical identities may be deduplicated only across explicitly ordered
+registry roots. Their full source provenance remains in the compiled artifact;
+same-ID content conflicts fail closed instead of using filesystem order.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
 

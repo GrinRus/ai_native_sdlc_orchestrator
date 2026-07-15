@@ -2008,6 +2008,8 @@ function buildProviderWorkPacket(envelope, options) {
       compiled_context_ref: options.compiledContextRef,
       compiled_context_id: asOptionalString(context.compiled_context_id),
       compiled_context_fingerprint: asOptionalString(context.compiled_context_fingerprint),
+      compiler_revision: asOptionalString(context.compiler_revision),
+      effective_assets: Array.isArray(context.effective_assets) ? context.effective_assets : [],
       context_bundle_refs: asStringArray(context.context_bundle_refs),
       context_doc_refs: asStringArray(context.context_doc_refs),
       context_rule_refs: asStringArray(context.context_rule_refs),

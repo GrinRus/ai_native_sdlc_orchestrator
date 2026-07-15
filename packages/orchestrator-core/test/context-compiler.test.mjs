@@ -382,3 +382,37 @@ test("compileStepContext uses project defaults when step override is absent", ()
     assert.equal(compiled.compiled_context.provenance.skill_resolution_source.field, "default_skill_profiles.repair");
   });
 });
+
+test("effective context content is delivered inline and content changes invalidate the fingerprint", () => {
+  withTempRepo((repoRoot) => {
+    const compile = () => {
+      const resolved = resolveExecutionArtifacts(repoRoot, "implement");
+      return compileStepContext({
+        projectRoot: repoRoot,
+        projectProfilePath: resolved.projectProfilePath,
+        stepClass: "implement",
+        routeResolution: resolved.routeResolution,
+        assetResolution: resolved.assetResolution,
+        policyResolution: resolved.policyResolution,
+        inputPacketRefs: ["packet://handoff", "packet://spec"],
+        runtimeEvidenceRefs: [],
+        skillsRoot: path.join(repoRoot, "examples/skills"),
+      });
+    };
+    const first = compile();
+    const safetyRule = first.compiled_context.effective_assets.find(
+      (entry) => entry.reference === "context-rule://context.rule.public-repo-safety@v1",
+    );
+    assert.equal(safetyRule.delivery_mode, "inline");
+    assert.match(safetyRule.content, /bounded and evidence-first/u);
+
+    const rulePath = path.join(repoRoot, "examples/context/rules/public-repo-safety.yaml");
+    fs.writeFileSync(rulePath, fs.readFileSync(rulePath, "utf8").replace("evidence-first", "content-addressed"));
+    const second = compile();
+    assert.notEqual(
+      first.compiled_context.compiled_context_fingerprint,
+      second.compiled_context.compiled_context_fingerprint,
+    );
+    assert.equal(first.compiled_context.context_refs.context_rule_refs[0], second.compiled_context.context_refs.context_rule_refs[0]);
+  });
+});

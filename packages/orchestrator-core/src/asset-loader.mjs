@@ -6,6 +6,11 @@ import {
   SUPPORTED_STEP_CLASSES,
   resolveRouteForStep,
 } from "../../provider-routing/src/route-resolution.mjs";
+import {
+  buildEffectiveAssetRegistry,
+  effectiveAssetView,
+  requireEffectiveAsset,
+} from "./effective-asset-registry.mjs";
 
 /**
  * @param {unknown} value
@@ -199,6 +204,9 @@ function buildContextBundleRegistry(options) {
  *   wrapperRegistry: Map<string, { profile: Record<string, unknown>, source: string }>,
  *   promptRegistry: Map<string, { profile: Record<string, unknown>, source: string }>,
  *   contextBundleRegistry: Map<string, { profile: Record<string, unknown>, source: string }>,
+ *   contextDocRegistry: Map<string, Record<string, unknown>>,
+ *   contextRuleRegistry: Map<string, Record<string, unknown>>,
+ *   contextSkillRegistry: Map<string, Record<string, unknown>>,
  * }} options
  */
 function resolveAssetBundleForStepWithRegistry(options) {
@@ -328,6 +336,11 @@ function resolveAssetBundleForStepWithRegistry(options) {
   const expandedContextDocRefs = [...new Set(contextBundleEntries.flatMap((entry) => entry.context_doc_refs))];
   const expandedContextRuleRefs = [...new Set(contextBundleEntries.flatMap((entry) => entry.context_rule_refs))];
   const expandedContextSkillRefs = [...new Set(contextBundleEntries.flatMap((entry) => entry.context_skill_refs))];
+  const effectiveContextAssets = [
+    ...expandedContextDocRefs.map((reference) => requireEffectiveAsset(options.contextDocRegistry, reference, "context-doc")),
+    ...expandedContextRuleRefs.map((reference) => requireEffectiveAsset(options.contextRuleRegistry, reference, "context-rule")),
+    ...expandedContextSkillRefs.map((reference) => requireEffectiveAsset(options.contextSkillRegistry, reference, "context-skill")),
+  ].map((entry, order) => effectiveAssetView(entry, order));
 
   return {
     step_class: options.stepClass,
@@ -383,6 +396,7 @@ function resolveAssetBundleForStepWithRegistry(options) {
         context_rule_refs: expandedContextRuleRefs,
         context_skill_refs: expandedContextSkillRefs,
       },
+      effective_assets: effectiveContextAssets,
     },
     provenance: {
       project_profile_path: options.projectProfilePath,
@@ -401,6 +415,9 @@ function resolveAssetBundleForStepWithRegistry(options) {
  *   wrappersRoot: string,
  *   promptsRoot: string,
  *   contextBundlesRoot?: string,
+ *   contextDocsRoot?: string | string[],
+ *   contextRulesRoot?: string | string[],
+ *   contextSkillsRoot?: string | string[],
  *   stepClass: string,
  *   routeOverrides?: Record<string, string>,
  *   wrapperOverrides?: Record<string, string>,
@@ -414,6 +431,25 @@ export function resolveAssetBundleForStep(options) {
   const contextBundleRegistry = buildContextBundleRegistry({
     contextBundlesRoot: options.contextBundlesRoot ?? path.join(path.dirname(options.projectProfilePath), "context/bundles"),
   });
+  const contextBase = path.join(path.dirname(options.projectProfilePath), "context");
+  const contextDocRegistry = buildEffectiveAssetRegistry({
+    roots: options.contextDocsRoot ?? path.join(contextBase, "docs"),
+    family: "context-doc",
+    idField: "context_doc_id",
+    scheme: "context-doc",
+  });
+  const contextRuleRegistry = buildEffectiveAssetRegistry({
+    roots: options.contextRulesRoot ?? path.join(contextBase, "rules"),
+    family: "context-rule",
+    idField: "context_rule_id",
+    scheme: "context-rule",
+  });
+  const contextSkillRegistry = buildEffectiveAssetRegistry({
+    roots: options.contextSkillsRoot ?? path.join(contextBase, "skills"),
+    family: "context-skill",
+    idField: "context_skill_id",
+    scheme: "context-skill",
+  });
 
   return resolveAssetBundleForStepWithRegistry({
     ...options,
@@ -422,6 +458,9 @@ export function resolveAssetBundleForStep(options) {
     wrapperRegistry,
     promptRegistry,
     contextBundleRegistry,
+    contextDocRegistry,
+    contextRuleRegistry,
+    contextSkillRegistry,
   });
 }
 
@@ -432,6 +471,9 @@ export function resolveAssetBundleForStep(options) {
  *   wrappersRoot: string,
  *   promptsRoot: string,
  *   contextBundlesRoot?: string,
+ *   contextDocsRoot?: string | string[],
+ *   contextRulesRoot?: string | string[],
+ *   contextSkillsRoot?: string | string[],
  *   routeOverrides?: Record<string, string>,
  *   wrapperOverrides?: Record<string, string>,
   *   promptBundleOverrides?: Record<string, string>,
@@ -444,6 +486,25 @@ export function resolveAssetBundleMatrix(options) {
   const contextBundleRegistry = buildContextBundleRegistry({
     contextBundlesRoot: options.contextBundlesRoot ?? path.join(path.dirname(options.projectProfilePath), "context/bundles"),
   });
+  const contextBase = path.join(path.dirname(options.projectProfilePath), "context");
+  const contextDocRegistry = buildEffectiveAssetRegistry({
+    roots: options.contextDocsRoot ?? path.join(contextBase, "docs"),
+    family: "context-doc",
+    idField: "context_doc_id",
+    scheme: "context-doc",
+  });
+  const contextRuleRegistry = buildEffectiveAssetRegistry({
+    roots: options.contextRulesRoot ?? path.join(contextBase, "rules"),
+    family: "context-rule",
+    idField: "context_rule_id",
+    scheme: "context-rule",
+  });
+  const contextSkillRegistry = buildEffectiveAssetRegistry({
+    roots: options.contextSkillsRoot ?? path.join(contextBase, "skills"),
+    family: "context-skill",
+    idField: "context_skill_id",
+    scheme: "context-skill",
+  });
   const contextBundlesRoot =
     options.contextBundlesRoot ?? path.join(path.dirname(options.projectProfilePath), "context/bundles");
 
@@ -455,6 +516,9 @@ export function resolveAssetBundleMatrix(options) {
       wrapperRegistry,
       promptRegistry,
       contextBundleRegistry,
+      contextDocRegistry,
+      contextRuleRegistry,
+      contextSkillRegistry,
     }),
   );
 }

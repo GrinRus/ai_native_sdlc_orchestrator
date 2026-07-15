@@ -245,3 +245,36 @@ test("project default route using non-allowed adapter fails with reference_targe
     assert.ok(issue, "expected project route adapter allowlist compatibility issue");
   });
 });
+
+test("missing context bundle child and workflow skill refs fail before runtime compilation", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/context/bundles/runner-foundation.yaml", (document) => {
+      document.context_rule_refs = ["context-rule://context.rule.missing@v1"];
+    });
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const defaults = /** @type {Record<string, unknown>} */ (document.default_skill_profiles);
+      defaults.runner = ["skill.runner.missing@v1"];
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+    assert.ok(result.issues.some((issue) =>
+      issue.code === "reference_target_missing" && issue.reference === "context-rule://context.rule.missing@v1"));
+    assert.ok(result.issues.some((issue) =>
+      issue.code === "reference_target_missing" && issue.reference === "skill.runner.missing@v1"));
+  });
+});
+
+test("wrong-family context refs fail with a structural family diagnostic", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/context/bundles/runner-foundation.yaml", (document) => {
+      document.context_rule_refs = ["context-doc://context.doc.repo-map.core@v1"];
+    });
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+    assert.ok(result.issues.some((issue) =>
+      issue.field === "context_rule_refs[0]" &&
+      issue.reference === "context-doc://context.doc.repo-map.core@v1" &&
+      issue.code === "reference_format_invalid"));
+  });
+});

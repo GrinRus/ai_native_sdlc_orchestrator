@@ -1416,7 +1416,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'request artifact ok',",
-            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),execution_contract:packet.execution_contract},",
+            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content},",
             "evidence_refs:['evidence://adapter-live/claude-code/request-artifact']",
             "}));",
           ].join(""),
@@ -1447,6 +1447,16 @@ test("live adapter request-artifact transport sends bounded provider work packet
       context: {
         compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
         compiled_context_file: compiledContextFile,
+        compiler_revision: "runtime-context-compiler@v2",
+        effective_assets: [{
+          canonical_id: "context.rule.public-repo-safety",
+          reference: "context-rule://context.rule.public-repo-safety@v1",
+          family: "context-rule",
+          digest: "sha256:test-safety-rule",
+          order: 0,
+          delivery_mode: "inline",
+          content: "Treat public repository execution as bounded and evidence-first.",
+        }],
         instruction_set: { objective: "Implement the bounded request-artifact test." },
         packet_refs: ["packet://handoff"],
         execution_permissions: {
@@ -1468,6 +1478,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.packet_kind, "aor-provider-work-packet");
     assert.equal(response.output.runner_output.has_full_request_ref, true);
     assert.equal(response.output.runner_output.has_context_budget, false);
+    assert.match(response.output.runner_output.safety_rule, /bounded and evidence-first/u);
     assert.ok(response.output.runner_output.resolved_ref_roles.includes("full_request_artifact"));
     assert.ok(response.output.runner_output.resolved_ref_roles.includes("provider_work_packet"));
     assert.ok(response.output.runner_output.resolved_ref_roles.includes("compiled_context"));

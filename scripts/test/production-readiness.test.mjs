@@ -53,7 +53,8 @@ test("production readiness gate enforces the committed audit hold with healthy i
   assert.equal(result.release_disposition, "audit-hold");
   assert.equal(result.release_clearance, false);
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-006"));
-  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
+  assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-009"));
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
