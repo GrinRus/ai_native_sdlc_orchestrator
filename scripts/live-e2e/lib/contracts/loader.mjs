@@ -855,6 +855,29 @@ function validateContextSizeSources(value, source, field, issues) {
 function validateCompiledContextArtifact(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  if (Array.isArray(document.effective_assets)) {
+    document.effective_assets.forEach((value, index) => {
+      const field = `effective_assets[${index}]`;
+      if (!isPlainObject(value)) {
+        issues.push(issue({ code: "field_type_mismatch", source, field, expected: "object", actual: describeActualType(value), message: `${field} must be an object.` }));
+        return;
+      }
+      for (const name of ["canonical_id", "reference", "family", "digest", "source_root", "source", "provenance", "delivery_mode", "content"]) {
+        validateNestedStringField({ record: value, source, field: `${field}.${name}`, issues, required: true });
+      }
+      validateNestedNumberField({ record: value, source, field: `${field}.order`, issues, required: true });
+      validateNestedArrayField({ record: value, source, field: `${field}.deduplicated_provenance`, issues, required: true });
+      if (typeof value.digest === "string" && !/^sha256:[a-f0-9]{64}$/u.test(value.digest)) {
+        issues.push(issue({ code: "enum_value_invalid", source, field: `${field}.digest`, expected: "sha256:<64 lowercase hex>", actual: value.digest, message: `${field}.digest must be a canonical SHA-256 digest.` }));
+      }
+      if (value.order !== index) {
+        issues.push(issue({ code: "enum_value_invalid", source, field: `${field}.order`, expected: String(index), actual: String(value.order), message: `${field}.order must match effective asset order.` }));
+      }
+      if (value.delivery_mode !== "inline" && value.delivery_mode !== "attachment") {
+        issues.push(issue({ code: "enum_value_invalid", source, field: `${field}.delivery_mode`, expected: "inline|attachment", actual: String(value.delivery_mode), message: `${field}.delivery_mode is unsupported.` }));
+      }
+    });
+  }
   const budgetReport = isPlainObject(document.budget_report) ? document.budget_report : {};
   validateContextBudgetEstimate(budgetReport, source, "budget_report", issues, { requireBudgetLimit: true });
   validateEnumString(

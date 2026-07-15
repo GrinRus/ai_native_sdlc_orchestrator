@@ -1,6 +1,22 @@
 compiled_context_id: compiled-context.aor-core.implement.runner-default
-version: 1
+version: 2
 step: implement
+compiler_revision: runtime-context-compiler@v2
+effective_assets:
+  - canonical_id: context.rule.public-repo-safety
+    reference: context-rule://context.rule.public-repo-safety@v1
+    family: context-rule
+    digest: sha256:1a48902bdbcc29c3c62d86d16aed7535cce0ff2e6a78a38c940b59dc9c582f06
+    source_root: examples/context/rules
+    source: examples/context/rules/public-repo-safety.yaml
+    provenance: selected
+    deduplicated_provenance: []
+    order: 0
+    delivery_mode: inline
+    content: |-
+      context_rule_id: context.rule.public-repo-safety
+      version: 1
+      instruction: Keep public repository execution bounded and evidence-first.
 prompt_bundle_ref: prompt-bundle://runner-default@v3
 context_bundle_refs:
   - context-bundle://context.bundle.runner.foundation@v1

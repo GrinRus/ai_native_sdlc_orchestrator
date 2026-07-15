@@ -6,6 +6,9 @@ import {
   buildReferenceRegistry,
   extractRouteAdapterRefs,
   isContextBundleRef,
+  isContextDocRef,
+  isContextRuleRef,
+  isContextSkillRef,
   isDatasetRef,
   isExternalReference,
   isPlaceholderAdapterReference,
@@ -293,6 +296,29 @@ export function validateExampleReferences(options = {}) {
         }
       }
 
+      for (const [containerField, container] of [
+        ["default_skill_profiles", document.default_skill_profiles],
+        ["skill_overrides", document.skill_overrides],
+      ]) {
+        if (!isPlainObject(container)) continue;
+        for (const [key, rawValue] of Object.entries(container)) {
+          const references = asStringArray(rawValue, { issues, source, field: `${containerField}.${key}` });
+          references.forEach((reference, index) => {
+            checkedReferences += 1;
+            validateReferenceTarget({
+              issues,
+              source,
+              field: `${containerField}.${key}[${index}]`,
+              reference,
+              expected: "existing skill_id@vN",
+              expectedFamily: "skill-profile",
+              expectedSet: registry.skillRefs,
+              registry,
+            });
+          });
+        }
+      }
+
       const defaultReleaseSuiteRef = document.eval_policy?.default_release_suite_ref;
       if (defaultReleaseSuiteRef !== undefined) {
         checkedReferences += 1;
@@ -326,6 +352,42 @@ export function validateExampleReferences(options = {}) {
         }
       }
 
+    }
+
+    if (result.family === "context-bundle") {
+      const referenceFields = [
+        ["context_doc_refs", "context-doc", registry.contextDocRefs, isContextDocRef],
+        ["context_rule_refs", "context-rule", registry.contextRuleRefs, isContextRuleRef],
+        ["context_skill_refs", "context-skill", registry.contextSkillRefs, isContextSkillRef],
+      ];
+      for (const [field, family, expectedSet, formatCheck] of referenceFields) {
+        const references = asStringArray(document[field], { issues, source, field });
+        references.forEach((reference, index) => {
+          checkedReferences += 1;
+          if (!formatCheck(reference)) {
+            issues.push(referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field: `${field}[${index}]`,
+              reference,
+              expected: `${family}://canonical_id@vN`,
+              actual: reference,
+              message: `Field '${field}[${index}]' has an invalid ${family} reference.`,
+            }));
+            return;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field: `${field}[${index}]`,
+            reference,
+            expected: `existing ${family} reference`,
+            expectedFamily: family,
+            expectedSet,
+            registry,
+          });
+        });
+      }
     }
 
     if (result.family === "provider-route-profile") {

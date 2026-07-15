@@ -70,7 +70,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   uniquely, contributes normalized content to the provider input, and changes the
   compiled fingerprint when its effective content changes.
 - **Epic:** EPIC-1, EPIC-3, EPIC-4
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** context/asset contracts, reference registry,

@@ -184,3 +184,29 @@ test("resolveAssetBundleForStep fails cleanly when project default context bundl
     );
   });
 });
+
+test("effective context registries deduplicate identical layered assets and reject identity conflicts", () => {
+  withTempRepo((repoRoot) => {
+    const primaryRules = path.join(repoRoot, "examples/context/rules");
+    const layeredRules = path.join(repoRoot, "layered-rules");
+    fs.mkdirSync(layeredRules, { recursive: true });
+    const primaryRule = path.join(primaryRules, "public-repo-safety.yaml");
+    const layeredRule = path.join(layeredRules, "z-public-repo-safety.yaml");
+    fs.copyFileSync(primaryRule, layeredRule);
+    const resolve = () => resolveAssetBundleForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      wrappersRoot: path.join(repoRoot, "examples/wrappers"),
+      promptsRoot: path.join(repoRoot, "examples/prompts"),
+      contextRulesRoot: [primaryRules, layeredRules],
+      stepClass: "implement",
+    });
+
+    const deduplicated = resolve().context_bundles.effective_assets.find(
+      (entry) => entry.reference === "context-rule://context.rule.public-repo-safety@v1",
+    );
+    assert.equal(deduplicated.deduplicated_provenance.length, 1);
+    fs.writeFileSync(layeredRule, fs.readFileSync(layeredRule, "utf8").replace("evidence-first", "conflicting"));
+    assert.throws(resolve, /Duplicate canonical asset identity.*public-repo-safety/u);
+  });
+});

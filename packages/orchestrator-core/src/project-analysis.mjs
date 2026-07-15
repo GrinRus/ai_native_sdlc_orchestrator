@@ -827,6 +827,9 @@ export function analyzeProjectRuntime(options = {}) {
       ? options.contextBundlesRoot
       : path.resolve(init.projectRoot, options.contextBundlesRoot)
     : registryRoots.context_bundles;
+  const contextDocsRoot = registryRoots.context_docs;
+  const contextRulesRoot = registryRoots.context_rules;
+  const contextSkillsRoot = registryRoots.context_skills;
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
@@ -848,6 +851,9 @@ export function analyzeProjectRuntime(options = {}) {
     wrappersRoot,
     promptsRoot,
     contextBundlesRoot,
+    contextDocsRoot,
+    contextRulesRoot,
+    contextSkillsRoot,
     routeOverrides: options.routeOverrides,
   });
   const policyResolutionMatrix = resolveStepPolicyMatrix({

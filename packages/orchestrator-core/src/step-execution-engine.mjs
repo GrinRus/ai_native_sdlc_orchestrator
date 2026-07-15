@@ -974,6 +974,9 @@ function writeRuntimeRepairInput(options) {
  *   wrappersRoot?: string,
  *   promptsRoot?: string,
  *   contextBundlesRoot?: string,
+ *   contextDocsRoot?: string,
+ *   contextRulesRoot?: string,
+ *   contextSkillsRoot?: string,
  *   policiesRoot?: string,
  *   adaptersRoot?: string,
  *   skillsRoot?: string,
@@ -1028,6 +1031,15 @@ export function executeRoutedStep(options) {
       ? options.contextBundlesRoot
       : path.resolve(init.projectRoot, options.contextBundlesRoot)
     : registryRoots.context_bundles;
+  const contextDocsRoot = options.contextDocsRoot
+    ? path.resolve(init.projectRoot, options.contextDocsRoot)
+    : registryRoots.context_docs;
+  const contextRulesRoot = options.contextRulesRoot
+    ? path.resolve(init.projectRoot, options.contextRulesRoot)
+    : registryRoots.context_rules;
+  const contextSkillsRoot = options.contextSkillsRoot
+    ? path.resolve(init.projectRoot, options.contextSkillsRoot)
+    : registryRoots.context_skills;
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
@@ -1280,6 +1292,9 @@ export function executeRoutedStep(options) {
         wrappersRoot,
         promptsRoot,
         contextBundlesRoot,
+        contextDocsRoot,
+        contextRulesRoot,
+        contextSkillsRoot,
         stepClass: requestedStepClass,
         routeOverrides: options.routeOverrides,
         wrapperOverrides: options.wrapperOverrides,
@@ -1351,11 +1366,18 @@ export function executeRoutedStep(options) {
       const resolvedAdapterProfile = asRecord(asRecord(adapterResolution).adapter?.profile);
       const externalRuntime = asRecord(asRecord(resolvedAdapterProfile.execution).external_runtime);
       const budgetLimitTokens = resolveContextBudgetLimitTokens(resolvedAdapterProfile);
+      const effectiveAssets = Array.isArray(compiled.compiled_context.effective_assets)
+        ? compiled.compiled_context.effective_assets
+        : [];
+      const promptAssetDigest = asString(
+        asRecord(effectiveAssets.find((entry) => asRecord(entry).family === "prompt-bundle")).digest,
+      );
       const contextSourceBreakdown = buildContextSourceBreakdown([
         { source: "instruction_set", value: compiled.compiled_context.instruction_set },
         { source: "required_inputs_resolved", value: compiled.compiled_context.required_inputs_resolved },
         { source: "guardrails", value: compiled.compiled_context.guardrails },
         { source: "context_refs", value: compiled.compiled_context.context_refs },
+        { source: "effective_assets", value: compiled.compiled_context.effective_assets },
         { source: "provenance", value: compiled.compiled_context.provenance },
       ]);
       const contextEstimate = sumContextEstimates(contextSourceBreakdown);
@@ -1369,8 +1391,10 @@ export function executeRoutedStep(options) {
       );
       compiledContextArtifact = {
         compiled_context_id: compiledContextId,
-        version: 1,
+        version: 2,
         step: requestedStepClass,
+        compiler_revision: compiled.compiled_context.compiler_revision,
+        effective_assets: effectiveAssets,
         prompt_bundle_ref: promptBundleRef,
         context_bundle_refs: uniqueStrings(contextBundles.bundle_refs),
         context_doc_refs: uniqueStrings(expandedRefs.context_doc_refs),
@@ -1379,11 +1403,11 @@ export function executeRoutedStep(options) {
         skill_refs: uniqueStrings(compiled.compiled_context.skill_refs),
         packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         hashes: {
-          prompt_hash: `sha256:${sha256Hex(promptBundleRef)}`,
+          prompt_hash: promptAssetDigest ?? `sha256:${sha256Hex(promptBundleRef)}`,
           context_hash: `sha256:${String(compiled.context_compilation.compiled_context_fingerprint ?? "")}`,
         },
         provenance: {
-          compiler_revision_ref: "compiler-revision://runtime-context-compiler@v1",
+          compiler_revision_ref: "compiler-revision://runtime-context-compiler@v2",
           project_profile_ref: init.projectProfilePath,
           route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
           wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,
@@ -1475,6 +1499,8 @@ export function executeRoutedStep(options) {
           compiled_context_file: compiledContextArtifactPath,
           compiled_context_id: compiledContextId,
           compiled_context_fingerprint: compiled.context_compilation.compiled_context_fingerprint,
+          compiler_revision: compiled.compiled_context.compiler_revision,
+          effective_assets: compiled.compiled_context.effective_assets,
           context_bundle_refs: compiledContextArtifact.context_bundle_refs,
           context_doc_refs: compiledContextArtifact.context_doc_refs,
           context_rule_refs: compiledContextArtifact.context_rule_refs,
