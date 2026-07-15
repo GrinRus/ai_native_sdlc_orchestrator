@@ -423,6 +423,8 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["certification_harness_capture_file", "certificationHarnessCaptureFile"],
   ["certification_harness_replay_file", "certificationHarnessReplayFile"],
   ["run_control_action", "runControlAction"],
+  ["run_control_command_id", "runControlCommandId"],
+  ["run_control_revision", "runControlRevision"],
   ["run_control_run_id", "runControlRunId"],
   ["run_control_state", "runControlState"],
   ["run_control_state_file", "runControlStateFile"],

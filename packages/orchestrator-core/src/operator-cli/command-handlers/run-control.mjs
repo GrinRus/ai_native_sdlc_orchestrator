@@ -102,6 +102,8 @@ function populateRunControlOutputState(outputState, controlResult) {
   outputState.projectProfileRef = controlResult.projectProfileRef;
   outputState.runtimeStateFile = controlResult.stateFile;
   outputState.runControlAction = controlResult.action;
+  outputState.runControlCommandId = controlResult.commandId;
+  outputState.runControlRevision = controlResult.revision;
   outputState.runControlRunId = controlResult.runId;
   outputState.runControlState = controlResult.state;
   outputState.runControlStateFile = controlResult.stateFile;
@@ -161,6 +163,8 @@ export function handleRunControlCommand(context) {
     const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
     const reason = resolveOptionalStringFlag("reason", flags.reason);
     const approvalRef = resolveOptionalStringFlag("approval-ref", flags["approval-ref"]);
+    const commandId = resolveOptionalStringFlag("command-id", flags["command-id"]);
+    const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
     const unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
       "unsafe-development-override",
       flags["unsafe-development-override"],
@@ -238,6 +242,8 @@ export function handleRunControlCommand(context) {
             targetStep,
             reason,
             approvalRef,
+            commandId,
+            expectedRevision,
             preflightBlock: {
               code: "validation.error",
               message: `Run start validation preflight failed before durable start transition: ${errorMessage(error)}`,
@@ -257,6 +263,8 @@ export function handleRunControlCommand(context) {
             targetStep,
             reason,
             approvalRef,
+            commandId,
+            expectedRevision,
             preflightBlock: {
               code: "validation.failed",
               message: "Run start requires a passing validation report before execution can begin.",
@@ -278,6 +286,8 @@ export function handleRunControlCommand(context) {
       targetStep,
       reason,
       approvalRef,
+      commandId,
+      expectedRevision,
       executionPlanRef: executionContext?.executionPlanRef,
       executionUnitId: executionContext?.executionUnitId,
       taskRefs: executionContext?.taskRefs,

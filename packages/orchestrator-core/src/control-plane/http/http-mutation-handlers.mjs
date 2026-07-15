@@ -69,6 +69,10 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     sendError(response, 400, "invalid_execution_unit_context", "execution_plan_ref and execution_unit_id are a paired input valid only for run start.");
     return;
   }
+  if (payload.expected_revision !== undefined && (!Number.isInteger(payload.expected_revision) || payload.expected_revision < 0)) {
+    sendError(response, 400, "invalid_expected_revision", "expected_revision must be a non-negative integer.");
+    return;
+  }
   let executionContext = null;
   if (executionPlanRef && executionUnitId) {
     try {
@@ -89,6 +93,8 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     executionPlanRef: executionContext?.executionPlanRef,
     executionUnitId: executionContext?.executionUnitId,
     taskRefs: executionContext?.taskRefs,
+    commandId: asString(payload.command_id) ?? undefined,
+    expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
   });
   const runControlPayload = toRunControlResponse(result);
 

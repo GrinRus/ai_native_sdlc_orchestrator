@@ -473,6 +473,8 @@ Run-level read baseline:
 ## Run-control baseline (module operations)
 
 Command payload baseline:
+- `command_id` (optional canonical id; generated when omitted and authoritative for idempotent retry);
+- `expected_revision` (optional non-negative integer CAS guard);
 - `reason` (optional text summary for operator intent);
 - `target_step` (optional for `start`, required for `steer`);
 - `require_validation_pass` (optional start-only boolean, defaults to true for public execution runs);
@@ -493,7 +495,8 @@ Guardrail baseline:
 
 Durable audit baseline:
 - every control action writes one durable `run-control-event-*.json` record under runtime reports;
-- control records include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
+- control records include `run_id`, `command_id`, `revision`, `action`, transition snapshot, guardrail decision, and `evidence_root`;
+- state transitions and their command records are serialized by a per-run cross-process lease; the same command id and payload returns the stored result, reuse with different content conflicts, and a stale expected revision is rejected before mutation.
 
 Full-journey execution baseline (W13):
 - `run start` is the canonical public execution entrypoint for full-journey live runs;
@@ -679,10 +682,11 @@ Detached read-model scale baseline:
 
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`,
-  `approval_ref`, and optional paired `execution_plan_ref` /
+  `approval_ref`, optional `command_id`, optional non-negative
+  `expected_revision`, and optional paired `execution_plan_ref` /
   `execution_unit_id` for `start`; the pair is resolved against the exact
   current approved plan and fixes task refs in run state;
-- run-control response reuses module parity fields: `state_file`, `audit_file`, guardrail decision, transition, live event ids;
+- run-control response reuses module parity fields: `command_id`, `revision`, `state_file`, `audit_file`, guardrail decision, transition, live event ids;
 - blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
 - ui lifecycle payload fields: `action`, `run_id`, `control_plane`;
 - ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.

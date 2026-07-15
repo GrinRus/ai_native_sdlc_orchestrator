@@ -37,6 +37,7 @@ function resolveRunEventLogFile(options) {
  *   payload: Record<string, unknown>,
  *   timestamp?: string,
  *   redactionPolicy?: unknown,
+ *   requestKey?: string,
  * }} options
  */
 export function appendRunEvent(options) {
@@ -52,6 +53,7 @@ export function appendRunEvent(options) {
     payload: options.payload,
     timestamp: options.timestamp,
     redactionPolicy: options.redactionPolicy,
+    requestKey: options.requestKey,
   });
 
   return {

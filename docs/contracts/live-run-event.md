@@ -66,3 +66,11 @@ The shared contract loader validates the query-safe nested event surface:
 Live events should support catch-up from a read model plus the live stream.
 Reconnect behavior should support replay from the last acknowledged `event_id`.
 Backpressure should use a bounded replay window and avoid unbounded in-memory buffering.
+
+Event append is a transactional identity operation. Writers serialize through a
+per-log cross-process lease and advance a sidecar cursor, so the steady-state
+append path does not scan the journal. `event_id` is derived from the validated
+`run_id` and the reserved monotonic sequence. Callers may supply a canonical
+request key: replaying the same key and payload returns the original event,
+while reusing it with different content is a typed conflict. Recovery may leave
+a sequence gap after a crash, but must never reuse an identity.

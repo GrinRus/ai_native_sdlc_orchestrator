@@ -120,6 +120,8 @@ test("run-control API emits deterministic control events and durable audit evide
       cwd: repoRoot,
       runId,
       action: "start",
+      commandId: "command.start.retry",
+      expectedRevision: 0,
     });
     assert.equal(started.blocked, false);
     assert.equal(started.state?.status, "running");
@@ -130,12 +132,32 @@ test("run-control API emits deterministic control events and durable audit evide
     assert.equal(started.evidenceEvent.payload.policy_context.action, "start");
     assert.equal(fs.existsSync(started.auditFile), true);
     assert.equal(fs.existsSync(started.stateFile), true);
+    const retriedStart = applyRunControlAction({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      action: "start",
+      commandId: "command.start.retry",
+      expectedRevision: 0,
+    });
+    assert.equal(retriedStart.revision, 1);
+    assert.equal(readRunEvents({ projectRef: repoRoot, cwd: repoRoot, runId }).length, 2);
+    assert.throws(() => applyRunControlAction({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      action: "pause",
+      commandId: "command.stale.pause",
+      expectedRevision: 0,
+    }), { code: "run-control-revision-conflict" });
 
     const blockedSteer = applyRunControlAction({
       projectRef: repoRoot,
       cwd: repoRoot,
       runId,
       action: "steer",
+      commandId: "command.blocked.steer",
+      expectedRevision: 1,
     });
     assert.equal(blockedSteer.blocked, true);
     assert.equal(blockedSteer.primaryEvent.event_type, "warning.raised");
@@ -150,6 +172,8 @@ test("run-control API emits deterministic control events and durable audit evide
       runId,
       action: "cancel",
       approvalRef: "approval://RC-API-1001",
+      commandId: "command.cancel",
+      expectedRevision: 2,
     });
     assert.equal(canceled.blocked, false);
     assert.equal(canceled.state?.status, "canceled");
