@@ -9,6 +9,8 @@ export function toRunControlResponse(result) {
   return {
     action: result.action,
     run_id: result.runId,
+    command_id: result.commandId,
+    revision: result.revision,
     blocked: result.blocked,
     blocked_reason: result.blockedReason ?? null,
     applied: result.applied,

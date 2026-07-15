@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 import { validatePublicId } from "../../contracts/src/index.mjs";
-import { redactSensitiveValue } from "../../observability/src/index.mjs";
+import { redactSensitiveValue, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
 
@@ -96,8 +97,7 @@ function readJson(filePath) {
  * @param {Record<string, unknown>} payload
  */
 function writeJson(filePath, payload) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeJsonAtomic(filePath, payload);
 }
 
 /**
@@ -378,9 +378,12 @@ function resolveNextActions(action, state) {
  *   taskRefs?: string[],
  *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
+ *   commandId?: string,
+ *   expectedRevision?: number,
+ *   initializedRuntime?: ReturnType<typeof initializeProjectRuntime>,
  * }} options
  */
-export function applyRunControlAction(options) {
+function applyRunControlActionUnlocked(options) {
   const cwd = options.cwd ?? process.cwd();
   const action = options.action;
   if (!RUN_CONTROL_ACTIONS.has(action)) {
@@ -402,7 +405,7 @@ export function applyRunControlAction(options) {
   const executionPlanRef = asString(options.executionPlanRef);
   const executionUnitId = asString(options.executionUnitId);
   const taskRefs = asStringArray(options.taskRefs);
-  const init = initializeProjectRuntime({
+  const init = options.initializedRuntime ?? initializeProjectRuntime({
     cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
@@ -411,6 +414,17 @@ export function applyRunControlAction(options) {
 
   const existingState = readExistingRunState(init, runId);
   const stateBefore = existingState.state;
+  const previousSequenceRaw = stateBefore ? Number(stateBefore.action_sequence) : 0;
+  const previousSequence = Number.isFinite(previousSequenceRaw) ? previousSequenceRaw : 0;
+  if (options.expectedRevision !== undefined && options.expectedRevision !== previousSequence) {
+    const conflict = new Error(
+      `Run-control revision conflict for '${runId}': expected ${options.expectedRevision}, current ${previousSequence}.`,
+    );
+    conflict.code = "run-control-revision-conflict";
+    conflict.expected_revision = options.expectedRevision;
+    conflict.current_revision = previousSequence;
+    throw conflict;
+  }
   const transition = resolveTransition(action, normalizeStatus(asString(stateBefore?.status)));
   const guardrails = evaluateGuardrails(profile, action, approvalRef, targetStep);
   const preflightBlock = asRecord(options.preflightBlock);
@@ -431,8 +445,6 @@ export function applyRunControlAction(options) {
         };
   const blocked = Boolean(blockedReason);
 
-  const previousSequenceRaw = stateBefore ? Number(stateBefore.action_sequence) : 0;
-  const previousSequence = Number.isFinite(previousSequenceRaw) ? previousSequenceRaw : 0;
   const actionSequence = previousSequence + 1;
   const stateFile = existingState.stateFile;
   const auditFile = resolveRunControlAuditFile(init, runId, actionSequence);
@@ -444,6 +456,9 @@ export function applyRunControlAction(options) {
     run_id: runId,
     action,
     applied: !blocked,
+    command_id: options.commandId,
+    expected_revision: options.expectedRevision ?? null,
+    revision: actionSequence,
     blocked,
     blocked_reason: blockedReason,
     requested_scope: {
@@ -540,6 +555,8 @@ export function applyRunControlAction(options) {
     runtimeLayout: init.runtimeLayout,
     runId,
     action,
+    commandId: options.commandId,
+    revision: actionSequence,
     state: stateAfter,
     stateFile,
     auditRecord,
@@ -551,6 +568,51 @@ export function applyRunControlAction(options) {
     applied: !blocked,
     nextActions: blocked && !stateAfter ? ["run start"] : resolveNextActions(action, stateAfter),
   };
+}
+
+export function applyRunControlAction(options) {
+  const cwd = options.cwd ?? process.cwd();
+  const init = initializeProjectRuntime({ cwd, projectRef: options.projectRef, runtimeRoot: options.runtimeRoot });
+  const runId = asString(options.runId) ?? (options.action === "start" ? `run-control-${Date.now()}` : null);
+  if (!runId) throw new Error(`Run-control action '${options.action}' requires 'runId'.`);
+  requirePublicId("run_id", runId);
+  const commandId = asString(options.commandId) ?? `command-${crypto.randomUUID()}`;
+  requirePublicId("command_id", commandId);
+  if (options.expectedRevision !== undefined && (!Number.isInteger(options.expectedRevision) || options.expectedRevision < 0)) {
+    const error = new Error("expectedRevision must be a non-negative integer.");
+    error.code = "run-control-revision-invalid";
+    throw error;
+  }
+  const lockDirectory = path.join(init.runtimeLayout.stateRoot, `run-control-${normalizeId(runId)}.lock`);
+  return withFileLock(lockDirectory, () => {
+    const commandDirectory = path.join(init.runtimeLayout.stateRoot, "run-control-commands", normalizeId(runId));
+    const commandFile = path.join(commandDirectory, `${normalizeId(commandId)}.json`);
+    const requestDigest = crypto.createHash("sha256").update(JSON.stringify({
+      action: options.action,
+      target_step: options.targetStep ?? null,
+      reason: options.reason ?? null,
+      approval_ref: options.approvalRef ?? null,
+      expected_revision: options.expectedRevision ?? null,
+    })).digest("hex");
+    if (fs.existsSync(commandFile)) {
+      const stored = readJson(commandFile);
+      if (stored.request_digest !== requestDigest) {
+        const conflict = new Error(`Run-control command '${commandId}' was reused with a different payload.`);
+        conflict.code = "run-control-command-conflict";
+        throw conflict;
+      }
+      return stored.result;
+    }
+    const result = applyRunControlActionUnlocked({
+      ...options,
+      cwd,
+      runId,
+      commandId,
+      initializedRuntime: init,
+    });
+    writeJsonAtomic(commandFile, { command_id: commandId, request_digest: requestDigest, result });
+    return result;
+  });
 }
 
 /**

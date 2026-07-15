@@ -19,6 +19,12 @@ Normalized output of one step regardless of whether that step was an artifact, p
 
 ## Notes
 Step results make routing, validation, and quality logic consistent across the lifecycle.
+The first materialization is exclusive and immutable. The execution engine
+reserves the attempt number under a cross-process lease before choosing artifact
+names; an optional canonical request key makes a completed attempt replay return
+the existing result. In-progress reuse and payload conflicts are rejected.
+Subsequent controller updates use a per-result lock, revision sidecar, atomic
+replacement, and optional expected-revision CAS.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
 `project verify` runner step results may add command-level evidence so bounded verification is machine-readable in addition to the transcript evidence:
 - `command_group_id`, `command_group_role`, `command_group_phase`, `command_group_enforcement`, `command_group_timeout_class`, and `enforcement_result`;

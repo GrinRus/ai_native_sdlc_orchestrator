@@ -32,6 +32,7 @@ import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mjs";
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
+import { completeStepAttempt, reserveStepAttempt } from "./attempt-store.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
 import {
   captureCheckoutSnapshot,
@@ -722,63 +723,6 @@ function mergeFeatureTraceabilityRecords(...records) {
 }
 
 /**
- * @param {{
- *   reportsRoot: string,
- *   runId: string,
- *   stepId: string,
- *   stepClass: string,
- * }} options
- * @returns {number}
- */
-function resolveStepExecutionAttempt(options) {
-  if (!fs.existsSync(options.reportsRoot)) {
-    return 1;
-  }
-
-  const reportFiles = fs.readdirSync(options.reportsRoot).filter((entry) => STEP_RESULT_FILE_REGEX.test(entry));
-  let highestAttempt = 0;
-
-  for (const reportFile of reportFiles) {
-    const reportPath = path.join(options.reportsRoot, reportFile);
-    /** @type {Record<string, unknown>} */
-    let stepResultDoc;
-    try {
-      const raw = fs.readFileSync(reportPath, "utf8");
-      const parsed = JSON.parse(raw);
-      stepResultDoc = asRecord(parsed);
-    } catch {
-      continue;
-    }
-
-    if (stepResultDoc.run_id !== options.runId || stepResultDoc.step_id !== options.stepId) {
-      continue;
-    }
-
-    const selectedStep = asRecord(asRecord(asRecord(stepResultDoc.routed_execution).architecture_traceability).selected_step);
-    if (typeof selectedStep.step_class === "string" && selectedStep.step_class !== options.stepClass) {
-      continue;
-    }
-
-    let detectedAttempt = 1;
-    if (typeof stepResultDoc.step_result_id === "string") {
-      const explicitAttempt = /\.attempt\.(\d+)$/u.exec(stepResultDoc.step_result_id);
-      if (explicitAttempt) {
-        const parsedAttempt = Number.parseInt(explicitAttempt[1], 10);
-        if (Number.isFinite(parsedAttempt) && parsedAttempt > 0) {
-          detectedAttempt = parsedAttempt;
-        }
-      }
-    }
-
-    if (detectedAttempt > highestAttempt) {
-      highestAttempt = detectedAttempt;
-    }
-  }
-
-  return highestAttempt + 1;
-}
-
-/**
  * @param {Record<string, unknown>} assetResolution
  * @returns {string[]}
  */
@@ -1047,6 +991,7 @@ function writeRuntimeRepairInput(options) {
  *   planDigest?: string,
  *   taskDigests?: Record<string, string>,
  *   unsafeDevelopmentOverride?: boolean,
+ *   requestKey?: string,
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -1135,12 +1080,15 @@ export function executeRoutedStep(options) {
   }
   const changedPathStatusBefore = listChangedPaths(executionRoot);
   const executionCheckoutSnapshotBefore = captureCheckoutSnapshot(executionRoot);
-  const executionAttempt = resolveStepExecutionAttempt({
-    reportsRoot: init.runtimeLayout.reportsRoot,
+  const attemptReservation = reserveStepAttempt({
+    stateRoot: init.runtimeLayout.stateRoot,
     runId,
     stepId,
     stepClass: requestedStepClass,
+    requestKey: options.requestKey,
   });
+  if (attemptReservation.replay) return attemptReservation.result;
+  const executionAttempt = attemptReservation.attempt;
   const stepResultId = derivePublicId(
     executionAttempt > 1
       ? [runId, "step", requestedStepClass, "attempt", String(executionAttempt)]
@@ -1952,7 +1900,7 @@ export function executeRoutedStep(options) {
     stepResult,
   });
 
-  return {
+  const result = {
     ...init,
     runId,
     stepId,
@@ -1960,6 +1908,17 @@ export function executeRoutedStep(options) {
     stepResult,
     stepResultPath,
   };
+  completeStepAttempt({
+    stateRoot: init.runtimeLayout.stateRoot,
+    runId,
+    stepId,
+    stepClass: requestedStepClass,
+    requestKey: attemptReservation.request_key,
+    attempt: executionAttempt,
+    expectedRevision: attemptReservation.revision,
+    result,
+  });
+  return result;
 }
 
 function continueInOwnedWorkspace(options, result) {

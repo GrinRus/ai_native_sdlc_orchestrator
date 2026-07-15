@@ -767,6 +767,25 @@ test("executeRoutedStep keeps same-step routed artifacts distinct for repeated e
   });
 });
 
+test("executeRoutedStep returns the completed result for an idempotent request key", () => {
+  withTempRepo((repoRoot) => {
+    const options = {
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId: "run.idempotent.attempt",
+      stepId: "step.idempotent.attempt",
+      requestKey: "request.idempotent.attempt",
+    };
+    const first = executeRoutedStep(options);
+    const retry = executeRoutedStep(options);
+    assert.equal(retry.stepResultPath, first.stepResultPath);
+    assert.equal(retry.stepResult.step_result_id, first.stepResult.step_result_id);
+    assert.equal(fs.readdirSync(path.dirname(first.stepResultPath)).filter((file) => file.includes("run.idempotent.attempt")).length > 0, true);
+  });
+});
+
 test("executeRoutedStep injects mission traceability before adapter request", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });

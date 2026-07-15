@@ -521,7 +521,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Concurrent execution, operator commands, and event writers preserve
   every transition with unique immutable identities.
 - **Epic:** EPIC-2, EPIC-3, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** step result/attempt store, run control,
