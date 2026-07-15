@@ -5,6 +5,7 @@ import {
   listLiveRunEvents,
   openLiveRunEventStream,
 } from "../../../observability/src/index.mjs";
+import { validatePublicId } from "../../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 import { createProjectReadContext } from "./project-context.mjs";
 
@@ -13,7 +14,11 @@ import { createProjectReadContext } from "./project-context.mjs";
  * @returns {string}
  */
 function normalizeRunId(runId) {
-  return runId.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const validation = validatePublicId(runId);
+  if (!validation.ok) {
+    throw new TypeError(`Invalid run ID (${validation.value_class}): ${validation.migration}`);
+  }
+  return runId;
 }
 
 /**

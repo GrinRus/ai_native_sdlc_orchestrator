@@ -40,6 +40,20 @@ The Runtime Harness writes step-level decision evidence and a completed-run `run
 
 As of W24-S01, normal `run start` execution uses a run-level Runtime Harness controller. The controller owns the run-stage ledger (`prepare`, `execute`, `classify`, `validate`, `retry`/`repair`/`escalate`, `verify`, `close`/`block`) and delegates routed step execution to the step engine. Controller-generated reports add `run_controller`, `run_transitions`, and `run_decision` so pass, block, fail, repair, and exhausted-repair outcomes are visible at run level without provider-specific behavior entering core.
 
+As of W58-S05, the HTTP lifecycle `run start` boundary is asynchronous. It
+reserves a durable `run-job`, starts a separate Node worker, and returns HTTP
+`202` with run, job, status, and event references before provider execution
+finishes. The worker owns heartbeat and terminal evidence updates under
+revision checks. Pause, answer, and cancel remain durable run-control actions;
+cancel performs bounded process-group cleanup. Module callers retain an inline
+compatibility wrapper while migrating to the accepted-response boundary.
+
+Live observation is journal-first rather than process-local. API SSE and the
+real CLI `run status --follow` tail the per-run JSONL journal from a durable
+cursor. Reconnect resumes after `after_event_id`, replay is explicitly bounded,
+and slow clients disconnect with a recovery cursor instead of creating an
+unbounded memory queue.
+
 Quality boundaries are explicit:
 - feature result quality is owned by review, eval, delivery, and release evidence;
 - AOR runtime quality is owned by Runtime Harness decisions and `runtime-harness-report`;

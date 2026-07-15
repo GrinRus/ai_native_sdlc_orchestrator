@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -16,19 +15,9 @@ const LIVE_RUN_EVENT_TYPES = new Set([
   "run.terminal",
 ]);
 
-/** @type {Map<string, EventEmitter>} */
-const EMITTERS = new Map();
-
-/**
- * @param {string} logFile
- * @returns {EventEmitter}
- */
-function getEmitter(logFile) {
-  if (!EMITTERS.has(logFile)) {
-    EMITTERS.set(logFile, new EventEmitter());
-  }
-  return /** @type {EventEmitter} */ (EMITTERS.get(logFile));
-}
+const DEFAULT_MAX_REPLAY = 200;
+const SERVER_MAX_REPLAY = 1000;
+const JOURNAL_POLL_MS = 50;
 
 /**
  * @param {string} logFile
@@ -176,8 +165,6 @@ export function appendLiveRunEvent(options) {
     }
     return nextEvent;
   });
-  getEmitter(options.logFile).emit("event", event);
-
   return event;
 }
 
@@ -202,6 +189,12 @@ export function listLiveRunEvents(options) {
  * @returns {{ replayEvents: Record<string, unknown>[], afterSequence: number }}
  */
 function resolveReplayWindow(events, afterEventId, maxReplay) {
+  if (maxReplay === 0) {
+    return {
+      replayEvents: [],
+      afterSequence: events.length === 0 ? 0 : getEventSequence(events.at(-1)),
+    };
+  }
   if (events.length === 0) {
     return { replayEvents: [], afterSequence: 0 };
   }
@@ -231,7 +224,11 @@ function resolveReplayWindow(events, afterEventId, maxReplay) {
  * }} options
  */
 export function openLiveRunEventStream(options) {
-  const maxReplay = options.maxReplay ?? 200;
+  const requestedReplay = Number.isInteger(options.maxReplay) && options.maxReplay >= 0
+    ? options.maxReplay
+    : DEFAULT_MAX_REPLAY;
+  const maxReplay = Math.min(requestedReplay, SERVER_MAX_REPLAY);
+  const initialJournalSize = fs.existsSync(options.logFile) ? fs.statSync(options.logFile).size : 0;
   const runEvents = listLiveRunEvents({
     logFile: options.logFile,
     runId: options.runId,
@@ -242,10 +239,10 @@ export function openLiveRunEventStream(options) {
     lastSequence = getEventSequence(replayWindow.replayEvents[replayWindow.replayEvents.length - 1]);
   }
 
-  const emitter = getEmitter(options.logFile);
   return {
     protocol: "sse",
     run_id: options.runId,
+    cursor_terminal: runEvents.at(-1)?.event_type === "run.terminal",
     reconnect_after_ms: 1000,
     backpressure: {
       policy: "bounded-replay-window",
@@ -259,20 +256,46 @@ export function openLiveRunEventStream(options) {
      * @returns {() => void}
      */
     subscribe(handler) {
-      /**
-       * @param {Record<string, unknown>} event
-       */
-      function onEvent(event) {
-        if (event.run_id !== options.runId) return;
-        const sequence = getEventSequence(event);
-        if (sequence <= lastSequence) return;
-        lastSequence = sequence;
-        handler(/** @type {Record<string, unknown>} */ (redactSensitiveValue(event, options.redactionPolicy)));
-      }
-
-      emitter.on("event", onEvent);
+      let offset = initialJournalSize;
+      let remainder = "";
+      let closed = false;
+      const poll = () => {
+        if (closed || !fs.existsSync(options.logFile)) return;
+        const size = fs.statSync(options.logFile).size;
+        if (size < offset) {
+          offset = 0;
+          remainder = "";
+        }
+        if (size === offset) return;
+        const length = size - offset;
+        const descriptor = fs.openSync(options.logFile, "r");
+        try {
+          const buffer = Buffer.alloc(length);
+          fs.readSync(descriptor, buffer, 0, length, offset);
+          offset = size;
+          const parts = `${remainder}${buffer.toString("utf8")}`.split("\n");
+          remainder = parts.pop() ?? "";
+          for (const line of parts) {
+            if (!line.trim()) continue;
+            try {
+              const event = JSON.parse(line);
+              if (event.run_id !== options.runId) continue;
+              const sequence = getEventSequence(event);
+              if (sequence <= lastSequence) continue;
+              lastSequence = sequence;
+              handler(/** @type {Record<string, unknown>} */ (redactSensitiveValue(event, options.redactionPolicy)));
+            } catch {
+              // A malformed journal line is ignored; appends are validated before write.
+            }
+          }
+        } finally {
+          fs.closeSync(descriptor);
+        }
+      };
+      const interval = setInterval(poll, JOURNAL_POLL_MS);
       return () => {
-        emitter.off("event", onEvent);
+        closed = true;
+        clearInterval(interval);
       };
     },
   };

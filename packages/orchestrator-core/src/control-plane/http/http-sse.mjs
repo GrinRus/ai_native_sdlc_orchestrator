@@ -11,12 +11,14 @@ import { asString, getResponseRedactionPolicy } from "./http-utils.mjs";
  */
 export function writeSseEvent(response, payload) {
   const data = redactSensitiveValue(payload.data, getResponseRedactionPolicy(response));
+  let writable = true;
   if (asString(payload.id)) {
-    response.write(`id: ${payload.id}\n`);
+    writable = response.write(`id: ${payload.id}\n`) && writable;
   }
-  response.write(`event: ${payload.event}\n`);
+  writable = response.write(`event: ${payload.event}\n`) && writable;
   for (const line of JSON.stringify(data).split("\n")) {
-    response.write(`data: ${line}\n`);
+    writable = response.write(`data: ${line}\n`) && writable;
   }
-  response.write("\n");
+  writable = response.write("\n") && writable;
+  return writable;
 }

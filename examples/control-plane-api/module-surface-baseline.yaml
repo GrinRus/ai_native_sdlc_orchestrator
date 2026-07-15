@@ -459,6 +459,17 @@ lifecycle_command_operations:
     preserves_cli_command_output: true
     blocked_http_status: 409
     invalid_input_http_status: 400
+    asynchronous_run_start:
+      http_status: 202
+      contract_family: run-job
+      required_fields:
+        - run_id
+        - job_id
+        - status
+        - revision
+        - status_ref
+        - event_ref
+      module_compatibility: inline
     evidence_fields:
       - artifact_refs
       - evidence_refs

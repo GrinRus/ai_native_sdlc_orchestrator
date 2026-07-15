@@ -71,6 +71,7 @@ const LIVE_RUN_EVENT_TYPE_VALUES = [
   "warning.raised",
   "run.terminal",
 ];
+const RUN_JOB_STATUS_VALUES = ["queued", "running", "paused", "waiting-input", "canceling", "succeeded", "failed", "canceled"];
 export const EXTERNAL_REFERENCE_PREFIXES = [
   "evidence://",
   "schema://",
@@ -1263,6 +1264,26 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "step_class", allowedValues: STEP_CLASS_VALUES }],
   },
   {
+    family: "run-job",
+    familyGroup: "operations",
+    sourceContract: "docs/contracts/run-job.md",
+    exampleGlob: "examples/reports/run-job*.yaml",
+    status: "implemented",
+    requiredFields: ["schema_version", "job_id", "run_id", "project_id", "status", "revision", "accepted_at", "status_ref", "event_ref"],
+    fieldTypes: {
+      schema_version: "number",
+      job_id: "string",
+      run_id: "string",
+      project_id: "string",
+      status: "string",
+      revision: "number",
+      accepted_at: "string",
+      status_ref: "string",
+      event_ref: "string",
+    },
+    enumChecks: [{ field: "status", allowedValues: RUN_JOB_STATUS_VALUES }],
+  },
+  {
     family: "live-run-event",
     familyGroup: "operations",
     sourceContract: "docs/contracts/live-run-event.md",
@@ -1522,6 +1543,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/reports\/review-report[^/]*\.ya?ml$/, family: "review-report" },
   { regex: /^examples\/reports\/quality-repair-request[^/]*\.ya?ml$/, family: "quality-repair-request" },
   { regex: /^examples\/reports\/live-run-event[^/]*\.ya?ml$/, family: "live-run-event" },
+  { regex: /^examples\/reports\/run-job[^/]*\.ya?ml$/, family: "run-job" },
   { regex: /^examples\/reports\/learning-loop-scorecard[^/]*\.ya?ml$/, family: "learning-loop-scorecard" },
   { regex: /^examples\/reports\/learning-loop-handoff[^/]*\.ya?ml$/, family: "learning-loop-handoff" },
   { regex: /^examples\/reports\/planner-metrics-snapshot[^/]*\.ya?ml$/, family: "planner-metrics-snapshot" },

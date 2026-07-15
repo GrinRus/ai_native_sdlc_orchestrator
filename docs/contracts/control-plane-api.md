@@ -492,7 +492,7 @@ Command payload baseline:
 - `approval_ref` (required by high-risk policy guardrails when applicable).
 
 Deterministic transition baseline:
-- `start` creates/opens `running` lifecycle and may finalize to `completed|failed` in the same invocation when one routed execution attempt finishes inline;
+- module compatibility may execute `run start` inline, while the detached HTTP lifecycle mutation reserves a durable `run-job`, starts a separate Node worker, and returns HTTP `202` before provider completion;
 - `pause` allowed only from `running`;
 - `resume` allowed only from `paused`;
 - `steer` allowed from `running|paused` with explicit target step;
@@ -513,6 +513,15 @@ Full-journey execution baseline (W13):
 - `run status` resolves that execution lineage without requiring harness-private execution state.
 - `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so provider-pinned routing can be applied deterministically through the public CLI surface.
 - Full-journey runs may continue after a degraded `run start` only when public routed step, Runtime Harness, and adapter raw evidence were materialized. Missing execution evidence remains a hard blocker.
+
+Asynchronous run-job baseline (W58-S05):
+- accepted responses contain `run_id`, `job_id`, `status`, `revision`, `status_ref`, and `event_ref`;
+- the durable job owns `queued|running|paused|waiting-input|canceling|succeeded|failed|canceled`, worker identity, heartbeat, CAS revision, and terminal evidence;
+- the worker supervises a separate process group, observes durable pause/resume/cancel state, and escalates bounded cleanup from terminate to kill;
+- SSE and CLI follow tail the JSONL journal by durable cursor, so appends from another process are delivered exactly once without a process-local emitter;
+- `maxReplay=0` disables replay, positive replay is capped at 1000, and reconnect resumes after `after_event_id`;
+- slow clients are disconnected when the bounded transport buffer rejects writes, and server shutdown closes active streams within a bounded interval;
+- `run status --follow` remains attached until `run.terminal` or `SIGINT`, then removes its journal subscription and signal handler.
 
 Interactive continuation target (W18-S01):
 - when a routed step requests operator input, the run should preserve a query-safe `requested_interaction` payload in the run-linked step result;

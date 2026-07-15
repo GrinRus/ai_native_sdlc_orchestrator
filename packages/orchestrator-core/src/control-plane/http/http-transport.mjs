@@ -242,7 +242,10 @@ export function createControlPlaneHttpServer(options) {
             return;
           }
           await new Promise((closeResolve, closeReject) => {
+            const forceClose = setTimeout(() => server.closeAllConnections?.(), 250);
+            forceClose.unref?.();
             server.close((error) => {
+              clearTimeout(forceClose);
               if (error) {
                 closeReject(error);
                 return;

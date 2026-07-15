@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { requestRunJobCancel, startRunJob } from "../../../packages/orchestrator-core/src/run-job.mjs";
 import { applyRunControlAction, readRunControlState } from "../src/index.mjs";
 import { appendRunEvent, openRunEventStream, readRunEvents } from "../src/live-event-stream.mjs";
 
@@ -17,6 +19,16 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
  */
 async function withTempRepo(callback) {
   await withTempRepoHelper({ prefix: "aor-w5-s02-", workspaceRoot }, callback);
+}
+
+async function waitForJob(file, accepted, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const job = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (accepted.includes(job.status)) return job;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`timed out waiting for ${accepted.join("|")} in '${file}'`);
 }
 
 test("live event stream supports ordered replay and subscribe flow", async () => {
@@ -108,6 +120,103 @@ test("live event stream supports ordered replay and subscribe flow", async () =>
     const streamedEvent = /** @type {Record<string, unknown>} */ (await received);
     assert.equal(streamedEvent.event_type, "warning.raised");
     assert.equal(streamedEvent.payload.sequence, 4);
+
+    const noReplay = openRunEventStream({ projectRef: repoRoot, cwd: repoRoot, runId, maxReplay: 0 });
+    assert.deepEqual(noReplay.replay_events, []);
+    assert.equal(noReplay.backpressure.max_replay_events, 0);
+    const capped = openRunEventStream({ projectRef: repoRoot, cwd: repoRoot, runId, maxReplay: 100_000 });
+    assert.equal(capped.backpressure.max_replay_events, 1000);
+  });
+});
+
+test("durable journal tail delivers a separate-process append exactly once", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.cross.process.stream.v1";
+    const stream = openRunEventStream({ projectRef: repoRoot, cwd: repoRoot, runId, maxReplay: 0 });
+    const received = [];
+    const completed = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("timed out waiting for cross-process event")), 5000);
+      const unsubscribe = stream.subscribe((event) => {
+        received.push(event);
+        clearTimeout(timeout);
+        unsubscribe();
+        resolve();
+      });
+    });
+    const moduleUrl = new URL("../src/live-event-stream.mjs", import.meta.url).href;
+    const child = spawnSync(process.execPath, [
+      "--input-type=module",
+      "-e",
+      `import { appendRunEvent } from ${JSON.stringify(moduleUrl)}; appendRunEvent({projectRef:${JSON.stringify(repoRoot)},cwd:${JSON.stringify(repoRoot)},runId:${JSON.stringify(runId)},eventType:"provider.heartbeat",payload:{status:"running"}});`,
+    ], { cwd: workspaceRoot, encoding: "utf8" });
+    assert.equal(child.status, 0, child.stderr);
+    await completed;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(received.length, 1);
+    assert.equal(received[0].event_type, "provider.heartbeat");
+  });
+});
+
+test("CLI run status follow waits for a later terminal event", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.cli.follow.terminal.v1";
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.started", payload: { status: "running" } });
+    const child = spawn(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "run", "status", "--project-ref", repoRoot, "--run-id", runId, "--follow", "true", "--max-replay", "0",
+    ], { cwd: workspaceRoot, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.equal(child.exitCode, null, "follow must remain attached before a terminal event");
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.terminal", payload: { status: "succeeded" } });
+    const exitCode = await new Promise((resolve) => child.once("exit", resolve));
+    assert.equal(exitCode, 0, stderr);
+    const payload = JSON.parse(stdout);
+    assert.equal(payload.follow_mode.enabled, true);
+    assert.equal(payload.run_event_history.total_events, 2);
+    assert.deepEqual(payload.replay_events, []);
+  });
+});
+
+test("CLI run status follow releases its subscription on SIGINT", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.cli.follow.sigint.v1";
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.started", payload: { status: "running" } });
+    const child = spawn(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "run", "status", "--project-ref", repoRoot, "--run-id", runId, "--follow", "true", "--max-replay", "1",
+    ], { cwd: workspaceRoot, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    assert.equal(child.exitCode, null, "follow process must be ready before SIGINT");
+    child.kill("SIGINT");
+    const exitCode = await new Promise((resolve) => child.once("exit", resolve));
+    assert.equal(exitCode, 0);
+    assert.equal(JSON.parse(stdout).follow_mode.enabled, true);
+  });
+});
+
+test("run job cancellation terminates its supervised process group", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.job.cancel.supervisor.v1";
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.started", payload: { status: "running" } });
+    const started = startRunJob({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      args: ["run", "status", "--project-ref", repoRoot, "--run-id", runId, "--follow", "true", "--max-replay", "0"],
+    });
+    const running = await waitForJob(started.file, ["running"]);
+    assert.ok(running.worker.pid > 0);
+    requestRunJobCancel({ projectRef: repoRoot, cwd: repoRoot, runId });
+    const canceled = await waitForJob(started.file, ["canceled"]);
+    assert.equal(canceled.status, "canceled");
+    assert.ok(canceled.terminal_at);
+    assert.ok(canceled.worker_result.signal);
   });
 });
 

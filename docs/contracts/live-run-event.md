@@ -66,6 +66,10 @@ The shared contract loader validates the query-safe nested event surface:
 Live events should support catch-up from a read model plus the live stream.
 Reconnect behavior should support replay from the last acknowledged `event_id`.
 Backpressure should use a bounded replay window and avoid unbounded in-memory buffering.
+Live delivery tails the durable journal from a byte cursor. A process-local
+emitter is not authoritative and is not required for cross-worker delivery.
+`maxReplay=0` means no replay; positive requests are capped at 1000. Slow SSE
+clients are disconnected with their last event id as the recovery cursor.
 
 Event append is a transactional identity operation. Writers serialize through a
 per-log cross-process lease and advance a sidecar cursor, so the steady-state

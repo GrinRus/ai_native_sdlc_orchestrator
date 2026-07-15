@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { derivePublicId } from "../../../contracts/src/index.mjs";
 import { getCommandDefinition } from "../operator-cli/command-catalog.mjs";
 import { invokeCli } from "../operator-cli/index.mjs";
+import { startRunJob } from "../run-job.mjs";
 
 const LIFECYCLE_COMMANDS = new Set([
   "project init",
@@ -385,6 +387,42 @@ export function runLifecycleCommand(options) {
     ...(command === "next" && flagResult.cliFlags.json === undefined ? ["--json"] : []),
     ...flagResult.args,
   ];
+  if (command === "run start") {
+    const runId = asString(flagResult.cliFlags["run-id"]);
+    const acceptedRunId = runId ?? derivePublicId(["run", Date.now(), process.pid], "run");
+    const workerArgs = runId ? args : [...args, "--run-id", acceptedRunId];
+    const started = startRunJob({
+      cwd: options.cwd ?? options.projectRef,
+      projectRef: options.projectRef,
+      runtimeRoot: options.runtimeRoot,
+      runId: acceptedRunId,
+      args: workerArgs,
+    });
+    const accepted = {
+      command,
+      args: workerArgs,
+      exit_code: 0,
+      stdout: "",
+      stderr: "",
+      command_output: {
+        accepted: true,
+        run_id: started.job.run_id,
+        job_id: started.job.job_id,
+        status: started.job.status,
+        revision: started.job.revision,
+        status_ref: started.job.status_ref,
+        event_ref: started.job.event_ref,
+      },
+      artifact_refs: [started.file],
+      evidence_refs: [started.job.status_ref, started.job.event_ref],
+      blocked: false,
+      blocked_reason: null,
+      interactive_continuation: null,
+      accepted: true,
+      job: started.job,
+    };
+    return { ok: true, statusCode: 202, accepted: true, result: accepted };
+  }
   const run = invokeCli(args, {
     cwd: options.cwd ?? options.projectRef,
   });

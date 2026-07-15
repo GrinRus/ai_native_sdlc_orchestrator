@@ -336,6 +336,18 @@ async function postJsonWithToken(url, payload, token = null) {
   });
 }
 
+async function waitForRunJob(file, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(file)) {
+      const job = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (["succeeded", "failed", "canceled", "waiting-input"].includes(job.status)) return job;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`timed out waiting for run job '${file}'`);
+}
+
 test("detached control-plane transport serves read baseline endpoints", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.read.v1";
@@ -899,6 +911,59 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
     } finally {
       await transport.close();
     }
+  });
+});
+
+test("HTTP run start returns 202 while a durable worker job executes", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const startedAt = Date.now();
+      const response = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`, {
+        command: "run start",
+        flags: {
+          run_id: "run.http.async.worker.v1",
+          target_step: "implement",
+          require_validation_pass: false,
+          unsafe_development_override: true,
+        },
+      });
+      assert.equal(response.status, 202);
+      assert.ok(Date.now() - startedAt < 2000, "run start must return before provider execution completes");
+      const accepted = await response.json();
+      assert.equal(accepted.run_id, "run.http.async.worker.v1");
+      assert.equal(accepted.job_id, "run.http.async.worker.v1.job");
+      assert.equal(accepted.status, "queued");
+      assert.equal(typeof accepted.revision, "number");
+      assert.equal(typeof accepted.status_ref, "string");
+      assert.equal(typeof accepted.event_ref, "string");
+
+      const stateStartedAt = Date.now();
+      const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      assert.ok(Date.now() - stateStartedAt < 1000, "state GET must remain responsive while worker runs");
+      const jobFile = accepted.lifecycle_command.artifact_refs[0];
+      const terminal = await waitForRunJob(jobFile);
+      assert.ok(terminal.worker?.identity.startsWith("node-worker-"));
+      assert.ok(terminal.heartbeat_at);
+      assert.ok(Array.isArray(terminal.terminal_evidence_refs));
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("HTTP shutdown bounds active SSE stream lifetime", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.shutdown.stream.v1";
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.started", payload: { status: "running" } });
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const response = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?max_replay=0`);
+    assert.equal(response.status, 200);
+    const startedAt = Date.now();
+    await transport.close();
+    assert.ok(Date.now() - startedAt < 1500, "server shutdown must bound active stream lifetime");
+    await response.body?.cancel().catch(() => {});
   });
 });
 

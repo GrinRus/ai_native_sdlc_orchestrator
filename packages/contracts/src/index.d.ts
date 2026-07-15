@@ -41,6 +41,7 @@ export type ContractFamily =
   | "adapter-capability-profile"
   | "skill-profile"
   | "live-run-event"
+  | "run-job"
   | "learning-loop-scorecard"
   | "learning-loop-handoff"
   | "incident-backfill-proposal"
