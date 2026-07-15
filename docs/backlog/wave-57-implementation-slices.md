@@ -372,7 +372,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Project initialization either publishes one fully valid runtime
   layout inside its canonical root or leaves the previous state unchanged.
 - **Epic:** EPIC-1, EPIC-2
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `packages/orchestrator-core/src/project-init.mjs`,
@@ -423,7 +423,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   explicit canonical project context, so behavior is independent of the
   launcher working directory and cannot cross project boundaries.
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** selected-project context and local project registry,
@@ -521,7 +521,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Concurrent execution, operator commands, and event writers preserve
   every transition with unique immutable identities.
 - **Epic:** EPIC-2, EPIC-3, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** step result/attempt store, run control,

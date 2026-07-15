@@ -250,7 +250,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(result.report.project_id, "aor-core");
     assert.equal(result.report.repo_facts.topology, "monorepo");
     assert.equal(result.report.repo_facts.package_manager, "pnpm");
-    assert.equal(result.reportPath.startsWith(runtimeRoot), true);
+    assert.equal(result.reportPath.startsWith(fs.realpathSync.native(runtimeRoot)), true);
     assert.equal(fs.existsSync(result.reportPath), true);
     assert.equal(fs.existsSync(result.routeResolutionPath), true);
     assert.equal(fs.existsSync(result.assetResolutionPath), true);

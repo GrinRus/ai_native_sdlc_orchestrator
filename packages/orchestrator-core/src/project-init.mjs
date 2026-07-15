@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import childProcess from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { stringify as stringifyYaml } from "yaml";
 
 import { loadContractFile, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
@@ -146,7 +148,7 @@ export function discoverProjectRoot(options = {}) {
   while (true) {
     const gitDir = path.join(current, ".git");
     if (fs.existsSync(gitDir)) {
-      return current;
+      return fs.realpathSync.native(current);
     }
 
     const parent = path.dirname(current);
@@ -221,7 +223,7 @@ function resolveBundledExamplesRoot() {
     }
     return override;
   }
-  return path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../examples");
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../examples");
 }
 
 /**
@@ -229,15 +231,14 @@ function resolveBundledExamplesRoot() {
  * @returns {string}
  */
 function detectDefaultBranch(projectRoot) {
-  const headPath = path.join(projectRoot, ".git", "HEAD");
-  if (!fs.existsSync(headPath)) {
-    return "main";
-  }
-
   try {
-    const head = fs.readFileSync(headPath, "utf8").trim();
-    const match = head.match(/^ref:\s+refs\/heads\/(.+)$/u);
-    return match ? match[1] : "main";
+    const branch = childProcess
+      .execFileSync("git", ["-C", projectRoot, "symbolic-ref", "--quiet", "--short", "HEAD"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim();
+    return branch || "main";
   } catch {
     return "main";
   }
@@ -594,6 +595,94 @@ function createBootstrapProjectProfile(options) {
   return { profile, templatePath, bundledExamplesRoot };
 }
 
+function createProjectAssetTransaction(projectRoot) {
+  return { projectRoot, transactionId: crypto.randomUUID(), createdPaths: [], stagedPaths: [] };
+}
+
+function ensureTrackedDirectory(transaction, directory) {
+  if (fs.existsSync(directory)) {
+    if (!fs.statSync(directory).isDirectory()) throw new Error(`Expected directory '${directory}'.`);
+    return;
+  }
+  const missing = [];
+  let cursor = directory;
+  while (!fs.existsSync(cursor)) {
+    missing.unshift(cursor);
+    cursor = path.dirname(cursor);
+  }
+  fs.mkdirSync(directory, { recursive: true });
+  transaction.createdPaths.push(...missing);
+}
+
+function writeNewFileTransactionally(transaction, targetPath, content) {
+  if (fs.existsSync(targetPath)) return false;
+  ensureTrackedDirectory(transaction, path.dirname(targetPath));
+  const stagedPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.aor-init-${transaction.transactionId}.tmp`,
+  );
+  transaction.stagedPaths.push(stagedPath);
+  fs.writeFileSync(stagedPath, content, { encoding: "utf8", flag: "wx" });
+  fs.renameSync(stagedPath, targetPath);
+  transaction.stagedPaths = transaction.stagedPaths.filter((entry) => entry !== stagedPath);
+  transaction.createdPaths.push(targetPath);
+  return true;
+}
+
+function copyMissingAssetTree(transaction, sourceRoot, targetRoot) {
+  if (!fs.existsSync(sourceRoot)) return false;
+  let materialized = false;
+  const visit = (sourcePath, targetPath) => {
+    const stat = fs.lstatSync(sourcePath);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Bootstrap asset source '${sourcePath}' must not contain symbolic links.`);
+    }
+    if (stat.isDirectory()) {
+      ensureTrackedDirectory(transaction, targetPath);
+      for (const entry of fs.readdirSync(sourcePath)) {
+        visit(path.join(sourcePath, entry), path.join(targetPath, entry));
+      }
+      return;
+    }
+    if (fs.existsSync(targetPath)) return;
+    const stagedPath = path.join(
+      path.dirname(targetPath),
+      `.${path.basename(targetPath)}.aor-init-${transaction.transactionId}.tmp`,
+    );
+    transaction.stagedPaths.push(stagedPath);
+    fs.copyFileSync(sourcePath, stagedPath, fs.constants.COPYFILE_EXCL);
+    fs.renameSync(stagedPath, targetPath);
+    transaction.stagedPaths = transaction.stagedPaths.filter((entry) => entry !== stagedPath);
+    transaction.createdPaths.push(targetPath);
+    materialized = true;
+  };
+  visit(sourceRoot, targetRoot);
+  return materialized;
+}
+
+function rollbackProjectAssetTransaction(transaction) {
+  for (const stagedPath of transaction.stagedPaths) {
+    fs.rmSync(stagedPath, { force: true });
+  }
+  for (const createdPath of [...transaction.createdPaths].reverse()) {
+    try {
+      const stat = fs.lstatSync(createdPath);
+      if (stat.isDirectory()) fs.rmdirSync(createdPath);
+      else fs.rmSync(createdPath, { force: true });
+    } catch (error) {
+      if (error?.code !== "ENOENT" && error?.code !== "ENOTEMPTY") throw error;
+    }
+  }
+}
+
+function injectInitializationFailure(options, point) {
+  if (options.failureInjectionPoint === point) {
+    const error = new Error(`Injected project initialization failure at '${point}'.`);
+    error.code = "AOR_INIT_FAILURE_INJECTION";
+    throw error;
+  }
+}
+
 /**
  * @param {{
  *   cwd: string,
@@ -633,8 +722,7 @@ function ensureMaterializedProjectProfile(options) {
   });
   const profile = generated.profile;
   const serialized = stringifyYaml(profile);
-  fs.mkdirSync(path.dirname(explicitPath), { recursive: true });
-  fs.writeFileSync(explicitPath, serialized, "utf8");
+  writeNewFileTransactionally(options.transaction, explicitPath, serialized);
 
   return {
     projectProfilePath: explicitPath,
@@ -680,12 +768,7 @@ function materializeBundledAssetTree(options) {
   if (missingPaths.length === 0) {
     return false;
   }
-  fs.cpSync(options.sourceRoot, options.targetRoot, {
-    recursive: true,
-    force: false,
-    errorOnExist: false,
-  });
-  return true;
+  return copyMissingAssetTree(options.transaction, options.sourceRoot, options.targetRoot);
 }
 
 /**
@@ -695,19 +778,16 @@ function materializeBundledAssetTree(options) {
 function ensureBootstrapAssets(options) {
   const bundledExamplesRoot = resolveBundledExamplesRoot();
   const targetExamplesRoot = path.join(options.projectRoot, "examples");
-  const targetContextRoot = path.join(options.projectRoot, "context");
   let materialized = false;
   const materializedPaths = [];
 
-  if (materializeBundledAssetTree({ sourceRoot: bundledExamplesRoot, targetRoot: targetExamplesRoot })) {
+  if (materializeBundledAssetTree({
+    transaction: options.transaction,
+    sourceRoot: bundledExamplesRoot,
+    targetRoot: targetExamplesRoot,
+  })) {
     materialized = true;
     materializedPaths.push(targetExamplesRoot);
-  }
-
-  const bundledContextRoot = path.join(bundledExamplesRoot, "context");
-  if (materializeBundledAssetTree({ sourceRoot: bundledContextRoot, targetRoot: targetContextRoot })) {
-    materialized = true;
-    materializedPaths.push(targetContextRoot);
   }
 
   return {
@@ -829,6 +909,102 @@ export function ensureRuntimeLayout(options) {
   }
 
   return layout;
+}
+
+function isContainedPath(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
+}
+
+/** Canonicalize a runtime boundary before the first write. */
+function canonicalizeRuntimeRoot(runtimeRoot) {
+  const absolute = path.resolve(runtimeRoot);
+  let cursor = absolute;
+  const missing = [];
+  while (!fs.existsSync(cursor)) {
+    missing.unshift(path.basename(cursor));
+    const parent = path.dirname(cursor);
+    if (parent === cursor) throw new Error(`Cannot resolve runtime root '${runtimeRoot}'.`);
+    cursor = parent;
+  }
+  const stat = fs.lstatSync(cursor);
+  if (cursor === absolute && stat.isSymbolicLink()) {
+    throw new Error(`Runtime root '${runtimeRoot}' must not be a symbolic link or junction.`);
+  }
+  const canonicalAncestor = fs.realpathSync.native(cursor);
+  return path.join(canonicalAncestor, ...missing);
+}
+
+function createStagingRuntimeLayout(finalLayout) {
+  fs.mkdirSync(finalLayout.projectsRoot, { recursive: true });
+  const canonicalProjectsRoot = fs.realpathSync.native(finalLayout.projectsRoot);
+  if (!isContainedPath(finalLayout.runtimeRoot, canonicalProjectsRoot)) {
+    throw new Error(`Projects root '${finalLayout.projectsRoot}' escapes runtime boundary '${finalLayout.runtimeRoot}'.`);
+  }
+  const transactionId = crypto.randomUUID();
+  const stagingProjectRuntimeRoot = path.join(
+    canonicalProjectsRoot,
+    `.${path.basename(finalLayout.projectRuntimeRoot)}.init-${transactionId}.tmp`,
+  );
+  const backupProjectRuntimeRoot = path.join(
+    canonicalProjectsRoot,
+    `.${path.basename(finalLayout.projectRuntimeRoot)}.init-${transactionId}.backup`,
+  );
+  fs.mkdirSync(stagingProjectRuntimeRoot, { recursive: false });
+  const ownerMarker = path.join(stagingProjectRuntimeRoot, ".aor-init-owner.json");
+  fs.writeFileSync(ownerMarker, `${JSON.stringify({ transaction_id: transactionId, project_id: path.basename(finalLayout.projectRuntimeRoot) })}\n`, "utf8");
+  if (fs.existsSync(finalLayout.projectRuntimeRoot)) {
+    for (const entry of fs.readdirSync(finalLayout.projectRuntimeRoot)) {
+      fs.cpSync(
+        path.join(finalLayout.projectRuntimeRoot, entry),
+        path.join(stagingProjectRuntimeRoot, entry),
+        { recursive: true, force: false, errorOnExist: false, preserveTimestamps: true },
+      );
+    }
+  }
+  const stagingLayout = {
+    ...finalLayout,
+    projectRuntimeRoot: stagingProjectRuntimeRoot,
+    artifactsRoot: path.join(stagingProjectRuntimeRoot, "artifacts"),
+    reportsRoot: path.join(stagingProjectRuntimeRoot, "reports"),
+    stateRoot: path.join(stagingProjectRuntimeRoot, "state"),
+  };
+  for (const directory of [stagingLayout.artifactsRoot, stagingLayout.reportsRoot, stagingLayout.stateRoot]) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+  return { transactionId, stagingLayout, ownerMarker, backupProjectRuntimeRoot };
+}
+
+function cleanupOwnedStagingTree(transaction) {
+  if (!fs.existsSync(transaction.ownerMarker)) return;
+  const marker = JSON.parse(fs.readFileSync(transaction.ownerMarker, "utf8"));
+  if (marker.transaction_id !== transaction.transactionId) return;
+  fs.rmSync(transaction.stagingLayout.projectRuntimeRoot, { recursive: true, force: true });
+}
+
+function publishStagedRuntime(finalLayout, transaction, options = {}) {
+  const hadExistingRuntime = fs.existsSync(finalLayout.projectRuntimeRoot);
+  try {
+    if (hadExistingRuntime) {
+      fs.renameSync(finalLayout.projectRuntimeRoot, transaction.backupProjectRuntimeRoot);
+      injectInitializationFailure(options, "after-backup-rename");
+    }
+    fs.renameSync(transaction.stagingLayout.projectRuntimeRoot, finalLayout.projectRuntimeRoot);
+  } catch (error) {
+    if (!fs.existsSync(finalLayout.projectRuntimeRoot) && fs.existsSync(transaction.backupProjectRuntimeRoot)) {
+      fs.renameSync(transaction.backupProjectRuntimeRoot, finalLayout.projectRuntimeRoot);
+    }
+    if (error?.code === "EXDEV") {
+      throw new Error("Runtime publication crossed a filesystem boundary; atomic initialization was refused.", {
+        cause: error,
+      });
+    }
+    throw error;
+  }
+  fs.rmSync(path.join(finalLayout.projectRuntimeRoot, path.basename(transaction.ownerMarker)), { force: true });
+  if (hadExistingRuntime) {
+    fs.rmSync(transaction.backupProjectRuntimeRoot, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -1032,6 +1208,8 @@ export function initializeProjectRuntime(options = {}) {
     options.materializeProjectProfile === true || requestedAssetMode === "materialized";
   const materializeBootstrapAssets =
     options.materializeBootstrapAssets === true || requestedAssetMode === "materialized";
+  const projectAssetTransaction = createProjectAssetTransaction(projectRoot);
+  try {
 
   let projectProfilePath;
   let projectProfileSource = "default-discovered";
@@ -1040,6 +1218,7 @@ export function initializeProjectRuntime(options = {}) {
   let profileMaterialization = { materialized: false, idempotent: false, templatePath: null };
   if (materializeProjectProfile) {
     const materialized = ensureMaterializedProjectProfile({
+      transaction: projectAssetTransaction,
       cwd,
       projectRoot,
       projectProfile: options.projectProfile,
@@ -1058,6 +1237,7 @@ export function initializeProjectRuntime(options = {}) {
       idempotent: materialized.idempotent,
       templatePath: materialized.templatePath,
     };
+    injectInitializationFailure(options, "after-profile-materialization");
   } else {
     projectProfilePath = resolveOptionalProjectProfilePath({
       cwd,
@@ -1088,13 +1268,14 @@ export function initializeProjectRuntime(options = {}) {
   }
 
   const bootstrapAssetsMaterialization = materializeBootstrapAssets
-    ? ensureBootstrapAssets({ projectRoot })
+    ? ensureBootstrapAssets({ projectRoot, transaction: projectAssetTransaction })
     : {
         materializedRoot: null,
         materialized: false,
         idempotent: false,
         materializedPaths: [],
       };
+  injectInitializationFailure(options, "after-asset-materialization");
 
   let loadedProfile = generatedBundledProfile
     ? resolveProjectProfileRuntimeMetadata({
@@ -1102,20 +1283,33 @@ export function initializeProjectRuntime(options = {}) {
         profileDocument: generatedBundledProfile.profile,
       })
     : loadProjectProfileForRuntime({ projectProfilePath });
-  const runtimeRoot = resolveRuntimeRoot({
-    projectRoot,
-    runtimeRootOverride: options.runtimeRoot,
-    runtimeRootFromProfile: loadedProfile.runtimeRootFromProfile,
-  });
+  const runtimeRoot = canonicalizeRuntimeRoot(
+    resolveRuntimeRoot({
+      projectRoot,
+      runtimeRootOverride: options.runtimeRoot,
+      runtimeRootFromProfile: loadedProfile.runtimeRootFromProfile,
+    }),
+  );
 
-  const runtimeLayout = ensureRuntimeLayout({
+  const runtimeLayout = resolveRuntimeLayout({
     runtimeRoot,
     projectId: loadedProfile.projectId,
   });
+  if (fs.existsSync(runtimeLayout.projectRuntimeRoot) && fs.lstatSync(runtimeLayout.projectRuntimeRoot).isSymbolicLink()) {
+    throw new Error(`Project runtime root '${runtimeLayout.projectRuntimeRoot}' must not be a symbolic link or junction.`);
+  }
+  const runtimeTransaction = createStagingRuntimeLayout(runtimeLayout);
+  const stagingRuntimeLayout = runtimeTransaction.stagingLayout;
+  try {
+  injectInitializationFailure(options, "after-runtime-staging");
 
   if (generatedBundledProfile) {
     projectProfilePath = path.join(runtimeLayout.stateRoot, "project.aor.yaml");
-    fs.writeFileSync(projectProfilePath, stringifyYaml(generatedBundledProfile.profile), "utf8");
+    fs.writeFileSync(
+      path.join(stagingRuntimeLayout.stateRoot, "project.aor.yaml"),
+      stringifyYaml(generatedBundledProfile.profile),
+      "utf8",
+    );
     loadedProfile = {
       ...loadedProfile,
       projectProfilePath,
@@ -1165,15 +1359,22 @@ export function initializeProjectRuntime(options = {}) {
   };
 
   const stateFile = path.join(runtimeLayout.stateRoot, "project-init-state.json");
-  fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    path.join(stagingRuntimeLayout.stateRoot, "project-init-state.json"),
+    `${JSON.stringify(state, null, 2)}\n`,
+    "utf8",
+  );
+  injectInitializationFailure(options, "after-state-write");
 
   const artifactPacket = materializeBootstrapArtifactPacket({
     projectId: loadedProfile.projectId,
     projectRoot,
     projectProfileRef: state.selected_profile_ref,
     runtimeLayout,
+    outputRuntimeLayout: stagingRuntimeLayout,
     command: options.command ?? "aor project init",
   });
+  injectInitializationFailure(options, "after-artifact-write");
 
   const targetRepoWrites = [];
   if (profileMaterialization.materialized) {
@@ -1219,7 +1420,13 @@ export function initializeProjectRuntime(options = {}) {
     const issueSummary = onboardingValidation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Generated onboarding report failed contract validation: ${issueSummary}`);
   }
-  fs.writeFileSync(onboardingReportPath, `${JSON.stringify(onboardingReport, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    path.join(stagingRuntimeLayout.reportsRoot, "onboarding-report.json"),
+    `${JSON.stringify(onboardingReport, null, 2)}\n`,
+    "utf8",
+  );
+  injectInitializationFailure(options, "before-runtime-publish");
+  publishStagedRuntime(runtimeLayout, runtimeTransaction, options);
 
   return {
     projectRoot,
@@ -1254,6 +1461,14 @@ export function initializeProjectRuntime(options = {}) {
         ? profileMaterialization.idempotent && bootstrapAssetsMaterialization.idempotent
         : null,
   };
+  } catch (error) {
+    cleanupOwnedStagingTree(runtimeTransaction);
+    throw error;
+  }
+  } catch (error) {
+    rollbackProjectAssetTransaction(projectAssetTransaction);
+    throw error;
+  }
 }
 
 /**

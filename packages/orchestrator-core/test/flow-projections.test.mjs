@@ -21,7 +21,7 @@ import { initializeProjectRuntime } from "../src/project-init.mjs";
  * @param {(repoRoot: string) => void} callback
  */
 function withCleanRepo(callback) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w34-flow-"));
+  const repoRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-w34-flow-")));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
   fs.writeFileSync(path.join(repoRoot, "package.json"), `${JSON.stringify({ name: "flow-target" }, null, 2)}\n`, "utf8");
   try {
