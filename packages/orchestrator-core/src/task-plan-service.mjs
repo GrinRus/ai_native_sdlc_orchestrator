@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { prepareHandoffArtifacts } from "./handoff-packets.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
@@ -78,7 +78,9 @@ function materializePlanSemanticEvaluation(options, result) {
     ...options,
     stepClass: "eval",
     dryRun: options.dryRun !== false,
-    runId: options.semanticRunId ?? `${safeSegment(result.waveTicket.plan_id)}.semantic.${Date.now()}`,
+    runId:
+      options.semanticRunId ??
+      derivePublicId([String(result.waveTicket.plan_id), "semantic", String(Date.now())], "semantic-run"),
     stepId: "plan.evaluate",
     runtimeEvidenceRefs: unique([...asStringArray(options.runtimeEvidenceRefs), planRef, validationRef]),
   });
@@ -101,7 +103,10 @@ function materializePlanSemanticEvaluation(options, result) {
   const planPolicy = asRecord(profile.structured_plan_policy);
   const blocking = planPolicy.semantic_evaluator_blocking === true;
   const evaluationReport = {
-    report_id: `${result.waveTicket.plan_id}.semantic-evaluation.v${result.waveTicket.plan_version}`,
+    report_id: derivePublicId(
+      [String(result.waveTicket.plan_id), "semantic-evaluation", `v${result.waveTicket.plan_version}`],
+      "semantic-evaluation",
+    ),
     subject_ref: planRef,
     subject_type: "wave-ticket",
     subject_fingerprint: result.waveTicket.plan_digest,
@@ -314,7 +319,7 @@ export function buildExecutionPlan({ projectId, projectRoot, plan, planFile, cre
   const taskToUnit = new Map();
   const units = [];
   for (const [groupKey, members] of grouped.entries()) {
-    const unitId = `unit.${safeSegment(groupKey)}`;
+    const unitId = derivePublicId(["unit", safeSegment(groupKey).toLowerCase()], "execution-unit");
     members.forEach((task) => taskToUnit.set(String(task.task_id), unitId));
     const firstHints = asRecord(members[0]?.execution_hints);
     units.push({
@@ -335,7 +340,10 @@ export function buildExecutionPlan({ projectId, projectRoot, plan, planFile, cre
   }
 
   return {
-    execution_plan_id: `${projectId}.execution-plan.${safeSegment(plan.plan_id)}.v${plan.plan_version}`,
+    execution_plan_id: derivePublicId(
+      [projectId, "execution-plan", String(plan.plan_id), `v${plan.plan_version}`],
+      "execution-plan",
+    ),
     project_id: projectId,
     plan_id: plan.plan_id,
     plan_version: plan.plan_version,
@@ -517,7 +525,10 @@ export function materializeTaskProgress(options) {
             ? "blocked"
             : "planned";
   const report = {
-    report_id: `${context.projectId}.task-progress.${safeSegment(context.plan.plan_id)}.v${context.plan.plan_version}`,
+    report_id: derivePublicId(
+      [context.projectId, "task-progress", String(context.plan.plan_id), `v${context.plan.plan_version}`],
+      "task-progress",
+    ),
     project_id: context.projectId,
     plan_id: context.plan.plan_id,
     plan_version: context.plan.plan_version,
@@ -540,12 +551,15 @@ export function materializeTaskProgress(options) {
 }
 
 export function createTaskPlan(options = {}) {
+  const projectContext = previewProjectRuntime(options);
   const planningInputRefs = collectPlanningInputRefs(options);
   const planningRun = executeRoutedStep({
     ...options,
     stepClass: "planning",
     dryRun: options.dryRun !== false,
-    runId: options.planningRunId ?? `${safeSegment(options.projectRef ?? "project")}.planning.${Date.now()}`,
+    runId:
+      options.planningRunId ??
+      derivePublicId([projectContext.projectId, "planning", String(Date.now())], "planning-run"),
     stepId: "plan.create",
     runtimeEvidenceRefs: unique([...asStringArray(options.runtimeEvidenceRefs), ...planningInputRefs]),
   });
@@ -683,12 +697,17 @@ export function requestTaskPlanRevision(options = {}) {
     ...options,
     stepClass: "planning",
     dryRun: options.dryRun !== false,
-    runId: options.planningRunId ?? `${safeSegment(context.plan.plan_id)}.revision.${Date.now()}`,
+    runId:
+      options.planningRunId ??
+      derivePublicId([String(context.plan.plan_id), "revision", String(Date.now())], "planning-revision"),
     stepId: "plan.revise",
     runtimeEvidenceRefs: unique([...asStringArray(options.runtimeEvidenceRefs), planRef]),
   });
   const planningRunRef = evidenceRef(context.projectRoot, planningRun.stepResultPath);
-  const requestId = `${context.plan.plan_id}.revision-request.v${context.plan.plan_version}`;
+  const requestId = derivePublicId(
+    [String(context.plan.plan_id), "revision-request", `v${context.plan.plan_version}`],
+    "revision-request",
+  );
   const requestFile = path.join(context.runtimeLayout.artifactsRoot, `plan-revision-request-${safeSegment(requestId)}.json`);
   const request = {
     request_id: requestId,

@@ -59,11 +59,11 @@
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "web:build": "vite build --config apps/web/vite.config.mjs && node ./scripts/web-dist-freshness.mjs write",
-    "test": "node ./scripts/test.mjs",
+    "test": "node ./scripts/test-runner.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",
-    "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs",
+    "check": "node ./scripts/lint.mjs && node ./scripts/test-runner.mjs && node ./scripts/build.mjs",
     "production:ready": "node ./scripts/production-readiness.mjs",
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
@@ -83,6 +83,6 @@
     "@vitejs/plugin-react": "^6.0.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "vite": "^8.0.14"
+    "vite": "^8.1.4"
   }
 }

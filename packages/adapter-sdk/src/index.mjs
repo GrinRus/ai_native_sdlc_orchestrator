@@ -4,7 +4,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
-import { loadContractFile } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
@@ -1595,7 +1595,15 @@ function collectAllowedPaths(value, output) {
   }
   for (const [key, entry] of Object.entries(value)) {
     if (key === "allowed_paths" && Array.isArray(entry)) {
-      output.push(...asStringArray(entry).map(pathHintToAllowedPath).filter(Boolean));
+      for (const allowedPath of entry) {
+        const validation = validateAllowedPathPattern(allowedPath);
+        if (!validation.ok) {
+          throw new Error(
+            `Invalid allowed_paths scope ${JSON.stringify(allowedPath)} (${validation.value_class}). ${validation.migration}`,
+          );
+        }
+        output.push(allowedPath);
+      }
       continue;
     }
     if (key === "required_path_prefixes" && Array.isArray(entry)) {
@@ -1864,17 +1872,22 @@ function buildExecutionContract(envelope, options = {}) {
   const commandConstraints = asRecord(resolvedBounds.command_constraints);
   const allowedCommands = asStringArray(commandConstraints.allowed_commands);
   const repairWorkContext = resolveRepairWorkContext(envelope, options);
+  const executionPermissions = asRecord(asRecord(envelope.context).execution_permissions);
+  const targetWriteAllowed = executionPermissions.target_write_allowed === true;
+  const meaningfulChangeRequired = targetWriteAllowed && executionPermissions.meaningful_change_required === true;
   const contract = {
-    mode: "execute-implementation",
+    mode: targetWriteAllowed ? "execute-implementation" : "read-only-inspection",
     must_open_required_local_refs: true,
     expected_meaningful_change: {
-      required: envelope.dry_run !== true && asOptionalString(envelope.step_class) === "implement",
+      required: meaningfulChangeRequired,
       allowed_target_paths: [...new Set(allowedPathCandidates)],
       ignore_paths: [".aor/**"],
-      no_op_forbidden: true,
+      no_op_forbidden: meaningfulChangeRequired,
     },
     target_checkout_write_policy: {
-      direct_edits_allowed: true,
+      direct_edits_allowed: targetWriteAllowed,
+      target_write_allowed: targetWriteAllowed,
+      writeback_allowed: executionPermissions.writeback_allowed === true,
       upstream_write_allowed: false,
       delivery_materialization_downstream: true,
     },
@@ -1894,7 +1907,7 @@ function buildExecutionContract(envelope, options = {}) {
     },
     final_report: {
       required_sections: ["summary", "changed-files", "commands-run", "verification", "risks"],
-      require_diff_or_patch_evidence: true,
+      require_diff_or_patch_evidence: targetWriteAllowed,
       structured_output_is_final_report_only: true,
     },
     blocked_output: {
@@ -2495,6 +2508,12 @@ export function resolveAdapterMatrix(options) {
  * }} input
  */
 export function createAdapterRequestEnvelope(input) {
+  for (const [field, value] of [["request_id", input.request_id], ["run_id", input.run_id], ["step_id", input.step_id]]) {
+    const validation = validatePublicId(value);
+    if (!validation.ok) {
+      throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+    }
+  }
   return {
     request_id: requireString("request_id", input.request_id),
     run_id: requireString("run_id", input.run_id),
@@ -2884,8 +2903,11 @@ export function createLiveAdapter(options) {
           },
         ];
       }
-      const defaultRequestArtifactMessage =
-        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, follow execution_contract.output_quality_policy, execution_contract.repair_closure_policy when present, and all execution_contract constraints, do not write upstream, run the requested verification commands when feasible, and return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
+      const executionContract = asRecord(providerWorkPacket.execution_contract);
+      const checkoutWritePolicy = asRecord(executionContract.target_checkout_write_policy);
+      const defaultRequestArtifactMessage = checkoutWritePolicy.direct_edits_allowed === true
+        ? "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits only in the disposable target checkout when execution_contract.expected_meaningful_change.required is true, follow all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final implementation report with changed-files, commands-run, verification, and risks."
+        : "Perform the approved read-only AOR inspection using the provider work packet at {provider_work_packet_path}. Read that JSON first, open required resolved_local_refs[].local_path files, do not edit the target checkout, index, HEAD, or untracked files, do not write upstream, run only permitted read-only checks, and return an inspection report with findings, commands-run, verification, and risks.";
       const requestMessage = renderRequestArtifactMessage(
         asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
         {

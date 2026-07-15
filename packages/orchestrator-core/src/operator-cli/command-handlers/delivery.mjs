@@ -372,8 +372,13 @@ export function handleDeliveryCommand(context) {
           })
           .filter((repo) => typeof repo.repo_id === "string")
       : [];
+    const executionRootFlag = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
+    const deliveryExecutionRoot = executionRootFlag
+      ? path.isAbsolute(executionRootFlag) ? executionRootFlag : path.resolve(init.projectRoot, executionRootFlag)
+      : init.projectRoot;
     const planResult = materializeDeliveryPlan({
       runtimeLayout: init.runtimeLayout,
+      executionRoot: deliveryExecutionRoot,
       projectId: init.projectId,
       runId,
       stepClass,
@@ -397,10 +402,7 @@ export function handleDeliveryCommand(context) {
         enforced: deliveryQualityGateMode === "strict",
         status: runtimeHarnessDeliveryGate.status,
         reportId: typeof runtimeHarness.report.report_id === "string" ? runtimeHarness.report.report_id : null,
-        reportRef:
-          typeof runtimeHarness.reportRef === "string"
-            ? runtimeHarness.reportRef
-            : toEvidenceRef(init.projectRoot, runtimeHarness.reportPath),
+        reportRef: runtimeHarness.reportPath,
         overallDecision:
           typeof runtimeHarness.report.overall_decision === "string" ? runtimeHarness.report.overall_decision : null,
         runDecision:
@@ -457,6 +459,17 @@ export function handleDeliveryCommand(context) {
       throw new CliUsageError(`${label} preconditions failed: ${reasons}.`);
     }
 
+    const enableNetworkWrite = resolveOptionalBooleanFlag("network-write", flags["network-write"]);
+    const unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
+      "unsafe-development-override",
+      flags["unsafe-development-override"],
+    );
+    if (enableNetworkWrite && !unsafeDevelopmentOverride) {
+      throw new CliUsageError(
+        "audit_release_hold: credentialed network delivery is blocked; maintainer-only development probes require '--unsafe-development-override true'.",
+      );
+    }
+
     const deliveryResult = runDeliveryDriver({
       projectRef: init.projectRoot,
       cwd,
@@ -471,12 +484,14 @@ export function handleDeliveryCommand(context) {
       baseRef: resolveOptionalStringFlag("base-ref", flags["base-ref"]),
       prTitle: resolveOptionalStringFlag("pr-title", flags["pr-title"]),
       prBody: resolveOptionalStringFlag("pr-body", flags["pr-body"]),
-      enableNetworkWrite: resolveOptionalBooleanFlag("network-write", flags["network-write"]),
+      enableNetworkWrite,
       ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
+      executionRoot: deliveryExecutionRoot,
       deliveryPlanPath: planResult.deliveryPlanFile,
     });
 
     outputState.deliveryBlocking = deliveryResult.blocking;
+    outputState.unsafeDevelopmentOverride = unsafeDevelopmentOverride;
     outputState.deliveryTranscriptFile = deliveryResult.transcriptFile;
     outputState.deliveryManifestId =
       typeof deliveryResult.deliveryManifest.manifest_id === "string"

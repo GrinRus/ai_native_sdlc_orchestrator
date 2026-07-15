@@ -8,14 +8,14 @@ provenance:
 splits:
   - governance
 cases:
-  - case_id: CASE-GOV-0001
+  - case_id: case-gov-0001
     split: governance
     tags:
       - no-upstream-write
       - policy-gates
       - delivery-manifest
-    input_ref: evidence://datasets/governance-integration/CASE-GOV-0001/input.json
-    expected_ref: evidence://datasets/governance-integration/CASE-GOV-0001/expected.json
+    input_ref: evidence://datasets/governance-integration/case-gov-0001/input.json
+    expected_ref: evidence://datasets/governance-integration/case-gov-0001/expected.json
     source_ref: profile://full-journey-governance
 flake_policy:
   default_retry_count: 0

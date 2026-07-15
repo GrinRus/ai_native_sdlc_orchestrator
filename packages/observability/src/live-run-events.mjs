@@ -1,9 +1,11 @@
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { redactSensitiveValue } from "./redaction.mjs";
+import { withFileLock, writeJsonAtomic } from "./file-transaction.mjs";
 
 const LIVE_RUN_EVENT_TYPES = new Set([
   "run.started",
@@ -58,7 +60,16 @@ function getEventSequence(event) {
  * @returns {string}
  */
 function buildEventId(runId, sequence) {
-  return `${runId}.event.${String(sequence).padStart(6, "0")}`;
+  return derivePublicId([runId, "event", String(sequence).padStart(6, "0")], "event");
+}
+
+function readCursor(cursorFile, logFile, runId) {
+  try {
+    const cursor = JSON.parse(fs.readFileSync(cursorFile, "utf8"));
+    if (cursor.run_id === runId && Number.isInteger(cursor.sequence) && cursor.sequence >= 0) return cursor.sequence;
+  } catch {}
+  const events = readEventLog(logFile).filter((event) => event.run_id === runId);
+  return events.length === 0 ? 0 : getEventSequence(events.at(-1));
 }
 
 /**
@@ -96,6 +107,7 @@ function readEventLog(logFile) {
  *   payload: Record<string, unknown>,
  *   timestamp?: string,
  *   redactionPolicy?: unknown,
+ *   requestKey?: string,
  * }} options
  */
 export function appendLiveRunEvent(options) {
@@ -104,36 +116,66 @@ export function appendLiveRunEvent(options) {
       `Unsupported live-run event type '${options.eventType}'. Expected one of: ${[...LIVE_RUN_EVENT_TYPES].join(", ")}.`,
     );
   }
+  const runIdValidation = validatePublicId(options.runId);
+  if (!runIdValidation.ok) {
+    throw new Error(
+      `Invalid run_id ${JSON.stringify(options.runId)} (${runIdValidation.value_class}). ${runIdValidation.migration}`,
+    );
+  }
 
+  if (options.requestKey) {
+    const requestKeyValidation = validatePublicId(options.requestKey);
+    if (!requestKeyValidation.ok) {
+      throw new Error(`Invalid request_key ${JSON.stringify(options.requestKey)} (${requestKeyValidation.value_class}).`);
+    }
+  }
   ensureLogDir(options.logFile);
-  const existing = readEventLog(options.logFile).filter((event) => event.run_id === options.runId);
-  const nextSequence = existing.length === 0 ? 1 : getEventSequence(existing[existing.length - 1]) + 1;
   const redactedPayload = /** @type {Record<string, unknown>} */ (
     redactSensitiveValue(options.payload, options.redactionPolicy)
   );
-
-  const event = {
-    event_id: buildEventId(options.runId, nextSequence),
-    run_id: options.runId,
-    timestamp: options.timestamp ?? new Date().toISOString(),
-    event_type: options.eventType,
-    payload: {
-      sequence: nextSequence,
-      ...redactedPayload,
-    },
-  };
-
-  const validation = validateContractDocument({
-    family: "live-run-event",
-    document: event,
-    source: "runtime://live-run-event",
+  const cursorFile = `${options.logFile}.cursor.json`;
+  const lockDirectory = `${options.logFile}.append.lock`;
+  const requestDigest = crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ event_type: options.eventType, payload: redactedPayload, timestamp: options.timestamp ?? null }))
+    .digest("hex");
+  const event = withFileLock(lockDirectory, () => {
+    const requestFile = options.requestKey
+      ? `${options.logFile}.requests/${crypto.createHash("sha256").update(options.requestKey).digest("hex")}.json`
+      : null;
+    if (requestFile && fs.existsSync(requestFile)) {
+      const existingRequest = JSON.parse(fs.readFileSync(requestFile, "utf8"));
+      if (existingRequest.request_digest !== requestDigest) {
+        const conflict = new Error(`Event request key '${options.requestKey}' was reused with a different payload.`);
+        conflict.code = "event-request-conflict";
+        throw conflict;
+      }
+      return existingRequest.event;
+    }
+    const nextSequence = readCursor(cursorFile, options.logFile, options.runId) + 1;
+    const nextEvent = {
+      event_id: buildEventId(options.runId, nextSequence),
+      run_id: options.runId,
+      timestamp: options.timestamp ?? new Date().toISOString(),
+      event_type: options.eventType,
+      payload: { sequence: nextSequence, ...redactedPayload },
+    };
+    const validation = validateContractDocument({
+      family: "live-run-event",
+      document: nextEvent,
+      source: "runtime://live-run-event",
+    });
+    if (!validation.ok) {
+      const issues = validation.issues.map((issue) => issue.message).join("; ");
+      throw new Error(`Generated live-run event failed contract validation: ${issues}`);
+    }
+    writeJsonAtomic(cursorFile, { run_id: options.runId, sequence: nextSequence, updated_at: new Date().toISOString() });
+    fs.appendFileSync(options.logFile, `${JSON.stringify(nextEvent)}\n`, "utf8");
+    if (requestFile) {
+      writeJsonAtomic(requestFile, { request_key: options.requestKey, request_digest: requestDigest, event: nextEvent });
+    }
+    return nextEvent;
   });
-  if (!validation.ok) {
-    const issues = validation.issues.map((issue) => issue.message).join("; ");
-    throw new Error(`Generated live-run event failed contract validation: ${issues}`);
-  }
-
-  fs.appendFileSync(options.logFile, `${JSON.stringify(event)}\n`, "utf8");
   getEmitter(options.logFile).emit("event", event);
 
   return event;

@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -8,6 +9,7 @@ import { materializeLearningLoopArtifacts } from "../../observability/src/index.
 import { runDeliveryMode } from "./delivery-mode-runners.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { classifyChangedPathsByRepo } from "./repo-scope.mjs";
+import { assertExactDeliveryDiff } from "./delivery-integrity.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
@@ -268,6 +270,66 @@ function classifyEvidenceRefs(refs) {
   };
 }
 
+function verifyLockedDeliveryEvidence(deliveryPlan, projectRoot) {
+  const preconditions = asRecord(deliveryPlan.preconditions);
+  const handoffRef = asString(asRecord(preconditions.approved_handoff).ref);
+  const promotionRefs = asStringArray(asRecord(preconditions.promotion_evidence).refs);
+  const runtimeHarness = asRecord(preconditions.runtime_harness);
+  const runtimeHarnessRef = runtimeHarness.required === true && runtimeHarness.enforced === true
+    ? asString(runtimeHarness.report_ref)
+    : null;
+  const locks = Array.isArray(deliveryPlan.evidence_locks) ? deliveryPlan.evidence_locks.map(asRecord) : [];
+  for (const [ref, declaredFamily] of [
+    ...(handoffRef ? [[handoffRef, "handoff-packet"]] : []),
+    ...promotionRefs.map((ref) => [ref, null]),
+    ...(runtimeHarnessRef ? [[runtimeHarnessRef, "runtime-harness-report"]] : []),
+  ]) {
+    const lock = locks.find((entry) => asString(entry.ref) === ref);
+    if (!lock || asString(lock.status) !== "locked" || !asString(lock.sha256)) {
+      throw new Error(`Delivery evidence '${ref}' is not locked by the plan.`);
+    }
+    const candidate = asString(lock.resolved_path) ??
+      (ref.startsWith("evidence://") ? ref.slice("evidence://".length) : ref);
+    const filePath = path.isAbsolute(candidate) ? candidate : path.resolve(projectRoot, candidate);
+    const digest = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+    if (digest !== lock.sha256) {
+      throw new Error(`Delivery evidence '${ref}' changed after plan authorization.`);
+    }
+    const candidateFamilies = declaredFamily ? [declaredFamily] : ["promotion-decision", "review-decision", "step-result"];
+    const loadedCandidates = candidateFamilies.map((family) => ({ family, loaded: loadContractFile({ filePath, family }) }));
+    const match = loadedCandidates.find((entry) => entry.loaded.ok);
+    if (!match) throw new Error(`Delivery evidence '${ref}' does not match an allowed authorization contract family.`);
+    const { family, loaded } = match;
+    const document = asRecord(loaded.document);
+    if (family === "handoff-packet" && asString(document.project_id) !== asString(deliveryPlan.project_id)) {
+      throw new Error(`Delivery handoff evidence '${ref}' belongs to a different project.`);
+    }
+    if (family === "handoff-packet" && asString(document.status) !== "approved") {
+      throw new Error(`Delivery handoff evidence '${ref}' is not approved.`);
+    }
+    if (family === "promotion-decision" && asString(document.status) !== "pass") {
+      throw new Error(`Delivery promotion evidence '${ref}' is not pass-level.`);
+    }
+    if (family === "review-decision" && (asString(document.decision) !== "approve" ||
+        asString(asRecord(document.delivery_gate).status) !== "pass")) {
+      throw new Error(`Delivery review evidence '${ref}' is not approved for delivery.`);
+    }
+    if (family === "step-result" && asString(document.status) !== "passed") {
+      throw new Error(`Delivery step evidence '${ref}' is not pass-level.`);
+    }
+    if (family === "runtime-harness-report") {
+      const runDecision = asRecord(document.run_decision);
+      if (asString(document.project_id) !== asString(deliveryPlan.project_id) ||
+          asString(document.run_id) !== asString(deliveryPlan.run_id) ||
+          asString(document.overall_decision) !== "pass" || asString(runDecision.overall_decision) !== "pass" ||
+          asString(runDecision.terminal_status) !== "closed" || !Array.isArray(document.step_decisions) ||
+          document.step_decisions.length === 0) {
+        throw new Error(`Delivery Runtime Harness evidence '${ref}' does not prove a pass-level run controller decision.`);
+      }
+    }
+  }
+}
+
 /**
  * @param {{
  *   deliveryPlanPath?: string,
@@ -325,16 +387,38 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
     );
   }
 
-  const writebackAllowed = deliveryPlan.writeback_allowed;
-  if (writebackAllowed !== true) {
-    throw new Error("Delivery plan does not allow write-back for this run.");
-  }
-
   const mode = asString(deliveryPlan.delivery_mode);
   if (!mode || !SUPPORTED_DELIVERY_MODES.has(mode)) {
     throw new Error(
       `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: no-write, patch-only, local-branch, fork-first-pr.`,
     );
+  }
+
+  const schemaVersion = deliveryPlan.schema_version ?? 1;
+  if (mode !== "no-write" && schemaVersion !== 2) {
+    throw new Error("Write-capable delivery plan v1 is not supported; migrate the plan to schema_version 2.");
+  }
+  if (schemaVersion === 2) {
+    const permissions = asRecord(deliveryPlan.permissions);
+    if (permissions.execution_allowed !== true) {
+      throw new Error("Delivery plan v2 does not grant execution permission.");
+    }
+    if (mode === "local-branch" && permissions.local_commit_allowed !== true) {
+      throw new Error("Delivery plan v2 does not grant local commit permission.");
+    }
+    if (mode === "fork-first-pr" && permissions.fork_push_allowed !== true) {
+      throw new Error("Delivery plan v2 does not grant fork push permission.");
+    }
+    if (permissions.direct_upstream_write_allowed === true) {
+      throw new Error("Direct upstream writes are not supported by the W57 delivery boundary.");
+    }
+  }
+
+  if (deliveryPlan.execution_allowed !== true) {
+    throw new Error("Delivery plan does not allow execution for this run.");
+  }
+  if (mode !== "no-write" && deliveryPlan.writeback_allowed !== true) {
+    throw new Error("Delivery plan does not allow write-back for this run.");
   }
 
   if (requestedMode && requestedMode !== mode) {
@@ -385,6 +469,20 @@ export function runDeliveryDriver(options = {}) {
     deliveryPlan: options.deliveryPlan,
   });
   const mode = resolveDeliveryMode(deliveryPlan, asString(options.mode) ?? undefined);
+  if (asString(deliveryPlan.project_id) !== init.projectId) {
+    throw new Error(`Delivery plan project '${String(deliveryPlan.project_id)}' does not own runtime project '${init.projectId}'.`);
+  }
+  if (asString(deliveryPlan.run_id) !== runId) {
+    throw new Error(`Delivery plan run '${String(deliveryPlan.run_id)}' does not match requested run '${runId}'.`);
+  }
+  const planCreatedAt = Date.parse(asString(deliveryPlan.created_at) ?? "");
+  const planAgeMs = Date.now() - planCreatedAt;
+  if (!Number.isFinite(planCreatedAt) || planAgeMs < -300_000 || planAgeMs > 86_400_000) {
+    throw new Error("Delivery plan is stale or has an invalid creation timestamp; create a fresh authorization plan.");
+  }
+  if (mode !== "no-write") {
+    verifyLockedDeliveryEvidence(deliveryPlan, init.projectRoot);
+  }
   const coordination = asRecord(deliveryPlan.coordination);
   const coordinationRepoIds = asStringArray(coordination.repo_ids);
   const coordinationEvidenceRefs = asStringArray(coordination.evidence_refs);
@@ -433,6 +531,9 @@ export function runDeliveryDriver(options = {}) {
   const startedAt = new Date().toISOString();
   const gitHeadBefore = readGitHead(executionRoot);
   const expectedMeaningfulChangedPaths = resolveExpectedMeaningfulChangedPaths(deliveryPlan, executionRoot);
+  const authorizedChangedPaths = asStringArray(
+    asRecord(asRecord(deliveryPlan.diff_authorization).changes).all_paths,
+  );
   /** @type {string[]} */
   const commands = [];
   /** @type {string[]} */
@@ -461,6 +562,10 @@ export function runDeliveryDriver(options = {}) {
       throw new Error(rerunPreflightIssues.join(" "));
     }
 
+    if (mode !== "no-write") {
+      assertExactDeliveryDiff(executionRoot, asRecord(deliveryPlan.diff_authorization));
+    }
+
     const modeResult = runDeliveryMode({
       mode,
       executionRoot,
@@ -477,7 +582,7 @@ export function runDeliveryDriver(options = {}) {
       enableNetworkWrite: options.enableNetworkWrite,
       githubToken: options.githubToken,
       githubCliPath: options.githubCliPath,
-      expectedChangedPaths: expectedMeaningfulChangedPaths,
+      expectedChangedPaths: authorizedChangedPaths,
     });
     commands.push(...modeResult.commands);
     changedPaths = modeResult.changedPaths;
@@ -543,6 +648,7 @@ export function runDeliveryDriver(options = {}) {
     changed_paths: changedPaths,
     diff_stats: diffStats,
     delivery_integrity: {
+      authorized_changed_paths: authorizedChangedPaths,
       expected_meaningful_changed_paths: expectedMeaningfulChangedPaths,
       missing_expected_changed_paths: missingExpectedChangedPaths,
     },

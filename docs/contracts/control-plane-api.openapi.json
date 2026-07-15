@@ -3597,6 +3597,11 @@
           "flags": {
             "type": "object",
             "additionalProperties": true
+          },
+          "unsafe_development_override": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit auditable maintainer override for external write-capable live execution while the audit release hold is open. It is not release clearance."
           }
         },
         "additionalProperties": true

@@ -1,4 +1,4 @@
-ticket_id: WAVE-CHECKOUT-PLAN-001
+ticket_id: wave-checkout-plan-001
 project_id: checkout-platform
 objective: Improve checkout error clarity without changing settlement behavior.
 scope:

@@ -1,6 +1,6 @@
 plan_id: aor-core.delivery-plan.implement.v1
 project_id: aor-core
-run_id: RUN-DELIVERY-004
+run_id: run-delivery-004
 step_class: implement
 delivery_mode: fork-first-pr
 mode_source:
@@ -22,7 +22,7 @@ preconditions:
     required: true
     enforced: true
     status: pass
-    report_id: RUN-DELIVERY-004.runtime-harness-report.v1
+    report_id: run-delivery-004.runtime-harness-report.v1
     report_ref: evidence://reports/runtime-harness-report-strict-delivery-pass.yaml
     overall_decision: pass
     run_decision: pass
@@ -37,7 +37,7 @@ preconditions:
     required: true
     status: present
     refs:
-      - evidence://coordination/WAVE-004/backend-mobile-frontend
+      - evidence://coordination/wave-004/backend-mobile-frontend
     lock_refs:
       - evidence://reports/multirepo-coordination-status.sample.yaml
     cross_repo_validation_refs:
@@ -71,19 +71,23 @@ coordination:
       source_root: repos/frontend
       source_kind: git
   evidence_refs:
-    - evidence://coordination/WAVE-004/backend-mobile-frontend
+    - evidence://coordination/wave-004/backend-mobile-frontend
   lock_evidence_refs:
     - evidence://reports/multirepo-coordination-status.sample.yaml
   cross_repo_validation_refs:
     - validation://integration/backend-frontend/api-contract
+execution_allowed: true
 writeback_allowed: true
+target_write_allowed: true
+direct_edits_allowed: true
+meaningful_change_required: true
 blocking_reasons: []
 status: ready
 evidence_refs:
   - .aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
   - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
   - evidence://reports/runtime-harness-report-strict-delivery-pass.yaml
-  - evidence://coordination/WAVE-004/backend-mobile-frontend
+  - evidence://coordination/wave-004/backend-mobile-frontend
   - evidence://reports/multirepo-coordination-status.sample.yaml
   - validation://integration/backend-frontend/api-contract
 created_at: 2026-04-21T00:00:00.000Z

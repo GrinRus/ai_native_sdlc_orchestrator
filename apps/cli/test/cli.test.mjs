@@ -21,7 +21,7 @@ const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../../..");
  * @param {(projectRoot: string) => void} callback
  */
 function withTempProject(callback) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-cli-w1-s01-"));
+  const tempRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-cli-w1-s01-")));
   try {
     callback(tempRoot);
   } finally {
@@ -154,7 +154,9 @@ function seedStrictRuntimeHarnessReport(options) {
   assert.equal(initResult.exitCode, 0, initResult.stderr);
   const initPayload = JSON.parse(initResult.stdout);
   const reportsRoot = initPayload.runtime_layout.reportsRoot;
-  const projectId = initPayload.project_id ?? "aor-cli-test";
+  const profileText = fs.readFileSync(path.join(options.projectRoot, "examples/project.aor.yaml"), "utf8");
+  const profileProjectId = profileText.match(/^project_id:\s*([^\s#]+)/mu)?.[1];
+  const projectId = profileProjectId ?? initPayload.project_id ?? "aor-cli-test";
   const overallDecision = options.overallDecision ?? "pass";
   const runDecision = options.runDecision ?? overallDecision;
   const terminalStatus = options.terminalStatus ?? (runDecision === "pass" ? "closed" : "blocked");
@@ -283,7 +285,87 @@ function seedStrictRuntimeHarnessReport(options) {
     filePath: reportFile,
     document: report,
   });
+  const aliases = new Set([
+    options.runId,
+    options.runId.replace(/^w6-deliver-/u, ""),
+    options.runId.replace(/^strict-delivery-/u, ""),
+    options.runId.replace(/^strict-delivery-/u, "strict-"),
+    options.runId.replace(/^w8-release-/u, "w8-release-"),
+  ]);
+  const artifactsRoot = initPayload.runtime_layout.artifactsRoot;
+  for (const alias of aliases) {
+    const seedHandoff = !options.runId.includes("missing-handoff");
+    const seedPromotion = !options.runId.includes("missing-promotion");
+    const handoffFile = path.join(artifactsRoot, `handoff-${alias}.json`);
+    if (seedHandoff) {
+      writeContractFixture({
+        family: "handoff-packet",
+        filePath: handoffFile,
+        document: {
+          packet_id: `${projectId}.handoff.${alias}`,
+          project_id: projectId,
+          ticket_id: alias,
+          version: 1,
+          status: "approved",
+          risk_tier: "medium",
+          approved_objective: "Authorize bounded delivery fixture.",
+          repo_scopes: ["main"],
+          allowed_paths: ["**"],
+          allowed_commands: ["git"],
+          verification_plan: {},
+          scope_constraints: {},
+          command_policy: {},
+          writeback_mode: "patch-only",
+          approval_state: { status: "approved" },
+        },
+      });
+    }
+    if (seedPromotion) {
+      writeContractFixture({
+        family: "promotion-decision",
+        filePath: path.join(reportsRoot, `promotion-${alias}.json`),
+        document: {
+          decision_id: `${projectId}.promotion.${alias}`,
+          subject_ref: `run://${options.runId}`,
+          from_channel: "candidate",
+          to_channel: "stable",
+          evidence_refs: [reportRef],
+          evidence_summary: { reason: "Runtime Harness delivery fixture passed." },
+          status: "pass",
+        },
+      });
+    }
+  }
   return { reportFile, reportRef, initPayload };
+}
+
+function seedDeliveryAuthorizationAlias(projectRoot, alias) {
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const profileText = fs.readFileSync(path.join(projectRoot, "examples/project.aor.yaml"), "utf8");
+  const projectId = profileText.match(/^project_id:\s*([^\s#]+)/mu)?.[1] ?? initPayload.project_id;
+  const handoffFile = path.join(initPayload.runtime_layout.artifactsRoot, `handoff-${alias}.json`);
+  writeContractFixture({
+    family: "handoff-packet",
+    filePath: handoffFile,
+    document: {
+      packet_id: `${projectId}.handoff.${alias}`, project_id: projectId, ticket_id: alias,
+      version: 1, status: "approved", risk_tier: "medium", approved_objective: "Authorize delivery.",
+      repo_scopes: ["main"], allowed_paths: ["**"], allowed_commands: ["git"],
+      verification_plan: {}, scope_constraints: {}, command_policy: {}, writeback_mode: "patch-only",
+      approval_state: { status: "approved" },
+    },
+  });
+  writeContractFixture({
+    family: "promotion-decision",
+    filePath: path.join(initPayload.runtime_layout.reportsRoot, `promotion-${alias}.json`),
+    document: {
+      decision_id: `${projectId}.promotion.${alias}`, subject_ref: `handoff://${alias}`,
+      from_channel: "candidate", to_channel: "stable", evidence_refs: [handoffFile],
+      evidence_summary: { reason: "Authorization fixture." }, status: "pass",
+    },
+  });
 }
 
 /**
@@ -763,7 +845,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(fs.existsSync(nextPayload.next_action_report_file), true);
     assert.ok(nextPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
 
-    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const customRuntimeRoot = path.join(fs.realpathSync.native(projectRoot), "custom-aor-runtime");
     const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
     const customDoctorHuman = invokeCli(["doctor", "--project-ref", projectRoot, "--runtime-root", customRuntimeRoot]);
     assert.equal(customDoctorHuman.exitCode, 0, customDoctorHuman.stderr);
@@ -808,7 +890,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     ]);
     assert.equal(customNextJson.exitCode, 0, customNextJson.stderr);
     const customNextPayload = JSON.parse(customNextJson.stdout);
-    assert.equal(customNextPayload.resolved_runtime_root, customRuntimeRoot);
+    assert.equal(customNextPayload.resolved_runtime_root, fs.realpathSync.native(customRuntimeRoot));
     assert.ok(customNextPayload.next_action_primary.command.includes(runtimeRootFlag));
     assert.ok(customNextPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
 
@@ -999,7 +1081,7 @@ test("guided mission create writes intake evidence and next resolves mission sta
 
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
-    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const customRuntimeRoot = path.join(fs.realpathSync.native(projectRoot), "custom-aor-runtime");
     const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
     const incompleteMission = invokeCli([
       "mission",
@@ -1022,7 +1104,7 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.equal(incompleteMission.exitCode, 0, incompleteMission.stderr);
     const incompletePayload = JSON.parse(incompleteMission.stdout);
     assert.equal(incompletePayload.guided_status, "blocked");
-    assert.equal(incompletePayload.resolved_runtime_root, customRuntimeRoot);
+    assert.equal(incompletePayload.resolved_runtime_root, fs.realpathSync.native(customRuntimeRoot));
     assert.deepEqual(incompletePayload.product_intake_completeness.missing_fields, [
       "kpis",
       "definition_of_done",
@@ -1297,6 +1379,16 @@ test("invalid project-ref fails clearly", () => {
   assert.match(result.stderr, /Invalid project reference '\.\/does-not-exist': path does not exist\./);
 });
 
+test("public identifier flags reject traversal, drive, control, Unicode, and uppercase forms before runtime access", () => {
+  for (const runId of ["../run", "C:run", "run\r\nnext", "rún", "RUN-001"]) {
+    const result = invokeCli(["run", "status", "--project-ref", ".", "--run-id", runId]);
+    assert.equal(result.exitCode, 1, runId);
+    assert.equal(result.stdout, "", runId);
+    assert.match(result.stderr, /--run-id.*rejects.*identifier/u, runId);
+    assert.match(result.stderr, /lowercase|Remove|Replace|Windows/u, runId);
+  }
+});
+
 test("planned command section is empty when the current shell has no planned commands", () => {
   const result = invokeCli(["--help"]);
 
@@ -1502,6 +1594,8 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
       "evidence://handoff/run-control-approved",
       "--promotion-evidence-refs",
       promotionEvidenceRefs,
+      "--unsafe-development-override",
+      "true",
     ]);
     assert.equal(startResult.exitCode, 0, startResult.stderr);
     const startPayload = JSON.parse(startResult.stdout);
@@ -2119,6 +2213,7 @@ test("delivery prepare observe mode materializes evidence with Runtime Harness f
     runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
     runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
     runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+    seedDeliveryAuthorizationAlias(projectRoot, "strict-empty-report");
 
     const result = invokeCli([
       "deliver",
@@ -2660,7 +2755,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         status: "pass",
       },
     });
-    const promotionDecisionRef = `evidence://${path.relative(projectRoot, promotionDecisionFile).replace(/\\/g, "/")}`;
+    const promotionDecisionRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), promotionDecisionFile).replace(/\\/g, "/")}`;
     const blockedPromotionFile = path.join(
       artifactsRoot,
       `promotion-decision-finance-audit-blocked-${runId.replace(/[^\w.-]+/g, "-")}.json`,
@@ -2689,7 +2784,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         status: "hold",
       },
     });
-    const blockedPromotionRef = `evidence://${path.relative(projectRoot, blockedPromotionFile).replace(/\\/g, "/")}`;
+    const blockedPromotionRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), blockedPromotionFile).replace(/\\/g, "/")}`;
     const rollbackPromotionFile = path.join(
       artifactsRoot,
       `promotion-decision-finance-audit-rollback-${runId.replace(/[^\w.-]+/g, "-")}.json`,
@@ -2725,7 +2820,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         },
       },
     });
-    const rollbackPromotionRef = `evidence://${path.relative(projectRoot, rollbackPromotionFile).replace(/\\/g, "/")}`;
+    const rollbackPromotionRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), rollbackPromotionFile).replace(/\\/g, "/")}`;
     const tiedArtifactTimestamp = new Date("2026-01-01T02:00:10.000Z");
     for (const fixturePath of [promotionDecisionFile, blockedPromotionFile, rollbackPromotionFile]) {
       fs.utimesSync(fixturePath, tiedArtifactTimestamp, tiedArtifactTimestamp);
@@ -3500,8 +3595,8 @@ test("project verify resolves runtime root and contract metadata", () => {
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.command, "project verify");
     assert.equal(parsed.status, "implemented");
-    assert.equal(parsed.resolved_project_ref, projectRoot);
-    assert.equal(parsed.resolved_runtime_root, path.join(projectRoot, ".aor"));
+    assert.equal(parsed.resolved_project_ref, fs.realpathSync.native(projectRoot));
+    assert.equal(parsed.resolved_runtime_root, path.join(fs.realpathSync.native(projectRoot), ".aor"));
     assert.equal(parsed.command_catalog_alignment, "docs/architecture/14-cli-command-catalog.md");
     assert.equal(fs.existsSync(parsed.verify_summary_file), true);
     assert.ok(Array.isArray(parsed.step_result_files));
@@ -3765,6 +3860,8 @@ test("project verify supports routed live execution baseline when delivery evide
           "const packetIndex=process.argv.indexOf('--work-packet');",
           "const input=packetIndex>=0?JSON.parse(fs.readFileSync(process.argv[packetIndex+1],'utf8')):JSON.parse(fs.readFileSync(0,'utf8'));",
           "const request=input.request||input||{};",
+          "fs.mkdirSync('source',{recursive:true});",
+          "fs.writeFileSync('source/live-success.js','export const liveSuccess = true;\\n');",
           "process.stdout.write(JSON.stringify({",
           "status:'success',",
           "summary:'external runner ok',",
@@ -3787,6 +3884,8 @@ test("project verify supports routed live execution baseline when delivery evide
       "evidence://handoff/live-approved",
       "--promotion-evidence-refs",
       "evidence://promotion/live-pass",
+      "--unsafe-development-override",
+      "true",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -3796,11 +3895,11 @@ test("project verify supports routed live execution baseline when delivery evide
 
     const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
     assert.equal(routedStepResult.step_class, "runner");
-    assert.equal(routedStepResult.status, "passed");
+    assert.equal(routedStepResult.status, "passed", routedStepResult.summary);
     assert.equal(routedStepResult.routed_execution.mode, "execute");
     assert.equal(routedStepResult.routed_execution.no_write_enforced, false);
     assert.equal(routedStepResult.routed_execution.delivery_plan.status, "ready");
-    assert.equal(routedStepResult.routed_execution.delivery_plan.writeback_allowed, true);
+    assert.equal(routedStepResult.routed_execution.delivery_plan.writeback_allowed, false);
     assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(routedStepResult.routed_execution.adapter_request.dry_run, false);
     assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
@@ -3812,7 +3911,12 @@ test("project verify supports routed live execution baseline when delivery evide
     );
     assert.equal(
       routedStepResult.routed_execution.adapter_response.output.external_runner.execution_root,
-      projectRoot,
+      routedStepResult.routed_execution.workspace_isolation.execution_root,
+    );
+    assert.equal(fs.existsSync(path.join(projectRoot, "source/live-success.js")), false);
+    assert.equal(
+      fs.existsSync(path.join(routedStepResult.routed_execution.workspace_isolation.execution_root, "source/live-success.js")),
+      true,
     );
     assert.ok(
       routedStepResult.routed_execution.adapter_response.evidence_refs.includes(
@@ -3849,6 +3953,8 @@ test("project verify routed live execution blocks with explicit guardrails when 
       projectRoot,
       "--routed-live-step",
       "implement",
+      "--unsafe-development-override",
+      "true",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -3906,6 +4012,8 @@ test("project verify routed live execution reports missing external runner prere
       "evidence://handoff/live-approved",
       "--promotion-evidence-refs",
       "evidence://promotion/live-pass",
+      "--unsafe-development-override",
+      "true",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -4203,7 +4311,7 @@ test("asset promote reports fail status when evaluative evidence regresses", () 
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
         'expected_ref: ""',
       ),
       "utf8",
@@ -4239,7 +4347,7 @@ test("asset freeze keeps freeze rollout action when regression evidence exists",
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
         'expected_ref: ""',
       ),
       "utf8",
@@ -4383,8 +4491,8 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     const firstPayload = JSON.parse(firstRun.stdout);
     const secondPayload = JSON.parse(secondRun.stdout);
 
-    assert.equal(firstPayload.resolved_project_ref, projectRoot);
-    assert.equal(secondPayload.resolved_project_ref, projectRoot);
+    assert.equal(firstPayload.resolved_project_ref, fs.realpathSync.native(projectRoot));
+    assert.equal(secondPayload.resolved_project_ref, fs.realpathSync.native(projectRoot));
     assert.equal(firstPayload.project_profile_ref, "examples/project.aor.yaml");
     assert.equal(secondPayload.project_profile_ref, "examples/project.aor.yaml");
     assert.equal(firstPayload.runtime_state_file, secondPayload.runtime_state_file);
@@ -4396,12 +4504,36 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     const runtimeState = JSON.parse(fs.readFileSync(firstPayload.runtime_state_file, "utf8"));
     assert.equal(runtimeState.project_id, "aor-core");
     assert.equal(runtimeState.selected_profile_ref, "examples/project.aor.yaml");
-    assert.equal(runtimeState.project_root, projectRoot);
+    assert.equal(runtimeState.project_root, fs.realpathSync.native(projectRoot));
 
     const artifactPacket = JSON.parse(fs.readFileSync(firstPayload.artifact_packet_file, "utf8"));
     assert.equal(artifactPacket.packet_id, "aor-core.artifact.bootstrap.v1");
     assert.equal(artifactPacket.project_id, "aor-core");
     assert.equal(artifactPacket.packet_type, "bootstrap");
+  });
+});
+
+test("project init with explicit project-ref is invariant from a neutral launcher", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "examples"), { recursive: true });
+    fs.copyFileSync(path.join(workspaceRoot, "examples/project.aor.yaml"), path.join(projectRoot, "examples/project.aor.yaml"));
+    const launcher = fs.mkdtempSync(path.join(os.tmpdir(), "aor-neutral-launcher-"));
+    try {
+      const args = ["project", "init", "--project-ref", projectRoot];
+      const fromLauncher = invokeCli(args, { cwd: launcher });
+      const fromProject = invokeCli(args, { cwd: projectRoot });
+      assert.equal(fromLauncher.exitCode, 0, fromLauncher.stderr);
+      assert.equal(fromProject.exitCode, 0, fromProject.stderr);
+      const launcherPayload = JSON.parse(fromLauncher.stdout);
+      const projectPayload = JSON.parse(fromProject.stdout);
+      assert.equal(launcherPayload.resolved_project_ref, projectPayload.resolved_project_ref);
+      assert.equal(launcherPayload.resolved_runtime_root, projectPayload.resolved_runtime_root);
+      assert.equal(launcherPayload.runtime_state_file, projectPayload.runtime_state_file);
+      assert.equal(fs.existsSync(path.join(launcher, ".aor")), false);
+    } finally {
+      fs.rmSync(launcher, { recursive: true, force: true });
+    }
   });
 });
 
@@ -4584,7 +4716,7 @@ test("intake create preserves mission traceability and discovery run consumes ex
     assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
     const discoveryPayload = JSON.parse(discoveryResult.stdout);
     const analysisReport = JSON.parse(fs.readFileSync(discoveryPayload.analysis_report_file, "utf8"));
-    const intakePacketRef = `evidence://${path.relative(projectRoot, intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
+    const intakePacketRef = `evidence://${path.relative(fs.realpathSync.native(projectRoot), intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
     assert.equal(discoveryPayload.discovery_research_status, "adr-ready");
     assert.equal(discoveryPayload.discovery_research_adr_ready, true);
     assert.deepEqual(discoveryPayload.discovery_research_open_questions, []);
@@ -4842,9 +4974,11 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--route-overrides",
         "implement=route.implement.w14-test",
+        "--unsafe-development-override",
+        "true",
       ]);
       assert.equal(runStart.exitCode, 0, runStart.stderr);
       const runStartPayload = JSON.parse(runStart.stdout);
@@ -4857,6 +4991,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       );
       assert.equal(runStartRuntimeHarnessReport.run_id, runId);
       assert.equal(runStartRuntimeHarnessReport.step_decisions[0].runtime_harness_decision, "pass");
+      const runStartStepResult = JSON.parse(fs.readFileSync(runStartPayload.routed_step_result_file, "utf8"));
+      const isolatedExecutionRoot = runStartStepResult.routed_execution.workspace_isolation.execution_root;
 
       const reviewRun = invokeCli([
         "review",
@@ -4868,7 +5004,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--run-id",
         runId,
         "--execution-root",
-        projectRoot,
+        isolatedExecutionRoot,
       ]);
       assert.equal(reviewRun.exitCode, 0, reviewRun.stderr);
       const reviewPayload = JSON.parse(reviewRun.stdout);
@@ -4894,13 +5030,16 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       assert.equal(reviewReport.feature_traceability.provider_variant_id, "openai-primary");
       assert.equal(reviewReport.feature_traceability.feature_size, "small");
       assert.equal(reviewReport.code_quality.status, "pass");
-      assert.equal(path.resolve(reviewReport.code_quality.target_checkout_root), path.resolve(projectRoot));
-      assert.equal(reviewReport.code_quality.changed_path_diagnostics.git_status_root, projectRoot);
+      assert.equal(fs.realpathSync(reviewReport.code_quality.target_checkout_root), fs.realpathSync(isolatedExecutionRoot));
+      assert.equal(fs.realpathSync(reviewReport.code_quality.changed_path_diagnostics.git_status_root), fs.realpathSync(isolatedExecutionRoot));
       assert.ok(reviewReport.code_quality.changed_paths.includes("source/mission.js"));
       assert.ok(
         runtimeHarnessReport.step_decisions[0].mission_semantics.meaningful_changed_paths.includes("source/mission.js"),
       );
-      assert.equal(runtimeHarnessReport.step_decisions[0].mission_semantics.git_status_root, projectRoot);
+      assert.equal(
+        fs.realpathSync(runtimeHarnessReport.step_decisions[0].mission_semantics.git_status_root),
+        fs.realpathSync(isolatedExecutionRoot),
+      );
       assert.equal(reviewReport.discovery_quality.status, "pass");
       assert.equal(reviewReport.feature_size_fit.status, "pass");
       assert.equal(reviewReport.provider_traceability.status, "pass");
@@ -4930,7 +5069,9 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
+        "--execution-root",
+        isolatedExecutionRoot,
         "--require-review-decision",
       ]);
       assert.equal(missingReviewDecisionGate.exitCode, 1);
@@ -4978,7 +5119,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--require-review-decision",
       ]);
       assert.equal(blockedByHoldDecision.exitCode, 1);
@@ -5029,14 +5170,19 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
+        "--execution-root",
+        isolatedExecutionRoot,
         "--require-review-decision",
       ]);
       assert.equal(gatedDelivery.exitCode, 0, gatedDelivery.stderr);
       const gatedDeliveryPayload = JSON.parse(gatedDelivery.stdout);
       assert.equal(gatedDeliveryPayload.review_decision, "approve");
       assert.equal(gatedDeliveryPayload.review_decision_gate, "pass");
-      assert.equal(gatedDeliveryPayload.delivery_blocking, false);
+      const gatedDeliveryTranscript = JSON.parse(
+        fs.readFileSync(gatedDeliveryPayload.delivery_transcript_file, "utf8"),
+      );
+      assert.equal(gatedDeliveryPayload.delivery_blocking, false, gatedDeliveryTranscript.error);
 
       const auditRun = invokeCli([
         "audit",
@@ -5281,9 +5427,11 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--route-overrides",
         "implement=route.implement.w14-budget-test",
+        "--unsafe-development-override",
+        "true",
       ]);
       assert.equal(runStart.exitCode, 0, runStart.stderr);
 

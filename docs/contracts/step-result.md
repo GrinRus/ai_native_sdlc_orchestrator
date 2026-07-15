@@ -1,5 +1,10 @@
 # Step result
 
+`run_id` and `step_id` use the canonical public-ID grammar defined in
+`canonical-identifiers-and-paths.md`. Evidence and mission path arrays retain
+literal project-relative values; invalid path syntax is rejected rather than
+normalized.
+
 ## Purpose
 Normalized output of one step regardless of whether that step was an artifact, planner, runner, repair, eval, or harness step.
 
@@ -14,6 +19,12 @@ Normalized output of one step regardless of whether that step was an artifact, p
 
 ## Notes
 Step results make routing, validation, and quality logic consistent across the lifecycle.
+The first materialization is exclusive and immutable. The execution engine
+reserves the attempt number under a cross-process lease before choosing artifact
+names; an optional canonical request key makes a completed attempt replay return
+the existing result. In-progress reuse and payload conflicts are rejected.
+Subsequent controller updates use a per-result lock, revision sidecar, atomic
+replacement, and optional expected-revision CAS.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
 `project verify` runner step results may add command-level evidence so bounded verification is machine-readable in addition to the transcript evidence:
 - `command_group_id`, `command_group_role`, `command_group_phase`, `command_group_enforcement`, `command_group_timeout_class`, and `enforcement_result`;
@@ -60,11 +71,12 @@ When present, `requested_interaction` must stay query-safe and should carry:
 - `answer_audit_refs` after an operator answer has been accepted;
 - `continuation` with the intended control-plane next action (`resume_from_boundary|continue_run|remain_blocked`) and a reason code when blocked.
 - `state_history[]` when the runtime has observed more than one continuation state for the same interaction.
-- `runtime_permission_request` for permission interactions, with adapter id, runner family, selected permission mode, operation type, sanitized target or command, confidence, and evidence refs.
-- `runtime_permission_decision` for permission interactions, with decision, rule id, approval scope, continuation strategy, optional operator decision, and audit ref.
+- `runtime_permission_request` for permission interactions. Its authoritative fields are `operation_type`, `resource_type`, `canonical_resource`, `relative_resource`, `capabilities`, `interpreter`, `command_parser`, `requested_scope`, `expires_at`, containment evidence, and evidence refs. Legacy target and command input is reduced to a non-authoritative digest under `legacy_diagnostic`; raw command text and embedded credentials must not be copied into permission evidence.
+- `runtime_permission_decision` for permission interactions, with decision, rule id, approval scope, continuation strategy, optional operator decision, expiry, and audit ref.
 
 The field must not embed sensitive answer text. Operator answers belong in durable audit evidence and may be referenced from this field after submission.
 Permission requests may also be summarized at top level as `runtime_permission_request` and `runtime_permission_decision` so Runtime Harness reports and policy history can inspect auto decisions even when no user-facing `requested_interaction` was needed.
+Permission decisions are made from the normalized request only. Filesystem resources are canonicalized against the disposable execution root, including every existing symlink ancestor. Shell composition, inline interpreter code, unknown Git aliases/subcommands, unsafe Git global options, and unparsed high-capability command forms are denied before process spawn. Grants bind the project, run, step, operation, canonical resource, capabilities, and expiry; `approve_once` is never reused and `approve_for_run` does not broaden resources or cross a step boundary.
 `state_history[]` is the durable query-safe ledger for interactive continuation. Each entry should include `status`, `timestamp`, optional sanitized `summary`, `evidence_refs[]`, optional `answer_audit_refs[]`, and optional `continuation`. It may record `requested`, `answered`, `resumed`, `resume_failed`, and `blocked` states for one `interaction_id`; it must never include raw operator answer text.
 `repair_attempts` is the step-local Runtime Harness ledger. It should preserve the trigger, failure class, selected policy action, input evidence refs, repair route/compiled-context refs when executed, result, and budget exhaustion metadata. When repair executes, `input_evidence_refs` should include the generated repair input evidence that carries previous findings, failed step-result refs, diff status, adapter evidence, validator findings, and the current Runtime Harness report ref.
 `quality_repair_lineage` is optional public repair-cycle lineage for steps that

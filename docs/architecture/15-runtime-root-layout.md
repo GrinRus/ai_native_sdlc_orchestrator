@@ -9,7 +9,15 @@ Define the deterministic `.aor/` structure created by `aor project init` so late
 2. resolve project profile from `--project-profile` or default candidates (`project.aor.yaml`, `examples/project.aor.yaml`, `examples/project.github.aor.yaml`);
 3. when no profile exists and materialization is not requested, generate a bundled-mode profile under `.aor/` with registry roots pointing to installed AOR assets;
 4. resolve runtime root from `--runtime-root` override or `runtime_defaults.runtime_root` in the selected project profile;
-5. create the runtime directory layout idempotently and emit an onboarding report.
+5. canonicalize the project and runtime boundaries, rejecting a symlinked project runtime root before any project-runtime write;
+6. build and validate the complete per-project runtime in a sibling transaction directory;
+7. publish the initialized tree with same-filesystem renames, restoring the prior valid tree if publication is interrupted.
+
+The runtime root may be outside the repository, but it is an explicit canonical
+boundary. `<runtime-root>/projects/<project_id>` must remain inside that boundary.
+Cross-device publication is refused because it cannot preserve rename atomicity.
+Materialized project assets use sibling temporary files and a rollback journal;
+existing user files are never overwritten.
 
 ## Directory structure
 For project `<project_id>`, the runtime layout is:
@@ -63,3 +71,9 @@ Repeated `aor project init` runs against the same project root must:
 - keep the same runtime root and project runtime paths;
 - keep the same state file path;
 - rewrite deterministic state content without creating duplicate directory trees.
+
+Interrupted staging directories are removed only by the transaction that owns
+their marker. Initialization failures leave either the previous complete
+per-project runtime or no per-project runtime. Linked worktrees and detached HEAD
+states are discovered with Git commands, and module URLs are converted with
+URL-aware filesystem primitives so spaces and Unicode remain literal.

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import childProcess from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -9,6 +10,7 @@ import {
   discoverProjectRoot,
   initializeProjectRuntime,
   resolveProjectProfilePath,
+  resolveRuntimeLayout,
 } from "../src/project-init.mjs";
 import { loadContractFile } from "../../contracts/src/index.mjs";
 
@@ -107,7 +109,7 @@ test("discoverProjectRoot finds git root from nested cwd", () => {
     fs.mkdirSync(nestedPath, { recursive: true });
 
     const discovered = discoverProjectRoot({ cwd: nestedPath });
-    assert.equal(discovered, tempRoot);
+    assert.equal(discovered, fs.realpathSync.native(tempRoot));
   });
 });
 
@@ -122,16 +124,37 @@ test("resolveProjectProfilePath defaults to examples/project.aor.yaml in repo ro
   });
 });
 
+test("relative profiles are project-bound and invalid project IDs fail before runtime writes", () => {
+  const launcher = fs.mkdtempSync(path.join(os.tmpdir(), "aor-launcher-"));
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-project-"));
+  const runtimeRoot = path.join(projectRoot, ".aor");
+  fs.writeFileSync(path.join(launcher, "launcher-only.yaml"), "project_id: launcher\n", "utf8");
+  try {
+    assert.throws(
+      () => resolveProjectProfilePath({ cwd: launcher, projectRoot, projectProfile: "launcher-only.yaml" }),
+      /never resolve from launcher cwd/u,
+    );
+    for (const projectId of ["../escape", "C:\\escape", "project\nretry: 1", "PROJECT"] ) {
+      assert.throws(() => resolveRuntimeLayout({ runtimeRoot, projectId }), /Invalid project_id/u);
+    }
+    assert.equal(fs.existsSync(runtimeRoot), false);
+  } finally {
+    fs.rmSync(launcher, { recursive: true, force: true });
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test("initializeProjectRuntime creates idempotent runtime layout and durable state", () => {
   withTempRepo((tempRoot) => {
+    const canonicalTempRoot = fs.realpathSync.native(tempRoot);
     const nestedPath = path.join(tempRoot, "apps", "cli");
     fs.mkdirSync(nestedPath, { recursive: true });
 
     const firstRun = initializeProjectRuntime({ cwd: nestedPath });
     const secondRun = initializeProjectRuntime({ cwd: nestedPath });
 
-    assert.equal(firstRun.projectRoot, tempRoot);
-    assert.equal(secondRun.projectRoot, tempRoot);
+    assert.equal(firstRun.projectRoot, canonicalTempRoot);
+    assert.equal(secondRun.projectRoot, canonicalTempRoot);
     assert.equal(firstRun.projectProfileRef, "examples/project.aor.yaml");
     assert.equal(secondRun.projectProfileRef, "examples/project.aor.yaml");
     assert.equal(firstRun.artifactPacketId, "aor-core.artifact.bootstrap.v1");
@@ -157,8 +180,8 @@ test("initializeProjectRuntime creates idempotent runtime layout and durable sta
     assert.equal(parsedState.project_id, "aor-core");
     assert.equal(parsedState.display_name, "AOR Core");
     assert.equal(parsedState.selected_profile_ref, "examples/project.aor.yaml");
-    assert.equal(parsedState.project_root, tempRoot);
-    assert.equal(parsedState.runtime_root, path.join(tempRoot, ".aor"));
+    assert.equal(parsedState.project_root, canonicalTempRoot);
+    assert.equal(parsedState.runtime_root, path.join(canonicalTempRoot, ".aor"));
     assert.equal(parsedState.asset_mode, "materialized");
     assert.equal(parsedState.onboarding_report_ref, ".aor/projects/aor-core/reports/onboarding-report.json");
     assert.equal(fs.existsSync(firstRun.onboardingReportFile), true);
@@ -180,7 +203,8 @@ test("initializeProjectRuntime onboards a clean repo in bundled mode without tar
   try {
     const result = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
 
-    assert.equal(result.projectId, path.basename(tempRoot).toLowerCase());
+    assert.match(result.projectId, /^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$/u);
+    assert.equal(initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot }).projectId, result.projectId);
     assert.equal(result.assetMode, "bundled");
     assert.equal(result.bootstrapMaterializationStatus, "bundled");
     assert.match(result.projectProfileRef, /^\.aor\/projects\/.+\/state\/project\.aor\.yaml$/);
@@ -363,6 +387,7 @@ test("initializeProjectRuntime materializes profile and assets only when materia
   fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
 
   try {
+    const canonicalTempRoot = fs.realpathSync.native(tempRoot);
     const result = initializeProjectRuntime({
       cwd: tempRoot,
       projectRef: tempRoot,
@@ -373,7 +398,7 @@ test("initializeProjectRuntime materializes profile and assets only when materia
     assert.equal(result.projectProfileRef, "project.aor.yaml");
     assert.equal(fs.existsSync(path.join(tempRoot, "project.aor.yaml")), true);
     assert.equal(fs.existsSync(path.join(tempRoot, "examples/routes")), true);
-    assert.equal(result.registryRoots.routes, path.join(tempRoot, "examples/routes"));
+    assert.equal(result.registryRoots.routes, path.join(canonicalTempRoot, "examples/routes"));
 
     const report = JSON.parse(fs.readFileSync(result.onboardingReportFile, "utf8"));
     assert.equal(report.asset_mode, "materialized");
@@ -420,6 +445,7 @@ test("initializeProjectRuntime merges bundled bootstrap assets when a target exa
   fs.writeFileSync(path.join(tempRoot, "examples", "README.md"), "target examples stay intact\n", "utf8");
 
   try {
+    const canonicalTempRoot = fs.realpathSync.native(tempRoot);
     const result = initializeProjectRuntime({
       cwd: tempRoot,
       projectRef: tempRoot,
@@ -430,7 +456,7 @@ test("initializeProjectRuntime merges bundled bootstrap assets when a target exa
     assert.equal(fs.readFileSync(path.join(tempRoot, "examples", "README.md"), "utf8"), "target examples stay intact\n");
     assert.equal(fs.existsSync(path.join(tempRoot, "examples/routes")), true);
     assert.equal(fs.existsSync(path.join(tempRoot, "examples/wrappers")), true);
-    assert.equal(result.registryRoots.routes, path.join(tempRoot, "examples/routes"));
+    assert.equal(result.registryRoots.routes, path.join(canonicalTempRoot, "examples/routes"));
 
     const report = JSON.parse(fs.readFileSync(result.onboardingReportFile, "utf8"));
     assert.equal(report.write_effects.copied_example_registries, true);
@@ -466,4 +492,120 @@ test("initializeProjectRuntime fails clearly for invalid explicit project refere
     () => initializeProjectRuntime({ cwd: workspaceRoot, projectRef: missing }),
     /Invalid project reference/,
   );
+});
+
+test("transactional initialization rolls back every injected write boundary", () => {
+  const failurePoints = [
+    "after-profile-materialization",
+    "after-asset-materialization",
+    "after-runtime-staging",
+    "after-state-write",
+    "after-artifact-write",
+    "before-runtime-publish",
+  ];
+  for (const failureInjectionPoint of failurePoints) {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w57-s06-failure-"));
+    fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+    try {
+      assert.throws(
+        () => initializeProjectRuntime({
+          cwd: tempRoot,
+          projectRef: tempRoot,
+          assetMode: "materialized",
+          failureInjectionPoint,
+        }),
+        /Injected project initialization failure/u,
+      );
+      assert.equal(fs.existsSync(path.join(tempRoot, "project.aor.yaml")), false, failureInjectionPoint);
+      assert.equal(fs.existsSync(path.join(tempRoot, "examples")), false, failureInjectionPoint);
+      const projectsRoot = path.join(tempRoot, ".aor", "projects");
+      const entries = fs.existsSync(projectsRoot) ? fs.readdirSync(projectsRoot) : [];
+      assert.deepEqual(entries, [], failureInjectionPoint);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("transactional reinitialization restores the previous runtime after publish interruption", () => {
+  withCleanTempRepo((tempRoot) => {
+    const first = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    const previousState = fs.readFileSync(first.stateFile, "utf8");
+    assert.throws(
+      () => initializeProjectRuntime({
+        cwd: tempRoot,
+        projectRef: tempRoot,
+        failureInjectionPoint: "after-backup-rename",
+      }),
+      /Injected project initialization failure/u,
+    );
+    assert.equal(fs.readFileSync(first.stateFile, "utf8"), previousState);
+    assert.equal(fs.readdirSync(first.runtimeLayout.projectsRoot).some((entry) => entry.includes(".tmp")), false);
+  });
+});
+
+test("transactional reinitialization preserves existing artifact lineage and timestamps", () => {
+  withCleanTempRepo((tempRoot) => {
+    const first = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    const lineageFile = path.join(first.runtimeLayout.reportsRoot, "existing-lineage.json");
+    fs.writeFileSync(lineageFile, '{"status":"preserved"}\n', "utf8");
+    const lineageTime = new Date("2026-01-02T03:04:05.000Z");
+    fs.utimesSync(lineageFile, lineageTime, lineageTime);
+
+    initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+
+    assert.equal(fs.readFileSync(lineageFile, "utf8"), '{"status":"preserved"}\n');
+    assert.equal(fs.statSync(lineageFile).mtime.toISOString(), lineageTime.toISOString());
+  });
+});
+
+test("runtime containment rejects a symlink boundary before external writes", () => {
+  withCleanTempRepo((tempRoot) => {
+    const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w57-s06-external-"));
+    fs.symlinkSync(externalRoot, path.join(tempRoot, ".aor"), "dir");
+    try {
+      assert.throws(
+        () => initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot }),
+        /must not be a symbolic link or junction/u,
+      );
+      assert.deepEqual(fs.readdirSync(externalRoot), []);
+    } finally {
+      fs.rmSync(externalRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test("initialization supports external runtime roots and linked detached worktrees with Unicode paths", () => {
+  const repositoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor w57 unicode-ß-"));
+  const worktreeRoot = `${repositoryRoot} linked Ω`;
+  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor runtime Ω-"));
+  try {
+    childProcess.execFileSync("git", ["init", "-q", repositoryRoot]);
+    writeFile(repositoryRoot, "package.json", '{"name":"transaction-test"}\n');
+    childProcess.execFileSync("git", ["-C", repositoryRoot, "add", "package.json"]);
+    childProcess.execFileSync("git", [
+      "-C", repositoryRoot,
+      "-c", "user.name=AOR Test",
+      "-c", "user.email=aor@example.invalid",
+      "commit", "-qm", "fixture",
+    ]);
+    childProcess.execFileSync("git", ["-C", repositoryRoot, "worktree", "add", "--detach", worktreeRoot, "HEAD"]);
+
+    const result = initializeProjectRuntime({
+      cwd: worktreeRoot,
+      projectRef: worktreeRoot,
+      runtimeRoot,
+    });
+    assert.equal(result.projectRoot, fs.realpathSync.native(worktreeRoot));
+    assert.equal(result.runtimeRoot, fs.realpathSync.native(runtimeRoot));
+    assert.equal(fs.existsSync(result.stateFile), true);
+    assert.equal(fs.existsSync(path.join(worktreeRoot, ".aor")), false);
+  } finally {
+    try {
+      childProcess.execFileSync("git", ["-C", repositoryRoot, "worktree", "remove", "--force", worktreeRoot]);
+    } catch {}
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+    fs.rmSync(repositoryRoot, { recursive: true, force: true });
+    fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  }
 });

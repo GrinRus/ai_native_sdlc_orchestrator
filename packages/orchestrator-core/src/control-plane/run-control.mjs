@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { applyRunControlAction as applyRunControlActionCore, readRunControlState as readRunControlStateCore } from "../run-control.mjs";
 
 import { appendRunEvent } from "./live-event-stream.mjs";
@@ -115,10 +116,13 @@ function buildPrimaryPayload(result) {
  *   taskRefs?: string[],
  *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
+ *   commandId?: string,
+ *   expectedRevision?: number,
  * }} options
  */
 export function applyRunControlAction(options) {
   const result = applyRunControlActionCore(options);
+  const eventRequestPrefix = `event-command-${crypto.createHash("sha256").update(result.commandId).digest("hex").slice(0, 24)}`;
   const primaryEventType = resolveLiveEventType(result.action, result.blocked);
   const primaryEvent = appendRunEvent({
     cwd: options.cwd,
@@ -128,6 +132,7 @@ export function applyRunControlAction(options) {
     runId: result.runId,
     eventType: primaryEventType,
     payload: buildPrimaryPayload(result),
+    requestKey: `${eventRequestPrefix}.primary`,
   });
 
   const evidenceEvent = appendRunEvent({
@@ -148,6 +153,7 @@ export function applyRunControlAction(options) {
       evidence_root: result.runtimeLayout.reportsRoot,
       policy_context: buildPolicyContext(result),
     },
+    requestKey: `${eventRequestPrefix}.evidence`,
   });
 
   return {

@@ -2,7 +2,8 @@
 
 ## Supported mode
 
-AOR is a **self-hosted CLI/API production candidate** for the bounded mode described here:
+AOR is under an **audit release hold**. The previously recorded self-hosted
+CLI/API production-candidate evidence is historical and does not clear a release.
 
 - CLI and API/control-plane runtime are supported operator surfaces.
 - The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
@@ -30,13 +31,19 @@ Run the baseline repository gate first:
 pnpm check
 ```
 
+This writes the ignored test-execution manifest consumed by readiness. Do not
+change commits or `scripts/test-manifest.json` between the two gates.
+
 Then run the production-readiness gate:
 
 ```bash
 pnpm production:ready
 ```
 
-The production gate verifies the W25 proof fixture, story-status honesty, source-of-truth alignment, production auth hardening, nested contract validation, run-level Runtime Harness evidence, and W30 alpha-hardening evidence. Use JSON output for review packets:
+The production gate validates its internal checks and the audit ledger. While a
+release-blocking invariant is open it exits nonzero with `status=blocked` and
+`gate_execution_status=pass`. An internal check failure instead returns
+`status=fail` and `release_disposition=unknown`. Use JSON output for review packets:
 
 ```bash
 pnpm production:ready --json
@@ -55,6 +62,9 @@ The default production proof fixture is the sanitized fixture configured by `pnp
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 8. For installed-user UI validation, launch `aor app --project-ref <repo> --runtime-root <repo>/.aor` on loopback.
 9. For operator-initiated runtime work, use `aor request create/run/status` or the local UI Ask AOR drawer; keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
+10. Do not start credentialed write-capable live execution or network delivery
+    while the audit hold is open. Maintainer-only development probes require
+    `--unsafe-development-override true` and must preserve its evidence.
 
 The production-hardened auth model is documented in `docs/ops/control-plane-production-hardening.md`.
 Environment, secrets, backup/restore, and incident procedures are documented in:
@@ -96,6 +106,10 @@ Rollback is workspace-local for this supported mode:
 3. Revert or discard local target checkout changes according to the operator's repository policy.
 4. Drop local branches created by `local-branch` delivery only after delivery manifests and audit refs are preserved.
 5. Re-run `pnpm check` and `pnpm production:ready` after restoring the workspace.
+
+Expected rollback verification remains `audit-hold` until all release-blocking
+ledger entries are independently resolved. A blocked result with passing
+internal checks is healthy hold enforcement, not permission to release.
 
 No hosted rollback, tenant migration rollback, or enterprise identity rollback procedure is part of this release mode.
 

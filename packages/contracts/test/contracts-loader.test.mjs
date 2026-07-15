@@ -6,9 +6,15 @@ import { fileURLToPath } from "node:url";
 
 import {
   getContractFamilyIndex,
+  classifyAllowedPaths,
+  derivePublicId,
   loadContractFile,
   loadExampleContracts,
+  matchesAllowedPath,
+  validateAllowedPathPattern,
   validateContractDocument,
+  validatePublicId,
+  validateReferenceBinding,
 } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -82,6 +88,77 @@ test("loads all examples through the shared contracts path", () => {
   assert.equal(loaded.results.length, expectedYamlCount, "all YAML examples should be processed");
   assert.equal(failed.length, 0, `expected no validation failures, got ${failed.length}`);
   assert.equal(loaded.ok, true, "batch example loading should pass");
+});
+
+test("canonical public identifiers reject traversal, separators, controls, Unicode, and lossy normalization", () => {
+  for (const value of ["a", "aor-core", "run.canonical_1", `a${"b".repeat(126)}c`]) {
+    assert.equal(validatePublicId(value).ok, true, value);
+  }
+  for (const [value, valueClass] of [
+    ["../run", "path-separator"],
+    ["run\\child", "path-separator"],
+    ["C:run", "drive-form"],
+    ["run..child", "dot-segment"],
+    ["run\r\nchild", "control-character"],
+    ["RÜN", "non-ascii-or-lossy-normalization"],
+    ["RUN", "grammar"],
+    ["run-", "grammar"],
+  ]) {
+    const validation = validatePublicId(value);
+    assert.equal(validation.ok, false, value);
+    assert.equal(validation.value_class, valueClass, value);
+  }
+  assert.notEqual("RÜN".toLowerCase().normalize("NFKD"), "RÜN");
+  assert.equal(derivePublicId(["run-1", "event", "000001"], "event"), "run-1.event.000001");
+  assert.match(derivePublicId([`run-${"r".repeat(124)}`, "event", "000001"], "event"), /^event-[a-f0-9]{32}$/u);
+  assert.throws(() => derivePublicId(["RUN-1", "event"], "event"), /Cannot derive/u);
+});
+
+test("allowed_paths distinguishes absent, deny-all, bounded, unrestricted, and malformed scopes", () => {
+  assert.equal(classifyAllowedPaths(undefined).state, "absent");
+  assert.equal(classifyAllowedPaths([]).state, "deny-all");
+  assert.equal(classifyAllowedPaths(["source/*.ts"]).state, "bounded");
+  assert.equal(classifyAllowedPaths(["**"]).state, "unrestricted");
+  assert.equal(classifyAllowedPaths(["**/*"]).state, "unrestricted");
+  for (const value of ["/tmp/**", "C:/tmp/**", "../source/**", "source\\**", "source/[ab].ts", "source/?.ts", "source/**.ts", "source//x"] ) {
+    assert.equal(validateAllowedPathPattern(value).ok, false, value);
+  }
+  assert.equal(matchesAllowedPath("source/*.ts", "source/index.ts"), true);
+  assert.equal(matchesAllowedPath("source/*.ts", "source/nested/index.ts"), false);
+  assert.equal(matchesAllowedPath("source/*.ts", "source/index.js"), false);
+  assert.equal(matchesAllowedPath("source/**", "source/nested/index.ts"), true);
+  assert.equal(matchesAllowedPath("source/**", "source-escape/index.ts"), false);
+});
+
+test("contract diagnostics identify rejected value class and a safe migration action", () => {
+  const invalidId = validateContractDocument({
+    family: "project-profile",
+    document: { project_id: "../AOR", project_kind: "monorepo", repo_topology: "monorepo", default_routes: {}, default_wrappers: {}, default_prompt_bundles: {}, default_context_bundles: {}, default_skills: {}, step_overrides: {}, policies: {}, verification: {} },
+    source: "test://invalid-id",
+  });
+  assertValidationIssue(invalidId, "identifier_format_invalid", "project_id");
+  assert.match(invalidId.issues.find((entry) => entry.code === "identifier_format_invalid").message, /path-separator|lowercase ASCII/u);
+
+  const loaded = loadContractFile({ filePath: path.join(workspaceRoot, "examples/packets/intake-request-body.complete.yaml"), family: "intake-request-body" });
+  const invalidScope = structuredClone(loaded.document);
+  invalidScope.mission_scope.allowed_paths = ["../source/**"];
+  const scopeValidation = validateContractDocument({ family: "intake-request-body", document: invalidScope, source: "test://invalid-scope" });
+  assertValidationIssue(scopeValidation, "path_scope_invalid", "mission_scope.allowed_paths[0]");
+  assert.match(scopeValidation.issues.find((entry) => entry.code === "path_scope_invalid").message, /Remove empty, '\.', and '\.\.'/u);
+
+  invalidScope.mission_scope.allowed_paths = "**";
+  const nonArrayScope = validateContractDocument({ family: "intake-request-body", document: invalidScope, source: "test://non-array-scope" });
+  assertValidationIssue(nonArrayScope, "path_scope_invalid", "mission_scope.allowed_paths");
+  assert.match(nonArrayScope.issues.find((entry) => entry.code === "path_scope_invalid").message, /use \[\] to deny all/u);
+});
+
+test("relative and evidence references require exactly one canonical base", () => {
+  assert.equal(validateReferenceBinding({ reference: "reports/result.json", base: "runtime-relative" }).ok, true);
+  assert.equal(validateReferenceBinding({ reference: "evidence://runs/run-1", base: "evidence-relative" }).ok, true);
+  assert.equal(validateReferenceBinding({ reference: "src/index.ts", base: "repository-bound" }).ok, true);
+  assert.equal(validateReferenceBinding({ reference: "src/index.ts", base: undefined }).value_class, "missing-or-unknown-base");
+  assert.equal(validateReferenceBinding({ reference: "../outside", base: "project-relative" }).ok, false);
+  assert.equal(validateReferenceBinding({ reference: "reports/result.json", base: "evidence-relative" }).ok, false);
 });
 
 test("structured task plans load while legacy compact plans remain compatible", () => {

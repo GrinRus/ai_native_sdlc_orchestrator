@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+
+import { captureDeliveryDiff } from "./delivery-integrity.mjs";
 
 export const CANONICAL_DELIVERY_MODES = Object.freeze([
   "no-write",
@@ -53,6 +56,30 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+function lockEvidenceRefs(refs, executionRoot, runtimeLayout) {
+  if (!executionRoot) return [];
+  return uniqueStrings(refs).map((ref) => {
+    const candidate = ref.startsWith("evidence://") ? ref.slice("evidence://".length) : ref;
+    const candidates = [path.isAbsolute(candidate) ? candidate : path.resolve(executionRoot, candidate)];
+    if (candidate.startsWith("handoff/") && runtimeLayout?.artifactsRoot) {
+      candidates.push(path.join(runtimeLayout.artifactsRoot, `handoff-${path.basename(candidate)}.json`));
+    }
+    if (candidate.startsWith("promotion/") && runtimeLayout?.reportsRoot) {
+      candidates.push(path.join(runtimeLayout.reportsRoot, `promotion-${path.basename(candidate)}.json`));
+    }
+    const filePath = candidates.find((entry) => fs.existsSync(entry) && fs.lstatSync(entry).isFile());
+    if (!filePath) {
+      return { ref, status: "missing", sha256: null };
+    }
+    return {
+      ref,
+      resolved_path: filePath,
+      status: "locked",
+      sha256: createHash("sha256").update(fs.readFileSync(filePath)).digest("hex"),
+    };
+  });
 }
 
 /**
@@ -131,7 +158,11 @@ function resolveGovernanceSource(policyResolution) {
 
 /**
  * @param {{
- *   runtimeLayout: { artifactsRoot: string },
+ *   runtimeLayout: { artifactsRoot: string, reportsRoot?: string },
+ *   executionRoot?: string,
+ *   authorizedDiff?: { baseline: { head_sha: string }, changes: Record<string, unknown> },
+ *   evidenceLocks?: Array<{ ref: string, status: string, sha256: string | null }>,
+ *   deliveryAuthorizationPhase?: boolean,
  *   projectId: string,
  *   runId: string,
  *   stepClass: string,
@@ -168,6 +199,8 @@ export function materializeDeliveryPlan(options) {
   const governance = resolveGovernanceSource(asRecord(options.policyResolution));
   const canonicalMode = normalizeDeliveryMode(modeSource.resolvedMode);
   const nonReadOnlyMode = canonicalMode !== "no-write";
+  const deliveryAuthorizationPhase = options.deliveryAuthorizationPhase !== false;
+  const writebackAuthorizationRequired = nonReadOnlyMode && deliveryAuthorizationPhase && governance.decision === "allow";
 
   const handoffStatusRaw = asString(asRecord(options.handoffApproval ?? {}).status);
   const handoffRef = asString(asRecord(options.handoffApproval ?? {}).ref);
@@ -285,13 +318,30 @@ export function materializeDeliveryPlan(options) {
     );
   }
 
-  const writebackAllowed = blockingReasons.length === 0;
-  const status = writebackAllowed ? "ready" : "blocked";
-
-  const evidenceRefs = [...new Set([...(handoffRef ? [handoffRef] : []), ...promotionEvidenceRefs])];
+  const evidenceRefs = [...new Set([
+    ...(handoffRef ? [handoffRef] : []),
+    ...promotionEvidenceRefs,
+    ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),
+  ])];
   const planId = `${options.projectId}.delivery-plan.${normalizeForId(options.stepClass)}.${Date.now()}`;
   const createdAt = new Date().toISOString();
+  const diffAuthorization = options.authorizedDiff ??
+    (writebackAuthorizationRequired && options.executionRoot ? captureDeliveryDiff(options.executionRoot) : null);
+  if (writebackAuthorizationRequired && diffAuthorization === null) {
+    blockingReasons.push("exact-diff-authorization-required");
+  }
+  const evidenceLocks = options.evidenceLocks ?? lockEvidenceRefs(evidenceRefs, options.executionRoot, options.runtimeLayout);
+  if (writebackAuthorizationRequired && (evidenceLocks.length !== evidenceRefs.length ||
+      evidenceLocks.some((lock) => lock.status !== "locked" || !lock.sha256))) {
+    blockingReasons.push("delivery-evidence-lock-required");
+    blockingReasons.push(...evidenceLocks
+      .filter((lock) => lock.status !== "locked" || !lock.sha256)
+      .map((lock) => `delivery-evidence-unresolved:${lock.ref}`));
+  }
+  const finalExecutionAllowed = blockingReasons.length === 0;
+  const finalWritebackAllowed = writebackAuthorizationRequired && finalExecutionAllowed;
   const deliveryPlan = {
+    schema_version: 2,
     plan_id: planId,
     project_id: options.projectId,
     run_id: options.runId,
@@ -342,9 +392,22 @@ export function materializeDeliveryPlan(options) {
       strategy: rerunStrategy,
       blocking_reasons: rerunBlockingReasons,
     },
-    writeback_allowed: writebackAllowed,
+    permissions: {
+      execution_allowed: finalExecutionAllowed,
+      artifact_materialization_allowed: finalWritebackAllowed,
+      local_commit_allowed: finalWritebackAllowed && canonicalMode === "local-branch",
+      fork_push_allowed: finalWritebackAllowed && canonicalMode === "fork-first-pr",
+      direct_upstream_write_allowed: false,
+    },
+    diff_authorization: diffAuthorization,
+    evidence_locks: evidenceLocks,
+    execution_allowed: finalExecutionAllowed,
+    writeback_allowed: finalWritebackAllowed,
+    target_write_allowed: finalWritebackAllowed,
+    direct_edits_allowed: finalWritebackAllowed,
+    meaningful_change_required: finalWritebackAllowed && options.stepClass === "implement",
     blocking_reasons: blockingReasons,
-    status,
+    status: finalExecutionAllowed ? "ready" : "blocked",
     evidence_refs: uniqueStrings([
       ...evidenceRefs,
       ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),

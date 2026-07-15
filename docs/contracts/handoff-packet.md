@@ -1,5 +1,9 @@
 # Handoff packet
 
+Packet/project identifiers and structured task scopes inherit
+`canonical-identifiers-and-paths.md`; legacy uppercase IDs require explicit
+migration and are not normalized during load.
+
 ## Purpose
 Approved execution boundary for runner-backed work. It defines allowed repos, paths, commands, verification expectations, approvals, and route overrides.
 

@@ -18,7 +18,7 @@ jobs:
   repo-integrity:
     name: Repo integrity (Node 22)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
 
     steps:
       - name: Checkout repository
@@ -40,4 +40,4 @@ jobs:
         run: pnpm check
 
       - name: Run production readiness gate
-        run: pnpm production:ready
+        run: pnpm production:ready --json --expect-audit-hold

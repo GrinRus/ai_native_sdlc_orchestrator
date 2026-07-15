@@ -287,11 +287,15 @@ export function submitInteractionAnswer(options) {
           approval_scope:
             operatorDecision === "deny"
               ? "none"
-              : asString(existingRuntimePermissionDecision.approval_scope) ?? "step-coarse",
+              : asString(existingRuntimePermissionDecision.approval_scope) ?? "tool-call-scoped",
           approval_resume_mode:
             operatorDecision === "deny"
               ? null
-              : asString(existingRuntimePermissionDecision.approval_resume_mode) ?? "full-bypass",
+              : asString(existingRuntimePermissionDecision.approval_resume_mode) === "restricted" ? "restricted" : null,
+          expires_at:
+            operatorDecision === "deny"
+              ? null
+              : asString(existingRuntimePermissionDecision.expires_at) ?? new Date(Date.now() + 15 * 60 * 1000).toISOString(),
           audit_ref: answerAuditRef,
         }
       : null;
