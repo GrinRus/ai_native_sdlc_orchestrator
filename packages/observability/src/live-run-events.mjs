@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { redactSensitiveValue } from "./redaction.mjs";
 
 const LIVE_RUN_EVENT_TYPES = new Set([
@@ -58,7 +58,7 @@ function getEventSequence(event) {
  * @returns {string}
  */
 function buildEventId(runId, sequence) {
-  return `${runId}.event.${String(sequence).padStart(6, "0")}`;
+  return derivePublicId([runId, "event", String(sequence).padStart(6, "0")], "event");
 }
 
 /**
@@ -102,6 +102,12 @@ export function appendLiveRunEvent(options) {
   if (!LIVE_RUN_EVENT_TYPES.has(options.eventType)) {
     throw new Error(
       `Unsupported live-run event type '${options.eventType}'. Expected one of: ${[...LIVE_RUN_EVENT_TYPES].join(", ")}.`,
+    );
+  }
+  const runIdValidation = validatePublicId(options.runId);
+  if (!runIdValidation.ok) {
+    throw new Error(
+      `Invalid run_id ${JSON.stringify(options.runId)} (${runIdValidation.value_class}). ${runIdValidation.migration}`,
     );
   }
 

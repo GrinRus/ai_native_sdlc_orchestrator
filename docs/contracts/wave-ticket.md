@@ -56,6 +56,12 @@ contain one to three tasks; `medium` and `large` plans contain three to seven.
 `xlarge` plans that cannot fit seven independently reviewable tasks fail with
 `mission-split-required`.
 
+Task and plan path scopes inherit `canonical-identifiers-and-paths.md`. `*`
+does not cross a segment boundary, `**` is a whole-segment recursive wildcard,
+and a task scope must be a real subset of the plan scope rather than a lexical
+prefix. Rename/copy/delete evidence retains and validates both affected
+endpoints where applicable.
+
 After structural pass, `source_refs.evaluation_report_ref` may point to the
 plan-quality `evaluation-report`, and `semantic_evaluation` exposes its status,
 blocking policy, warnings, finding count, and report ref. Semantic warnings are

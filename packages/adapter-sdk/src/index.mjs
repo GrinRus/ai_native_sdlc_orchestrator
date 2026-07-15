@@ -4,7 +4,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
-import { loadContractFile } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
@@ -1595,7 +1595,15 @@ function collectAllowedPaths(value, output) {
   }
   for (const [key, entry] of Object.entries(value)) {
     if (key === "allowed_paths" && Array.isArray(entry)) {
-      output.push(...asStringArray(entry).map(pathHintToAllowedPath).filter(Boolean));
+      for (const allowedPath of entry) {
+        const validation = validateAllowedPathPattern(allowedPath);
+        if (!validation.ok) {
+          throw new Error(
+            `Invalid allowed_paths scope ${JSON.stringify(allowedPath)} (${validation.value_class}). ${validation.migration}`,
+          );
+        }
+        output.push(allowedPath);
+      }
       continue;
     }
     if (key === "required_path_prefixes" && Array.isArray(entry)) {
@@ -2495,6 +2503,12 @@ export function resolveAdapterMatrix(options) {
  * }} input
  */
 export function createAdapterRequestEnvelope(input) {
+  for (const [field, value] of [["request_id", input.request_id], ["run_id", input.run_id], ["step_id", input.step_id]]) {
+    const validation = validatePublicId(value);
+    if (!validation.ok) {
+      throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+    }
+  }
   return {
     request_id: requireString("request_id", input.request_id),
     run_id: requireString("run_id", input.run_id),

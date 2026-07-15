@@ -1,8 +1,8 @@
-packet_id: REL-004
+packet_id: rel-004
 project_id: aor-core
-ticket_id: WAVE-004
+ticket_id: wave-004
 run_refs:
-  - RUN-101
+  - run-101
 change_summary: >
   Added bounded multirepo governance documents, contracts and examples.
 impacted_repos:
@@ -10,9 +10,9 @@ impacted_repos:
   - mobile
   - frontend
 verification_refs:
-  - evidence://reports/RUN-101/tests.xml
-  - evidence://evaluation/RUN-101/release-suite.json
-delivery_manifest_ref: evidence://release/REL-004/delivery-manifest.yaml
+  - evidence://reports/run-101/tests.xml
+  - evidence://evaluation/run-101/release-suite.json
+delivery_manifest_ref: evidence://release/rel-004/delivery-manifest.yaml
 evidence_lineage:
   handoff_refs:
     - evidence://packets/handoff-wave-004.yaml
@@ -22,13 +22,13 @@ evidence_lineage:
     - evidence://reports/step-result-routed-implement.json
     - evidence://reports/delivery-transcript-fork-first-pr-run-101.json
   coordination_refs:
-    - evidence://coordination/WAVE-004/backend-mobile-frontend
+    - evidence://coordination/wave-004/backend-mobile-frontend
   coordination_lock_refs:
     - evidence://reports/multirepo-coordination-status.sample.yaml
   cross_repo_validation_refs:
     - validation://integration/backend-frontend/api-contract
   delivery_output_refs:
-    - evidence://release/REL-004/delivery-manifest.yaml
+    - evidence://release/rel-004/delivery-manifest.yaml
 coordination:
   required: true
   status: present
@@ -37,7 +37,7 @@ coordination:
     - mobile
     - frontend
   evidence_refs:
-    - evidence://coordination/WAVE-004/backend-mobile-frontend
+    - evidence://coordination/wave-004/backend-mobile-frontend
   lock_evidence_refs:
     - evidence://reports/multirepo-coordination-status.sample.yaml
   cross_repo_validation_refs:

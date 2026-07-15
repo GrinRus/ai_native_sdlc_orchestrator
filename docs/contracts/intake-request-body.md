@@ -38,7 +38,13 @@ External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook conn
 - `delivery_mode` - one of `no-write`, `patch-only`, `local-branch`, or `fork-first-pr`.
 - `writeback_policy` - explicit write-back defaults. `upstream_writes_default` must remain false for installed-user guided flows, and delivery-capable modes require review before write-back.
 
-`allowed_paths` and `forbidden_paths` are legacy path-scope hints and must not be used by Runtime Harness acceptance logic. Product acceptance should be expressed through goals, constraints, KPIs, Definition of Done, expected evidence, and verification commands.
+`allowed_paths` and `forbidden_paths` are project-relative authorization hints
+and follow `canonical-identifiers-and-paths.md`. Absence, `[]`, bounded patterns,
+and explicit unrestricted scope are distinct. Malformed values fail contract
+validation. These fields bound filesystem authorization; they do not replace
+Runtime Harness product acceptance, which remains expressed through goals,
+constraints, KPIs, Definition of Done, expected evidence, and verification
+commands.
 
 ## Notes
 The artifact packet owns packet identity and lifecycle status. This body owns product acceptance evidence and source-material traceability.

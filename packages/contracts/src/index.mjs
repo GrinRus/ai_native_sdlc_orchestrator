@@ -1,5 +1,17 @@
 export { getContractFamilyIndex, loadContractFile, validateContractDocument } from "./loader.mjs";
 export {
+  CANONICAL_REFERENCE_BASES,
+  PUBLIC_ID_FIELDS,
+  PUBLIC_ID_PATTERN,
+  classifyAllowedPaths,
+  derivePublicId,
+  matchesAllowedPath,
+  validateAllowedPathPattern,
+  validateCanonicalContractValues,
+  validatePublicId,
+  validateReferenceBinding,
+} from "./canonical-values.mjs";
+export {
   CRITERION_KIND_VALUES,
   PLAN_SIZE_VALUES,
   PLAN_STATUS_VALUES,

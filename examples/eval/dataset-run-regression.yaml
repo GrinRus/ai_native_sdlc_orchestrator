@@ -9,13 +9,13 @@ splits:
   - regression
   - release
 cases:
-  - case_id: CASE-RUN-0091
+  - case_id: case-run-0091
     split: regression
     tags:
       - multirepo
       - release-packet
-    input_ref: evidence://datasets/run-regression/CASE-RUN-0091/input.json
-    expected_ref: evidence://datasets/run-regression/CASE-RUN-0091/expected.json
+    input_ref: evidence://datasets/run-regression/case-run-0091/input.json
+    expected_ref: evidence://datasets/run-regression/case-run-0091/expected.json
     source_ref: incident://INC-009
 flake_policy:
   default_retry_count: 1

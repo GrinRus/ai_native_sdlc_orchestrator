@@ -1,5 +1,10 @@
 # Review report
 
+Project, run, and mission identifiers plus reviewed changed paths inherit
+`canonical-identifiers-and-paths.md`. Scope findings for rename/copy/delete
+must retain both endpoints so review cannot approve a destination while losing
+an out-of-scope source.
+
 ## Purpose
 Durable report-only quality verdict for one run after execution evidence, delivery lineage, and feature-mission traceability have been materialized.
 

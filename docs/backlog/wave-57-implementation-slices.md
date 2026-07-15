@@ -150,7 +150,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   can escape roots, collide after normalization, inject protocol fields, or
   authorize changes outside the mission.
 - **Epic:** EPIC-1, EPIC-2, EPIC-3, EPIC-5
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`,
@@ -214,7 +214,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   advertised execution workspace has independent Git metadata and canonical
   filesystem containment.
 - **Epic:** EPIC-1, EPIC-3, EPIC-5
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** `packages/orchestrator-core/src/workspace-isolation.mjs`,
@@ -372,7 +372,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Project initialization either publishes one fully valid runtime
   layout inside its canonical root or leaves the previous state unchanged.
 - **Epic:** EPIC-1, EPIC-2
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `packages/orchestrator-core/src/project-init.mjs`,

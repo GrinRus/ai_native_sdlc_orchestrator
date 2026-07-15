@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { validatePublicId } from "../../contracts/src/index.mjs";
 import { redactSensitiveValue } from "../../observability/src/index.mjs";
 import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
@@ -29,6 +30,14 @@ function nowIso() {
  */
 function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function requirePublicId(field, value) {
+  const validation = validatePublicId(value);
+  if (!validation.ok) {
+    throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+  }
+  return value;
 }
 
 /**
@@ -385,6 +394,7 @@ export function applyRunControlAction(options) {
   if (!runId) {
     throw new Error(`Run-control action '${action}' requires 'runId'.`);
   }
+  requirePublicId("run_id", runId);
 
   const reason = asString(options.reason);
   const targetStep = asString(options.targetStep);
@@ -553,6 +563,7 @@ export function applyRunControlAction(options) {
  * }} options
  */
 export function readRunControlState(options) {
+  requirePublicId("run_id", options.runId);
   const cwd = options.cwd ?? process.cwd();
   const init = initializeProjectRuntime({
     cwd,

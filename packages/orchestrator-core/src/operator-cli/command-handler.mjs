@@ -1,4 +1,4 @@
-import { getContractFamilyIndex } from "../../../contracts/src/index.mjs";
+import { getContractFamilyIndex, validatePublicId } from "../../../contracts/src/index.mjs";
 
 import {
   RUNTIME_ROOT_DIRNAME,
@@ -18,7 +18,6 @@ import { executeCommandHandlerGroup, resolveCommandHandlerGroup } from "./comman
 export { CliUsageError };
 
 const GUIDED_SHORTCUT_COMMANDS = new Set(["doctor", "onboard", "app", "next"]);
-
 const TOP_LEVEL_HELP_GROUPS = Object.freeze([
   {
     title: "Guided shortcuts",
@@ -161,6 +160,18 @@ function parseFlags(args) {
     flags[flagName] = true;
   }
 
+  for (const [flagName, rawValue] of Object.entries(flags)) {
+    if (!flagName.endsWith("-id")) continue;
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      const validation = validatePublicId(value);
+      if (!validation.ok) {
+        throw new CliUsageError(
+          `Flag '--${flagName}' rejects ${validation.value_class} identifier ${JSON.stringify(value)}. ${validation.migration}`,
+        );
+      }
+    }
+  }
   return flags;
 }
 

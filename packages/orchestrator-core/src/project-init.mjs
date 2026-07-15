@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { stringify as stringifyYaml } from "yaml";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 
@@ -32,28 +33,12 @@ const DEFAULT_REGISTRY_ROOTS = Object.freeze({
  * @param {string} value
  * @returns {string}
  */
-function normalizeId(value) {
-  let normalized = "";
-  let pendingSeparator = false;
-  for (const character of value.toLowerCase()) {
-    const codePoint = character.codePointAt(0) ?? 0;
-    const isLowerAscii = codePoint >= 97 && codePoint <= 122;
-    const isDigit = codePoint >= 48 && codePoint <= 57;
-    const isAllowedSymbol = character === "." || character === "_" || character === "-";
-    if (isLowerAscii || isDigit || isAllowedSymbol) {
-      if (pendingSeparator && normalized.length > 0) {
-        normalized += "-";
-      }
-      normalized += character;
-      pendingSeparator = false;
-    } else if (normalized.length > 0) {
-      pendingSeparator = true;
-    }
-  }
-  while (normalized.endsWith("-")) {
-    normalized = normalized.slice(0, -1);
-  }
-  return normalized;
+function deriveGeneratedProjectId(projectRoot) {
+  const projectName = path.basename(projectRoot);
+  if (validatePublicId(projectName).ok) return projectName;
+  const canonicalRoot = fs.realpathSync.native(projectRoot);
+  const digest = crypto.createHash("sha256").update(canonicalRoot).digest("hex").slice(0, 16);
+  return `project-${digest}`;
 }
 
 /**
@@ -181,21 +166,16 @@ export function discoverProjectRoot(options = {}) {
  * @returns {string}
  */
 export function resolveProjectProfilePath(options) {
-  const cwd = options.cwd ?? process.cwd();
-
   if (options.projectProfile) {
-    const cwdCandidate = path.resolve(cwd, options.projectProfile);
-    if (fs.existsSync(cwdCandidate)) {
-      return cwdCandidate;
-    }
-
-    const projectCandidate = path.resolve(options.projectRoot, options.projectProfile);
+    const projectCandidate = path.isAbsolute(options.projectProfile)
+      ? options.projectProfile
+      : path.resolve(options.projectRoot, options.projectProfile);
     if (fs.existsSync(projectCandidate)) {
       return projectCandidate;
     }
 
     throw new Error(
-      `Project profile '${options.projectProfile}' was not found from cwd '${cwd}' or project root '${options.projectRoot}'.`,
+      `Project profile '${options.projectProfile}' was not found from canonical project root '${options.projectRoot}'. Relative profile paths never resolve from launcher cwd.`,
     );
   }
 
@@ -236,7 +216,10 @@ function resolveOptionalProjectProfilePath(options) {
 function resolveBundledExamplesRoot() {
   const override = process.env.AOR_BOOTSTRAP_ASSETS_ROOT ?? process.env.AOR_EXAMPLES_ROOT;
   if (typeof override === "string" && override.trim().length > 0) {
-    return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override);
+    if (!path.isAbsolute(override)) {
+      throw new Error("AOR bootstrap asset-root overrides must be absolute; launcher cwd is not a reference base.");
+    }
+    return override;
   }
   return path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../examples");
 }
@@ -495,8 +478,7 @@ function resolveBootstrapTemplate(options) {
     templatePath = path.join(bundledExamplesRoot, "project.github.aor.yaml");
   } else {
     const candidates = [
-      path.resolve(options.cwd, bootstrapTemplate),
-      path.resolve(options.projectRoot, bootstrapTemplate),
+      path.isAbsolute(bootstrapTemplate) ? bootstrapTemplate : path.resolve(options.projectRoot, bootstrapTemplate),
       path.resolve(bundledExamplesRoot, bootstrapTemplate),
     ];
     templatePath = candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
@@ -532,7 +514,7 @@ function createBootstrapProjectProfile(options) {
   }
 
   const projectName = path.basename(options.projectRoot);
-  const projectId = normalizeId(projectName) || "target-project";
+  const projectId = deriveGeneratedProjectId(options.projectRoot);
   const profile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(loaded.document)));
   profile.project_id = projectId;
   profile.display_name = projectName;
@@ -807,6 +789,12 @@ export function resolveRuntimeRoot(options) {
  * @returns {{ runtimeRoot: string, projectsRoot: string, projectRuntimeRoot: string, artifactsRoot: string, reportsRoot: string, stateRoot: string }}
  */
 export function resolveRuntimeLayout(options) {
+  const projectIdValidation = validatePublicId(options.projectId);
+  if (!projectIdValidation.ok) {
+    throw new Error(
+      `Invalid project_id ${JSON.stringify(options.projectId)} (${projectIdValidation.value_class}). ${projectIdValidation.migration}`,
+    );
+  }
   const projectsRoot = path.join(options.runtimeRoot, "projects");
   const projectRuntimeRoot = path.join(projectsRoot, options.projectId);
   const artifactsRoot = path.join(projectRuntimeRoot, "artifacts");
