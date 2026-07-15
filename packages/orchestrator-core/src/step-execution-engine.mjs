@@ -6,7 +6,7 @@ import {
   createAdapterRequestEnvelope,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
-import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
+import { derivePublicId, loadContractFile, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
@@ -33,6 +33,12 @@ import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mj
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
+import {
+  captureCheckoutSnapshot,
+  compareCheckoutSnapshots,
+  prepareWorkspaceIsolation,
+  resumeWorkspaceIsolation,
+} from "./workspace-isolation.mjs";
 import {
   evaluateRuntimePermissionRequest,
   normalizeRuntimeAgentAutoApprovalProfile,
@@ -1075,17 +1081,43 @@ export function executeRoutedStep(options) {
       ? options.skillsRoot
       : path.resolve(init.projectRoot, options.skillsRoot)
     : registryRoots.skills;
-  const executionRoot = options.executionRoot
-    ? path.isAbsolute(options.executionRoot)
-      ? options.executionRoot
-      : path.resolve(init.projectRoot, options.executionRoot)
-    : init.projectRoot;
-  const changedPathStatusBefore = listChangedPaths(executionRoot);
-
   const requestedStepClass = options.stepClass;
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
   const runId = options.runId ?? `${init.projectId}.routed-execution.v1`;
   const stepId = options.stepId ?? `routed.${requestedStepClass}`;
+  const dryRun = options.dryRun !== false;
+  let workspaceIsolation = null;
+  let primaryCheckoutSnapshotBefore = null;
+  let executionRoot = options.executionRoot
+    ? path.isAbsolute(options.executionRoot)
+      ? options.executionRoot
+      : path.resolve(init.projectRoot, options.executionRoot)
+    : init.projectRoot;
+  if (!dryRun) {
+    const loadedProjectProfile = loadContractFile({ filePath: init.projectProfilePath, family: "project-profile" });
+    if (!loadedProjectProfile.ok) throw new Error(`Project profile '${init.projectProfilePath}' failed contract validation.`);
+    primaryCheckoutSnapshotBefore = captureCheckoutSnapshot(init.projectRoot);
+    workspaceIsolation = options.reuseDisposableWorkspace === true && options.executionRoot
+      ? resumeWorkspaceIsolation({
+          projectRoot: init.projectRoot,
+          projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+          runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
+          executionRoot: options.executionRoot,
+        })
+      : prepareWorkspaceIsolation({
+          projectRoot: init.projectRoot,
+          runtimeRoot: init.runtimeRoot,
+          projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+          runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
+          runId,
+        });
+    if (!workspaceIsolation.provisioned || !workspaceIsolation.executionRoot) {
+      throw new Error(`Disposable workspace provisioning failed for mode '${workspaceIsolation.requestedMode}'.`);
+    }
+    executionRoot = workspaceIsolation.executionRoot;
+  }
+  const changedPathStatusBefore = listChangedPaths(executionRoot);
+  const executionCheckoutSnapshotBefore = captureCheckoutSnapshot(executionRoot);
   const executionAttempt = resolveStepExecutionAttempt({
     reportsRoot: init.runtimeLayout.reportsRoot,
     runId,
@@ -1104,8 +1136,6 @@ export function executeRoutedStep(options) {
   const scopedArtifactSuffix = `${runScopeSuffix}.${stepScopeSuffix}.${classScopeSuffix}.attempt.${executionAttempt}`;
   const stepResultFileName = `step-result-routed-${scopedArtifactSuffix}.json`;
   const compiledContextFileName = `compiled-context-${scopedArtifactSuffix}.json`;
-  const dryRun = options.dryRun !== false;
-
   const startedAt = new Date().toISOString();
 
   /** @type {Record<string, unknown> | null} */
@@ -1424,7 +1454,7 @@ export function executeRoutedStep(options) {
           ? Math.floor(timeoutSec * 1000)
           : null;
       const planReady =
-        deliveryPlanResult?.deliveryPlan?.status === "ready" && deliveryPlanResult.deliveryPlan.writeback_allowed === true;
+        deliveryPlanResult?.deliveryPlan?.status === "ready" && deliveryPlanResult.deliveryPlan.execution_allowed === true;
       const auditReleaseHold = evaluateAuditReleaseHold({
         dryRun,
         externalRuntime,
@@ -1487,6 +1517,14 @@ export function executeRoutedStep(options) {
           instruction_set: compiled.compiled_context.instruction_set,
           required_inputs_resolved: compiled.compiled_context.required_inputs_resolved,
           runtime_evidence_refs: evidenceRefs,
+          execution_permissions: {
+            execution_allowed: deliveryPlanResult?.deliveryPlan?.execution_allowed === true,
+            writeback_allowed: deliveryPlanResult?.deliveryPlan?.writeback_allowed === true,
+            target_write_allowed: deliveryPlanResult?.deliveryPlan?.target_write_allowed === true,
+            direct_edits_allowed: deliveryPlanResult?.deliveryPlan?.direct_edits_allowed === true,
+            meaningful_change_required: deliveryPlanResult?.deliveryPlan?.meaningful_change_required === true,
+            delivery_mode: asString(deliveryPlanResult?.deliveryPlan?.delivery_mode),
+          },
           guardrails: compiled.compiled_context.guardrails,
           skill_refs: compiled.compiled_context.skill_refs,
           provenance: compiled.compiled_context.provenance,
@@ -1580,6 +1618,38 @@ export function executeRoutedStep(options) {
     artifactsRoot: init.runtimeLayout.artifactsRoot,
     evidenceRoot: executionRoot,
   });
+  const executionCheckoutSnapshotAfter = captureCheckoutSnapshot(executionRoot);
+  const executionIntegrity = compareCheckoutSnapshots(executionCheckoutSnapshotBefore, executionCheckoutSnapshotAfter);
+  const primaryCheckoutSnapshotAfter = primaryCheckoutSnapshotBefore
+    ? captureCheckoutSnapshot(init.projectRoot)
+    : null;
+  const primaryIntegrity = primaryCheckoutSnapshotBefore && primaryCheckoutSnapshotAfter
+    ? compareCheckoutSnapshots(primaryCheckoutSnapshotBefore, primaryCheckoutSnapshotAfter)
+    : { unchanged: true, changed_fields: [] };
+  const deliveryMode = asString(deliveryPlanResult?.deliveryPlan?.delivery_mode);
+  const noWriteExecution = !dryRun && deliveryMode === "no-write";
+  if (!primaryIntegrity.unchanged) {
+    status = "failed";
+    summary = `Primary checkout integrity violation: provider execution changed ${primaryIntegrity.changed_fields.join(", ")}.`;
+    blockedNextStep = "Restore the primary checkout from captured integrity evidence before retrying in a new disposable workspace.";
+  } else if (noWriteExecution && !executionIntegrity.unchanged) {
+    status = "failed";
+    summary = `No-write integrity violation: provider execution changed disposable checkout state (${executionIntegrity.changed_fields.join(", ")}).`;
+    blockedNextStep = "Inspect no-write mutation evidence and retry with a provider that honors the read-only execution contract.";
+  }
+  let workspaceCleanup = null;
+  if (workspaceIsolation) {
+    workspaceCleanup = noWriteExecution
+      ? workspaceIsolation.cleanup(status === "passed" ? "success" : "failure", "delete")
+      : status === "passed"
+        ? workspaceIsolation.cleanup("success", "retain")
+        : workspaceIsolation.finalize("failure");
+    if (workspaceCleanup.status === "delete-failed") {
+      status = "failed";
+      summary = `Disposable workspace cleanup failed: ${workspaceCleanup.error}`;
+      blockedNextStep = "Inspect the retained workspace owner marker and retry cleanup without deleting the primary checkout.";
+    }
+  }
   const strictCodeChangingNoopDetectionApplied =
     !dryRun &&
     requestedStepClass === "implement" &&
@@ -1603,7 +1673,20 @@ export function executeRoutedStep(options) {
     evidence_refs: evidenceRefs,
     routed_execution: {
       mode: dryRun ? "dry-run" : "execute",
-      no_write_enforced: dryRun,
+      no_write_enforced: dryRun || noWriteExecution,
+      workspace_isolation: workspaceIsolation
+        ? {
+            requested_mode: workspaceIsolation.requestedMode,
+            mode: workspaceIsolation.mode,
+            source_root: workspaceIsolation.sourceRoot,
+            execution_root: executionRoot,
+            checkout: workspaceIsolation.checkout,
+            provisioning: workspaceIsolation.provisioning,
+            primary_integrity: primaryIntegrity,
+            execution_integrity: executionIntegrity,
+            cleanup: workspaceCleanup,
+          }
+        : null,
       audit_release_hold: {
         override_requested: options.unsafeDevelopmentOverride === true,
         override_used:
@@ -1621,7 +1704,11 @@ export function executeRoutedStep(options) {
             plan_id: deliveryPlanResult.deliveryPlan.plan_id,
             delivery_mode: deliveryPlanResult.deliveryPlan.delivery_mode,
             status: deliveryPlanResult.deliveryPlan.status,
+            execution_allowed: deliveryPlanResult.deliveryPlan.execution_allowed,
             writeback_allowed: deliveryPlanResult.deliveryPlan.writeback_allowed,
+            target_write_allowed: deliveryPlanResult.deliveryPlan.target_write_allowed,
+            direct_edits_allowed: deliveryPlanResult.deliveryPlan.direct_edits_allowed,
+            meaningful_change_required: deliveryPlanResult.deliveryPlan.meaningful_change_required,
             delivery_plan_file: deliveryPlanResult.deliveryPlanFile,
           }
         : null,
@@ -1858,6 +1945,14 @@ export function executeRoutedStep(options) {
   };
 }
 
+function continueInOwnedWorkspace(options, result) {
+  const workspace = asRecord(asRecord(result.stepResult.routed_execution).workspace_isolation);
+  const executionRoot = asString(workspace.execution_root);
+  return executionRoot
+    ? { ...options, executionRoot, reuseDisposableWorkspace: true }
+    : options;
+}
+
 /**
  * Execute a routed step through the AOR Runtime Harness controller.
  *
@@ -1964,7 +2059,7 @@ export function executeRuntimeHarnessControlledStep(options) {
       ]);
       const retried = runWithRuntimePermissionMode(resumeMode, () =>
         executeRoutedStep({
-          ...options,
+          ...continueInOwnedWorkspace(options, current),
           runtimeEvidenceRefs: permissionDecisionRefs,
         }),
       );
@@ -2009,7 +2104,7 @@ export function executeRuntimeHarnessControlledStep(options) {
       ...baseEvidenceRefs,
     ]);
     const repair = executeRoutedStep({
-      ...options,
+      ...continueInOwnedWorkspace(options, current),
       stepClass: "repair",
       stepId: repairStepId,
       requireDiscoveryCompleteness: false,
@@ -2064,7 +2159,7 @@ export function executeRuntimeHarnessControlledStep(options) {
       return current;
     }
 
-    const rerun = executeRoutedStep(options);
+    const rerun = executeRoutedStep(continueInOwnedWorkspace(options, repair));
     persistRuntimeHarnessAttemptLedger(rerun, executedAttempts, "pending");
     current = rerun;
     refreshRuntimeHarnessReportForStep(current);

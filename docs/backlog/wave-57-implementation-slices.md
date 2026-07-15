@@ -214,7 +214,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   advertised execution workspace has independent Git metadata and canonical
   filesystem containment.
 - **Epic:** EPIC-1, EPIC-3, EPIC-5
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** `packages/orchestrator-core/src/workspace-isolation.mjs`,
@@ -267,7 +267,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Runtime permissions are enforced by normalized capabilities and
   canonical resources rather than bypassable command-text regular expressions.
 - **Epic:** EPIC-3
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/adapter-capability-profile.md`,

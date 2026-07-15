@@ -49,6 +49,7 @@ test("materializeDeliveryPlan blocks non-no-write mode without approved handoff 
     assert.equal(fs.existsSync(result.deliveryPlanFile), true);
     assert.equal(result.deliveryPlan.delivery_mode, "fork-first-pr");
     assert.equal(result.deliveryPlan.status, "blocked");
+    assert.equal(result.deliveryPlan.execution_allowed, false);
     assert.equal(result.deliveryPlan.writeback_allowed, false);
     assert.ok(result.deliveryPlan.blocking_reasons.includes("approved-handoff-required"));
     assert.ok(result.deliveryPlan.blocking_reasons.includes("promotion-evidence-required"));
@@ -87,6 +88,7 @@ test("materializeDeliveryPlan allows non-no-write mode only with approved handof
 
     assert.equal(result.deliveryPlan.delivery_mode, "fork-first-pr");
     assert.equal(result.deliveryPlan.status, "ready");
+    assert.equal(result.deliveryPlan.execution_allowed, true);
     assert.equal(result.deliveryPlan.writeback_allowed, true);
     assert.deepEqual(result.deliveryPlan.blocking_reasons, []);
     assert.equal(result.deliveryPlan.governance.decision, "allow");
@@ -121,7 +123,11 @@ test("materializeDeliveryPlan keeps no-write mode ready without handoff or promo
 
     assert.equal(result.deliveryPlan.delivery_mode, "no-write");
     assert.equal(result.deliveryPlan.status, "ready");
-    assert.equal(result.deliveryPlan.writeback_allowed, true);
+    assert.equal(result.deliveryPlan.execution_allowed, true);
+    assert.equal(result.deliveryPlan.writeback_allowed, false);
+    assert.equal(result.deliveryPlan.target_write_allowed, false);
+    assert.equal(result.deliveryPlan.direct_edits_allowed, false);
+    assert.equal(result.deliveryPlan.meaningful_change_required, false);
     assert.deepEqual(result.deliveryPlan.blocking_reasons, []);
     assert.equal(result.deliveryPlan.preconditions.approved_handoff.status, "not-required");
     assert.equal(result.deliveryPlan.preconditions.promotion_evidence.status, "not-required");

@@ -3777,6 +3777,8 @@ test("project verify supports routed live execution baseline when delivery evide
           "const packetIndex=process.argv.indexOf('--work-packet');",
           "const input=packetIndex>=0?JSON.parse(fs.readFileSync(process.argv[packetIndex+1],'utf8')):JSON.parse(fs.readFileSync(0,'utf8'));",
           "const request=input.request||input||{};",
+          "fs.mkdirSync('source',{recursive:true});",
+          "fs.writeFileSync('source/live-success.js','export const liveSuccess = true;\\n');",
           "process.stdout.write(JSON.stringify({",
           "status:'success',",
           "summary:'external runner ok',",
@@ -3810,7 +3812,7 @@ test("project verify supports routed live execution baseline when delivery evide
 
     const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
     assert.equal(routedStepResult.step_class, "runner");
-    assert.equal(routedStepResult.status, "passed");
+    assert.equal(routedStepResult.status, "passed", routedStepResult.summary);
     assert.equal(routedStepResult.routed_execution.mode, "execute");
     assert.equal(routedStepResult.routed_execution.no_write_enforced, false);
     assert.equal(routedStepResult.routed_execution.delivery_plan.status, "ready");
@@ -3826,7 +3828,12 @@ test("project verify supports routed live execution baseline when delivery evide
     );
     assert.equal(
       routedStepResult.routed_execution.adapter_response.output.external_runner.execution_root,
-      projectRoot,
+      routedStepResult.routed_execution.workspace_isolation.execution_root,
+    );
+    assert.equal(fs.existsSync(path.join(projectRoot, "source/live-success.js")), false);
+    assert.equal(
+      fs.existsSync(path.join(routedStepResult.routed_execution.workspace_isolation.execution_root, "source/live-success.js")),
+      true,
     );
     assert.ok(
       routedStepResult.routed_execution.adapter_response.evidence_refs.includes(
@@ -4877,6 +4884,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       );
       assert.equal(runStartRuntimeHarnessReport.run_id, runId);
       assert.equal(runStartRuntimeHarnessReport.step_decisions[0].runtime_harness_decision, "pass");
+      const runStartStepResult = JSON.parse(fs.readFileSync(runStartPayload.routed_step_result_file, "utf8"));
+      const isolatedExecutionRoot = runStartStepResult.routed_execution.workspace_isolation.execution_root;
 
       const reviewRun = invokeCli([
         "review",
@@ -4888,7 +4897,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--run-id",
         runId,
         "--execution-root",
-        projectRoot,
+        isolatedExecutionRoot,
       ]);
       assert.equal(reviewRun.exitCode, 0, reviewRun.stderr);
       const reviewPayload = JSON.parse(reviewRun.stdout);
@@ -4914,13 +4923,16 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       assert.equal(reviewReport.feature_traceability.provider_variant_id, "openai-primary");
       assert.equal(reviewReport.feature_traceability.feature_size, "small");
       assert.equal(reviewReport.code_quality.status, "pass");
-      assert.equal(path.resolve(reviewReport.code_quality.target_checkout_root), path.resolve(projectRoot));
-      assert.equal(reviewReport.code_quality.changed_path_diagnostics.git_status_root, projectRoot);
+      assert.equal(fs.realpathSync(reviewReport.code_quality.target_checkout_root), fs.realpathSync(isolatedExecutionRoot));
+      assert.equal(fs.realpathSync(reviewReport.code_quality.changed_path_diagnostics.git_status_root), fs.realpathSync(isolatedExecutionRoot));
       assert.ok(reviewReport.code_quality.changed_paths.includes("source/mission.js"));
       assert.ok(
         runtimeHarnessReport.step_decisions[0].mission_semantics.meaningful_changed_paths.includes("source/mission.js"),
       );
-      assert.equal(runtimeHarnessReport.step_decisions[0].mission_semantics.git_status_root, projectRoot);
+      assert.equal(
+        fs.realpathSync(runtimeHarnessReport.step_decisions[0].mission_semantics.git_status_root),
+        fs.realpathSync(isolatedExecutionRoot),
+      );
       assert.equal(reviewReport.discovery_quality.status, "pass");
       assert.equal(reviewReport.feature_size_fit.status, "pass");
       assert.equal(reviewReport.provider_traceability.status, "pass");
@@ -4951,6 +4963,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
         [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--execution-root",
+        isolatedExecutionRoot,
         "--require-review-decision",
       ]);
       assert.equal(missingReviewDecisionGate.exitCode, 1);
@@ -5050,13 +5064,18 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
         [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--execution-root",
+        isolatedExecutionRoot,
         "--require-review-decision",
       ]);
       assert.equal(gatedDelivery.exitCode, 0, gatedDelivery.stderr);
       const gatedDeliveryPayload = JSON.parse(gatedDelivery.stdout);
       assert.equal(gatedDeliveryPayload.review_decision, "approve");
       assert.equal(gatedDeliveryPayload.review_decision_gate, "pass");
-      assert.equal(gatedDeliveryPayload.delivery_blocking, false);
+      const gatedDeliveryTranscript = JSON.parse(
+        fs.readFileSync(gatedDeliveryPayload.delivery_transcript_file, "utf8"),
+      );
+      assert.equal(gatedDeliveryPayload.delivery_blocking, false, gatedDeliveryTranscript.error);
 
       const auditRun = invokeCli([
         "audit",

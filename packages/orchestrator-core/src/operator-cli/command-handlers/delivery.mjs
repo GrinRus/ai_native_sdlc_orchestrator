@@ -484,6 +484,7 @@ export function handleDeliveryCommand(context) {
       prBody: resolveOptionalStringFlag("pr-body", flags["pr-body"]),
       enableNetworkWrite,
       ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
+      executionRoot: resolveOptionalStringFlag("execution-root", flags["execution-root"]),
       deliveryPlanPath: planResult.deliveryPlanFile,
     });
 

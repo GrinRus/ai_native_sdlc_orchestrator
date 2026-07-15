@@ -304,7 +304,10 @@ export function collectMissionChangeEvidence(options) {
   const changedPathStatus = listChangedPaths(gitStatusRoot);
   const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatus.changedPaths);
   const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatus.changedPaths);
-  const missionScope = loadMissionScope(gitStatusRoot, options.artifactsRoot);
+  // Intake packet paths are owned by the canonical project checkout, while Git
+  // evidence is collected from its disposable checkout. Both checkouts share
+  // the same project-relative namespace but never the same absolute root.
+  const missionScope = loadMissionScope(options.projectRoot, options.artifactsRoot);
   const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope, {
     projectRoot: gitStatusRoot,
   });

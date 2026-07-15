@@ -89,7 +89,7 @@ export function invokeStepAdapterForStep(options) {
   }
 
   const plan = asRecord(options.deliveryPlan);
-  const planReady = plan.status === "ready" && plan.writeback_allowed === true;
+  const planReady = plan.status === "ready" && plan.execution_allowed === true;
   const blockingReasons = asStringArray(plan.blocking_reasons);
 
   if (!planReady) {

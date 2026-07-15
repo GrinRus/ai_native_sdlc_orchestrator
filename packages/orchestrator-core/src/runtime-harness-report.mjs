@@ -630,12 +630,27 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
   const routedExecution = asRecord(stepResult.routed_execution);
   const contextCompilation = asRecord(routedExecution.context_compilation);
   const adapterResponse = asRecord(routedExecution.adapter_response);
+  const storedMission = asRecord(stepResult.mission_semantics);
+  const effectiveMissionSemantics = Object.keys(storedMission).length === 0
+    ? missionSemantics
+    : {
+        gitStatusAvailable: storedMission.git_status_available !== false,
+        gitStatusRoot: asString(storedMission.git_status_root),
+        changedPaths: asStringArray(storedMission.changed_paths_after_step),
+        nonBootstrapChangedPaths: asStringArray(storedMission.non_bootstrap_changed_paths),
+        nonInputChangedPaths: asStringArray(storedMission.non_input_changed_paths),
+        meaningfulChangedPaths: asStringArray(storedMission.meaningful_changed_paths),
+        runnerOwnedStatePaths: asStringArray(storedMission.runner_owned_state_paths),
+        ignoredInputFiles: asStringArray(storedMission.ignored_input_files),
+        strictCodeChangingNoopDetectionApplied: storedMission.strict_code_changing_noop_detection_applied === true,
+        strictCodeChangingNoop: storedMission.strict_code_changing_noop === true,
+      };
   const classification = classifyRuntimeStepOutcome(stepResult, {
-    gitStatusAvailable: missionSemantics.gitStatusAvailable,
-    strictCodeChangingNoop: missionSemantics.strictCodeChangingNoop,
-    nonBootstrapChangedPaths: missionSemantics.nonBootstrapChangedPaths,
-    meaningfulChangedPaths: missionSemantics.meaningfulChangedPaths,
-    runnerOwnedStatePaths: missionSemantics.runnerOwnedStatePaths,
+    gitStatusAvailable: effectiveMissionSemantics.gitStatusAvailable,
+    strictCodeChangingNoop: effectiveMissionSemantics.strictCodeChangingNoop,
+    nonBootstrapChangedPaths: effectiveMissionSemantics.nonBootstrapChangedPaths,
+    meaningfulChangedPaths: effectiveMissionSemantics.meaningfulChangedPaths,
+    runnerOwnedStatePaths: effectiveMissionSemantics.runnerOwnedStatePaths,
   });
   const startedAt = asString(routedExecution.started_at);
   const finishedAt = asString(routedExecution.finished_at);
@@ -657,16 +672,16 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
       duration_sec: resolveDurationSeconds(startedAt, finishedAt),
     },
     mission_semantics: {
-      git_status_available: missionSemantics.gitStatusAvailable,
-      git_status_root: asString(missionSemantics.gitStatusRoot),
-      changed_paths: missionSemantics.changedPaths,
-      non_bootstrap_changed_paths: missionSemantics.nonBootstrapChangedPaths,
-      non_input_changed_paths: missionSemantics.nonInputChangedPaths,
-      meaningful_changed_paths: missionSemantics.meaningfulChangedPaths,
-      runner_owned_state_paths: asStringArray(missionSemantics.runnerOwnedStatePaths),
-      ignored_input_files: missionSemantics.ignoredInputFiles,
-      strict_code_changing_noop_detection_applied: missionSemantics.strictCodeChangingNoopDetectionApplied === true,
-      strict_code_changing_noop: missionSemantics.strictCodeChangingNoop,
+      git_status_available: effectiveMissionSemantics.gitStatusAvailable,
+      git_status_root: asString(effectiveMissionSemantics.gitStatusRoot),
+      changed_paths: effectiveMissionSemantics.changedPaths,
+      non_bootstrap_changed_paths: effectiveMissionSemantics.nonBootstrapChangedPaths,
+      non_input_changed_paths: effectiveMissionSemantics.nonInputChangedPaths,
+      meaningful_changed_paths: effectiveMissionSemantics.meaningfulChangedPaths,
+      runner_owned_state_paths: asStringArray(effectiveMissionSemantics.runnerOwnedStatePaths),
+      ignored_input_files: effectiveMissionSemantics.ignoredInputFiles,
+      strict_code_changing_noop_detection_applied: effectiveMissionSemantics.strictCodeChangingNoopDetectionApplied === true,
+      strict_code_changing_noop: effectiveMissionSemantics.strictCodeChangingNoop,
     },
     evidence_refs: uniqueStrings([artifactRef, ...asStringArray(stepResult.evidence_refs)]),
   };
@@ -687,15 +702,21 @@ function loadRunStepArtifacts(options) {
     ...loadAllRunStepArtifacts(options),
     ...loadLinkedRunStepArtifacts(options),
   ];
-  const seenStepKeys = new Set();
-  return loadedArtifacts.filter((entry) => {
+  const latestByStep = new Map();
+  for (const entry of loadedArtifacts) {
     const stepId = asString(entry.document.step_id) ?? entry.file;
     const stepClass = asString(entry.document.step_class) ?? "unknown";
     const key = `${stepId}:${stepClass}`;
-    if (seenStepKeys.has(key)) return false;
-    seenStepKeys.add(key);
-    return true;
-  });
+    const previous = latestByStep.get(key);
+    const finishedAt = asString(asRecord(entry.document.routed_execution).finished_at) ?? "";
+    const previousFinishedAt = previous
+      ? asString(asRecord(previous.document.routed_execution).finished_at) ?? ""
+      : "";
+    if (!previous || finishedAt > previousFinishedAt || (finishedAt === previousFinishedAt && entry.file > previous.file)) {
+      latestByStep.set(key, entry);
+    }
+  }
+  return [...latestByStep.values()];
 }
 
 /**
@@ -1174,14 +1195,8 @@ export function materializeRuntimeHarnessReport(options) {
   const deliveryFindings = resolveDeliveryFindings(deliveryArtifacts, missionSemantics);
   const runFindings = [...stepFindings, ...reviewFindings, ...evalFindings, ...deliveryFindings];
   const impactedAssetRefs = uniqueStrings(
-    stepArtifacts.flatMap((artifact) =>
-      classifyRuntimeStepOutcome(artifact.document, {
-        gitStatusAvailable: missionSemantics.gitStatusAvailable,
-        strictCodeChangingNoop: missionSemantics.strictCodeChangingNoop,
-        nonBootstrapChangedPaths: missionSemantics.nonBootstrapChangedPaths,
-        meaningfulChangedPaths: missionSemantics.meaningfulChangedPaths,
-        runnerOwnedStatePaths: missionSemantics.runnerOwnedStatePaths,
-      }).decision === "pass"
+    stepArtifacts.flatMap((artifact, index) =>
+      asString(stepDecisions[index]?.runtime_harness_decision) === "pass"
         ? []
         : extractImpactedAssetRefs(artifact.document),
     ),

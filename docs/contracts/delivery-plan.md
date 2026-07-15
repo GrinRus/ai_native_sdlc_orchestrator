@@ -16,14 +16,21 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 - `delivery_mode`
 - `mode_source`
 - `preconditions`
+- `execution_allowed`
 - `writeback_allowed`
+- `target_write_allowed`
+- `direct_edits_allowed`
+- `meaningful_change_required`
 - `blocking_reasons[]`
 - `status`
 - `evidence_refs[]`
 - `created_at`
 
 ## Delivery mode values
-- `no-write` — read-only/rehearsal-only execution with no write-back.
+- `no-write` — read-only execution in a disposable checkout. A ready no-write
+  plan has `execution_allowed=true`, while `writeback_allowed`,
+  `target_write_allowed`, `direct_edits_allowed`, and
+  `meaningful_change_required` are all `false`.
 - `patch-only` — produce patch output only.
 - `local-branch` — write changes to a local branch in an isolated checkout.
 - `fork-first-pr` — plan fork-first branch + pull request style delivery.
@@ -40,7 +47,8 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
   - `report_ref` pointing to Runtime Harness execution evidence for the same `run_id`;
   - `overall_decision=pass`, routed step decisions, and meaningful changed-path evidence when the mission requires code changes;
   - `run_decision=pass` when run-level controller evidence is present.
-- `status=blocked` means write-back is not allowed for the planned mode yet.
+- `status=blocked` means execution is not authorized for the planned mode.
+  Execution authorization never implies writeback authorization.
 - `governance` should expose route-governance decision semantics (`allow|deny|escalate`) with explicit reason codes for security/compliance review.
 - `coordination` should preserve repo-level coordination requirements:
   - `required` and `status` for multi-repo gating;
