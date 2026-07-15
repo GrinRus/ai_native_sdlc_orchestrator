@@ -506,7 +506,8 @@ This is the master index for the implementation slices across all defined waves.
 | W57-S05 | Exact-diff delivery and resolvable authorization evidence | EPIC-4, EPIC-5 | blocked | delivery/Harness contracts, delivery runtime, CLI/tests | W57-S02, W57-S03, W57-S04 |
 | W57-S06 | Transactional initialization and runtime-root containment | EPIC-1, EPIC-2 | blocked | project init, artifact store, asset roots, tests | W57-S02 |
 | W57-S07 | Atomic attempts, run control, and event identity | EPIC-2, EPIC-3, EPIC-6 | blocked | attempt/result store, run control, observability journal | W57-S06 |
-| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | blocked | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07 |
+| W57-S10 | Project-anchored command and evidence resolution | EPIC-1, EPIC-2, EPIC-6 | blocked | project context, control-plane handlers, evidence/path resolution, package/browser tests | W57-S02, W57-S06 |
+| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | blocked | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10 |
 
 ## W58 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -547,7 +548,9 @@ This is the master index for the implementation slices across all defined waves.
 | W61-S02 | Persistent local workspace registry and topology discovery | EPIC-1, EPIC-6 | blocked | `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, local registry and project-analysis tests | W61-S01 |
 | W61-S03 | Project topology CLI/API management and validation | EPIC-1, EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, OpenAPI/examples, tests | W61-S02 |
 | W61-S04 | Add Project and Project Structure UX | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, browser tests | W61-S03 |
-| W61-S05 | Topology onboarding proof and documentation closure | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W61-S04 |
+| W61-S06 | Project execution profile and runner-readiness contract | EPIC-1, EPIC-3, EPIC-6 | blocked | execution-profile/readiness contracts, project profile, provider routing, CLI/API/control plane, tests | W61-S03 |
+| W61-S07 | Execution Setup UX and browser proof | EPIC-1, EPIC-6 | blocked | `apps/web/**`, control-plane client, execution setup/readiness projections, browser/accessibility tests | W61-S04, W61-S06 |
+| W61-S05 | Topology onboarding proof and documentation closure | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W61-S07 |
 
 ## W62 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -568,7 +571,8 @@ This is the master index for the implementation slices across all defined waves.
 | W63-S04 | Truthful action-first cockpit and recovery controls | EPIC-3, EPIC-4, EPIC-6 | blocked | next-action/control-plane contracts, cockpit/recovery UI, browser tests | W63-S01, W63-S02 |
 | W63-S05 | Adaptive shell and lifecycle navigation | EPIC-6 | blocked | app shell, responsive navigation, accessibility/browser tests | W63-S03, W63-S04 |
 | W63-S06 | Attention queue, evidence workbench, and cockpit hierarchy | EPIC-1, EPIC-4, EPIC-6 | blocked | queue/workbench projections, responsive UI, browser tests | W63-S03, W63-S04, W63-S05 |
-| W63-S07 | Installed-console UX/UI acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | blocked | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
+| W63-S07 | Installed-console UX/UI acceptance | EPIC-0, EPIC-6, EPIC-7 | blocked | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
+| W63-S08 | Browser-operable canonical lifecycle parity | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | blocked | canonical lifecycle actions, installed SPA full-flow proof, durable readback, story closure | W63-S07 |
 
 ## W64 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -580,7 +584,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W65 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W65-S01 | Cutover contract, parity baseline, and migration ledger | EPIC-0, EPIC-6 | blocked | product/contract docs, W63 scenarios, selector/app-config compatibility, parity fixtures | W63-S07 |
+| W65-S01 | Cutover contract, parity baseline, and migration ledger | EPIC-0, EPIC-6 | blocked | product/contract docs, W63 scenarios, selector/app-config compatibility, parity fixtures | W63-S08 |
 | W65-S02 | Reversible experience selector and navigation compatibility | EPIC-0, EPIC-6 | blocked | shared web bootstrap/client/action boundary, selector/navigation fixtures, packaged assets | W65-S01 |
 | W65-S03 | Mission and Quiet Cockpit pilot activation | EPIC-1, EPIC-2, EPIC-6 | blocked | Mission/Cockpit pilot scenarios, canonical mutations, browser/a11y/durable readback | W65-S02 |
 | W65-S04 | Attention, Journey, and Evidence pilot activation | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | blocked | specialist modes, W60-W62 projections, evidence/trace reads, comparison fixtures | W65-S02 |

@@ -119,7 +119,7 @@ function parseStoryCoverageMatrix(rootDir, storyMatrixPath = defaultStoryMatrixP
     });
   }
 
-  const countsMatch = /Current W\d+-S\d+ status counts: `baseline-covered=(\d+)`, `proof-covered=(\d+)`, `partial=(\d+)`, `blocked=(\d+)`/u.exec(
+  const countsMatch = /Current (?:W\d+-S\d+|planning) status counts: `baseline-covered=(\d+)`, `proof-covered=(\d+)`, `partial=(\d+)`, `blocked=(\d+)`/u.exec(
     matrix,
   );
   const documentedCounts = countsMatch
@@ -257,8 +257,8 @@ function checkProductionProof(rootDir, proofFixturePath) {
 function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
   const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir, storyMatrixPath);
   const findings = [];
-  if (rows.size !== 114) {
-    findings.push(`Expected 114 user-story rows, found ${rows.size}.`);
+  if (rows.size !== 116) {
+    findings.push(`Expected 116 user-story rows, found ${rows.size}.`);
   }
 
   const actualCounts = {

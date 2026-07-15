@@ -67,15 +67,17 @@ The authoritative planning model for implementation lives in:
 | W54 | Turn generic verification command groups into an authoring, discovery, profile-generation, operator-inspection, and public-boundary hardening workflow for arbitrary project stacks. | 8 | EPIC-0, EPIC-1, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-54-implementation-slices.md` |
 | W55 | Turn `ky` large/xlarge control findings into actionable repair evidence, target-catalog alignment, Claude guardrails, and rerun reporting. | 5 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-55-implementation-slices.md` |
 | W56 | Harden the installed-user console so first-run setup and active-flow cockpit work stay primary while advanced evidence remains progressively disclosed. | 3 | EPIC-1, EPIC-6 | `docs/backlog/wave-56-implementation-slices.md` |
-| W57 | Restore execution, filesystem, permission, delivery, and evidence trust boundaries from the July 2026 codebase audit before credentialed or write-capable use. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-57-implementation-slices.md` |
+| W57 | Restore execution, filesystem, permission, delivery, project-context, and evidence trust boundaries from the July 2026 codebase audit before credentialed or write-capable use. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-57-implementation-slices.md` |
 | W58 | Make read models, context, routing, evaluation, jobs, live events, APIs, and the loopback local-app transport truthful and executable. | 8 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-58-implementation-slices.md` |
 | W59 | Replace source-marker confidence with browser behavior, harden the local console, ratchet code quality, decompose hotspots, and independently close the audit. | 7 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-59-implementation-slices.md` |
 | W60 | Replace generic task lists with structured, versioned, execution-ready plans and an operator Plan workbench. | 5 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-60-implementation-slices.md` |
-| W61 | Add portable project/repository/component topology, persistent local bindings, and installed-user Project Structure management. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-61-implementation-slices.md` |
+| W61 | Add portable project/repository/component topology, persistent local bindings, neutral Workspace launch, Execution Setup, and installed-user Project Structure management. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-61-implementation-slices.md` |
 | W62 | Execute approved task DAGs through isolated workspace sets, bounded concurrency, integration, repair, and coordinated delivery. | 6 | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-62-implementation-slices.md` |
-| W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, and a reusable visual system. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
+| W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, a reusable visual system, and browser-operable safe lifecycle parity. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
+
+The current roadmap contains **332 slices across 66 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -243,17 +245,18 @@ The authoritative planning model for implementation lives in:
 | W57-S05 | exact delivery and resolvable evidence target: PSO-05, RQA-02, RQA-06, OPS-04, SEC-04, DTX-01, DTX-02, DTX-03, DTX-04, DTX-07, FIN-03 |
 | W57-S06 | transactional initialization target: PBO-01, PBO-05, PBO-09, FIN-03 |
 | W57-S07 | atomic execution/run/event identity target: EMP-03, EMP-05, EMP-06, DEV-01, OPS-01, OPS-02, OPS-04, OPS-09, SEC-03, FIN-03, FIN-04 |
+| W57-S10 | project-anchored command/evidence resolution target: PBO-01, PBO-05, PBO-09, PBO-10, OPS-01, FIN-03 |
 | W57-S08 | W57 safety and release-disposition proof target: OPS-06, OPS-07, SEC-04, FIN-03 |
 | W58-S01 | non-materializing read-model target: PBO-05, PBO-09, OPS-01 |
 | W58-S02 | effective context and unique asset target: DIS-02, ARC-02, ARC-04, DEV-07, AIP-01, AIP-02, PBO-06, SEC-04 |
-| W58-S03 | executable routing/policy/adapter target: ARC-02, DEV-01, DEV-05, EMP-07, AIP-03, AIP-04, OPS-03, SEC-04 |
+| W58-S03 | executable routing/policy/adapter/model target: ARC-02, DEV-01, DEV-05, EMP-07, AIP-03, AIP-04, OPS-03, PBO-10, SEC-04 |
 | W58-S04 | real eval/Harness/replay target: PSO-05, ARC-03, ARC-04, RQA-03, RQA-04, AIP-05, AIP-06, AIP-07, OPS-05 |
 | W58-S05 | asynchronous run and durable live-event target: EMP-05, DEV-01, OPS-01, OPS-02, OPS-04, OPS-10 |
-| W58-S06 | canonical API/OpenAPI/CLI target: ARC-06, OPS-01, OPS-02, OPS-04, OPS-09, OPS-11, SEC-02, SEC-06, FIN-04 |
+| W58-S06 | canonical API/OpenAPI/CLI/error target: ARC-06, OPS-01, OPS-02, OPS-04, OPS-09, OPS-11, OPS-12, PBO-10, SEC-02, SEC-06, FIN-04 |
 | W58-S07 | loopback-only local transport target: ARC-06, PBO-09, OPS-04, OPS-10, OPS-11, SEC-06 |
 | W58-S08 | W58 runtime-quality acceptance target: OPS-06, OPS-07, FIN-03 |
-| W59-S01 | executable browser behavior-gate target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-07, OPS-11 |
-| W59-S02 | local console live-state and interaction target: ARC-06, PBO-09, EMP-05, OPS-01, OPS-02, OPS-04, OPS-10, OPS-11 |
+| W59-S01 | executable browser behavior-gate target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-07, OPS-11, OPS-12 |
+| W59-S02 | local console live-state, truthful-action, and interaction target: ARC-06, PBO-09, EMP-05, OPS-01, OPS-02, OPS-04, OPS-10, OPS-11, OPS-12 |
 | W59-S03 | accessible dialog and web decomposition target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W59-S04 | repository code-quality/dependency ratchet (no direct story closure) |
 | W59-S05 | core/CLI/control-plane decomposition target: ARC-06, DEV-01, DEV-05, OPS-01, OPS-06, OPS-10 |
@@ -265,10 +268,12 @@ The authoritative planning model for implementation lives in:
 | W60-S04 | Plan workbench and approval UX target: EMP-01, EMP-02, EMP-03, PSO-04, PSO-07, OPS-01, OPS-02, OPS-10 |
 | W60-S05 | structured planning proof target: EMP-02, EMP-03, OPS-06, OPS-10, FIN-03 |
 | W61-S01 | project topology and binding contract target: RMO-01, RMO-02, PBO-01, PBO-07, PBO-08, ARC-01 |
-| W61-S02 | persistent local registry and discovery target: PBO-01, PBO-03, PBO-07, PBO-08, RMO-01, RMO-02 |
-| W61-S03 | topology CLI/API management target: RMO-01, RMO-02, PBO-03, PBO-04, PBO-05, OPS-01, OPS-10 |
-| W61-S04 | Add Project and Project Structure UX target: PBO-01, PBO-03, PBO-08, PBO-09, RMO-01, RMO-02, OPS-01, OPS-10 |
-| W61-S05 | topology onboarding proof target: PBO-08, PBO-09, RMO-01, RMO-02, OPS-06, OPS-10 |
+| W61-S02 | persistent neutral Workspace registry and discovery target: PBO-01, PBO-03, PBO-07, PBO-08, PBO-10, RMO-01, RMO-02 |
+| W61-S03 | topology CLI/API management target: RMO-01, RMO-02, PBO-03, PBO-04, PBO-05, PBO-10, OPS-01, OPS-10 |
+| W61-S04 | Add Project and Project Structure UX target: PBO-01, PBO-03, PBO-08, PBO-09, PBO-10, RMO-01, RMO-02, OPS-01, OPS-10 |
+| W61-S06 | project execution-profile and runner-readiness target: ARC-02, DEV-01, AIP-03, AIP-04, PBO-10, OPS-01, OPS-10, SEC-01, SEC-03, SEC-05 |
+| W61-S07 | Execution Setup UX target: PBO-09, PBO-10, OPS-01, OPS-10 |
+| W61-S05 | topology and Execution Setup onboarding proof target: PBO-08, PBO-09, PBO-10, RMO-01, RMO-02, OPS-06, OPS-10 |
 | W62-S01 | workspace-set and repo-change evidence target: RMO-01, RMO-04, DEV-01, DTX-05, SEC-04 |
 | W62-S02 | impact scope and execution DAG target: EMP-02, EMP-03, ARC-01, RMO-02, RMO-04, PSO-07 |
 | W62-S03 | parent/child scheduler target: EMP-03, EMP-04, EMP-05, DEV-01, DEV-05, OPS-01, OPS-07 |
@@ -278,20 +283,21 @@ The authoritative planning model for implementation lives in:
 | W63-S01 | operator journey, action semantics, and scenario enablement (no direct story closure) |
 | W63-S02 | semantic design-system enablement (no direct story closure) |
 | W63-S03 | guided Mission intake target: PSO-01, PSO-02, PBO-09, OPS-11 |
-| W63-S04 | truthful cockpit action and recovery target: OPS-01, OPS-04, OPS-11, RQA-02, RQA-06 |
+| W63-S04 | truthful cockpit action and recovery target: OPS-01, OPS-04, OPS-11, OPS-12, RQA-02, RQA-06 |
 | W63-S05 | adaptive shell and lifecycle navigation target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W63-S06 | attention queue and evidence workbench target: OPS-01, OPS-02, OPS-04, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06 |
-| W63-S07 | installed-console UX/UI acceptance target: PBO-09, OPS-01, OPS-02, OPS-04, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06 |
+| W63-S07 | installed-console UX/UI acceptance target: PBO-09, PBO-10, OPS-01, OPS-02, OPS-04, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06 |
+| W63-S08 | browser-operable safe lifecycle and story-closure target: PBO-10, OPS-01, OPS-04, OPS-10, OPS-12, RQA-02, RQA-06 |
 | W64-S01 | recoverable alpha-release transaction enablement: DTX-07, OPS-06, FIN-03 |
 | W64-S02 | verification/delivery maintainability target: DEV-06, DTX-01, DTX-02, DTX-03, DTX-04 |
 | W64-S03 | operator decision-projection maintainability target: ARC-04, DEV-05, OPS-01, OPS-04 |
-| W65-S01 | cutover contract and parity enablement: PBO-09, OPS-01, OPS-04, OPS-10, OPS-11 |
+| W65-S01 | cutover contract and parity enablement: PBO-09, PBO-10, OPS-01, OPS-04, OPS-10, OPS-11, OPS-12 |
 | W65-S02 | reversible selector and navigation compatibility target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W65-S03 | Mission/Cockpit pilot target: PSO-01, PSO-02, PSO-07, PBO-05, PBO-09, OPS-01, OPS-04, OPS-11 |
 | W65-S04 | specialist-mode pilot target: EMP-01, EMP-02, EMP-03, ARC-05, OPS-01, OPS-02, OPS-03, OPS-04, OPS-10, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
 | W65-S05 | default-on and rollback target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-10, SEC-02, SEC-04 |
 | W65-S06 | legacy retirement and compatibility target: PBO-09, OPS-01, OPS-10, OPS-11 |
-| W65-S07 | post-cutover installed acceptance target: PBO-09, OPS-01, OPS-02, OPS-04, OPS-06, OPS-10, OPS-11, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
+| W65-S07 | post-cutover installed acceptance target: PBO-09, PBO-10, OPS-01, OPS-02, OPS-04, OPS-06, OPS-10, OPS-11, OPS-12, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1131,7 +1137,9 @@ evidence/debug surfaces stay available through progressive disclosure.
 **Goal:** Convert the July 2026 codebase audit into contract-first repairs for
 release honesty, identifiers and scope, no-write/workspace isolation, runtime
 permissions, exact delivery authorization, transactional initialization, and
-concurrent evidence identity.
+concurrent evidence identity, while keeping every project-scoped command and
+evidence reference anchored to the explicitly selected Project rather than the
+launcher working directory.
 
 **Current lane:** W57-S01 is the only ready slice. W57-S09 follows it to make the
 repository gate complete before contract/runtime remediation starts.
@@ -1148,6 +1156,9 @@ supported release claim until W57 closure evidence exists.
   cases.
 - Initialization and concurrent attempt/run/event writes preserve complete,
   immutable, idempotent evidence.
+- Explicit project context produces identical command/evidence behavior from
+  the target repository, an unrelated directory, or the AOR checkout, with no
+  artifact written into the launcher directory.
 - All tracked tests are discovered and W57 safety regressions are stable on the
   supported Node 22 environment.
 
@@ -1155,9 +1166,10 @@ supported release claim until W57 closure evidence exists.
 
 ## W58 - runtime, quality, and loopback control-plane truthfulness
 **Goal:** Make queries non-materializing, context/evaluation evidence effective,
-routing and policy semantics executable, run lifecycle asynchronous, live events
-cross-process, API/CLI/OpenAPI surfaces canonical, and the local loopback HTTP
-boundary safe without introducing hosted frontend scope.
+routing, effective-model, and policy semantics executable, run lifecycle
+asynchronous, live events cross-process, API/CLI/OpenAPI/error surfaces
+canonical, and the local loopback HTTP boundary safe without introducing hosted
+frontend scope.
 
 **Exit criteria:**
 - Every read/query operation leaves a clean project unchanged until an explicit
@@ -1165,11 +1177,13 @@ boundary safe without introducing hosted frontend scope.
 - Effective context content and hashes reach the provider; real evaluation,
   run-owned Harness lineage, and replay compatibility fail closed.
 - Route fallback/retry/repair and adapter semantic normalization execute the
-  declared policy instead of descriptive metadata only.
+  declared policy instead of descriptive metadata only; requested/effective
+  model evidence matches the actual adapter invocation.
 - Active runs leave HTTP/SSE/CLI controls responsive and deliver durable events
   between worker, server, CLI, and local SPA processes.
 - API exports, OpenAPI fixtures, CLI flags, limits, redaction, and lifecycle
-  dependencies agree.
+  dependencies agree, and typed recovery actions provide one provider-neutral
+  operator error vocabulary across CLI, API, and web.
 - `aor app` rejects non-loopback, hostile Host/Origin, wrong media type, and
   oversized body requests without requiring browser login or hosted auth.
 
@@ -1183,9 +1197,13 @@ parity, and independently close the audit.
 
 **Exit criteria:**
 - The installed SPA is tested through clean first load, live/reconnect, project
-  race, partial failure, multi-item queue, responsive, and keyboard scenarios.
+  race, partial failure, multi-item queue, truthful action/side-effect,
+  durable-success, contextual-error, responsive, and keyboard scenarios.
 - The local console uses one same-origin client and atomic snapshot state without
   remote/hosted frontend assumptions.
+- The current console names refresh, project-add, lifecycle, and terminal
+  handoff actions truthfully and distinguishes current runtime stage from the
+  stage selected for inspection.
 - Scoped lint/type/dependency/dead-code/complexity/duplication gates prevent new
   debt while supporting incremental cleanup.
 - Core, CLI, control-plane, adapter, web, and live-E2E hotspots are decomposed
@@ -1218,8 +1236,9 @@ headless and web surfaces.
 
 ## W61 - project topology, bindings, and management UX
 **Goal:** Make single-repo, monorepo, and bounded multirepo projects explicitly
-configurable through portable topology plus machine-local bindings, with
-headless management and an installed-user Project Structure experience.
+configurable through portable topology plus machine-local bindings, with a
+neutral Local Workspace launcher, headless management, approved execution-route
+readiness, and installed-user Project Structure and Execution Setup experiences.
 
 **Exit criteria:**
 - product and architecture distinguish Local Workspace, AOR Project,
@@ -1228,10 +1247,16 @@ headless management and an installed-user Project Structure experience.
   packages remain components of one physical repository;
 - explicitly connected projects and bindings persist across app restart without
   filesystem scanning or implicit runtime initialization;
+- bare `aor app` outside Git opens a neutral Local Workspace with no selected
+  Project and no write into the launcher directory;
 - CLI/API/UI support topology create/import, add/edit/rebind/disable,
   reanalysis, validation, and recoverable blocker states;
+- approved route selection remains project-profile-owned while non-materializing
+  readiness reads and explicit checks expose runner, provider, effective model,
+  capability, policy, and credential-readiness status without credential values;
 - single-project no-settings launch and current profiles stay compatible;
-- installed-user proof covers all supported topologies, persistence, rebind,
+- installed-user proof covers all supported topologies, two-Project versus
+  one-Project/two-repository semantics, persistence, rebind, Execution Setup,
   accessibility, responsive behavior, and project isolation.
 
 **Detailed slices:** `docs/backlog/wave-61-implementation-slices.md`
@@ -1260,8 +1285,9 @@ and truthful per-repository coordinated delivery.
 ## W63 - operator-console UX and UI maturity
 **Goal:** Consolidate the installed local console after structured planning,
 topology, and repo-aware delivery land, so an operator can create or resume a
-Mission, take one truthful next action, recover safely, and inspect evidence on
-desktop or mobile without terminal-only ambiguity.
+Mission, take truthful runtime-owned actions, recover safely, inspect evidence,
+and complete the canonical safe no-write lifecycle on desktop or mobile without
+a required terminal handoff.
 
 **Adopted target design:** `docs/product/05-quiet-cockpit-console-design.md`
 defines Quiet Cockpit as the eventual installed default with flow-scoped
@@ -1283,9 +1309,14 @@ slice states, or implementation/readiness claims.
   from compact mobile widths through desktop, with keyboard and zoom/reflow
   coverage;
 - installed-package browser, accessibility, screenshot, and story evidence
-  proves the opt-in completed journey without creating upstream writes;
-- the accepted selector, scenario, and evidence handoff is ready for W65 while
-  default-on activation and legacy removal remain out of W63 scope.
+  proves the opt-in experience without creating upstream writes;
+- a built/installed SPA completes the mock/deterministic golden path from
+  Workspace and Execution Setup through Mission, planning, execution,
+  review/QA, no-write delivery/release evidence, learning, and follow-up with
+  durable readback and no duplicate operation artifacts;
+- the accepted selector, scenario, lifecycle-parity, and evidence handoff is
+  ready for W65 while default-on activation and legacy removal remain out of
+  W63 scope.
 
 **Detailed slices:** `docs/backlog/wave-63-implementation-slices.md`
 
@@ -1320,7 +1351,7 @@ pilots, default-on activation, explicit rollback rehearsal, legacy retirement,
 and single-renderer package proof.
 
 **Ownership boundary:** W63 owns Quiet Cockpit product behavior and acceptance
-under an explicit selector. W65 starts only after W63-S07 and owns migration;
+under an explicit selector. W65 starts only after W63-S08 and owns migration;
 it may not reimplement lifecycle logic, invent a second client/evidence store,
 or hide projection changes inside cutover work. W64 remains independent and
 behavior-preserving.

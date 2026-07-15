@@ -6,10 +6,13 @@ or safety policy. It is a cutover wave, not a second implementation wave.
 
 W63 remains the owner of the Quiet Cockpit product implementation, component
 system, Mission, Cockpit, Attention, Journey, Evidence, responsive behavior,
-and target-state acceptance. W63 must leave the new experience executable under
-an explicit reversible selector while the W34 experience remains the installed
-default. W65 owns parity proof, reversible activation, default-on cutover,
-rollback rehearsal, legacy removal, and post-cutover acceptance.
+target-state acceptance, and canonical safe UI-only lifecycle parity. W63 must
+leave the new experience executable under an explicit reversible selector while
+the W34 experience remains the installed default. W65 owns parity proof,
+reversible activation, default-on cutover, rollback rehearsal, legacy removal,
+and post-cutover acceptance. If W63-S08 exposes a missing product action,
+projection, recovery path, or durable readback, W65 remains blocked rather than
+implementing that behavior inside the cutover wave.
 
 W64 remains an independent behavior-preserving maintenance lane. W65 does not
 depend on W64, and it must not hide public projection changes inside cutover
@@ -26,8 +29,9 @@ removes the legacy renderer after executable parity and safety proof pass.
 
 ## Entry conditions
 
-- W63-S07 is `done` with Quiet Cockpit executable through an explicit
-  presentation selector and the W34 experience still available.
+- W63-S08 is `done` with the canonical safe no-write lifecycle executable
+  through Quiet Cockpit under an explicit presentation selector and the W34
+  experience still available.
 - The W63 scenario catalog, component contracts, action taxonomy, reference
   screens, installed browser matrix, and no-write evidence are reviewable.
 - The accepted W59 browser/state/accessibility foundations and W60-W62
@@ -238,7 +242,7 @@ must never switch to legacy silently because Quiet Cockpit failed.
 
 | Gate | Default | Legacy availability | Required evidence |
 |---|---|---|---|
-| G0: W63 accepted | legacy | explicit Quiet Cockpit selector | W63 installed browser matrix and reference comparisons |
+| G0: W63-S08 accepted | legacy | explicit Quiet Cockpit selector | W63 installed golden-lifecycle browser matrix and reference comparisons |
 | G1: dual-surface parity | legacy | both explicit | route/action/state parity matrix; no split clients or mutations |
 | G2: mode pilots | legacy | both explicit | Mission/Cockpit and specialist-mode pilot evidence |
 | G3: default-on | Quiet Cockpit | explicit `?console=legacy` rollback | packaged app smoke, default resolution, browser/a11y/no-write matrix |
@@ -282,8 +286,9 @@ Visual similarity alone cannot produce a pass.
 - **Estimated effort:** M
 - **Primary modules:** product/contract docs, app-config examples and transport
   when required, W63 scenario artifacts, web/API fixtures, backlog/runbooks
-- **Hard dependencies:** W63-S07
-- **Primary user story surfaces:** PBO-09, OPS-01, OPS-04, OPS-10, OPS-11.
+- **Hard dependencies:** W63-S08
+- **Primary user story surfaces:** PBO-09, PBO-10, OPS-01, OPS-04, OPS-10,
+  OPS-11, OPS-12.
 
 ### Local tasks
 
@@ -326,6 +331,15 @@ Visual similarity alone cannot produce a pass.
      explicitly with W64-S03.
    - Validation: the W65 diff contains no unreviewed behavior change to public
      action, blocker, ordering, pagination, isolation, or certification output.
+6. **Enforce the cutover-only boundary.**
+   - Purpose: prevent parity review from becoming a second implementation owner
+     for lifecycle behavior that W63-S08 did not close.
+   - Changes: classify missing action, projection, recovery, execution-setup,
+     or durable-readback behavior as an entry-condition failure and route it
+     back to the owning W63 or earlier contract slice before cutover resumes.
+   - Validation: the W65-S01 diff contains only parity, selector, migration,
+     rollout, rollback, and coordination artifacts, with no new lifecycle
+     mutation or UI-only orchestration state.
 
 ### Acceptance criteria
 
@@ -340,6 +354,8 @@ Visual similarity alone cannot produce a pass.
    artifacts, unsafe fallback, cross-Flow leakage, or completed-flow mutation.
 5. W64 overlap is documented without adding an artificial hard dependency or
    hiding a public behavior change inside cutover work.
+6. W65-S01 does not implement or waive any lifecycle action, execution setup,
+   recovery path, projection, or durable readback required by W63-S08.
 
 ### Done evidence
 
@@ -353,6 +369,8 @@ Visual similarity alone cannot produce a pass.
 
 - Changing the installed default.
 - Reimplementing W63 components or product flows.
+- Backfilling a missing canonical UI-only lifecycle action or execution-setup
+  behavior; that work returns to W63 or its owning earlier slice.
 - Removing legacy source or fixtures.
 
 ## W65-S02 — Reversible experience selector and navigation compatibility
@@ -681,8 +699,8 @@ Visual similarity alone cannot produce a pass.
 - **Primary modules:** installed SPA/browser suite, guided proof profile,
   package smoke, UX quality report, product/story/readiness/runbook docs
 - **Hard dependencies:** W65-S06
-- **Primary user story surfaces:** PBO-09, OPS-01, OPS-02, OPS-04, OPS-06,
-  OPS-10, OPS-11, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04.
+- **Primary user story surfaces:** PBO-09, PBO-10, OPS-01, OPS-02, OPS-04,
+  OPS-06, OPS-10, OPS-11, OPS-12, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04.
 
 ### Local tasks
 
