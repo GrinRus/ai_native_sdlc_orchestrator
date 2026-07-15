@@ -9,7 +9,10 @@ import { fileURLToPath } from "node:url";
 import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { readRunEventHistory } from "../src/control-plane/read-surface.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
-import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
+import {
+  executeRoutedStep as executeRoutedStepWithoutAuditOverride,
+  executeRuntimeHarnessControlledStep as executeRuntimeHarnessControlledStepWithoutAuditOverride,
+} from "../src/step-execution-engine.mjs";
 import { classifyRuntimeStepOutcome, materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
 import {
   collectMissionChangeEvidence,
@@ -21,6 +24,13 @@ import {
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
+
+// These fixtures intentionally exercise external write-capable development probes.
+// The release-hold behavior itself is covered separately by the readiness suite.
+const executeRoutedStep = (options) =>
+  executeRoutedStepWithoutAuditOverride({ ...options, unsafeDevelopmentOverride: true });
+const executeRuntimeHarnessControlledStep = (options) =>
+  executeRuntimeHarnessControlledStepWithoutAuditOverride({ ...options, unsafeDevelopmentOverride: true });
 
 /**
  * @param {(repoRoot: string) => void} callback

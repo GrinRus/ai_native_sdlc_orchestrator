@@ -42,6 +42,10 @@ The default W25 production proof evidence is the sanitized fixture configured by
 
 The gate verifies:
 
+- complete test execution: `scripts/test-manifest.json` maps every tracked
+  `*.test.mjs` file to exactly one group or a reviewed unexpired exclusion, and
+  `node_modules/.cache/aor/test-execution-manifest.json` proves the current HEAD
+  and manifest digest executed every candidate once;
 - audit remediation ledger validity, complete AUD-001 through AUD-022
   disposition, the post-audit `project-context-cwd-divergence` entry, and every
   open release-blocking invariant;
@@ -69,6 +73,7 @@ Top-level meanings:
 | Failed check | Meaning | Operator action |
 |---|---|---|
 | `audit-remediation-ledger` | The ledger is missing, malformed, incomplete, or contains an invalid resolved claim. | Restore the ledger and evidence; do not infer release status. |
+| `complete-test-execution` | The discovered-test report is missing, stale, incomplete, duplicated, or belongs to another HEAD/policy digest. | Run `pnpm test` or `pnpm check`, then rerun readiness without changing HEAD. |
 | `baseline-boundary` | `pnpm check` or `pnpm production:ready` no longer has the expected meaning. | Restore the script boundary before making any production claim. |
 | `w25-real-proof-fixture` | The proof fixture is missing, unsafe, mock-backed, non-passing, or no longer proves code-changing no-upstream-write execution. | Re-run or re-sanitize W25 proof evidence; do not replace it with mock output. |
 | `story-status-honesty` | Story statuses or counts overstate production evidence. | Update only evidence-backed rows; leave residual stories `partial` or `blocked`. |

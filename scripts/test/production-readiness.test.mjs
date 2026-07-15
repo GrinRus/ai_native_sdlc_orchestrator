@@ -7,6 +7,12 @@ import test from "node:test";
 import { runProductionReadinessGate } from "../production-readiness.mjs";
 import { evaluateAuditReleaseHold } from "../../packages/orchestrator-core/src/audit-release-hold.mjs";
 import { getCommandDefinition } from "../../packages/orchestrator-core/src/operator-cli/command-catalog.mjs";
+import {
+  buildTestExecutionPlan,
+  discoverTestExecutionPlan,
+  readGitHead,
+  validateTestExecutionReport,
+} from "../test-discovery.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
 const proofFixturePath = path.posix.join(
@@ -40,6 +46,7 @@ test("production readiness gate enforces the committed audit hold with healthy i
     result.checks.find((check) => check.id === "w30-alpha-hardening")?.status,
     "pass",
   );
+  assert.equal(result.checks.find((check) => check.id === "dependency-safety")?.status, "pass");
 });
 
 test("production readiness gate clears only a valid ledger with evidence-backed closed blockers", () => {
@@ -78,6 +85,67 @@ test("CI workflow accepts only the explicit healthy audit-hold mode", () => {
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
   assert.match(workflow, /pnpm production:ready --json --expect-audit-hold/u);
   assert.doesNotMatch(workflow, /run: pnpm production:ready\s*$/mu);
+});
+
+test("test discovery maps all 57 tracked candidates exactly once", () => {
+  const plan = discoverTestExecutionPlan(root);
+  assert.equal(plan.ok, true, plan.errors.join("\n"));
+  assert.equal(plan.candidate_count, 57);
+  assert.equal(plan.excluded.length, 0);
+  assert.equal(plan.groups.flatMap((group) => group.files).length, 57);
+});
+
+test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {
+  const candidates = ["area/test/example.test.mjs"];
+  const unmapped = buildTestExecutionPlan({ rootDir: root, manifest: { groups: [], exclusions: [] }, candidates });
+  assert.equal(unmapped.ok, false);
+  assert.match(unmapped.errors.join("\n"), /not mapped/u);
+
+  const duplicate = buildTestExecutionPlan({
+    rootDir: root,
+    manifest: {
+      groups: [
+        { group_id: "one", path_prefixes: ["area/"], timeout_class: "standard" },
+        { group_id: "two", path_prefixes: ["area/test/"], timeout_class: "standard" },
+      ],
+      exclusions: [],
+    },
+    candidates,
+  });
+  assert.equal(duplicate.ok, false);
+  assert.match(duplicate.errors.join("\n"), /multiple groups/u);
+
+  const invalidExclusion = buildTestExecutionPlan({
+    rootDir: root,
+    manifest: { groups: [], exclusions: [{ path: candidates[0], owner: "", reason: "", expires_at: "2020-01-01" }] },
+    candidates,
+    now: new Date("2026-07-15T00:00:00Z"),
+  });
+  assert.equal(invalidExclusion.ok, false);
+  assert.match(invalidExclusion.errors.join("\n"), /owner|reason|expired/u);
+});
+
+test("readiness test evidence rejects stale head and accepts complete current execution", () => {
+  const plan = discoverTestExecutionPlan(root);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-test-report-"));
+  const reportPath = path.join(tempDir, "test-report.json");
+  const report = {
+    status: "pass",
+    git_head: readGitHead(root),
+    manifest_digest: plan.manifest_digest,
+    discovered_files: plan.candidates,
+    executed_files: plan.candidates,
+    groups: plan.groups.map((group) => ({ ...group, status: "pass" })),
+    duplicate_files: [],
+    missing_files: [],
+  };
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  assert.equal(validateTestExecutionReport(root, { reportPath }).ok, true);
+  report.git_head = "stale";
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  const stale = validateTestExecutionReport(root, { reportPath });
+  assert.equal(stale.ok, false);
+  assert.match(stale.errors.join("\n"), /current Git HEAD/u);
 });
 
 test("audit release hold blocks only external write-capable live execution without explicit override", () => {

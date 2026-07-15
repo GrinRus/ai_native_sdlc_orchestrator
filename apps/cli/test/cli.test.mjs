@@ -1502,6 +1502,8 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
       "evidence://handoff/run-control-approved",
       "--promotion-evidence-refs",
       promotionEvidenceRefs,
+      "--unsafe-development-override",
+      "true",
     ]);
     assert.equal(startResult.exitCode, 0, startResult.stderr);
     const startPayload = JSON.parse(startResult.stdout);
@@ -3787,6 +3789,8 @@ test("project verify supports routed live execution baseline when delivery evide
       "evidence://handoff/live-approved",
       "--promotion-evidence-refs",
       "evidence://promotion/live-pass",
+      "--unsafe-development-override",
+      "true",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -3849,6 +3853,8 @@ test("project verify routed live execution blocks with explicit guardrails when 
       projectRoot,
       "--routed-live-step",
       "implement",
+      "--unsafe-development-override",
+      "true",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -3906,6 +3912,8 @@ test("project verify routed live execution reports missing external runner prere
       "evidence://handoff/live-approved",
       "--promotion-evidence-refs",
       "evidence://promotion/live-pass",
+      "--unsafe-development-override",
+      "true",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -4845,6 +4853,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
         "--route-overrides",
         "implement=route.implement.w14-test",
+        "--unsafe-development-override",
+        "true",
       ]);
       assert.equal(runStart.exitCode, 0, runStart.stderr);
       const runStartPayload = JSON.parse(runStart.stdout);
@@ -5284,6 +5294,8 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
         "--route-overrides",
         "implement=route.implement.w14-budget-test",
+        "--unsafe-development-override",
+        "true",
       ]);
       assert.equal(runStart.exitCode, 0, runStart.stderr);
 
