@@ -663,6 +663,12 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(compactDoctorPayload.resolved_project_ref, projectRoot);
     assert.equal(Object.prototype.hasOwnProperty.call(compactDoctorPayload, "validation_report_id"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(compactDoctorPayload, "contract_families"), false);
+    assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false, "doctor reads must not initialize runtime state");
+
+    const cleanAppJson = invokeCli(["app", "--project-ref", projectRoot, "--json"]);
+    assert.equal(cleanAppJson.exitCode, 0, cleanAppJson.stderr);
+    assert.equal(JSON.parse(cleanAppJson.stdout).read_only, true);
+    assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false, "app inspection must not initialize runtime state");
 
     const invalidJsonProject = path.join(projectRoot, "invalid-json-target");
     fs.mkdirSync(invalidJsonProject, { recursive: true });

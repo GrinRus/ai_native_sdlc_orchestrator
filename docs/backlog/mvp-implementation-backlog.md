@@ -512,7 +512,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W58 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | ready | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
+| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | done | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
 | W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | ready | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
 | W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | ready | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
 | W58-S04 | Real evaluation, Harness lineage, and replay compatibility | EPIC-4 | blocked | eval/Harness contracts, scorer, certification, replay | W57-S05, W58-S02, W58-S03 |

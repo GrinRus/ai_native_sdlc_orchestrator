@@ -23,6 +23,15 @@ function freezeContext(value) {
   return Object.freeze(value);
 }
 
+function readExistingState(stateFile) {
+  if (!fs.existsSync(stateFile)) return null;
+  const document = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  if (typeof document !== "object" || document === null || Array.isArray(document)) {
+    throw new Error(`Project runtime state '${stateFile}' must contain a JSON object.`);
+  }
+  return Object.freeze(document);
+}
+
 function registryIdentity(parts) {
   return crypto.createHash("sha256").update(parts.join("\0")).digest("hex");
 }
@@ -54,13 +63,38 @@ export function createProjectContext(input) {
     canonicalProfilePath,
     registryIdentity: identity,
     launcherCwd,
-    originalProjectRef: path.resolve(launcherCwd, input.projectRef),
+    originalProjectRef: path.resolve(launcherCwd, input.projectRef ?? preview.projectRoot),
     runtimeOptions: {
       cwd: projectRoot,
       projectRef: projectRoot,
       projectProfile: input.projectProfile ? canonicalProfilePath : undefined,
       runtimeRoot,
     },
+  });
+}
+
+
+/**
+ * Resolve an immutable, initialization-compatible view of an existing project
+ * runtime. This function never creates directories, profiles, reports, or
+ * packets. Missing runtime state is represented explicitly by `initialized`.
+ */
+export function createProjectReadContext(input = {}) {
+  const projectContext = createProjectContext(input);
+  const preview = previewProjectRuntime(projectContext.runtimeOptions);
+  const state = readExistingState(preview.stateFile);
+  const initialized = state !== null && preview.onboardingReportExists;
+  return Object.freeze({
+    ...projectContext,
+    initialized,
+    displayName: preview.displayName,
+    projectProfileRef: preview.projectProfileRef,
+    projectProfileSource: preview.projectProfileSource,
+    runtimeLayout: preview.runtimeLayout,
+    stateFile: initialized ? preview.stateFile : null,
+    onboardingReportFile: initialized ? preview.onboardingReportFile : null,
+    state: state ?? Object.freeze({ runtime_layout: preview.runtimeLayout }),
+    preview: Object.freeze(preview),
   });
 }
 

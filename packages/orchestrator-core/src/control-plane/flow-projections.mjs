@@ -5,7 +5,7 @@ import {
   buildMissingArtifactDisplaySummary,
   uniqueArtifactDisplaySummaries,
 } from "../artifact-display-summary.mjs";
-import { initializeProjectRuntime } from "../project-init.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
 import {
   applyReadModelLimit,
   listArtifactDisplaySummaries,
@@ -83,7 +83,7 @@ function readJsonFile(filePath) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {string} ref
  * @param {string} baseFile
  * @returns {string | null}
@@ -133,7 +133,7 @@ function resolveMissionKey(body, packet, packetFile) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @returns {Array<{
  *   packetFile: string,
  *   packetRef: string,
@@ -173,7 +173,7 @@ function loadIntakeFlowSeeds(init) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @returns {Array<{ file: string, artifactRef: string, document: Record<string, unknown>, updatedMs: number }>}
  */
 function loadNextActionReports(init) {
@@ -502,7 +502,7 @@ function buildActiveQualityGateProjection(options) {
 
 /**
  * @param {{
- *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   init: ReturnType<typeof createProjectReadContext>,
  *   seed: ReturnType<typeof loadIntakeFlowSeeds>[number],
  *   reportEntry: ReturnType<typeof loadNextActionReports>[number] | null,
  *   artifactSummaryByRef: Map<string, Record<string, unknown>>,
@@ -553,7 +553,7 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
  * @param {{ projectRef?: string, cwd?: string, projectProfile?: string, runtimeRoot?: string, limit?: number }} options
  */
 export function listFlowProjections(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reports = loadNextActionReports(init);
   const seeds = loadIntakeFlowSeeds(init);
   const latestReport = reports[0] ?? null;
@@ -586,6 +586,7 @@ export function listFlowProjections(options = {}) {
     : null;
 
   return {
+    initialized: init.initialized,
     project_id: init.projectId,
     selected_flow_id: selectedInWindow?.flow_id ?? limitedFlows[0]?.flow_id ?? null,
     active_flow_ids: limitedFlows.filter((flow) => flow.status === "active").map((flow) => flow.flow_id),
@@ -869,7 +870,7 @@ export function readFlowEvidenceGraph(options) {
   }
 
   return {
-    project_id: options.projectRef ? initializeProjectRuntime(options).projectId : listFlowProjections(options).project_id,
+    project_id: options.projectRef ? createProjectReadContext(options).projectId : listFlowProjections(options).project_id,
     flow_id: flow.flow_id,
     status: flow.status,
     read_only: true,
@@ -1029,7 +1030,7 @@ export function readFlowRuntimeTrace(options) {
   }
 
   return {
-    project_id: options.projectRef ? initializeProjectRuntime(options).projectId : listFlowProjections(options).project_id,
+    project_id: options.projectRef ? createProjectReadContext(options).projectId : listFlowProjections(options).project_id,
     flow_id: flow.flow_id,
     status: flow.status,
     read_only: true,

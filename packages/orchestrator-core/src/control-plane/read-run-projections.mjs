@@ -5,7 +5,7 @@ import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../
 import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs";
 import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
-import { initializeProjectRuntime } from "../project-init.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
 import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
@@ -461,7 +461,7 @@ function classifyRunRisk(run) {
  * @returns {string[]}
  */
 function listRunControlStateRecords(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const stateFiles = applyReadModelLimit(listRunControlStateFiles(init), options.limit);
 
   /** @type {Array<{ runId: string, file: string, state: Record<string, unknown> }>} */
@@ -493,7 +493,7 @@ function listRunControlStateRecords(options = {}) {
  * }} options
  */
 export function listRuns(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
   const quality = listQualityArtifacts(options);
@@ -1149,7 +1149,7 @@ export function readRunPolicyHistory(options) {
  * }} options
  */
 export function readPlannerMetrics(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   return buildPlannerMetricsSnapshot({
     projectId: init.projectId,
     runSummaries: listRuns(options),
@@ -1190,7 +1190,7 @@ function listRunEventsForSummaries(options, runs) {
  * }} options
  */
 export function readFinanceMonitoringSnapshot(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const runs = listRuns(options);
   return buildFinanceMonitoringSnapshot({
     projectId: init.projectId,
@@ -1208,7 +1208,7 @@ export function readFinanceMonitoringSnapshot(options = {}) {
  * }} options
  */
 export function readStrategicSnapshot(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const generatedAt = new Date().toISOString();
   const backlogPath = path.join(init.projectRoot, MASTER_BACKLOG_FILE);
   const backlogRows =

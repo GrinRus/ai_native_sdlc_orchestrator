@@ -14,6 +14,8 @@ import { initializeProjectRuntime } from "../../../packages/orchestrator-core/sr
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
+  listFlowProjections,
+  listOperatorRequests,
   listDeliveryManifests,
   listCompilerRevisionStatuses,
   listMultirepoCoordinationStatuses,
@@ -53,6 +55,67 @@ function writeContractFile(options) {
 function withTempRepo(callback) {
   return withTempRepoHelper({ prefix: "aor-w5-s01-", workspaceRoot }, callback);
 }
+
+function byteSnapshot(root) {
+  const entries = [];
+  const visit = (directory) => {
+    for (const name of fs.readdirSync(directory).sort()) {
+      if (name === ".git") continue;
+      const absolute = path.join(directory, name);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      const stat = fs.lstatSync(absolute);
+      if (stat.isDirectory()) {
+        entries.push([relative, "directory"]);
+        visit(absolute);
+      } else if (stat.isSymbolicLink()) {
+        entries.push([relative, `symlink:${fs.readlinkSync(absolute)}`]);
+      } else {
+        entries.push([relative, fs.readFileSync(absolute).toString("base64")]);
+      }
+    }
+  };
+  visit(root);
+  return entries;
+}
+
+test("module read surfaces leave an uninitialized project byte-for-byte unchanged", () => {
+  withTempRepo((repoRoot) => {
+    const options = { projectRef: repoRoot, cwd: repoRoot };
+    const before = byteSnapshot(repoRoot);
+
+    const state = readProjectState(options);
+    assert.equal(state.initialized, false);
+    assert.equal(state.state_file, null);
+    assert.deepEqual(listPacketArtifacts(options), []);
+    assert.deepEqual(listStepResults(options), []);
+    assert.deepEqual(listQualityArtifacts(options), []);
+    assert.deepEqual(listDeliveryManifests(options), []);
+    assert.deepEqual(listPromotionDecisions(options), []);
+    assert.deepEqual(listOperatorRequests(options), []);
+    assert.deepEqual(listRuns(options), []);
+    assert.deepEqual(listFlowProjections(options), {
+      project_id: state.project_id,
+      initialized: false,
+      selected_flow_id: null,
+      active_flow_ids: [],
+      completed_flow_ids: [],
+      flows: [],
+      generated_from: {
+        read_model: "control-plane.flow-projections",
+        runtime_root: state.runtime_root,
+        artifacts_root: state.runtime_layout.artifactsRoot,
+        reports_root: state.runtime_layout.reportsRoot,
+      },
+      read_only: true,
+    });
+    assert.deepEqual(readRunEventHistory({ ...options, runId: "clean.read" }).events, []);
+    assert.deepEqual(readRunPolicyHistory({ ...options, runId: "clean.read" }).entries, []);
+    assert.equal(readUiLifecycleState(options).initialized, false);
+
+    assert.deepEqual(byteSnapshot(repoRoot), before);
+    assert.equal(fs.existsSync(path.join(repoRoot, ".aor")), false);
+  });
+});
 
 test("read surface exposes project state, packets, runs, and quality artifacts", () => {
   withTempRepo((repoRoot) => {

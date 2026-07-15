@@ -7,7 +7,8 @@ import {
   uniqueArtifactDisplaySummaries,
 } from "../artifact-display-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
-import { initializeProjectRuntime, previewProjectRuntime } from "../project-init.mjs";
+import { previewProjectRuntime } from "../project-init.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
 import {
   listExternalRunHealthArtifactDisplaySummariesForRuntime,
   readLatestExternalRunHealthProjectionForRuntime,
@@ -95,7 +96,7 @@ function toPosix(value) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {string} filePath
  * @returns {string}
  */
@@ -194,7 +195,7 @@ function listMatchingJsonFiles(dirPath, matchers, limit) {
 
 /**
  * @param {{
- *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   init: ReturnType<typeof createProjectReadContext>,
  *   files: string[],
  *   family: import("../../../contracts/src/index.d.ts").ContractFamily,
  *   matcher: RegExp,
@@ -231,7 +232,7 @@ function loadContractDocuments(options) {
 }
 
 /**
- * @param {{ init: ReturnType<typeof initializeProjectRuntime>, files: string[], matcher: RegExp }}
+ * @param {{ init: ReturnType<typeof createProjectReadContext>, files: string[], matcher: RegExp }}
  * @returns {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>}
  */
 function loadJsonDocuments(options) {
@@ -264,7 +265,7 @@ function loadJsonDocuments(options) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @returns {string[]}
  */
 export function listRunControlStateFiles(init) {
@@ -304,7 +305,7 @@ export function listRunControlStateFiles(init) {
 
 /**
  * @param {{
- *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   init: ReturnType<typeof createProjectReadContext>,
  *   files: string[],
  *   matcher: RegExp,
  *   type: string,
@@ -353,7 +354,7 @@ function loadReadableEvidenceSidecarSummaries(options) {
  * @returns {Array<Record<string, unknown>>}
  */
 function listReadableEvidenceSidecarSummaries(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const summaries = [
     ...loadReadableEvidenceSidecarSummaries({
       init,
@@ -396,7 +397,7 @@ function listReadableEvidenceSidecarSummaries(options = {}) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {{ runId?: string | null }} [options]
  * @returns {Record<string, unknown> | null}
  */
@@ -440,7 +441,7 @@ function readJsonObject(filePath) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {RegExp} matcher
  * @returns {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null}
  */
@@ -486,7 +487,7 @@ function isFailedStatus(value) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {string} ref
  * @returns {string | null}
  */
@@ -506,7 +507,7 @@ function localArtifactPathForRef(init, ref) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {string[]} refs
  * @returns {{ failedStepResultRefs: string[], blockedNextStep: string | null }}
  */
@@ -527,7 +528,7 @@ function verificationFailureStepResultSurface(init, refs) {
 /**
  * @param {Record<string, unknown>} group
  * @param {Record<string, unknown> | null} latestGroup
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @returns {Record<string, unknown>}
  */
 function verificationPlanCommandGroupSurface(group, latestGroup, init) {
@@ -585,7 +586,7 @@ function verificationPlanCommandGroupSurface(group, latestGroup, init) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @returns {Record<string, unknown> | null}
  */
 function readVerificationPlanSurface(init) {
@@ -646,6 +647,7 @@ export function readProjectState(options = {}) {
   });
   if (!preview.stateExists) {
     return {
+      initialized: false,
       project_id: preview.projectId,
       display_name: preview.displayName,
       project_root: preview.projectRoot,
@@ -660,7 +662,7 @@ export function readProjectState(options = {}) {
       artifact_display_summaries: [],
     };
   }
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const initializedPreview = previewProjectRuntime({
     cwd: options.cwd,
     projectRef: init.projectRoot,
@@ -669,6 +671,7 @@ export function readProjectState(options = {}) {
   });
   const runHealth = readLatestExternalRunHealthProjectionForRuntime(init);
   return {
+    initialized: init.initialized,
     project_id: init.projectId,
     display_name: init.displayName,
     project_root: init.projectRoot,
@@ -693,7 +696,7 @@ export function readProjectState(options = {}) {
  * }} options
  */
 export function listPacketArtifacts(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const files = listMatchingJsonFiles(
     init.runtimeLayout.artifactsRoot,
     [
@@ -726,7 +729,7 @@ export function listPacketArtifacts(options = {}) {
  * }} options
  */
 export function listStepResults(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const files = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [STEP_RESULT_REGEX], options.limit);
   return applyReadModelLimit(
     loadContractDocuments({ init, files, family: "step-result", matcher: STEP_RESULT_REGEX }),
@@ -755,7 +758,7 @@ export function listDeliveryManifests(options = {}) {
  * }} options
  */
 export function listPromotionDecisions(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const files = listMatchingJsonFiles(init.runtimeLayout.artifactsRoot, [PROMOTION_DECISION_REGEX], options.limit);
   return applyReadModelLimit(
     loadContractDocuments({ init, files, family: "promotion-decision", matcher: PROMOTION_DECISION_REGEX }),
@@ -772,7 +775,7 @@ export function listPromotionDecisions(options = {}) {
  * }} options
  */
 export function listQualityArtifacts(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reportFiles = listMatchingJsonFiles(
     init.runtimeLayout.reportsRoot,
     [
@@ -853,7 +856,7 @@ export function listQualityArtifacts(options = {}) {
  * }} options
  */
 export function listMultirepoCoordinationStatuses(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [MULTIREPO_COORDINATION_STATUS_REGEX], options.limit);
   return applyReadModelLimit(
     loadContractDocuments({
@@ -875,7 +878,7 @@ export function listMultirepoCoordinationStatuses(options = {}) {
  * }} options
  */
 export function listCompilerRevisionStatuses(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [COMPILER_REVISION_STATUS_REGEX], options.limit);
   return applyReadModelLimit(
     loadContractDocuments({
@@ -897,7 +900,7 @@ export function listCompilerRevisionStatuses(options = {}) {
  * }} options
  */
 export function listRunControlAudits(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [RUN_CONTROL_AUDIT_REGEX], options.limit);
   return applyReadModelLimit(loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX }), options.limit);
 }
@@ -925,7 +928,7 @@ function sanitizeOperatorRequestDocument(document) {
  * }} options
  */
 export function listOperatorRequests(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
   return loadContractDocuments({
     init,
@@ -968,7 +971,7 @@ export function listArtifactDisplaySummaries(options = {}) {
     ...listStepResults(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listQualityArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listOperatorRequests(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
-    ...listExternalRunHealthArtifactDisplaySummariesForRuntime(initializeProjectRuntime(options), options),
+    ...listExternalRunHealthArtifactDisplaySummariesForRuntime(createProjectReadContext(options), options),
     ...(nextActionReport?.artifact_display_summaries ?? []),
   ];
   return applyReadModelLimit(uniqueArtifactDisplaySummaries(summaries), options.limit);
@@ -984,7 +987,7 @@ export function listArtifactDisplaySummaries(options = {}) {
  * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null}
  */
 export function readNextActionReport(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [NEXT_ACTION_REPORT_REGEX], options.limit);
   return (
     loadContractDocuments({

@@ -23,6 +23,26 @@ async function withTempRepo(callback) {
   await withTempRepoHelper({ prefix: "aor-w9-s07-api-http-", workspaceRoot }, callback);
 }
 
+function byteSnapshot(root) {
+  const entries = [];
+  const visit = (directory) => {
+    for (const name of fs.readdirSync(directory).sort()) {
+      if (name === ".git") continue;
+      const absolute = path.join(directory, name);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      const stat = fs.lstatSync(absolute);
+      if (stat.isDirectory()) {
+        entries.push([relative, "directory"]);
+        visit(absolute);
+      } else {
+        entries.push([relative, stat.isSymbolicLink() ? `symlink:${fs.readlinkSync(absolute)}` : fs.readFileSync(absolute).toString("base64")]);
+      }
+    }
+  };
+  visit(root);
+  return entries;
+}
+
 /**
  * @param {{ family: import("../../../packages/contracts/src/index.d.ts").ContractFamily, filePath: string, document: Record<string, unknown> }} options
  */
@@ -1216,6 +1236,7 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
 
 test("local app server serves SPA config and existing control-plane routes", async () => {
   await withTempRepo(async (projectRoot) => {
+    const beforeReads = byteSnapshot(projectRoot);
     const transport = await createControlPlaneHttpServer({
       cwd: workspaceRoot,
       projectRef: projectRoot,
@@ -1243,6 +1264,35 @@ test("local app server serves SPA config and existing control-plane routes", asy
       assert.equal(stateResponse.status, 200);
       const state = await stateResponse.json();
       assert.equal(state.project_id, transport.projectId);
+      assert.equal(state.initialized, false);
+
+      const readPaths = [
+        "/api/projects",
+        `/api/projects/${transport.projectId}/packets`,
+        `/api/projects/${transport.projectId}/step-results`,
+        `/api/projects/${transport.projectId}/quality-artifacts`,
+        `/api/projects/${transport.projectId}/delivery-manifests`,
+        `/api/projects/${transport.projectId}/promotion-decisions`,
+        `/api/projects/${transport.projectId}/strategic-snapshot`,
+        `/api/projects/${transport.projectId}/planner-metrics`,
+        `/api/projects/${transport.projectId}/finance-monitoring`,
+        `/api/projects/${transport.projectId}/next-action-report`,
+        `/api/projects/${transport.projectId}/flows`,
+        `/api/projects/${transport.projectId}/flows/selected`,
+        `/api/projects/${transport.projectId}/operator-requests`,
+        `/api/projects/${transport.projectId}/multirepo-coordination`,
+        `/api/projects/${transport.projectId}/compiler-revisions`,
+        `/api/projects/${transport.projectId}/runs`,
+        `/api/projects/${transport.projectId}/runs/clean.read/events/history`,
+        `/api/projects/${transport.projectId}/runs/clean.read/policy-history`,
+      ];
+      for (const readPath of readPaths) {
+        const readResponse = await fetch(`${transport.baseUrl}${readPath}`);
+        assert.equal(readResponse.status, 200, readPath);
+        await readResponse.arrayBuffer();
+      }
+      assert.deepEqual(byteSnapshot(projectRoot), beforeReads);
+      assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
 
       const missionResponse = await postJson(
         `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`,

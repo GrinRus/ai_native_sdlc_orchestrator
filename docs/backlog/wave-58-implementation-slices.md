@@ -19,7 +19,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Every query surface can inspect a clean project without creating
   `.aor`, profiles, reports, packets, or workflow state.
 - **Epic:** EPIC-1, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `docs/contracts/control-plane-api.md`, read-model services,

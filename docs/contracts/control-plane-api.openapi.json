@@ -1462,6 +1462,7 @@
       "ProjectStateResponse": {
         "type": "object",
         "required": [
+          "initialized",
           "project_id",
           "project_root",
           "runtime_root",
@@ -1469,6 +1470,10 @@
           "state_file"
         ],
         "properties": {
+          "initialized": {
+            "type": "boolean",
+            "description": "False when the resolved runtime has not been explicitly initialized. Reads never change this value by materializing state."
+          },
           "project_id": {
             "type": "string"
           },
@@ -1494,7 +1499,10 @@
             "$ref": "#/components/schemas/RuntimeLayout"
           },
           "state_file": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "onboarding_summary": {
             "$ref": "#/components/schemas/OnboardingSummary"
@@ -2394,6 +2402,7 @@
       "FlowListResponse": {
         "type": "object",
         "required": [
+          "initialized",
           "project_id",
           "selected_flow_id",
           "active_flow_ids",
@@ -2402,6 +2411,9 @@
           "read_only"
         ],
         "properties": {
+          "initialized": {
+            "type": "boolean"
+          },
           "project_id": {
             "type": "string"
           },
