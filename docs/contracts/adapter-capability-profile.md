@@ -98,6 +98,12 @@ normal product input.
 
 External-process adapters must enforce `execution.external_runtime.timeout_ms` and preflight probe timeouts as hard local subprocess bounds. A policy `resolved_bounds.budget.timeout_sec` may shorten a single request timeout, but it must not extend execution beyond the adapter profile's hard bound. A runner that exceeds the bound, including one that ignores graceful termination or launches a long-lived child process, must have its local process group terminated and return fail-closed timeout evidence with `failure_kind=external-runner-timeout` and `timed_out=true`; it must not leave the public lifecycle waiting indefinitely.
 
+Adapters may declare `model_aliases`, `supported_models`, and `default_model`.
+For external processes, `execution.external_runtime.model_argument.flag` owns
+the argv mapping for the resolved effective model. Core routing never invents
+provider-specific model flags. Invocation evidence records the same requested
+and effective model passed through this adapter-owned boundary.
+
 `execution.external_runtime.permission_policy` is required for external-process adapters. It declares named non-interactive permission modes:
 - `default_mode` selects the adapter default when `AOR_RUNTIME_AGENT_PERMISSION_MODE` is not set.
 - `modes.<mode>.args` is the selected runtime invocation argument list.

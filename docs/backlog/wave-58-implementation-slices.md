@@ -123,7 +123,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   fallback transitions execute exactly as recorded without erasing structured
   denial evidence.
 - **Epic:** EPIC-3, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** route/policy contracts, `packages/provider-routing/**`,
@@ -195,7 +195,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   strictness to the owning run, and reject replay when effective content or
   execution versions differ.
 - **Epic:** EPIC-4
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** evaluation/Harness contracts,

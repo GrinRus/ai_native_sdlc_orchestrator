@@ -514,8 +514,8 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | done | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
 | W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | done | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
-| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | ready | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
-| W58-S04 | Real evaluation, Harness lineage, and replay compatibility | EPIC-4 | blocked | eval/Harness contracts, scorer, certification, replay | W57-S05, W58-S02, W58-S03 |
+| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | done | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
+| W58-S04 | Real evaluation, Harness lineage, and replay compatibility | EPIC-4 | ready | eval/Harness contracts, scorer, certification, replay | W57-S05, W58-S02, W58-S03 |
 | W58-S05 | Asynchronous run jobs and durable live-event delivery | EPIC-3, EPIC-6 | done | lifecycle worker, process supervision, journal, SSE/CLI follow | W57-S08 |
 | W58-S06 | Canonical API, OpenAPI, CLI, and service boundary | EPIC-0, EPIC-6 | ready | API/CLI/control-plane services, OpenAPI, readiness tests | W58-S01, W58-S05 |
 | W58-S07 | Loopback-only local app transport boundary | EPIC-6 | blocked | local-console ADR, app launcher, HTTP transport/config/tests | W58-S01, W58-S06 |

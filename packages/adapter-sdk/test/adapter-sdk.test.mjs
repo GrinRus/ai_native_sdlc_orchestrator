@@ -190,6 +190,35 @@ test("resolveAdapterForRoute passes when required capabilities are declared by s
     assert.equal(resolved.adapter.resolution_source.kind, "route-primary");
     assert.equal(resolved.capability_check.status, "pass");
     assert.deepEqual(resolved.capability_check.missing, []);
+    assert.equal(resolved.requested_model, "coding-primary");
+    assert.equal(resolved.effective_model, "gpt-5.5");
+    assert.equal(resolved.model_source, "policy-approved-alias");
+    assert.equal(resolved.execution_candidates.length, 2);
+    assert.equal(resolved.execution_candidates[1].adapter_id, "claude-code");
+    assert.equal(resolved.execution_candidates[1].effective_model, "claude-opus-4-6");
+  });
+});
+
+test("resolveAdapterForRoute blocks unsupported models before invocation", () => {
+  withTempRepo((repoRoot) => {
+    const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");
+    fs.writeFileSync(
+      routePath,
+      fs.readFileSync(routePath, "utf8").replace("model: coding-primary", "model: unsupported-model"),
+      "utf8",
+    );
+    const routeResolution = resolveRouteForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      stepClass: "implement",
+    });
+    assert.throws(
+      () => resolveAdapterForRoute({
+        routeResolution,
+        adaptersRoot: path.join(repoRoot, "examples/adapters"),
+      }),
+      /unsupported-model.*not a supported concrete model or declared alias/u,
+    );
   });
 });
 
@@ -2167,6 +2196,9 @@ test("live adapter parses Qwen JSON array output and detects permission denials"
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
   assert.equal(response.output.runner_output.json_events.length, 2);
   assert.equal(response.output.runtime_permission_request.runner_family, "qwen");
+  assert.deepEqual(response.output.semantic_events, [
+    { event_type: "permission-denial", status: "blocked", failure_kind: "permission-mode-blocked" },
+  ]);
   assert.equal(response.output.runtime_permission_request.operation_type, "shell_command");
   assert.equal(response.output.runtime_permission_request.command, "git status --short");
 });

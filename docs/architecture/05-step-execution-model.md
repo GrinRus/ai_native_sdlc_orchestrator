@@ -93,10 +93,19 @@ The routed execution baseline follows one deterministic sequence:
 3. resolve policy bounds and governance;
 4. materialize delivery guardrails (`delivery-plan`) for writeback policy truth;
 5. compile context and persist one `compiled-context` artifact;
-6. negotiate adapter capabilities;
+6. negotiate every primary/fallback adapter capability and resolve the requested
+   model to an adapter-supported effective model before execution;
 7. execute:
   - dry-run path: deterministic mock adapter;
   - live path: supported live adapter only when delivery guardrails are ready; external runner command execution emits `success`, `blocked`, or `failed` adapter responses with explicit prerequisite/policy diagnostics.
+
+Live execution tries each declared route candidate at most once. A fallback is
+eligible only for a canonical failure class listed by `retry.on[]`; incompatible
+or unsupported candidates fail before spawn, and exhausted transitions block
+instead of rerunning the primary implicitly. Retry, repair, and escalation use
+the same fail-closed predicate rule. Adapter-owned model arguments and semantic
+provider events keep argv/config evidence provider-specific at the boundary
+while route decisions remain runner-neutral.
 
 The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with:
 - selected route/asset/policy/adapter metadata;

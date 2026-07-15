@@ -494,6 +494,10 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
     };
   }
 
+  if (adapterOutput.fallback_exhausted === true) {
+    return { failureClass: failureKind ?? "route-fallback-exhausted", decision: "block", missionOutcome: "not_satisfied" };
+  }
+
   if (failureKind === "external-runner-timeout") {
     return { failureClass: "provider-timeout", decision: "retry", missionOutcome: "not_satisfied" };
   }

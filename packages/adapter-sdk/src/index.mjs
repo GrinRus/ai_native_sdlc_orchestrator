@@ -709,6 +709,16 @@ function resolveRequestTimeoutMs(request, fallback) {
   return Math.min(fallback, Math.max(1, Math.floor(timeoutSec * 1000)));
 }
 
+function resolveExternalRuntimeModelArgs(externalRuntime, route) {
+  const effectiveModel = asOptionalString(route.effective_model);
+  if (!effectiveModel) return [];
+  const flag = asOptionalString(asRecord(externalRuntime.model_argument).flag);
+  if (!flag) {
+    throw new Error("Effective model requires adapter-owned execution.external_runtime.model_argument.flag.");
+  }
+  return [...asStringArray(asRecord(externalRuntime.model_argument).prefix_args), flag, effectiveModel];
+}
+
 /**
  * @param {{ externalRuntime: Record<string, unknown>, timeoutMs: number }} options
  * @returns {string[]}
@@ -2321,6 +2331,108 @@ export function buildAdapterRegistry(options) {
   return registry;
 }
 
+function resolveModelForAdapter(candidate, adapterProfile) {
+  const requestedModel = asOptionalString(candidate.model);
+  if (asOptionalString(candidate.adapter) === "none") {
+    return {
+      requested_model: requestedModel,
+      effective_model: requestedModel,
+      model_source: requestedModel ? "route-explicit" : "not-applicable",
+    };
+  }
+  const aliases = asRecord(adapterProfile.model_aliases);
+  const supportedModels = asStringArray(adapterProfile.supported_models);
+  const defaultModel = asOptionalString(adapterProfile.default_model);
+  if (requestedModel && typeof aliases[requestedModel] === "string") {
+    return {
+      requested_model: requestedModel,
+      effective_model: aliases[requestedModel],
+      model_source: "policy-approved-alias",
+    };
+  }
+  if (requestedModel && supportedModels.includes(requestedModel)) {
+    return {
+      requested_model: requestedModel,
+      effective_model: requestedModel,
+      model_source: "route-explicit",
+    };
+  }
+  if (requestedModel) {
+    throw new Error(
+      `Adapter negotiation failed: model '${requestedModel}' is not a supported concrete model or declared alias for adapter '${String(adapterProfile.adapter_id)}'.`,
+    );
+  }
+  if (defaultModel) {
+    return {
+      requested_model: null,
+      effective_model: defaultModel,
+      model_source: "adapter-default",
+    };
+  }
+  return { requested_model: null, effective_model: null, model_source: "not-applicable" };
+}
+
+function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterRegistry, adaptersRoot, requiredCapabilities }) {
+  const adapterId = asOptionalString(candidate.adapter) ?? "none";
+  const provider = asOptionalString(candidate.provider);
+  if (adapterId === "none") {
+    if (requiredCapabilities.length > 0) {
+      throw new Error(
+        `Adapter negotiation failed: ${kind} candidate ${candidateIndex} resolves to 'none' but requires capabilities [${requiredCapabilities.join(", ")}].`,
+      );
+    }
+    return {
+      candidate_index: candidateIndex,
+      kind,
+      adapter_id: "none",
+      provider,
+      ...resolveModelForAdapter(candidate, { adapter_id: "none" }),
+      profile_source: null,
+      profile: null,
+      capability_check: { required: [], satisfied: [], missing: [], status: "not-required" },
+    };
+  }
+  const adapterEntry = adapterRegistry.get(adapterId);
+  if (!adapterEntry) {
+    throw new Error(`Adapter negotiation failed: adapter '${adapterId}' is not present in adapter registry '${adaptersRoot}'.`);
+  }
+  const capabilities = asRecord(adapterEntry.profile.capabilities);
+  const missing = requiredCapabilities.filter((capability) => capabilities[capability] !== true);
+  if (missing.length > 0) {
+    throw new Error(
+      `Adapter negotiation failed: ${kind} adapter '${adapterId}' is missing capabilities [${missing.join(", ")}].`,
+    );
+  }
+  const execution = asRecord(adapterEntry.profile.execution);
+  const externalRuntime = asRecord(execution.external_runtime);
+  const model = resolveModelForAdapter(candidate, adapterEntry.profile);
+  if (model.effective_model && !asOptionalString(asRecord(externalRuntime.model_argument).flag)) {
+    throw new Error(
+      `Adapter negotiation failed: adapter '${adapterId}' has an effective model but no execution.external_runtime.model_argument.flag.`,
+    );
+  }
+  return {
+    candidate_index: candidateIndex,
+    kind,
+    adapter_id: adapterId,
+    provider,
+    ...model,
+    profile_source: adapterEntry.source,
+    profile: {
+      adapter_id: adapterEntry.profile.adapter_id,
+      version: adapterEntry.profile.version,
+      runner_family: asOptionalString(adapterEntry.profile.runner_family),
+      capabilities,
+      constraints: asRecord(adapterEntry.profile.constraints),
+      model_aliases: asRecord(adapterEntry.profile.model_aliases),
+      supported_models: asStringArray(adapterEntry.profile.supported_models),
+      default_model: asOptionalString(adapterEntry.profile.default_model),
+      execution,
+    },
+    capability_check: { required: requiredCapabilities, satisfied: requiredCapabilities, missing: [], status: "pass" },
+  };
+}
+
 /**
  * @param {{
  *   routeResolution: {
@@ -2354,6 +2466,32 @@ function resolveAdapterForRouteWithRegistry(options) {
   const selectedFromRoute =
     typeof primary.adapter === "string" && primary.adapter.trim().length > 0 ? primary.adapter.trim() : null;
   const resolvedAdapterId = selectedFromOverride ?? selectedFromRoute;
+  const fallback = Array.isArray(routeProfile.fallback)
+    ? routeProfile.fallback.filter((entry) => typeof entry === "object" && entry !== null).map((entry) => asRecord(entry))
+    : [];
+  const primaryCandidate = {
+    ...primary,
+    adapter: resolvedAdapterId ?? "none",
+  };
+  const executionCandidates = [
+    resolveExecutionCandidate({
+      candidate: primaryCandidate,
+      candidateIndex: 0,
+      kind: "primary",
+      adapterRegistry: options.adapterRegistry,
+      adaptersRoot: options.adaptersRoot,
+      requiredCapabilities,
+    }),
+    ...fallback.map((candidate, index) => resolveExecutionCandidate({
+      candidate,
+      candidateIndex: index + 1,
+      kind: "fallback",
+      adapterRegistry: options.adapterRegistry,
+      adaptersRoot: options.adaptersRoot,
+      requiredCapabilities,
+    })),
+  ];
+  const selectedCandidate = executionCandidates[0];
 
   if (!resolvedAdapterId || resolvedAdapterId === "none") {
     if (requiredCapabilities.length > 0) {
@@ -2378,6 +2516,10 @@ function resolveAdapterForRouteWithRegistry(options) {
         profile_source: null,
         profile: null,
       },
+      requested_model: selectedCandidate.requested_model,
+      effective_model: selectedCandidate.effective_model,
+      model_source: selectedCandidate.model_source,
+      execution_candidates: executionCandidates,
       capability_check: {
         required: [],
         satisfied: [],
@@ -2428,9 +2570,16 @@ function resolveAdapterForRouteWithRegistry(options) {
           typeof adapterEntry.profile.runner_family === "string" ? adapterEntry.profile.runner_family : null,
         capabilities,
         constraints: asRecord(adapterEntry.profile.constraints),
+        model_aliases: asRecord(adapterEntry.profile.model_aliases),
+        supported_models: asStringArray(adapterEntry.profile.supported_models),
+        default_model: asOptionalString(adapterEntry.profile.default_model),
         execution: asRecord(adapterEntry.profile.execution),
       },
     },
+    requested_model: selectedCandidate.requested_model,
+    effective_model: selectedCandidate.effective_model,
+    model_source: selectedCandidate.model_source,
+    execution_candidates: executionCandidates,
     capability_check: {
       required: requiredCapabilities,
       satisfied: requiredCapabilities,
@@ -2551,12 +2700,25 @@ export function createAdapterResponseEnvelope(input) {
     );
   }
 
+  const output = asRecord(input.output);
+  const failureKind = asOptionalString(output.failure_kind);
+  const semanticType =
+    failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
+      ? "permission-denial"
+      : failureKind === "interactive-question-requested"
+        ? "interaction-request"
+        : failureKind === "external-runner-timeout"
+          ? "timeout"
+          : "terminal-result";
+  const semanticEvents = Array.isArray(output.semantic_events)
+    ? output.semantic_events.map((event) => asRecord(event))
+    : [{ event_type: semanticType, status, failure_kind: failureKind }];
   return {
     request_id: requireString("request_id", input.request_id),
     adapter_id: requireString("adapter_id", input.adapter_id),
     status,
     summary: requireString("summary", input.summary),
-    output: asRecord(input.output),
+    output: { ...output, semantic_events: semanticEvents },
     evidence_refs: asStringArray(input.evidence_refs),
     tool_traces: Array.isArray(input.tool_traces) ? input.tool_traces.map((trace) => asRecord(trace)) : [],
   };
@@ -2844,11 +3006,15 @@ export function createLiveAdapter(options) {
           route_id: routeId,
           compiled_context_ref: compiledContextRef,
           permission_mode: runtimeInvocation.permissionMode,
+          requested_model: asOptionalString(route.requested_model),
+          effective_model: asOptionalString(route.effective_model),
+          model_source: asOptionalString(route.model_source),
         },
       };
       const serializedRunnerInput = `${JSON.stringify(runnerInput)}\n`;
       runtimeArgs = [
         ...runtimeArgs,
+        ...resolveExternalRuntimeModelArgs(externalRuntime, route),
         ...resolveExternalRuntimeNativeTimeoutArgs({
           externalRuntime,
           timeoutMs: requestTimeoutMs,
@@ -2986,6 +3152,9 @@ export function createLiveAdapter(options) {
             mode: runtimeMode,
             command: runtimeCommand,
             args: runtimeArgs,
+            requested_model: asOptionalString(route.requested_model),
+            effective_model: asOptionalString(route.effective_model),
+            model_source: asOptionalString(route.model_source),
             timeout_ms: requestTimeoutMs,
             request_via_stdin: requestViaStdin,
             request_transport: requestTransport,
@@ -3143,6 +3312,9 @@ export function createLiveAdapter(options) {
           mode: runtimeMode,
           command: runtimeCommand,
           args: runtimeArgs,
+          requested_model: asOptionalString(route.requested_model),
+          effective_model: asOptionalString(route.effective_model),
+          model_source: asOptionalString(route.model_source),
           timeout_ms: requestTimeoutMs,
           request_via_stdin: requestViaStdin,
           request_transport: requestTransport,
@@ -3191,11 +3363,18 @@ export function createLiveAdapter(options) {
         mode: "execute",
         route_id: routeId,
         provider_adapter: adapterId,
+        provider: asOptionalString(route.active_provider) ?? asOptionalString(asRecord(route.route_profile).primary?.provider),
+        requested_model: asOptionalString(route.requested_model),
+        effective_model: asOptionalString(route.effective_model),
+        model_source: asOptionalString(route.model_source),
         compiled_context_ref: compiledContextRef,
         external_runner: {
           runtime_mode: runtimeMode,
           command: runtimeCommand,
           args: runtimeArgs,
+          requested_model: asOptionalString(route.requested_model),
+          effective_model: asOptionalString(route.effective_model),
+          model_source: asOptionalString(route.model_source),
           execution_root: runnerExecutionRoot,
           execution_root_mode: executionRootBinding.mode,
           canonical_execution_root: executionRootBinding.canonicalExecutionRoot,

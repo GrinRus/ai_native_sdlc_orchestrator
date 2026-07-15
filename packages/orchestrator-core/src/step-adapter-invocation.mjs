@@ -57,6 +57,27 @@ function resolveAdapterFailureNextStep(failureKind) {
   return "Inspect adapter response evidence/tool traces, fix external runner execution, then retry live execution.";
 }
 
+function canonicalFailureClass(failureKind) {
+  if (failureKind === "external-runner-timeout") return "provider-timeout";
+  if (failureKind === "rate-limit") return "rate-limit";
+  if (failureKind === "external-runner-failed" || failureKind === "runner-crash") return "runner-crash";
+  if (failureKind === "auth-failed") return "auth-failure";
+  return failureKind ?? "runtime-failed";
+}
+
+function withRouteAttemptEvidence(response, attempts, transitions, fallbackExhausted) {
+  const output = asRecord(response.output);
+  return {
+    ...response,
+    output: {
+      ...output,
+      route_attempts: attempts,
+      fallback_transitions: transitions,
+      fallback_exhausted: fallbackExhausted,
+    },
+  };
+}
+
 /**
  * @param {{
  *   dryRun: boolean,
@@ -118,32 +139,103 @@ export function invokeStepAdapterForStep(options) {
   }
 
   try {
-    const liveAdapter = createLiveAdapter({
-      adapterId: selectedAdapterId,
-      adapterProfile: asRecord(asRecord(/** @type {any} */ (options.adapterResolution).adapter).profile),
-      runtimeEvidenceRoot: options.runtimeEvidenceRoot,
-      projectRoot: options.projectRoot,
-      executionRoot: options.executionRoot,
-    });
-    const adapterResponse = liveAdapter.execute(/** @type {any} */ (options.adapterRequest));
+    const resolution = asRecord(options.adapterResolution);
+    const configuredCandidates = Array.isArray(resolution.execution_candidates)
+      ? resolution.execution_candidates.map((candidate) => asRecord(candidate))
+      : [];
+    const candidates = configuredCandidates.length > 0
+      ? configuredCandidates
+      : [{
+          candidate_index: 0,
+          kind: "primary",
+          adapter_id: selectedAdapterId,
+          provider: null,
+          requested_model: null,
+          effective_model: null,
+          model_source: "not-applicable",
+          profile: asRecord(asRecord(resolution.adapter).profile),
+        }];
+    const policyProfile = asRecord(asRecord(asRecord(options.adapterRequest.policy_bundle).policy).profile);
+    const retryOn = asStringArray(asRecord(policyProfile.retry).on);
+    const attempts = [];
+    const transitions = [];
+    let adapterResponse = null;
+    let attemptedFallback = false;
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      const adapterId = asString(candidate.adapter_id) ?? "none";
+      const route = {
+        ...asRecord(options.adapterRequest.route),
+        active_candidate_index: candidate.candidate_index,
+        active_candidate_kind: asString(candidate.kind),
+        active_provider: asString(candidate.provider),
+        requested_model: asString(candidate.requested_model),
+        effective_model: asString(candidate.effective_model),
+        model_source: asString(candidate.model_source) ?? "not-applicable",
+      };
+      const liveAdapter = createLiveAdapter({
+        adapterId,
+        adapterProfile: asRecord(candidate.profile),
+        runtimeEvidenceRoot: options.runtimeEvidenceRoot,
+        projectRoot: options.projectRoot,
+        executionRoot: options.executionRoot,
+      });
+      adapterResponse = liveAdapter.execute(/** @type {any} */ ({ ...options.adapterRequest, route }));
+      const output = asRecord(adapterResponse.output);
+      const failureKind = asString(output.failure_kind);
+      const failureClass = adapterResponse.status === "success" ? "none" : canonicalFailureClass(failureKind);
+      attempts.push({
+        attempt: index + 1,
+        candidate_index: candidate.candidate_index,
+        candidate_kind: asString(candidate.kind),
+        provider: asString(candidate.provider),
+        adapter: adapterId,
+        requested_model: asString(candidate.requested_model),
+        effective_model: asString(candidate.effective_model),
+        model_source: asString(candidate.model_source),
+        status: adapterResponse.status,
+        failure_kind: failureKind,
+        failure_class: failureClass,
+        evidence_refs: asStringArray(adapterResponse.evidence_refs),
+      });
+      if (adapterResponse.status === "success") break;
+      const next = candidates[index + 1];
+      if (!next || !retryOn.includes(failureClass)) break;
+      attemptedFallback = true;
+      transitions.push({
+        from_candidate_index: candidate.candidate_index,
+        to_candidate_index: next.candidate_index,
+        failure_class: failureClass,
+        policy_ref: asString(asRecord(options.adapterRequest.route).route_profile?.retry_policy_ref)
+          ?? asString(asRecord(options.adapterRequest.route).retry_policy_ref),
+        decision: "fallback",
+      });
+    }
+
+    if (!adapterResponse) throw new Error("Adapter negotiation produced no executable candidate.");
+    const finalOutput = asRecord(adapterResponse.output);
+    const finalFailureKind = asString(finalOutput.failure_kind);
+    const fallbackExhausted = attemptedFallback && adapterResponse.status !== "success";
+    adapterResponse = withRouteAttemptEvidence(adapterResponse, attempts, transitions, fallbackExhausted);
     if (adapterResponse.status === "success") {
+      const finalAttempt = attempts[attempts.length - 1];
       return {
         adapterResponse,
         status: "passed",
-        summary: `Routed live execution for step '${options.requestedStepClass}' completed with adapter '${selectedAdapterId}'.`,
+        summary: `Routed live execution for step '${options.requestedStepClass}' completed with adapter '${String(finalAttempt.adapter)}'.`,
         blockedNextStep: null,
       };
     }
-
-    const adapterOutput = asRecord(adapterResponse.output);
-    const failureKind = asString(adapterOutput.failure_kind);
     return {
       adapterResponse,
       status: "failed",
       summary:
         asString(adapterResponse.summary) ??
         `Routed live execution for step '${options.requestedStepClass}' completed.`,
-      blockedNextStep: resolveAdapterFailureNextStep(failureKind),
+      blockedNextStep: fallbackExhausted
+        ? "Inspect exhausted primary/fallback route evidence and select a compatible approved route."
+        : resolveAdapterFailureNextStep(finalFailureKind),
     };
   } catch (error) {
     const summary = error instanceof Error ? error.message : String(error);
