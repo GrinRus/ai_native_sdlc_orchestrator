@@ -417,7 +417,7 @@ function runtimePermissionDecisionOutcome(stepResult) {
   }
   const failureClass = asString(stepResult.failure_class) ?? "permission-mode-blocked";
   if (value === "auto_approve" || value === "user_approved") {
-    return { failureClass, decision: "retry", missionOutcome: "not_satisfied" };
+    return { failureClass, decision: "block", missionOutcome: "not_satisfied" };
   }
   if (value === "ask_user" || value === "auto_deny" || value === "user_denied") {
     return { failureClass, decision: "block", missionOutcome: "not_satisfied" };
@@ -828,8 +828,12 @@ function collectRuntimePermissionDecisions(stepArtifacts) {
           asString(runtimePermissionRequest.permission_mode) ?? asString(externalRunner.permission_mode),
         operation_type: asString(runtimePermissionRequest.operation_type) ?? "unknown",
         tool_name: asString(runtimePermissionRequest.tool_name),
-        target: asString(runtimePermissionRequest.target) ?? asString(runtimePermissionRequest.target_path),
-        command: asString(runtimePermissionRequest.command),
+        resource_type: asString(runtimePermissionRequest.resource_type),
+        canonical_resource: asString(runtimePermissionRequest.canonical_resource),
+        relative_resource: asString(runtimePermissionRequest.relative_resource),
+        capabilities: asRecord(runtimePermissionRequest.capabilities),
+        target: asString(runtimePermissionRequest.relative_resource) ?? asString(runtimePermissionRequest.canonical_resource),
+        command_digest: asString(asRecord(runtimePermissionRequest.legacy_diagnostic).command_digest),
         confidence: asString(runtimePermissionRequest.confidence),
         decision: asString(runtimePermissionDecision.decision) ?? "unknown",
         operator_decision: asString(runtimePermissionDecision.operator_decision),
@@ -1180,6 +1184,9 @@ export function materializeRuntimeHarnessReport(options) {
   );
   const runtimePermissionDecisions = collectRuntimePermissionDecisions(runtimePermissionStepArtifacts);
   const runtimePermissionSummary = buildRuntimePermissionSummary(runtimePermissionDecisions);
+  const unresolvedPermissionDecisions = runtimePermissionDecisions.filter((entry) =>
+    ["auto_approve", "user_approved", "ask_user", "auto_deny", "user_denied"].includes(asString(entry.decision) ?? ""),
+  );
   const stepFindings = stepDecisions
     .filter((decision) => asString(decision.runtime_harness_decision) !== "pass")
     .map((decision) => ({
@@ -1236,7 +1243,13 @@ export function materializeRuntimeHarnessReport(options) {
     generated_at: new Date().toISOString(),
     mission_type: missionType,
     strictness_profile: strictnessProfile,
-    overall_decision: resolveOverallDecision(runFindings, stepDecisions, activeRunDecision),
+    overall_decision: resolveOverallDecision(
+      runFindings,
+      unresolvedPermissionDecisions.length > 0
+        ? [...stepDecisions, { runtime_harness_decision: "block" }]
+        : stepDecisions,
+      activeRunDecision,
+    ),
     step_decisions: stepDecisions,
     runtime_permission_summary: runtimePermissionSummary,
     runtime_permission_decisions: runtimePermissionDecisions,

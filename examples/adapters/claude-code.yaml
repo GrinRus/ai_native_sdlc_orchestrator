@@ -24,7 +24,7 @@ execution:
   external_runtime:
     command: claude
     permission_policy:
-      default_mode: full-bypass
+      default_mode: restricted
       modes:
         full-bypass:
           args:
@@ -61,8 +61,8 @@ approval_features:
   supports_human_approval: true
   supports_pause_resume: true
   continuation_strategy: reinvoke
-  approval_grant_scope: step-coarse
-  approval_resume_mode: full-bypass
+  approval_grant_scope: tool-call-scoped
+  approval_resume_mode: restricted
   permission_request_detection:
     - structured-output
     - stdout-stderr-patterns

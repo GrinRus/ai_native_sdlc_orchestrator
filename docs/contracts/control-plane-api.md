@@ -426,7 +426,7 @@ HTTP interactive answer mutation baseline:
 - CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
 - for runtime permission requests, `decision` is required; legacy free-text `answer` is only compatible with ordinary clarification questions.
 - for runtime permission requests, answer submission records the structured decision but must not claim a pass unless an actual continuation or reinvocation has run. Current coarse external-process adapters report `continuation.reinvoke_required` after user approval so the next runtime action is explicit.
-- `approve_for_run` creates a run-scoped grant that may auto-approve later matching permission requests in the same run after hard-deny policy checks still pass; it is not persisted globally.
+- `approve_once` applies only to the recorded operation. `approve_for_run` creates an expiring grant, but reuse still requires the same project, run, step, operation identity, canonical resource, and capability set after hard-deny checks pass; it cannot broaden resources or cross a step boundary and is not persisted globally.
 
 ## Operator request mutations (W32-S01)
 

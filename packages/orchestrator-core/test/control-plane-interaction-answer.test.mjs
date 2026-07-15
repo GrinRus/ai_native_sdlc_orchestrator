@@ -225,7 +225,8 @@ test("permission interaction answer records structured decision without claiming
     assert.equal(updatedStepResult.requested_interaction.runtime_permission_decision.decision, "user_approved");
     assert.equal(updatedStepResult.requested_interaction.runtime_permission_decision.operator_decision, "approve_once");
     assert.equal(updatedStepResult.requested_interaction.runtime_permission_decision.approval_scope, "step-coarse");
-    assert.equal(updatedStepResult.requested_interaction.runtime_permission_decision.approval_resume_mode, "full-bypass");
+    assert.equal(updatedStepResult.requested_interaction.runtime_permission_decision.approval_resume_mode, null);
+    assert.ok(Date.parse(updatedStepResult.requested_interaction.runtime_permission_decision.expires_at) > Date.now());
     assert.equal(JSON.stringify(updatedStepResult).includes("operator approved one file edit"), false);
   });
 });
