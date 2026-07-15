@@ -5,13 +5,29 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { materializeDeliveryPlan } from "../src/delivery-plan.mjs";
+import { materializeDeliveryPlan as materializeDeliveryPlanV2 } from "../src/delivery-plan.mjs";
 import { resolveStepPolicyForStep } from "../src/policy-resolution.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
+
+function materializeDeliveryPlan(options) {
+  const refs = [
+    options.handoffApproval?.ref,
+    ...(options.promotionEvidenceRefs ?? []),
+    options.runtimeHarnessGate?.reportRef,
+  ].filter((ref) => typeof ref === "string");
+  return materializeDeliveryPlanV2({
+    authorizedDiff: {
+      baseline: { head_sha: "0000000000000000000000000000000000000000" },
+      changes: { additions: [], modifications: [], deletions: [], renames: [], all_paths: [] },
+    },
+    evidenceLocks: refs.map((ref) => ({ ref, status: "locked", sha256: "0".repeat(64) })),
+    ...options,
+  });
+}
 
 /**
  * @param {(repoRoot: string) => void} callback
@@ -88,6 +104,10 @@ test("materializeDeliveryPlan allows non-no-write mode only with approved handof
 
     assert.equal(result.deliveryPlan.delivery_mode, "fork-first-pr");
     assert.equal(result.deliveryPlan.status, "ready");
+    assert.equal(result.deliveryPlan.schema_version, 2);
+    assert.equal(result.deliveryPlan.permissions.fork_push_allowed, true);
+    assert.equal(result.deliveryPlan.permissions.direct_upstream_write_allowed, false);
+    assert.equal(typeof result.deliveryPlan.diff_authorization.baseline.head_sha, "string");
     assert.equal(result.deliveryPlan.execution_allowed, true);
     assert.equal(result.deliveryPlan.writeback_allowed, true);
     assert.deepEqual(result.deliveryPlan.blocking_reasons, []);

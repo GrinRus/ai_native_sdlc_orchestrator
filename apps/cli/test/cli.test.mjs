@@ -154,7 +154,9 @@ function seedStrictRuntimeHarnessReport(options) {
   assert.equal(initResult.exitCode, 0, initResult.stderr);
   const initPayload = JSON.parse(initResult.stdout);
   const reportsRoot = initPayload.runtime_layout.reportsRoot;
-  const projectId = initPayload.project_id ?? "aor-cli-test";
+  const profileText = fs.readFileSync(path.join(options.projectRoot, "examples/project.aor.yaml"), "utf8");
+  const profileProjectId = profileText.match(/^project_id:\s*([^\s#]+)/mu)?.[1];
+  const projectId = profileProjectId ?? initPayload.project_id ?? "aor-cli-test";
   const overallDecision = options.overallDecision ?? "pass";
   const runDecision = options.runDecision ?? overallDecision;
   const terminalStatus = options.terminalStatus ?? (runDecision === "pass" ? "closed" : "blocked");
@@ -283,7 +285,87 @@ function seedStrictRuntimeHarnessReport(options) {
     filePath: reportFile,
     document: report,
   });
+  const aliases = new Set([
+    options.runId,
+    options.runId.replace(/^w6-deliver-/u, ""),
+    options.runId.replace(/^strict-delivery-/u, ""),
+    options.runId.replace(/^strict-delivery-/u, "strict-"),
+    options.runId.replace(/^w8-release-/u, "w8-release-"),
+  ]);
+  const artifactsRoot = initPayload.runtime_layout.artifactsRoot;
+  for (const alias of aliases) {
+    const seedHandoff = !options.runId.includes("missing-handoff");
+    const seedPromotion = !options.runId.includes("missing-promotion");
+    const handoffFile = path.join(artifactsRoot, `handoff-${alias}.json`);
+    if (seedHandoff) {
+      writeContractFixture({
+        family: "handoff-packet",
+        filePath: handoffFile,
+        document: {
+          packet_id: `${projectId}.handoff.${alias}`,
+          project_id: projectId,
+          ticket_id: alias,
+          version: 1,
+          status: "approved",
+          risk_tier: "medium",
+          approved_objective: "Authorize bounded delivery fixture.",
+          repo_scopes: ["main"],
+          allowed_paths: ["**"],
+          allowed_commands: ["git"],
+          verification_plan: {},
+          scope_constraints: {},
+          command_policy: {},
+          writeback_mode: "patch-only",
+          approval_state: { status: "approved" },
+        },
+      });
+    }
+    if (seedPromotion) {
+      writeContractFixture({
+        family: "promotion-decision",
+        filePath: path.join(reportsRoot, `promotion-${alias}.json`),
+        document: {
+          decision_id: `${projectId}.promotion.${alias}`,
+          subject_ref: `run://${options.runId}`,
+          from_channel: "candidate",
+          to_channel: "stable",
+          evidence_refs: [reportRef],
+          evidence_summary: { reason: "Runtime Harness delivery fixture passed." },
+          status: "pass",
+        },
+      });
+    }
+  }
   return { reportFile, reportRef, initPayload };
+}
+
+function seedDeliveryAuthorizationAlias(projectRoot, alias) {
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const profileText = fs.readFileSync(path.join(projectRoot, "examples/project.aor.yaml"), "utf8");
+  const projectId = profileText.match(/^project_id:\s*([^\s#]+)/mu)?.[1] ?? initPayload.project_id;
+  const handoffFile = path.join(initPayload.runtime_layout.artifactsRoot, `handoff-${alias}.json`);
+  writeContractFixture({
+    family: "handoff-packet",
+    filePath: handoffFile,
+    document: {
+      packet_id: `${projectId}.handoff.${alias}`, project_id: projectId, ticket_id: alias,
+      version: 1, status: "approved", risk_tier: "medium", approved_objective: "Authorize delivery.",
+      repo_scopes: ["main"], allowed_paths: ["**"], allowed_commands: ["git"],
+      verification_plan: {}, scope_constraints: {}, command_policy: {}, writeback_mode: "patch-only",
+      approval_state: { status: "approved" },
+    },
+  });
+  writeContractFixture({
+    family: "promotion-decision",
+    filePath: path.join(initPayload.runtime_layout.reportsRoot, `promotion-${alias}.json`),
+    document: {
+      decision_id: `${projectId}.promotion.${alias}`, subject_ref: `handoff://${alias}`,
+      from_channel: "candidate", to_channel: "stable", evidence_refs: [handoffFile],
+      evidence_summary: { reason: "Authorization fixture." }, status: "pass",
+    },
+  });
 }
 
 /**
@@ -2131,6 +2213,7 @@ test("delivery prepare observe mode materializes evidence with Runtime Harness f
     runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
     runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
     runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+    seedDeliveryAuthorizationAlias(projectRoot, "strict-empty-report");
 
     const result = invokeCli([
       "deliver",
@@ -3816,7 +3899,7 @@ test("project verify supports routed live execution baseline when delivery evide
     assert.equal(routedStepResult.routed_execution.mode, "execute");
     assert.equal(routedStepResult.routed_execution.no_write_enforced, false);
     assert.equal(routedStepResult.routed_execution.delivery_plan.status, "ready");
-    assert.equal(routedStepResult.routed_execution.delivery_plan.writeback_allowed, true);
+    assert.equal(routedStepResult.routed_execution.delivery_plan.writeback_allowed, false);
     assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(routedStepResult.routed_execution.adapter_request.dry_run, false);
     assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
@@ -4867,7 +4950,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--route-overrides",
         "implement=route.implement.w14-test",
         "--unsafe-development-override",
@@ -4962,7 +5045,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--execution-root",
         isolatedExecutionRoot,
         "--require-review-decision",
@@ -5012,7 +5095,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--require-review-decision",
       ]);
       assert.equal(blockedByHoldDecision.exitCode, 1);
@@ -5063,7 +5146,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--execution-root",
         isolatedExecutionRoot,
         "--require-review-decision",
@@ -5320,7 +5403,7 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         "--approved-handoff-ref",
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
-        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        preflightPayload.step_result_files.join(","),
         "--route-overrides",
         "implement=route.implement.w14-budget-test",
         "--unsafe-development-override",

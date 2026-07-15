@@ -1355,6 +1355,7 @@ export function executeRoutedStep(options) {
       );
       deliveryPlanResult = materializeDeliveryPlan({
         runtimeLayout: init.runtimeLayout,
+        deliveryAuthorizationPhase: false,
         projectId: init.projectId,
         runId,
         stepClass: requestedStepClass,

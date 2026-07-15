@@ -940,7 +940,7 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.mode, "execute");
     assert.equal(result.stepResult.routed_execution.no_write_enforced, false);
     assert.equal(result.stepResult.routed_execution.delivery_plan.status, "ready");
-    assert.equal(result.stepResult.routed_execution.delivery_plan.writeback_allowed, true);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.writeback_allowed, false);
     assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(result.stepResult.routed_execution.adapter_request.dry_run, false);
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "codex-cli");

@@ -319,7 +319,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Delivery stages only an exact approved diff and cannot unlock
   commit or push with fabricated, stale, cross-run, or origin-equivalent evidence.
 - **Epic:** EPIC-4, EPIC-5
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** `docs/contracts/delivery-plan.md`, delivery/handoff/Harness

@@ -75,9 +75,25 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         status: "pass",
       },
     });
+    const handoffPath = path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.handoff.bootstrap.v1.json`);
+    writeContractFile({
+      family: "handoff-packet",
+      filePath: handoffPath,
+      document: {
+        packet_id: `${init.projectId}.handoff.bootstrap.v1`, project_id: init.projectId,
+        ticket_id: "api-read", version: 1, status: "approved", risk_tier: "medium",
+        approved_objective: "Authorize API read-surface delivery fixture.", repo_scopes: ["main"],
+        allowed_paths: ["examples/project.aor.yaml"], allowed_commands: ["git"],
+        verification_plan: {}, scope_constraints: {}, command_policy: {}, writeback_mode: "patch-only",
+        approval_state: { status: "approved" },
+      },
+    });
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w5-s01 api read smoke\n", "utf8");
 
     const plan = materializeDeliveryPlan({
       runtimeLayout: init.runtimeLayout,
+      executionRoot: init.projectRoot,
       projectId: init.projectId,
       runId,
       stepClass: "implement",
@@ -94,13 +110,11 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
       },
       handoffApproval: {
         status: "pass",
-        ref: path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.handoff.bootstrap.v1.json`),
+        ref: handoffPath,
       },
       promotionEvidenceRefs: [promotionDecisionPath],
     });
 
-    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
-    fs.appendFileSync(targetFile, "\n# w5-s01 api read smoke\n", "utf8");
     const deliveryResult = runDeliveryDriver({
       projectRef: repoRoot,
       cwd: repoRoot,

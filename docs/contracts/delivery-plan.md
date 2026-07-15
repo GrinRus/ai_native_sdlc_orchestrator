@@ -9,6 +9,7 @@ scope blocks planning and is never coerced to no-write or unrestricted access.
 Durable pre-write artifact that makes delivery intent explicit before any write-back path starts.
 
 ## Required fields
+- `schema_version` (`2` for newly materialized plans)
 - `plan_id`
 - `project_id`
 - `run_id`
@@ -16,6 +17,9 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 - `delivery_mode`
 - `mode_source`
 - `preconditions`
+- `permissions`
+- `diff_authorization`
+- `evidence_locks[]`
 - `execution_allowed`
 - `writeback_allowed`
 - `target_write_allowed`
@@ -36,6 +40,21 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 - `fork-first-pr` — plan fork-first branch + pull request style delivery.
 
 ## Policy notes
+- Version 2 separates authorization for execution, artifact materialization,
+  local commits, fork pushes, and direct upstream writes. Direct upstream write
+  is denied by default and is not implied by any other permission.
+- `diff_authorization.baseline.head_sha` binds the plan to one Git baseline.
+  Its `changes` object contains the exact additions, modifications, deletions,
+  and rename endpoint pairs plus their canonical `all_paths` union. Delivery
+  fails before materialization or staging when the live diff differs.
+- `evidence_locks[]` binds every authorization ref to a SHA-256 digest. The
+  driver reloads the declared contract family and checks project/run ownership
+  and pass-level status before executing a delivery mode.
+- A plan without `schema_version` is read as v1 for compatibility. A v1
+  `no-write` plan remains readable; every write-capable v1 plan fails with an
+  explicit migration error.
+- Staging is path-explicit. Unrelated tracked, untracked, deleted, renamed, or
+  symlink paths are never absorbed into delivery.
 - Delivery mode must be explicit and machine-checkable before write-back starts.
 - Non-`no-write` modes (`patch-only`, `local-branch`, `fork-first-pr`) must require:
   - approved handoff evidence;
