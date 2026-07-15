@@ -63,6 +63,33 @@ test("production readiness gate enforces the committed audit hold with healthy i
     "pass",
   );
   assert.equal(result.checks.find((check) => check.id === "dependency-safety")?.status, "pass");
+  assert.equal(result.checks.find((check) => check.id === "w57-remediation-closure")?.status, "pass");
+  assert.equal(
+    result.remediation_closure_reports.W57,
+    "docs/research/08-w57-security-reliability-closure.json",
+  );
+});
+
+test("W57 closure report maps its audit scope exactly once and fails closed on drift", () => {
+  const source = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/08-w57-security-reliability-closure.json"), "utf8"),
+  );
+  assert.equal(source.findings.length, 21);
+  assert.equal(new Set(source.findings.map((entry) => entry.finding_id)).size, 21);
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w57-closure-"));
+  const tempClosure = path.join(tempDir, "w57-closure.json");
+  source.findings = source.findings.filter((entry) => entry.finding_id !== "AUD-017");
+  fs.writeFileSync(tempClosure, `${JSON.stringify(source, null, 2)}\n`);
+  const result = runProductionReadinessGate({
+    rootDir: root,
+    w57ClosurePath: tempClosure,
+    testReportPath: writeCurrentPassingTestReport(),
+  });
+  assert.equal(result.status, "fail");
+  const closureCheck = result.checks.find((check) => check.id === "w57-remediation-closure");
+  assert.equal(closureCheck?.status, "fail");
+  assert.match(closureCheck?.findings?.join("\n") ?? "", /missing 'AUD-017'/u);
 });
 
 test("production readiness gate clears only a valid ledger with evidence-backed closed blockers", () => {

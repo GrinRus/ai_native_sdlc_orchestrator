@@ -507,16 +507,16 @@ This is the master index for the implementation slices across all defined waves.
 | W57-S06 | Transactional initialization and runtime-root containment | EPIC-1, EPIC-2 | done | project init, artifact store, asset roots, tests | W57-S02 |
 | W57-S07 | Atomic attempts, run control, and event identity | EPIC-2, EPIC-3, EPIC-6 | done | attempt/result store, run control, observability journal | W57-S06 |
 | W57-S10 | Project-anchored command and evidence resolution | EPIC-1, EPIC-2, EPIC-6 | done | project context, control-plane handlers, evidence/path resolution, package/browser tests | W57-S02, W57-S06 |
-| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | ready | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10 |
+| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | done | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10 |
 
 ## W58 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | blocked | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
-| W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | blocked | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
-| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | blocked | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
+| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | ready | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
+| W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | ready | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
+| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | ready | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
 | W58-S04 | Real evaluation, Harness lineage, and replay compatibility | EPIC-4 | blocked | eval/Harness contracts, scorer, certification, replay | W57-S05, W58-S02, W58-S03 |
-| W58-S05 | Asynchronous run jobs and durable live-event delivery | EPIC-3, EPIC-6 | blocked | lifecycle worker, process supervision, journal, SSE/CLI follow | W57-S08 |
+| W58-S05 | Asynchronous run jobs and durable live-event delivery | EPIC-3, EPIC-6 | ready | lifecycle worker, process supervision, journal, SSE/CLI follow | W57-S08 |
 | W58-S06 | Canonical API, OpenAPI, CLI, and service boundary | EPIC-0, EPIC-6 | blocked | API/CLI/control-plane services, OpenAPI, readiness tests | W58-S01, W58-S05 |
 | W58-S07 | Loopback-only local app transport boundary | EPIC-6 | blocked | local-console ADR, app launcher, HTTP transport/config/tests | W58-S01, W58-S06 |
 | W58-S08 | Runtime-quality acceptance proof | EPIC-0, EPIC-7 | blocked | integration proof, package smoke, audit/readiness evidence | W58-S02, W58-S03, W58-S04, W58-S05, W58-S06, W58-S07 |

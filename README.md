@@ -16,8 +16,9 @@ general-purpose orchestrator runtime.
 The previous bounded verdict, labeled a self-hosted CLI/API production candidate,
 is under an audit release hold. The July 2026 baseline review found confirmed execution,
 permission, delivery, evidence, and quality-gate failures, so AOR is not ready
-for production or unattended write-capable runs. The W57-W59 remediation queue
-owns requalification. `pnpm production:ready --json` now reports this as
+for production or unattended write-capable runs. W57 has closed its local
+trust-boundary scope with a machine-readable evidence map; W58-W59 still own
+runtime, quality, browser, and release requalification. `pnpm production:ready --json` reports this as
 `status=blocked`, `gate_execution_status=pass`, and
 `release_disposition=audit-hold`; historical W25/W26 evidence is not release
 clearance.

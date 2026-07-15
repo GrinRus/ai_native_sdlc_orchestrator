@@ -46,9 +46,12 @@ The gate verifies:
   `*.test.mjs` file to exactly one group or a reviewed unexpired exclusion, and
   `node_modules/.cache/aor/test-execution-manifest.json` proves the current HEAD
   and manifest digest executed every candidate once;
-- audit remediation ledger validity, complete AUD-001 through AUD-022
+- audit remediation ledger validity, complete AUD-001 through AUD-055
   disposition, the post-audit `project-context-cwd-divergence` entry, and every
   open release-blocking invariant;
+- W57 remediation closure integrity: the exact W57 finding set maps one-to-one
+  to existing deterministic evidence, while AUD-009 and AUD-052 retain their
+  explicitly shared W58 disposition;
 
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
@@ -73,6 +76,7 @@ Top-level meanings:
 | Failed check | Meaning | Operator action |
 |---|---|---|
 | `audit-remediation-ledger` | The ledger is missing, malformed, incomplete, or contains an invalid resolved claim. | Restore the ledger and evidence; do not infer release status. |
+| `w57-remediation-closure` | The W57 finding set is missing, duplicated, regressed, or points at missing evidence. | Restore the closure report and its referenced deterministic suites; keep the audit hold. |
 | `complete-test-execution` | The discovered-test report is missing, stale, incomplete, duplicated, or belongs to another HEAD/policy digest. | Run `pnpm test` or `pnpm check`, then rerun readiness without changing HEAD. |
 | `baseline-boundary` | `pnpm check` or `pnpm production:ready` no longer has the expected meaning. | Restore the script boundary before making any production claim. |
 | `w25-real-proof-fixture` | The proof fixture is missing, unsafe, mock-backed, non-passing, or no longer proves code-changing no-upstream-write execution. | Re-run or re-sanitize W25 proof evidence; do not replace it with mock output. |

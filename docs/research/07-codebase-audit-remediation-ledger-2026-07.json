@@ -3,6 +3,9 @@
   "audit_source": "docs/research/05-codebase-audit-2026-07.md",
   "updated_at": "2026-07-15",
   "release_disposition": "audit-hold",
+  "closure_reports": [
+    {"wave_id":"W57","path":"docs/research/08-w57-security-reliability-closure.json","status":"passed"}
+  ],
   "allowed_states": ["open", "in-progress", "resolved", "accepted-risk", "superseded"],
   "findings": [
     {"finding_id":"AUD-001","severity":"S1","state":"resolved","owner_slices":["W57-S03"],"release_blocking":true,"summary":"Default no-write live runs request and accept source edits","evidence_refs":["packages/orchestrator-core/src/delivery-plan.mjs","packages/orchestrator-core/src/step-execution-engine.mjs","packages/adapter-sdk/src/index.mjs","packages/orchestrator-core/test/step-execution-engine.test.mjs","packages/adapter-sdk/test/adapter-sdk.test.mjs"],"limitations":[]},
