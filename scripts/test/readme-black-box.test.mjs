@@ -232,7 +232,7 @@ test("documented app smoke does not initialize clean target runtime", () => {
     assert.equal(smoke.project_switcher_loaded, true);
     assert.equal(smoke.flow_selector_loaded, true);
     assert.equal(smoke.new_flow_action_loaded, true);
-    assert.equal(smoke.runtime_root, runtimeRoot);
+    assert.equal(smoke.runtime_root, path.join(fs.realpathSync.native(targetRepo), ".aor"));
     assert.equal(fs.existsSync(runtimeRoot), false, "clean app smoke must not create .aor before explicit initialization");
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

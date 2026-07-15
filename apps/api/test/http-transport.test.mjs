@@ -1274,6 +1274,8 @@ test("local app project index and add-project action keep project runtimes isola
     await withTempRepo(async (secondProjectRoot) => {
       const firstRuntimeRoot = path.join(firstProjectRoot, ".aor");
       const secondRuntimeRoot = path.join(secondProjectRoot, ".aor-alt");
+      const canonicalFirstRuntimeRoot = path.join(fs.realpathSync.native(firstProjectRoot), ".aor");
+      const canonicalSecondRuntimeRoot = path.join(fs.realpathSync.native(secondProjectRoot), ".aor-alt");
       const transport = await createControlPlaneHttpServer({
         cwd: workspaceRoot,
         projectRef: firstProjectRoot,
@@ -1312,7 +1314,7 @@ test("local app project index and add-project action keep project runtimes isola
         const added = await addResponse.json();
         assert.equal(added.projects.length, 2);
         assert.equal(added.project.label, "Second target");
-        assert.equal(added.project.runtime_root, secondRuntimeRoot);
+        assert.equal(added.project.runtime_root, canonicalSecondRuntimeRoot);
         assert.notEqual(added.project.project_id, transport.projectId);
         assert.equal(typeof added.project.runtime_project_id, "string");
         assert.equal(fs.existsSync(secondRuntimeRoot), false, "adding a project must not initialize runtime state");
@@ -1321,7 +1323,7 @@ test("local app project index and add-project action keep project runtimes isola
         assert.equal(secondPreviewResponse.status, 200);
         const secondPreview = await secondPreviewResponse.json();
         assert.equal(secondPreview.project_id, added.project.runtime_project_id);
-        assert.equal(secondPreview.runtime_root, secondRuntimeRoot);
+        assert.equal(secondPreview.runtime_root, canonicalSecondRuntimeRoot);
         assert.equal(secondPreview.state_file, null);
         assert.equal(secondPreview.onboarding_summary.initialized, false);
         assert.equal(secondPreview.onboarding_summary.recommended_action, "initialize-runtime");
@@ -1351,7 +1353,7 @@ test("local app project index and add-project action keep project runtimes isola
         assert.equal(firstStateResponse.status, 200);
         const firstState = await firstStateResponse.json();
         assert.equal(firstState.project_id, transport.projectId);
-        assert.equal(firstState.runtime_root, firstRuntimeRoot);
+        assert.equal(firstState.runtime_root, canonicalFirstRuntimeRoot);
         assert.equal(firstState.state_file, null);
         assert.equal(firstState.onboarding_summary.initialized, false);
         assert.equal(fs.existsSync(firstRuntimeRoot), false, "default project state preview must not initialize runtime state");
@@ -1421,9 +1423,9 @@ test("local app add-project action accepts an explicit project profile", async (
       assert.equal(added.projects.length, 2);
       assert.equal(added.project.label, "Profiled target");
       assert.equal(added.project.runtime_project_id, "explicit-profile-target");
-      assert.equal(added.project.project_profile_ref, explicitProjectProfile);
+      assert.equal(added.project.project_profile_ref, fs.realpathSync.native(explicitProjectProfile));
       assert.equal(added.project.project_profile_source, "explicit");
-      assert.equal(added.project.runtime_root, profiledRuntimeRoot);
+      assert.equal(added.project.runtime_root, fs.realpathSync.native(profiledRuntimeRoot));
       assert.equal(added.project.onboarding_summary.initialized, true);
       assert.equal(added.project.active_flow_summary.status, "no-flows");
       assert.notEqual(added.project.project_id, initialIndex.projects[0].project_id);

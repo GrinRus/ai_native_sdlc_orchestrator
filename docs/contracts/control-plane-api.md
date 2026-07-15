@@ -114,6 +114,15 @@ The control plane remains the orchestration owner:
 - guided web can invoke operator-request mutations to analyze, explain, revise, repair, validate, plan, implement, or review bounded artifacts from any stage while keeping raw request text in durable evidence only;
 - the installed local SPA is served by `aor app` from the shared HTTP transport, not by importing `apps/api` into the CLI launcher;
 - the installed local SPA can switch between explicitly registered local projects through app-session project summaries, but each selected project keeps separate runtime state, flow projections, evidence refs, and mutation routes;
+- CLI/app/API ingress creates one immutable selected-project context containing
+  the runtime project id, canonical project root, runtime root, project runtime
+  root, canonical profile path, and registry identity. Downstream compatibility
+  options are derived from that context with `cwd` pinned to the canonical
+  project root; launcher cwd is never an internal fallback.
+- project-, runtime-, evidence-, and repository-relative references use an
+  explicit context base and reject absolute, traversal, empty-segment,
+  backslash, and existing-symlink escapes. Read-only context creation and
+  project selection never materialize runtime state.
 - read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
 - guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
 

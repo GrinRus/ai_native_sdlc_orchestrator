@@ -14,6 +14,13 @@ AOR is the durable SDLC control plane that coordinates:
 - platform-asset evolution,
 - incident learning.
 
+Project context is immutable after ingress. It binds one runtime project id to
+canonical project, runtime, project-runtime, and profile paths plus a stable
+registry identity. Long-lived processes retain one separate context per
+selected project; there is no ambient current project. Compatibility wrappers
+may translate the context to legacy `{cwd, projectRef, runtimeRoot}` arguments
+once, with `cwd` anchored to the project root rather than the launcher.
+
 Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to AOR development workflow only. Runtime AOR flows consume only AOR-owned versioned assets, packets, and project-profile references.
 
 ## Runtime Harness boundary
