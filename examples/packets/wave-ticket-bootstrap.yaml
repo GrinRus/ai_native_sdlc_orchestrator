@@ -1,4 +1,4 @@
-ticket_id: WAVE-BOOTSTRAP-001
+ticket_id: wave-bootstrap-001
 project_id: aor-core
 objective: >
   Establish the first bounded handoff packet from bootstrap artifacts before execution flows.

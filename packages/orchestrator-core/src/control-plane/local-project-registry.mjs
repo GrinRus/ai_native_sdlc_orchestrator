@@ -5,6 +5,7 @@ import path from "node:path";
 import { previewProjectRuntime } from "../project-init.mjs";
 import { listFlowProjections } from "./flow-projections.mjs";
 import { buildOnboardingSummary } from "./onboarding-summary.mjs";
+import { createProjectContext, rekeyProjectContext } from "./project-context.mjs";
 
 /**
  * @param {unknown} value
@@ -138,30 +139,6 @@ function detectProfileMismatchCandidateProjectIds(preview) {
  *   label?: string,
  * }} input
  */
-function createProjectContext(input) {
-  const cwd = input.cwd ?? process.cwd();
-  const preview = previewProjectRuntime({
-    cwd,
-    projectRef: input.projectRef,
-    projectProfile: input.projectProfile,
-    runtimeRoot: input.runtimeRoot,
-  });
-  return {
-    projectId: preview.projectId,
-    runtimeProjectId: preview.projectId,
-    label: optionalString(input.label) ?? preview.displayName,
-    runtimeOptions: {
-      cwd,
-      projectRef: preview.projectRoot,
-      projectProfile: input.projectProfile,
-      runtimeRoot: input.runtimeRoot,
-    },
-    resolvedProjectRoot: preview.projectRoot,
-    resolvedRuntimeRoot: preview.runtimeRoot,
-    originalProjectRef: path.resolve(cwd, input.projectRef),
-  };
-}
-
 /**
  * @param {ReturnType<typeof createProjectContext>} context
  * @param {Map<string, ReturnType<typeof createProjectContext>>} contexts
@@ -172,10 +149,10 @@ function resolveRegistryProjectId(context, contexts) {
     return context.projectId;
   }
 
-  const base = normalizeId(path.basename(context.resolvedProjectRoot)) || normalizeId(context.runtimeProjectId);
+  const base = normalizeId(path.basename(context.projectRoot)) || normalizeId(context.runtimeProjectId);
   const suffix = shortHash([
-    context.resolvedProjectRoot,
-    context.resolvedRuntimeRoot,
+    context.projectRoot,
+    context.runtimeRoot,
     context.runtimeProjectId,
     projectProfileIdentity(context),
   ].join("\0"));
@@ -193,8 +170,7 @@ function resolveRegistryProjectId(context, contexts) {
  * @returns {string}
  */
 function projectProfileIdentity(context) {
-  const projectProfile = optionalString(context.runtimeOptions.projectProfile);
-  return projectProfile ? path.resolve(context.runtimeOptions.cwd ?? process.cwd(), projectProfile) : "";
+  return context.canonicalProfilePath;
 }
 
 /**
@@ -204,8 +180,8 @@ function projectProfileIdentity(context) {
  */
 function isSameRegisteredTarget(left, right) {
   return (
-    left.resolvedProjectRoot === right.resolvedProjectRoot
-    && left.resolvedRuntimeRoot === right.resolvedRuntimeRoot
+    left.projectRoot === right.projectRoot
+    && left.runtimeRoot === right.runtimeRoot
     && projectProfileIdentity(left) === projectProfileIdentity(right)
   );
 }
@@ -233,10 +209,10 @@ export function summarizeProjectContext(context) {
     runtime_project_id: preview.projectId,
     label: context.label,
     display_name: preview.displayName,
-    project_ref: preview.projectRoot,
-    project_profile_ref: preview.projectProfileRef,
+    project_ref: context.projectRoot,
+    project_profile_ref: context.canonicalProfilePath,
     project_profile_source: preview.projectProfileSource,
-    runtime_root: preview.runtimeRoot,
+    runtime_root: context.runtimeRoot,
     onboarding_summary: {
       ...onboardingSummary,
       ...(profileMismatchCandidateProjectIds.length > 0
@@ -278,17 +254,11 @@ export function createLocalProjectRegistry(options) {
     const existing = [...contexts.values()].find((context) => isSameRegisteredTarget(context, nextContext));
     let selectedProjectId;
     if (existing) {
-      contexts.set(existing.projectId, {
-        ...existing,
-        label: optionalString(input.label) ?? existing.label,
-      });
+      contexts.set(existing.projectId, rekeyProjectContext(existing, existing.projectId, optionalString(input.label) ?? existing.label));
       selectedProjectId = existing.projectId;
     } else {
       const registryProjectId = resolveRegistryProjectId(nextContext, contexts);
-      const context = {
-        ...nextContext,
-        projectId: registryProjectId,
-      };
+      const context = rekeyProjectContext(nextContext, registryProjectId);
       contexts.set(context.projectId, context);
       defaultProjectId ??= context.projectId;
       selectedProjectId = context.projectId;

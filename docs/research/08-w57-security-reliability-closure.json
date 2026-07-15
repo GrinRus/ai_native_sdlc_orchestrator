@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "wave_id": "W57",
+  "title": "Security and Reliability Remediation closure",
+  "status": "passed",
+  "closed_at": "2026-07-15",
+  "release_disposition_after_wave": "audit-hold",
+  "release_clearance": false,
+  "test_discovery": {
+    "manifest": "scripts/test-manifest.json",
+    "execution_report": "node_modules/.cache/aor/test-execution-manifest.json",
+    "expected_tracked_test_files": 60,
+    "required_execution_count": 60,
+    "exclusions": 0
+  },
+  "package_smoke": {
+    "command": "pnpm release:smoke",
+    "report": "node_modules/.cache/aor/release-smoke-report.json",
+    "network_writes": false,
+    "upstream_writes": false,
+    "credentialed_provider_calls": false
+  },
+  "dependency_audit": {
+    "commands": ["pnpm audit --prod --json", "pnpm audit --json"],
+    "status": "passed-via-bulk-advisory-fallback",
+    "observed_error": "ERR_PNPM_AUDIT_BAD_RESPONSE: npm audit endpoint returned HTTP 410",
+    "fallback_endpoint": "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+    "audited_lockfile_packages": 51,
+    "advisory_count": 0,
+    "deterministic_fallback": "scripts/production-readiness.mjs dependency-safety check plus exact pnpm-lock package versions submitted to the npm bulk advisory endpoint",
+    "fallback_status": "passed",
+    "follow_up_owner": "W59-S04"
+  },
+  "findings": [
+    {"finding_id":"AUD-001","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/step-execution-engine.test.mjs"]},
+    {"finding_id":"AUD-002","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/runtime-permission-policy.test.mjs"]},
+    {"finding_id":"AUD-003","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/delivery-driver.test.mjs"]},
+    {"finding_id":"AUD-004","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/delivery-driver.test.mjs"]},
+    {"finding_id":"AUD-005","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/delivery-driver.test.mjs"]},
+    {"finding_id":"AUD-007","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-verify.test.mjs"]},
+    {"finding_id":"AUD-008","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/runtime-permission-policy.test.mjs"]},
+    {"finding_id":"AUD-009","disposition":"in-progress","evidence_refs":["packages/orchestrator-core/test/delivery-driver.test.mjs"],"remaining_owner_slices":["W58-S04"]},
+    {"finding_id":"AUD-011","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/attempt-store-concurrency.test.mjs"]},
+    {"finding_id":"AUD-013","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-context.test.mjs"]},
+    {"finding_id":"AUD-014","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-init.test.mjs"]},
+    {"finding_id":"AUD-015","disposition":"resolved","evidence_refs":["packages/contracts/test/contracts-loader.test.mjs"]},
+    {"finding_id":"AUD-016","disposition":"resolved","evidence_refs":["packages/observability/test/live-run-events-concurrency.test.mjs"]},
+    {"finding_id":"AUD-017","disposition":"resolved","evidence_refs":["packages/observability/test/live-run-events-concurrency.test.mjs"]},
+    {"finding_id":"AUD-022","disposition":"resolved","evidence_refs":["scripts/test/production-readiness.test.mjs"]},
+    {"finding_id":"AUD-023","disposition":"resolved","evidence_refs":["apps/api/test/live-event-stream.test.mjs"]},
+    {"finding_id":"AUD-029","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-init.test.mjs"]},
+    {"finding_id":"AUD-030","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-verify.test.mjs"]},
+    {"finding_id":"AUD-031","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-init.test.mjs"]},
+    {"finding_id":"AUD-052","disposition":"in-progress","evidence_refs":["packages/orchestrator-core/test/project-context.test.mjs"],"remaining_owner_slices":["W58-S02"]},
+    {"finding_id":"project-context-cwd-divergence","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/project-context.test.mjs"]}
+  ],
+  "remaining_release_boundary": {
+    "owner_waves": ["W58", "W59"],
+    "reason": "W57 repairs the local trust boundary, but runtime truthfulness, hosted transport, browser behavior, quality lineage, and audit retention remain open.",
+    "production_ready": false
+  }
+}

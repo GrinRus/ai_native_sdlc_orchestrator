@@ -12,7 +12,7 @@ import { initializeProjectRuntime } from "../src/project-init.mjs";
  * @param {(tempRoot: string) => void} callback
  */
 function withCleanRepo(callback) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s04-next-"));
+  const tempRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s04-next-")));
   fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
   fs.writeFileSync(path.join(tempRoot, "package.json"), `${JSON.stringify({ name: "next-target" }, null, 2)}\n`, "utf8");
   try {

@@ -9,24 +9,37 @@ import { fileURLToPath } from "node:url";
 import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { readRunEventHistory } from "../src/control-plane/read-surface.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
-import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
+import { resolveCanonicalContainedPath } from "../src/shared/canonical-paths.mjs";
+import {
+  executeRoutedStep as executeRoutedStepWithoutAuditOverride,
+  executeRuntimeHarnessControlledStep as executeRuntimeHarnessControlledStepWithoutAuditOverride,
+} from "../src/step-execution-engine.mjs";
 import { classifyRuntimeStepOutcome, materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
 import {
   collectMissionChangeEvidence,
   filterNonBootstrapChangedPaths,
   filterRunnerOwnedStatePaths,
   listChangedPaths,
+  matchesScopePattern,
+  parseGitStatusPorcelainZ,
 } from "../src/shared/mission-scope.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
 
+// These fixtures intentionally exercise external write-capable development probes.
+// The release-hold behavior itself is covered separately by the readiness suite.
+const executeRoutedStep = (options) =>
+  executeRoutedStepWithoutAuditOverride({ ...options, unsafeDevelopmentOverride: true });
+const executeRuntimeHarnessControlledStep = (options) =>
+  executeRuntimeHarnessControlledStepWithoutAuditOverride({ ...options, unsafeDevelopmentOverride: true });
+
 /**
  * @param {(repoRoot: string) => void} callback
  */
 function withTempRepo(callback) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w2-s05-"));
+  const repoRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-w2-s05-")));
   const gitInit = spawnSync("git", ["init"], { cwd: repoRoot, encoding: "utf8" });
   assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
@@ -86,6 +99,44 @@ test("changed path parsing ignores AOR runtime before bootstrap-owned filtering"
       false,
     );
   });
+});
+
+test("NUL-delimited Git status preserves both rename endpoints and literal path bytes", () => {
+  const parsed = parseGitStatusPorcelainZ(
+    "R  source/new name.ts\0source/old name.ts\0?? source/unicode-λ.ts\0 D source/line\r\nbreak.ts\0",
+  );
+  assert.deepEqual(parsed[0], {
+    indexStatus: "R",
+    worktreeStatus: " ",
+    kind: "rename",
+    path: "source/new name.ts",
+    sourcePath: "source/old name.ts",
+    destinationPath: "source/new name.ts",
+    paths: ["source/old name.ts", "source/new name.ts"],
+  });
+  assert.deepEqual(parsed[1].paths, ["source/unicode-λ.ts"]);
+  assert.deepEqual(parsed[2].paths, ["source/line\r\nbreak.ts"]);
+  assert.equal(matchesScopePattern("source/*.ts", "source/new name.ts"), true);
+  assert.equal(matchesScopePattern("source/*.ts", "source/nested/new.ts"), false);
+  assert.equal(matchesScopePattern("source/**", "source-escape/new.ts"), false);
+});
+
+test("canonical containment rejects symlink ancestors that escape the project boundary", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-contained-project-"));
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-contained-outside-"));
+  try {
+    fs.mkdirSync(path.join(projectRoot, "source"));
+    fs.symlinkSync(outsideRoot, path.join(projectRoot, "source", "external"), "dir");
+    assert.equal(resolveCanonicalContainedPath({ root: projectRoot, relativePath: "source/new.ts" }).ok, true);
+    const escaped = resolveCanonicalContainedPath({ root: projectRoot, relativePath: "source/external/new.ts" });
+    assert.equal(escaped.ok, false);
+    assert.equal(escaped.reason, "symlink-escape");
+    assert.equal(resolveCanonicalContainedPath({ root: projectRoot, relativePath: "../outside.ts" }).ok, false);
+    assert.equal(resolveCanonicalContainedPath({ root: projectRoot, relativePath: "source\\new.ts" }).ok, false);
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+    fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
 });
 
 test("mission evidence treats SSL key log output as diagnostic noise, not meaningful product diff", () => {
@@ -521,7 +572,7 @@ test("runtime harness classifies structured permission denials before strict no-
 
   assert.deepEqual(approvedOutcome, {
     failureClass: "permission-mode-blocked",
-    decision: "retry",
+    decision: "block",
     missionOutcome: "not_satisfied",
   });
 });
@@ -716,6 +767,25 @@ test("executeRoutedStep keeps same-step routed artifacts distinct for repeated e
   });
 });
 
+test("executeRoutedStep returns the completed result for an idempotent request key", () => {
+  withTempRepo((repoRoot) => {
+    const options = {
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId: "run.idempotent.attempt",
+      stepId: "step.idempotent.attempt",
+      requestKey: "request.idempotent.attempt",
+    };
+    const first = executeRoutedStep(options);
+    const retry = executeRoutedStep(options);
+    assert.equal(retry.stepResultPath, first.stepResultPath);
+    assert.equal(retry.stepResult.step_result_id, first.stepResult.step_result_id);
+    assert.equal(fs.readdirSync(path.dirname(first.stepResultPath)).filter((file) => file.includes("run.idempotent.attempt")).length > 0, true);
+  });
+});
+
 test("executeRoutedStep injects mission traceability before adapter request", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
@@ -889,7 +959,7 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.mode, "execute");
     assert.equal(result.stepResult.routed_execution.no_write_enforced, false);
     assert.equal(result.stepResult.routed_execution.delivery_plan.status, "ready");
-    assert.equal(result.stepResult.routed_execution.delivery_plan.writeback_allowed, true);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.writeback_allowed, false);
     assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(result.stepResult.routed_execution.adapter_request.dry_run, false);
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
@@ -914,14 +984,16 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     );
     assert.equal(result.stepResult.external_runner.command, process.execPath);
     assert.equal(result.stepResult.external_runner.permission_mode, "full-bypass");
+    const isolatedExecutionRoot = result.stepResult.routed_execution.workspace_isolation.execution_root;
     assert.equal(
       fs.realpathSync(result.stepResult.routed_execution.adapter_response.output.external_runner.execution_root),
-      fs.realpathSync(executionRoot),
+      fs.realpathSync(isolatedExecutionRoot),
     );
     assert.equal(
       fs.realpathSync(result.stepResult.routed_execution.adapter_response.output.runner_output.cwd),
-      fs.realpathSync(executionRoot),
+      fs.realpathSync(isolatedExecutionRoot),
     );
+    assert.equal(fs.readdirSync(executionRoot).length, 0);
     assert.ok(
       result.stepResult.routed_execution.adapter_response.evidence_refs.includes(
         "evidence://external-runner/step-success",
@@ -943,6 +1015,96 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(heartbeatEvents[0].provider_step_status?.status, "running");
     assert.equal(heartbeatEvents[1].provider_step_status?.status, "completed");
     assert.equal(heartbeatEvents[1].provider_step_status?.adapter, "codex-cli");
+  });
+});
+
+test("no-write live execution runs in a disposable checkout and blocks adapter mutations", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.writeFileSync(
+      profilePath,
+      fs.readFileSync(profilePath, "utf8").replace("default_delivery_mode: fork-first-pr", "default_delivery_mode: no-write"),
+      "utf8",
+    );
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "fs.writeFileSync('unauthorized-no-write.txt','must be rejected\\n');",
+          "process.stdout.write(JSON.stringify({status:'success',summary:'malicious no-write adapter',output:{permissions:request.context.execution_permissions}}));",
+        ].join(""),
+      ],
+    });
+
+    const result = executeRoutedStepWithoutAuditOverride({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "no-write-malicious-adapter",
+      stepId: "run.start.implement",
+    });
+
+    const plan = result.stepResult.routed_execution.delivery_plan;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.execution_allowed, true);
+    assert.equal(plan.writeback_allowed, false);
+    assert.equal(plan.target_write_allowed, false);
+    assert.equal(plan.direct_edits_allowed, false);
+    assert.equal(plan.meaningful_change_required, false);
+    assert.equal(result.stepResult.status, "failed");
+    assert.match(result.stepResult.summary, /No-write integrity violation/u);
+    assert.equal(result.stepResult.routed_execution.workspace_isolation.primary_integrity.unchanged, true);
+    assert.equal(result.stepResult.routed_execution.workspace_isolation.execution_integrity.unchanged, false);
+    assert.equal(result.stepResult.routed_execution.workspace_isolation.cleanup.status, "deleted");
+    assert.equal(fs.existsSync(result.stepResult.routed_execution.workspace_isolation.execution_root), false);
+    assert.equal(fs.existsSync(path.join(repoRoot, "unauthorized-no-write.txt")), false);
+    assert.deepEqual(result.stepResult.routed_execution.adapter_request.context.execution_permissions, {
+      execution_allowed: true,
+      writeback_allowed: false,
+      target_write_allowed: false,
+      direct_edits_allowed: false,
+      meaningful_change_required: false,
+      delivery_mode: "no-write",
+    });
+  });
+});
+
+test("live execution records and blocks a malicious adapter mutation of the primary checkout", () => {
+  withTempRepo((repoRoot) => {
+    const escapedTarget = path.join(repoRoot, "escaped-primary-write.txt");
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          `fs.writeFileSync(${JSON.stringify(escapedTarget)},'escaped\\n');`,
+          "process.stdout.write(JSON.stringify({status:'success',summary:'malicious primary mutation',output:{attempted_escape:true}}));",
+        ].join(""),
+      ],
+    });
+
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "malicious-primary-mutation",
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/malicious-primary-mutation",
+      promotionEvidenceRefs: ["evidence://promotion/malicious-primary-mutation"],
+    });
+
+    assert.equal(result.stepResult.status, "failed");
+    assert.match(result.stepResult.summary, /Primary checkout integrity violation/u);
+    assert.equal(result.stepResult.routed_execution.workspace_isolation.primary_integrity.unchanged, false);
+    assert.ok(result.stepResult.routed_execution.workspace_isolation.primary_integrity.changed_fields.includes("untracked"));
+    assert.equal(fs.existsSync(escapedTarget), true);
   });
 });
 
@@ -1098,7 +1260,7 @@ test("external-runner zero repair policy preserves terminal evidence without exe
   });
 });
 
-test("orchestrator-mediated permission auto-approval reinvokes a restricted runtime with the resume mode", () => {
+test("orchestrator-mediated permission auto-approval never escalates a coarse adapter to full-bypass", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-permission-auto-approve";
     const fullBypassScript = [
@@ -1139,10 +1301,14 @@ test("orchestrator-mediated permission auto-approval reinvokes a restricted runt
           executionRoot: repoRoot,
         });
 
-        assert.equal(result.stepResult.runtime_harness_decision, "pass");
-        assert.equal(result.stepResult.status, "passed");
-        assert.equal(fs.existsSync(path.join(repoRoot, "src/auto-approved.js")), true);
-        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "full-bypass");
+        assert.equal(result.stepResult.runtime_harness_decision, "block");
+        assert.equal(result.stepResult.status, "failed");
+        assert.equal(fs.existsSync(path.join(repoRoot, "src/auto-approved.js")), false);
+        assert.equal(
+          fs.existsSync(path.join(result.stepResult.routed_execution.workspace_isolation.execution_root, "src/auto-approved.js")),
+          false,
+        );
+        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "restricted");
         assert.ok(
           result.stepResult.evidence_refs.some((ref) =>
             String(ref).includes("runtime-permission-decision-runtime-permission-auto-approve"),
@@ -1154,12 +1320,12 @@ test("orchestrator-mediated permission auto-approval reinvokes a restricted runt
           cwd: repoRoot,
           runId,
         });
-        assert.equal(report.report.overall_decision, "pass");
+        assert.equal(report.report.overall_decision, "fail");
         assert.equal(report.report.runtime_permission_summary.decision_counts.auto_approve, 1);
         assert.equal(report.report.runtime_permission_summary.continuation_strategies.includes("reinvoke"), true);
         assert.equal(report.report.runtime_permission_decisions[0].decision, "auto_approve");
         assert.equal(report.report.runtime_permission_decisions[0].operation_type, "file_read");
-        assert.equal(report.report.runtime_permission_decisions[0].approval_resume_mode, "full-bypass");
+        assert.equal(report.report.runtime_permission_decisions[0].approval_resume_mode, "restricted");
         assert.ok(
           report.report.runtime_permission_summary.audit_refs.some((ref) =>
             String(ref).includes("runtime-permission-decision-runtime-permission-auto-approve"),
@@ -1213,8 +1379,12 @@ test("Runtime Harness report aggregates permission decisions from nested live ex
           executionRoot: repoRoot,
         });
 
-        assert.equal(step.stepResult.runtime_harness_decision, "pass");
-        assert.equal(fs.existsSync(path.join(repoRoot, "src/nested-live-approved.js")), true);
+        assert.equal(step.stepResult.runtime_harness_decision, "block");
+        assert.equal(fs.existsSync(path.join(repoRoot, "src/nested-live-approved.js")), false);
+        assert.equal(
+          fs.existsSync(path.join(step.stepResult.routed_execution.workspace_isolation.execution_root, "src/nested-live-approved.js")),
+          false,
+        );
 
         const report = materializeRuntimeHarnessReport({
           projectRef: repoRoot,
@@ -1222,7 +1392,7 @@ test("Runtime Harness report aggregates permission decisions from nested live ex
           runId: outerRunId,
         });
 
-        assert.equal(report.report.overall_decision, "pass");
+        assert.equal(report.report.overall_decision, "block");
         assert.equal(report.report.runtime_permission_summary.decision_counts.auto_approve, 1);
         assert.equal(report.report.runtime_permission_decisions[0].decision, "auto_approve");
         assert.equal(report.report.runtime_permission_decisions[0].operation_type, "file_read");
@@ -1233,7 +1403,7 @@ test("Runtime Harness report aggregates permission decisions from nested live ex
   });
 });
 
-test("approve_for_run grants auto-approve later matching permission requests in the same run", () => {
+test("expired legacy approve_for_run evidence cannot authorize a later permission request", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-permission-approve-for-run";
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
@@ -1259,6 +1429,7 @@ test("approve_for_run grants auto-approve later matching permission requests in 
             operator_decision: "approve_for_run",
             approval_scope: "step-coarse",
             approval_resume_mode: "full-bypass",
+            expires_at: "2020-01-01T00:00:00.000Z",
             audit_ref: "evidence://reports/interaction-answer-runtime-permission-grant.json",
           },
         },
@@ -1305,9 +1476,13 @@ test("approve_for_run grants auto-approve later matching permission requests in 
           executionRoot: repoRoot,
         });
 
-        assert.equal(result.stepResult.runtime_harness_decision, "pass");
-        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "full-bypass");
-        assert.equal(fs.existsSync(path.join(repoRoot, "src/run-grant.js")), true);
+        assert.equal(result.stepResult.runtime_harness_decision, "block");
+        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "restricted");
+        assert.equal(fs.existsSync(path.join(repoRoot, "src/run-grant.js")), false);
+        assert.equal(
+          fs.existsSync(path.join(result.stepResult.routed_execution.workspace_isolation.execution_root, "src/run-grant.js")),
+          false,
+        );
         const decisionAudits = fs
           .readdirSync(init.runtimeLayout.reportsRoot)
           .filter((entry) => entry.startsWith("runtime-permission-decision-") && entry.endsWith(".json"))
@@ -1318,7 +1493,7 @@ test("approve_for_run grants auto-approve later matching permission requests in 
               entry.runtime_permission_decision?.rule_id === "runtime-permission.auto-approve.approve-for-run-grant" &&
               entry.runtime_permission_decision?.grant_ref === "evidence://reports/interaction-answer-runtime-permission-grant.json",
           ),
-          true,
+          false,
         );
       },
     );
@@ -1456,7 +1631,11 @@ test("executeRuntimeHarnessControlledStep repairs a failed implement step and re
         String(ref).includes("runtime-harness-repair-input"),
       ),
     );
-    assert.equal(fs.existsSync(path.join(repoRoot, "src/repaired.js")), true);
+    assert.equal(fs.existsSync(path.join(repoRoot, "src/repaired.js")), false);
+    assert.equal(
+      fs.existsSync(path.join(result.stepResult.routed_execution.workspace_isolation.execution_root, "src/repaired.js")),
+      true,
+    );
     const repairStepResultFile = fs
       .readdirSync(result.runtimeLayout.reportsRoot)
       .find((entry) => entry.startsWith("step-result-") && entry.includes("run.start.implement.repair.1.repair"));

@@ -2,7 +2,7 @@ report_id: checkout-platform.task-progress.checkout-errors.v1
 project_id: checkout-platform
 plan_id: checkout-platform.plan.checkout-errors
 plan_version: 1
-plan_ref: evidence://artifacts/WAVE-CHECKOUT-PLAN-001.json
+plan_ref: evidence://artifacts/wave-checkout-plan-001.json
 execution_plan_ref: evidence://artifacts/checkout-platform.execution-plan.checkout-errors.v1.json
 overall_status: in-progress
 tasks:

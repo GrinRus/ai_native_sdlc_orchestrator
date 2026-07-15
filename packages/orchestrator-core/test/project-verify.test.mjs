@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,11 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { planProjectVerification, verifyProjectRuntime } from "../src/project-verify.mjs";
+import {
+  captureCheckoutSnapshot,
+  compareCheckoutSnapshots,
+  prepareWorkspaceIsolation,
+} from "../src/workspace-isolation.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -29,6 +35,86 @@ function withTempRepo(callback) {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
 }
+
+function git(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout.trim();
+}
+
+test("workspace isolation provisions a detached checkout for a linked worktree without mutating its source", () => {
+  const container = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03 space-ü-"));
+  const mainRoot = path.join(container, "main");
+  const linkedRoot = path.join(container, "linked checkout");
+  fs.mkdirSync(mainRoot);
+  try {
+    git(mainRoot, ["init"]);
+    git(mainRoot, ["config", "user.email", "aor@example.invalid"]);
+    git(mainRoot, ["config", "user.name", "AOR Test"]);
+    fs.writeFileSync(path.join(mainRoot, ".gitignore"), ".aor/\n", "utf8");
+    fs.writeFileSync(path.join(mainRoot, "source.txt"), "baseline\n", "utf8");
+    git(mainRoot, ["add", ".gitignore", "source.txt"]);
+    git(mainRoot, ["commit", "-m", "fixture"]);
+    git(mainRoot, ["worktree", "add", "--detach", linkedRoot, "HEAD"]);
+
+    const projectRuntimeRoot = path.join(linkedRoot, ".aor", "projects", "project-one");
+    fs.mkdirSync(projectRuntimeRoot, { recursive: true });
+    const before = captureCheckoutSnapshot(linkedRoot);
+    const isolation = prepareWorkspaceIsolation({
+      projectRoot: linkedRoot,
+      runtimeRoot: path.join(linkedRoot, ".aor"),
+      projectRuntimeRoot,
+      runtimeDefaults: { workspace_mode: "worktree" },
+      runId: "project-one.run-one",
+    });
+
+    assert.equal(isolation.mode, "worktree");
+    assert.notEqual(isolation.executionRoot, linkedRoot);
+    assert.notEqual(isolation.checkout.execution_git_dir, isolation.checkout.source_git_dir);
+    fs.writeFileSync(path.join(isolation.executionRoot, "source.txt"), "workspace-only\n", "utf8");
+    git(isolation.executionRoot, ["add", "source.txt"]);
+    assert.deepEqual(compareCheckoutSnapshots(before, captureCheckoutSnapshot(linkedRoot)), {
+      unchanged: true,
+      changed_fields: [],
+    });
+    assert.equal(fs.readFileSync(path.join(linkedRoot, "source.txt"), "utf8"), "baseline\n");
+
+    const cleanup = isolation.cleanup("success", "delete");
+    assert.equal(cleanup.status, "deleted");
+    assert.deepEqual(isolation.cleanup("success", "delete"), cleanup);
+    assert.equal(fs.existsSync(isolation.executionRoot), false);
+  } finally {
+    fs.rmSync(container, { recursive: true, force: true });
+  }
+});
+
+test("workspace cleanup refuses a symlink replacement and preserves its external target", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03-cleanup-"));
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03-outside-"));
+  try {
+    fs.writeFileSync(path.join(projectRoot, "source.txt"), "source\n", "utf8");
+    fs.writeFileSync(path.join(outsideRoot, "keep.txt"), "keep\n", "utf8");
+    const projectRuntimeRoot = path.join(projectRoot, ".aor", "projects", "project-one");
+    fs.mkdirSync(projectRuntimeRoot, { recursive: true });
+    const isolation = prepareWorkspaceIsolation({
+      projectRoot,
+      runtimeRoot: path.join(projectRoot, ".aor"),
+      projectRuntimeRoot,
+      runtimeDefaults: { workspace_mode: "ephemeral" },
+      runId: "project-one.cleanup-escape",
+    });
+
+    fs.rmSync(isolation.executionRoot, { recursive: true, force: true });
+    fs.symlinkSync(outsideRoot, isolation.executionRoot, "dir");
+    const cleanup = isolation.cleanup("failure", "delete");
+    assert.equal(cleanup.status, "delete-failed");
+    assert.match(cleanup.error, /symlinked workspace/u);
+    assert.equal(fs.readFileSync(path.join(outsideRoot, "keep.txt"), "utf8"), "keep\n");
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+    fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
 
 test("verifyProjectRuntime records passing bounded command execution", () => {
   withTempRepo((repoRoot) => {
@@ -55,9 +141,10 @@ test("verifyProjectRuntime records passing bounded command execution", () => {
     ]);
     assert.equal(result.verifySummary.preflight_safety.workspace_mode, "ephemeral");
     assert.equal(result.verifySummary.preflight_safety.network_mode, "deny-by-default");
-    assert.equal(result.verifySummary.execution_isolation.mode, "ephemeral");
-    assert.equal(result.verifySummary.execution_isolation.execution_root, repoRoot);
-    assert.equal(result.verifySummary.execution_isolation.cleanup.status, "skipped");
+    assert.equal(result.verifySummary.execution_isolation.requested_mode, "ephemeral");
+    assert.equal(result.verifySummary.execution_isolation.mode, "workspace-clone");
+    assert.notEqual(result.verifySummary.execution_isolation.execution_root, repoRoot);
+    assert.equal(result.verifySummary.execution_isolation.cleanup.status, "deleted");
     assert.equal(fs.existsSync(result.verifySummaryPath), true);
     assert.equal(result.stepResultFiles.every((filePath) => fs.existsSync(filePath)), true);
   });
@@ -393,7 +480,8 @@ test("verifyProjectRuntime supports worktree isolation mode and retains workspac
     const result = verifyProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
 
     assert.equal(result.verifySummary.status, "failed");
-    assert.equal(result.verifySummary.execution_isolation.mode, "worktree");
+    assert.equal(result.verifySummary.execution_isolation.requested_mode, "worktree");
+    assert.equal(result.verifySummary.execution_isolation.mode, "workspace-clone");
     assert.equal(result.verifySummary.execution_isolation.cleanup.status, "retained");
     assert.equal(fs.existsSync(result.verifySummary.execution_isolation.execution_root), true);
   });
@@ -673,7 +761,7 @@ test("verifyProjectRuntime executes command groups from configured working_dir",
 
     assert.equal(result.verifySummary.status, "passed");
     assert.equal(fs.existsSync(path.join(repoRoot, "working-dir-marker.txt")), false);
-    assert.equal(fs.existsSync(path.join(repoRoot, "apps/api/working-dir-marker.txt")), true);
+    assert.equal(fs.existsSync(path.join(repoRoot, "apps/api/working-dir-marker.txt")), false);
     assert.equal(result.stepResults[0].working_dir, "apps/api");
     assert.match(fs.readFileSync(result.stepResults[0].evidence_refs[0], "utf8"), /command_cwd: .*apps\/api/u);
     assert.equal(result.verifySummary.command_groups[0].working_dir, "apps/api");

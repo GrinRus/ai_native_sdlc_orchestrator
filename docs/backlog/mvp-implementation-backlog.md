@@ -498,25 +498,25 @@ This is the master index for the implementation slices across all defined waves.
 ## W57 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W57-S01 | Audit disposition, release hold, and local-app threat model | EPIC-0, EPIC-6 | ready | architecture/contracts/ops docs, README, production-readiness gate | W56-S03 |
-| W57-S09 | Complete test discovery and deterministic safety-gate baseline | EPIC-0 | blocked | root test discovery, readiness/CI/release gates, dependency baseline | W57-S01 |
-| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | blocked | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S09 |
-| W57-S03 | True workspace isolation and no-write enforcement | EPIC-1, EPIC-3, EPIC-5 | blocked | workspace isolation, step execution, delivery plan, adapter SDK | W57-S02 |
-| W57-S04 | Structural runtime permission enforcement | EPIC-3 | blocked | permission contracts/policy, step execution, adapter tests | W57-S02, W57-S03 |
-| W57-S05 | Exact-diff delivery and resolvable authorization evidence | EPIC-4, EPIC-5 | blocked | delivery/Harness contracts, delivery runtime, CLI/tests | W57-S02, W57-S03, W57-S04 |
-| W57-S06 | Transactional initialization and runtime-root containment | EPIC-1, EPIC-2 | blocked | project init, artifact store, asset roots, tests | W57-S02 |
-| W57-S07 | Atomic attempts, run control, and event identity | EPIC-2, EPIC-3, EPIC-6 | blocked | attempt/result store, run control, observability journal | W57-S06 |
-| W57-S10 | Project-anchored command and evidence resolution | EPIC-1, EPIC-2, EPIC-6 | blocked | project context, control-plane handlers, evidence/path resolution, package/browser tests | W57-S02, W57-S06 |
-| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | blocked | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10 |
+| W57-S01 | Audit disposition, release hold, and local-app threat model | EPIC-0, EPIC-6 | done | architecture/contracts/ops docs, README, production-readiness gate | W56-S03 |
+| W57-S09 | Complete test discovery and deterministic safety-gate baseline | EPIC-0 | done | root test discovery, readiness/CI/release gates, dependency baseline | W57-S01 |
+| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | done | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S09 |
+| W57-S03 | True workspace isolation and no-write enforcement | EPIC-1, EPIC-3, EPIC-5 | done | workspace isolation, step execution, delivery plan, adapter SDK | W57-S02 |
+| W57-S04 | Structural runtime permission enforcement | EPIC-3 | done | permission contracts/policy, step execution, adapter tests | W57-S02, W57-S03 |
+| W57-S05 | Exact-diff delivery and resolvable authorization evidence | EPIC-4, EPIC-5 | done | delivery/Harness contracts, delivery runtime, CLI/tests | W57-S02, W57-S03, W57-S04 |
+| W57-S06 | Transactional initialization and runtime-root containment | EPIC-1, EPIC-2 | done | project init, artifact store, asset roots, tests | W57-S02 |
+| W57-S07 | Atomic attempts, run control, and event identity | EPIC-2, EPIC-3, EPIC-6 | done | attempt/result store, run control, observability journal | W57-S06 |
+| W57-S10 | Project-anchored command and evidence resolution | EPIC-1, EPIC-2, EPIC-6 | done | project context, control-plane handlers, evidence/path resolution, package/browser tests | W57-S02, W57-S06 |
+| W57-S08 | Trust-boundary regression proof and release disposition | EPIC-0, EPIC-7 | done | root gates, safety fixtures, package smoke, audit ledger | W57-S03, W57-S04, W57-S05, W57-S06, W57-S07, W57-S10 |
 
 ## W58 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | blocked | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
-| W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | blocked | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
-| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | blocked | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
+| W58-S01 | Non-materializing read-model contract and runtime | EPIC-1, EPIC-6 | ready | control-plane contract, read services/handlers, CLI/API/web fixtures | W57-S08 |
+| W58-S02 | Effective context and unique asset identity | EPIC-1, EPIC-3, EPIC-4 | ready | asset/context contracts, registry/compiler, adapter SDK | W57-S08 |
+| W58-S03 | Executable route fallback, retry, repair, and adapter semantics | EPIC-3, EPIC-4, EPIC-7 | ready | route/policy contracts, provider routing, step execution, adapters | W57-S08 |
 | W58-S04 | Real evaluation, Harness lineage, and replay compatibility | EPIC-4 | blocked | eval/Harness contracts, scorer, certification, replay | W57-S05, W58-S02, W58-S03 |
-| W58-S05 | Asynchronous run jobs and durable live-event delivery | EPIC-3, EPIC-6 | blocked | lifecycle worker, process supervision, journal, SSE/CLI follow | W57-S08 |
+| W58-S05 | Asynchronous run jobs and durable live-event delivery | EPIC-3, EPIC-6 | ready | lifecycle worker, process supervision, journal, SSE/CLI follow | W57-S08 |
 | W58-S06 | Canonical API, OpenAPI, CLI, and service boundary | EPIC-0, EPIC-6 | blocked | API/CLI/control-plane services, OpenAPI, readiness tests | W58-S01, W58-S05 |
 | W58-S07 | Loopback-only local app transport boundary | EPIC-6 | blocked | local-console ADR, app launcher, HTTP transport/config/tests | W58-S01, W58-S06 |
 | W58-S08 | Runtime-quality acceptance proof | EPIC-0, EPIC-7 | blocked | integration proof, package smoke, audit/readiness evidence | W58-S02, W58-S03, W58-S04, W58-S05, W58-S06, W58-S07 |

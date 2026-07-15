@@ -223,6 +223,23 @@ function resetIntentToAddPaths(options) {
   });
 }
 
+function stageAuthorizedPaths(options) {
+  const paths = Array.from(new Set(options.expectedChangedPaths ?? [])).map(normalizeRepoPath).filter(Boolean);
+  if (paths.length === 0) {
+    throw new Error("Write-capable delivery requires an explicit non-empty authorized path set.");
+  }
+  const present = paths.filter((repoPath) => fs.existsSync(path.join(options.executionRoot, repoPath)));
+  const deleted = paths.filter((repoPath) => !fs.existsSync(path.join(options.executionRoot, repoPath)));
+  if (present.length > 0) {
+    options.commands.push(`git add -- ${present.join(" ")}`);
+    runGitChecked({ cwd: options.executionRoot, args: ["add", "--", ...present] });
+  }
+  if (deleted.length > 0) {
+    options.commands.push(`git rm --ignore-unmatch -- ${deleted.join(" ")}`);
+    runGitChecked({ cwd: options.executionRoot, args: ["rm", "--ignore-unmatch", "--", ...deleted] });
+  }
+}
+
 /**
  * @param {string} remoteUrl
  * @returns {{ host: string, owner: string, repo: string } | null}
@@ -244,6 +261,11 @@ function parseGitHubRemote(remoteUrl) {
       owner: sshMatch[2],
       repo: sshMatch[3],
     };
+  }
+
+  const sshUrlMatch = remoteUrl.match(/^ssh:\/\/(?:git@)?([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (sshUrlMatch) {
+    return { host: sshUrlMatch[1].toLowerCase(), owner: sshUrlMatch[2], repo: sshUrlMatch[3] };
   }
 
   return null;
@@ -328,7 +350,7 @@ export function runPatchOnlyDeliveryMode(options) {
 }
 
 /**
- * @param {{ executionRoot: string, runId: string, branchName?: string, commitMessage?: string }} options
+ * @param {{ executionRoot: string, runId: string, branchName?: string, commitMessage?: string, expectedChangedPaths?: string[] }} options
  */
 export function runLocalBranchDeliveryMode(options) {
   const commands = [];
@@ -341,11 +363,7 @@ export function runLocalBranchDeliveryMode(options) {
     args: ["checkout", "-B", branchName],
   });
 
-  commands.push("git add -A");
-  runGitChecked({
-    cwd: options.executionRoot,
-    args: ["add", "-A"],
-  });
+  stageAuthorizedPaths({ executionRoot: options.executionRoot, expectedChangedPaths: options.expectedChangedPaths, commands });
 
   commands.push("git diff --cached --quiet");
   const stagedDiff = runGit({
@@ -449,6 +467,13 @@ export function runForkFirstPrDeliveryMode(options) {
   const githubCliPath = asString(options.githubCliPath) ?? "gh";
   const forkRemoteUrl =
     asString(options.forkRemoteUrl) ?? `https://github.com/${forkOwner}/${parsedRemote.repo}.git`;
+  const parsedForkRemote = parseGitHubRemote(forkRemoteUrl);
+  const localForkRemote = path.isAbsolute(forkRemoteUrl) && fs.existsSync(forkRemoteUrl);
+  if ((!parsedForkRemote && !localForkRemote) || (parsedForkRemote && parsedForkRemote.host !== parsedRemote.host) ||
+      (parsedForkRemote && parsedForkRemote.owner.toLowerCase() === parsedRemote.owner.toLowerCase() &&
+       parsedForkRemote.repo.toLowerCase() === parsedRemote.repo.toLowerCase())) {
+    throw new Error("Fork remote must be a distinct repository on the verified upstream host.");
+  }
 
   const intentToAddPaths = stageExpectedUntrackedPaths({
     executionRoot: options.executionRoot,
@@ -597,6 +622,13 @@ export function runForkFirstPrDeliveryMode(options) {
     });
     forkState = "created";
   }
+  const forkFullName = asString(forkMetadata.full_name);
+  const forkParentFullName = asString(asRecord(forkMetadata.parent).full_name);
+  const expectedForkFullName = `${forkOwner}/${parsedRemote.repo}`.toLowerCase();
+  const expectedParentFullName = `${parsedRemote.owner}/${parsedRemote.repo}`.toLowerCase();
+  if (forkFullName?.toLowerCase() !== expectedForkFullName || forkParentFullName?.toLowerCase() !== expectedParentFullName) {
+    throw new Error("Fork repository metadata does not prove the requested fork identity and upstream parent.");
+  }
 
   commands.push(`git checkout -B ${headBranch}`);
   runGitChecked({
@@ -604,11 +636,7 @@ export function runForkFirstPrDeliveryMode(options) {
     args: ["checkout", "-B", headBranch],
   });
 
-  commands.push("git add -A");
-  runGitChecked({
-    cwd: options.executionRoot,
-    args: ["add", "-A"],
-  });
+  stageAuthorizedPaths({ executionRoot: options.executionRoot, expectedChangedPaths: options.expectedChangedPaths, commands });
 
   commands.push("git diff --cached --quiet");
   const stagedDiff = runGit({

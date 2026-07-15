@@ -1,6 +1,6 @@
-report_id: RUN-DELIVERY-004.runtime-harness-report.v1
+report_id: run-delivery-004.runtime-harness-report.v1
 project_id: aor-core
-run_id: RUN-DELIVERY-004
+run_id: run-delivery-004
 generated_at: 2026-04-26T00:10:00.000Z
 mission_type: code-changing
 strictness_profile: strict-code-changing
@@ -12,9 +12,9 @@ run_controller:
   started_at: 2026-04-26T00:00:00.000Z
   finished_at: 2026-04-26T00:10:00.000Z
   transition_count: 4
-  terminal_transition_id: RUN-DELIVERY-004.transition.close.004
+  terminal_transition_id: run-delivery-004.transition.close.004
 run_transitions:
-  - transition_id: RUN-DELIVERY-004.transition.prepare.001
+  - transition_id: run-delivery-004.transition.prepare.001
     stage: prepare
     status: pass
     runtime_harness_decision: pass
@@ -23,7 +23,7 @@ run_transitions:
     finished_at: 2026-04-26T00:00:01.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
-  - transition_id: RUN-DELIVERY-004.transition.execute.002
+  - transition_id: run-delivery-004.transition.execute.002
     stage: execute
     status: pass
     runtime_harness_decision: pass
@@ -32,7 +32,7 @@ run_transitions:
     finished_at: 2026-04-26T00:08:00.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
-  - transition_id: RUN-DELIVERY-004.transition.verify.003
+  - transition_id: run-delivery-004.transition.verify.003
     stage: verify
     status: pass
     runtime_harness_decision: pass
@@ -41,7 +41,7 @@ run_transitions:
     finished_at: 2026-04-26T00:09:00.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
-  - transition_id: RUN-DELIVERY-004.transition.close.004
+  - transition_id: run-delivery-004.transition.close.004
     stage: close
     status: pass
     runtime_harness_decision: pass
@@ -61,7 +61,7 @@ run_decision:
 step_decisions:
   - step_id: run.start.implement
     step_class: runner
-    compiled_context_ref: compiled-context://RUN-DELIVERY-004.implement
+    compiled_context_ref: compiled-context://run-delivery-004.implement
     adapter_status: success
     failure_class: null
     mission_outcome: satisfied
@@ -90,7 +90,7 @@ step_decisions:
         - repos/mobile/src/api/client.ts
         - repos/frontend/src/api/client.ts
       ignored_input_files:
-        - requests/RUN-DELIVERY-004.json
+        - requests/run-delivery-004.json
       strict_code_changing_noop: false
       meaningful_changed_paths:
         - repos/backend/src/orders.ts

@@ -12,7 +12,7 @@ import { materializeReviewReport } from "../src/review-run.mjs";
  * @param {(repoRoot: string) => void} callback
  */
 function withGitRepo(callback) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-review-run-"));
+  const repoRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-review-run-")));
   try {
     runGit(repoRoot, ["init"]);
     fs.mkdirSync(path.join(repoRoot, "source"), { recursive: true });

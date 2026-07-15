@@ -56,6 +56,21 @@ The detached HTTP/SSE transport now has two explicit security modes:
 - `local-trusted` is the default for loopback development and local harness use. It may run without bearer credentials, but it still uses the same route permission metadata and redaction helpers.
 - `production-hardened` requires bearer authentication for every read, stream, and mutation route. This mode is a transport hardening baseline, not an enterprise identity-provider integration or hosted SaaS claim.
 
+The packaged browser application is a separate loopback-only same-origin
+topology. It does not make the detached API a hosted-web backend, may not attach
+to an arbitrary remote control plane, and may not persist AOR bearer tokens in
+browser storage. The detached production-hardened API remains fully usable
+without the SPA. Hosted browser authentication, SSO, TLS termination, tenant
+security, and public cross-origin access require a future ADR and contract.
+
+While the July 2026 trust-boundary audit hold is open, lifecycle mutation bodies
+may carry `unsafe_development_override: true`. The shared runtime accepts it only
+as an explicit, auditable development override for external write-capable live
+execution or credentialed network delivery. Omission and `false` are equivalent
+and fail closed for those operations. Dry-run, mock, contract,
+repository-integrity, and external `no-write` paths do not require the override.
+The field is not release clearance and transport wrappers may not synthesize it.
+
 Auth and authorization behavior:
 - bearer principals are configured out-of-band when the detached transport starts;
 - each principal carries `read` and/or `mutate` permission scopes plus allowed `project_refs`;
@@ -99,6 +114,15 @@ The control plane remains the orchestration owner:
 - guided web can invoke operator-request mutations to analyze, explain, revise, repair, validate, plan, implement, or review bounded artifacts from any stage while keeping raw request text in durable evidence only;
 - the installed local SPA is served by `aor app` from the shared HTTP transport, not by importing `apps/api` into the CLI launcher;
 - the installed local SPA can switch between explicitly registered local projects through app-session project summaries, but each selected project keeps separate runtime state, flow projections, evidence refs, and mutation routes;
+- CLI/app/API ingress creates one immutable selected-project context containing
+  the runtime project id, canonical project root, runtime root, project runtime
+  root, canonical profile path, and registry identity. Downstream compatibility
+  options are derived from that context with `cwd` pinned to the canonical
+  project root; launcher cwd is never an internal fallback.
+- project-, runtime-, evidence-, and repository-relative references use an
+  explicit context base and reject absolute, traversal, empty-segment,
+  backslash, and existing-symlink escapes. Read-only context creation and
+  project selection never materialize runtime state.
 - read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
 - guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
 
@@ -411,7 +435,7 @@ HTTP interactive answer mutation baseline:
 - CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
 - for runtime permission requests, `decision` is required; legacy free-text `answer` is only compatible with ordinary clarification questions.
 - for runtime permission requests, answer submission records the structured decision but must not claim a pass unless an actual continuation or reinvocation has run. Current coarse external-process adapters report `continuation.reinvoke_required` after user approval so the next runtime action is explicit.
-- `approve_for_run` creates a run-scoped grant that may auto-approve later matching permission requests in the same run after hard-deny policy checks still pass; it is not persisted globally.
+- `approve_once` applies only to the recorded operation. `approve_for_run` creates an expiring grant, but reuse still requires the same project, run, step, operation identity, canonical resource, and capability set after hard-deny checks pass; it cannot broaden resources or cross a step boundary and is not persisted globally.
 
 ## Operator request mutations (W32-S01)
 
@@ -458,6 +482,8 @@ Run-level read baseline:
 ## Run-control baseline (module operations)
 
 Command payload baseline:
+- `command_id` (optional canonical id; generated when omitted and authoritative for idempotent retry);
+- `expected_revision` (optional non-negative integer CAS guard);
 - `reason` (optional text summary for operator intent);
 - `target_step` (optional for `start`, required for `steer`);
 - `require_validation_pass` (optional start-only boolean, defaults to true for public execution runs);
@@ -478,7 +504,8 @@ Guardrail baseline:
 
 Durable audit baseline:
 - every control action writes one durable `run-control-event-*.json` record under runtime reports;
-- control records include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
+- control records include `run_id`, `command_id`, `revision`, `action`, transition snapshot, guardrail decision, and `evidence_root`;
+- state transitions and their command records are serialized by a per-run cross-process lease; the same command id and payload returns the stored result, reuse with different content conflicts, and a stale expected revision is rejected before mutation.
 
 Full-journey execution baseline (W13):
 - `run start` is the canonical public execution entrypoint for full-journey live runs;
@@ -664,10 +691,11 @@ Detached read-model scale baseline:
 
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`,
-  `approval_ref`, and optional paired `execution_plan_ref` /
+  `approval_ref`, optional `command_id`, optional non-negative
+  `expected_revision`, and optional paired `execution_plan_ref` /
   `execution_unit_id` for `start`; the pair is resolved against the exact
   current approved plan and fixes task refs in run state;
-- run-control response reuses module parity fields: `state_file`, `audit_file`, guardrail decision, transition, live event ids;
+- run-control response reuses module parity fields: `command_id`, `revision`, `state_file`, `audit_file`, guardrail decision, transition, live event ids;
 - blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
 - ui lifecycle payload fields: `action`, `run_id`, `control_plane`;
 - ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.

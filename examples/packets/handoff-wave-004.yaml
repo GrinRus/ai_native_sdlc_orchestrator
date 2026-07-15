@@ -1,6 +1,6 @@
-packet_id: HANDOFF-004
+packet_id: handoff-004
 project_id: aor-core
-ticket_id: WAVE-004
+ticket_id: wave-004
 version: 2
 status: approved
 risk_tier: medium
@@ -116,7 +116,7 @@ approval_refs:
 baseline_refs:
   - route://route.implement.default@stable
 coordination_refs:
-  - evidence://coordination/WAVE-004/backend-mobile-frontend
+  - evidence://coordination/wave-004/backend-mobile-frontend
 integration_validation_refs:
   - validation://integration/backend-frontend/api-contract
   - validation://integration/backend-mobile/api-contract

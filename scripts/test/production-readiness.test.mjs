@@ -5,6 +5,14 @@ import path from "node:path";
 import test from "node:test";
 
 import { runProductionReadinessGate } from "../production-readiness.mjs";
+import { evaluateAuditReleaseHold } from "../../packages/orchestrator-core/src/audit-release-hold.mjs";
+import { getCommandDefinition } from "../../packages/orchestrator-core/src/operator-cli/command-catalog.mjs";
+import {
+  buildTestExecutionPlan,
+  discoverTestExecutionPlan,
+  readGitHead,
+  validateTestExecutionReport,
+} from "../test-discovery.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
 const proofFixturePath = path.posix.join(
@@ -14,9 +22,38 @@ const proofFixturePath = path.posix.join(
   "w25-s03-production-proof.json",
 );
 
-test("production readiness gate passes with the committed W25 proof fixture", () => {
-  const result = runProductionReadinessGate({ rootDir: root });
-  assert.equal(result.status, "pass");
+function writeCurrentPassingTestReport() {
+  const plan = discoverTestExecutionPlan(root);
+  const reportPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aor-readiness-report-")), "test-report.json");
+  fs.writeFileSync(reportPath, `${JSON.stringify({
+    status: "pass",
+    git_head: readGitHead(root),
+    manifest_digest: plan.manifest_digest,
+    discovered_files: plan.candidates,
+    executed_files: plan.candidates,
+    groups: plan.groups.map((group) => ({ ...group, status: "pass" })),
+    duplicate_files: [],
+    missing_files: [],
+  }, null, 2)}\n`);
+  return reportPath;
+}
+
+test("production readiness gate enforces the committed audit hold with healthy internal checks", () => {
+  const ledger = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
+  );
+  const auditIds = ledger.findings
+    .map((entry) => entry.finding_id)
+    .filter((findingId) => /^AUD-[0-9]{3}$/u.test(findingId));
+  assert.equal(auditIds.length, 55);
+  assert.ok(auditIds.includes("AUD-055"));
+  const result = runProductionReadinessGate({ rootDir: root, testReportPath: writeCurrentPassingTestReport() });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.gate_execution_status, "pass");
+  assert.equal(result.release_disposition, "audit-hold");
+  assert.equal(result.release_clearance, false);
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-006"));
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
@@ -25,6 +62,163 @@ test("production readiness gate passes with the committed W25 proof fixture", ()
     result.checks.find((check) => check.id === "w30-alpha-hardening")?.status,
     "pass",
   );
+  assert.equal(result.checks.find((check) => check.id === "dependency-safety")?.status, "pass");
+  assert.equal(result.checks.find((check) => check.id === "w57-remediation-closure")?.status, "pass");
+  assert.equal(
+    result.remediation_closure_reports.W57,
+    "docs/research/08-w57-security-reliability-closure.json",
+  );
+});
+
+test("W57 closure report maps its audit scope exactly once and fails closed on drift", () => {
+  const source = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/08-w57-security-reliability-closure.json"), "utf8"),
+  );
+  assert.equal(source.findings.length, 21);
+  assert.equal(new Set(source.findings.map((entry) => entry.finding_id)).size, 21);
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w57-closure-"));
+  const tempClosure = path.join(tempDir, "w57-closure.json");
+  source.findings = source.findings.filter((entry) => entry.finding_id !== "AUD-017");
+  fs.writeFileSync(tempClosure, `${JSON.stringify(source, null, 2)}\n`);
+  const result = runProductionReadinessGate({
+    rootDir: root,
+    w57ClosurePath: tempClosure,
+    testReportPath: writeCurrentPassingTestReport(),
+  });
+  assert.equal(result.status, "fail");
+  const closureCheck = result.checks.find((check) => check.id === "w57-remediation-closure");
+  assert.equal(closureCheck?.status, "fail");
+  assert.match(closureCheck?.findings?.join("\n") ?? "", /missing 'AUD-017'/u);
+});
+
+test("production readiness gate clears only a valid ledger with evidence-backed closed blockers", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-audit-ledger-"));
+  const tempLedger = path.join(tempDir, "audit-ledger.json");
+  const ledger = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
+  );
+  ledger.release_disposition = "cleared";
+  ledger.findings = ledger.findings.map((entry) => ({
+    ...entry,
+    state: "resolved",
+    evidence_refs: entry.evidence_refs.length > 0 ? entry.evidence_refs : [`evidence://closure/${entry.finding_id}`],
+  }));
+  fs.writeFileSync(tempLedger, `${JSON.stringify(ledger, null, 2)}\n`);
+
+  const result = runProductionReadinessGate({ rootDir: root, auditLedgerPath: tempLedger, testReportPath: writeCurrentPassingTestReport() });
+  assert.equal(result.status, "pass");
+  assert.equal(result.gate_execution_status, "pass");
+  assert.equal(result.release_disposition, "cleared");
+  assert.equal(result.release_clearance, true);
+});
+
+test("production readiness gate distinguishes an invalid ledger from an expected hold", () => {
+  const result = runProductionReadinessGate({
+    rootDir: root,
+    auditLedgerPath: "docs/research/missing-audit-ledger.json",
+  });
+  assert.equal(result.status, "fail");
+  assert.equal(result.gate_execution_status, "fail");
+  assert.equal(result.release_disposition, "unknown");
+  assert.equal(result.release_clearance, false);
+});
+
+test("CI workflow accepts only the explicit healthy audit-hold mode", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+  assert.match(workflow, /pnpm production:ready --json --expect-audit-hold/u);
+  assert.doesNotMatch(workflow, /run: pnpm production:ready\s*$/mu);
+});
+
+test("test discovery maps all 60 tracked candidates exactly once", () => {
+  const plan = discoverTestExecutionPlan(root);
+  assert.equal(plan.ok, true, plan.errors.join("\n"));
+  assert.equal(plan.candidate_count, 60);
+  assert.equal(plan.excluded.length, 0);
+  assert.equal(plan.groups.flatMap((group) => group.files).length, 60);
+});
+
+test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {
+  const candidates = ["area/test/example.test.mjs"];
+  const unmapped = buildTestExecutionPlan({ rootDir: root, manifest: { groups: [], exclusions: [] }, candidates });
+  assert.equal(unmapped.ok, false);
+  assert.match(unmapped.errors.join("\n"), /not mapped/u);
+
+  const duplicate = buildTestExecutionPlan({
+    rootDir: root,
+    manifest: {
+      groups: [
+        { group_id: "one", path_prefixes: ["area/"], timeout_class: "standard" },
+        { group_id: "two", path_prefixes: ["area/test/"], timeout_class: "standard" },
+      ],
+      exclusions: [],
+    },
+    candidates,
+  });
+  assert.equal(duplicate.ok, false);
+  assert.match(duplicate.errors.join("\n"), /multiple groups/u);
+
+  const invalidExclusion = buildTestExecutionPlan({
+    rootDir: root,
+    manifest: { groups: [], exclusions: [{ path: candidates[0], owner: "", reason: "", expires_at: "2020-01-01" }] },
+    candidates,
+    now: new Date("2026-07-15T00:00:00Z"),
+  });
+  assert.equal(invalidExclusion.ok, false);
+  assert.match(invalidExclusion.errors.join("\n"), /owner|reason|expired/u);
+});
+
+test("readiness test evidence rejects stale head and accepts complete current execution", () => {
+  const plan = discoverTestExecutionPlan(root);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-test-report-"));
+  const reportPath = path.join(tempDir, "test-report.json");
+  const report = {
+    status: "pass",
+    git_head: readGitHead(root),
+    manifest_digest: plan.manifest_digest,
+    discovered_files: plan.candidates,
+    executed_files: plan.candidates,
+    groups: plan.groups.map((group) => ({ ...group, status: "pass" })),
+    duplicate_files: [],
+    missing_files: [],
+  };
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  assert.equal(validateTestExecutionReport(root, { reportPath }).ok, true);
+  report.git_head = "stale";
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  const stale = validateTestExecutionReport(root, { reportPath });
+  assert.equal(stale.ok, false);
+  assert.match(stale.errors.join("\n"), /current Git HEAD/u);
+});
+
+test("audit release hold blocks only external write-capable live execution without explicit override", () => {
+  const externalRuntime = { command: "provider" };
+  assert.equal(
+    evaluateAuditReleaseHold({ dryRun: true, externalRuntime, deliveryMode: "patch-only" }).allowed,
+    true,
+  );
+  assert.equal(
+    evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "no-write" }).allowed,
+    true,
+  );
+  const blocked = evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "patch-only" });
+  assert.equal(blocked.allowed, false);
+  assert.equal(blocked.code, "audit_release_hold");
+  const overridden = evaluateAuditReleaseHold({
+    dryRun: false,
+    externalRuntime,
+    deliveryMode: "patch-only",
+    unsafeDevelopmentOverride: true,
+  });
+  assert.equal(overridden.allowed, true);
+  assert.equal(overridden.override_used, true);
+});
+
+test("write-capable command surfaces expose the explicit unsafe development override", () => {
+  for (const command of ["project verify", "run start", "deliver prepare", "release prepare"]) {
+    const definition = getCommandDefinition(command);
+    assert.ok(definition?.inputs.some((input) => input.includes("--unsafe-development-override")), command);
+  }
 });
 
 test("production readiness gate fails closed without W25 proof evidence", () => {
@@ -79,6 +273,10 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
   const responses = openApi.components.responses;
   const requestBodies = openApi.components.requestBodies;
   const schemas = openApi.components.schemas;
+  assert.equal(
+    schemas.LifecycleCommandActionRequest.properties.unsafe_development_override.default,
+    false,
+  );
 
   const responseRefs = {
     projectState: openApi.paths["/api/projects/{projectId}/state"].get.responses["200"].$ref,

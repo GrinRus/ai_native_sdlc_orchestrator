@@ -2,6 +2,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { matchesAllowedPath } from "../../../contracts/src/index.mjs";
+
 const BOOTSTRAP_OWNED_PREFIXES = ["examples/", "context/", ".aor/"];
 const BOOTSTRAP_OWNED_FILES = new Set(["project.aor.yaml"]);
 const RUNNER_OWNED_STATE_PREFIXES = [".codex/", ".claude/", ".qwen/", ".opencode/"];
@@ -71,39 +73,53 @@ function listJsonFiles(dirPath) {
 }
 
 /**
+ * @param {string} output
+ * @returns {Array<{ indexStatus: string, worktreeStatus: string, kind: string, path: string, sourcePath: string | null, destinationPath: string | null, paths: string[] }>}
+ */
+export function parseGitStatusPorcelainZ(output) {
+  const fields = output.split("\0");
+  if (fields.at(-1) === "") fields.pop();
+  const changes = [];
+  for (let index = 0; index < fields.length; index += 1) {
+    const entry = fields[index];
+    if (entry.length < 4 || entry[2] !== " ") continue;
+    const indexStatus = entry[0];
+    const worktreeStatus = entry[1];
+    const statusPath = entry.slice(3);
+    const isRenameOrCopy = indexStatus === "R" || indexStatus === "C" || worktreeStatus === "R" || worktreeStatus === "C";
+    const sourcePath = isRenameOrCopy ? fields[index + 1] ?? null : null;
+    if (isRenameOrCopy) index += 1;
+    changes.push({
+      indexStatus,
+      worktreeStatus,
+      kind: isRenameOrCopy ? (indexStatus === "C" || worktreeStatus === "C" ? "copy" : "rename") : "path",
+      path: statusPath,
+      sourcePath,
+      destinationPath: isRenameOrCopy ? statusPath : null,
+      paths: sourcePath ? [sourcePath, statusPath] : [statusPath],
+    });
+  }
+  return changes;
+}
+
+/**
  * @param {string} root
- * @returns {{ available: boolean, changedPaths: string[] }}
+ * @returns {{ available: boolean, changedPaths: string[], changes: ReturnType<typeof parseGitStatusPorcelainZ> }}
  */
 export function listChangedPaths(root) {
   if (!fs.existsSync(root)) {
-    return { available: false, changedPaths: [] };
+    return { available: false, changedPaths: [], changes: [] };
   }
-  const run = spawnSync("git", ["status", "--porcelain", "--untracked-files=all", "--", ".", ":!.aor/**"], {
+  const run = spawnSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ".", ":!.aor/**"], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 8 * 1024 * 1024,
   });
   if (run.status !== 0) {
-    return { available: false, changedPaths: [] };
+    return { available: false, changedPaths: [], changes: [] };
   }
-  const changedPaths = (run.stdout ?? "")
-    .split(/\r?\n/u)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => line.slice(3).trim())
-    .map((candidate) => {
-      const renameParts = candidate.split(" -> ");
-      return renameParts.length > 1 ? renameParts[renameParts.length - 1] : candidate;
-    })
-    .map((candidate) => {
-      if (!candidate.startsWith("\"") || !candidate.endsWith("\"")) return candidate;
-      try {
-        return /** @type {string} */ (JSON.parse(candidate));
-      } catch {
-        return candidate.slice(1, -1);
-      }
-    })
-    .map((candidate) => candidate.replace(/\\/g, "/"));
-  return { available: true, changedPaths };
+  const changes = parseGitStatusPorcelainZ(run.stdout ?? "");
+  return { available: true, changedPaths: [...new Set(changes.flatMap((change) => change.paths))], changes };
 }
 
 /**
@@ -204,22 +220,7 @@ export function filterRunnerOwnedStatePaths(changedPaths) {
  * @returns {boolean}
  */
 export function matchesScopePattern(pattern, candidate) {
-  const normalizedPattern = pattern.replace(/\\/g, "/").replace(/^\.\//u, "");
-  const normalizedCandidate = candidate.replace(/\\/g, "/").replace(/^\.\//u, "");
-  if (normalizedPattern === "**" || normalizedPattern === "**/*") return true;
-  if (normalizedPattern.endsWith("/**")) {
-    const prefix = normalizedPattern.slice(0, -3);
-    return normalizedCandidate === prefix || normalizedCandidate.startsWith(`${prefix}/`);
-  }
-  if (normalizedPattern.endsWith("/*")) {
-    const prefix = normalizedPattern.slice(0, -1);
-    return normalizedCandidate.startsWith(prefix) && !normalizedCandidate.slice(prefix.length).includes("/");
-  }
-  if (!normalizedPattern.includes("*")) {
-    return normalizedCandidate === normalizedPattern;
-  }
-  const wildcardPrefix = normalizedPattern.slice(0, normalizedPattern.indexOf("*"));
-  return normalizedCandidate.startsWith(wildcardPrefix);
+  return matchesAllowedPath(pattern, candidate);
 }
 
 /**
@@ -303,7 +304,10 @@ export function collectMissionChangeEvidence(options) {
   const changedPathStatus = listChangedPaths(gitStatusRoot);
   const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatus.changedPaths);
   const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatus.changedPaths);
-  const missionScope = loadMissionScope(gitStatusRoot, options.artifactsRoot);
+  // Intake packet paths are owned by the canonical project checkout, while Git
+  // evidence is collected from its disposable checkout. Both checkouts share
+  // the same project-relative namespace but never the same absolute root.
+  const missionScope = loadMissionScope(options.projectRoot, options.artifactsRoot);
   const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope, {
     projectRoot: gitStatusRoot,
   });

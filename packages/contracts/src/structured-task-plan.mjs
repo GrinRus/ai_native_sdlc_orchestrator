@@ -1,4 +1,5 @@
 import { describeActualType, isPlainObject, issue } from "./utils.mjs";
+import { matchesAllowedPath } from "./canonical-values.mjs";
 
 export const STRUCTURED_TASK_MODEL_VERSION = 1;
 export const PLAN_STATUS_VALUES = Object.freeze([
@@ -115,20 +116,8 @@ function validateEnum(record, field, allowedValues, source, issues) {
   return value;
 }
 
-function normalizeScopePath(value) {
-  return value.replaceAll("\\", "/").replace(/^\.\//u, "");
-}
-
 function pathWithinAllowedScope(candidate, allowedPaths) {
-  const normalizedCandidate = normalizeScopePath(candidate);
-  return allowedPaths.some((allowed) => {
-    const normalizedAllowed = normalizeScopePath(allowed);
-    if (normalizedAllowed === "**" || normalizedAllowed === normalizedCandidate) return true;
-    if (normalizedAllowed.endsWith("/**")) {
-      return normalizedCandidate.startsWith(normalizedAllowed.slice(0, -2));
-    }
-    return false;
-  });
+  return allowedPaths.some((allowed) => matchesAllowedPath(allowed, candidate));
 }
 
 function findCycle(taskIds, dependencies) {

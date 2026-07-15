@@ -1,9 +1,9 @@
-manifest_id: DM-004
+manifest_id: dm-004
 project_id: aor-core
-ticket_id: WAVE-004
+ticket_id: wave-004
 run_refs:
-  - RUN-101
-step_ref: RUN-101:delivery.apply
+  - run-101
+step_ref: run-101:delivery.apply
 delivery_mode: fork-first-pr
 execution_isolation:
   mode: workspace-clone
@@ -19,15 +19,15 @@ execution_isolation:
 writeback_policy:
   allow_remote_push: true
   require_review_before_merge: true
-  branch_pattern: aor/WAVE-004/RUN-101
+  branch_pattern: aor/wave-004/run-101
 repo_deliveries:
   - repo_id: backend
     role: backend
     source_kind: git
     source_root: repos/backend
     base_ref: origin/main
-    head_ref: refs/heads/aor/WAVE-004/RUN-101
-    branch_name: aor/WAVE-004/RUN-101
+    head_ref: refs/heads/aor/wave-004/run-101
+    branch_name: aor/wave-004/run-101
     changed_paths:
       - repos/backend/src/orders.ts
       - repos/backend/contracts/openapi.yaml
@@ -44,7 +44,7 @@ repo_deliveries:
         - mobile
         - frontend
       evidence_refs:
-        - evidence://coordination/WAVE-004/backend-mobile-frontend
+        - evidence://coordination/wave-004/backend-mobile-frontend
       lock_evidence_refs:
         - evidence://reports/multirepo-coordination-status.sample.yaml
       cross_repo_validation_refs:
@@ -56,8 +56,8 @@ repo_deliveries:
     source_kind: git
     source_root: repos/mobile
     base_ref: origin/main
-    head_ref: refs/heads/aor/WAVE-004/RUN-101
-    branch_name: aor/WAVE-004/RUN-101
+    head_ref: refs/heads/aor/wave-004/run-101
+    branch_name: aor/wave-004/run-101
     changed_paths:
       - repos/mobile/src/api/client.ts
     commit_refs:
@@ -71,7 +71,7 @@ repo_deliveries:
         - mobile
         - frontend
       evidence_refs:
-        - evidence://coordination/WAVE-004/backend-mobile-frontend
+        - evidence://coordination/wave-004/backend-mobile-frontend
       lock_evidence_refs:
         - evidence://reports/multirepo-coordination-status.sample.yaml
       cross_repo_validation_refs:
@@ -81,8 +81,8 @@ repo_deliveries:
     source_kind: git
     source_root: repos/frontend
     base_ref: origin/main
-    head_ref: refs/heads/aor/WAVE-004/RUN-101
-    branch_name: aor/WAVE-004/RUN-101
+    head_ref: refs/heads/aor/wave-004/run-101
+    branch_name: aor/wave-004/run-101
     changed_paths:
       - repos/frontend/src/api/client.ts
     commit_refs:
@@ -96,14 +96,14 @@ repo_deliveries:
         - mobile
         - frontend
       evidence_refs:
-        - evidence://coordination/WAVE-004/backend-mobile-frontend
+        - evidence://coordination/wave-004/backend-mobile-frontend
       lock_evidence_refs:
         - evidence://reports/multirepo-coordination-status.sample.yaml
       cross_repo_validation_refs:
         - validation://integration/backend-frontend/api-contract
 verification_refs:
-  - evidence://reports/RUN-101/tests.xml
-  - evidence://evaluation/RUN-101/release-suite.json
+  - evidence://reports/run-101/tests.xml
+  - evidence://evaluation/run-101/release-suite.json
 approval_context:
   approved_handoff:
     status: present
@@ -116,7 +116,7 @@ approval_context:
     required: true
     enforced: true
     status: pass
-    report_id: RUN-101.runtime-harness-report.v1
+    report_id: run-101.runtime-harness-report.v1
     report_ref: evidence://reports/runtime-harness-report-strict-delivery-pass.yaml
     overall_decision: pass
     run_decision: pass
@@ -130,7 +130,7 @@ approval_context:
   coordination_evidence:
     status: present
     refs:
-      - evidence://coordination/WAVE-004/backend-mobile-frontend
+      - evidence://coordination/wave-004/backend-mobile-frontend
     lock_refs:
       - evidence://reports/multirepo-coordination-status.sample.yaml
     cross_repo_validation_refs:
@@ -143,7 +143,7 @@ coordination:
     - mobile
     - frontend
   evidence_refs:
-    - evidence://coordination/WAVE-004/backend-mobile-frontend
+    - evidence://coordination/wave-004/backend-mobile-frontend
   lock_evidence_refs:
     - evidence://reports/multirepo-coordination-status.sample.yaml
   cross_repo_validation_refs:

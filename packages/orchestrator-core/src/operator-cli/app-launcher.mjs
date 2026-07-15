@@ -387,7 +387,7 @@ export async function runAppCommand(args, options = {}) {
       control_plane: transport.baseUrl,
       project_id: transport.projectId,
       project_profile_ref: transport.projectProfileRef,
-      project_ref: projectRef,
+      project_ref: transport.projectRef,
       runtime_root: transport.runtimeRoot ?? (runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor")),
       host: transport.host,
       port: transport.port,

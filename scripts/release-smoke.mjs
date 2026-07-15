@@ -33,7 +33,7 @@ function parseJsonOutput(stdout) {
 }
 
 function createTargetRepo(tempRoot) {
-  const targetRepo = path.join(tempRoot, "target-repo");
+  const targetRepo = path.join(tempRoot, "target repo Δ");
   fs.mkdirSync(path.join(targetRepo, "src"), { recursive: true });
   fs.writeFileSync(path.join(targetRepo, "README.md"), "# Package smoke target\n", "utf8");
   fs.writeFileSync(
@@ -78,12 +78,46 @@ function assertOnlyRuntimeStateChanged(targetRepo) {
   }
 }
 
+const sourceRoot = process.cwd();
+const reportPath = path.join(sourceRoot, "node_modules/.cache/aor/release-smoke-report.json");
+const report = {
+  schema_version: 1,
+  status: "running",
+  git_head: null,
+  node_version: process.version,
+  started_at: new Date().toISOString(),
+  finished_at: null,
+  package_name: null,
+  package_version: null,
+  assertions: {
+    clean_neutral_launcher: false,
+    primary_head_unchanged: false,
+    primary_tracked_files_unchanged: false,
+    writes_confined_to_runtime_root: false,
+    upstream_writes: false,
+    credentialed_provider_calls: false
+  }
+};
+
+function writeReport() {
+  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+}
+
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-release-smoke-"));
 try {
   const packDestination = path.join(tempRoot, "pack");
   const installRoot = path.join(tempRoot, "install");
+  const launcherRoot = path.join(tempRoot, "neutral launcher");
   fs.mkdirSync(packDestination, { recursive: true });
   fs.mkdirSync(installRoot, { recursive: true });
+  fs.mkdirSync(launcherRoot, { recursive: true });
+
+  report.git_head = runChecked("git", ["rev-parse", "HEAD"], { cwd: sourceRoot }).stdout.trim();
+  const packageMetadata = JSON.parse(fs.readFileSync(path.join(sourceRoot, "package.json"), "utf8"));
+  report.package_name = packageMetadata.name;
+  report.package_version = packageMetadata.version;
+  writeReport();
 
   const packRun = runChecked("npm", ["pack", "--json", "--pack-destination", packDestination]);
   const packJson = JSON.parse(packRun.stdout.slice(packRun.stdout.indexOf("[")));
@@ -103,12 +137,12 @@ try {
   });
 
   const installedBin = path.join(installRoot, "node_modules/@grinrus/aor/apps/cli/bin/aor.mjs");
-  const help = runChecked(process.execPath, [installedBin, "--help"], { cwd: installRoot });
+  const help = runChecked(process.execPath, [installedBin, "--help"], { cwd: launcherRoot });
   if (!help.stdout.includes("AOR CLI")) {
     throw new Error(`Installed package help output did not look like AOR help:\n${help.stdout}`);
   }
 
-  const appHelp = runChecked(process.execPath, [installedBin, "app", "--help"], { cwd: installRoot });
+  const appHelp = runChecked(process.execPath, [installedBin, "app", "--help"], { cwd: launcherRoot });
   if (!appHelp.stdout.includes("local loopback web console") || !appHelp.stdout.includes("--smoke --open false --json")) {
     throw new Error(`Installed package app help did not preserve optional API/web boundary:\n${appHelp.stdout}`);
   }
@@ -116,13 +150,14 @@ try {
   const targetRepo = createTargetRepo(tempRoot);
   const runtimeRoot = path.join(targetRepo, ".aor");
   const baseArgs = ["--project-ref", targetRepo, "--runtime-root", runtimeRoot, "--json"];
+  const primaryHead = runChecked("git", ["rev-parse", "HEAD"], { cwd: targetRepo }).stdout.trim();
 
-  const doctor = parseJsonOutput(runChecked(process.execPath, [installedBin, "doctor", ...baseArgs]).stdout);
+  const doctor = parseJsonOutput(runChecked(process.execPath, [installedBin, "doctor", ...baseArgs], { cwd: launcherRoot }).stdout);
   if (doctor.command !== "doctor" || doctor.guided_status !== "ready") {
     throw new Error(`Installed package doctor smoke failed:\n${JSON.stringify(doctor, null, 2)}`);
   }
 
-  const onboard = parseJsonOutput(runChecked(process.execPath, [installedBin, "onboard", ...baseArgs]).stdout);
+  const onboard = parseJsonOutput(runChecked(process.execPath, [installedBin, "onboard", ...baseArgs], { cwd: launcherRoot }).stdout);
   if (onboard.command !== "onboard" || onboard.guided_status !== "ready" || onboard.asset_mode !== "bundled") {
     throw new Error(`Installed package onboard smoke failed:\n${JSON.stringify(onboard, null, 2)}`);
   }
@@ -143,7 +178,7 @@ try {
       "--open",
       "false",
       "--json",
-    ]).stdout,
+    ], { cwd: launcherRoot }).stdout,
   );
   if (
     appSmoke.command !== "app" ||
@@ -163,8 +198,30 @@ try {
   }
 
   assertOnlyRuntimeStateChanged(targetRepo);
-  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding plus flow-centric local app smoke\n`);
+  const finalHead = runChecked("git", ["rev-parse", "HEAD"], { cwd: targetRepo }).stdout.trim();
+  const trackedDiff = runChecked("git", ["diff", "--name-only", "HEAD", "--"], { cwd: targetRepo }).stdout.trim();
+  const launcherEntries = fs.readdirSync(launcherRoot);
+  if (launcherEntries.length > 0) {
+    throw new Error(`Neutral launcher was materialized: ${launcherEntries.join(", ")}`);
+  }
+  report.assertions.clean_neutral_launcher = true;
+  report.assertions.primary_head_unchanged = finalHead === primaryHead;
+  report.assertions.primary_tracked_files_unchanged = trackedDiff === "";
+  report.assertions.writes_confined_to_runtime_root = true;
+  if (!report.assertions.primary_head_unchanged || !report.assertions.primary_tracked_files_unchanged) {
+    throw new Error("Package smoke changed the target repository HEAD or tracked files.");
+  }
+  report.status = "pass";
+  report.finished_at = new Date().toISOString();
+  writeReport();
+  process.stdout.write(
+    `release smoke ok: installed ${tarballName}; neutral launcher stayed clean and target writes stayed under .aor/\n`,
+  );
 } catch (error) {
+  report.status = "fail";
+  report.finished_at = new Date().toISOString();
+  report.failure = error instanceof Error ? error.message : String(error);
+  writeReport();
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);
 } finally {

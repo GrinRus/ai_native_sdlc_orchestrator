@@ -408,6 +408,10 @@ export function handleBootstrapCommand(context) {
         projectRef: /** @type {string} */ (flags["project-ref"]),
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        unsafeDevelopmentOverride: resolveOptionalBooleanFlag(
+          "unsafe-development-override",
+          flags["unsafe-development-override"],
+        ),
         stepClass: selectedRoutedStep,
         dryRun: routedDryRunStep ? true : false,
         approvedHandoffRef: resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]),
@@ -421,6 +425,10 @@ export function handleBootstrapCommand(context) {
 
       outputState.routedStepResultId = routedResult.stepResultId;
       outputState.routedStepResultFile = routedResult.stepResultPath;
+      outputState.unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
+        "unsafe-development-override",
+        flags["unsafe-development-override"],
+      );
       outputState.verifyStepResultFiles = [...verifyResult.stepResultFiles, routedResult.stepResultPath];
     }
   } else if (command === "spec build") {

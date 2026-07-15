@@ -9,13 +9,13 @@ splits:
   - certification
   - regression
 cases:
-  - case_id: CASE-WRAP-0023
+  - case_id: case-wrap-0023
     split: certification
     tags:
       - wrapper-change
       - evidence-discipline
-    input_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/input.json
-    expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json
+    input_ref: evidence://datasets/wrapper-certification/case-wrap-0023/input.json
+    expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json
     source_ref: review://CERT-GOLDEN-023
 flake_policy:
   default_retry_count: 1

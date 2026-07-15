@@ -22,7 +22,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   audit findings and defines the supported web topology as loopback-only,
   same-origin, and optional.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `docs/architecture/**`, `docs/contracts/**`,
@@ -30,14 +30,14 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Hard dependencies:** W56-S03
 - **Primary user story surfaces:** EMP-05, DEV-07, AIP-06, OPS-02, OPS-06,
   OPS-10, OPS-12, SEC-04, SEC-06, PBO-09, PBO-10, DTX-05, FIN-03.
-- **Audit findings:** AUD-001 through AUD-022 disposition baseline and the
+- **Audit findings:** AUD-001 through AUD-055 disposition baseline and the
   post-audit `project-context-cwd-divergence` finding.
 
 ### Local tasks
 1. Amend the packaged-local-console ADR and control-plane contract to separate
    the loopback same-origin SPA from the detached production-hardened headless
    API and from any future hosted/remote web product.
-2. Record a machine-readable remediation status for every S1 finding and make
+2. Record a machine-readable remediation status for every audit finding and make
    the production-readiness result explain which release-blocking invariants are
    still open.
 3. Keep write-capable live execution and credentialed delivery behind an
@@ -94,7 +94,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   gate, dependency safety is patched, and later trust-boundary remediation cannot
   add a test that CI, release, or readiness checks silently omit.
 - **Epic:** EPIC-0
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `scripts/test.mjs`, test-discovery helpers/manifest,
@@ -150,7 +150,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   can escape roots, collide after normalization, inject protocol fields, or
   authorize changes outside the mission.
 - **Epic:** EPIC-1, EPIC-2, EPIC-3, EPIC-5
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`,
@@ -214,7 +214,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   advertised execution workspace has independent Git metadata and canonical
   filesystem containment.
 - **Epic:** EPIC-1, EPIC-3, EPIC-5
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** `packages/orchestrator-core/src/workspace-isolation.mjs`,
@@ -267,7 +267,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Runtime permissions are enforced by normalized capabilities and
   canonical resources rather than bypassable command-text regular expressions.
 - **Epic:** EPIC-3
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/adapter-capability-profile.md`,
@@ -319,7 +319,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Delivery stages only an exact approved diff and cannot unlock
   commit or push with fabricated, stale, cross-run, or origin-equivalent evidence.
 - **Epic:** EPIC-4, EPIC-5
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** `docs/contracts/delivery-plan.md`, delivery/handoff/Harness
@@ -372,7 +372,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Project initialization either publishes one fully valid runtime
   layout inside its canonical root or leaves the previous state unchanged.
 - **Epic:** EPIC-1, EPIC-2
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `packages/orchestrator-core/src/project-init.mjs`,
@@ -423,7 +423,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   explicit canonical project context, so behavior is independent of the
   launcher working directory and cannot cross project boundaries.
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** selected-project context and local project registry,
@@ -521,7 +521,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Concurrent execution, operator commands, and event writers preserve
   every transition with unique immutable identities.
 - **Epic:** EPIC-2, EPIC-3, EPIC-6
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** step result/attempt store, run control,
@@ -572,7 +572,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** W57 closes only when the repaired execution, filesystem, delivery,
   and concurrency boundaries are reproducible through public/local test surfaces.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** root gates, safety fixtures, package smoke, release docs,

@@ -7,11 +7,38 @@ import test from "node:test";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import {
   closeQualityRepairRequest,
+  appendLiveRunEvent,
   listQualityRepairRequests,
   materializeQualityRepairRequest,
   materializeReviewDecision,
   updateQualityRepairRequest,
 } from "../src/index.mjs";
+
+test("live event IDs remain canonical and invalid run IDs fail before log materialization", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-canonical-live-event-"));
+  const logFile = path.join(root, "nested", "events.jsonl");
+  try {
+    const runId = `run-${"r".repeat(124)}`;
+    const event = appendLiveRunEvent({
+      logFile,
+      runId,
+      eventType: "run.started",
+      payload: {},
+      timestamp: "2026-07-15T00:00:00.000Z",
+    });
+    assert.match(event.event_id, /^event-[a-f0-9]{32}$/u);
+    assert.equal(event.event_id.length <= 128, true);
+
+    const rejectedLog = path.join(root, "rejected", "events.jsonl");
+    assert.throws(
+      () => appendLiveRunEvent({ logFile: rejectedLog, runId: "run\nretry: 1", eventType: "run.started", payload: {} }),
+      /Invalid run_id/u,
+    );
+    assert.equal(fs.existsSync(path.dirname(rejectedLog)), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 /**
  * @param {(root: string, runtimeLayout: { reportsRoot: string }) => void} callback
