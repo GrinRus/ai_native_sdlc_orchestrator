@@ -2,7 +2,7 @@
 
 ## Status
 
-The historical **self-hosted CLI/API production candidate** verdict is under an audit release hold and is not the current AOR status. W22-W34 evidence remains useful as a historical bounded baseline, but the July 2026 audit found confirmed execution, permission, delivery, evidence, and quality-gate failures that invalidate the previous readiness verdict. W57-W59 own remediation and independent requalification. Until W57-S01 adds the audit disposition to the machine-readable gate, a green legacy `pnpm production:ready` result proves only the pre-audit W25/W26 checks and must not be treated as release clearance.
+The historical **self-hosted CLI/API production candidate** verdict is under an audit release hold and is not the current AOR status. W22-W34 evidence remains useful as a historical bounded baseline, but the July 2026 audit found confirmed execution, permission, delivery, evidence, and quality-gate failures that invalidate the previous readiness verdict. W57-W59 own remediation and independent requalification. The machine-readable gate now distinguishes a healthy enforced hold (`status=blocked`, `gate_execution_status=pass`) from an invalid gate (`status=fail`, `release_disposition=unknown`).
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -26,7 +26,7 @@ Production readiness requires:
 
 | Blocker | Owning slice | Required evidence |
 |---|---|---|
-| Release/readiness sources and gates do not yet encode the July 2026 audit hold. | `W57-S01` | Threat-model boundary, story-gap disposition, blocked readiness fixture, and default unsafe-mode denial. |
+| Release/readiness sources and gates encode the July 2026 audit hold; runtime fixes remain open. | `W57-S01` | Machine-readable ledger, threat-model boundary, story-gap disposition, blocked readiness fixture, and default unsafe-mode denial. |
 | No-write, workspace, path/scope, permission, delivery, and evidence trust boundaries are not reliable. | `W57-S02` through `W57-S08` | Adversarial regression evidence and an independently reviewable W57 disposition. |
 | Runtime context, evaluation, routing, control, event, API, and local HTTP behavior are not yet truthful end to end. | `W58-S01` through `W58-S08` | Cross-process and installed-package runtime-quality acceptance proof. |
 | Browser behavior, maintainability ratchets, hotspot decomposition, and independent audit closure remain open. | `W59-S01` through `W59-S07` | Executable browser evidence, quality baselines, finding-by-finding closure ledger, and a new readiness decision. |
@@ -60,7 +60,7 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-The last accepted W34-S06 snapshot records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. Those values predate the July 2026 audit and are not a current release verdict. W57-S01 must reopen the directly invalidated outcomes and bind them to W57-W59 gap slices before machine-readable readiness can be reconsidered. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+The W57-S01 matrix records `baseline-covered=102`, `proof-covered=3`, `partial=9`, and `blocked=2`. It reopens the seven audit-invalidated outcomes and limits PBO-09 to its demonstrated repo-attached first-Mission flow. PBO-10 and OPS-12 remain partial; W34/W56 evidence does not prove neutral launch, execution/model readiness, or a complete UI-only lifecycle. A story can move to `proof-covered` only when executable evidence proves the outcome at the required strength.
 
 The current sanitized production proof fixture is configured by `pnpm production:ready`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 

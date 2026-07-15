@@ -17,9 +17,10 @@ The previous bounded verdict, labeled a self-hosted CLI/API production candidate
 is under an audit release hold. The July 2026 baseline review found confirmed execution,
 permission, delivery, evidence, and quality-gate failures, so AOR is not ready
 for production or unattended write-capable runs. The W57-W59 remediation queue
-owns requalification. Until W57-S01 encodes the hold in the machine-readable
-gate, a green legacy `pnpm production:ready` result proves only the pre-audit
-W25/W26 evidence checks and is not release clearance.
+owns requalification. `pnpm production:ready --json` now reports this as
+`status=blocked`, `gate_execution_status=pass`, and
+`release_disposition=audit-hold`; historical W25/W26 evidence is not release
+clearance.
 
 The first package channel is the npm CLI alpha package `@grinrus/aor`. Internal
 workspace apps and packages remain private implementation modules and are not
@@ -31,7 +32,7 @@ The public source channel is the `main` branch on GitHub. Versioned npm CLI
 alpha releases are published as `@grinrus/aor` and tagged with matching GitHub
 Releases. There is no Docker or GHCR version channel yet.
 
-The root package is publishable as `@grinrus/aor@0.1.0-alpha.15`; internal
+The root package version is the value in `package.json`; internal
 workspace packages stay `private:true`. The release branch and publish process
 are documented in `docs/ops/npm-cli-alpha-release.md`.
 
@@ -66,7 +67,8 @@ or OpenCode, are installed and configured outside AOR.
 ## Install CLI from npm alpha
 
 ```bash
-npm install -g @grinrus/aor@0.1.0-alpha.15
+AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
+npm install -g "@grinrus/aor@$AOR_VERSION"
 aor --help
 ```
 
@@ -228,10 +230,11 @@ TMP="$(mktemp -d)"
 mkdir -p "$TMP/target" "$TMP/runner"
 git -C "$TMP/target" init
 cd "$TMP/runner"
+AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
 
-npm exec --yes --package @grinrus/aor@0.1.0-alpha.15 -- aor --help
+npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help
 
-npm exec --yes --package @grinrus/aor@0.1.0-alpha.15 -- \
+npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
   aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
 ```
 
@@ -330,7 +333,7 @@ claim.
 
 | Capability | Status | How to try or verify |
 | --- | --- | --- |
-| npm CLI alpha package | Implemented alpha | `npm install -g @grinrus/aor@0.1.0-alpha.15`. |
+| npm CLI alpha package | Implemented alpha | Resolve `AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"`, then run `npm install -g "@grinrus/aor@$AOR_VERSION"`. |
 | Source checkout install | Implemented | `corepack enable` and `pnpm install --frozen-lockfile`. |
 | Repository integrity checks | Implemented | `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`. |
 | Guided target onboarding | Implemented UI baseline | `cd <repo> && aor app`; headless path remains `pnpm aor onboard ... --json`. |

@@ -10,6 +10,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
+import { evaluateAuditReleaseHold } from "./audit-release-hold.mjs";
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
 import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
@@ -1019,6 +1020,7 @@ function writeRuntimeRepairInput(options) {
  *   taskRefs?: string[],
  *   planDigest?: string,
  *   taskDigests?: Record<string, string>,
+ *   unsafeDevelopmentOverride?: boolean,
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -1337,6 +1339,7 @@ export function executeRoutedStep(options) {
       const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
       const expandedRefs = asRecord(contextBundles.expanded_refs);
       const resolvedAdapterProfile = asRecord(asRecord(adapterResolution).adapter?.profile);
+      const externalRuntime = asRecord(asRecord(resolvedAdapterProfile.execution).external_runtime);
       const budgetLimitTokens = resolveContextBudgetLimitTokens(resolvedAdapterProfile);
       const contextSourceBreakdown = buildContextSourceBreakdown([
         { source: "instruction_set", value: compiled.compiled_context.instruction_set },
@@ -1408,6 +1411,15 @@ export function executeRoutedStep(options) {
           : null;
       const planReady =
         deliveryPlanResult?.deliveryPlan?.status === "ready" && deliveryPlanResult.deliveryPlan.writeback_allowed === true;
+      const auditReleaseHold = evaluateAuditReleaseHold({
+        dryRun,
+        externalRuntime,
+        deliveryMode: asString(deliveryPlanResult?.deliveryPlan?.delivery_mode),
+        unsafeDevelopmentOverride: options.unsafeDevelopmentOverride,
+      });
+      if (!auditReleaseHold.allowed) {
+        throw new Error(`${auditReleaseHold.code}: ${auditReleaseHold.message}`);
+      }
       const providerStepStatusBase = {
         provider: asString(routePrimary.provider),
         adapter: asString(adapterProfile.adapter_id),
@@ -1578,6 +1590,13 @@ export function executeRoutedStep(options) {
     routed_execution: {
       mode: dryRun ? "dry-run" : "execute",
       no_write_enforced: dryRun,
+      audit_release_hold: {
+        override_requested: options.unsafeDevelopmentOverride === true,
+        override_used:
+          !dryRun &&
+          asString(deliveryPlanResult?.deliveryPlan?.delivery_mode) !== "no-write" &&
+          options.unsafeDevelopmentOverride === true,
+      },
       started_at: startedAt,
       finished_at: finishedAt,
       route_resolution: routeResolution,

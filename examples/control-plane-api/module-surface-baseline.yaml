@@ -8,6 +8,10 @@ openapi_contract:
   path: docs/contracts/control-plane-api.openapi.json
   drift_check: pnpm production:ready
   scope: current detached HTTP/SSE alpha route surface only
+  audit_release_hold:
+    lifecycle_override_field: unsafe_development_override
+    default: false
+    allowed_use: maintainer-only external write-capable development probes
   read_model_limits:
     default_limit: 200
     max_limit: 1000

@@ -15,6 +15,9 @@ const defaultProofFixturePath = path.posix.join(
 );
 const defaultOpenApiPath = "docs/contracts/control-plane-api.openapi.json";
 const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
+const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledger-2026-07.json";
+const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
+const ALLOWED_AUDIT_STATES = new Set(["open", "in-progress", "resolved", "accepted-risk", "superseded"]);
 
 function resolvePath(rootDir, file) {
   return path.isAbsolute(file) ? file : path.join(rootDir, file);
@@ -48,6 +51,86 @@ function fail(id, summary, findings, evidence = []) {
     summary,
     findings,
     evidence,
+  };
+}
+
+function checkAuditRemediationLedger(rootDir, auditLedgerPath = defaultAuditLedgerPath) {
+  const findings = [];
+  if (!fileExists(rootDir, auditLedgerPath)) {
+    return fail("audit-remediation-ledger", "Audit remediation ledger is missing.", [`${auditLedgerPath} is missing.`], [
+      auditLedgerPath,
+    ]);
+  }
+
+  let ledger;
+  try {
+    ledger = readJson(rootDir, auditLedgerPath);
+  } catch (error) {
+    return fail(
+      "audit-remediation-ledger",
+      "Audit remediation ledger is invalid.",
+      [`${auditLedgerPath} is not valid JSON: ${error.message}`],
+      [auditLedgerPath],
+    );
+  }
+
+  const entries = Array.isArray(ledger.findings) ? ledger.findings : [];
+  const byId = new Map();
+  for (const entry of entries) {
+    const id = typeof entry?.finding_id === "string" ? entry.finding_id.trim() : "";
+    if (!id) {
+      findings.push("Every audit ledger entry must have a non-empty finding_id.");
+      continue;
+    }
+    if (byId.has(id)) findings.push(`Audit finding '${id}' is duplicated.`);
+    byId.set(id, entry);
+    if (!ALLOWED_AUDIT_STATES.has(entry.state)) findings.push(`Audit finding '${id}' has invalid state '${entry.state}'.`);
+    if (!Array.isArray(entry.owner_slices) || entry.owner_slices.length === 0) {
+      findings.push(`Audit finding '${id}' must declare owner_slices.`);
+    }
+    if (typeof entry.release_blocking !== "boolean") {
+      findings.push(`Audit finding '${id}' must declare release_blocking as a boolean.`);
+    }
+    const evidenceRefs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
+    if (!Array.isArray(entry.evidence_refs) || !Array.isArray(entry.limitations)) {
+      findings.push(`Audit finding '${id}' must declare evidence_refs and limitations arrays.`);
+    }
+    if (entry.state === "resolved" && evidenceRefs.length === 0) {
+      findings.push(`Resolved audit finding '${id}' must cite evidence_refs.`);
+    }
+  }
+
+  for (let sequence = 1; sequence <= 55; sequence += 1) {
+    const id = `AUD-${String(sequence).padStart(3, "0")}`;
+    if (!byId.has(id)) findings.push(`Audit ledger must include ${id}.`);
+  }
+  if (!byId.has("project-context-cwd-divergence")) {
+    findings.push("Audit ledger must include project-context-cwd-divergence.");
+  }
+
+  if (findings.length > 0) {
+    return fail("audit-remediation-ledger", "Audit remediation ledger is incomplete or invalid.", findings, [auditLedgerPath]);
+  }
+
+  const blockingInvariants = entries
+    .filter((entry) => entry.release_blocking === true && !CLOSED_AUDIT_STATES.has(entry.state))
+    .map((entry) => ({
+      finding_id: entry.finding_id,
+      state: entry.state,
+      owner_slices: entry.owner_slices,
+      summary: entry.summary,
+    }))
+    .sort((left, right) => left.finding_id.localeCompare(right.finding_id));
+
+  return {
+    ...pass(
+      "audit-remediation-ledger",
+      blockingInvariants.length > 0
+        ? `Audit ledger is valid with ${blockingInvariants.length} open release-blocking invariants.`
+        : "Audit ledger is valid and has no open release-blocking invariants.",
+      [auditLedgerPath],
+    ),
+    blocking_invariants: blockingInvariants,
   };
 }
 
@@ -286,7 +369,7 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
     }
   }
 
-  const requiredProofRows = ["OPS-07", "DTX-01", "DTX-04", "FIN-03"];
+  const requiredProofRows = ["OPS-07", "DTX-01", "DTX-04"];
   for (const storyId of requiredProofRows) {
     const row = rows.get(storyId);
     if (!row) {
@@ -306,6 +389,27 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
       if (!evidence.includes(requiredEvidence)) {
         findings.push(`${storyId} proof-covered evidence must cite ${requiredEvidence}.`);
       }
+    }
+  }
+
+  const auditInvalidatedRows = new Map([
+    ["EMP-05", ["W58-S05"]],
+    ["DEV-07", ["W58-S02"]],
+    ["AIP-06", ["W58-S04"]],
+    ["OPS-02", ["W58-S05"]],
+    ["SEC-04", ["W57-S05", "W58-S04"]],
+    ["DTX-05", ["W57-S03"]],
+    ["FIN-03", ["W57-S07", "W59-S07"]],
+  ]);
+  for (const [storyId, requiredGaps] of auditInvalidatedRows) {
+    const row = rows.get(storyId);
+    if (!row) {
+      findings.push(`${storyId} is missing from the story matrix.`);
+      continue;
+    }
+    if (row.coverageStatus !== "partial") findings.push(`${storyId} must remain partial while its audit gap is open.`);
+    for (const gap of requiredGaps) {
+      if (!row.gapSlices.includes(gap)) findings.push(`${storyId} must retain audit gap ${gap}.`);
     }
   }
 
@@ -340,8 +444,8 @@ function checkSourceOfTruth(rootDir) {
   const opsRunbook = readText(rootDir, "docs/ops/production-readiness-gate.md");
   const releaseRunbook = readText(rootDir, "docs/ops/self-hosted-release.md");
 
-  if (!readme.includes("self-hosted CLI/API production candidate")) {
-    findings.push("README.md must state the bounded self-hosted CLI/API production-candidate status.");
+  if (!readme.includes("audit release hold")) {
+    findings.push("README.md must state the current audit release hold.");
   }
   if (!readme.includes("pnpm production:ready")) {
     findings.push("README.md must document the separate production-readiness gate command.");
@@ -352,8 +456,8 @@ function checkSourceOfTruth(rootDir) {
   if (!readme.includes("hosted SaaS") || !readme.includes("enterprise identity")) {
     findings.push("README.md must keep hosted SaaS and enterprise identity out of the supported mode.");
   }
-  if (!readiness.includes("self-hosted CLI/API production candidate")) {
-    findings.push("self-hosted production readiness doc must state the bounded production-candidate status.");
+  if (!readiness.includes("audit release hold")) {
+    findings.push("self-hosted production readiness doc must state the audit release hold.");
   }
   if (!readiness.includes("pnpm production:ready")) {
     findings.push("self-hosted production readiness doc must document the production gate command.");
@@ -365,7 +469,7 @@ function checkSourceOfTruth(rootDir) {
     findings.push("production-readiness runbook must document command usage and proof evidence.");
   }
   for (const required of [
-    "self-hosted CLI/API production candidate",
+    "audit release hold",
     "pnpm production:ready",
     "sanitized production proof fixture",
     "hosted SaaS",
@@ -614,6 +718,27 @@ function checkAlphaHardening(rootDir, openApiPath = defaultOpenApiPath) {
     }
   }
 
+  const packageJson = readJson(rootDir, "package.json");
+  const currentClaimFiles = ["README.md", "docs/ops/self-hosted-environment-matrix.md"];
+  for (const file of currentClaimFiles) {
+    const text = readText(rootDir, file);
+    const pinnedAlphaClaims = text.match(/@(?:grinrus\/aor@)?0\.1\.0-alpha\.\d+/gu) ?? [];
+    if (pinnedAlphaClaims.length > 0) {
+      findings.push(
+        `${file} must derive current npm alpha examples from package metadata or the registry tag; found ${pinnedAlphaClaims.join(", ")}.`,
+      );
+    }
+  }
+  if (!readText(rootDir, "README.md").includes("package.json")) {
+    findings.push(`README.md must identify package.json as the source of the source-channel version.`);
+  }
+  if (!readText(rootDir, "docs/ops/self-hosted-environment-matrix.md").includes("npm view @grinrus/aor dist-tags.alpha")) {
+    findings.push("self-hosted environment matrix must derive the install version from the npm alpha dist-tag.");
+  }
+  if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+    findings.push("package.json must declare the current source-channel version.");
+  }
+
   if (findings.length > 0) {
     return fail("w30-alpha-hardening", "W30 alpha hardening evidence is incomplete or drifting.", findings, [
       "docs/backlog/wave-30-implementation-slices.md",
@@ -639,7 +764,10 @@ export function runProductionReadinessGate(options = {}) {
   const proofFixturePath = options.proofFixturePath ?? defaultProofFixturePath;
   const openApiPath = options.openApiPath ?? defaultOpenApiPath;
   const storyMatrixPath = options.storyMatrixPath ?? defaultStoryMatrixPath;
+  const auditLedgerPath = options.auditLedgerPath ?? defaultAuditLedgerPath;
+  const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
   const checks = [
+    auditLedgerCheck,
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
     checkStoryHonesty(rootDir, storyMatrixPath),
@@ -648,12 +776,20 @@ export function runProductionReadinessGate(options = {}) {
     checkContractAndHarnessEvidence(rootDir),
     checkAlphaHardening(rootDir, openApiPath),
   ];
-  const status = checks.every((check) => check.status === "pass") ? "pass" : "fail";
+  const gateExecutionStatus = checks.every((check) => check.status === "pass") ? "pass" : "fail";
+  const blockingInvariants = auditLedgerCheck.blocking_invariants ?? [];
+  const releaseDisposition = gateExecutionStatus === "fail" ? "unknown" : blockingInvariants.length > 0 ? "audit-hold" : "cleared";
+  const status = gateExecutionStatus === "fail" ? "fail" : releaseDisposition === "audit-hold" ? "blocked" : "pass";
   return {
     status,
+    gate_execution_status: gateExecutionStatus,
+    release_disposition: releaseDisposition,
+    release_clearance: status === "pass",
+    blocking_invariants: blockingInvariants,
     root_dir: rootDir,
     proof_fixture_path: proofFixturePath,
     openapi_path: openApiPath,
+    remediation_ledger_path: auditLedgerPath,
     checks,
   };
 }
@@ -663,6 +799,8 @@ function parseArgs(argv) {
     rootDir: defaultRoot,
     proofFixturePath: defaultProofFixturePath,
     openApiPath: defaultOpenApiPath,
+    auditLedgerPath: defaultAuditLedgerPath,
+    expectAuditHold: false,
     json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -676,8 +814,13 @@ function parseArgs(argv) {
     } else if (arg === "--openapi") {
       args.openApiPath = argv[index + 1];
       index += 1;
+    } else if (arg === "--audit-ledger") {
+      args.auditLedgerPath = argv[index + 1];
+      index += 1;
     } else if (arg === "--json") {
       args.json = true;
+    } else if (arg === "--expect-audit-hold") {
+      args.expectAuditHold = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -687,6 +830,7 @@ function parseArgs(argv) {
 
 function printTextReport(result) {
   console.log(`Production readiness gate: ${result.status}`);
+  console.log(`Gate execution: ${result.gate_execution_status}; release disposition: ${result.release_disposition}`);
   for (const check of result.checks) {
     console.log(`[${check.status}] ${check.id}: ${check.summary}`);
     if (check.status === "fail") {
@@ -708,7 +852,8 @@ if (invokedAsMain) {
     } else {
       printTextReport(result);
     }
-    if (result.status !== "pass") process.exit(1);
+    const expectedAuditHold = args.expectAuditHold && result.status === "blocked" && result.gate_execution_status === "pass";
+    if (result.status !== "pass" && !expectedAuditHold) process.exit(1);
   } catch (error) {
     console.error(error.message);
     process.exit(1);

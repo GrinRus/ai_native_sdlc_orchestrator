@@ -8,8 +8,6 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
-const packageVersion = JSON.parse(fs.readFileSync(path.join(workspaceRoot, "package.json"), "utf8")).version;
-const registryPackageSpec = `@grinrus/aor@${packageVersion}`;
 
 function readRepoFile(filePath) {
   return fs.readFileSync(path.join(workspaceRoot, filePath), "utf8");
@@ -195,13 +193,14 @@ test("installed-user docs require neutral registry package smoke", () => {
     const content = readRepoFile(filePath);
     assert.ok(content.includes('mkdir -p "$TMP/target" "$TMP/runner"'), `${filePath} must create separate target and runner directories.`);
     assert.ok(content.includes('cd "$TMP/runner"'), `${filePath} must run registry smoke from the neutral runner directory.`);
+    assert.ok(content.includes("npm view @grinrus/aor dist-tags.alpha"), `${filePath} must resolve the current alpha tag.`);
     assert.ok(
-      content.includes(`npm exec --yes --package ${registryPackageSpec} -- aor --help`),
+      content.includes('npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help'),
       `${filePath} must prove the published package help command.`,
     );
     assert.ok(
-      content.includes(`--package ${registryPackageSpec} --`),
-      `${filePath} must pin npm exec to the current published package version.`,
+      content.includes('--package "@grinrus/aor@$AOR_VERSION" --'),
+      `${filePath} must pin npm exec to the resolved published package version.`,
     );
     assert.match(content, /source checkout/u, `${filePath} must warn against source-checkout package shadowing.`);
   }

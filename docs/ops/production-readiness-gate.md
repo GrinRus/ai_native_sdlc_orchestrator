@@ -2,7 +2,9 @@
 
 ## Purpose
 
-`pnpm production:ready` is the self-hosted production-readiness gate. It is intentionally separate from `pnpm check`: `pnpm check` remains the repository-integrity baseline for lint, tests, and build checks, while `pnpm production:ready` evaluates whether the current repo evidence supports the self-hosted CLI/API production-candidate claim.
+`pnpm production:ready` is the release-disposition gate. It is intentionally
+separate from `pnpm check`: the latter remains the repository-integrity baseline.
+The current expected result is an audit release hold, not a production claim.
 
 The gate is review-oriented and fails closed. It must not create runtime state, target checkouts, upstream writes, or `.aor/` artifacts.
 
@@ -18,6 +20,16 @@ Machine-readable output:
 pnpm production:ready --json
 ```
 
+CI verifies the expected hold without weakening the default exit contract:
+
+```bash
+pnpm production:ready --json --expect-audit-hold
+```
+
+This mode exits successfully only for `blocked` plus
+`gate_execution_status=pass`; it still fails for `fail`, `unknown`, or an
+unexpected cleared state.
+
 To verify another sanitized proof fixture:
 
 ```bash
@@ -30,6 +42,10 @@ The default W25 production proof evidence is the sanitized fixture configured by
 
 The gate verifies:
 
+- audit remediation ledger validity, complete AUD-001 through AUD-022
+  disposition, the post-audit `project-context-cwd-divergence` entry, and every
+  open release-blocking invariant;
+
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
 - story honesty: all 116 stories remain machine-counted, partial PBO-10/OPS-12 rows retain their backlog gaps, proof-covered rows cite executable W25 fixture evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
@@ -41,8 +57,18 @@ The gate verifies:
 
 ## Failure interpretation
 
+Top-level meanings:
+
+- `status=blocked`, `gate_execution_status=pass`,
+  `release_disposition=audit-hold`: checks ran correctly and an audited release
+  invariant is still open;
+- `status=fail`, `gate_execution_status=fail`,
+  `release_disposition=unknown`: the gate itself or its evidence is invalid;
+- `status=pass`, `release_clearance=true`: no release-blocking invariant remains.
+
 | Failed check | Meaning | Operator action |
 |---|---|---|
+| `audit-remediation-ledger` | The ledger is missing, malformed, incomplete, or contains an invalid resolved claim. | Restore the ledger and evidence; do not infer release status. |
 | `baseline-boundary` | `pnpm check` or `pnpm production:ready` no longer has the expected meaning. | Restore the script boundary before making any production claim. |
 | `w25-real-proof-fixture` | The proof fixture is missing, unsafe, mock-backed, non-passing, or no longer proves code-changing no-upstream-write execution. | Re-run or re-sanitize W25 proof evidence; do not replace it with mock output. |
 | `story-status-honesty` | Story statuses or counts overstate production evidence. | Update only evidence-backed rows; leave residual stories `partial` or `blocked`. |

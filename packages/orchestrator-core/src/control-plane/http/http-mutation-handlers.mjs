@@ -291,6 +291,18 @@ export async function handleLifecycleCommandAction({ request, response, runtimeO
     sendError(response, 400, "invalid_lifecycle_flags", "Lifecycle command flags must be a JSON object when supplied.");
     return;
   }
+  if (payload.unsafe_development_override !== undefined && typeof payload.unsafe_development_override !== "boolean") {
+    sendError(
+      response,
+      400,
+      "invalid_unsafe_development_override",
+      "unsafe_development_override must be a boolean when supplied.",
+    );
+    return;
+  }
+  if (payload.unsafe_development_override !== undefined) {
+    flags.unsafe_development_override = payload.unsafe_development_override;
+  }
 
   const result = runLifecycleCommand({
     ...runtimeOptions,

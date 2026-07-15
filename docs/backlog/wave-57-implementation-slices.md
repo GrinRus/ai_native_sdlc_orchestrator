@@ -22,7 +22,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   audit findings and defines the supported web topology as loopback-only,
   same-origin, and optional.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `docs/architecture/**`, `docs/contracts/**`,
@@ -30,14 +30,14 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Hard dependencies:** W56-S03
 - **Primary user story surfaces:** EMP-05, DEV-07, AIP-06, OPS-02, OPS-06,
   OPS-10, OPS-12, SEC-04, SEC-06, PBO-09, PBO-10, DTX-05, FIN-03.
-- **Audit findings:** AUD-001 through AUD-022 disposition baseline and the
+- **Audit findings:** AUD-001 through AUD-055 disposition baseline and the
   post-audit `project-context-cwd-divergence` finding.
 
 ### Local tasks
 1. Amend the packaged-local-console ADR and control-plane contract to separate
    the loopback same-origin SPA from the detached production-hardened headless
    API and from any future hosted/remote web product.
-2. Record a machine-readable remediation status for every S1 finding and make
+2. Record a machine-readable remediation status for every audit finding and make
    the production-readiness result explain which release-blocking invariants are
    still open.
 3. Keep write-capable live execution and credentialed delivery behind an
@@ -94,7 +94,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   gate, dependency safety is patched, and later trust-boundary remediation cannot
   add a test that CI, release, or readiness checks silently omit.
 - **Epic:** EPIC-0
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `scripts/test.mjs`, test-discovery helpers/manifest,

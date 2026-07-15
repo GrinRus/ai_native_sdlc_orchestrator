@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 
 import { runProductionReadinessGate } from "../production-readiness.mjs";
+import { evaluateAuditReleaseHold } from "../../packages/orchestrator-core/src/audit-release-hold.mjs";
+import { getCommandDefinition } from "../../packages/orchestrator-core/src/operator-cli/command-catalog.mjs";
 
 const root = path.resolve(new URL("../..", import.meta.url).pathname);
 const proofFixturePath = path.posix.join(
@@ -14,9 +16,22 @@ const proofFixturePath = path.posix.join(
   "w25-s03-production-proof.json",
 );
 
-test("production readiness gate passes with the committed W25 proof fixture", () => {
+test("production readiness gate enforces the committed audit hold with healthy internal checks", () => {
+  const ledger = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
+  );
+  const auditIds = ledger.findings
+    .map((entry) => entry.finding_id)
+    .filter((findingId) => /^AUD-[0-9]{3}$/u.test(findingId));
+  assert.equal(auditIds.length, 55);
+  assert.ok(auditIds.includes("AUD-055"));
   const result = runProductionReadinessGate({ rootDir: root });
-  assert.equal(result.status, "pass");
+  assert.equal(result.status, "blocked");
+  assert.equal(result.gate_execution_status, "pass");
+  assert.equal(result.release_disposition, "audit-hold");
+  assert.equal(result.release_clearance, false);
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-001"));
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "project-context-cwd-divergence"));
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
@@ -25,6 +40,74 @@ test("production readiness gate passes with the committed W25 proof fixture", ()
     result.checks.find((check) => check.id === "w30-alpha-hardening")?.status,
     "pass",
   );
+});
+
+test("production readiness gate clears only a valid ledger with evidence-backed closed blockers", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-audit-ledger-"));
+  const tempLedger = path.join(tempDir, "audit-ledger.json");
+  const ledger = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
+  );
+  ledger.release_disposition = "cleared";
+  ledger.findings = ledger.findings.map((entry) => ({
+    ...entry,
+    state: "resolved",
+    evidence_refs: entry.evidence_refs.length > 0 ? entry.evidence_refs : [`evidence://closure/${entry.finding_id}`],
+  }));
+  fs.writeFileSync(tempLedger, `${JSON.stringify(ledger, null, 2)}\n`);
+
+  const result = runProductionReadinessGate({ rootDir: root, auditLedgerPath: tempLedger });
+  assert.equal(result.status, "pass");
+  assert.equal(result.gate_execution_status, "pass");
+  assert.equal(result.release_disposition, "cleared");
+  assert.equal(result.release_clearance, true);
+});
+
+test("production readiness gate distinguishes an invalid ledger from an expected hold", () => {
+  const result = runProductionReadinessGate({
+    rootDir: root,
+    auditLedgerPath: "docs/research/missing-audit-ledger.json",
+  });
+  assert.equal(result.status, "fail");
+  assert.equal(result.gate_execution_status, "fail");
+  assert.equal(result.release_disposition, "unknown");
+  assert.equal(result.release_clearance, false);
+});
+
+test("CI workflow accepts only the explicit healthy audit-hold mode", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
+  assert.match(workflow, /pnpm production:ready --json --expect-audit-hold/u);
+  assert.doesNotMatch(workflow, /run: pnpm production:ready\s*$/mu);
+});
+
+test("audit release hold blocks only external write-capable live execution without explicit override", () => {
+  const externalRuntime = { command: "provider" };
+  assert.equal(
+    evaluateAuditReleaseHold({ dryRun: true, externalRuntime, deliveryMode: "patch-only" }).allowed,
+    true,
+  );
+  assert.equal(
+    evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "no-write" }).allowed,
+    true,
+  );
+  const blocked = evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "patch-only" });
+  assert.equal(blocked.allowed, false);
+  assert.equal(blocked.code, "audit_release_hold");
+  const overridden = evaluateAuditReleaseHold({
+    dryRun: false,
+    externalRuntime,
+    deliveryMode: "patch-only",
+    unsafeDevelopmentOverride: true,
+  });
+  assert.equal(overridden.allowed, true);
+  assert.equal(overridden.override_used, true);
+});
+
+test("write-capable command surfaces expose the explicit unsafe development override", () => {
+  for (const command of ["project verify", "run start", "deliver prepare", "release prepare"]) {
+    const definition = getCommandDefinition(command);
+    assert.ok(definition?.inputs.some((input) => input.includes("--unsafe-development-override")), command);
+  }
 });
 
 test("production readiness gate fails closed without W25 proof evidence", () => {
@@ -79,6 +162,10 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
   const responses = openApi.components.responses;
   const requestBodies = openApi.components.requestBodies;
   const schemas = openApi.components.schemas;
+  assert.equal(
+    schemas.LifecycleCommandActionRequest.properties.unsafe_development_override.default,
+    false,
+  );
 
   const responseRefs = {
     projectState: openApi.paths["/api/projects/{projectId}/state"].get.responses["200"].$ref,

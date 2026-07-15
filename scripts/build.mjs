@@ -445,7 +445,8 @@ for (const section of [
 
 for (const needle of [
   "git clone https://github.com/GrinRus/ai_native_sdlc_orchestrator.git",
-  `npm install -g @grinrus/aor@${packageJson.version}`,
+  "npm view @grinrus/aor dist-tags.alpha",
+  'npm install -g "@grinrus/aor@$AOR_VERSION"',
   "docs/ops/npm-cli-alpha-release.md",
   "workspace packages stay `private:true`",
   "pnpm install --frozen-lockfile",
@@ -456,7 +457,7 @@ for (const needle of [
   "--delivery-mode no-write",
   "In no-write mode, AOR still writes runtime state",
   "registry smoke from a neutral temporary runner directory",
-  `npm exec --yes --package @grinrus/aor@${packageJson.version} -- aor --help`,
+  'npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help',
   "Do not run this registry-package smoke from the AOR source checkout",
   "app smoke should pass without\ncreating `.aor/`",
   "do not pass `examples/project.aor.yaml`",

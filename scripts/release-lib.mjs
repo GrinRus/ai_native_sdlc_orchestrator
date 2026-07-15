@@ -218,7 +218,8 @@ export function validateReleaseState(options = {}) {
 
   const readme = readText(rootDir, "README.md");
   ensureIncludes(findings, readme, RELEASE_PACKAGE_NAME, "README.md");
-  ensureIncludes(findings, readme, `npm install -g ${RELEASE_PACKAGE_NAME}@${packageVersion}`, "README.md");
+  ensureIncludes(findings, readme, `npm view ${RELEASE_PACKAGE_NAME} dist-tags.alpha`, "README.md");
+  ensureIncludes(findings, readme, `npm install -g "${RELEASE_PACKAGE_NAME}@$AOR_VERSION"`, "README.md");
   ensureIncludes(findings, readme, "docs/ops/npm-cli-alpha-release.md", "README.md");
 
   const contributing = readText(rootDir, "CONTRIBUTING.md");

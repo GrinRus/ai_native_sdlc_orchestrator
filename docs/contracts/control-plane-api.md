@@ -56,6 +56,21 @@ The detached HTTP/SSE transport now has two explicit security modes:
 - `local-trusted` is the default for loopback development and local harness use. It may run without bearer credentials, but it still uses the same route permission metadata and redaction helpers.
 - `production-hardened` requires bearer authentication for every read, stream, and mutation route. This mode is a transport hardening baseline, not an enterprise identity-provider integration or hosted SaaS claim.
 
+The packaged browser application is a separate loopback-only same-origin
+topology. It does not make the detached API a hosted-web backend, may not attach
+to an arbitrary remote control plane, and may not persist AOR bearer tokens in
+browser storage. The detached production-hardened API remains fully usable
+without the SPA. Hosted browser authentication, SSO, TLS termination, tenant
+security, and public cross-origin access require a future ADR and contract.
+
+While the July 2026 trust-boundary audit hold is open, lifecycle mutation bodies
+may carry `unsafe_development_override: true`. The shared runtime accepts it only
+as an explicit, auditable development override for external write-capable live
+execution or credentialed network delivery. Omission and `false` are equivalent
+and fail closed for those operations. Dry-run, mock, contract,
+repository-integrity, and external `no-write` paths do not require the override.
+The field is not release clearance and transport wrappers may not synthesize it.
+
 Auth and authorization behavior:
 - bearer principals are configured out-of-band when the detached transport starts;
 - each principal carries `read` and/or `mutate` permission scopes plus allowed `project_refs`;

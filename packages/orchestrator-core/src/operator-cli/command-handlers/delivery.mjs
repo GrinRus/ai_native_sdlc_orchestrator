@@ -457,6 +457,17 @@ export function handleDeliveryCommand(context) {
       throw new CliUsageError(`${label} preconditions failed: ${reasons}.`);
     }
 
+    const enableNetworkWrite = resolveOptionalBooleanFlag("network-write", flags["network-write"]);
+    const unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
+      "unsafe-development-override",
+      flags["unsafe-development-override"],
+    );
+    if (enableNetworkWrite && !unsafeDevelopmentOverride) {
+      throw new CliUsageError(
+        "audit_release_hold: credentialed network delivery is blocked; maintainer-only development probes require '--unsafe-development-override true'.",
+      );
+    }
+
     const deliveryResult = runDeliveryDriver({
       projectRef: init.projectRoot,
       cwd,
@@ -471,12 +482,13 @@ export function handleDeliveryCommand(context) {
       baseRef: resolveOptionalStringFlag("base-ref", flags["base-ref"]),
       prTitle: resolveOptionalStringFlag("pr-title", flags["pr-title"]),
       prBody: resolveOptionalStringFlag("pr-body", flags["pr-body"]),
-      enableNetworkWrite: resolveOptionalBooleanFlag("network-write", flags["network-write"]),
+      enableNetworkWrite,
       ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
       deliveryPlanPath: planResult.deliveryPlanFile,
     });
 
     outputState.deliveryBlocking = deliveryResult.blocking;
+    outputState.unsafeDevelopmentOverride = unsafeDevelopmentOverride;
     outputState.deliveryTranscriptFile = deliveryResult.transcriptFile;
     outputState.deliveryManifestId =
       typeof deliveryResult.deliveryManifest.manifest_id === "string"

@@ -17,6 +17,20 @@ same loopback process as the control-plane API.
 
 ## Decision
 
+AOR has three distinct deployment topologies:
+
+1. **Packaged local application:** `aor app` binds to loopback and serves the
+   SPA and control plane from one same-origin process. This is the only
+   supported browser topology in the alpha channel. The browser stores no AOR
+   bearer credential.
+2. **Detached hardened headless API:** the HTTP/SSE control plane can run without
+   the SPA in `production-hardened` mode with out-of-band bearer principals.
+   Headless CLI and module workflows remain usable independently.
+3. **Future hosted or remote web product:** arbitrary remote SPA attachment,
+   browser credential storage, SSO/OAuth/OIDC, TLS termination, reverse-proxy
+   trust, tenant isolation, public CORS, WAF, and internet-facing rate limiting
+   are not supported by this ADR.
+
 The npm alpha package includes `apps/web/dist` as a supported installed-user
 surface. `aor app` starts a foreground local loopback server, serves the
 packaged SPA at `/`, serves `/app-config.json`, exposes the existing
@@ -51,5 +65,8 @@ policy gates.
 ## Migration triggers
 
 Open a new ADR before making the web console mandatory, moving the installed
-surface to a hosted service, replacing the shared HTTP transport with a
+surface to a hosted service, permitting an arbitrary remote control-plane
+attachment, storing bearer tokens in a browser, adding SSO/OAuth/OIDC, TLS
+termination, reverse-proxy trust, tenant isolation, public CORS, a WAF, or
+internet-facing rate limiting, replacing the shared HTTP transport with a
 framework-owned server, or adding UI-only packet schema fields.

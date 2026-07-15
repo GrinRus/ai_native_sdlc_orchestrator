@@ -161,6 +161,10 @@ export function handleRunControlCommand(context) {
     const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
     const reason = resolveOptionalStringFlag("reason", flags.reason);
     const approvalRef = resolveOptionalStringFlag("approval-ref", flags["approval-ref"]);
+    const unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
+      "unsafe-development-override",
+      flags["unsafe-development-override"],
+    );
 
     if (runAction !== "start" && runAction !== "steer" && targetStep) {
       throw new CliUsageError(`Flag '--target-step' is only valid for 'aor run start' or 'aor run steer'.`);
@@ -304,6 +308,7 @@ export function handleRunControlCommand(context) {
           taskRefs: executionContext?.taskRefs,
           planDigest: executionContext?.planDigest,
           taskDigests: executionContext?.taskDigests,
+          unsafeDevelopmentOverride,
         });
       } catch (error) {
         const message = errorMessage(error);
@@ -336,6 +341,7 @@ export function handleRunControlCommand(context) {
         throw new CliUsageError(`Run start failed after durable start transition: ${message}`);
       }
       outputState.routedStepResultId = routedExecution.stepResult.step_result_id;
+      outputState.unsafeDevelopmentOverride = unsafeDevelopmentOverride;
       outputState.routedStepResultFile = routedExecution.stepResultPath;
       outputState.runControlState = finalizeRunControlState({
         projectRoot: controlResult.projectRoot,

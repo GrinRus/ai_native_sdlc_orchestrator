@@ -40,4 +40,4 @@ jobs:
         run: pnpm check
 
       - name: Run production readiness gate
-        run: pnpm production:ready
+        run: pnpm production:ready --json --expect-audit-hold
