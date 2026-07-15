@@ -17,8 +17,14 @@ const defaultProofFixturePath = path.posix.join(
 const defaultOpenApiPath = "docs/contracts/control-plane-api.openapi.json";
 const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
 const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledger-2026-07.json";
+const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure.json";
 const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
 const ALLOWED_AUDIT_STATES = new Set(["open", "in-progress", "resolved", "accepted-risk", "superseded"]);
+const W57_CLOSURE_FINDINGS = [
+  "AUD-001", "AUD-002", "AUD-003", "AUD-004", "AUD-005", "AUD-007", "AUD-008", "AUD-009",
+  "AUD-011", "AUD-013", "AUD-014", "AUD-015", "AUD-016", "AUD-017", "AUD-022", "AUD-023",
+  "AUD-029", "AUD-030", "AUD-031", "AUD-052", "project-context-cwd-divergence",
+];
 
 function resolvePath(rootDir, file) {
   return path.isAbsolute(file) ? file : path.join(rootDir, file);
@@ -133,6 +139,82 @@ function checkAuditRemediationLedger(rootDir, auditLedgerPath = defaultAuditLedg
     ),
     blocking_invariants: blockingInvariants,
   };
+}
+
+function checkW57ClosureReport(rootDir, auditLedgerPath, closureReportPath = defaultW57ClosurePath) {
+  const findings = [];
+  let ledger;
+  let report;
+  try {
+    ledger = readJson(rootDir, auditLedgerPath);
+    report = readJson(rootDir, closureReportPath);
+  } catch (error) {
+    return fail("w57-remediation-closure", "W57 remediation closure evidence is missing or invalid.", [error.message], [
+      auditLedgerPath,
+      closureReportPath,
+    ]);
+  }
+
+  if (report.schema_version !== 1 || report.wave_id !== "W57" || report.status !== "passed") {
+    findings.push("W57 closure report must declare schema_version=1, wave_id=W57, and status=passed.");
+  }
+  if (report.release_disposition_after_wave !== "audit-hold") {
+    findings.push("W57 closure report must preserve audit-hold for remaining W58/W59 findings.");
+  }
+
+  const ledgerById = new Map((ledger.findings ?? []).map((entry) => [entry.finding_id, entry]));
+  const entries = Array.isArray(report.findings) ? report.findings : [];
+  const reportById = new Map();
+  for (const entry of entries) {
+    if (reportById.has(entry.finding_id)) findings.push(`W57 closure finding '${entry.finding_id}' is duplicated.`);
+    reportById.set(entry.finding_id, entry);
+  }
+  const expected = new Set(W57_CLOSURE_FINDINGS);
+  for (const findingId of W57_CLOSURE_FINDINGS) {
+    const entry = reportById.get(findingId);
+    const ledgerEntry = ledgerById.get(findingId);
+    if (!entry) {
+      findings.push(`W57 closure report is missing '${findingId}'.`);
+      continue;
+    }
+    if (!ledgerEntry) {
+      findings.push(`W57 closure finding '${findingId}' is missing from the audit ledger.`);
+      continue;
+    }
+    const evidenceRefs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
+    if (evidenceRefs.length === 0) findings.push(`W57 closure finding '${findingId}' must cite evidence.`);
+    for (const evidenceRef of evidenceRefs) {
+      const fileRef = String(evidenceRef).split("#", 1)[0];
+      if (!fileRef || !fileExists(rootDir, fileRef)) {
+        findings.push(`W57 closure evidence '${evidenceRef}' for '${findingId}' does not exist.`);
+      }
+    }
+    const isSharedDeferred = findingId === "AUD-009" || findingId === "AUD-052";
+    if (isSharedDeferred && entry.disposition !== "in-progress") {
+      findings.push(`Shared finding '${findingId}' must record its in-progress disposition at W57 closure.`);
+    }
+    if (isSharedDeferred && !["in-progress", "resolved", "superseded"].includes(ledgerEntry.state)) {
+      findings.push(`Shared finding '${findingId}' has regressed to ledger state '${ledgerEntry.state}'.`);
+    }
+    if (!isSharedDeferred && (entry.disposition !== "resolved" || !CLOSED_AUDIT_STATES.has(ledgerEntry.state))) {
+      findings.push(`W57-owned finding '${findingId}' must be resolved before W57 closes.`);
+    }
+  }
+  for (const findingId of reportById.keys()) {
+    if (!expected.has(findingId)) findings.push(`Unexpected finding '${findingId}' appears in the W57 closure report.`);
+  }
+
+  if (findings.length > 0) {
+    return fail("w57-remediation-closure", "W57 remediation closure evidence is incomplete or drifting.", findings, [
+      auditLedgerPath,
+      closureReportPath,
+    ]);
+  }
+  return pass(
+    "w57-remediation-closure",
+    "W57 trust-boundary findings map one-to-one to reproducible evidence; shared W58 work remains open.",
+    [auditLedgerPath, closureReportPath],
+  );
 }
 
 function splitMarkdownTableRow(line) {
@@ -816,9 +898,11 @@ export function runProductionReadinessGate(options = {}) {
   const openApiPath = options.openApiPath ?? defaultOpenApiPath;
   const storyMatrixPath = options.storyMatrixPath ?? defaultStoryMatrixPath;
   const auditLedgerPath = options.auditLedgerPath ?? defaultAuditLedgerPath;
+  const w57ClosurePath = options.w57ClosurePath ?? defaultW57ClosurePath;
   const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
   const checks = [
     auditLedgerCheck,
+    checkW57ClosureReport(rootDir, auditLedgerPath, w57ClosurePath),
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
     checkStoryHonesty(rootDir, storyMatrixPath),
@@ -845,6 +929,9 @@ export function runProductionReadinessGate(options = {}) {
     proof_fixture_path: proofFixturePath,
     openapi_path: openApiPath,
     remediation_ledger_path: auditLedgerPath,
+    remediation_closure_reports: {
+      W57: w57ClosurePath,
+    },
     checks,
   };
 }

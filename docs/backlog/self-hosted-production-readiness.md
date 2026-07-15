@@ -26,8 +26,8 @@ Production readiness requires:
 
 | Blocker | Owning slice | Required evidence |
 |---|---|---|
-| Release/readiness sources and gates encode the July 2026 audit hold; runtime fixes remain open. | `W57-S01` | Machine-readable ledger, threat-model boundary, story-gap disposition, blocked readiness fixture, and default unsafe-mode denial. |
-| No-write, workspace, path/scope, permission, delivery, and evidence trust boundaries are not reliable. | `W57-S02` through `W57-S08` | Adversarial regression evidence and an independently reviewable W57 disposition. |
+| Release/readiness sources and gates encode the July 2026 audit hold; post-W57 runtime and product fixes remain open. | `W58`, `W59` | Machine-readable ledger, W57 closure report, and blocked readiness output that names every remaining invariant. |
+| W57 local trust-boundary closure must remain reproducible while later waves change runtime behavior. | `W57-S08`, preserved by `W58`/`W59` | `docs/research/08-w57-security-reliability-closure.json`, complete test discovery, adversarial suites, and isolated package smoke. |
 | Runtime context, evaluation, routing, control, event, API, and local HTTP behavior are not yet truthful end to end. | `W58-S01` through `W58-S08` | Cross-process and installed-package runtime-quality acceptance proof. |
 | Browser behavior, maintainability ratchets, hotspot decomposition, and independent audit closure remain open. | `W59-S01` through `W59-S07` | Executable browser evidence, quality baselines, finding-by-finding closure ledger, and a new readiness decision. |
 
@@ -72,7 +72,7 @@ OpenCode is extended candidate coverage after W22-S03. It is not a required or c
 
 The historical W22-W34 evidence does not by itself restore the production-candidate verdict. Requalification requires:
 
-1. W57 closes every execution, filesystem, scope, permission, delivery, and concurrent-evidence trust blocker with adversarial proof.
+1. W57 has closed its execution, filesystem, scope, permission, delivery, and concurrent-evidence trust-boundary scope with adversarial proof. AUD-009 quality lineage and AUD-052 effective-context identity remain explicitly shared with W58.
 2. W58 proves non-materializing reads, effective context, real evaluation, executable routing, asynchronous control, durable events, canonical public surfaces, and the loopback HTTP boundary.
 3. W59 replaces marker checks with browser behavior, lands maintainability ratchets and bounded decomposition, and independently disposes every `AUD-001` through `AUD-055` finding.
 4. `W59-S07` updates the readiness, release, story, and roadmap sources only after all remaining S1 findings are resolved or an explicit narrower release claim is approved.

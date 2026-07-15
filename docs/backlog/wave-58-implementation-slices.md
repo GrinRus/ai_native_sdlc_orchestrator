@@ -19,7 +19,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** Every query surface can inspect a clean project without creating
   `.aor`, profiles, reports, packets, or workflow state.
 - **Epic:** EPIC-1, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `docs/contracts/control-plane-api.md`, read-model services,
@@ -70,7 +70,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   uniquely, contributes normalized content to the provider input, and changes the
   compiled fingerprint when its effective content changes.
 - **Epic:** EPIC-1, EPIC-3, EPIC-4
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** context/asset contracts, reference registry,
@@ -123,7 +123,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   fallback transitions execute exactly as recorded without erasing structured
   denial evidence.
 - **Epic:** EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** route/policy contracts, `packages/provider-routing/**`,
@@ -247,7 +247,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   asynchronously, and CLI/API/SSE can observe, pause, answer, or cancel the same
   durable run across process boundaries.
 - **Epic:** EPIC-3, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** lifecycle command service, run worker/supervisor,

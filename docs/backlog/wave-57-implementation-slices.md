@@ -572,7 +572,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
 - **Outcome:** W57 closes only when the repaired execution, filesystem, delivery,
   and concurrency boundaries are reproducible through public/local test surfaces.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** root gates, safety fixtures, package smoke, release docs,
