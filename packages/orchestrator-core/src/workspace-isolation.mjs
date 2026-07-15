@@ -224,7 +224,7 @@ function provisionGitWorkspace({ sourceRoot, executionRoot, requestedMode, sourc
     }
     fs.rmSync(executionRoot, { recursive: true, force: true });
   }
-  const clone = runGit(sourceRoot, ["clone", "--no-hardlinks", "--no-checkout", sourceRoot, executionRoot], true);
+  const clone = runGit(sourceRoot, ["clone", "--no-hardlinks", "--no-checkout", "--", sourceRoot, executionRoot], true);
   if (clone.status !== 0) {
     fs.rmSync(executionRoot, { recursive: true, force: true });
     return null;

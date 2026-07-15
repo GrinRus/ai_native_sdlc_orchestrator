@@ -290,7 +290,6 @@ function seedStrictRuntimeHarnessReport(options) {
     options.runId.replace(/^w6-deliver-/u, ""),
     options.runId.replace(/^strict-delivery-/u, ""),
     options.runId.replace(/^strict-delivery-/u, "strict-"),
-    options.runId.replace(/^w8-release-/u, "w8-release-"),
   ]);
   const artifactsRoot = initPayload.runtime_layout.artifactsRoot;
   for (const alias of aliases) {
