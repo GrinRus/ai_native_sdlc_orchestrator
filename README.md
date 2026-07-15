@@ -351,12 +351,11 @@ release flow. They validate docs, examples, contracts, command surfaces, tests,
 package metadata, and scaffold policy; they do not certify AOR as an unattended
 production runtime for arbitrary repositories.
 
-`pnpm production:ready --json` is a maintainer-facing gate for the bounded
-self-hosted CLI/API mode documented in this repository. Internal evaluation and
-proof fixtures exist for maintainers, but they are not a public onboarding path
-and are intentionally not part of the README workflow. Until W57-S01 encodes
-the July 2026 audit disposition, a green result is legacy pre-audit evidence and
-does not lift the audit release hold.
+`pnpm production:ready --json` is a maintainer-facing release-disposition gate.
+Run `pnpm check` first: it discovers every tracked `*.test.mjs` file through
+`scripts/test-manifest.json` and writes ignored execution evidence bound to the
+current HEAD. Readiness rejects a missing, stale, duplicated, or incomplete test
+report and currently returns the explicit July 2026 audit hold.
 
 The current roadmap source of truth extends through W65 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path

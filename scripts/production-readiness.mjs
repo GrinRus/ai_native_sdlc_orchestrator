@@ -5,6 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/control-plane/http/http-router.mjs";
+import { validateTestExecutionReport } from "./test-discovery.mjs";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = path.posix.join(
@@ -307,7 +308,7 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
 function checkBaselineBoundary(rootDir) {
   const packageJson = readJson(rootDir, "package.json");
   const findings = [];
-  if (packageJson.scripts?.check !== "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs") {
+  if (packageJson.scripts?.check !== "node ./scripts/lint.mjs && node ./scripts/test-runner.mjs && node ./scripts/build.mjs") {
     findings.push("package.json scripts.check must remain the repository-integrity gate.");
   }
   if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-readiness.mjs") {
@@ -322,6 +323,57 @@ function checkBaselineBoundary(rootDir) {
   }
   return pass("baseline-boundary", "`pnpm check` remains baseline integrity; `pnpm production:ready` is separate.", [
     "package.json",
+  ]);
+}
+
+function checkTestExecutionEvidence(rootDir, options = {}) {
+  const validation = validateTestExecutionReport(rootDir, options);
+  if (!validation.ok) {
+    return fail(
+      "complete-test-execution",
+      "Tracked test execution evidence is missing, stale, or incomplete.",
+      validation.errors,
+      [validation.plan.manifest_path, validation.report_path],
+    );
+  }
+  return pass(
+    "complete-test-execution",
+    `${validation.report.executed_files.length}/${validation.plan.candidate_count} tracked tests executed exactly once.`,
+    [validation.plan.manifest_path, validation.report_path],
+  );
+}
+
+function compareVersions(left, right) {
+  const leftParts = left.split(".").map(Number);
+  const rightParts = right.split(".").map(Number);
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function checkDependencySafety(rootDir) {
+  const packageJson = readJson(rootDir, "package.json");
+  const lockfile = readText(rootDir, "pnpm-lock.yaml");
+  const findings = [];
+  const declaredVite = String(packageJson.devDependencies?.vite ?? "");
+  const declaredVersion = /([0-9]+\.[0-9]+\.[0-9]+)/u.exec(declaredVite)?.[1] ?? null;
+  const lockMatch = /^\s{6}vite:\s*\n\s{8}specifier:\s*[^\n]+\n\s{8}version:\s*([0-9]+\.[0-9]+\.[0-9]+)/mu.exec(lockfile);
+  const resolvedVite = lockMatch?.[1] ?? null;
+  if (!declaredVersion || !declaredVersion.startsWith("8.") || compareVersions(declaredVersion, "8.0.16") < 0) {
+    findings.push(`package.json must require a supported Vite range patched at or above 8.0.16; found '${declaredVite}'.`);
+  }
+  if (!resolvedVite) findings.push("pnpm-lock.yaml does not expose the root Vite resolution.");
+  else if (!resolvedVite.startsWith("8.") || compareVersions(resolvedVite, "8.0.16") < 0) {
+    findings.push(`pnpm-lock.yaml resolves Vite ${resolvedVite}; expected supported 8.x at or above 8.0.16.`);
+  }
+  if (findings.length > 0) {
+    return fail("dependency-safety", "Vite dependency safety baseline is not patched.", findings, ["package.json", "pnpm-lock.yaml"]);
+  }
+  return pass("dependency-safety", `Vite ${resolvedVite} is above the affected 8.0.14 baseline.`, [
+    "package.json",
+    "pnpm-lock.yaml",
   ]);
 }
 
@@ -775,6 +827,10 @@ export function runProductionReadinessGate(options = {}) {
     checkAuthHardening(rootDir),
     checkContractAndHarnessEvidence(rootDir),
     checkAlphaHardening(rootDir, openApiPath),
+    checkDependencySafety(rootDir),
+    ...(options.requireTestEvidence
+      ? [checkTestExecutionEvidence(rootDir, { manifestPath: options.testManifestPath, reportPath: options.testReportPath })]
+      : []),
   ];
   const gateExecutionStatus = checks.every((check) => check.status === "pass") ? "pass" : "fail";
   const blockingInvariants = auditLedgerCheck.blocking_invariants ?? [];
@@ -801,6 +857,7 @@ function parseArgs(argv) {
     openApiPath: defaultOpenApiPath,
     auditLedgerPath: defaultAuditLedgerPath,
     expectAuditHold: false,
+    requireTestEvidence: true,
     json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {

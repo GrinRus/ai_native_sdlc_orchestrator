@@ -76,6 +76,7 @@ function executeController(repoRoot, runId) {
     approvedHandoffRef: `evidence://handoff/${runId}`,
     promotionEvidenceRefs: [`evidence://promotion/${runId}`],
     executionRoot: repoRoot,
+    unsafeDevelopmentOverride: true,
   });
 }
 

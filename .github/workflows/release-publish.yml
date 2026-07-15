@@ -24,7 +24,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'release:publish')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
       AOR_RELEASE_STRICT_BRANCH: "true"

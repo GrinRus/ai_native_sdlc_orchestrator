@@ -94,7 +94,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   gate, dependency safety is patched, and later trust-boundary remediation cannot
   add a test that CI, release, or readiness checks silently omit.
 - **Epic:** EPIC-0
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** `scripts/test.mjs`, test-discovery helpers/manifest,
@@ -150,7 +150,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   can escape roots, collide after normalization, inject protocol fields, or
   authorize changes outside the mission.
 - **Epic:** EPIC-1, EPIC-2, EPIC-3, EPIC-5
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`,

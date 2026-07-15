@@ -499,8 +499,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W57-S01 | Audit disposition, release hold, and local-app threat model | EPIC-0, EPIC-6 | done | architecture/contracts/ops docs, README, production-readiness gate | W56-S03 |
-| W57-S09 | Complete test discovery and deterministic safety-gate baseline | EPIC-0 | ready | root test discovery, readiness/CI/release gates, dependency baseline | W57-S01 |
-| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | blocked | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S09 |
+| W57-S09 | Complete test discovery and deterministic safety-gate baseline | EPIC-0 | done | root test discovery, readiness/CI/release gates, dependency baseline | W57-S01 |
+| W57-S02 | Canonical identifier, path, and mission-scope contracts | EPIC-1, EPIC-2, EPIC-3, EPIC-5 | ready | `docs/contracts/**`, `packages/contracts/**`, examples/tests | W57-S09 |
 | W57-S03 | True workspace isolation and no-write enforcement | EPIC-1, EPIC-3, EPIC-5 | blocked | workspace isolation, step execution, delivery plan, adapter SDK | W57-S02 |
 | W57-S04 | Structural runtime permission enforcement | EPIC-3 | blocked | permission contracts/policy, step execution, adapter tests | W57-S02, W57-S03 |
 | W57-S05 | Exact-diff delivery and resolvable authorization evidence | EPIC-4, EPIC-5 | blocked | delivery/Harness contracts, delivery runtime, CLI/tests | W57-S02, W57-S03, W57-S04 |

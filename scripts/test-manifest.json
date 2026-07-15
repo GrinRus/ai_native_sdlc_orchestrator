@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "candidate_pattern": "**/*.test.mjs",
+  "report_path": "node_modules/.cache/aor/test-execution-manifest.json",
+  "groups": [
+    {"group_id":"contracts","path_prefixes":["packages/contracts/test/"],"timeout_class":"standard"},
+    {"group_id":"repository-scripts","path_prefixes":["scripts/test/"],"timeout_class":"standard"},
+    {"group_id":"cli","path_prefixes":["apps/cli/test/"],"timeout_class":"standard"},
+    {"group_id":"api","path_prefixes":["apps/api/test/"],"timeout_class":"standard"},
+    {"group_id":"web","path_prefixes":["apps/web/test/"],"timeout_class":"standard"},
+    {"group_id":"adapter-sdk","path_prefixes":["packages/adapter-sdk/test/"],"timeout_class":"standard"},
+    {"group_id":"harness","path_prefixes":["packages/harness/test/"],"timeout_class":"standard"},
+    {"group_id":"observability","path_prefixes":["packages/observability/test/"],"timeout_class":"standard"},
+    {"group_id":"orchestrator-core","path_prefixes":["packages/orchestrator-core/test/"],"timeout_class":"standard"},
+    {"group_id":"provider-routing","path_prefixes":["packages/provider-routing/test/"],"timeout_class":"standard"},
+    {"group_id":"private-live-e2e","path_prefixes":["scripts/live-e2e/test/"],"timeout_class":"private-proof-harness"}
+  ],
+  "exclusions": []
+}

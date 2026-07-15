@@ -31,6 +31,9 @@ Run the baseline repository gate first:
 pnpm check
 ```
 
+This writes the ignored test-execution manifest consumed by readiness. Do not
+change commits or `scripts/test-manifest.json` between the two gates.
+
 Then run the production-readiness gate:
 
 ```bash
