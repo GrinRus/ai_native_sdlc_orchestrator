@@ -1,6 +1,6 @@
-packet_id: HANDOFF-CHECKOUT-PLAN-001
+packet_id: handoff-checkout-plan-001
 project_id: checkout-platform
-ticket_id: WAVE-CHECKOUT-PLAN-001
+ticket_id: wave-checkout-plan-001
 version: 1
 status: pending-approval
 risk_tier: medium
@@ -180,5 +180,5 @@ approval_state:
   state: pending
   approval_refs: []
 source_refs:
-  wave_ticket_ref: evidence://artifacts/WAVE-CHECKOUT-PLAN-001.json
+  wave_ticket_ref: evidence://artifacts/wave-checkout-plan-001.json
   artifact_packet_ref: evidence://artifacts/checkout-platform.artifact.intake.checkout-errors.v1

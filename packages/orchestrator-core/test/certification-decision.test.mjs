@@ -416,7 +416,7 @@ test("certifyAssetPromotion blocks context promotion on critical findings via co
       dataset
         .replace("      - evidence-discipline", "      - evidence-discipline\n      - critical")
         .replace(
-          "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+          "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
           'expected_ref: ""',
         ),
       "utf8",
@@ -451,7 +451,7 @@ test("certifyAssetPromotion reports fail status when evaluative evidence regress
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
         'expected_ref: ""',
       ),
       "utf8",
@@ -534,7 +534,7 @@ test("certifyAssetPromotion keeps freeze rollout action when regression evidence
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
         'expected_ref: ""',
       ),
       "utf8",

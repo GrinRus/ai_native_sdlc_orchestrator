@@ -281,6 +281,13 @@ test("adapter request and response envelopes enforce stable required fields", ()
   assert.equal(response.status, "success");
   assert.deepEqual(response.evidence_refs, ["evidence://mock-adapter/req-1"]);
 
+  for (const invalidId of ["../run", "C:\\temp", "run\nretry: 1", "RUN-1", "rún-1", `run-${"x".repeat(128)}`]) {
+    assert.throws(
+      () => createAdapterRequestEnvelope({ ...request, request_id: invalidId }),
+      /Invalid request_id/u,
+    );
+  }
+
   assert.throws(
     () =>
       createAdapterResponseEnvelope({
@@ -724,12 +731,11 @@ test("live adapter keeps raw evidence filenames bounded for long live run ids", 
       executionRoot,
     });
 
-    const edgePadding = "-".repeat(1024);
-    const longRunId = `${edgePadding}internal-rehearsal.${"very-long-segment.".repeat(18)}repair-2${edgePadding}`;
+    const longRunId = `run-${"r".repeat(124)}`;
     const response = adapter.execute({
-      request_id: `${longRunId}.run-start-implement.${"request.".repeat(8)}`,
+      request_id: `request-${"q".repeat(120)}`,
       run_id: longRunId,
-      step_id: `${longRunId}.step.implement`,
+      step_id: `step-${"s".repeat(123)}`,
       step_class: "implement",
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },

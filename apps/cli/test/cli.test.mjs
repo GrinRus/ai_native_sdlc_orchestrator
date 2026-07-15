@@ -1297,6 +1297,16 @@ test("invalid project-ref fails clearly", () => {
   assert.match(result.stderr, /Invalid project reference '\.\/does-not-exist': path does not exist\./);
 });
 
+test("public identifier flags reject traversal, drive, control, Unicode, and uppercase forms before runtime access", () => {
+  for (const runId of ["../run", "C:run", "run\r\nnext", "rún", "RUN-001"]) {
+    const result = invokeCli(["run", "status", "--project-ref", ".", "--run-id", runId]);
+    assert.equal(result.exitCode, 1, runId);
+    assert.equal(result.stdout, "", runId);
+    assert.match(result.stderr, /--run-id.*rejects.*identifier/u, runId);
+    assert.match(result.stderr, /lowercase|Remove|Replace|Windows/u, runId);
+  }
+});
+
 test("planned command section is empty when the current shell has no planned commands", () => {
   const result = invokeCli(["--help"]);
 
@@ -4211,7 +4221,7 @@ test("asset promote reports fail status when evaluative evidence regresses", () 
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
         'expected_ref: ""',
       ),
       "utf8",
@@ -4247,7 +4257,7 @@ test("asset freeze keeps freeze rollout action when regression evidence exists",
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
         'expected_ref: ""',
       ),
       "utf8",

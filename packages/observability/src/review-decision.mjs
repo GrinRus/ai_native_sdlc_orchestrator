@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeQualityRepairRequest } from "./quality-repair-request.mjs";
 
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
@@ -477,7 +477,10 @@ export function materializeReviewDecision(options) {
     : null;
   const qualityRepairRef = qualityRepairResult?.requestRef ?? null;
   const qualityRepairLineage = qualityRepairResult?.lineage ?? null;
-  const decisionId = `${options.runId}.review-decision.${options.decision}.${generatedAt.replace(/[:.]/g, "-")}`;
+  const decisionId = derivePublicId(
+    [options.runId, "review-decision", options.decision, generatedAt.replace(/[:.]/g, "-").toLowerCase()],
+    "review-decision",
+  );
   const document = {
     decision_id: decisionId,
     project_id: options.projectId,

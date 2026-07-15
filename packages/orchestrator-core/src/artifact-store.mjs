@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 
 const INTAKE_SOURCE_KIND_VALUES = Object.freeze(["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"]);
 const DELIVERY_MODE_VALUES = Object.freeze(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
@@ -10,8 +11,26 @@ const DELIVERY_MODE_VALUES = Object.freeze(["no-write", "patch-only", "local-bra
  * @param {string} value
  * @returns {string}
  */
-function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+function requirePublicId(field, value) {
+  const validation = validatePublicId(value);
+  if (!validation.ok) {
+    throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+  }
+  return value;
+}
+
+function contentAddressedId(prefix, value) {
+  return `${prefix}-${crypto.createHash("sha256").update(value).digest("hex").slice(0, 32)}`;
+}
+
+function buildPacketId(parts) {
+  const candidate = parts.join(".");
+  const validation = validatePublicId(candidate);
+  if (validation.ok) return candidate;
+  if (validation.value_class === "length") {
+    return `packet-${crypto.createHash("sha256").update(candidate).digest("hex").slice(0, 32)}`;
+  }
+  return requirePublicId("packet_id", candidate);
 }
 
 /**
@@ -245,7 +264,7 @@ function buildProductIntake(options) {
     : options.requestFile;
   if (sourceRef) {
     sourceRefs.unshift({
-      source_id: normalizeId(`${requestedSourceKind}-${path.basename(sourceRef)}`) || "local-source",
+      source_id: contentAddressedId("local-source", JSON.stringify([requestedSourceKind, sourceRef])),
       source_kind: requestedSourceKind,
       title: options.requestTitle,
       ref: sourceRef,
@@ -298,7 +317,8 @@ function buildProductIntake(options) {
  * }} options
  */
 export function materializeBootstrapArtifactPacket(options) {
-  const packetId = `${options.projectId}.artifact.bootstrap.v1`;
+  requirePublicId("project_id", options.projectId);
+  const packetId = buildPacketId([options.projectId, "artifact", "bootstrap", "v1"]);
   const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
   const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
 
@@ -392,13 +412,15 @@ export function materializeIntakeArtifactPacket(options) {
     : "Prepare one bounded feature mission request for full-journey execution.";
   const missionId =
     typeof options.missionId === "string" && options.missionId.trim().length > 0 ? options.missionId.trim() : null;
+  requirePublicId("project_id", options.projectId);
+  if (missionId) requirePublicId("mission_id", missionId);
   const requestConstraints = Array.isArray(options.requestConstraints)
     ? options.requestConstraints.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
     : [];
   const requestFile =
     typeof options.requestFile === "string" && options.requestFile.trim().length > 0 ? options.requestFile.trim() : null;
-  const packetIdSuffix = missionId ? normalizeId(missionId) : normalizeId(requestTitle) || "request";
-  const packetId = `${options.projectId}.artifact.intake.${packetIdSuffix}.v1`;
+  const packetIdSuffix = missionId ?? contentAddressedId("request", requestTitle);
+  const packetId = buildPacketId([options.projectId, "artifact", "intake", packetIdSuffix, "v1"]);
   const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
   const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
 

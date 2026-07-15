@@ -56,6 +56,9 @@ export type ContractValidationIssueCode =
   | "field_type_mismatch"
   | "unsupported_field_present"
   | "enum_value_invalid"
+  | "identifier_format_invalid"
+  | "path_scope_invalid"
+  | "reference_base_invalid"
   | "yaml_parse_error";
 
 export interface ContractValidationIssue {
@@ -166,3 +169,17 @@ export function loadContractFile(options: LoadContractFileOptions): LoadedContra
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
 
 export function validateExampleReferences(options?: LoadExampleContractsOptions): ReferenceValidationResult;
+
+export const PUBLIC_ID_PATTERN: RegExp;
+export const PUBLIC_ID_FIELDS: readonly string[];
+export const CANONICAL_REFERENCE_BASES: readonly string[];
+export function validatePublicId(value: unknown): { ok: boolean; value_class: string; migration: string | null };
+export function derivePublicId(components: string[], fallbackPrefix: string): string;
+export function validateAllowedPathPattern(value: unknown): { ok: boolean; value_class: string; migration: string | null };
+export function matchesAllowedPath(pattern: string, candidate: string): boolean;
+export function classifyAllowedPaths(value: unknown): { ok: boolean; state: string; patterns: string[] };
+export function validateReferenceBinding(options: { reference: unknown; base: unknown }): {
+  ok: boolean;
+  value_class: string;
+  migration: string | null;
+};

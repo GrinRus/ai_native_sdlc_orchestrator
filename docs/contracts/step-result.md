@@ -1,5 +1,10 @@
 # Step result
 
+`run_id` and `step_id` use the canonical public-ID grammar defined in
+`canonical-identifiers-and-paths.md`. Evidence and mission path arrays retain
+literal project-relative values; invalid path syntax is rejected rather than
+normalized.
+
 ## Purpose
 Normalized output of one step regardless of whether that step was an artifact, planner, runner, repair, eval, or harness step.
 

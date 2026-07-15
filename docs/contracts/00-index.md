@@ -1,5 +1,8 @@
 # Contracts index
 
+All families inherit the cross-cutting [canonical identifier, path-scope, and
+reference-base rules](canonical-identifiers-and-paths.md).
+
 ## Core packets and profiles
 - `project-profile.md`
 - `onboarding-report.md`

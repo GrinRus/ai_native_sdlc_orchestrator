@@ -9,6 +9,7 @@ import {
   discoverProjectRoot,
   initializeProjectRuntime,
   resolveProjectProfilePath,
+  resolveRuntimeLayout,
 } from "../src/project-init.mjs";
 import { loadContractFile } from "../../contracts/src/index.mjs";
 
@@ -122,6 +123,26 @@ test("resolveProjectProfilePath defaults to examples/project.aor.yaml in repo ro
   });
 });
 
+test("relative profiles are project-bound and invalid project IDs fail before runtime writes", () => {
+  const launcher = fs.mkdtempSync(path.join(os.tmpdir(), "aor-launcher-"));
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-project-"));
+  const runtimeRoot = path.join(projectRoot, ".aor");
+  fs.writeFileSync(path.join(launcher, "launcher-only.yaml"), "project_id: launcher\n", "utf8");
+  try {
+    assert.throws(
+      () => resolveProjectProfilePath({ cwd: launcher, projectRoot, projectProfile: "launcher-only.yaml" }),
+      /never resolve from launcher cwd/u,
+    );
+    for (const projectId of ["../escape", "C:\\escape", "project\nretry: 1", "PROJECT"] ) {
+      assert.throws(() => resolveRuntimeLayout({ runtimeRoot, projectId }), /Invalid project_id/u);
+    }
+    assert.equal(fs.existsSync(runtimeRoot), false);
+  } finally {
+    fs.rmSync(launcher, { recursive: true, force: true });
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test("initializeProjectRuntime creates idempotent runtime layout and durable state", () => {
   withTempRepo((tempRoot) => {
     const nestedPath = path.join(tempRoot, "apps", "cli");
@@ -180,7 +201,8 @@ test("initializeProjectRuntime onboards a clean repo in bundled mode without tar
   try {
     const result = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
 
-    assert.equal(result.projectId, path.basename(tempRoot).toLowerCase());
+    assert.match(result.projectId, /^project-[a-f0-9]{16}$/u);
+    assert.equal(initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot }).projectId, result.projectId);
     assert.equal(result.assetMode, "bundled");
     assert.equal(result.bootstrapMaterializationStatus, "bundled");
     assert.match(result.projectProfileRef, /^\.aor\/projects\/.+\/state\/project\.aor\.yaml$/);

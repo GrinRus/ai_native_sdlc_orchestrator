@@ -27,6 +27,12 @@ Persistent configuration for one target project, including repos, allowed provid
 ## Notes
 Use the project profile as the durable source of truth for runtime default selection.
 
+`project_id` follows the canonical lowercase public-ID grammar in
+`canonical-identifiers-and-paths.md`. Invalid or collision-equivalent values are
+rejected rather than normalized. Project-relative registry roots resolve from
+the canonical project root; bundled absolute registry roots are explicit
+installed-asset inputs and must never be inferred from launcher `cwd`.
+
 `asset_mode` is optional for backward compatibility and should be present on new or materialized profiles:
 - `bundled` resolves AOR-provided registry roots from the installed AOR asset bundle without copying example registries into the target repository;
 - `materialized` resolves registry roots from target-repo committed assets after the user explicitly materializes or ejects them.

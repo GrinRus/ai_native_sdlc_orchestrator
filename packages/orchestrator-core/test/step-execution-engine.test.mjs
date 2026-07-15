@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { readRunEventHistory } from "../src/control-plane/read-surface.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
+import { resolveCanonicalContainedPath } from "../src/shared/canonical-paths.mjs";
 import {
   executeRoutedStep as executeRoutedStepWithoutAuditOverride,
   executeRuntimeHarnessControlledStep as executeRuntimeHarnessControlledStepWithoutAuditOverride,
@@ -19,6 +20,8 @@ import {
   filterNonBootstrapChangedPaths,
   filterRunnerOwnedStatePaths,
   listChangedPaths,
+  matchesScopePattern,
+  parseGitStatusPorcelainZ,
 } from "../src/shared/mission-scope.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -96,6 +99,44 @@ test("changed path parsing ignores AOR runtime before bootstrap-owned filtering"
       false,
     );
   });
+});
+
+test("NUL-delimited Git status preserves both rename endpoints and literal path bytes", () => {
+  const parsed = parseGitStatusPorcelainZ(
+    "R  source/new name.ts\0source/old name.ts\0?? source/unicode-λ.ts\0 D source/line\r\nbreak.ts\0",
+  );
+  assert.deepEqual(parsed[0], {
+    indexStatus: "R",
+    worktreeStatus: " ",
+    kind: "rename",
+    path: "source/new name.ts",
+    sourcePath: "source/old name.ts",
+    destinationPath: "source/new name.ts",
+    paths: ["source/old name.ts", "source/new name.ts"],
+  });
+  assert.deepEqual(parsed[1].paths, ["source/unicode-λ.ts"]);
+  assert.deepEqual(parsed[2].paths, ["source/line\r\nbreak.ts"]);
+  assert.equal(matchesScopePattern("source/*.ts", "source/new name.ts"), true);
+  assert.equal(matchesScopePattern("source/*.ts", "source/nested/new.ts"), false);
+  assert.equal(matchesScopePattern("source/**", "source-escape/new.ts"), false);
+});
+
+test("canonical containment rejects symlink ancestors that escape the project boundary", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-contained-project-"));
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-contained-outside-"));
+  try {
+    fs.mkdirSync(path.join(projectRoot, "source"));
+    fs.symlinkSync(outsideRoot, path.join(projectRoot, "source", "external"), "dir");
+    assert.equal(resolveCanonicalContainedPath({ root: projectRoot, relativePath: "source/new.ts" }).ok, true);
+    const escaped = resolveCanonicalContainedPath({ root: projectRoot, relativePath: "source/external/new.ts" });
+    assert.equal(escaped.ok, false);
+    assert.equal(escaped.reason, "symlink-escape");
+    assert.equal(resolveCanonicalContainedPath({ root: projectRoot, relativePath: "../outside.ts" }).ok, false);
+    assert.equal(resolveCanonicalContainedPath({ root: projectRoot, relativePath: "source\\new.ts" }).ok, false);
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+    fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
 });
 
 test("mission evidence treats SSL key log output as diagnostic noise, not meaningful product diff", () => {

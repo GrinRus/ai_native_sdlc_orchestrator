@@ -1,5 +1,10 @@
 # Delivery plan
 
+Delivery paths and authorization references inherit the canonical scope and
+reference-base rules in `canonical-identifiers-and-paths.md`. Rename, copy, and
+delete authorization covers every source and destination endpoint. A malformed
+scope blocks planning and is never coerced to no-write or unrestricted access.
+
 ## Purpose
 Durable pre-write artifact that makes delivery intent explicit before any write-back path starts.
 

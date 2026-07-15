@@ -3,6 +3,7 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES } from "./families.mjs";
+import { validateCanonicalContractValues } from "./canonical-values.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
@@ -156,6 +157,7 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  issues.push(...validateCanonicalContractValues(document, source));
 
   for (const field of entry.requiredFields) {
     if (!(field in document)) {

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
 
 const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/;
 const QUALITY_REPAIR_STATUSES = new Set([
@@ -218,7 +218,10 @@ export function materializeQualityRepairRequest(options) {
     options.projectRoot,
     asString(options.sourceRef) ?? `.aor/projects/${options.projectId}/reports/${sourceStage}-repair-source-${normalizeId(options.runId)}.json`,
   );
-  const requestId = `${options.runId}.quality-repair-request.${sourceStage}.${generatedAt.replace(/[:.]/g, "-")}`;
+  const requestId = derivePublicId(
+    [options.runId, "quality-repair-request", sourceStage, generatedAt.replace(/[:.]/g, "-").toLowerCase()],
+    "quality-repair-request",
+  );
   const attemptBudget = asRecord(options.attemptBudget);
   const maxAttempts = asNonNegativeInteger(attemptBudget.max_attempts) ?? 1;
   const attemptIndex = asNonNegativeInteger(attemptBudget.attempt_index) ?? 1;

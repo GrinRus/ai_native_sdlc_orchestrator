@@ -6,7 +6,7 @@ import {
   createAdapterRequestEnvelope,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
@@ -363,7 +363,7 @@ function uniquePacketRefsByName(packetRefs) {
 function buildRequestedInteraction(options) {
   return {
     requested: true,
-    interaction_id: `interaction.${normalizeRefSuffix(options.stepResultId) || "step"}.1`,
+    interaction_id: derivePublicId(["interaction", options.stepResultId, "1"], "interaction"),
     status: "requested",
     prompt_summary: options.summary,
     question_evidence_refs: options.evidenceRefs,
@@ -600,7 +600,10 @@ function buildCompiledContextId(projectId, runId, stepId, stepClass, promptBundl
   const runSuffix = normalizeRefSuffix(runId) || "run";
   const stepSuffix = normalizeRefSuffix(stepId) || "step";
   const classSuffix = normalizeRefSuffix(stepClass) || "step";
-  return `compiled-context.${projectId}.${runSuffix}.${stepSuffix}.${classSuffix}.attempt.${attempt}.${promptSuffix || "default"}`;
+  return derivePublicId(
+    ["compiled-context", projectId, runSuffix, stepSuffix, classSuffix, "attempt", String(attempt), promptSuffix || "default"],
+    "compiled-context",
+  );
 }
 
 /**
@@ -1024,6 +1027,13 @@ function writeRuntimeRepairInput(options) {
  * }} options
  */
 export function executeRoutedStep(options) {
+  for (const [field, value] of [["runId", options.runId], ["stepId", options.stepId]]) {
+    if (value === undefined) continue;
+    const validation = validatePublicId(value);
+    if (!validation.ok) {
+      throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+    }
+  }
   const init = initializeProjectRuntime(options);
   const registryRoots =
     typeof init.registryRoots === "object" && init.registryRoots !== null
@@ -1082,8 +1092,12 @@ export function executeRoutedStep(options) {
     stepId,
     stepClass: requestedStepClass,
   });
-  const stepResultIdBase = `${runId}.step.${requestedStepClass}`;
-  const stepResultId = executionAttempt > 1 ? `${stepResultIdBase}.attempt.${executionAttempt}` : stepResultIdBase;
+  const stepResultId = derivePublicId(
+    executionAttempt > 1
+      ? [runId, "step", requestedStepClass, "attempt", String(executionAttempt)]
+      : [runId, "step", requestedStepClass],
+    "step-result",
+  );
   const runScopeSuffix = normalizeRefSuffix(runId) || "run";
   const stepScopeSuffix = normalizeRefSuffix(stepId) || "step";
   const classScopeSuffix = normalizeRefSuffix(requestedStepClass) || "step";
@@ -1450,7 +1464,7 @@ export function executeRoutedStep(options) {
       }
 
       adapterRequest = createAdapterRequestEnvelope({
-        request_id: `${stepResultId}.request`,
+        request_id: derivePublicId([stepResultId, "request"], "adapter-request"),
         run_id: runId,
         step_id: stepId,
         step_class: requestedStepClass,

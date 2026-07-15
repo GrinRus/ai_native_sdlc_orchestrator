@@ -1,5 +1,10 @@
 # Live run event
 
+`event_id` and `run_id` use the canonical public-ID grammar in
+`canonical-identifiers-and-paths.md`. Event identity is data, not a path or SSE
+field; CR/LF, separators, traversal, and normalization-derived values are
+rejected.
+
 ## Purpose
 Normalized event emitted during workflow execution for CLI, API, and web subscribers.
 
