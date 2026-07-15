@@ -31,6 +31,7 @@ import {
 import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mjs";
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
+import { applyExecutableFailurePolicy } from "./failure-policy.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
 import { completeStepAttempt, reserveStepAttempt } from "./attempt-store.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
@@ -1338,6 +1339,26 @@ export function executeRoutedStep(options) {
         adaptersRoot,
         adapterOverrides: options.adapterOverrides,
       });
+      routeResolution = {
+        ...routeResolution,
+        requested_model: asString(adapterResolution.requested_model),
+        effective_model: asString(adapterResolution.effective_model),
+        model_source: asString(adapterResolution.model_source) ?? "not-applicable",
+        fallback_candidates: Array.isArray(adapterResolution.execution_candidates)
+          ? adapterResolution.execution_candidates.slice(1).map((candidate) => {
+              const record = asRecord(candidate);
+              return {
+                candidate_index: record.candidate_index,
+                adapter: asString(record.adapter_id),
+                provider: asString(record.provider),
+                requested_model: asString(record.requested_model),
+                effective_model: asString(record.effective_model),
+                model_source: asString(record.model_source),
+                capability_check: asRecord(record.capability_check),
+              };
+            })
+          : [],
+      };
       const inputPacketRefs = resolveStepInputPacketRefs({
         projectRoot: init.projectRoot,
         assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
@@ -1458,6 +1479,9 @@ export function executeRoutedStep(options) {
         provider: asString(routePrimary.provider),
         adapter: asString(adapterProfile.adapter_id),
         route_id: asString(routeResolution.resolved_route_id),
+        requested_model: asString(routeResolution.requested_model),
+        effective_model: asString(routeResolution.effective_model),
+        model_source: asString(routeResolution.model_source),
         step_id: stepId,
         status: "running",
         timeout_budget_ms: timeoutBudgetMs,
@@ -1794,6 +1818,7 @@ export function executeRoutedStep(options) {
     meaningfulChangedPaths: missionEvidence.meaningfulChangedPaths,
     runnerOwnedStatePaths: missionEvidence.runnerOwnedStatePaths,
   });
+  runtimeOutcome = applyExecutableFailurePolicy(runtimeOutcome, asRecord(policyResolution));
   let runtimePermissionRequest = null;
   let runtimePermissionDecision = null;
   let runtimePermissionDecisionAuditRef = null;

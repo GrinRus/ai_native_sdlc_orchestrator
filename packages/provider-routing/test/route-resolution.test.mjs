@@ -60,6 +60,15 @@ test("resolveRouteForStep applies step-level override deterministically", () => 
     assert.equal(resolved.resolution_source.kind, "step-override");
     assert.equal(resolved.resolution_source.field, "step_overrides.planning");
     assert.equal(resolved.resolved_route_id, "route.plan.default");
+    assert.equal(resolved.route_profile.retry_policy_ref, "retry.transient.default");
+    assert.equal(resolved.route_profile.repair_policy_ref, "repair.plan.default");
+    assert.equal(resolved.route_profile.requested_model, "planning-primary");
+    assert.equal(resolved.route_profile.effective_model, null);
+    assert.equal(resolved.route_profile.model_source, "unresolved");
+    assert.equal(resolved.route_profile.attempt_budget, 2);
+    assert.deepEqual(resolved.route_profile.fallback, [
+      { adapter: "none", provider: "anthropic", model: "planning-fallback" },
+    ]);
   });
 });
 

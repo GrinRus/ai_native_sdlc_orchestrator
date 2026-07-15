@@ -683,6 +683,19 @@ function validateArtifactPacket(document, source) {
 function validateAdapterCapabilityProfile(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  validateNestedStringField({ record: document, source, field: "default_model", issues, required: false });
+  validateOptionalStringArrayField({ record: document, source, field: "supported_models", issues });
+  if (document.model_aliases !== undefined) {
+    if (!isPlainObject(document.model_aliases)) {
+      issues.push(issue({ code: "field_type_mismatch", source, field: "model_aliases", expected: "object", actual: describeActualType(document.model_aliases), message: "model_aliases must be an object." }));
+    } else {
+      for (const [alias, model] of Object.entries(document.model_aliases)) {
+        if (typeof model !== "string" || model.length === 0) {
+          issues.push(issue({ code: "field_type_mismatch", source, field: `model_aliases.${alias}`, expected: "string", actual: describeActualType(model), message: `model_aliases.${alias} must name a concrete model.` }));
+        }
+      }
+    }
+  }
   const execution = isPlainObject(document.execution) ? document.execution : null;
   if (!execution) return issues;
   const externalRuntime = validateOptionalObjectField({
@@ -699,6 +712,11 @@ function validateAdapterCapabilityProfile(document, source) {
     field: "execution.external_runtime.default_args",
     issues,
   });
+  const modelArgument = validateOptionalObjectField({ record: externalRuntime, source, field: "execution.external_runtime.model_argument", issues });
+  if (modelArgument) {
+    validateNestedStringField({ record: modelArgument, source, field: "execution.external_runtime.model_argument.flag", issues, required: true });
+    validateNestedArrayField({ record: modelArgument, source, field: "execution.external_runtime.model_argument.prefix_args", issues, required: false });
+  }
 
   const requestTransport =
     typeof externalRuntime.request_transport === "string" && externalRuntime.request_transport.length > 0

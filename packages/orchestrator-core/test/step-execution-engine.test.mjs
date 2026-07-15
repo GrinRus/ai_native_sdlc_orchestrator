@@ -10,6 +10,7 @@ import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { readRunEventHistory } from "../src/control-plane/read-surface.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { resolveCanonicalContainedPath } from "../src/shared/canonical-paths.mjs";
+import { invokeStepAdapterForStep } from "../src/step-adapter-invocation.mjs";
 import {
   executeRoutedStep as executeRoutedStepWithoutAuditOverride,
   executeRuntimeHarnessControlledStep as executeRuntimeHarnessControlledStepWithoutAuditOverride,
@@ -34,6 +35,74 @@ const executeRoutedStep = (options) =>
   executeRoutedStepWithoutAuditOverride({ ...options, unsafeDevelopmentOverride: true });
 const executeRuntimeHarnessControlledStep = (options) =>
   executeRuntimeHarnessControlledStepWithoutAuditOverride({ ...options, unsafeDevelopmentOverride: true });
+
+function fakeModelAdapterProfile(args) {
+  return {
+    runner_family: "fake",
+    execution: {
+      runtime_mode: "external-process",
+      handler: "fake-external-runner",
+      evidence_namespace: "evidence://adapter-live/fake",
+      external_runtime: {
+        command: process.execPath,
+        model_argument: { prefix_args: ["--"], flag: "--model" },
+        permission_policy: { default_mode: "test", modes: { test: { args } } },
+        request_via_stdin: true,
+        request_transport: "stdin-json",
+        stdin_json_scope: "test-only",
+        timeout_ms: 30000,
+      },
+    },
+  };
+}
+
+test("adapter invocation executes one compatible fallback and records argv/model parity", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w58-s03-fallback-"));
+  try {
+    const primary = fakeModelAdapterProfile(["-e", "process.exit(1)"]);
+    const fallback = fakeModelAdapterProfile([
+      "-e",
+      "process.stdout.write(JSON.stringify({status:'success',summary:'fallback ok'}))",
+    ]);
+    const result = invokeStepAdapterForStep({
+      dryRun: false,
+      requestedStepClass: "implement",
+      adapterResolution: {
+        adapter: { adapter_id: "primary-fake", profile: primary },
+        execution_candidates: [
+          { candidate_index: 0, kind: "primary", adapter_id: "primary-fake", provider: "first", requested_model: "coding-primary", effective_model: "model-a", model_source: "policy-approved-alias", profile: primary },
+          { candidate_index: 1, kind: "fallback", adapter_id: "fallback-fake", provider: "second", requested_model: "coding-fallback", effective_model: "model-b", model_source: "policy-approved-alias", profile: fallback },
+        ],
+      },
+      adapterRequest: {
+        request_id: "fallback-request",
+        run_id: "fallback-run",
+        step_id: "fallback-step",
+        step_class: "implement",
+        route: { resolved_route_id: "route.implement.default", retry_policy_ref: "retry.transient.default" },
+        asset_bundle: {},
+        policy_bundle: { policy: { profile: { retry: { max_attempts: 1, on: ["runner-crash"] } } } },
+        input_packet_refs: [],
+        dry_run: false,
+        context: {},
+      },
+      deliveryPlan: { status: "ready", execution_allowed: true },
+      runtimeEvidenceRoot: path.join(root, "evidence"),
+      projectRoot: root,
+      executionRoot: root,
+    });
+    assert.equal(result.status, "passed");
+    assert.equal(result.adapterResponse.output.route_attempts.length, 2);
+    assert.equal(result.adapterResponse.output.fallback_transitions.length, 1);
+    assert.equal(result.adapterResponse.output.effective_model, "model-b");
+    assert.deepEqual(
+      result.adapterResponse.output.external_runner.args.slice(-3),
+      ["--", "--model", "model-b"],
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 /**
  * @param {(repoRoot: string) => void} callback
@@ -201,6 +270,9 @@ function configureCodexExternalRuntime(repoRoot, runtime) {
     "  evidence_namespace: evidence://adapter-live/codex-cli",
     "  external_runtime:",
     `    command: ${JSON.stringify(runtime.command)}`,
+    "    model_argument:",
+    "      prefix_args: [--]",
+    "      flag: --model",
     "    permission_policy:",
     "      default_mode: full-bypass",
     "      modes:",
@@ -230,6 +302,9 @@ function configureCodexExternalRuntimePermissionModes(repoRoot, runtime) {
     "  evidence_namespace: evidence://adapter-live/codex-cli",
     "  external_runtime:",
     `    command: ${JSON.stringify(runtime.command)}`,
+    "    model_argument:",
+    "      prefix_args: [--]",
+    "      flag: --model",
     "    permission_policy:",
     "      default_mode: full-bypass",
     "      modes:",
@@ -1199,6 +1274,7 @@ test("external-runner zero repair policy preserves terminal evidence without exe
         "    - lint-failed",
         "    - tests-failed",
         "    - missing-evidence",
+        "    - no-op",
         "escalation:",
         "  after_total_failures: 4",
         "  on:",

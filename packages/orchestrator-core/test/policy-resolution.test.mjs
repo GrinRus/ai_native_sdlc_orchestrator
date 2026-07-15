@@ -9,10 +9,35 @@ import {
   resolveStepPolicyForStep,
   resolveStepPolicyMatrix,
 } from "../src/policy-resolution.mjs";
+import { applyExecutableFailurePolicy } from "../src/failure-policy.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
+
+test("failure policy predicates block unlisted repair classes and preserve listed actions", () => {
+  const policyResolution = {
+    policy: {
+      profile: {
+        retry: { on: ["provider-timeout"] },
+        repair: { on: ["tests-failed"] },
+        escalation: { on: ["security-boundary"] },
+      },
+    },
+  };
+  assert.equal(
+    applyExecutableFailurePolicy({ failureClass: "tests-failed", decision: "repair" }, policyResolution).decision,
+    "repair",
+  );
+  assert.equal(
+    applyExecutableFailurePolicy({ failureClass: "security-boundary", decision: "repair" }, policyResolution).decision,
+    "escalate",
+  );
+  assert.equal(
+    applyExecutableFailurePolicy({ failureClass: "schema-mismatch", decision: "repair" }, policyResolution).decision,
+    "block",
+  );
+});
 
 /**
  * @param {(repoRoot: string) => void} callback
@@ -79,6 +104,9 @@ test("resolveStepPolicyForStep applies explicit step policy overrides with deter
         "  max_attempts: 3",
         "  on:",
         "    - provider-timeout",
+        "repair:",
+        "  max_attempts: 0",
+        "  on: []",
         "command_constraints:",
         "  allowed_commands:",
         "    - pnpm test --filter planner",
