@@ -51,6 +51,7 @@ Compiled-context and external-runner contracts include context-budget evidence f
 - `skill-profile.md`
 
 ## Operations
+- `run-job.md`
 - `live-run-event.md`
 - `planner-metrics-snapshot.md`
 - `finance-monitoring-snapshot.md`

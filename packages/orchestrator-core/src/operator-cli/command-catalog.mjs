@@ -888,7 +888,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "command_catalog_alignment",
     ],
     requiredFlags: ["project-ref"],
-    contractFamilies: ["live-run-event", "step-result", "runtime-harness-report", "execution-plan", "task-progress-report"],
+    contractFamilies: ["run-job", "live-run-event", "step-result", "runtime-harness-report", "execution-plan", "task-progress-report"],
   },
   {
     command: "run pause",

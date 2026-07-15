@@ -7,6 +7,7 @@ import {
 } from "./http-presenters.mjs";
 import { InteractionAnswerError, submitInteractionAnswer } from "../interaction-answer.mjs";
 import { runLifecycleCommand } from "../lifecycle-command.mjs";
+import { requestRunJobCancel } from "../../run-job.mjs";
 import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
@@ -97,6 +98,10 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
   });
   const runControlPayload = toRunControlResponse(result);
+
+  if (action === "cancel" && !result.blocked) {
+    requestRunJobCancel({ ...runtimeOptions, runId: result.runId });
+  }
 
   if (result.blocked) {
     sendJson(response, 409, {
@@ -324,9 +329,21 @@ export async function handleLifecycleCommandAction({ request, response, runtimeO
     return;
   }
 
-  sendJson(response, 200, {
-    lifecycle_command: toLifecycleCommandResponse(result.result),
-  });
+  if (result.accepted === true) {
+    const job = result.result.job;
+    sendJson(response, 202, {
+      run_id: job.run_id,
+      job_id: job.job_id,
+      status: job.status,
+      revision: job.revision,
+      status_ref: job.status_ref,
+      event_ref: job.event_ref,
+      lifecycle_command: toLifecycleCommandResponse(result.result),
+    });
+    return;
+  }
+
+  sendJson(response, 200, { lifecycle_command: toLifecycleCommandResponse(result.result) });
 }
 
 /**

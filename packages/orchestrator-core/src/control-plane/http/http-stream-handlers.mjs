@@ -52,13 +52,18 @@ export function handleRunEventStream({ params, request, requestUrl, response, ru
     });
   }
 
-  const unsubscribe = stream.subscribe((event) => {
+  let unsubscribe = () => {};
+  unsubscribe = stream.subscribe((event) => {
     const payload = toHistoryEvent(event);
-    writeSseEvent(response, {
+    const writable = writeSseEvent(response, {
       event: "live-run-event",
       id: payload.event_id,
       data: payload,
     });
+    if (!writable) {
+      unsubscribe();
+      response.end();
+    }
   });
 
   const onClose = () => {

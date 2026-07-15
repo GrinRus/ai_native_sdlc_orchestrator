@@ -247,7 +247,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   asynchronously, and CLI/API/SSE can observe, pause, answer, or cancel the same
   durable run across process boundaries.
 - **Epic:** EPIC-3, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** lifecycle command service, run worker/supervisor,
@@ -301,7 +301,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   service, limits, redaction, and operator errors describe and execute one
   unambiguous surface.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/api/**`, `apps/cli/**`, control-plane services,

@@ -59,6 +59,7 @@ export function toLifecycleCommandResponse(result) {
     blocked: result.blocked,
     blocked_reason: result.blocked_reason,
     interactive_continuation: result.interactive_continuation,
+    ...(result.accepted === true ? { accepted: true, job: result.job } : {}),
   };
 }
 

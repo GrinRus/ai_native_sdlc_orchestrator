@@ -1,5 +1,6 @@
 import { getCommandDefinition } from "./command-catalog.mjs";
 import { runAppCommand } from "./app-launcher.mjs";
+import { openRunEventStream } from "../control-plane/live-event-stream.mjs";
 import {
   CliUsageError,
   executeImplementedCommand,
@@ -76,14 +77,57 @@ function isAppLaunchInvocation(args) {
   return !args.slice(1).some((arg) => arg === "--help" || arg === "-h" || arg === "help");
 }
 
+function flagValue(args, name) {
+  const index = args.indexOf(`--${name}`);
+  if (index < 0) return undefined;
+  const value = args[index + 1];
+  return value && !value.startsWith("--") ? value : "true";
+}
+
+function isRunFollowInvocation(args) {
+  return args[0] === "run" && args[1] === "status" && flagValue(args, "follow") !== undefined && flagValue(args, "follow") !== "false";
+}
+
+async function waitForFollowTerminal(args, options) {
+  const projectRef = flagValue(args, "project-ref");
+  const runId = flagValue(args, "run-id");
+  if (!projectRef || !runId) return;
+  const maxReplayRaw = Number(flagValue(args, "max-replay"));
+  const stream = openRunEventStream({
+    cwd: options.cwd ?? process.cwd(),
+    projectRef,
+    runtimeRoot: flagValue(args, "runtime-root"),
+    runId,
+    afterEventId: flagValue(args, "after-event-id"),
+    maxReplay: Number.isInteger(maxReplayRaw) && maxReplayRaw >= 0 ? maxReplayRaw : undefined,
+  });
+  if (stream.cursor_terminal || stream.replay_events.some((event) => event.event_type === "run.terminal")) return;
+  await new Promise((resolve) => {
+    let unsubscribe = () => {};
+    const finish = () => {
+      unsubscribe();
+      process.off("SIGINT", finish);
+      resolve(undefined);
+    };
+    unsubscribe = stream.subscribe((event) => {
+      if (event.event_type === "run.terminal") finish();
+    });
+    process.once("SIGINT", finish);
+  });
+}
+
 /**
  * @param {string[]} args
  * @param {{ cwd?: string, stdout?: NodeJS.WriteStream, stderr?: NodeJS.WriteStream }} [options]
  * @returns {number | Promise<number>}
  */
-export function runCli(args, options = {}) {
+export async function runCli(args, options = {}) {
   if (isAppLaunchInvocation(args)) {
     return runAppCommand(args.slice(1), options);
+  }
+
+  if (isRunFollowInvocation(args)) {
+    await waitForFollowTerminal(args, options);
   }
 
   const stdout = options.stdout ?? process.stdout;

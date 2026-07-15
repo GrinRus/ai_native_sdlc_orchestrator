@@ -1021,6 +1021,9 @@
           "200": {
             "$ref": "#/components/responses/LifecycleCommandAction"
           },
+          "202": {
+            "$ref": "#/components/responses/RunJobAccepted"
+          },
           "400": {
             "$ref": "#/components/responses/JsonError"
           },
@@ -1163,6 +1166,16 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/LifecycleCommandActionRequest"
+            }
+          }
+        }
+      },
+      "RunJobAccepted": {
+        "description": "Asynchronous run start accepted with durable job and event references.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunJobAcceptedResponse"
             }
           }
         }
@@ -3627,6 +3640,20 @@
           "lifecycle_command": {
             "$ref": "#/components/schemas/LifecycleCommandPayload"
           }
+        },
+        "additionalProperties": true
+      },
+      "RunJobAcceptedResponse": {
+        "type": "object",
+        "required": ["run_id", "job_id", "status", "revision", "status_ref", "event_ref", "lifecycle_command"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "paused", "waiting-input", "canceling", "succeeded", "failed", "canceled"] },
+          "revision": { "type": "integer", "minimum": 0 },
+          "status_ref": { "type": "string" },
+          "event_ref": { "type": "string" },
+          "lifecycle_command": { "$ref": "#/components/schemas/LifecycleCommandPayload" }
         },
         "additionalProperties": true
       },

@@ -527,10 +527,8 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
   }
 
   const auditInvalidatedRows = new Map([
-    ["EMP-05", ["W58-S05"]],
     ["DEV-07", ["W58-S02"]],
     ["AIP-06", ["W58-S04"]],
-    ["OPS-02", ["W58-S05"]],
     ["SEC-04", ["W58-S04"]],
     ["FIN-03", ["W59-S07"]],
   ]);
@@ -680,6 +678,7 @@ function checkContractAndHarnessEvidence(rootDir) {
     "validation-report",
     "review-report",
     "live-run-event",
+    "run-job",
     "artifact-packet",
     "incident-report",
     "learning-loop-scorecard",
