@@ -555,7 +555,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W62 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W62-S01 | Workspace-set provisioner and repository change evidence | EPIC-3, EPIC-5 | ready | `docs/contracts/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, workspace and Git tests | W61-S03, W4-S01 |
+| W62-S01 | Workspace-set provisioner and repository change evidence | EPIC-3, EPIC-5 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, workspace and Git tests | W61-S03, W4-S01 |
 | W62-S02 | Impact scope and execution DAG planning | EPIC-2, EPIC-3, EPIC-4 | ready | `docs/contracts/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `examples/packets/**`, planner/scope tests | W60-S03, W61-S03 |
 | W62-S03 | Parent/child Runtime Harness scheduler and bounded concurrency | EPIC-3, EPIC-4, EPIC-6 | blocked | `packages/orchestrator-core/**`, `packages/observability/**`, `apps/cli/**`, `apps/api/**`, scheduler tests | W62-S01, W62-S02, W24-S01 |
 | W62-S04 | Integration, stale-task invalidation, and bounded repair | EPIC-4, EPIC-5, EPIC-6 | blocked | `packages/orchestrator-core/**`, `packages/observability/**`, `docs/contracts/**`, integration/repair tests | W62-S03, W45-S02 |

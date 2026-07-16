@@ -118,6 +118,9 @@ export function validateProjectBinding(document, source) {
 
 export function validateWorkspaceSet(document, source) {
   const issues = [];
+  if (document.schema_version !== 2) {
+    pushTopologyIssue(issues, source, "schema_version", "Run-owned workspace sets must use schema_version 2.", String(document.schema_version));
+  }
   const repositories = Array.isArray(document.repositories) ? document.repositories : [];
   const mounts = new Set();
   const writableIdentities = new Map();
@@ -127,12 +130,24 @@ export function validateWorkspaceSet(document, source) {
     const mount = repository.mount_path;
     if (!isPortablePath(mount) || mounts.has(mount)) pushTopologyIssue(issues, source, `repositories.${index}.mount_path`, "Workspace-set mount paths must be unique portable relative paths.", String(mount));
     mounts.add(mount);
+    if (!string(repository.repo_id)) pushTopologyIssue(issues, source, `repositories.${index}.repo_id`, "Workspace repository id is required.");
+    if (!string(repository.base_ref)) pushTopologyIssue(issues, source, `repositories.${index}.base_ref`, "Workspace repository base ref is required.");
+    if (!/^[0-9a-f]{40}$/u.test(String(repository.resolved_commit ?? ""))) pushTopologyIssue(issues, source, `repositories.${index}.resolved_commit`, "Workspace repository commit must be an exact 40-character Git SHA.", String(repository.resolved_commit));
+    if (!string(repository.execution_root)) pushTopologyIssue(issues, source, `repositories.${index}.execution_root`, "Workspace repository execution root is required.");
+    const provisioning = record(repository.provisioning);
+    if (!provisioning || !["detached-worktree", "independent-clone"].includes(String(provisioning.strategy)) || !["ready", "failed", "cleaned"].includes(String(provisioning.state))) {
+      pushTopologyIssue(issues, source, `repositories.${index}.provisioning`, "Workspace repository provisioning must declare a supported strategy and state.");
+    }
     const identity = string(repository.resolved_identity);
     if (identity && string(repository.access_mode) !== "read-only") {
       const scope = JSON.stringify(repository.write_scope ?? []);
       if (writableIdentities.get(identity) === scope) pushTopologyIssue(issues, source, `repositories.${index}.write_scope`, `Shared repository '${identity}' has an unsafe overlapping write scope.`, scope);
       writableIdentities.set(identity, scope);
     }
+  }
+  const cleanup = record(document.cleanup);
+  if (!cleanup || !record(cleanup.policy) || !["pending", "retained", "deleted", "delete-failed"].includes(String(cleanup.state))) {
+    pushTopologyIssue(issues, source, "cleanup", "Workspace cleanup must declare policy and current state.");
   }
   return issues;
 }

@@ -520,9 +520,10 @@ delivery program are tracked through `W65` and focus on:
   presets, explicit preflight, simulation labelling, and credential-free recovery.
   `pnpm w61:proof` reproduces single-repo, monorepo-component, bounded-multirepo,
   project-isolation, and route-readiness closure without provider or upstream calls.
-- Planned repo-aware workspace sets, bounded parent/child concurrency,
-  integration and stale-work recovery, and truthful coordinated multirepo
-  delivery.
+- Run-owned repo-aware workspace sets now provision exact isolated worktrees or
+  clones, preserve primary-checkout immutability, and collect per-repository
+  change/cleanup evidence. Bounded parent/child concurrency, integration and
+  stale-work recovery, and truthful coordinated multirepo delivery remain.
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a
   semantic design system, and installed-package acceptance proof.

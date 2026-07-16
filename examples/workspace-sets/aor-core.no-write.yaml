@@ -1,14 +1,38 @@
+schema_version: 2
 workspace_set_id: workspace-set.aor-core.no-write
 project_id: aor-core
+run_id: run-aor-core-no-write
 binding_ref: binding://binding.aor-core.local@r1
 status: ready
+workspace_root: .aor/projects/aor-core/workspace-sets/run-aor-core-no-write
+owner_marker: .aor/projects/aor-core/workspace-sets/run-aor-core-no-write/.aor-workspace-set-owner.json
 repositories:
   - repo_id: main
     mount_path: repos/main
     binding_ref: binding://binding.aor-core.local#main
     base_ref: main
-    resolved_commit: 1111111111111111111111111111111111111111
+    resolved_commit: "1111111111111111111111111111111111111111"
     resolved_identity: github.com/grinrus/ai_native_sdlc_orchestrator
     access_mode: read-only
     write_scope: []
+    provisioning:
+      strategy: detached-worktree
+      state: ready
+    execution_root: .aor/projects/aor-core/workspace-sets/run-aor-core-no-write/repos/main
+    git_evidence:
+      baseline:
+        head: "1111111111111111111111111111111111111111"
+        status_entries: []
+        changed_paths: []
+        untracked_paths: []
+        ignored_scratch_paths: []
+      final: null
 conflicts: []
+cleanup:
+  policy:
+    on_success: delete
+    on_abort: delete
+    on_failure: retain
+  state: pending
+evidence_refs:
+  - evidence://.aor/projects/aor-core/reports/workspace-set.run-aor-core-no-write.json
