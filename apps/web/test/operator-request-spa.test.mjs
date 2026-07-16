@@ -108,7 +108,7 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /externalRunSignalState/u);
   assert.match(source, /deterministicRunEvidenceStatus/u);
   assert.match(source, /signal-state/u);
-  assert.match(source, /Add local project/u);
+  assert.match(source, /Add another AOR project/u);
   assert.match(source, /Runtime root preview/u);
   assert.match(source, /Project profile/u);
   assert.match(source, /project_profile/u);

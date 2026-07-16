@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import { createProjectGeneration, readControlPlaneJson as readJson, readProjectResourceSnapshot } from "./control-plane-client.js";
+import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
+import { mergeProjectPreview } from "./project-snapshot.js";
 import "./spa.css";
 
 const STAGES = [
@@ -775,26 +778,6 @@ function requestReadinessItems({ flow, completed, form, targetStep, flowMissing,
       detail: completed && !readOnlyAllowed ? "Completed flows only allow no-write analyze, explain, review, or validate requests." : "Delivery mode is compatible with the selected flow state.",
     },
   ];
-}
-
-async function readJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      ...(options.headers ?? {}),
-    },
-    ...options,
-  });
-  const raw = await response.text();
-  const payload = raw.trim().length > 0 ? JSON.parse(raw) : {};
-  if (!response.ok) {
-    const message = payload?.error?.message ?? response.statusText;
-    const error = new Error(message);
-    error.status = response.status;
-    error.code = payload?.error?.code ?? "request_failed";
-    throw error;
-  }
-  return payload;
 }
 
 function resolveUiStageId(nextAction) {
@@ -2891,7 +2874,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
         </details>
       </div>
       <button className="utility-button compact" type="button" onClick={onOpenAddProject} disabled={busy}>
-        <Icon name="folder" />Add local project
+        <Icon name="folder" />Add another AOR project
       </button>
     </div>
   );
@@ -2929,7 +2912,8 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, 
       </div>
       <div className="stage-progress-strip" aria-label="Compact stage progress">
         <span>{newFlowDraft ? "2/7" : `${currentIndex + 1}/7`}</span>
-        <strong>{currentStageEntry.label}</strong>
+        <strong>Current lifecycle stage: {currentStageEntry.label}</strong>
+        <small>Viewing stage: {STAGES.find((stage) => stage.id === selectedStage)?.label ?? currentStageEntry.label}</small>
         <em>{newFlowDraft ? "Mission draft" : currentStageEntry.hint}</em>
       </div>
       {providerStepStatus && !blockingExternalRun ? (
@@ -3886,7 +3870,7 @@ function FlowCockpit({
             {onOpenAddProject ? (
               <button className="secondary" type="button" onClick={onOpenAddProject} disabled={busy}>
                 <Icon name="folder" />
-                Add local project
+                Add another AOR project
               </button>
             ) : null}
             <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
@@ -4100,7 +4084,7 @@ function FlowCockpit({
       disabled: busy,
     }
     : {
-      label: "Resolve Next Action",
+      label: "Refresh next action",
       icon: "play",
       onClick: onResolveNext,
       disabled: busy,
@@ -5969,11 +5953,11 @@ function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, o
   const profilePreview = form.projectProfile.trim() || "Default discovery or generated bundled profile";
   return (
     <div className="drawer-backdrop add-project-backdrop" role="presentation">
-      <aside className="request-drawer add-project-drawer" aria-label="Add local project drawer">
+      <aside className="request-drawer add-project-drawer" aria-label="Add another AOR project drawer">
         <div className="drawer-header">
           <div>
             <p className="eyebrow">Local workspace</p>
-            <h2>Add local project</h2>
+            <h2>Add another AOR project</h2>
           </div>
           <button className="secondary compact" type="button" onClick={onClose}>Close</button>
         </div>
@@ -6241,6 +6225,8 @@ function App() {
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const [newFlowDraft, setNewFlowDraft] = useState(false);
   const [projectSnapshotLoaded, setProjectSnapshotLoaded] = useState(false);
+  const [connectionState, setConnectionState] = useState("loading");
+  const [resourceErrors, setResourceErrors] = useState({});
   const [draftSourceFlow, setDraftSourceFlow] = useState(null);
   const [draftFollowUpHandoffRef, setDraftFollowUpHandoffRef] = useState(null);
   const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
@@ -6273,6 +6259,7 @@ function App() {
   const didChooseStage = useRef(false);
   const didAutoSelectStage = useRef(false);
   const flowSelectionVersion = useRef(0);
+  const projectGeneration = useRef(createProjectGeneration());
   const requestDrawerOpenerRef = useRef(null);
   const pendingRequestDrawerFocusRestore = useRef(false);
 
@@ -6518,12 +6505,15 @@ function App() {
 
   async function refresh(options = {}) {
     if (!options.silent) setError("");
+    const refreshGeneration = options.projectGeneration ?? projectGeneration.current.current().revision;
     const refreshSelectionVersion = options.selectionVersion ?? flowSelectionVersion.current;
-    const appConfig = config ?? (await readJson("/app-config.json"));
-    const projectPayload = await readJson("/api/projects").catch(() => ({
+    const requestOptions = { signal: projectGeneration.current.current().signal };
+    const appConfig = config ?? (await readJson("/app-config.json", requestOptions));
+    const projectPayload = await readJson("/api/projects", requestOptions).catch(() => ({
       default_project_id: appConfig.default_project_id ?? appConfig.project_id,
       projects: Array.isArray(appConfig.projects) ? appConfig.projects : [],
     }));
+    if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
     setConfig(appConfig);
     const projects = Array.isArray(projectPayload.projects) && projectPayload.projects.length > 0
       ? projectPayload.projects
@@ -6541,19 +6531,9 @@ function App() {
     const statePreviewRoute = effectiveProjectId ? `/api/projects/${encodeURIComponent(effectiveProjectId)}/state` : null;
     const onboarding = selectedProject?.onboarding_summary ?? {};
     const needsStatePreview = statePreviewRoute && onboarding.initialized !== true && onboarding.state_exists !== true;
-    const statePreview = needsStatePreview ? await readJson(statePreviewRoute).catch(() => null) : null;
+    const statePreview = needsStatePreview ? await readJson(statePreviewRoute, requestOptions).catch(() => null) : null;
     const statePreviewOnboarding = statePreview?.onboarding_summary ?? {};
-    const projectsWithLiveState = statePreview?.onboarding_summary && effectiveProjectId
-      ? projects.map((project) => (
-          project.project_id === effectiveProjectId
-            ? {
-                ...project,
-                runtime_root: statePreview.runtime_root ?? project.runtime_root,
-                onboarding_summary: statePreview.onboarding_summary,
-              }
-            : project
-        ))
-      : projects;
+    const projectsWithLiveState = mergeProjectPreview(projects, effectiveProjectId, statePreview);
     setProjectIndex({
       ...projectPayload,
       default_project_id: projectPayload.default_project_id ?? appConfig.default_project_id ?? appConfig.project_id,
@@ -6582,6 +6562,8 @@ function App() {
       setStepResults([]);
       setRuns(Array.isArray(previewRunList) ? previewRunList : []);
       setOperatorRequests([]);
+      setConnectionState("connected");
+      setResourceErrors({});
       setFlowEvidenceGraph(null);
       setFlowRuntimeTrace(null);
       setPlanWorkbenchState({ scopeKey: `${effectiveProjectId ?? "project"}:none`, status: "idle", plan: null, progress: null, error: "" });
@@ -6601,16 +6583,28 @@ function App() {
       };
     }
     const base = `/api/projects/${encodeURIComponent(effectiveProjectId)}`;
-    const [state, next, flowPayload, selectedFlowPayload, packetList, stepList, runList, requestList] = await Promise.all([
-      statePreview ? Promise.resolve(statePreview) : readJson(`${base}/state`),
-      readJson(`${base}/next-action-report`).catch(() => null),
-      readJson(`${base}/flows`).catch(() => ({ flows: [], selected_flow_id: null })),
-      readJson(`${base}/flows/selected`).catch(() => null),
-      readJson(`${base}/packets`).catch(() => []),
-      readJson(`${base}/step-results`).catch(() => []),
-      readJson(`${base}/runs`).catch(() => []),
-      readJson(`${base}/operator-requests`).catch(() => []),
-    ]);
+    const snapshot = await readProjectResourceSnapshot({
+      base,
+      statePreview,
+      requestOptions,
+      previous: {
+        state: projectState, next: nextAction, flowPayload: flowList, selectedFlowPayload: selectedFlow,
+        packetList: packets, stepList: stepResults, runList: runs, requestList: operatorRequests,
+      },
+    });
+    if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
+    const {
+      state,
+      next,
+      flowPayload,
+      selectedFlowPayload,
+      packetList,
+      stepList,
+      runList,
+      requestList,
+    } = snapshot.data;
+    setConnectionState(snapshot.status);
+    setResourceErrors(snapshot.errors);
     const nextReport = next?.document
       ? {
           ...next.document,
@@ -6737,6 +6731,7 @@ function App() {
   }
 
   function resetProjectScopedState() {
+    projectGeneration.current.begin();
     flowSelectionVersion.current += 1;
     didChooseStage.current = false;
     didAutoSelectStage.current = false;
@@ -6769,7 +6764,11 @@ function App() {
     resetProjectScopedState();
     setActiveProjectId(projectId);
     try {
-      await refresh({ projectId, selectionVersion: flowSelectionVersion.current });
+      await refresh({
+        projectId,
+        selectionVersion: flowSelectionVersion.current,
+        projectGeneration: projectGeneration.current.current().revision,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -7335,7 +7334,7 @@ function App() {
           <div className="brand-mark">A</div>
           <div>
             <strong>AOR Operator Console</strong>
-            <span>v0.4.2</span>
+            <span>v{config?.version ?? "loading"}</span>
           </div>
         </div>
         <ProjectSwitcher
@@ -7364,7 +7363,7 @@ function App() {
         <div className="topbar-status-strip" aria-label="Console status">
           <StatusPill state={topbarFlowStatus} />
           {providerStepStatus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
-          <StatusPill state={config ? "connected" : "loading"} />
+          <StatusPill state={connectionState} />
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         </div>
         <div className="topbar-spacer" />
@@ -7415,6 +7414,7 @@ function App() {
 
       <main className="main">
         {error ? <div className="alert" role="alert">{error}</div> : null}
+        <ResourceErrorCard errors={resourceErrors} />
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
         ) : draftSurface ? (

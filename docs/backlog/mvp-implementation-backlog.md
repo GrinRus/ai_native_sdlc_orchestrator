@@ -525,8 +525,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W59-S01 | Executable browser and component behavior gate | EPIC-0, EPIC-6, EPIC-7 | done | web browser/component tests, package smoke, CI | W58-S08 |
-| W59-S02 | Local console live-state and interaction correctness | EPIC-1, EPIC-6 | ready | web client/state/queues, shared read models, fixtures | W59-S01 |
-| W59-S03 | Accessible local dialogs and web state decomposition | EPIC-0, EPIC-6 | blocked | web components/styles/state modules, browser tests | W59-S01, W59-S02 |
+| W59-S02 | Local console live-state and interaction correctness | EPIC-1, EPIC-6 | done | web client/state/queues, shared read models, fixtures | W59-S01 |
+| W59-S03 | Accessible local dialogs and web state decomposition | EPIC-0, EPIC-6 | ready | web components/styles/state modules, browser tests | W59-S01, W59-S02 |
 | W59-S04 | Code-quality, dependency, and dead-code ratchet | EPIC-0 | done | root quality gates, ESLint/typecheck, dependency/dead-code baselines | W58-S08 |
 | W59-S05 | Core, CLI, and control-plane decomposition | EPIC-0, EPIC-3, EPIC-6 | ready | execution services, CLI handlers, lifecycle/control-plane modules | W58-S08, W59-S04 |
 | W59-S06 | Adapter/live-E2E decomposition and contract-kernel parity | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | ready | adapter SDK, live E2E stages, public/private contract kernels | W58-S08, W59-S04 |
