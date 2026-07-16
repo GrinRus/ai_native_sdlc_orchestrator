@@ -90,7 +90,11 @@ try {
       const durationMs = runCommand(
         `test group '${group.group_id}'`,
         process.execPath,
-        ["--test", ...group.files.map((file) => path.join(root, file))],
+        [
+          "--test",
+          ...(group.test_concurrency ? [`--test-concurrency=${group.test_concurrency}`] : []),
+          ...group.files.map((file) => path.join(root, file)),
+        ],
         {
           timeout,
           env:
@@ -102,6 +106,7 @@ try {
       report.groups.push({
         group_id: group.group_id,
         timeout_class: group.timeout_class,
+        test_concurrency: group.test_concurrency ?? null,
         status: "pass",
         duration_ms: durationMs,
         files: group.files,
@@ -112,6 +117,7 @@ try {
       report.groups.push({
         group_id: group.group_id,
         timeout_class: group.timeout_class,
+        test_concurrency: group.test_concurrency ?? null,
         status: "fail",
         duration_ms: Number(error?.durationMs ?? 0),
         files: group.files,

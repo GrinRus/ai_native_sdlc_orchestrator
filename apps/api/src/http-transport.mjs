@@ -1,1 +1,1 @@
-export * from "../../../packages/orchestrator-core/src/control-plane/http/http-transport.mjs";
+export { createControlPlaneHttpServer } from "../../../packages/orchestrator-core/src/control-plane/http/http-transport.mjs";

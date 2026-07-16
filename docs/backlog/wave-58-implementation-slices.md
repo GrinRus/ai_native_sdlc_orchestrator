@@ -301,7 +301,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   service, limits, redaction, and operator errors describe and execute one
   unambiguous surface.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/api/**`, `apps/cli/**`, control-plane services,
@@ -373,7 +373,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   a LAN host, foreign web origin, DNS-rebinding Host, malformed body, or oversized
   request cannot invoke or steer its local mutation handlers.
 - **Epic:** EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P0
 - **Estimated effort:** M
 - **Primary modules:** packaged-local-console ADR, control-plane HTTP contract,

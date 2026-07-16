@@ -11,6 +11,7 @@ import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { createOperatorRequest } from "../../../packages/orchestrator-core/src/operator-request.mjs";
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
@@ -77,6 +78,21 @@ function byteSnapshot(root) {
   visit(root);
   return entries;
 }
+
+test("operator-request read model applies the canonical list bound", () => {
+  withTempRepo((repoRoot) => {
+    for (let index = 0; index < 3; index += 1) {
+      createOperatorRequest({
+        cwd: repoRoot,
+        projectRef: repoRoot,
+        targetStage: "discovery",
+        intentType: "analyze",
+        requestText: `bounded request ${index}`,
+      });
+    }
+    assert.equal(listOperatorRequests({ cwd: repoRoot, projectRef: repoRoot, limit: 2 }).length, 2);
+  });
+});
 
 test("module read surfaces leave an uninitialized project byte-for-byte unchanged", () => {
   withTempRepo((repoRoot) => {

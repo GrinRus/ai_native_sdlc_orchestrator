@@ -1232,6 +1232,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path>",
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
+      "--execution-root <path> (optional, canonical target checkout root for changed-path evidence)",
       "--run-id <id> (optional)",
       "--step-class <step_class> (optional, defaults to implement)",
       "--mode <mode> (optional, one of no-write, patch-only, local-branch, fork-first-pr)",
@@ -1855,8 +1856,47 @@ const COMMAND_DEFINITIONS = Object.freeze([
   },
 ]);
 
+const GLOBAL_FLAG_NAMES = new Set(["help", "json"]);
+
+function parseInputDefinition(input, requiredFlags) {
+  const flagMatch = /^--([a-z0-9-]+)(?:\s+<([^>]+)>)?/u.exec(input);
+  if (!flagMatch) return null;
+  const [, name, valueHint] = flagMatch;
+  const enumValues = valueHint?.includes("|") ? valueHint.split("|").map((value) => value.trim()) : [];
+  const booleanEnum = enumValues.length > 0 && enumValues.every((value) => value === "true" || value === "false");
+  const type = !valueHint || booleanEnum ? "boolean" : /number|count|revision|limit|port|timeout|replay/iu.test(valueHint) ? "integer" : "string";
+  return {
+    name,
+    type,
+    required: requiredFlags.includes(name),
+    repeatable: /repeatable/iu.test(input),
+    ...(enumValues.length > 0 ? { enum: enumValues } : {}),
+    ...(input.match(/defaults? to ([^) ,]+)/iu)?.[1] ? { default: input.match(/defaults? to ([^) ,]+)/iu)[1] } : {}),
+  };
+}
+
+function decorateCommandDefinition(definition) {
+  const flags = definition.inputs
+    .map((input) => parseInputDefinition(input, definition.requiredFlags))
+    .filter(Boolean);
+  for (const globalName of GLOBAL_FLAG_NAMES) {
+    if (!flags.some((flag) => flag.name === globalName)) {
+      flags.push({ name: globalName, type: "boolean", required: false, repeatable: false });
+    }
+  }
+  const positionals = definition.inputs
+    .filter((input) => input.startsWith("<"))
+    .map((input) => ({
+      name: input.slice(1, input.indexOf(">")),
+      type: "string",
+      required: !/optional/iu.test(input),
+      repeatable: /repeatable/iu.test(input),
+    }));
+  return { ...definition, flags, positionals };
+}
+
 export function getCliCommandCatalog() {
-  return COMMAND_DEFINITIONS.map((definition) => ({ ...definition }));
+  return COMMAND_DEFINITIONS.map(decorateCommandDefinition);
 }
 
 export function getImplementedCommands() {

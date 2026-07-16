@@ -2,6 +2,7 @@ import { asString, readQueryInteger } from "./http-utils.mjs";
 import { toHistoryEvent } from "./http-presenters.mjs";
 import { writeSseEvent } from "./http-sse.mjs";
 import { openRunEventStream } from "../live-event-stream.mjs";
+import { CONTROL_PLANE_LIMITS, resolveBoundedInteger } from "../control-plane-limits.mjs";
 
 /**
  * @param {{
@@ -16,8 +17,8 @@ export function handleRunEventStream({ params, request, requestUrl, response, ru
   const runId = params.runId;
   const afterEventId =
     asString(requestUrl.searchParams.get("after_event_id")) ?? asString(requestUrl.searchParams.get("afterEventId"));
-  const maxReplay =
-    readQueryInteger(requestUrl.searchParams, "max_replay") ?? readQueryInteger(requestUrl.searchParams, "maxReplay");
+  const requestedReplay = readQueryInteger(requestUrl.searchParams, "max_replay") ?? readQueryInteger(requestUrl.searchParams, "maxReplay");
+  const maxReplay = resolveBoundedInteger(requestedReplay, CONTROL_PLANE_LIMITS.sse_replay);
 
   const stream = openRunEventStream({
     ...runtimeOptions,

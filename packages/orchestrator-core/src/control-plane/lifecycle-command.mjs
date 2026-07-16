@@ -3,8 +3,9 @@ import path from "node:path";
 
 import { derivePublicId } from "../../../contracts/src/index.mjs";
 import { getCommandDefinition } from "../operator-cli/command-catalog.mjs";
-import { invokeCli } from "../operator-cli/index.mjs";
+import { executeImplementedCommand } from "../operator-cli/command-handler.mjs";
 import { startRunJob } from "../run-job.mjs";
+import { createOperatorError } from "./operator-error.mjs";
 
 const LIFECYCLE_COMMANDS = new Set([
   "project init",
@@ -35,6 +36,10 @@ const LIFECYCLE_COMMANDS = new Set([
 ]);
 
 const SERVER_OWNED_FLAGS = new Set(["project-ref", "project_ref", "runtime-root", "runtime_root", "help"]);
+
+function lifecycleError(code, detail, operation = null) {
+  return createOperatorError({ code, detail, operation, phase: "lifecycle", consequence: "command_not_invoked" });
+}
 
 /**
  * @param {unknown} value
@@ -317,6 +322,21 @@ function validateRequiredFlags({ command, cliFlags }) {
   return { ok: true };
 }
 
+function validateCatalogFlags({ command, cliFlags }) {
+  const definition = getCommandDefinition(command);
+  const allowed = new Map((definition?.flags ?? []).map((flag) => [flag.name, flag]));
+  for (const [name, value] of Object.entries(cliFlags)) {
+    const flag = allowed.get(name);
+    if (!flag) {
+      return { ok: false, code: "invalid_lifecycle_flags", message: `Unknown flag '--${name}' for lifecycle command '${command}'.` };
+    }
+    if (Array.isArray(value) && flag.repeatable !== true) {
+      return { ok: false, code: "invalid_lifecycle_flags", message: `Flag '--${name}' is not repeatable for lifecycle command '${command}'.` };
+    }
+  }
+  return { ok: true };
+}
+
 /**
  * @param {string} stdout
  * @returns {Record<string, unknown> | null}
@@ -349,10 +369,7 @@ export function runLifecycleCommand(options) {
     return {
       ok: false,
       statusCode: 400,
-      error: {
-        code: "invalid_lifecycle_command",
-        message: `Unsupported lifecycle command '${command ?? "missing"}'.`,
-      },
+      error: lifecycleError("invalid_lifecycle_command", `Unsupported lifecycle command '${command ?? "missing"}'.`, command),
     };
   }
 
@@ -361,24 +378,32 @@ export function runLifecycleCommand(options) {
     return {
       ok: false,
       statusCode: 400,
-      error: {
-        code: "invalid_lifecycle_command",
-        message: `Lifecycle command '${command}' is not implemented in the CLI catalog.`,
-      },
+      error: lifecycleError("invalid_lifecycle_command", `Lifecycle command '${command}' is not implemented in the CLI catalog.`, command),
     };
   }
 
   const flagResult = normalizeClientFlags(asRecord(options.flags));
   if (!flagResult.ok) {
-    return { ok: false, statusCode: 400, error: { code: flagResult.code, message: flagResult.message } };
+    return { ok: false, statusCode: 400, error: lifecycleError(flagResult.code, flagResult.message, command) };
+  }
+
+  const catalogResult = validateCatalogFlags({ command, cliFlags: flagResult.cliFlags });
+  if (!catalogResult.ok) {
+    return { ok: false, statusCode: 400, error: lifecycleError(catalogResult.code, catalogResult.message, command) };
   }
 
   const requiredResult = validateRequiredFlags({ command, cliFlags: flagResult.cliFlags });
   if (!requiredResult.ok) {
-    return { ok: false, statusCode: 400, error: { code: requiredResult.code, message: requiredResult.message } };
+    return { ok: false, statusCode: 400, error: lifecycleError(requiredResult.code, requiredResult.message, command) };
   }
 
   const commandParts = command.split(" ");
+  const executionFlags = {
+    "project-ref": options.projectRef,
+    ...(options.runtimeRoot ? { "runtime-root": options.runtimeRoot } : {}),
+    ...(command === "next" && flagResult.cliFlags.json === undefined ? { json: true } : {}),
+    ...flagResult.cliFlags,
+  };
   const args = [
     ...commandParts,
     "--project-ref",
@@ -423,9 +448,12 @@ export function runLifecycleCommand(options) {
     };
     return { ok: true, statusCode: 202, accepted: true, result: accepted };
   }
-  const run = invokeCli(args, {
-    cwd: options.cwd ?? options.projectRef,
-  });
+  let run;
+  try {
+    run = executeImplementedCommand(command, executionFlags, options.cwd ?? options.projectRef);
+  } catch (error) {
+    run = { exitCode: 1, stdout: "", stderr: `${error instanceof Error ? error.message : String(error)}\n` };
+  }
   const exitCode = run.exitCode;
   const stdout = run.stdout ?? "";
   const stderr = run.stderr ?? "";
@@ -473,10 +501,7 @@ export function runLifecycleCommand(options) {
     return {
       ok: false,
       statusCode: 409,
-      error: {
-        code: reason.code ?? "lifecycle_command.blocked",
-        message: reason.message ?? "Lifecycle command blocked.",
-      },
+      error: lifecycleError(reason.code ?? "lifecycle_command.blocked", reason.message ?? "Lifecycle command blocked.", command),
       result: response,
     };
   }

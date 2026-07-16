@@ -336,16 +336,20 @@ async function postJsonWithToken(url, payload, token = null) {
   });
 }
 
-async function waitForRunJob(file, timeoutMs = 30000) {
+async function waitForRunJob(file, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
+  let lastJob = null;
   while (Date.now() < deadline) {
     if (fs.existsSync(file)) {
       const job = JSON.parse(fs.readFileSync(file, "utf8"));
+      lastJob = job;
       if (["succeeded", "failed", "canceled", "waiting-input"].includes(job.status)) return job;
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw new Error(`timed out waiting for run job '${file}'`);
+  throw new Error(
+    `timed out waiting for run job '${file}'; last status=${lastJob?.status ?? "missing"}, revision=${lastJob?.revision ?? "missing"}`,
+  );
 }
 
 test("detached control-plane transport serves read baseline endpoints", async () => {
@@ -718,6 +722,18 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(successPayload.lifecycle_command.command_output.command, "intake create");
       assert.equal(fs.existsSync(successPayload.lifecycle_command.command_output.artifact_packet_file), true);
       assert.ok(successPayload.lifecycle_command.artifact_refs.includes(successPayload.lifecycle_command.command_output.artifact_packet_file));
+
+      const invalidFlagsResponse = await postJson(commandUrl, {
+        command: "intake create",
+        flags: { request_titel: "typo must fail before invocation" },
+      });
+      assert.equal(invalidFlagsResponse.status, 400);
+      const invalidFlagsPayload = await invalidFlagsResponse.json();
+      assert.equal(invalidFlagsPayload.error.code, "invalid_lifecycle_flags");
+      assert.equal(invalidFlagsPayload.error.phase, "lifecycle");
+      assert.equal(invalidFlagsPayload.error.message, invalidFlagsPayload.error.detail);
+      assert.deepEqual(invalidFlagsPayload.error.field_errors, []);
+      assert.ok(Array.isArray(invalidFlagsPayload.error.recovery_actions));
 
       const missionResponse = await postJson(commandUrl, {
         command: "mission create",

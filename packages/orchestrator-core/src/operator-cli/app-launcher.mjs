@@ -5,6 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { createControlPlaneHttpServer } from "../control-plane/http/http-transport.mjs";
+import { parseRedactionSecretList, redactSensitiveValue } from "../../../observability/src/index.mjs";
 
 /**
  * @param {string | boolean | undefined} value
@@ -59,7 +60,11 @@ function compactJson(value) {
  * @returns {string}
  */
 function formatJson(payload, jsonMode) {
-  return JSON.stringify(jsonMode === "compact" ? compactJson(payload) : payload, null, 2);
+  const redacted = redactSensitiveValue(payload, {
+    enabled: true,
+    secretValues: parseRedactionSecretList(process.env.AOR_REDACTION_SECRETS),
+  });
+  return JSON.stringify(jsonMode === "compact" ? compactJson(redacted) : redacted, null, 2);
 }
 
 /**
@@ -464,7 +469,11 @@ export async function runAppCommand(args, options = {}) {
     });
     return 0;
   } catch (error) {
-    stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    const redacted = redactSensitiveValue(error instanceof Error ? error.message : String(error), {
+      enabled: true,
+      secretValues: parseRedactionSecretList(process.env.AOR_REDACTION_SECRETS),
+    });
+    stderr.write(`${String(redacted)}\n`);
     return 1;
   }
 }

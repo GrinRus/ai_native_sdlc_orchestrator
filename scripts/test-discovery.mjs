@@ -64,6 +64,9 @@ export function buildTestExecutionPlan({ rootDir, manifest, candidates, now = ne
     if (!new Set(["standard", "private-proof-harness"]).has(group.timeout_class)) {
       errors.push(`Test group '${group.group_id}' has invalid timeout_class '${group.timeout_class}'.`);
     }
+    if (group.test_concurrency !== undefined && (!Number.isInteger(group.test_concurrency) || group.test_concurrency < 1)) {
+      errors.push(`Test group '${group.group_id}' has invalid test_concurrency '${group.test_concurrency}'.`);
+    }
   }
 
   for (const exclusion of exclusions) {
@@ -75,6 +78,7 @@ export function buildTestExecutionPlan({ rootDir, manifest, candidates, now = ne
   const plannedGroups = groups.map((group) => ({
     group_id: group.group_id,
     timeout_class: group.timeout_class,
+    test_concurrency: group.test_concurrency,
     files: [],
   }));
   const plannedById = new Map(plannedGroups.map((group) => [group.group_id, group]));

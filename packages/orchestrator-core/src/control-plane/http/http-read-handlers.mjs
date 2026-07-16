@@ -1,4 +1,5 @@
 import { readQueryInteger, sendError, sendJson } from "./http-utils.mjs";
+import { CONTROL_PLANE_LIMITS, resolveBoundedInteger } from "../control-plane-limits.mjs";
 import { getTaskPlanStatus, showTaskPlan } from "../../task-plan-service.mjs";
 import {
   listCompilerRevisionStatuses,
@@ -24,18 +25,14 @@ import {
   readStrategicSnapshot,
 } from "../read-surface.mjs";
 
-const DEFAULT_READ_MODEL_LIMIT = 200;
-const MAX_READ_MODEL_LIMIT = 1000;
-
 /**
  * @param {URLSearchParams} searchParams
  * @param {number} defaultLimit
  * @returns {number}
  */
-function resolveReadModelLimit(searchParams, defaultLimit = DEFAULT_READ_MODEL_LIMIT) {
+function resolveReadModelLimit(searchParams, defaultLimit = CONTROL_PLANE_LIMITS.list.default) {
   const requestedLimit = readQueryInteger(searchParams, "limit");
-  const limit = typeof requestedLimit === "number" ? requestedLimit : defaultLimit;
-  return Math.min(limit, MAX_READ_MODEL_LIMIT);
+  return resolveBoundedInteger(requestedLimit, { ...CONTROL_PLANE_LIMITS.list, default: defaultLimit });
 }
 
 /**

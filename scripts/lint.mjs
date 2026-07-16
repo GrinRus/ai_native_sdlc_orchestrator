@@ -135,6 +135,19 @@ function assertNoAppToAppSourceEdges() {
   console.log("app boundary ok: no apps/api <-> apps/cli source edges");
 }
 
+function assertCanonicalControlPlaneBoundary() {
+  const apiStarExports = listSourceFiles("apps/api/src").filter((file) => /export\s+\*/u.test(read(file)));
+  const lifecycleSource = read("packages/orchestrator-core/src/control-plane/lifecycle-command.mjs");
+  const cycleEdges = ["../operator-cli/index.mjs", "../operator-cli/app-launcher.mjs"].filter((specifier) => lifecycleSource.includes(specifier));
+  if (apiStarExports.length > 0 || cycleEdges.length > 0) {
+    console.error("Canonical control-plane boundary violations:");
+    for (const file of apiStarExports) console.error(`- ${file} uses an ambiguous star export`);
+    for (const edge of cycleEdges) console.error(`- lifecycle-command imports ${edge}`);
+    process.exit(1);
+  }
+  console.log("control-plane boundary ok: explicit API facade and no launcher cycle");
+}
+
 const missing = [...requiredAgents, ...requiredDocs].filter(
   (file) => !fs.existsSync(path.join(root, file)),
 );
@@ -171,3 +184,4 @@ for (const file of [
 
 console.log(`guidance coverage ok: ${requiredAgents.length} AGENTS files, ${requiredDocs.length} required docs`);
 assertNoAppToAppSourceEdges();
+assertCanonicalControlPlaneBoundary();

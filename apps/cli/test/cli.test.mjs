@@ -772,6 +772,25 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appSmokeCompactPayload.first_run_wizard_loaded, true);
     assert.equal(appSmokeCompactPayload.project_switcher_loaded, true);
 
+    const redactedAppSmoke = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      env: { ...process.env, AOR_REDACTION_SECRETS: projectRoot },
+    });
+    assert.equal(redactedAppSmoke.status, 0, redactedAppSmoke.stderr);
+    assert.equal(redactedAppSmoke.stdout.includes(projectRoot), false);
+    assert.equal(redactedAppSmoke.stdout.includes("[REDACTED]"), true);
+
     const customProfilePath = path.join(projectRoot, "custom-app-profile.aor.yaml");
     fs.writeFileSync(
       customProfilePath,
@@ -1374,6 +1393,16 @@ test("unknown command fails clearly", () => {
   assert.equal(result.exitCode, 1);
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /Unknown command 'project unknown'/);
+});
+
+test("command catalog rejects unknown and duplicate non-repeatable flags before handlers", () => {
+  const unknown = invokeCli(["project", "analyze", "--project-ref", ".", "--project-reff", "."]);
+  assert.equal(unknown.exitCode, 1);
+  assert.match(unknown.stderr, /Unknown flag '--project-reff'/u);
+
+  const duplicate = invokeCli(["project", "analyze", "--project-ref", ".", "--project-ref", "."]);
+  assert.equal(duplicate.exitCode, 1);
+  assert.match(duplicate.stderr, /not repeatable/u);
 });
 
 test("missing required project-ref fails clearly", () => {

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import Ajv2020 from "ajv/dist/2020.js";
 
 import { runProductionReadinessGate } from "../production-readiness.mjs";
 import { evaluateAuditReleaseHold } from "../../packages/orchestrator-core/src/audit-release-hold.mjs";
@@ -401,6 +402,34 @@ test("control-plane OpenAPI documents bounded read-model limit parameters", () =
     const refs = openApi.paths[pathName].get.parameters.map((parameter) => parameter.$ref);
     assert.ok(refs.includes("#/components/parameters/eventHistoryLimit"), `${pathName} documents eventHistoryLimit`);
   }
+});
+
+test("OpenAPI 3.1 validates the canonical typed operator error envelope", () => {
+  const openApi = JSON.parse(fs.readFileSync(path.join(root, "docs/contracts/control-plane-api.openapi.json"), "utf8"));
+  const validate = new Ajv2020({ strict: false }).compile({
+    components: openApi.components,
+    $ref: "#/components/schemas/ErrorEnvelope",
+  });
+  const payload = {
+    error: {
+      code: "invalid_lifecycle_flags",
+      title: "Invalid lifecycle flags",
+      detail: "Unknown flag '--typo'.",
+      message: "Unknown flag '--typo'.",
+      operation: "intake create",
+      phase: "lifecycle",
+      resource: null,
+      consequence: "command_not_invoked",
+      retryable: false,
+      project_ref: null,
+      flow_ref: null,
+      run_ref: null,
+      field_errors: [],
+      evidence_refs: [],
+      recovery_actions: [{ action: "inspect", payload: { resource: null } }],
+    },
+  };
+  assert.equal(validate(payload), true, JSON.stringify(validate.errors));
 });
 
 test("production readiness gate fails closed on API router and OpenAPI drift", () => {

@@ -1,4 +1,5 @@
 import { normalizeRedactionPolicy } from "../../../../observability/src/index.mjs";
+import { createOperatorError } from "../operator-error.mjs";
 import { asRecord, asString, sendJson } from "./http-utils.mjs";
 
 const AUTH_MODES = new Set(["local-trusted", "production-hardened"]);
@@ -196,10 +197,18 @@ export function authorizeRequest(options) {
  * }} decision
  */
 export function sendAuthError(response, decision) {
+  const error = createOperatorError({
+    code: decision.code,
+    detail: decision.message,
+    operation: decision.requiredPermission,
+    phase: "authorization",
+    resource: decision.projectId,
+    project_ref: decision.projectId,
+    consequence: "request_denied",
+  });
   sendJson(response, decision.statusCode, {
     error: {
-      code: decision.code,
-      message: decision.message,
+      ...error,
       auth: {
         required_permission: decision.requiredPermission,
         project_id: decision.projectId,
