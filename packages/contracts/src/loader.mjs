@@ -1,13 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
-
 import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES } from "./families.mjs";
 import { validateCanonicalContractValues } from "./canonical-values.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
-
+import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -235,9 +234,9 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateAdapterCapabilityProfile(document, source));
   }
 
-  if (family === "project-profile") {
-    issues.push(...validateProjectProfile(document, source));
-  }
+  if (family === "project-profile") issues.push(...validateProjectProfile(document, source));
+  if (family === "project-binding") issues.push(...validateProjectBinding(document, source));
+  if (family === "workspace-set") issues.push(...validateWorkspaceSet(document, source));
 
   if (family === "next-action-report") {
     issues.push(...validateNextActionReport(document, source));
@@ -380,6 +379,7 @@ function validateEvaluationCaseExpected(document, source) {
 function validateProjectProfile(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  validateProjectTopology(normalizeProjectTopology(document), source, issues);
   const verification = validateOptionalObjectField({
     record: document,
     source,

@@ -275,6 +275,40 @@ test("loads monorepo and bounded multirepo profiles through the same project-pro
   }
 });
 
+test("W61 topology contracts preserve legacy defaults and fail closed on unsafe shared writes", () => {
+  const legacy = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.github.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(legacy.ok, true);
+
+  const project = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(project.ok, true);
+  assert.equal(project.document.components.length, 2);
+
+  const binding = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/bindings/aor-core.local.yaml"),
+    family: "project-binding",
+  });
+  assert.equal(binding.ok, true);
+
+  const workspaceSet = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/workspace-sets/aor-core.no-write.yaml"),
+    family: "workspace-set",
+  });
+  assert.equal(workspaceSet.ok, true);
+
+  const invalid = loadContractFile({
+    filePath: path.join(workspaceRoot, "packages/contracts/test/fixtures/workspace-set.invalid-overlap.yaml"),
+    family: "workspace-set",
+  });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.validation.issues.some((problem) => problem.message.includes("unsafe overlapping write scope")));
+});
+
 test("artifact workflow prompt bundles validate as artifact execution prompts", () => {
   const expected = {
     discovery: {

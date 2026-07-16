@@ -106,6 +106,12 @@ projects in one loopback session. That is a UI workspace convenience for
 switching between independent `project_id` contexts; it does not merge those
 projects into one planning, execution, delivery, or release flow.
 
+The Local Workspace is operator-local state, not a target repository. Portable
+AOR Project profiles describe repositories and components, while Project
+Bindings contain machine-local checkout paths and redacted readiness. A
+Workspace Set is a later run-scoped snapshot of those bindings rather than a
+second project definition.
+
 AOR does **not** target unbounded organization-wide orchestration in MVP.
 
 The MVP proof path for bounded multirepo support is intentionally narrow: one profile, explicit `repos[]`, explicit `repo_graph[]`, deterministic per-repo and integration validation refs, coordination evidence before non-`no-write` delivery, and repo-level changed-path lineage in the delivery manifest and release packet.

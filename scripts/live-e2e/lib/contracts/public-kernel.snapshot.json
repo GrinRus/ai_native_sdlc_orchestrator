@@ -1,16 +1,18 @@
 {
   "schema_version": 1,
-  "kernel_version": 1,
+  "kernel_version": 2,
   "source": "packages/contracts/src",
   "files": {
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
     "example-reference-validation.mjs": "5b7777c6bd6f90903474eb603b6fc66b02aa503d7fb25885746fd06d3b7f7670",
-    "families.mjs": "0c4e2d5bea35b60635a5ceb5ef8df9d5ec2efde2efbb740b69afe3a5af19ea71",
-    "index.d.ts": "d798f20a694aa8a74153d605bf802780b0245290979f57787c7d8a530d321d0e",
-    "index.mjs": "64cbd832fc8ebad8ed70aaf41d8a9a3763e30e0f6ee2d909bc63b7a09ed89932",
-    "loader.mjs": "2ab259cd89913eabfe37203b1174b8298565b0d51d7459ea711bdcfe80b2e4ae",
+    "families.mjs": "e03b173829b7c89ee34b747d99dc704a901270bd9a36b301c1790e983f19da98",
+    "index.d.ts": "a757985f753f95e6953fc59f655eff1c63d5eb5bdb9a9ddd4740ac6652f48675",
+    "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
+    "loader.mjs": "737cf7ca1fff7ede117096131c4b9bfdbe6ccb2fd0d401a32a5bdbb194cb7c73",
+    "project-topology.mjs": "d0278523e9735b5ae3f4976c01d99b5c0e24ba219eaecb1805c0b076b7698c75",
     "reference-registry.mjs": "90e94fad7a8cc231ad14714cd885a3961ad3e8625a77e0aafc31538c3fa965b5",
+    "topology-contract-families.mjs": "7ff274c5294284dd5e8f407a9e09aacb36223b7c400b99b6bc46b0d8d7304be9",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
   }
 }

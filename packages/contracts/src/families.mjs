@@ -1,16 +1,6 @@
+import { TOPOLOGY_CONTRACT_FAMILIES, TOPOLOGY_EXAMPLE_RULES } from "./topology-contract-families.mjs";
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
-const ROUTE_STEP_VALUES = [
-  "discovery",
-  "research",
-  "spec",
-  "planning",
-  "implement",
-  "review",
-  "qa",
-  "repair",
-  "eval",
-  "harness",
-];
+const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
@@ -137,6 +127,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     },
     enumChecks: [{ field: "asset_mode", allowedValues: ASSET_MODE_VALUES }],
   },
+  ...TOPOLOGY_CONTRACT_FAMILIES,
   {
     family: "onboarding-report",
     familyGroup: "core-packets-and-profiles",
@@ -1610,6 +1601,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/policies\/[^/]+\.ya?ml$/, family: "step-policy-profile" },
   { regex: /^examples\/project-analysis-report\.sample\.ya?ml$/, family: "project-analysis-report" },
   { regex: /^examples\/project[^/]*\.aor\.ya?ml$/, family: "project-profile" },
+  ...TOPOLOGY_EXAMPLE_RULES,
   { regex: /^examples\/prompts\/[^/]+\.ya?ml$/, family: "prompt-bundle" },
   { regex: /^examples\/routes\/[^/]+\.ya?ml$/, family: "provider-route-profile" },
   { regex: /^examples\/skills\/[^/]+\.ya?ml$/, family: "skill-profile" },

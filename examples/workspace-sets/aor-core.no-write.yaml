@@ -1,0 +1,14 @@
+workspace_set_id: workspace-set.aor-core.no-write
+project_id: aor-core
+binding_ref: binding://binding.aor-core.local@r1
+status: ready
+repositories:
+  - repo_id: main
+    mount_path: repos/main
+    binding_ref: binding://binding.aor-core.local#main
+    base_ref: main
+    resolved_commit: 1111111111111111111111111111111111111111
+    resolved_identity: github.com/grinrus/ai_native_sdlc_orchestrator
+    access_mode: read-only
+    write_scope: []
+conflicts: []
