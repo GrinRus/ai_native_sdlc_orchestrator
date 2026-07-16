@@ -65,6 +65,8 @@
     "aor": "node ./apps/cli/bin/aor.mjs",
     "check": "node ./scripts/lint.mjs && node ./scripts/test-runner.mjs && node ./scripts/build.mjs",
     "production:ready": "node ./scripts/production-readiness.mjs",
+    "w58:proof": "node ./scripts/w58-runtime-quality-proof.mjs",
+    "audit:prod:bulk": "node ./scripts/dependency-audit-bulk.mjs",
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
     "release:smoke": "node ./scripts/release-smoke.mjs",

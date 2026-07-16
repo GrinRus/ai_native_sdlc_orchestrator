@@ -91,6 +91,8 @@ const report = {
   package_version: null,
   assertions: {
     clean_neutral_launcher: false,
+    first_load_non_materializing: false,
+    explicit_mutation_smoke: false,
     primary_head_unchanged: false,
     primary_tracked_files_unchanged: false,
     writes_confined_to_runtime_root: false,
@@ -157,6 +159,26 @@ try {
     throw new Error(`Installed package doctor smoke failed:\n${JSON.stringify(doctor, null, 2)}`);
   }
 
+  const cleanAppSmoke = parseJsonOutput(
+    runChecked(process.execPath, [
+      installedBin,
+      "app",
+      "--project-ref",
+      targetRepo,
+      "--runtime-root",
+      runtimeRoot,
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
+    ], { cwd: launcherRoot }).stdout,
+  );
+  if (cleanAppSmoke.status !== "smoke-pass" || fs.existsSync(runtimeRoot)) {
+    throw new Error("Installed package first-load app smoke materialized runtime state or failed.");
+  }
+  report.assertions.first_load_non_materializing = true;
+
   const onboard = parseJsonOutput(runChecked(process.execPath, [installedBin, "onboard", ...baseArgs], { cwd: launcherRoot }).stdout);
   if (onboard.command !== "onboard" || onboard.guided_status !== "ready" || onboard.asset_mode !== "bundled") {
     throw new Error(`Installed package onboard smoke failed:\n${JSON.stringify(onboard, null, 2)}`);
@@ -164,6 +186,7 @@ try {
   if (!fs.existsSync(onboard.onboarding_report_file) || !fs.existsSync(onboard.runtime_state_file)) {
     throw new Error("Installed package onboard smoke did not write expected runtime evidence.");
   }
+  report.assertions.explicit_mutation_smoke = true;
 
   const appSmoke = parseJsonOutput(
     runChecked(process.execPath, [

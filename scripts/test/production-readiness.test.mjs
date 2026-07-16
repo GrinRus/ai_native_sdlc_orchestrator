@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -69,10 +70,40 @@ test("production readiness gate enforces the committed audit hold with healthy i
   );
   assert.equal(result.checks.find((check) => check.id === "dependency-safety")?.status, "pass");
   assert.equal(result.checks.find((check) => check.id === "w57-remediation-closure")?.status, "pass");
+  assert.equal(result.checks.find((check) => check.id === "w58-remediation-closure")?.status, "pass");
   assert.equal(
     result.remediation_closure_reports.W57,
     "docs/research/08-w57-security-reliability-closure.json",
   );
+  assert.equal(result.remediation_closure_reports.W58, "docs/research/09-w58-runtime-quality-closure.json");
+});
+
+test("W58 runtime-quality profile proves clean read, explicit mutation, durable run parity, evaluation, and fail-closed transport", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w58-proof-test-"));
+  const reportPath = path.join(tempRoot, "report.json");
+  try {
+    const result = spawnSync(process.execPath, [path.join(root, "scripts/w58-runtime-quality-proof.mjs"), "--output", reportPath], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    assert.equal(report.status, "pass");
+    assert.equal(report.first_read_materialized, false);
+    assert.equal(report.initialized_after_explicit_mutation, true);
+    assert.equal(report.cancellation_status, "canceled");
+    assert.equal(report.evaluation.status, "pass");
+    assert.equal(report.surfaces.api_run_id, report.run_id);
+    assert.equal(report.surfaces.cli_run_id, report.run_id);
+    assert.equal(report.surfaces.sse_run_id, report.run_id);
+    assert.match(report.surfaces.worker_identity, /^node-worker-/u);
+    assert.deepEqual(report.fail_closed, { foreign_origin: 403, oversized_body: 413 });
+    assert.equal(report.credentialed_provider_calls, false);
+    assert.equal(report.paid_judge_calls, false);
+    assert.equal(report.upstream_writes, false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("W57 closure report maps its audit scope exactly once and fails closed on drift", () => {
@@ -95,6 +126,25 @@ test("W57 closure report maps its audit scope exactly once and fails closed on d
   const closureCheck = result.checks.find((check) => check.id === "w57-remediation-closure");
   assert.equal(closureCheck?.status, "fail");
   assert.match(closureCheck?.findings?.join("\n") ?? "", /missing 'AUD-017'/u);
+});
+
+test("W58 closure report maps runtime-quality findings exactly once and fails closed on drift", () => {
+  const source = JSON.parse(fs.readFileSync(path.join(root, "docs/research/09-w58-runtime-quality-closure.json"), "utf8"));
+  assert.equal(source.findings.length, 24);
+  assert.equal(new Set(source.findings.map((entry) => entry.finding_id)).size, 24);
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w58-closure-"));
+  const tempClosure = path.join(tempDir, "w58-closure.json");
+  source.findings = source.findings.filter((entry) => entry.finding_id !== "AUD-046");
+  fs.writeFileSync(tempClosure, `${JSON.stringify(source, null, 2)}\n`);
+  const result = runProductionReadinessGate({
+    rootDir: root,
+    w58ClosurePath: tempClosure,
+    testReportPath: writeCurrentPassingTestReport(),
+  });
+  assert.equal(result.status, "fail");
+  const closureCheck = result.checks.find((check) => check.id === "w58-remediation-closure");
+  assert.equal(closureCheck?.status, "fail");
+  assert.match(closureCheck?.findings?.join("\n") ?? "", /missing 'AUD-046'/u);
 });
 
 test("production readiness gate clears only a valid ledger with evidence-backed closed blockers", () => {
