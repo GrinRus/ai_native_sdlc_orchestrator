@@ -518,6 +518,8 @@ delivery program are tracked through `W65` and focus on:
   plus Project Structure management. Headless execution-route selection and
   runner readiness now share one installed Execution Setup UI with approved
   presets, explicit preflight, simulation labelling, and credential-free recovery.
+  `pnpm w61:proof` reproduces single-repo, monorepo-component, bounded-multirepo,
+  project-isolation, and route-readiness closure without provider or upstream calls.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,
   integration and stale-work recovery, and truthful coordinated multirepo
   delivery.

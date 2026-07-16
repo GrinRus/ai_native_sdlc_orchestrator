@@ -26,6 +26,7 @@ local AOR run.
 ```bash
 pnpm check
 pnpm production:ready --json
+pnpm w61:proof
 pnpm aor doctor --project-ref <repo> --json
 pnpm aor onboard --project-ref <repo> --json
 pnpm aor app --help
