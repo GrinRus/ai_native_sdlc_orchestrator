@@ -43,7 +43,7 @@ Use `no-write` for inspection and rehearsal. Use `patch-only` only when a
 code-changing delivery proof is explicitly intended and reviewable local patch
 artifacts are acceptable.
 
-During the audit release hold, external write-capable live execution and
+Outside the bounded cleared matrix, external credentialed write-capable execution and
 credentialed network delivery are blocked by default. Maintainer-only source
 experiments must add `--unsafe-development-override true`; the resulting step or
 delivery evidence must retain the override. This flag is not a supported

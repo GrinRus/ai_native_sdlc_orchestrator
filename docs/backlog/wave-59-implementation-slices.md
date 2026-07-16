@@ -422,7 +422,7 @@ hard dependencies nor makes any W60 slice done.
   evidence or an explicit accepted/open disposition, and repository readiness
   claims are recalibrated without automatically publishing a release.
 - **Epic:** EPIC-0, EPIC-5, EPIC-7
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** audit report/ledger, backlog/story evidence, readiness and

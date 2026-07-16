@@ -3,10 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-
 import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/control-plane/http/http-router.mjs";
 import { validateTestExecutionReport } from "./test-discovery.mjs";
-
+import { checkW59ClosureReport } from "./readiness/w59-closure.mjs";
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = path.posix.join(
   "scripts",
@@ -19,6 +18,7 @@ const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
 const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledger-2026-07.json";
 const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure.json";
 const defaultW58ClosurePath = "docs/research/09-w58-runtime-quality-closure.json";
+const defaultW59ClosurePath = "docs/research/10-w59-audit-closure.json", defaultW59IndependentReviewPath = "docs/research/11-w59-independent-s1-review.json";
 const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
 const ALLOWED_AUDIT_STATES = new Set(["open", "in-progress", "resolved", "accepted-risk", "superseded"]);
 const W57_CLOSURE_FINDINGS = [
@@ -31,7 +31,6 @@ const W58_CLOSURE_FINDINGS = [
   "AUD-024", "AUD-025", "AUD-026", "AUD-027", "AUD-028", "AUD-032", "AUD-033", "AUD-034",
   "AUD-035", "AUD-036", "AUD-037", "AUD-038", "AUD-045", "AUD-046", "AUD-048", "AUD-052",
 ];
-
 function resolvePath(rootDir, file) {
   return path.isAbsolute(file) ? file : path.join(rootDir, file);
 }
@@ -120,7 +119,7 @@ function checkAuditRemediationLedger(rootDir, auditLedgerPath = defaultAuditLedg
   if (!byId.has("project-context-cwd-divergence")) {
     findings.push("Audit ledger must include project-context-cwd-divergence.");
   }
-
+  if (ledger.release_disposition !== (entries.some((entry) => entry.release_blocking === true && !CLOSED_AUDIT_STATES.has(entry.state)) ? "audit-hold" : "cleared")) findings.push("Audit ledger release_disposition disagrees with its blocking findings.");
   if (findings.length > 0) {
     return fail("audit-remediation-ledger", "Audit remediation ledger is incomplete or invalid.", findings, [auditLedgerPath]);
   }
@@ -607,19 +606,20 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
     }
   }
 
-  const auditInvalidatedRows = new Map([
-    ["FIN-03", ["W59-S07"]],
+  const auditClosedRows = new Map([
+    ["FIN-03", ["docs/research/10-w59-audit-closure.json", "docs/research/11-w59-independent-s1-review.json"]],
   ]);
-  for (const [storyId, requiredGaps] of auditInvalidatedRows) {
+  for (const [storyId, requiredEvidence] of auditClosedRows) {
     const row = rows.get(storyId);
     if (!row) {
       findings.push(`${storyId} is missing from the story matrix.`);
       continue;
     }
-    if (row.coverageStatus !== "partial") findings.push(`${storyId} must remain partial while its audit gap is open.`);
-    for (const gap of requiredGaps) {
-      if (!row.gapSlices.includes(gap)) findings.push(`${storyId} must retain audit gap ${gap}.`);
+    if (row.coverageStatus !== "baseline-covered") findings.push(`${storyId} must be baseline-covered after W59 audit closure.`);
+    for (const evidenceRef of requiredEvidence) {
+      if (!row.evidence.includes(evidenceRef)) findings.push(`${storyId} must cite ${evidenceRef}.`);
     }
+    if (row.gapSlices.length !== 0) findings.push(`${storyId} must have no remaining audit gap.`);
   }
 
   for (const storyId of ["DEV-04", "AIP-12"]) {
@@ -653,8 +653,8 @@ function checkSourceOfTruth(rootDir) {
   const opsRunbook = readText(rootDir, "docs/ops/production-readiness-gate.md");
   const releaseRunbook = readText(rootDir, "docs/ops/self-hosted-release.md");
 
-  if (!readme.includes("audit release hold")) {
-    findings.push("README.md must state the current audit release hold.");
+  if (!readme.includes("bounded self-hosted release clearance")) {
+    findings.push("README.md must state the current bounded self-hosted release clearance.");
   }
   if (!readme.includes("pnpm production:ready")) {
     findings.push("README.md must document the separate production-readiness gate command.");
@@ -665,8 +665,8 @@ function checkSourceOfTruth(rootDir) {
   if (!readme.includes("hosted SaaS") || !readme.includes("enterprise identity")) {
     findings.push("README.md must keep hosted SaaS and enterprise identity out of the supported mode.");
   }
-  if (!readiness.includes("audit release hold")) {
-    findings.push("self-hosted production readiness doc must state the audit release hold.");
+  if (!readiness.includes("bounded self-hosted release clearance")) {
+    findings.push("self-hosted production readiness doc must state bounded self-hosted release clearance.");
   }
   if (!readiness.includes("pnpm production:ready")) {
     findings.push("self-hosted production readiness doc must document the production gate command.");
@@ -678,7 +678,7 @@ function checkSourceOfTruth(rootDir) {
     findings.push("production-readiness runbook must document command usage and proof evidence.");
   }
   for (const required of [
-    "audit release hold",
+    "bounded self-hosted release clearance",
     "pnpm production:ready",
     "sanitized production proof fixture",
     "hosted SaaS",
@@ -977,11 +977,13 @@ export function runProductionReadinessGate(options = {}) {
   const auditLedgerPath = options.auditLedgerPath ?? defaultAuditLedgerPath;
   const w57ClosurePath = options.w57ClosurePath ?? defaultW57ClosurePath;
   const w58ClosurePath = options.w58ClosurePath ?? defaultW58ClosurePath;
+  const w59ClosurePath = options.w59ClosurePath ?? defaultW59ClosurePath, w59IndependentReviewPath = options.w59IndependentReviewPath ?? defaultW59IndependentReviewPath;
   const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
   const checks = [
     auditLedgerCheck,
     checkW57ClosureReport(rootDir, auditLedgerPath, w57ClosurePath),
     checkW58ClosureReport(rootDir, auditLedgerPath, w58ClosurePath),
+    checkW59ClosureReport({ rootDir, auditLedgerPath, closureReportPath: w59ClosurePath, independentReviewPath: w59IndependentReviewPath }),
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
     checkStoryHonesty(rootDir, storyMatrixPath),
@@ -1008,10 +1010,7 @@ export function runProductionReadinessGate(options = {}) {
     proof_fixture_path: proofFixturePath,
     openapi_path: openApiPath,
     remediation_ledger_path: auditLedgerPath,
-    remediation_closure_reports: {
-      W57: w57ClosurePath,
-      W58: w58ClosurePath,
-    },
+    remediation_closure_reports: { W57: w57ClosurePath, W58: w58ClosurePath, W59: w59ClosurePath },
     checks,
   };
 }

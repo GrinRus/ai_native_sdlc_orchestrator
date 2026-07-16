@@ -1152,6 +1152,7 @@ function executeRoutedStepImplementation(options) {
     : `Routed live execution for step '${requestedStepClass}' completed.`;
   /** @type {string | null} */
   let blockedNextStep = null;
+  let auditReleaseHold = evaluateAuditReleaseHold({ dryRun, externalRuntime: {}, deliveryMode: null, unsafeDevelopmentOverride: options.unsafeDevelopmentOverride });
   /** @type {{
    *   status: "pass" | "fail",
    *   blocking: boolean,
@@ -1465,7 +1466,7 @@ function executeRoutedStepImplementation(options) {
           : null;
       const planReady =
         deliveryPlanResult?.deliveryPlan?.status === "ready" && deliveryPlanResult.deliveryPlan.execution_allowed === true;
-      const auditReleaseHold = evaluateAuditReleaseHold({
+      auditReleaseHold = evaluateAuditReleaseHold({
         dryRun,
         externalRuntime,
         deliveryMode: asString(deliveryPlanResult?.deliveryPlan?.delivery_mode),
@@ -1704,10 +1705,7 @@ function executeRoutedStepImplementation(options) {
         : null,
       audit_release_hold: {
         override_requested: options.unsafeDevelopmentOverride === true,
-        override_used:
-          !dryRun &&
-          asString(deliveryPlanResult?.deliveryPlan?.delivery_mode) !== "no-write" &&
-          options.unsafeDevelopmentOverride === true,
+        override_used: auditReleaseHold.override_used,
       },
       started_at: startedAt,
       finished_at: finishedAt,

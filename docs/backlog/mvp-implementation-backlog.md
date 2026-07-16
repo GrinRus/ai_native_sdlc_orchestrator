@@ -530,12 +530,12 @@ This is the master index for the implementation slices across all defined waves.
 | W59-S04 | Code-quality, dependency, and dead-code ratchet | EPIC-0 | done | root quality gates, ESLint/typecheck, dependency/dead-code baselines | W58-S08 |
 | W59-S05 | Core, CLI, and control-plane decomposition | EPIC-0, EPIC-3, EPIC-6 | done | execution services, CLI handlers, lifecycle/control-plane modules | W58-S08, W59-S04 |
 | W59-S06 | Adapter/live-E2E decomposition and contract-kernel parity | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | done | adapter SDK, live E2E stages, public/private contract kernels | W58-S08, W59-S04 |
-| W59-S07 | Independent audit closure and readiness decision | EPIC-0, EPIC-5, EPIC-7 | ready | audit ledger/report, story/readiness/release sources, full gates | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
+| W59-S07 | Independent audit closure and readiness decision | EPIC-0, EPIC-5, EPIC-7 | done | audit ledger/report, story/readiness/release sources, full gates | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
 
 ## W60 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W60-S01 | Structured task contract and backlog detail baseline | EPIC-0, EPIC-2, EPIC-4 | blocked | `docs/product/**`, `docs/contracts/**`, `docs/backlog/**`, `packages/contracts/**`, `examples/packets/**`, `.agents/skills/backlog-workflow/**`, tests | W59-S07 |
+| W60-S01 | Structured task contract and backlog detail baseline | EPIC-0, EPIC-2, EPIC-4 | ready | `docs/product/**`, `docs/contracts/**`, `docs/backlog/**`, `packages/contracts/**`, `examples/packets/**`, `.agents/skills/backlog-workflow/**`, tests | W59-S07 |
 | W60-S02 | Planner decomposition and task quality gate | EPIC-2, EPIC-3, EPIC-4 | blocked | `examples/prompts/**`, `examples/context/**`, `packages/orchestrator-core/src/handoff-packets.mjs`, `packages/contracts/**`, planning tests | W60-S01, W44-S03 |
 | W60-S03 | Execution plan and evidence-derived task progress | EPIC-2, EPIC-3, EPIC-6 | blocked | `docs/contracts/**`, `packages/contracts/**`, `packages/orchestrator-core/**`, `packages/observability/**`, `examples/reports/**`, tests | W60-S02 |
 | W60-S04 | Plan workbench UX and approval flow | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, control-plane tests | W60-S03 |
@@ -577,9 +577,9 @@ This is the master index for the implementation slices across all defined waves.
 ## W64 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W64-S01 | Idempotent alpha publish transaction and partial-failure recovery | EPIC-0, EPIC-5 | blocked | release workflow/state inspection, release tests, npm alpha runbook | W29-S01, W59-S07 |
-| W64-S02 | Verification-to-delivery transaction decomposition | EPIC-0, EPIC-5 | blocked | project verification, delivery plan/driver, fork-first flow, characterization tests | W59-S07 |
-| W64-S03 | Operator decision projection decomposition | EPIC-0, EPIC-4, EPIC-6 | blocked | next-action/read projections, asset certification, golden fixtures | W59-S07 |
+| W64-S01 | Idempotent alpha publish transaction and partial-failure recovery | EPIC-0, EPIC-5 | ready | release workflow/state inspection, release tests, npm alpha runbook | W29-S01, W59-S07 |
+| W64-S02 | Verification-to-delivery transaction decomposition | EPIC-0, EPIC-5 | ready | project verification, delivery plan/driver, fork-first flow, characterization tests | W59-S07 |
+| W64-S03 | Operator decision projection decomposition | EPIC-0, EPIC-4, EPIC-6 | ready | next-action/read projections, asset certification, golden fixtures | W59-S07 |
 
 ## W65 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

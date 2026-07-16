@@ -38,7 +38,7 @@ behavior.
 ## W64-S01 — Idempotent alpha publish transaction and partial-failure recovery
 
 - **Epic:** EPIC-0 Repository development system; EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Alpha publication detects exact remote state, conditionally
   converges compatible partial state to one complete release, and fails closed
   on conflicts without deleting recovery context.
@@ -135,7 +135,7 @@ behavior.
 ## W64-S02 — Verification-to-delivery transaction decomposition
 
 - **Epic:** EPIC-0 Repository development system; EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Project verification and delivery orchestration are split into
   focused transaction services while preserving exact verification, no-write,
   diff, delivery, failure, and rollback behavior.
@@ -233,7 +233,7 @@ behavior.
 
 - **Epic:** EPIC-0 Repository development system; EPIC-4 Quality platform;
   EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Next-action, run-read, and certification decisions are produced
   by focused deterministic projections whose observable results remain fixed by
   golden fixtures.

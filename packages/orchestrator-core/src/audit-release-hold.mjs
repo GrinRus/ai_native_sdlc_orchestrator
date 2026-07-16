@@ -1,16 +1,19 @@
 export const AUDIT_RELEASE_HOLD_CODE = "audit_release_hold";
+export const CURRENT_RELEASE_DISPOSITION = "cleared";
 
 /**
  * Decide from resolved capabilities rather than provider names or credentials.
  *
- * @param {{ dryRun: boolean, externalRuntime: unknown, deliveryMode: string | null, unsafeDevelopmentOverride?: boolean }} options
+ * @param {{ dryRun: boolean, externalRuntime: unknown, deliveryMode: string | null, releaseDisposition?: "audit-hold" | "cleared", unsafeDevelopmentOverride?: boolean }} options
  */
 export function evaluateAuditReleaseHold(options) {
+  const releaseDisposition = options.releaseDisposition ?? CURRENT_RELEASE_DISPOSITION;
   const externalRuntime =
     typeof options.externalRuntime === "object" && options.externalRuntime !== null && !Array.isArray(options.externalRuntime)
       ? options.externalRuntime
       : {};
   const holdApplies =
+    releaseDisposition === "audit-hold" &&
     options.dryRun === false &&
     Object.keys(externalRuntime).length > 0 &&
     typeof options.deliveryMode === "string" &&
@@ -24,7 +27,7 @@ export function evaluateAuditReleaseHold(options) {
       override_used: false,
       code: AUDIT_RELEASE_HOLD_CODE,
       message:
-        "External write-capable live execution is blocked by the audit release hold; maintainer-only development probes require --unsafe-development-override true.",
+        "External write-capable live execution is blocked by the active audit release hold; maintainer-only development probes require --unsafe-development-override true.",
     };
   }
 
