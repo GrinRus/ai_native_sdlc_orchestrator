@@ -62,7 +62,7 @@
     "test:web:browser": "playwright test --config apps/web/playwright.config.mjs",
     "test": "node ./scripts/test-runner.mjs",
     "typecheck": "node ./scripts/typecheck-ratchet.mjs",
-    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs",
+    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/contract-kernel-parity.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",
