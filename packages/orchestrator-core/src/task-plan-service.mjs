@@ -8,6 +8,7 @@ import { prepareHandoffArtifacts } from "./handoff-packets.mjs";
 import { buildPlanningInputManifest, selectPlannerCandidate } from "./planner-decomposition.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
+import { resolveOverallTaskProgressStatus, resolveTaskProgressStatus } from "./task-progress-projection.mjs";
 
 function asRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
@@ -454,12 +455,17 @@ function progressFromEvidence({ task, unit, dependencyStatuses, evidenceDocument
   const criteriaSatisfied = effectiveMatching.some((entry) => asRecord(entry.document).criteria_status === "satisfied");
   const dependenciesComplete = dependencyStatuses.every((status) => status === "complete");
 
-  let status = dependenciesComplete ? "ready" : "blocked";
-  if (stale) status = "stale";
-  else if (failed || blockingFindings.length > 0) status = "failed";
-  else if (running) status = "in-progress";
-  else if (adapterSucceeded) status = evidenceComplete && verificationPass && criteriaSatisfied ? "complete" : "verification-pending";
-  else if (effectiveMatching.length === 0) status = dependenciesComplete ? "ready" : "blocked";
+  const status = resolveTaskProgressStatus({
+    stale,
+    failed,
+    blockingFindings: blockingFindings.length,
+    running,
+    adapterSucceeded,
+    evidenceComplete,
+    verificationPass,
+    criteriaSatisfied,
+    dependenciesComplete,
+  });
 
   return {
     task_id: taskId,
@@ -529,17 +535,7 @@ export function materializeTaskProgress(options) {
   }
   const projections = tasks.map((task) => projectTask(String(task.task_id))).filter(Boolean);
   const statuses = projections.map((task) => task.status);
-  const overallStatus = statuses.every((status) => status === "complete")
-    ? "complete"
-    : statuses.some((status) => status === "failed")
-      ? "failed"
-      : statuses.some((status) => status === "stale")
-        ? "stale"
-        : statuses.some((status) => status === "in-progress" || status === "verification-pending")
-          ? "in-progress"
-          : statuses.some((status) => status === "blocked")
-            ? "blocked"
-            : "planned";
+  const overallStatus = resolveOverallTaskProgressStatus(statuses);
   const report = {
     report_id: derivePublicId(
       [context.projectId, "task-progress", String(context.plan.plan_id), `v${context.plan.plan_version}`],

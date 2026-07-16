@@ -29,6 +29,10 @@ verification passes, required evidence resolves, no blocking finding remains,
 and the task digest still matches the approved plan. Adapter success alone can
 advance a task only to `verification-pending`.
 
+Status precedence is deterministic: stale identity, failed attempt or blocking
+finding, active attempt, acceptance completeness, then dependency readiness.
+Evaluator or adapter summaries cannot override an earlier deterministic state.
+
 Each task projection includes `task_id`, `task_digest`, `status`,
 `criteria_status`, `verification_status`, `evidence_status`,
 `execution_unit_refs`, `attempt_refs`, `evidence_refs`, `blocking_findings`,

@@ -20,6 +20,12 @@ import {
   revisionAdviceForValidationIssue,
   selectPlannerCandidate,
 } from "../src/planner-decomposition.mjs";
+import {
+  EXECUTION_PLAN_STAGES,
+  TASK_PROGRESS_STAGES,
+  resolveOverallTaskProgressStatus,
+  resolveTaskProgressStatus,
+} from "../src/task-progress-projection.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -45,6 +51,34 @@ test("planner decomposition records input provenance and candidate precedence", 
     adapterOutput: { wave_ticket_candidate: { local_tasks: [{ task_id: "task.runner" }] } },
   }).source, "explicit-candidate");
   assert.match(revisionAdviceForValidationIssue({ field: "local_tasks[0].depends_on" }), /dependencies/u);
+});
+
+test("execution and progress projections keep lifecycle identities separate", () => {
+  assert.equal(EXECUTION_PLAN_STAGES.includes("preserve-dependencies"), true);
+  assert.equal(TASK_PROGRESS_STAGES.includes("project-attempts"), true);
+  assert.equal(resolveTaskProgressStatus({
+    stale: false,
+    failed: false,
+    blockingFindings: 0,
+    running: false,
+    adapterSucceeded: true,
+    evidenceComplete: false,
+    verificationPass: false,
+    criteriaSatisfied: false,
+    dependenciesComplete: true,
+  }), "verification-pending");
+  assert.equal(resolveTaskProgressStatus({
+    stale: true,
+    failed: false,
+    blockingFindings: 0,
+    running: false,
+    adapterSucceeded: true,
+    evidenceComplete: true,
+    verificationPass: true,
+    criteriaSatisfied: true,
+    dependenciesComplete: true,
+  }), "stale");
+  assert.equal(resolveOverallTaskProgressStatus(["complete", "blocked"]), "blocked");
 });
 
 test("structured plan create is routed, idempotent, approvable, and materializes execution progress", () => {
