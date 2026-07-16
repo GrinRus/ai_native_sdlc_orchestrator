@@ -101,7 +101,7 @@ hard dependencies nor makes any W60 slice done.
   the operator handle every pending interaction/decision with truthful action,
   lifecycle-stage, error, and durable-result presentation.
 - **Epic:** EPIC-1, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/**`, local control-plane client, web fixtures,
@@ -177,7 +177,7 @@ hard dependencies nor makes any W60 slice done.
 - **Outcome:** Local console dialogs follow accessible keyboard semantics, and
   state/client/feature boundaries are decomposed behind the W59-S01 behavior gate.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P2
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/spa.jsx`, `apps/web/src/spa.css`, extracted

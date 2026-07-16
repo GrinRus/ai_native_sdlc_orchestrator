@@ -38,6 +38,8 @@ test.describe.serial("installed local operator console", () => {
       await page.goto(state.app_url);
       await expect(page.getByText("Initialize Project Runtime").first()).toBeVisible();
       await expect(page.locator("#project-switcher-control")).toBeVisible();
+      const appConfig = await page.request.get(`${new URL(state.app_url).origin}/app-config.json`).then((response) => response.json());
+      await expect(page.getByText(`v${appConfig.version}`)).toHaveText(`v${appConfig.version}`);
       expect(fs.existsSync(state.runtime_root), `${viewport.id} first load created runtime`).toBe(false);
     }
     expect(failures).toEqual([]);
@@ -82,10 +84,12 @@ test.describe.serial("installed local operator console", () => {
     });
     await page.goto(state.app_url);
     await expect(page.locator("#project-switcher-control")).toBeVisible();
-    await page.getByRole("button", { name: /Add local project/i }).first().click();
-    await expect(page.getByLabel("Add local project drawer")).toBeVisible();
+    await expect(page.getByText("Some live resources are unavailable.")).toBeVisible();
+    await expect(page.getByText(/Existing project state remains visible/)).toBeVisible();
+    await page.getByRole("button", { name: /Add another AOR project/i }).first().click();
+    await expect(page.getByLabel("Add another AOR project drawer")).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByLabel("Add local project drawer")).toBeHidden();
+    await expect(page.getByLabel("Add another AOR project drawer")).toBeHidden();
   });
 
   test("durable event delivery refreshes browser state", async ({ page }) => {

@@ -22,7 +22,12 @@ function withTempProject(callback) {
 }
 
 test("packaging-only marker smoke exposes installed-user guided mission controls", () => {
-  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const source = [
+    "spa.jsx",
+    "control-plane-client.js",
+    "project-snapshot.js",
+    "operator-error-card.jsx",
+  ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
   const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 
   for (const required of [
@@ -394,7 +399,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     'id="project-switcher-control"',
     'name="project-switcher"',
     'aria-label="Project switcher"',
-    "Add local project",
+    "Add another AOR project",
     "Runtime root preview",
     "Project profile",
     "projectProfile",
