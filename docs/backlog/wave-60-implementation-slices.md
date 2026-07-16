@@ -125,7 +125,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S02 — Planner decomposition and task quality gate
 
 - **Epic:** EPIC-2 Packet lifecycle; EPIC-3 Routed execution; EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Generate mission-specific structured tasks from current planning
   evidence instead of the generic implementation/verification/lineage fallback.
 - **Primary modules:** `examples/prompts/**`, `examples/context/**`,
@@ -202,7 +202,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S03 — Execution plan and evidence-derived task progress
 
 - **Epic:** EPIC-2 Packet lifecycle; EPIC-3 Routed execution; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add a durable execution plan and progress projection that map
   stable tasks to execution units, attempts, verification, and completion.
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`,

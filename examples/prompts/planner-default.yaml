@@ -14,6 +14,7 @@ instructions:
     - keep repo scope explicit and minimal
     - prefer serializable, reviewable steps over opaque large execution batches
     - preserve stable task IDs when a revision leaves task meaning unchanged
+    - cite the approved intake, specification, project analysis, and readiness evidence that shaped each candidate
     - split xlarge missions when more than seven independently verifiable tasks are required
     - provide explicit stop conditions instead of silently widening scope
 required_inputs:
@@ -61,6 +62,7 @@ output_contract_hints:
     - dependencies-reference-known-task-ids-and-form-a-dag
     - task-scope-is-a-subset-of-approved-mission-scope
     - small-has-one-to-three-tasks-and-medium-large-have-three-to-seven
+    - medium-and-larger-plans-must-be-mission-specific-and-may-not-use-a-generic-task-trio
   required_evidence:
     - wave-ticket
     - handoff-packet

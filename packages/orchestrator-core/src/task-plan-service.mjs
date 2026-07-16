@@ -5,6 +5,7 @@ import path from "node:path";
 import { derivePublicId, loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { prepareHandoffArtifacts } from "./handoff-packets.mjs";
+import { buildPlanningInputManifest, selectPlannerCandidate } from "./planner-decomposition.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
 
@@ -585,17 +586,18 @@ export function createTaskPlan(options = {}) {
     throw error;
   }
   const adapterOutput = asRecord(asRecord(asRecord(planningRun.stepResult.routed_execution).adapter_response).output);
-  const plannerCandidate = Object.keys(asRecord(options.plannerCandidate)).length > 0
-    ? asRecord(options.plannerCandidate)
-    : Object.keys(asRecord(adapterOutput.wave_ticket_candidate)).length > 0
-      ? asRecord(adapterOutput.wave_ticket_candidate)
-      : asRecord(adapterOutput.structured_plan);
+  const candidateSelection = selectPlannerCandidate({
+    explicitCandidate: options.plannerCandidate,
+    adapterOutput,
+  });
   const planningRunRef = evidenceRef(planningRun.projectRoot, planningRun.stepResultPath);
   const result = prepareHandoffArtifacts({
     ...options,
-    plannerCandidate,
+    plannerCandidate: candidateSelection.candidate,
+    plannerCandidateSource: candidateSelection.source,
     plannerAttemptRef: planningRunRef,
     planningInputRefs,
+    planningInputManifest: buildPlanningInputManifest(planningInputRefs),
   });
   const semanticEvaluation = materializePlanSemanticEvaluation(options, result);
   if (options.flowId && flowIdForPlan(result.projectId, result.waveTicket) !== options.flowId) {

@@ -15,6 +15,11 @@ import {
   resolveExecutionUnitContext,
   showTaskPlan,
 } from "../src/task-plan-service.mjs";
+import {
+  buildPlanningInputManifest,
+  revisionAdviceForValidationIssue,
+  selectPlannerCandidate,
+} from "../src/planner-decomposition.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -29,6 +34,19 @@ function withTempRepo(callback) {
   }
 }
 
+test("planner decomposition records input provenance and candidate precedence", () => {
+  assert.deepEqual(buildPlanningInputManifest([
+    "evidence://artifacts/intake.artifact.json",
+    "evidence://reports/project-analysis.json",
+    "evidence://reports/spec.step-result.json",
+  ]).map((entry) => entry.kind), ["approved-intake", "project-analysis", "specification"]);
+  assert.equal(selectPlannerCandidate({
+    explicitCandidate: { local_tasks: [{ task_id: "task.explicit" }] },
+    adapterOutput: { wave_ticket_candidate: { local_tasks: [{ task_id: "task.runner" }] } },
+  }).source, "explicit-candidate");
+  assert.match(revisionAdviceForValidationIssue({ field: "local_tasks[0].depends_on" }), /dependencies/u);
+});
+
 test("structured plan create is routed, idempotent, approvable, and materializes execution progress", () => {
   withTempRepo((repoRoot) => {
     const semanticEvaluation = { status: "warn", warnings: ["Keep the integration boundary explicit."] };
@@ -41,6 +59,8 @@ test("structured plan create is routed, idempotent, approvable, and materializes
     assert.equal(first.plan.semantic_evaluation.blocking, false);
     assert.equal(first.planEvaluationReport.status, "warn");
     assert.equal(first.plan.plan_version, 1);
+    assert.equal(first.plan.source_refs.planner_candidate_source, "mission-derived-fallback");
+    assert.equal(first.plan.source_refs.planning_input_manifest.length > 0, true);
     assert.equal(second.plan.plan_version, 1);
     assert.equal(second.plan.plan_digest, first.plan.plan_digest);
     assert.equal(second.plan.local_tasks.some((task) => task.task_id.startsWith("local-task.")), false);
@@ -138,6 +158,10 @@ test("incomplete planner output remains readable as revision-required but cannot
     });
     assert.equal(created.plan.plan_status, "revision-required");
     assert.equal(created.planValidationReport.status, "fail");
+    assert.equal(
+      created.planValidationReport.validators.every((entry) => typeof entry.details.revision_advice === "string"),
+      true,
+    );
     assert.equal(created.planEvaluationReport, null);
     assert.equal(showTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planRef: created.planRef }).plan.plan_status, "revision-required");
     assert.throws(
