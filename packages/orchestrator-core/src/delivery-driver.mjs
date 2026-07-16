@@ -10,6 +10,7 @@ import { runDeliveryMode } from "./delivery-mode-runners.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { classifyChangedPathsByRepo } from "./repo-scope.mjs";
 import { assertExactDeliveryDiff } from "./delivery-integrity.mjs";
+import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
@@ -457,7 +458,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
  *  deliveryPlan?: Record<string, unknown>,
  * }} options
  */
-export function runDeliveryDriver(options = {}) {
+function executeDeliveryDriverTransaction(options = {}) {
   const init = initializeProjectRuntime(options);
   const runId = options.runId ?? `${init.projectId}.delivery.v1`;
   const stepId = options.stepId ?? "delivery.apply";
@@ -927,4 +928,8 @@ export function runDeliveryDriver(options = {}) {
     diffStats,
     outputs,
   };
+}
+
+export function runDeliveryDriver(options = {}) {
+  return runTransactionCoordinator(executeDeliveryDriverTransaction, options);
 }
