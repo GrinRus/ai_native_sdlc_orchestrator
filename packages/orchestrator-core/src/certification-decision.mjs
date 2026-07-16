@@ -1,14 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-
 import { validateContractDocument } from "../../contracts/src/index.mjs";
-
 import { materializeCompilerRevisionStatus, parseCompilerRevisionRef } from "./compiler-revision.mjs";
 import { captureHarnessReplayArtifact, replayHarnessCapture } from "./harness-capture-replay.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { validateProjectRuntime } from "./project-validate.mjs";
-
+import { runProjectionCoordinator } from "./operator-projection-services.mjs";
 const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "frozen", "demoted"]);
 const FLAKY_PASS_RATE_DELTA_THRESHOLD = 0.02;
 const MAJOR_DRIFT_DELTA_THRESHOLD = 0.1;
@@ -800,7 +798,7 @@ export function resolveCertificationDecisionStatus(options) {
  *  withoutContextBundleRef?: string,
  * }} options
  */
-export function certifyAssetPromotion(options) {
+function executeCertificationProjection(options) {
   const init = initializeProjectRuntime(options);
   const fromChannel = options.fromChannel ?? "candidate";
   const toChannel = options.toChannel ?? "stable";
@@ -1271,3 +1269,5 @@ export function certifyAssetPromotion(options) {
     governanceChecks,
   };
 }
+
+export function certifyAssetPromotion(options) { return runProjectionCoordinator(executeCertificationProjection, options); }

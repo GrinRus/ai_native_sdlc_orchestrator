@@ -1,15 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
-
-const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
-const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
-const DEFAULT_RUNTIME_ROOT = ".aor";
-const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
-
+import { runProjectionCoordinator } from "./operator-projection-services.mjs";
+const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
+const DEFAULT_RUNTIME_ROOT = ".aor"; const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
@@ -454,7 +450,7 @@ function buildQualityRepairState(entry, approved, repairRunState = null) {
  * }} options
  * @returns {Record<string, unknown>}
  */
-function buildClosureState(options) {
+function projectClosureState(options) {
   const runId = options.runId;
   const emptyEvidence = uniqueStrings([options.runEvidenceRef ?? null]);
   if (!runId) {
@@ -1343,7 +1339,7 @@ function readinessStage(options) {
  *   missionState: Record<string, unknown>,
  * }} options
  */
-function buildArtifactReadiness(options) {
+function projectArtifactReadiness(options) {
   const policy = resolveArtifactReadinessPolicy(options.init);
   const packetRef = options.intake ? toEvidenceRef(options.init.projectRoot, options.intake.packetFile) : null;
   const bodyRef = options.intake?.bodyFile ? toEvidenceRef(options.init.projectRoot, options.intake.bodyFile) : null;
@@ -1676,7 +1672,7 @@ function resolveMissionState(body) {
  *   runId?: string,
  * }} options
  */
-export function resolveNextAction(options = {}) {
+function executeNextActionProjection(options = {}) {
   const init = initializeProjectRuntime({
     cwd: options.cwd,
     projectRef: options.projectRef,
@@ -2022,3 +2018,7 @@ export function resolveNextAction(options = {}) {
     nextActionReportId: report.report_id,
   };
 }
+
+function buildClosureState(options) { return runProjectionCoordinator(projectClosureState, options); }
+function buildArtifactReadiness(options) { return runProjectionCoordinator(projectArtifactReadiness, options); }
+export function resolveNextAction(options = {}) { return runProjectionCoordinator(executeNextActionProjection, options); }

@@ -233,7 +233,7 @@ behavior.
 
 - **Epic:** EPIC-0 Repository development system; EPIC-4 Quality platform;
   EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Next-action, run-read, and certification decisions are produced
   by focused deterministic projections whose observable results remain fixed by
   golden fixtures.
