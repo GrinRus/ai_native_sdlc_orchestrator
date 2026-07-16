@@ -17,7 +17,9 @@ instruction: >-
   criterion and required evidence type owned by at least one task. Use one to three
   tasks for small plans and three to seven for medium or large plans. Stop with
   mission-split-required when an xlarge mission cannot fit in seven independently
-  verifiable tasks. Do not write wave, handoff, validation, or execution artifacts.
+  verifiable tasks. Preserve the source evidence that shaped the decomposition and
+  never substitute a generic implementation/verification/lineage trio for a medium+
+  mission. Do not write wave, handoff, validation, or execution artifacts.
 source_refs:
   - docs/contracts/wave-ticket.md
   - docs/contracts/handoff-packet.md

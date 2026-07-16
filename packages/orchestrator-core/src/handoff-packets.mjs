@@ -5,7 +5,7 @@ import path from "node:path";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
-
+import { revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
 /**
  * @param {string[]} values
  * @returns {string[]}
@@ -619,7 +619,6 @@ export function prepareHandoffArtifacts(options = {}) {
   if (!loadedProfile.ok) {
     throw new Error(`Project profile '${init.projectProfilePath}' failed contract validation.`);
   }
-
   const profile = asRecord(loadedProfile.document);
   const artifactPacketFile = resolveArtifactPacketPath({
     runtimeLayout: init.runtimeLayout,
@@ -631,7 +630,6 @@ export function prepareHandoffArtifacts(options = {}) {
   const artifactPacketBody = loadArtifactPacketBody(artifactPacket);
   const missionTraceability = asRecord(artifactPacketBody.mission_traceability);
   const featureRequest = asRecord(artifactPacketBody.feature_request);
-
   const profileRepoScopes = deriveRepoScopes(profile);
   const missionAllowedPaths = deriveMissionAllowedPaths(artifactPacketBody);
   const allowedPaths =
@@ -640,7 +638,6 @@ export function prepareHandoffArtifacts(options = {}) {
   const requestDocument = asRecord(featureRequest.request_document);
   const verificationExpectations = deriveVerificationExpectations(requestDocument);
   const allowedCommands = unique([...deriveAllowedCommands(profile), ...verificationExpectations.primary_commands]);
-
   const ticketId =
     typeof options.ticketId === "string" && options.ticketId.trim().length > 0
       ? options.ticketId.trim()
@@ -661,11 +658,14 @@ export function prepareHandoffArtifacts(options = {}) {
     sourceRef: `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`,
     plannerCandidate: options.plannerCandidate,
   });
-
   const missionId = typeof missionTraceability.mission_id === "string" && missionTraceability.mission_id.trim().length > 0
     ? missionTraceability.mission_id.trim()
     : ticketId;
   const planId = `${init.projectId}.plan.${stableTaskSegment(missionId, "current")}`;
+  const approvedInputRef = `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`;
+  const planningInputManifest = Array.isArray(options.planningInputManifest) && options.planningInputManifest.length > 0 ? options.planningInputManifest : [{
+    input_id: "planning-input.1", kind: "approved-intake", ref: approvedInputRef,
+  }];
   const planDigest = stableDigest({
     objective,
     scope: { repo_scopes: repoScopes, allowed_paths: allowedPaths },
@@ -740,13 +740,15 @@ export function prepareHandoffArtifacts(options = {}) {
     verification_expectations: planningContent.verification_expectations,
     verification_plan: planningContent.verification_plan,
     kpis: planningContent.kpis,
-    approved_input_ref: `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`,
+    approved_input_ref: approvedInputRef,
     source_refs: {
       artifact_packet_file: artifactPacketFile,
       project_profile_ref: init.projectProfileRef,
       previous_plan_ref: previousPlanRef,
       planner_attempt_ref: options.plannerAttemptRef ?? null,
       planning_input_refs: unique(asStringArray(options.planningInputRefs)),
+      planning_input_manifest: planningInputManifest,
+      planner_candidate_source: options.plannerCandidateSource ?? "mission-derived-fallback",
     },
     feature_traceability: {
       mission_id: typeof missionTraceability.mission_id === "string" ? missionTraceability.mission_id : null,
@@ -755,7 +757,6 @@ export function prepareHandoffArtifacts(options = {}) {
       request_brief: typeof featureRequest.brief === "string" ? featureRequest.brief : null,
     },
   };
-
   const waveTicketValidation = validateContractDocument({
     family: "wave-ticket",
     document: waveTicket,
@@ -774,7 +775,6 @@ export function prepareHandoffArtifacts(options = {}) {
       ),
     };
   }
-
   const planRef = toEvidenceRef(init.projectRoot, waveTicketFile);
   const planValidationReportFile = path.join(
     init.runtimeLayout.reportsRoot,
@@ -803,6 +803,7 @@ export function prepareHandoffArtifacts(options = {}) {
             blocker_code: entry.message.includes("mission-split-required")
               ? "mission-split-required"
               : `structured-plan.${entry.field.replace(/[^a-zA-Z0-9._-]+/gu, "-")}`,
+            revision_advice: revisionAdviceForValidationIssue(entry),
           },
           evidence_refs: [planRef],
         })),
@@ -828,7 +829,6 @@ export function prepareHandoffArtifacts(options = {}) {
   }
   fs.writeFileSync(waveTicketFile, `${JSON.stringify(waveTicket, null, 2)}\n`, "utf8");
   fs.writeFileSync(planValidationReportFile, `${JSON.stringify(planValidationReport, null, 2)}\n`, "utf8");
-
   const writebackPolicy = asRecord(profile.writeback_policy);
   const writebackMode =
     typeof writebackPolicy.default_delivery_mode === "string" && writebackPolicy.default_delivery_mode.length > 0
