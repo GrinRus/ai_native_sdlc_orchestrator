@@ -152,7 +152,7 @@ baseline rather than the full operator workflow in
 
 `W31-S01` closes the installed-user local UI intake story, and `W36-S03`/`W36-S04` make it no-settings and project-aware: a user who installed `@grinrus/aor` can run `cd <repo> && aor app`, confirm project context, initialize the runtime explicitly, apply the safe walkthrough Mission template, submit the first mission, switch between explicitly added local projects, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
 
-That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S07 closes the approved Execution Setup UX over the canonical execution-profile contract; `PBO-10` remains partial only until W61-S05 records the combined neutral Workspace, topology, persistence, and installed onboarding proof.
+That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S07 closes the approved Execution Setup UX over the canonical execution-profile contract, and W61-S05 records the combined neutral Workspace, topology, persistence, and installed onboarding proof that closes `PBO-10`.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

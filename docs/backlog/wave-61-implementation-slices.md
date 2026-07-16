@@ -354,7 +354,7 @@ profiles.
 ## W61-S05 — Topology onboarding proof and documentation closure
 
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove project topology and approved execution-route setup through
   installed-user and headless paths while preserving current no-settings
   compatibility.
