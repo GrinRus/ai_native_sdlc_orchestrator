@@ -728,6 +728,11 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `POST /api/projects/actions` for explicit local add-project actions in the app session.
 
 Local app project summary baseline:
+- the project index is Workspace-scoped and may return
+  `selected_project_id=null`, `default_project_id=null`, and `projects=[]` for a
+  neutral launch;
+- explicitly connected projects persist in the operator-local Workspace
+  registry, but neutral launch never restores a sticky project as CLI context;
 - `project_id` as the local app route key, `runtime_project_id` as the underlying runtime contract identity, `label`, `project_ref`, `project_profile_ref`, and `runtime_root`;
 - `project_id` remains equal to `runtime_project_id` for the default single-project case; duplicate local profiles in one app session get a stable app-scoped `project_id` suffix so their runtime/evidence chains do not mix;
 - `onboarding_summary` with `status`, `initialized`, `can_initialize`, `recommended_action`, user-facing blockers, and optional `profile_mismatch_candidate_project_ids` when the runtime root already contains initialized evidence for a different project profile id;

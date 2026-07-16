@@ -44,7 +44,7 @@ function isJsonMediaType(value) {
 /**
  * @param {{
  *   cwd?: string,
- *   projectRef: string,
+ *   projectRef?: string,
  *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   projects?: Array<{
@@ -55,6 +55,7 @@ function isJsonMediaType(value) {
  *   }>,
  *   host?: string,
  *   port?: number,
+ *   workspaceRegistry?: { mode: "ephemeral" | "persistent", root?: string },
  *   auth?: {
  *     mode?: "local-trusted" | "production-hardened",
  *     enabled?: boolean,
@@ -80,27 +81,28 @@ export function createControlPlaneHttpServer(options) {
   }
   const requestedPort = asPositiveInteger(options.port);
   const port = requestedPort ?? 0;
-  const projectInputs = Array.isArray(options.projects) && options.projects.length > 0
+  const projectInputs = Array.isArray(options.projects)
     ? options.projects
-    : [{
+    : asString(options.projectRef) ? [{
         projectRef: options.projectRef,
         projectProfile: options.projectProfile,
         runtimeRoot: options.runtimeRoot,
-      }];
+      }] : [];
   const registry = createLocalProjectRegistry({
     cwd: options.cwd,
     projects: projectInputs,
+    persistence: options.workspaceRegistry,
   });
   const defaultContext = registry.getContext(registry.defaultProjectId);
-  const defaultSummary = summarizeProjectContext(defaultContext);
-  const projectId = defaultSummary.project_id;
-  const projectProfileRef = defaultSummary.project_profile_ref;
+  const defaultSummary = defaultContext ? summarizeProjectContext(defaultContext) : null;
+  const projectId = defaultSummary?.project_id ?? null;
+  const projectProfileRef = defaultSummary?.project_profile_ref ?? null;
   const appStaticRoot = asString(options.app?.staticRoot);
   const appIndexFile = appStaticRoot ? path.join(appStaticRoot, "index.html") : null;
   if (appStaticRoot && !fs.existsSync(appIndexFile ?? "")) {
     throw new Error(`AOR app static bundle is missing at '${appStaticRoot}'. Run the web build before launching the app.`);
   }
-  const authPolicy = normalizeAuthPolicy(options.auth, projectId);
+  const authPolicy = normalizeAuthPolicy(options.auth, projectId ?? "*");
   let canonicalAuthority = null;
   let canonicalOrigin = null;
 
@@ -175,18 +177,17 @@ export function createControlPlaneHttpServer(options) {
         return;
       }
 
-      const routeProjectId = asString(params.projectId) ?? projectId;
-      const context = route.id === "project-index" || route.id === "project-actions"
-        ? defaultContext
-        : registry.getContext(routeProjectId);
-      if (!context) {
+      const workspaceRoute = route.id === "project-index" || route.id === "project-actions";
+      const routeProjectId = asString(params.projectId) ?? projectId ?? "*";
+      const context = workspaceRoute ? null : registry.getContext(routeProjectId);
+      if (!workspaceRoute && !context) {
         sendError(response, 404, "project_not_found", "Requested project id does not match any registered local project.");
         return;
       }
-      const runtimeOptionsWithSecurity = {
+      const runtimeOptionsWithSecurity = context ? {
         ...context.runtimeOptions,
         redactionPolicy: authPolicy.redactionPolicy,
-      };
+      } : null;
 
       const decision = authorizeRequest({
         request,
@@ -295,8 +296,8 @@ export function createControlPlaneHttpServer(options) {
         baseUrl,
         projectId,
         projectProfileRef,
-        projectRef: defaultSummary.project_ref,
-        runtimeRoot: defaultSummary.runtime_root,
+        projectRef: defaultSummary?.project_ref ?? null,
+        runtimeRoot: defaultSummary?.runtime_root ?? null,
         async close() {
           if (!server.listening) {
             return;

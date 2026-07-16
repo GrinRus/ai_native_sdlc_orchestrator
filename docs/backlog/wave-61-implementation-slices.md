@@ -115,7 +115,7 @@ profiles.
 ## W61-S02 — Persistent local workspace registry and topology discovery
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Open a neutral Local Workspace, persist explicitly connected
   projects and repository bindings, then analyze repositories/components
   without automatic filesystem discovery.
@@ -197,7 +197,7 @@ profiles.
 ## W61-S03 — Project topology CLI/API management and validation
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Expose project, repository, component, dependency, binding, and
   validation management through auditable headless surfaces.
 - **Primary modules:** `apps/cli/**`, `apps/api/**`,
