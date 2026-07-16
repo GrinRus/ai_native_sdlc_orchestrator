@@ -10,9 +10,11 @@ import {
   handleOperatorRequestAction,
   handleOperatorRequestCreate,
   handleProjectAction,
+  handleProjectTopologyAction,
   handleRunControlAction,
   handleUiLifecycleAction,
 } from "./http-mutation-handlers.mjs";
+import { readProjectTopology } from "../topology-management.mjs";
 import { handleReadRoute } from "./http-read-handlers.mjs";
 import { matchControlPlaneRoute } from "./http-router.mjs";
 import { handleRunEventStream } from "./http-stream-handlers.mjs";
@@ -205,6 +207,16 @@ export function createControlPlaneHttpServer(options) {
           sendJson(response, 200, registry.summarize());
           return;
         }
+        if (route.id === "project-topology" || route.id === "project-topology-validation") {
+          const topology = readProjectTopology({ registry, projectId: routeProjectId });
+          sendJson(response, 200, route.id === "project-topology" ? topology : {
+            project_id: topology.project_id,
+            revision: topology.revision,
+            validation: topology.latest_validation,
+            read_only: true,
+          });
+          return;
+        }
         handleReadRoute({
           routeId: route.id,
           params,
@@ -217,6 +229,10 @@ export function createControlPlaneHttpServer(options) {
 
       if (route.id === "project-actions") {
         await handleProjectAction({ request, response, registry });
+        return;
+      }
+      if (route.id === "project-topology-actions") {
+        await handleProjectTopologyAction({ request, response, params, registry });
         return;
       }
 

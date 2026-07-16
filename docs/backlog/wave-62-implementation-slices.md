@@ -33,7 +33,7 @@ recoverable coordinated delivery.
 ## W62-S01 — Workspace-set provisioner and repository change evidence
 
 - **Epic:** EPIC-3 Routed execution; EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Provision one isolated execution root containing exact run-scoped
   checkouts for all participating repositories and collect per-repository change evidence.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core/**`,
@@ -100,7 +100,7 @@ recoverable coordinated delivery.
 ## W62-S02 — Impact scope and execution DAG planning
 
 - **Epic:** EPIC-2 Packet lifecycle; EPIC-3 Routed execution; EPIC-4 Quality platform
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Derive and validate the task/repository/component execution DAG,
   affected scope, integration checks, and concurrency candidates from approved evidence.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core/**`,

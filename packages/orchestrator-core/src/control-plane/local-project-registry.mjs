@@ -262,6 +262,8 @@ export function createLocalProjectRegistry(options) {
         runtime_root: input.runtimeRoot ?? null,
         label: input.label ?? null,
         bindings: Array.isArray(input.bindings) ? input.bindings : [],
+        latest_validation: input.latestValidation ?? null,
+        topology_history: Array.isArray(input.topologyHistory) ? input.topologyHistory : [],
       })),
     }));
     registryRevision = next.revision;
@@ -304,6 +306,8 @@ export function createLocalProjectRegistry(options) {
       runtimeRoot: optionalString(project.runtime_root),
       label: optionalString(project.label),
       bindings: Array.isArray(project.bindings) ? project.bindings : [],
+      latestValidation: project.latest_validation ?? null,
+      topologyHistory: Array.isArray(project.topology_history) ? project.topology_history : [],
     }, { persist: false, select: false });
   }
   for (const project of options.projects) {
@@ -329,6 +333,18 @@ export function createLocalProjectRegistry(options) {
     addProject,
     getProjectInput(projectId) {
       return inputs.get(projectId) ?? null;
+    },
+    updateProject(projectId, expectedRevision, mutate) {
+      if (expectedRevision !== undefined && registryRevision !== expectedRevision) {
+        const error = new Error(`Workspace registry revision conflict: expected ${expectedRevision}, current ${registryRevision}.`);
+        error.code = "workspace_registry_revision_conflict";
+        throw error;
+      }
+      const current = inputs.get(projectId);
+      if (!current) return null;
+      inputs.set(projectId, mutate(structuredClone(current)));
+      persist();
+      return inputs.get(projectId);
     },
     summarize() {
       return {

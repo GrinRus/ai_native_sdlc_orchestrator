@@ -19,6 +19,7 @@ import {
   requestTaskPlanRevision,
   resolveExecutionUnitContext,
 } from "../../task-plan-service.mjs";
+import { applyTopologyAction, TopologyManagementError } from "../topology-management.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
 const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
@@ -282,6 +283,28 @@ export async function handleProjectAction({ request, response, registry }) {
     });
   } catch (error) {
     sendError(response, 400, "project_add_failed", error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function handleProjectTopologyAction({ request, response, params, registry }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+  try {
+    const result = applyTopologyAction({
+      registry,
+      projectId: params.projectId,
+      expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+      action: asString(payload.action) ?? "",
+      family: asString(payload.family) ?? "topology",
+      payload: payload.value && typeof payload.value === "object" && !Array.isArray(payload.value) ? payload.value : {},
+    });
+    sendJson(response, payload.action === "reanalyze" ? 202 : 200, result);
+  } catch (error) {
+    if (error instanceof TopologyManagementError) {
+      sendError(response, error.statusCode, error.code, error.message);
+      return;
+    }
+    throw error;
   }
 }
 

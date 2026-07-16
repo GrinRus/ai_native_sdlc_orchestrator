@@ -139,6 +139,24 @@ structured_plan_operations:
     - execution-plan
     - task-progress-report
 
+project_topology_operations:
+  owning_slice: W61-S03
+  status: implemented
+  workspace_routes:
+    - GET /api/projects
+    - POST /api/projects/actions
+  project_routes:
+    - GET /api/projects/:projectId/topology
+    - GET /api/projects/:projectId/topology/validation
+    - POST /api/projects/:projectId/topology/actions
+  revision_protection: expected_revision
+  deterministic_validation_before_publish: true
+  compatibility_add_action_preserved: true
+  contract_families:
+    - project-profile
+    - project-binding
+    - workspace-set
+
 run_control_operations:
   - operation_id: run.start
     action: start

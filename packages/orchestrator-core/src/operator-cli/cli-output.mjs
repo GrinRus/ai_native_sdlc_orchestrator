@@ -272,6 +272,12 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   guidedActionableBlockers: null,
   guidedRecommendedCommands: null,
   guidedWebSurface: null,
+  workspace: null,
+  project: null,
+  topology: null,
+  validation: null,
+  proposals: null,
+  revisionEvent: null,
 });
 
 const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
@@ -532,6 +538,12 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["guided_actionable_blockers", "guidedActionableBlockers"],
   ["guided_recommended_commands", "guidedRecommendedCommands"],
   ["guided_web_surface", "guidedWebSurface"],
+  ["workspace", "workspace"],
+  ["project", "project"],
+  ["topology", "topology"],
+  ["validation", "validation"],
+  ["proposals", "proposals"],
+  ["revision_event", "revisionEvent"],
   ["run_summaries", "runSummaries"],
   ["run_event_history", "runEventHistory"],
   ["run_policy_history", "runPolicyHistory"],
