@@ -1,0 +1,14 @@
+binding_id: binding.aor-core.local
+project_id: aor-core
+profile_ref: examples/project.aor.yaml
+revision: 1
+repositories:
+  - repo_id: main
+    local_path: /opt/aor/checkouts/aor-core
+    clone_source: https://github.com/GrinRus/ai_native_sdlc_orchestrator.git
+    resolved_identity: github.com/grinrus/ai_native_sdlc_orchestrator
+    resolved_commit: 1111111111111111111111111111111111111111
+    status: available
+    credential_readiness:
+      status: not-required
+      mechanism: public-read

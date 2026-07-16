@@ -1,5 +1,7 @@
 export type ContractFamily =
   | "project-profile"
+  | "project-binding"
+  | "workspace-set"
   | "onboarding-report"
   | "next-action-report"
   | "project-analysis-report"
@@ -168,6 +170,7 @@ export function validateStructuredTaskPlan(
 ): ContractValidationIssue[];
 
 export function loadContractFile(options: LoadContractFileOptions): LoadedContractFile;
+export function normalizeProjectTopology(document: Record<string, unknown>): Record<string, unknown>;
 
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
 

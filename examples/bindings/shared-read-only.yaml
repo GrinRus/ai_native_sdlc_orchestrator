@@ -1,0 +1,13 @@
+binding_id: binding.shared.read-only
+project_id: docs-consumer
+profile_ref: examples/project.aor.yaml
+revision: 1
+repositories:
+  - repo_id: main
+    local_path: /opt/aor/checkouts/shared-aor
+    resolved_identity: github.com/grinrus/ai_native_sdlc_orchestrator
+    resolved_commit: 1111111111111111111111111111111111111111
+    status: available
+    credential_readiness:
+      status: not-required
+      mechanism: local-checkout

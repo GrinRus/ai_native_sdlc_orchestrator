@@ -42,7 +42,7 @@ profiles.
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-2 Packet lifecycle;
   EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Define portable topology, machine-local binding, component, and
   workspace-set boundaries before persistence or UI behavior depends on them.
 - **Primary modules:** `docs/product/**`, `docs/architecture/**`,
@@ -115,7 +115,7 @@ profiles.
 ## W61-S02 — Persistent local workspace registry and topology discovery
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Open a neutral Local Workspace, persist explicitly connected
   projects and repository bindings, then analyze repositories/components
   without automatic filesystem discovery.

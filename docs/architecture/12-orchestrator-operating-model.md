@@ -21,6 +21,12 @@ selected project; there is no ambient current project. Compatibility wrappers
 may translate the context to legacy `{cwd, projectRef, runtimeRoot}` arguments
 once, with `cwd` anchored to the project root rather than the launcher.
 
+The topology vocabulary is also explicit: a Local Workspace contains
+independent AOR Projects; each Project owns portable Repository and Component
+definitions; a Project Binding owns machine-local checkout resolution; and a
+Workspace Set freezes exact repository identities for a later run. Components
+inside a monorepo never become synthetic Git repositories.
+
 Query ingress derives an immutable `ProjectReadContext` from that project
 context and a non-materializing runtime preview. It resolves the same canonical
 paths but represents missing runtime state as `initialized=false`; it never

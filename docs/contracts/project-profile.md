@@ -39,6 +39,17 @@ installed-asset inputs and must never be inferred from launcher `cwd`.
 
 For bounded multirepo flows, one project profile owns all participating `repos[]` entries and any `repo_graph` dependency edges. This supports separate backend, mobile, frontend, documentation, or shared-library repositories inside one AOR flow; it is not the same as coordinating multiple independent AOR `project_id` profiles.
 
+W61 topology is additive. `repos[].workspace_mount` is the portable stable mount
+for a future workspace set. When it is absent, loaders derive the same in-memory
+value from legacy `repos[].source.root`. `components[]` identifies apps,
+packages, and services inside a declared repository through `component_id`,
+`repo_id`, repository-relative `root`, `role`, and optional
+`command_group_refs[]`. `component_graph[]` records component dependencies and
+optional validation refs. Legacy profiles load with empty component arrays.
+
+Absolute checkout paths and credential readiness do not belong in this profile;
+they are owned by `project-binding`.
+
 Bounded multirepo profiles should keep each repo entry explicit:
 - `repo_id`, `role`, `default_branch`, and `source.kind`;
 - a stable checkout or workspace-local `source.root` when delivery evidence must classify changed paths by repo;

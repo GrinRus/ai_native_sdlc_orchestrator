@@ -10,6 +10,7 @@ repos:
       root: .
     default_branch: main
     role: application
+    workspace_mount: repos/main
     build_commands:
       - pnpm build
     test_commands:
@@ -17,6 +18,27 @@ repos:
     lint_commands:
       - pnpm lint
 repo_graph: []
+components:
+  - component_id: api
+    repo_id: main
+    name: Control-plane API
+    root: apps/api
+    role: service
+    command_group_refs:
+      - baseline-test
+  - component_id: web
+    repo_id: main
+    name: Operator console
+    root: apps/web
+    role: application
+    command_group_refs:
+      - baseline-build
+component_graph:
+  - from_component_id: web
+    to_component_id: api
+    relationship: consumes
+    validation_refs:
+      - validation://integration/web-api/control-plane
 allowed_providers:
   - openai
   - anthropic

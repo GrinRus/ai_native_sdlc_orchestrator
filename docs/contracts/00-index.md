@@ -5,6 +5,7 @@ reference-base rules](canonical-identifiers-and-paths.md).
 
 ## Core packets and profiles
 - `project-profile.md`
+- `project-binding.md`
 - `onboarding-report.md`
 - `next-action-report.md`
 - `project-analysis-report.md`
@@ -37,6 +38,7 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `compiled-context-artifact.md`
 - `operator-request.md`
 - `task-progress-report.md`
+- `workspace-set.md`
 
 Compiled-context and external-runner contracts include context-budget evidence for routed steps. Runtime Harness reports consume those facts as deterministic run-quality signals, while product quality remains owned by validation, review, evaluation, delivery, and learning-loop artifacts.
 

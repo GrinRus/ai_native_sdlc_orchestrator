@@ -13,6 +13,7 @@ repos:
       default_ref: main
     default_branch: main
     role: backend
+    workspace_mount: repos/backend
     build_commands:
       - pnpm --dir repos/backend build
     test_commands:
@@ -29,6 +30,7 @@ repos:
       default_ref: main
     default_branch: main
     role: mobile
+    workspace_mount: repos/mobile
     build_commands:
       - pnpm --dir repos/mobile build
     test_commands:
@@ -45,6 +47,7 @@ repos:
       default_ref: main
     default_branch: main
     role: frontend
+    workspace_mount: repos/frontend
     build_commands:
       - pnpm --dir repos/frontend build
     test_commands:
@@ -60,6 +63,36 @@ repo_graph:
   - from_repo_id: backend
     to_repo_id: mobile
     relationship: api-contract
+    validation_refs:
+      - validation://integration/backend-mobile/api-contract
+components:
+  - component_id: backend-api
+    repo_id: backend
+    name: Backend API
+    root: services/api
+    role: service
+    command_group_refs: []
+  - component_id: mobile-app
+    repo_id: mobile
+    name: Mobile application
+    root: apps/mobile
+    role: application
+    command_group_refs: []
+  - component_id: web-app
+    repo_id: frontend
+    name: Web application
+    root: apps/web
+    role: application
+    command_group_refs: []
+component_graph:
+  - from_component_id: web-app
+    to_component_id: backend-api
+    relationship: consumes
+    validation_refs:
+      - validation://integration/backend-frontend/api-contract
+  - from_component_id: mobile-app
+    to_component_id: backend-api
+    relationship: consumes
     validation_refs:
       - validation://integration/backend-mobile/api-contract
 allowed_providers:

@@ -1,4 +1,5 @@
 export { getContractFamilyIndex, loadContractFile, validateContractDocument } from "./loader.mjs";
+export { normalizeProjectTopology } from "./project-topology.mjs";
 export {
   CANONICAL_REFERENCE_BASES,
   PUBLIC_ID_FIELDS,
