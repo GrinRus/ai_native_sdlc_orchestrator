@@ -129,7 +129,9 @@ decomposition, deterministic completeness before semantic checks, exact-version
 approval, evidence-derived task progress, and the accessible Plan workbench.
 W61 closes project topology and installed execution setup. W62-S01 adds the
 run-owned isolated workspace-set provisioner and per-repository change
-evidence; safe concurrency, integration, and coordinated recovery remain open.
+evidence. W62-S02 adds exact task-to-unit DAG planning, impacted topology scope,
+criteria coverage, and reasoned concurrency candidates; scheduling,
+integration execution, and coordinated recovery remain open.
 Until those later slices close, parallel-step coverage remains a bounded
 contract/proof baseline rather than the full operator workflow in
 `docs/product/04-project-topology-and-task-planning-ux.md`.

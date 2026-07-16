@@ -9,6 +9,7 @@ groupings; attempts are repeated runs of a unit.
 ## Required fields
 
 - `execution_plan_id`
+- `schema_version` (`2` for topology-aware plans)
 - `project_id`
 - `plan_id`
 - `plan_version`
@@ -18,13 +19,20 @@ groupings; attempts are repeated runs of a unit.
 - `execution_units`
 - `created_at`
 
+Schema version 2 also requires `dag_version`, `dag_digest`,
+`source_plan_refs[]`, `impacted_scope`, `non_run_tasks[]`,
+`integration_gates[]`, `validation_findings[]`, `concurrency_summary`,
+`risks[]`, and `approval`.
+
 ## Lifecycle
 
 `status` is `ready`, `blocked`, `superseded`, or `complete`. W60 materializes
 units sequentially and may record advisory parallel candidates, but it does not
 schedule parallel work. W62 owns bounded concurrency.
 
-Every unit contains `unit_id`, `task_refs[]`, `depends_on[]`, `scope`,
+Every v2 unit contains `unit_id`, `task_refs[]`, `depends_on[]`, `scope`,
+repository/component scope, workspace mounts, conflict keys, command locks,
+verification gates, criteria coverage, concurrency classification,
 `required_evidence[]`, `integration_requirements[]`, `grouping_rationale`, and
 `parallel_candidate`. One task maps to one unit by default. Multiple tasks may
 share a unit only when the approved tasks use the same non-empty group key,
@@ -48,6 +56,9 @@ The lifecycle remains deliberately split:
 - Unit dependencies preserve task dependencies and remain acyclic.
 - Unit scope cannot widen the approved task or handoff scope.
 - Grouped units require an explicit rationale.
+- Every task maps exactly once to an execution unit or `non_run_tasks[]`.
+- `parallel-candidate` means eligible for scheduler consideration, not running.
+- Material DAG/scope/content changes produce a new digest and invalidate approval.
 
 ## Example
 

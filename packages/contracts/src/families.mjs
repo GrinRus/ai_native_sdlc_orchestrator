@@ -418,6 +418,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       "created_at",
     ],
     fieldTypes: {
+      schema_version: "number",
       execution_plan_id: "string",
       project_id: "string",
       plan_id: "string",

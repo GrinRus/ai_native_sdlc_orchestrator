@@ -100,7 +100,7 @@ recoverable coordinated delivery.
 ## W62-S02 — Impact scope and execution DAG planning
 
 - **Epic:** EPIC-2 Packet lifecycle; EPIC-3 Routed execution; EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Derive and validate the task/repository/component execution DAG,
   affected scope, integration checks, and concurrency candidates from approved evidence.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core/**`,
@@ -163,7 +163,7 @@ recoverable coordinated delivery.
 ## W62-S03 — Parent/child Runtime Harness scheduler and bounded concurrency
 
 - **Epic:** EPIC-3 Routed execution; EPIC-4 Quality platform; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Execute approved units under one parent run with bounded child
   attempts and safe parallelism while preserving runner-agnostic Runtime Harness decisions.
 - **Primary modules:** `packages/orchestrator-core/**`,

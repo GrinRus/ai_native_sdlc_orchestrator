@@ -1,10 +1,20 @@
+schema_version: 2
 execution_plan_id: checkout-platform.execution-plan.checkout-errors.v1
 project_id: checkout-platform
 plan_id: checkout-platform.plan.checkout-errors
 plan_version: 1
 plan_ref: evidence://artifacts/wave-checkout-plan-001.json
 plan_digest: sha256:fixture-checkout-plan-v1
+dag_version: 1
+dag_digest: sha256:fixture-execution-dag-v1
+source_plan_refs:
+  - evidence://artifacts/wave-checkout-plan-001.json
 status: ready
+impacted_scope:
+  repo_ids: [main]
+  component_ids: [payments, web]
+  allowed_paths: [apps/web/**, packages/payments/**]
+  forbidden_paths: []
 execution_units:
   - unit_id: unit.task-error-contract
     task_refs:
@@ -20,6 +30,21 @@ execution_units:
     integration_requirements: []
     grouping_rationale: null
     parallel_candidate: false
+    repository_scope: [main]
+    component_scope: [payments]
+    workspace_mounts:
+      - repo_id: main
+        mount_path: repos/main
+    conflict_keys: [contract.checkout-error]
+    command_locks: []
+    verification_gates: []
+    criteria_coverage:
+      - criterion_ref: criterion.error-contract
+        task_ref: task.error-contract
+        gate: unit
+    concurrency:
+      classification: serialized
+      reasons: [policy-limit]
   - unit_id: unit.task-error-ui
     task_refs:
       - task.error-ui
@@ -35,6 +60,21 @@ execution_units:
     integration_requirements: []
     grouping_rationale: null
     parallel_candidate: false
+    repository_scope: [main]
+    component_scope: [web]
+    workspace_mounts:
+      - repo_id: main
+        mount_path: repos/main
+    conflict_keys: [contract.checkout-error]
+    command_locks: []
+    verification_gates: []
+    criteria_coverage:
+      - criterion_ref: criterion.error-ui
+        task_ref: task.error-ui
+        gate: unit
+    concurrency:
+      classification: serialized
+      reasons: [dependency, conflict-key, policy-limit]
   - unit_id: unit.task-checkout-verification
     task_refs:
       - task.checkout-verification
@@ -54,4 +94,39 @@ execution_units:
       - All implementation units are terminal before verification.
     grouping_rationale: null
     parallel_candidate: false
+    repository_scope: [main]
+    component_scope: [payments, web]
+    workspace_mounts:
+      - repo_id: main
+        mount_path: repos/main
+    conflict_keys: [integration.checkout]
+    command_locks: [verify.checkout]
+    verification_gates: []
+    criteria_coverage:
+      - criterion_ref: criterion.checkout-verification
+        task_ref: task.checkout-verification
+        gate: unit
+    concurrency:
+      classification: serialized
+      reasons: [dependency, policy-limit]
+non_run_tasks: []
+integration_gates:
+  - gate_id: integration-checkout
+    criterion_refs:
+      - criterion.checkout-verification
+    verification: pnpm test --filter checkout
+validation_findings: []
+concurrency_summary:
+  parallel_candidates: []
+  serialized_units:
+    - unit.task-error-contract
+    - unit.task-error-ui
+    - unit.task-checkout-verification
+risks:
+  - Shared error contract changes require aggregate verification.
+approval:
+  state: approved
+  plan_digest: sha256:fixture-checkout-plan-v1
+  dag_digest: sha256:fixture-execution-dag-v1
+  invalidated: false
 created_at: 2026-07-13T10:00:00.000Z
