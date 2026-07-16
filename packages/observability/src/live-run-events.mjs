@@ -15,7 +15,7 @@ const LIVE_RUN_EVENT_TYPES = new Set([
   "run.terminal",
 ]);
 
-const DEFAULT_MAX_REPLAY = 200;
+const DEFAULT_MAX_REPLAY = 0;
 const SERVER_MAX_REPLAY = 1000;
 const JOURNAL_POLL_MS = 50;
 

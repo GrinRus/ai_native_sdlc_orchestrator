@@ -1403,20 +1403,7 @@
         ],
         "properties": {
           "error": {
-            "type": "object",
-            "required": [
-              "code",
-              "message"
-            ],
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": true
+            "$ref": "#/components/schemas/ErrorBody"
           }
         },
         "additionalProperties": true
@@ -1428,46 +1415,35 @@
         ],
         "properties": {
           "error": {
-            "type": "object",
-            "required": [
-              "code",
-              "message"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "enum": [
-                  "auth.missing_credentials",
-                  "auth.invalid_token",
-                  "auth.forbidden_project",
-                  "auth.insufficient_permission"
-                ]
-              },
-              "message": {
-                "type": "string"
-              },
-              "required_permission": {
-                "type": "string",
-                "enum": [
-                  "read",
-                  "mutate"
-                ]
-              },
-              "project_id": {
-                "type": "string"
-              },
-              "token_id": {
-                "type": "string"
-              },
-              "security_mode": {
-                "type": "string",
-                "enum": [
-                  "local-trusted",
-                  "production-hardened"
-                ]
+            "allOf": [
+              { "$ref": "#/components/schemas/ErrorBody" },
+              {
+                "type": "object",
+                "required": ["auth"],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "auth.missing_credentials",
+                      "auth.invalid_token",
+                      "auth.forbidden_project",
+                      "auth.insufficient_permission"
+                    ]
+                  },
+                  "auth": {
+                    "type": "object",
+                    "required": ["required_permission", "project_id", "token_id", "security_mode"],
+                    "properties": {
+                      "required_permission": { "type": "string", "enum": ["read", "mutate"] },
+                      "project_id": { "type": "string" },
+                      "token_id": { "type": ["string", "null"] },
+                      "security_mode": { "type": "string", "enum": ["local-trusted", "production-hardened"] }
+                    },
+                    "additionalProperties": false
+                  }
+                }
               }
-            },
-            "additionalProperties": true
+            ]
           }
         },
         "additionalProperties": true
@@ -3900,17 +3876,62 @@
         "type": "object",
         "required": [
           "code",
-          "message"
+          "title",
+          "detail",
+          "message",
+          "operation",
+          "phase",
+          "resource",
+          "consequence",
+          "retryable",
+          "project_ref",
+          "flow_ref",
+          "run_ref",
+          "field_errors",
+          "evidence_refs",
+          "recovery_actions"
         ],
         "properties": {
           "code": {
             "type": "string"
           },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
           "message": {
             "type": "string"
+          },
+          "operation": { "type": ["string", "null"] },
+          "phase": { "type": "string" },
+          "resource": { "type": ["string", "null"] },
+          "consequence": { "type": "string" },
+          "retryable": { "type": "boolean" },
+          "project_ref": { "type": ["string", "null"] },
+          "flow_ref": { "type": ["string", "null"] },
+          "run_ref": { "type": ["string", "null"] },
+          "field_errors": { "type": "array", "items": { "type": "object" } },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "recovery_actions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecoveryAction" }
           }
         },
         "additionalProperties": true
+      },
+      "RecoveryAction": {
+        "type": "object",
+        "required": ["action", "payload"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["retry", "refresh", "inspect", "select_project", "rebind_repository", "configure_execution", "copy_command", "continue_in_terminal"]
+          },
+          "payload": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
       }
     }
   }

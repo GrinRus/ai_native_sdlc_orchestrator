@@ -105,11 +105,15 @@ function isHelpFlag(value) {
 
 /**
  * @param {string[]} args
+ * @param {Record<string, unknown>} definition
  * @returns {Record<string, string | string[] | true>}
  */
-function parseFlags(args) {
+function parseFlags(args, definition) {
   /** @type {Record<string, string | string[] | true>} */
   const flags = {};
+  const allowedFlags = new Map(
+    (Array.isArray(definition.flags) ? definition.flags : []).map((flag) => [flag.name, flag]),
+  );
 
   for (let index = 0; index < args.length; index += 1) {
     const current = args[index];
@@ -122,6 +126,13 @@ function parseFlags(args) {
 
     if (!flagName) {
       throw new CliUsageError(`Invalid flag '${current}'.`);
+    }
+    const flagDefinition = allowedFlags.get(flagName);
+    if (!flagDefinition) {
+      throw new CliUsageError(`Unknown flag '--${flagName}' for 'aor ${definition.command}'. Use '--help' for supported flags.`);
+    }
+    if (Object.prototype.hasOwnProperty.call(flags, flagName) && flagDefinition.repeatable !== true) {
+      throw new CliUsageError(`Flag '--${flagName}' is not repeatable for 'aor ${definition.command}'.`);
     }
 
     if (inlineValue !== undefined) {
@@ -185,12 +196,14 @@ function parseGuidedShortcut(command, args) {
     return { type: "command-help", command };
   }
 
+  const definition = getCommandDefinition(command);
+  if (!definition) throw new CliUsageError(`Unknown command '${command}'.`);
   if (command !== "onboard" || args.length === 0 || args[0].startsWith("--")) {
-    return { type: "execute", command, flags: parseFlags(args) };
+    return { type: "execute", command, flags: parseFlags(args, definition) };
   }
 
   const [projectRef, ...rest] = args;
-  const flags = parseFlags(rest);
+  const flags = parseFlags(rest, definition);
   if (flags["project-ref"] !== undefined) {
     throw new CliUsageError("Use either positional '<repo>' or '--project-ref <path>' for 'aor onboard', not both.");
   }
@@ -807,7 +820,7 @@ export function parseInvocation(args) {
     throw new CliUsageError(`Unknown command '${command}'. Use '--help' to see available commands.`);
   }
 
-  const flags = parseFlags(rest);
+  const flags = parseFlags(rest, definition);
 
   if (flags.help === true) {
     return { type: "command-help", command };

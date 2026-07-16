@@ -1,4 +1,5 @@
 import { redactSensitiveValue } from "../../../../observability/src/index.mjs";
+import { createOperatorError } from "../operator-error.mjs";
 
 const RESPONSE_REDACTION_POLICY = Symbol.for("aor.http.responseRedactionPolicy");
 
@@ -69,10 +70,7 @@ export function sendJson(response, statusCode, payload) {
  */
 export function sendError(response, statusCode, code, message) {
   sendJson(response, statusCode, {
-    error: {
-      code,
-      message,
-    },
+    error: createOperatorError({ code, detail: message }),
   });
 }
 

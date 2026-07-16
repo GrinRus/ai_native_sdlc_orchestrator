@@ -3,11 +3,19 @@
 ## Purpose
 Define one control-plane surface for command, query, and live-stream operations while keeping the runtime headless-first.
 
+The application service in `packages/orchestrator-core` is the single implementation boundary. `apps/api`, the CLI, and the local app launcher are transport facades with explicit exports; transports must not import one another.
+
+The command catalog exposes structural `flags[]` and `positionals[]` metadata (`type`, `required`, `repeatable`, optional `enum`, and optional `default`). CLI and lifecycle HTTP validation reject unknown flags and repeated non-repeatable flags before invoking a handler.
+
+All operator failures use one `OperatorError`: `code`, `title`, `detail`, the compatibility alias `message`, operation/phase/resource/consequence/retryability, scoped refs, field errors, evidence refs, and typed recovery actions. Recovery identifiers come only from the canonical catalog and are never inferred from provider text, stack traces, or shell commands.
+
+Control-plane collection limits are centralized: list responses default to 200 and cap at 1000; SSE replay defaults to 0 and caps at 1000.
+
 ## Current implementation binding (W9 baseline)
 
 Current code is **hybrid module + detached transport**:
 - API surface is exported from `apps/api/src/index.mjs` as function operations for headless/in-process workflows.
-- Detached HTTP/SSE transport baseline is implemented in `packages/orchestrator-core/src/control-plane/http/**`; `apps/api/src/http-*.mjs` files are thin re-export wrappers for compatibility.
+- Detached HTTP/SSE transport baseline is implemented in `packages/orchestrator-core/src/control-plane/http/**`; `apps/api/src/http-*.mjs` files are explicit compatibility facades.
 - CLI/API lifecycle behavior is owned by shared package services under `packages/orchestrator-core/src/operator-cli/**` and `packages/orchestrator-core/src/control-plane/**`; app-level API and CLI modules are transports/wrappers and must not import each other.
 - Contract and artifact semantics stay aligned across both bindings.
 

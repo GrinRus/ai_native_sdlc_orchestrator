@@ -930,7 +930,7 @@ function sanitizeOperatorRequestDocument(document) {
 export function listOperatorRequests(options = {}) {
   const init = createProjectReadContext(options);
   const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
-  return loadContractDocuments({
+  return applyReadModelLimit(loadContractDocuments({
     init,
     files: reportFiles,
     family: "operator-request",
@@ -951,7 +951,7 @@ export function listOperatorRequests(options = {}) {
       artifact_display_summaries: [displaySummary],
       document: sanitizeOperatorRequestDocument(entry.document),
     };
-  });
+  }), options.limit);
 }
 
 /**

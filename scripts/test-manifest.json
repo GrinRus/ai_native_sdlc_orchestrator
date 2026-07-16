@@ -6,7 +6,7 @@
     {"group_id":"contracts","path_prefixes":["packages/contracts/test/"],"timeout_class":"standard"},
     {"group_id":"repository-scripts","path_prefixes":["scripts/test/"],"timeout_class":"standard"},
     {"group_id":"cli","path_prefixes":["apps/cli/test/"],"timeout_class":"standard"},
-    {"group_id":"api","path_prefixes":["apps/api/test/"],"timeout_class":"standard"},
+    {"group_id":"api","path_prefixes":["apps/api/test/"],"timeout_class":"standard","test_concurrency":1},
     {"group_id":"web","path_prefixes":["apps/web/test/"],"timeout_class":"standard"},
     {"group_id":"adapter-sdk","path_prefixes":["packages/adapter-sdk/test/"],"timeout_class":"standard"},
     {"group_id":"harness","path_prefixes":["packages/harness/test/"],"timeout_class":"standard"},
