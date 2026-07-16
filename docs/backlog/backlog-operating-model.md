@@ -11,6 +11,18 @@ This document defines how AOR implementation work should be represented in the s
 - **Slice** — the smallest persistent shared backlog unit. A slice should deliver one bounded outcome that can be implemented and verified end to end.
 - **Local task** — a short execution checklist derived from one slice. Local tasks can change during implementation without becoming new shared backlog items unless they introduce a new independently acceptable outcome.
 
+Runtime planning uses separate identities:
+
+- **Plan task** — a stable, versioned unit of intended work in a wave ticket or
+  handoff packet. It owns scope, criteria, verification, and expected evidence.
+- **Execution unit** — an approved grouping of one or more plan tasks for
+  scheduling. Grouping does not merge or replace task identity.
+- **Attempt** — one concrete execution of an execution unit. Retries create new
+  attempts while retaining the same task and execution-unit references.
+
+Backlog slices and local tasks are repository planning records; they are not
+runtime plan tasks and must not be reused as run or attempt identifiers.
+
 ## Source of truth rule
 
 The shared backlog tracks **waves, epics, and slices**.
@@ -77,6 +89,10 @@ Use these states in the backlog docs:
 ## Local-task rules
 
 A local task plan should usually break one slice into **3 to 7 tasks**.
+
+For new medium-or-larger slice definitions, every local task must retain
+`Purpose`, concrete `Changes`, and `Validation` detail. `slice:plan` emits this
+content losslessly for handoff instead of reducing it to a heading.
 
 Use local tasks for things like:
 

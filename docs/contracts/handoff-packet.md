@@ -33,6 +33,11 @@ remain loadable and approvable under their original contract. New packets copy
 the structured task plan from the owning wave ticket without allowing the
 handoff step to invent, widen, or silently rewrite tasks.
 
+Compatibility wrappers may read legacy compact packets, but they must not add a
+synthetic `task_model_version`, plan digest, execution unit, or attempt
+identity. Migration occurs only by creating a new versioned plan and handoff
+with explicit source refs; reading an old packet remains non-materializing.
+
 Structured packets carry `task_model_version`, `plan_id`, `plan_version`,
 `plan_status`, `plan_size`, `previous_plan_ref`, `criteria_catalog`,
 `revision_summary`, and `source_refs`. Their `local_tasks[]` use the structured

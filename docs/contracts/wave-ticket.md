@@ -56,6 +56,20 @@ contain one to three tasks; `medium` and `large` plans contain three to seven.
 `xlarge` plans that cannot fit seven independently reviewable tasks fail with
 `mission-split-required`.
 
+### Compatibility and migration
+
+`task_model_version: 1` is additive. Loaders must first determine whether the
+field is present: legacy compact tickets use their original validation path,
+while versioned tickets run deterministic structured validation. Implementers
+must not infer version 1 from the presence of individual optional fields or
+rewrite legacy artifacts during read.
+
+The validation order is fixed: shape and enum checks, canonical scope
+containment, dependency DAG, criterion coverage, verification completeness,
+expected-evidence ownership, and execution-group compatibility. Optional
+semantic evaluation runs only after those deterministic checks pass and cannot
+convert a structurally invalid plan into an approvable plan.
+
 Task and plan path scopes inherit `canonical-identifiers-and-paths.md`. `*`
 does not cross a segment boundary, `**` is a whole-segment recursive wildcard,
 and a task scope must be a real subset of the plan scope rather than a lexical
