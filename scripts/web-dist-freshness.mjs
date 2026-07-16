@@ -90,15 +90,22 @@ function collectDistFiles() {
 }
 
 /**
- * @returns {{ manifest_version: number, source_hash: string, source_files: string[], dist_files: string[] }}
+ * @returns {{ manifest_version: number, source_hash: string, source_files: string[], dist_files: string[], dist_hashes: Record<string, string> }}
  */
 function buildManifest() {
   const source = computeSourceFingerprint();
+  const distFiles = collectDistFiles();
   return {
-    manifest_version: 1,
+    manifest_version: 2,
     source_hash: source.hash,
     source_files: source.files,
-    dist_files: collectDistFiles(),
+    dist_files: distFiles,
+    dist_hashes: Object.fromEntries(
+      distFiles.map((file) => [
+        file,
+        crypto.createHash("sha256").update(fs.readFileSync(path.join(repoRoot, file))).digest("hex"),
+      ]),
+    ),
   };
 }
 
@@ -137,6 +144,9 @@ function checkManifest() {
   }
   if (JSON.stringify(actual?.dist_files ?? []) !== JSON.stringify(expected.dist_files)) {
     errors.push("dist_files mismatch");
+  }
+  if (JSON.stringify(actual?.dist_hashes ?? {}) !== JSON.stringify(expected.dist_hashes)) {
+    errors.push("dist_hashes mismatch");
   }
   if (!fs.existsSync(path.join(distRoot, "index.html"))) {
     errors.push("apps/web/dist/index.html is missing");

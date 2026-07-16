@@ -59,6 +59,7 @@
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "web:build": "vite build --config apps/web/vite.config.mjs && node ./scripts/web-dist-freshness.mjs write",
+    "test:web:browser": "playwright test --config apps/web/playwright.config.mjs",
     "test": "node ./scripts/test-runner.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
@@ -70,7 +71,7 @@
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
     "release:smoke": "node ./scripts/release-smoke.mjs",
-    "release:gate": "pnpm check && pnpm production:ready && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
+    "release:gate": "pnpm check && pnpm test:web:browser && pnpm production:ready && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
     "slice:status": "node ./scripts/slice-cycle.mjs status",
     "slice:next": "node ./scripts/slice-cycle.mjs next",
     "slice:plan": "node ./scripts/slice-cycle.mjs plan",
@@ -82,6 +83,7 @@
     "yaml": "^2.8.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@vitejs/plugin-react": "^6.0.2",
     "ajv": "^8.20.0",
     "react": "^19.2.6",
