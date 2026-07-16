@@ -11,6 +11,9 @@ export function ResourceErrorCard({ errors }) {
           <li key={resource}>
             <strong>{resource}</strong>: {error.title ?? error.message}
             {error.consequence ? ` — ${error.consequence}` : ""}
+            {error.recoveryActions?.length ? (
+              <span> Recovery: {error.recoveryActions.map((action) => action.label ?? action.action).join(", ")}.</span>
+            ) : null}
           </li>
         ))}
       </ul>

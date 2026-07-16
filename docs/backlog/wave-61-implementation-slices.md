@@ -354,7 +354,7 @@ profiles.
 ## W61-S05 — Topology onboarding proof and documentation closure
 
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Prove project topology and approved execution-route setup through
   installed-user and headless paths while preserving current no-settings
   compatibility.
@@ -531,7 +531,7 @@ profiles.
 ## W61-S07 — Execution Setup UX and browser proof
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Installed users can select an approved execution route, inspect
   the effective runner/provider/model, check readiness, and recover from setup
   blockers without editing raw profiles or mistaking simulation for live work.

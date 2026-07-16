@@ -57,6 +57,99 @@ test.describe.serial("installed local operator console", () => {
     expect(fs.existsSync(state.runtime_root)).toBe(false);
   });
 
+  test("Execution Setup selects only approved presets and keeps simulation truthful", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    const secretCanary = "aor-browser-secret-canary";
+    let mutationCount = 0;
+    const profile = {
+      profile_id: `execution-profile.${state.project_id}`,
+      project_id: state.project_id,
+      revision: 7,
+      initialized: true,
+      read_only: true,
+      latest_readiness_ref: null,
+      routes: [{
+        step: "implement",
+        route_id: "route.implement.simulation",
+        mode: "simulation",
+        runner: "mock",
+        adapter: "mock-runner",
+        provider: "mock",
+        requested_model: null,
+        effective_model: null,
+        model_source: "adapter-default",
+        required_capabilities: [],
+        fallback: { count: 0, route_ids: [] },
+        qualification: "deterministic",
+        readiness: "ready",
+        blocker_codes: [],
+        approved_routes: [
+          {
+            route_id: "route.implement.simulation",
+            mode: "simulation",
+            route_class: "deterministic",
+            risk_tier: "low",
+            provider: "mock",
+            requested_model: null,
+            required_capabilities: [],
+            qualification: "deterministic",
+          },
+          {
+            route_id: "route.implement.live",
+            mode: "live",
+            route_class: "coding",
+            risk_tier: "medium",
+            provider: "openai",
+            requested_model: "coding-primary",
+            required_capabilities: ["repo_write"],
+            qualification: "project-approved",
+          },
+        ],
+      }],
+    };
+    await page.route(new RegExp(`/api/projects/${state.project_id}/execution-profile$`, "u"), (route) => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(profile),
+    }));
+    await page.route(new RegExp(`/api/projects/${state.project_id}/execution-profile/actions$`, "u"), async (route) => {
+      mutationCount += 1;
+      const request = route.request().postDataJSON();
+      expect(request).toEqual({
+        action: "select",
+        step: "implement",
+        route_id: "route.implement.live",
+        expected_revision: 7,
+      });
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          execution_profile: {
+            ...profile,
+            revision: 8,
+            routes: [{ ...profile.routes[0], route_id: request.route_id, mode: "live", readiness: "stale" }],
+          },
+          readiness_report: null,
+          diagnostic: secretCanary,
+        }),
+      });
+    });
+    await page.goto(state.app_url);
+    await expect(page.getByRole("heading", { name: "Execution Setup" })).toBeVisible();
+    await expect(page.getByText("Simulation", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Approved route preset")).toHaveCount(1);
+    await expect(page.getByLabel(/provider/i)).toHaveCount(0);
+    await expect(page.getByLabel(/model/i)).toHaveCount(0);
+    await page.getByLabel("Approved route preset").selectOption("route.implement.live");
+    await page.getByRole("button", { name: "Select route" }).click();
+    const dialog = page.getByRole("dialog", { name: "Confirm execution route change" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("No provider process is started.")).toBeVisible();
+    await dialog.getByRole("button", { name: "Confirm route change" }).click();
+    await expect.poll(() => mutationCount).toBe(1);
+    await expect(page.getByText(secretCanary)).toHaveCount(0);
+  });
+
   test("explicit initialization has durable readback and truthful action semantics", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);

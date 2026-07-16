@@ -86,8 +86,32 @@ function classifyResolutionError(error) {
   return { status: "policy-denied", code: "execution.route-policy-denied" };
 }
 
+function routeMode(route) {
+  const primary = route?.primary ?? {};
+  return ["none", "mock-runner"].includes(primary.adapter) || ["none", "mock"].includes(primary.provider)
+    ? "simulation"
+    : "live";
+}
+
+function approvedRoutesForStep(roots, step) {
+  return [...buildRouteRegistry({ routesRoot: roots.routes }).routeById.values()]
+    .filter((route) => route.step === step)
+    .map((route) => ({
+      route_id: route.route_id,
+      mode: routeMode(route),
+      route_class: route.route_class,
+      risk_tier: route.risk_tier,
+      provider: route.primary?.provider ?? null,
+      requested_model: route.primary?.model ?? null,
+      required_capabilities: route.required_adapter_capabilities ?? [],
+      qualification: route.promotion_channel ?? "project-approved",
+    }))
+    .sort((left, right) => left.route_id.localeCompare(right.route_id));
+}
+
 function resolveRouteRow({ context, registry, projectId, profile, step, environment, check }) {
   const roots = resolveProjectRegistryRoots(profile, { projectRoot: context.projectRoot }).roots;
+  const approvedRoutes = approvedRoutesForStep(roots, step);
   try {
     const route = resolveRouteForStep({
       projectProfilePath: context.canonicalProfilePath,
@@ -111,6 +135,9 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
         model_source: adapter.model_source,
         required_capabilities: adapter.capability_check.required,
         fallback: { count: Math.max(0, adapter.execution_candidates.length - 1), route_ids: [] },
+        mode: routeMode(route.route_profile),
+        qualification: route.route_profile.promotion_channel ?? "project-approved",
+        approved_routes: approvedRoutes,
         readiness: "policy-denied",
         blocker_codes: ["execution.route-policy-denied"],
       };
@@ -133,6 +160,9 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
       model_source: adapter.model_source,
       required_capabilities: adapter.capability_check.required,
       fallback: { count: Math.max(0, adapter.execution_candidates.length - 1), route_ids: [] },
+      mode: routeMode(route.route_profile),
+      qualification: route.route_profile.promotion_channel ?? "project-approved",
+      approved_routes: approvedRoutes,
       readiness,
       runner_available: check ? runnerAvailable : null,
       auth_ready: check ? authenticationReady : null,
@@ -151,6 +181,9 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
       model_source: "unresolved",
       required_capabilities: [],
       fallback: { count: 0, route_ids: [] },
+      mode: "unknown",
+      qualification: "unresolved",
+      approved_routes: approvedRoutes,
       readiness: classified.status,
       blocker_codes: [classified.code],
     };

@@ -41,7 +41,11 @@ test("execution profile is derived, revisioned, and readiness evidence contains 
       const projectId = registry.defaultProjectId;
       const initial = readExecutionProfile({ registry, projectId });
       assert.equal(initial.initialized, true);
-      assert.equal(initial.routes.find((row) => row.step === "implement").route_id, "route.implement.default");
+      const initialImplement = initial.routes.find((row) => row.step === "implement");
+      assert.equal(initialImplement.route_id, "route.implement.default");
+      assert.equal(initialImplement.mode, "live");
+      assert.ok(initialImplement.approved_routes.some((route) => route.route_id === "route.implement.default"));
+      assert.equal(initialImplement.approved_routes.every((route) => ["simulation", "live"].includes(route.mode)), true);
 
       const checked = applyExecutionProfileAction({
         registry,

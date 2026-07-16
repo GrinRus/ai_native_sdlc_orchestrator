@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { createProjectGeneration, readControlPlaneJson as readJson, readProjectResourceSnapshot } from "./control-plane-client.js";
 import { Dialog } from "./dialog.jsx";
+import { ExecutionSetup } from "./execution-setup.jsx";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
@@ -6162,6 +6163,7 @@ function App() {
   const [addProjectForm, setAddProjectForm] = useState({ ...EMPTY_PROJECT_SETUP });
   const [addProjectResult, setAddProjectResult] = useState(null);
   const [topologyState, setTopologyState] = useState({ status: "idle", data: null, error: null });
+  const [executionSetupState, setExecutionSetupState] = useState({ status: "idle", data: null, error: null });
   const [requestForm, setRequestForm] = useState(DEFAULT_REQUEST);
   const [requestResult, setRequestResult] = useState(null);
   const [selectedRef, setSelectedRef] = useState("");
@@ -6432,7 +6434,26 @@ function App() {
       return null;
     }
   }
-
+  async function loadExecutionSetup(projectId, options = {}) {
+    if (!projectId) {
+      setExecutionSetupState({ status: "empty", data: null, error: null });
+      return null;
+    }
+    const generation = options.generation ?? projectGeneration.current.current().revision;
+    if (!options.silent) setExecutionSetupState((current) => ({ ...current, status: "loading", error: null }));
+    try {
+      const profile = await readJson(`/api/projects/${encodeURIComponent(projectId)}/execution-profile`, {
+        signal: projectGeneration.current.current().signal,
+      });
+      if (!projectGeneration.current.isCurrent(generation)) return null;
+      setExecutionSetupState({ status: "ready", data: profile, error: null });
+      return profile;
+    } catch (setupError) {
+      if (!projectGeneration.current.isCurrent(generation)) return null;
+      setExecutionSetupState((current) => ({ status: "error", data: current.data, error: setupError }));
+      return null;
+    }
+  }
   async function refresh(options = {}) {
     if (!options.silent) setError("");
     const refreshGeneration = options.projectGeneration ?? projectGeneration.current.current().revision;
@@ -6458,7 +6479,10 @@ function App() {
       appConfig.project_id;
     const selectedProject = projects.find((project) => project.project_id === selectedProjectId) ?? projects[0] ?? null;
     const effectiveProjectId = selectedProject?.project_id ?? selectedProjectId;
-    await loadProjectTopology(effectiveProjectId, { silent: Boolean(options.silent), generation: refreshGeneration });
+    await Promise.all([
+      loadProjectTopology(effectiveProjectId, { silent: Boolean(options.silent), generation: refreshGeneration }),
+      loadExecutionSetup(effectiveProjectId, { silent: Boolean(options.silent), generation: refreshGeneration }),
+    ]);
     if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
     const statePreviewRoute = effectiveProjectId ? `/api/projects/${encodeURIComponent(effectiveProjectId)}/state` : null;
     const onboarding = selectedProject?.onboarding_summary ?? {};
@@ -6690,6 +6714,7 @@ function App() {
     setRequestDrawerOpen(false);
     setRequestResult(null);
     setTopologyState({ status: "idle", data: null, error: null });
+    setExecutionSetupState({ status: "idle", data: null, error: null });
   }
 
   async function selectProject(projectId) {
@@ -6819,7 +6844,34 @@ function App() {
       setBusy(false);
     }
   }
-
+  async function runExecutionSetupAction(action, value = {}) {
+    if (!apiProjectBase || busy) return;
+    const generation = projectGeneration.current.current().revision;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/execution-profile/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({
+          action,
+          step: value.step,
+          ...(action === "select" ? { route_id: value.route_id } : {}),
+          ...(["select", "reset"].includes(action) ? { expected_revision: executionSetupState.data?.revision } : {}),
+        }),
+        signal: projectGeneration.current.current().signal,
+      });
+      if (!projectGeneration.current.isCurrent(generation)) return;
+      setExecutionSetupState({ status: "ready", data: result.execution_profile, error: null });
+      pushActivity(`execution-setup.${action}`, result.readiness_report?.status ?? value.route_id ?? value.step ?? "updated");
+    } catch (setupError) {
+      if (!projectGeneration.current.isCurrent(generation)) return;
+      setExecutionSetupState((current) => ({ ...current, status: "error", error: setupError }));
+      setError(setupError instanceof Error ? setupError.message : String(setupError));
+    } finally {
+      if (projectGeneration.current.isCurrent(generation)) setBusy(false);
+    }
+  }
   function startNewFlow({ sourceFlow = null, followUp = false, duplicate = false } = {}) {
     if (!activeProjectRuntimeReady) {
       setSelectedStage("readiness");
@@ -7396,14 +7448,24 @@ function App() {
           </>
         )}
         {activeProjectDisplay ? (
-          <ProjectStructure
-            topology={topologyState.data}
-            status={topologyState.status}
-            error={topologyState.error}
-            busy={busy}
-            onRefresh={() => loadProjectTopology(activeProjectDisplay.project_id)}
-            onAction={runTopologyAction}
-          />
+          <>
+            <ExecutionSetup
+              profile={executionSetupState.data}
+              status={executionSetupState.status}
+              error={executionSetupState.error}
+              busy={busy}
+              onRefresh={() => loadExecutionSetup(activeProjectDisplay.project_id)}
+              onAction={runExecutionSetupAction}
+            />
+            <ProjectStructure
+              topology={topologyState.data}
+              status={topologyState.status}
+              error={topologyState.error}
+              busy={busy}
+              onRefresh={() => loadProjectTopology(activeProjectDisplay.project_id)}
+              onAction={runTopologyAction}
+            />
+          </>
         ) : null}
       </main>
 
