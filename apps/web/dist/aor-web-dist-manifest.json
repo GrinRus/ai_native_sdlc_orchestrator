@@ -1,11 +1,13 @@
 {
   "manifest_version": 2,
-  "source_hash": "7d4105855325e89d3cf6a91578d2d231b69f4bc26f00353034bb10d027fee37f",
+  "source_hash": "17605c321fd624fa199e76ce813defc54ecb7c085a6330b034a1e4ccb82c332d",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
     "apps/web/src/control-plane-client.js",
     "apps/web/src/dialog.jsx",
+    "apps/web/src/execution-setup.css",
+    "apps/web/src/execution-setup.jsx",
     "apps/web/src/operator-error-card.jsx",
     "apps/web/src/plan-workbench-views.jsx",
     "apps/web/src/plan-workbench.jsx",
@@ -18,13 +20,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-A_eqYydt.js",
-    "apps/web/dist/assets/index-DuNMQjAe.css",
+    "apps/web/dist/assets/index-D8ga1wj9.css",
+    "apps/web/dist/assets/index-nT9BuDzH.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-A_eqYydt.js": "46d588b6ec6dbe5179a19365c5bf20f1360f7241db3331cdddeff4f7b6079ebd",
-    "apps/web/dist/assets/index-DuNMQjAe.css": "6e224c20bd7e748b5e69be099f151608c8547962135362752f449d45712b5396",
-    "apps/web/dist/index.html": "64d91629270c43cb819f10acef8e2e6a63d68823d2f1da8681535f0bb6bc152d"
+    "apps/web/dist/assets/index-D8ga1wj9.css": "a4e80a284bc244fc844cb04d84bd0e72a84d96ce31bd3b01b3774057c3412210",
+    "apps/web/dist/assets/index-nT9BuDzH.js": "e3292afbe63943caf063b013550e421ea7b0684e6f264d5174a8e6195e6c7d2c",
+    "apps/web/dist/index.html": "e88250bb61dd43fe2dfb29fee23524eaf9f43c70008b70f920726e089e55ca42"
   }
 }

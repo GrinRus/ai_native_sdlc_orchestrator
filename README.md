@@ -516,7 +516,8 @@ delivery program are tracked through `W65` and focus on:
 - Portable project/repository/component topology, persistent machine-local
   bindings, revisioned topology control, and installed-user `Add AOR Project`
   plus Project Structure management. Headless execution-route selection and
-  runner readiness are available; the installed Execution Setup UI remains W61 work.
+  runner readiness now share one installed Execution Setup UI with approved
+  presets, explicit preflight, simulation labelling, and credential-free recovery.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,
   integration and stale-work recovery, and truthful coordinated multirepo
   delivery.

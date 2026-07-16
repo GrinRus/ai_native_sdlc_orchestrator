@@ -18,6 +18,20 @@ routes:
     fallback:
       count: 1
       route_ids: []
+    mode: live
+    qualification: alpha
+    approved_routes:
+      - route_id: route.implement.default
+        mode: live
+        route_class: coding
+        risk_tier: medium
+        provider: openai
+        requested_model: coding-primary
+        required_capabilities:
+          - repo_write
+          - shell_commands
+          - live_logs
+        qualification: alpha
     readiness: ready
 latest_readiness_ref: evidence://execution-readiness/aor-core/revision-12
 read_only: true

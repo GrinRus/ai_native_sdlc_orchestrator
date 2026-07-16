@@ -18,9 +18,12 @@ Required top-level fields:
 
 Each route row carries `step`, `route_id`, runner/adapter, provider,
 `requested_model`, `effective_model`, `model_source`, required capabilities,
-fallback summary, and readiness state. Machine paths and credential values are
-not part of this contract. `latest_readiness_ref` may link the latest durable
-check without embedding local secrets.
+fallback summary, `mode` (`simulation` or `live`), qualification, readiness,
+and `approved_routes[]`. Each approved route option contains only a canonical
+route ID and bounded display metadata from the route registry; clients must
+submit that ID rather than provider/model strings. Machine paths and credential
+values are not part of this contract. `latest_readiness_ref` may link the latest
+durable check without embedding local secrets.
 
 For an unconfigured project, reads return `initialized: false` and `routes: []`
 without creating a project profile or runtime state.

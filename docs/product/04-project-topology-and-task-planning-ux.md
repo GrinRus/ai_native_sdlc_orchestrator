@@ -174,7 +174,7 @@ runtime state.
 ### Execution Setup
 
 W61-S06 provides the headless contract and control-plane baseline used by the
-future installed UI. `project-profile.default_route_profiles` remains the only
+installed UI. `project-profile.default_route_profiles` remains the only
 persisted route selection. `execution-profile` derives approved route, runner,
 provider, requested/effective model, model source, capabilities, fallback, and
 readiness without exposing credentials or initializing `.aor`.
@@ -182,8 +182,14 @@ readiness without exposing credentials or initializing `.aor`.
 CLI and API support show, revisioned select/reset, and explicit check. Check
 persists only runner/auth availability summaries in the Local Workspace
 registry and fails closed before provider spawn for missing runner/auth,
-unsupported model, capability mismatch, or policy denial. W61-S07 remains
-responsible for the accessible Execution Setup browser surface and proof.
+unsupported model, capability mismatch, or policy denial.
+
+W61-S07 adds the project-scoped Execution Setup browser surface. It lists only
+approved route IDs returned by the canonical read model, labels deterministic
+routes as simulation, previews revisioned route changes, and requires explicit
+readiness checking before live execution is presented as ready. Project
+switches abort or ignore stale reads and mutations; no browser field accepts
+provider, model, credential, or environment values.
 
 ### Flow Plan workbench
 
