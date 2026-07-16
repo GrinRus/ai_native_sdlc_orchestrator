@@ -96,6 +96,67 @@
         }
       }
     },
+    "/api/projects/{projectId}/topology": {
+      "get": {
+        "operationId": "getProjectTopology",
+        "tags": ["read"],
+        "x-aor-route-id": "project-topology",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/topology/validation": {
+      "get": {
+        "operationId": "getLatestProjectTopologyValidation",
+        "tags": ["read"],
+        "x-aor-route-id": "project-topology-validation",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/topology/actions": {
+      "post": {
+        "operationId": "applyProjectTopologyAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "project-topology-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TopologyActionRequest" } },
+            "application/*+json": { "schema": { "$ref": "#/components/schemas/TopologyActionRequest" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
     "/api/projects/{projectId}/state": {
       "get": {
         "operationId": "getProjectState",
@@ -3925,6 +3986,23 @@
           }
         },
         "additionalProperties": true
+      },
+      "TopologyActionRequest": {
+        "type": "object",
+        "required": ["action", "family"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["add", "update", "disable", "rebind", "upsert", "remove", "reanalyze", "validate"]
+          },
+          "family": {
+            "type": "string",
+            "enum": ["repository", "component", "dependency", "binding", "topology"]
+          },
+          "expected_revision": { "type": "integer", "minimum": 0 },
+          "value": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
       },
       "ErrorBody": {
         "type": "object",

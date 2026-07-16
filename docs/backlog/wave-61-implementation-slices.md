@@ -197,7 +197,7 @@ profiles.
 ## W61-S03 — Project topology CLI/API management and validation
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Expose project, repository, component, dependency, binding, and
   validation management through auditable headless surfaces.
 - **Primary modules:** `apps/cli/**`, `apps/api/**`,
@@ -275,7 +275,7 @@ profiles.
 ## W61-S04 — Add Project and Project Structure UX
 
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Let installed users configure and recover project topology through
   an accessible setup flow and project-scoped management surface.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,
@@ -428,7 +428,7 @@ profiles.
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-3 Execution;
   EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Operators can inspect, select, reset, and check an approved
   project execution route through one contract-owned CLI/API surface, with
   truthful runner/provider/model readiness and no credential disclosure.

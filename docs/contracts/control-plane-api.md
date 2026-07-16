@@ -7,6 +7,17 @@ The application service in `packages/orchestrator-core` is the single implementa
 
 The command catalog exposes structural `flags[]` and `positionals[]` metadata (`type`, `required`, `repeatable`, optional `enum`, and optional `default`). CLI and lifecycle HTTP validation reject unknown flags and repeated non-repeatable flags before invoking a handler.
 
+Project topology is controlled through the same application-service boundary from
+CLI and HTTP. `GET /api/projects/:projectId/topology` returns the portable
+repositories, components, dependency graph, machine-local binding summaries,
+registry revision, and latest deterministic validation. `POST
+/api/projects/:projectId/topology/actions` accepts a typed family/action/value
+request with optional `expected_revision`; stale revisions, unknown references,
+blocking validation, and active-flow conflicts fail before publication. `GET
+/api/projects/:projectId/topology/validation` returns the latest stored validation
+without initializing project runtime state. The compatibility
+`POST /api/projects/actions` add action remains workspace-scoped.
+
 All operator failures use one `OperatorError`: `code`, `title`, `detail`, the compatibility alias `message`, operation/phase/resource/consequence/retryability, scoped refs, field errors, evidence refs, and typed recovery actions. Recovery identifiers come only from the canonical catalog and are never inferred from provider text, stack traces, or shell commands.
 
 Control-plane collection limits are centralized: list responses default to 200 and cap at 1000; SSE replay defaults to 0 and caps at 1000.

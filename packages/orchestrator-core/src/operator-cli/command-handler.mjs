@@ -24,6 +24,18 @@ const TOP_LEVEL_HELP_GROUPS = Object.freeze([
     commands: ["doctor", "onboard", "app", "next", "mission create"],
   },
   {
+    title: "Project topology",
+    commands: [
+      "project list",
+      "project add",
+      "project import",
+      "project repository",
+      "project component",
+      "project dependency",
+      "project topology",
+    ],
+  },
+  {
     title: "Core lifecycle",
     commands: [
       "project init",

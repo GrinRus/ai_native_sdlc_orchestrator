@@ -13,6 +13,15 @@ Guided shortcuts:
   - aor next
   - aor mission create
 
+Project topology:
+  - aor project list
+  - aor project add
+  - aor project import
+  - aor project repository
+  - aor project component
+  - aor project dependency
+  - aor project topology
+
 Core lifecycle:
   - aor project init
   - aor project analyze
