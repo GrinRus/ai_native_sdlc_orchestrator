@@ -195,7 +195,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   strictness to the owning run, and reject replay when effective content or
   execution versions differ.
 - **Epic:** EPIC-4
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P0
 - **Estimated effort:** XL
 - **Primary modules:** evaluation/Harness contracts,

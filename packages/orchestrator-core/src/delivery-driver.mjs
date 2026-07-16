@@ -319,11 +319,15 @@ function verifyLockedDeliveryEvidence(deliveryPlan, projectRoot) {
     }
     if (family === "runtime-harness-report") {
       const runDecision = asRecord(document.run_decision);
+      const missionLineage = asRecord(document.mission_lineage);
+      const meaningfulPaths = (Array.isArray(document.step_decisions) ? document.step_decisions : [])
+        .flatMap((step) => asStringArray(asRecord(asRecord(step).mission_semantics).meaningful_changed_paths));
       if (asString(document.project_id) !== asString(deliveryPlan.project_id) ||
           asString(document.run_id) !== asString(deliveryPlan.run_id) ||
           asString(document.overall_decision) !== "pass" || asString(runDecision.overall_decision) !== "pass" ||
           asString(runDecision.terminal_status) !== "closed" || !Array.isArray(document.step_decisions) ||
-          document.step_decisions.length === 0) {
+          document.step_decisions.length === 0 || asString(missionLineage.status) !== "resolved" ||
+          asString(missionLineage.strictness_profile) === "unknown" || meaningfulPaths.length === 0) {
         throw new Error(`Delivery Runtime Harness evidence '${ref}' does not prove a pass-level run controller decision.`);
       }
     }

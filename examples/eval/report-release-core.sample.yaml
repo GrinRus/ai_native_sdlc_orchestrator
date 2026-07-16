@@ -2,6 +2,18 @@ report_id: aor-core.eval.suite.release.core.v1.sample
 subject_ref: run://bootstrap-smoke
 subject_type: run
 subject_fingerprint: sha256:4f1fb94ac49f1437e9af7a8dd8cb83067f357857644443ec846f4c9525a4fef4
+subject_snapshot:
+  reference: run://bootstrap-smoke
+  family: run
+  version: run-v1
+  digest: sha256:4f1fb94ac49f1437e9af7a8dd8cb83067f357857644443ec846f4c9525a4fef4
+  source_refs:
+    - runtime://runs/bootstrap-smoke.json
+case_resolution:
+  - case_id: case-run-0091
+    status: resolved
+    input_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+    expected_digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
 suite_ref: suite.release.core@v1
 dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
 scorer_metadata:

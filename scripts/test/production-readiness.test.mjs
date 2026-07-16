@@ -54,7 +54,8 @@ test("production readiness gate enforces the committed audit hold with healthy i
   assert.equal(result.release_clearance, false);
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-006"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
-  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-009"));
+  assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-009"));
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-020"));
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
@@ -131,12 +132,12 @@ test("CI workflow accepts only the explicit healthy audit-hold mode", () => {
   assert.doesNotMatch(workflow, /run: pnpm production:ready\s*$/mu);
 });
 
-test("test discovery maps all 60 tracked candidates exactly once", () => {
+test("test discovery maps all 61 tracked candidates exactly once", () => {
   const plan = discoverTestExecutionPlan(root);
   assert.equal(plan.ok, true, plan.errors.join("\n"));
-  assert.equal(plan.candidate_count, 60);
+  assert.equal(plan.candidate_count, 61);
   assert.equal(plan.excluded.length, 0);
-  assert.equal(plan.groups.flatMap((group) => group.files).length, 60);
+  assert.equal(plan.groups.flatMap((group) => group.files).length, 61);
 });
 
 test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {

@@ -716,6 +716,8 @@ test("materializeRuntimeHarnessReport links eval reports by subject_ref run URI"
           subject_ref: `run://${runId}`,
           subject_type: "run",
           subject_fingerprint: "sha256:test-eval-fail",
+          subject_snapshot: { reference: `run://${runId}`, family: "run", version: 1, digest: "sha256:test-eval-fail", source_refs: ["evidence://eval/fail"] },
+          case_resolution: [{ case_id: "case-fail", status: "resolved", input_digest: "sha256:input", expected_digest: "sha256:expected" }],
           suite_ref: "suite.regress.short@v1",
           dataset_ref: "dataset.regress.short@v1",
           scorer_metadata: [{ scorer_id: "deterministic", mode: "deterministic", implementation: "test" }],

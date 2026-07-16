@@ -259,10 +259,54 @@ function missionTypeFromRequestDocument(requestDocument) {
 /**
  * @param {string} projectRoot
  * @param {string} artifactsRoot
- * @returns {{ missionType: string, strictnessProfile: string, source: string }}
+ * @param {{ runId?: string, evidenceRefs?: string[] }} [options]
+ * @returns {{ missionType: string, strictnessProfile: string, source: string, lineage: Record<string, unknown> }}
  */
-export function resolveRuntimeMissionProfile(projectRoot, artifactsRoot) {
-  const packetFiles = listJsonFiles(artifactsRoot).filter((filePath) => path.basename(filePath).includes(".artifact."));
+export function resolveRuntimeMissionProfile(projectRoot, artifactsRoot, options = {}) {
+  const referencedFiles = new Set();
+  const runOwnedProfiles = new Map();
+  const collectReferences = (value) => {
+    if (typeof value === "string") {
+      const resolved = resolveLocalEvidenceFile(projectRoot, value);
+      if (resolved && fs.existsSync(resolved)) referencedFiles.add(resolved);
+      return;
+    }
+    if (Array.isArray(value)) { value.forEach(collectReferences); return; }
+    for (const nested of Object.values(asRecord(value))) collectReferences(nested);
+  };
+  for (const ref of options.evidenceRefs ?? []) collectReferences(ref);
+  if (options.runId) {
+    for (const reportFile of listJsonFiles(path.join(path.dirname(artifactsRoot), "reports"))) {
+      const report = readJsonFile(reportFile);
+      if (asString(report?.run_id) === options.runId) {
+        collectReferences(report);
+        const semantics = asRecord(report?.mission_semantics);
+        const missionType = asString(semantics.mission_type);
+        const strictnessProfile = asString(semantics.strictness_profile);
+        if (missionType && strictnessProfile) runOwnedProfiles.set(`${missionType}:${strictnessProfile}`, { missionType, strictnessProfile, source: reportFile });
+      }
+    }
+  }
+  const inspectedFiles = new Set();
+  let discoveredMore = true;
+  while (discoveredMore && inspectedFiles.size < 200) {
+    discoveredMore = false;
+    for (const filePath of [...referencedFiles].sort()) {
+      if (inspectedFiles.has(filePath) || !filePath.endsWith(".json")) continue;
+      inspectedFiles.add(filePath);
+      const document = readJsonFile(filePath);
+      if (document) {
+        const before = referencedFiles.size;
+        collectReferences(document);
+        if (referencedFiles.size > before) discoveredMore = true;
+      }
+    }
+  }
+  const packetFiles = [...new Set([
+    ...[...referencedFiles].filter((filePath) => path.basename(filePath).includes(".artifact.")),
+    ...(!options.runId ? listJsonFiles(artifactsRoot).filter((filePath) => path.basename(filePath).includes(".artifact.")) : []),
+  ])].sort();
+  const matches = [];
   for (const packetFile of packetFiles) {
     const packet = readJsonFile(packetFile);
     if (asString(packet?.packet_type) !== "intake-request") continue;
@@ -272,16 +316,47 @@ export function resolveRuntimeMissionProfile(projectRoot, artifactsRoot) {
     const featureRequest = asRecord(body?.feature_request);
     const requestDocument = asRecord(featureRequest.request_document);
     const missionType = missionTypeFromRequestDocument(requestDocument) ?? "code-changing";
-    return {
+    matches.push({
       missionType,
       strictnessProfile: strictnessProfileForMissionType(missionType),
       source: packetFile,
+      lineage: {
+        status: "resolved",
+        run_id: options.runId ?? null,
+        intake_packet_ref: packetFile,
+        intake_body_ref: bodyRef,
+        mission_type: missionType,
+        strictness_profile: strictnessProfileForMissionType(missionType),
+      },
+    });
+  }
+  if (matches.length === 1) return matches[0];
+  if (matches.length === 0 && runOwnedProfiles.size === 1) {
+    const profile = [...runOwnedProfiles.values()][0];
+    return {
+      ...profile,
+      lineage: {
+        status: "unknown",
+        run_id: options.runId ?? null,
+        intake_packet_ref: null,
+        intake_body_ref: null,
+        mission_type: profile.missionType,
+        strictness_profile: profile.strictnessProfile,
+      },
     };
   }
   return {
     missionType: "code-changing",
-    strictnessProfile: "strict-code-changing",
-    source: "runtime://default-mission-profile",
+    strictnessProfile: options.runId ? "unknown" : "strict-code-changing",
+    source: matches.length > 1 ? "runtime://ambiguous-mission-lineage" : "runtime://missing-mission-lineage",
+    lineage: {
+      status: matches.length > 1 ? "ambiguous" : "unknown",
+      run_id: options.runId ?? null,
+      intake_packet_ref: null,
+      intake_body_ref: null,
+      mission_type: "code-changing",
+      strictness_profile: options.runId ? "unknown" : "strict-code-changing",
+    },
   };
 }
 
@@ -1145,7 +1220,13 @@ export function materializeRuntimeHarnessReport(options) {
   const activeRunTransitions = Array.isArray(options.runTransitions)
     ? options.runTransitions
     : previousRunTransitions;
-  const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
+  const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot, {
+    runId: options.runId,
+    evidenceRefs: uniqueStrings([
+      ...asStringArray(activeRunDecision.evidence_refs),
+      ...asRecordArray(activeRunTransitions).flatMap((transition) => asStringArray(transition.evidence_refs)),
+    ]),
+  });
   const missionType = options.missionType ?? missionProfile.missionType;
   const strictnessProfile = options.strictnessProfile ?? missionProfile.strictnessProfile;
   const executionRoot = asString(options.executionRoot)
@@ -1247,6 +1328,11 @@ export function materializeRuntimeHarnessReport(options) {
     generated_at: new Date().toISOString(),
     mission_type: missionType,
     strictness_profile: strictnessProfile,
+    mission_lineage: {
+      ...missionProfile.lineage,
+      mission_type: missionType,
+      strictness_profile: strictnessProfile,
+    },
     overall_decision: resolveOverallDecision(
       runFindings,
       unresolvedPermissionDecisions.length > 0

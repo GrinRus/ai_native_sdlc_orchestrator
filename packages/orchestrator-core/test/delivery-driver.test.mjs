@@ -116,6 +116,14 @@ function createReadyPlan(options) {
       generated_at: new Date().toISOString(),
       mission_type: "code-changing",
       strictness_profile: "strict-code-changing",
+      mission_lineage: {
+        status: "resolved",
+        run_id: options.runId,
+        intake_packet_ref: handoffPath,
+        intake_body_ref: handoffPath,
+        mission_type: "code-changing",
+        strictness_profile: "strict-code-changing",
+      },
       overall_decision: options.runtimeHarnessGate.overallDecision ?? "pass",
       run_decision: {
         overall_decision: options.runtimeHarnessGate.runDecision ?? "pass",
@@ -125,7 +133,11 @@ function createReadyPlan(options) {
         summary: "Delivery fixture passed",
         evidence_refs: [handoffPath],
       },
-      step_decisions: [{ step_id: "implement", runtime_harness_decision: "pass" }],
+      step_decisions: [{
+        step_id: "implement",
+        runtime_harness_decision: "pass",
+        mission_semantics: { meaningful_changed_paths: options.runtimeHarnessGate.meaningfulChangedPaths ?? ["examples/project.aor.yaml"] },
+      }],
       run_findings: [],
       recommendations: [],
       impacted_asset_refs: [],

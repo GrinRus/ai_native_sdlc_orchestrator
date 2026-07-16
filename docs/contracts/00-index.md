@@ -22,6 +22,8 @@ reference-base rules](canonical-identifiers-and-paths.md).
 ## Execution and quality
 - `step-result.md`
 - `validation-report.md`
+- `evaluation-case-input.md`
+- `evaluation-case-expected.md`
 - `evaluation-report.md`
 - `review-report.md`
 - `review-decision.md`

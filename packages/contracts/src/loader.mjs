@@ -279,6 +279,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateValidationReport(document, source));
   }
 
+  if (family === "evaluation-case-expected") {
+    issues.push(...validateEvaluationCaseExpected(document, source));
+  }
+
   if (family === "review-report") {
     issues.push(...validateReviewReport(document, source));
   }
@@ -317,6 +321,55 @@ export function validateContractDocument({ family, document, source = "<in-memor
     source,
     issues,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateEvaluationCaseExpected(document, source) {
+  const issues = [];
+  const assertions = Array.isArray(document.assertions) ? document.assertions : [];
+  if (assertions.length === 0 || assertions.length > 100) {
+    issues.push(issue({
+      code: "field_type_mismatch",
+      source,
+      field: "assertions",
+      expected: "array with 1..100 entries",
+      actual: String(assertions.length),
+      message: "Evaluation expected assertions must contain between 1 and 100 entries.",
+    }));
+  }
+  const ids = new Set();
+  assertions.forEach((raw, index) => {
+    if (!isPlainObject(raw)) {
+      issues.push(issue({ code: "field_type_mismatch", source, field: `assertions.${index}`, expected: "object", actual: describeActualType(raw), message: "Evaluation assertion must be an object." }));
+      return;
+    }
+    const assertionId = raw.assertion_id;
+    if (typeof assertionId !== "string" || !assertionId || ids.has(assertionId)) {
+      issues.push(issue({ code: "identifier_format_invalid", source, field: `assertions.${index}.assertion_id`, expected: "unique non-empty string", actual: String(assertionId), message: "Evaluation assertion_id must be unique and non-empty." }));
+    } else {
+      ids.add(assertionId);
+    }
+    if (raw.target !== "subject" && raw.target !== "input") {
+      issues.push(issue({ code: "enum_value_invalid", source, field: `assertions.${index}.target`, expected: "subject|input", actual: String(raw.target), message: "Evaluation assertion target must be subject or input." }));
+    }
+    const operator = raw.operator;
+    if (!["equals", "contains", "exists", "absent"].includes(String(operator))) {
+      issues.push(issue({ code: "enum_value_invalid", source, field: `assertions.${index}.operator`, expected: "equals|contains|exists|absent", actual: String(operator), message: "Evaluation assertion operator is unsupported." }));
+    }
+    const pointer = raw.path;
+    const depth = typeof pointer === "string" && pointer !== "" ? pointer.split("/").length - 1 : 0;
+    if (typeof pointer !== "string" || (pointer !== "" && !pointer.startsWith("/")) || depth > 64) {
+      issues.push(issue({ code: "field_type_mismatch", source, field: `assertions.${index}.path`, expected: "RFC 6901 JSON Pointer with depth <= 64", actual: String(pointer), message: "Evaluation assertion path must be a bounded RFC 6901 JSON Pointer." }));
+    }
+    if ((operator === "equals" || operator === "contains") && !("value" in raw)) {
+      issues.push(issue({ code: "required_field_missing", source, field: `assertions.${index}.value`, expected: "present", actual: "missing", message: `Evaluation assertion '${String(operator)}' requires value.` }));
+    }
+  });
+  return issues;
 }
 
 /**

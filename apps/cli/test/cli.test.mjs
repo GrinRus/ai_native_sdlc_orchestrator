@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
-import { appendRunEvent, applyRunControlAction } from "../../api/src/index.mjs";
+import { appendRunEvent, applyRunControlAction, listQualityArtifacts } from "../../api/src/index.mjs";
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { buildCliOutput } from "../src/cli-output.mjs";
 import { invokeCli } from "../src/index.mjs";
@@ -171,6 +171,7 @@ function seedStrictRuntimeHarnessReport(options) {
     generated_at: generatedAt,
     mission_type: "code-changing",
     strictness_profile: "strict-code-changing",
+    mission_lineage: { status: "resolved", run_id: options.runId, intake_packet_ref: "evidence://intake.json", intake_body_ref: "evidence://intake-body.json", mission_type: "code-changing", strictness_profile: "strict-code-changing" },
     overall_decision: overallDecision,
     ...(options.includeRunLevel === false
       ? {}
@@ -285,6 +286,10 @@ function seedStrictRuntimeHarnessReport(options) {
     filePath: reportFile,
     document: report,
   });
+  const loadedReport = listQualityArtifacts({ projectRef: options.projectRoot, cwd: options.projectRoot })
+    .find((artifact) => artifact.family === "runtime-harness-report" && artifact.document.run_id === options.runId);
+  assert.ok(loadedReport, `seeded Runtime Harness report for ${options.runId} must remain queryable`);
+  assert.ok(Array.isArray(loadedReport.document.step_decisions) && loadedReport.document.step_decisions.length > 0);
   const aliases = new Set([
     options.runId,
     options.runId.replace(/^w6-deliver-/u, ""),
@@ -3507,7 +3512,7 @@ test("operator commands inspect runs, packets, and evidence through shared contr
       "--suite-ref",
       "suite.release.core@v1",
       "--subject-ref",
-      "run://operator-cli-smoke",
+      `run://${runId}`,
     ]);
     assert.equal(evalResult.exitCode, 0, evalResult.stderr);
 
@@ -4051,6 +4056,14 @@ test("eval run executes offline suite and persists evaluation report", () => {
     const smokeFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "eval-run-smoke-transcript.json"), "utf8"),
     );
+    const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+    assert.equal(initResult.exitCode, 0, initResult.stderr);
+    const initPayload = JSON.parse(initResult.stdout);
+    writeRuntimeJson(path.join(initPayload.runtime_layout.artifactsRoot, "run-smoke-target.json"), {
+      run_id: "smoke-target",
+      status: "succeeded",
+      result: { summary: "deterministic offline evaluation subject" },
+    });
     const result = invokeCli([
       "eval",
       "run",
@@ -4319,8 +4332,8 @@ test("asset promote reports fail status when evaluative evidence regresses", () 
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
-        'expected_ref: ""',
+        "expected_ref: examples/eval/cases/wrapper-certification/case-wrap-0023/expected.yaml",
+        "expected_ref: examples/eval/cases/wrapper-certification/case-wrap-0023/missing.yaml",
       ),
       "utf8",
     );
@@ -4355,8 +4368,8 @@ test("asset freeze keeps freeze rollout action when regression evidence exists",
     fs.writeFileSync(
       datasetPath,
       dataset.replace(
-        "expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json",
-        'expected_ref: ""',
+        "expected_ref: examples/eval/cases/wrapper-certification/case-wrap-0023/expected.yaml",
+        "expected_ref: examples/eval/cases/wrapper-certification/case-wrap-0023/missing.yaml",
       ),
       "utf8",
     );

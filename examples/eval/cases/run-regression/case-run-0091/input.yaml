@@ -1,0 +1,8 @@
+family: evaluation-case-input
+case_id: case-run-0091
+version: 1
+subject_type: run
+content:
+  scenario: regression
+  required_evidence: durable-run-document
+

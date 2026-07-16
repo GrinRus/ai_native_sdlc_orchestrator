@@ -1,6 +1,6 @@
 {
   "capture_id": "aor-core.harness.capture.sample",
-  "schema_version": 1,
+  "schema_version": 2,
   "captured_at": "2026-04-21T08:00:00.000Z",
   "capture_kind": "harness-step-execution",
   "project_profile_ref": "examples/project.aor.yaml",

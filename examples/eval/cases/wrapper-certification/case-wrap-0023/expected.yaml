@@ -1,0 +1,14 @@
+family: evaluation-case-expected
+case_id: case-wrap-0023
+version: 1
+subject_type: wrapper
+assertions:
+  - assertion_id: wrapper-identity-present
+    target: subject
+    path: /wrapper_id
+    operator: exists
+  - assertion_id: wrapper-version-present
+    target: subject
+    path: /version
+    operator: exists
+
