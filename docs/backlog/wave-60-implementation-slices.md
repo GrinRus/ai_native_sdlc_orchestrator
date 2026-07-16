@@ -276,7 +276,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S04 — Plan workbench UX and approval flow
 
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make proposed and approved task plans understandable, reviewable,
   and safely revisable in the flow-centric local console.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,
@@ -353,7 +353,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S05 — Structured planning proof and documentation closure
 
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Prove the detailed planning path through public headless and web
   surfaces and align documentation with implemented behavior.
 - **Primary modules:** `README.md`, `docs/product/**`, `docs/architecture/**`,
