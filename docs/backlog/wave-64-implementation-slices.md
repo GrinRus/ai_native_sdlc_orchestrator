@@ -38,7 +38,7 @@ behavior.
 ## W64-S01 — Idempotent alpha publish transaction and partial-failure recovery
 
 - **Epic:** EPIC-0 Repository development system; EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Alpha publication detects exact remote state, conditionally
   converges compatible partial state to one complete release, and fails closed
   on conflicts without deleting recovery context.

@@ -60,43 +60,9 @@ jobs:
       - name: Run release gate on merge commit
         run: pnpm release:gate
 
-      - name: Check tag and npm version are unused
+      - name: Reconcile alpha publication transaction
         env:
           RELEASE_TAG: ${{ steps.guard.outputs.tag }}
           RELEASE_VERSION: ${{ steps.guard.outputs.version }}
-        run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "Tag ${RELEASE_TAG} already exists."
-            exit 1
-          fi
-          if npm view "@grinrus/aor@${RELEASE_VERSION}" version >/dev/null 2>&1; then
-            echo "npm version @grinrus/aor@${RELEASE_VERSION} already exists."
-            exit 1
-          fi
-
-      - name: Create and push release tag
-        env:
-          RELEASE_TAG: ${{ steps.guard.outputs.tag }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "${RELEASE_TAG}" -m "${RELEASE_TAG}"
-          git push origin "${RELEASE_TAG}"
-
-      - name: Create GitHub Release
-        env:
-          RELEASE_TAG: ${{ steps.guard.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.guard.outputs.version }}
-        run: |
-          gh release create "${RELEASE_TAG}" \
-            --target "${GITHUB_SHA}" \
-            --prerelease \
-            --title "AOR ${RELEASE_TAG}" \
-            --notes "npm CLI alpha release for @grinrus/aor@${RELEASE_VERSION}. npm dist-tag: alpha. Release gate: pnpm release:gate."
-
-      - name: Publish npm package
-        run: npm publish --access public --tag alpha --provenance
-
-      - name: Delete release branch
-        continue-on-error: true
-        run: git push origin --delete "${AOR_RELEASE_BRANCH}"
+          RELEASE_COMMIT_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: node ./scripts/release-publish-transaction.mjs

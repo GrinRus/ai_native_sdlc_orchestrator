@@ -125,11 +125,18 @@ publishes only when all of these conditions are true:
 - the head repository is the same as `GrinRus/ai_native_sdlc_orchestrator`;
 - the PR has the `release:publish` label;
 - `package.json` version matches the release branch version;
-- the npm package version and git tag do not already exist;
+- existing npm, tag, Release, and `alpha` dist-tag state is either absent or
+  exactly compatible with the expected version and merge commit;
 - `pnpm release:gate` passes on the merge commit.
 
-The publish workflow creates tag `v<semver-alpha>`, creates the matching GitHub
-Prerelease, and publishes prerelease builds to the npm `alpha` dist-tag with:
+The publish workflow reconciles one bounded transaction across tag
+`v<semver-alpha>`, the matching GitHub Prerelease, the immutable npm version,
+and the npm `alpha` dist-tag. Exact existing surfaces are reused; only missing
+compatible surfaces are created. The workflow re-inspects remote state after
+each operation and deletes the release branch only after all four surfaces are
+verified as complete.
+
+Publication uses:
 
 ```bash
 npm publish --access public --tag alpha --provenance
@@ -162,7 +169,22 @@ Before the first publish, maintainers must configure:
 
 If those prerequisites are missing, the publish workflow must fail closed.
 
-## Rollback and recovery
+## Partial publication recovery
+
+Rerun the failed `Release publish` workflow against the same merged release PR.
+The transaction classifies the remote state before mutation:
+
+- `absent` starts a fresh publication;
+- `tag-only`, `release-only`, `npm-only`, and other compatible partial states
+  create only the missing surfaces;
+- `complete` performs no publication and only removes a retained release branch;
+- `conflict` stops before mutation and retains the branch for investigation.
+
+Before retrying a conflict, capture the tag target SHA, GitHub Release JSON,
+published npm version, `alpha` dist-tag, merge commit, and failed workflow URL.
+Do not delete or overwrite a conflicting remote artifact automatically.
+
+## Bad-release rollback
 
 npm package versions are immutable. Do not overwrite an existing package
 version. If a release is bad:
