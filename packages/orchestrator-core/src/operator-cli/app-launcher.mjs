@@ -89,8 +89,8 @@ function parsePort(value) {
  */
 function parseHost(value) {
   const host = value ?? "127.0.0.1";
-  if (host.trim() !== host || host.length === 0 || /\s/u.test(host) || host.includes("/")) {
-    throw new Error("Flag '--host' must be a host name or IP address, not a URL or path.");
+  if (host !== "127.0.0.1" && host !== "::1") {
+    throw new Error("Flag '--host' must be the literal loopback address '127.0.0.1' or '::1'.");
   }
   return host;
 }

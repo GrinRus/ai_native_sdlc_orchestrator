@@ -71,6 +71,21 @@ browser storage. The detached production-hardened API remains fully usable
 without the SPA. Hosted browser authentication, SSO, TLS termination, tenant
 security, and public cross-origin access require a future ADR and contract.
 
+`local-trusted` listeners accept only the literal bind addresses `127.0.0.1`
+and `::1`; names such as `localhost`, wildcard/LAN addresses, and IPv4-mapped
+IPv6 addresses fail before `listen` or runtime materialization. After bind the
+transport derives one canonical authority (`127.0.0.1:<port>` or
+`[::1]:<port>`), rejects every other `Host`, and requires browser mutations to
+carry that exact `Origin`. Requests without `Origin` remain available to trusted
+same-account CLI/curl clients only when browser fetch metadata is absent.
+
+Every mutation requires `application/json` or `application/*+json`, is limited
+to 1 MiB by both declared and incremental byte counts, and must finish body
+delivery within five seconds. Rejections return `415`, `413`, or `408` before a
+domain mutation runs. Same-origin responses and `/app-config.json` use the
+shared redaction policy and `Cache-Control: no-store`; app config contains only
+listener metadata and minimal project identities, not absolute project paths.
+
 While the July 2026 trust-boundary audit hold is open, lifecycle mutation bodies
 may carry `unsafe_development_override: true`. The shared runtime accepts it only
 as an explicit, auditable development override for external write-capable live
@@ -689,7 +704,7 @@ implicit initialization is intentionally removed.
 
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /` for the packaged local SPA when the transport is started with an app static root;
-- `GET /app-config.json` for same-origin app configuration (`project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata);
+- `GET /app-config.json` for no-store, redacted same-origin app configuration (`project_id`, `default_project_id`, minimal `projects[]` identities, package version, canonical API base, and control-plane metadata);
 - `GET /api/projects` for local app-session project summaries;
 - `GET /api/projects/:projectId/state` including `verification_plan` plan/status read-model data when available
 - `GET /api/projects/:projectId/strategic-snapshot`
@@ -752,6 +767,10 @@ The OpenAPI component names that own these local-alpha payloads are
 `ProjectActionResponse`.
 
 Detached mutation error-shape baseline:
+- `invalid_host` for a Host value different from the bound listener authority;
+- `cross_origin_mutation_denied` for foreign/null browser Origin or browser fetch metadata without Origin;
+- `unsupported_media_type` (`415`) for mutation bodies outside the JSON media families;
+- `request_body_too_large` (`413`) and `request_body_timeout` (`408`) for bounded body-reader rejection;
 - `invalid_json` for malformed request body;
 - `invalid_payload` for non-object JSON payload;
 - `invalid_run_control_action`, `invalid_ui_lifecycle_action`, and `invalid_lifecycle_command` for unsupported actions;

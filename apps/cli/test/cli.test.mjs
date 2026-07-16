@@ -839,21 +839,23 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(invalidAppPort.status, 1);
     assert.match(invalidAppPort.stderr, /--port/);
 
-    const invalidAppHost = spawnSync(process.execPath, [
-      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
-      "app",
-      "--project-ref",
-      projectRoot,
-      "--host",
-      "http://127.0.0.1",
-      "--open",
-      "false",
-    ], {
-      cwd: projectRoot,
-      encoding: "utf8",
-    });
-    assert.equal(invalidAppHost.status, 1);
-    assert.match(invalidAppHost.stderr, /--host/);
+    for (const invalidHost of ["http://127.0.0.1", "localhost", "0.0.0.0", "::", "::ffff:127.0.0.1"]) {
+      const invalidAppHost = spawnSync(process.execPath, [
+        path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+        "app",
+        "--project-ref",
+        projectRoot,
+        "--host",
+        invalidHost,
+        "--open",
+        "false",
+      ], {
+        cwd: projectRoot,
+        encoding: "utf8",
+      });
+      assert.equal(invalidAppHost.status, 1);
+      assert.match(invalidAppHost.stderr, /--host/);
+    }
 
     const missingAppProject = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
