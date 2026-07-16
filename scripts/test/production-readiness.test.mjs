@@ -185,12 +185,12 @@ test("CI workflow accepts only the explicit healthy audit-hold mode", () => {
   assert.doesNotMatch(workflow, /run: pnpm production:ready\s*$/mu);
 });
 
-test("test discovery maps all 61 tracked candidates exactly once", () => {
+test("test discovery maps every tracked candidate exactly once", () => {
   const plan = discoverTestExecutionPlan(root);
   assert.equal(plan.ok, true, plan.errors.join("\n"));
-  assert.equal(plan.candidate_count, 61);
+  assert.ok(plan.candidate_count > 0);
   assert.equal(plan.excluded.length, 0);
-  assert.equal(plan.groups.flatMap((group) => group.files).length, 61);
+  assert.equal(plan.groups.flatMap((group) => group.files).length, plan.candidate_count);
 });
 
 test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {

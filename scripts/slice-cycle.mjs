@@ -115,11 +115,8 @@ function runPnpmScript(scriptName) {
 }
 
 function runGate() {
-  const commands = ["lint", "test", "build", "check"];
-  for (const command of commands) {
-    runPnpmScript(command);
-  }
-  console.log("Check gate passed: lint, test, build, and check completed successfully.");
+  runPnpmScript("check");
+  console.log("Check gate passed: the canonical check pipeline completed each quality stage once.");
 }
 
 function executeTransition(args) {
