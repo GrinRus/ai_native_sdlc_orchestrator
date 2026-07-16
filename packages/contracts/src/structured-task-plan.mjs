@@ -1,5 +1,11 @@
 import { describeActualType, isPlainObject, issue } from "./utils.mjs";
 import { matchesAllowedPath } from "./canonical-values.mjs";
+import {
+  validateCriterionCoverage,
+  validateEvidenceOwnership,
+  validateExecutionGroups,
+  validateTaskDag,
+} from "./structured-task-plan-checks.mjs";
 
 export const STRUCTURED_TASK_MODEL_VERSION = 1;
 export const PLAN_STATUS_VALUES = Object.freeze([
@@ -118,32 +124,6 @@ function validateEnum(record, field, allowedValues, source, issues) {
 
 function pathWithinAllowedScope(candidate, allowedPaths) {
   return allowedPaths.some((allowed) => matchesAllowedPath(allowed, candidate));
-}
-
-function findCycle(taskIds, dependencies) {
-  const visiting = new Set();
-  const visited = new Set();
-  function visit(taskId) {
-    if (visiting.has(taskId)) return taskId;
-    if (visited.has(taskId)) return null;
-    visiting.add(taskId);
-    for (const dependency of dependencies.get(taskId) ?? []) {
-      const cycle = visit(dependency);
-      if (cycle) return cycle;
-    }
-    visiting.delete(taskId);
-    visited.add(taskId);
-    return null;
-  }
-  for (const taskId of taskIds) {
-    const cycle = visit(taskId);
-    if (cycle) return cycle;
-  }
-  return null;
-}
-
-function stableArrayKey(value) {
-  return JSON.stringify([...value].sort());
 }
 
 /**
@@ -360,59 +340,14 @@ export function validateStructuredTaskPlan(document, source) {
     expectedEvidence.forEach((evidence) => ownedEvidence.add(evidence));
   });
 
-  for (const [taskId, taskDependencies] of dependencies.entries()) {
-    for (const dependency of taskDependencies) {
-      if (!taskIds.has(dependency)) {
-        issues.push(issue({ code: "enum_value_invalid", source, field: `local_tasks.${taskId}.depends_on`, expected: "known task id", actual: dependency, message: `Task '${taskId}' depends on unknown task '${dependency}'.` }));
-      }
-    }
-  }
-  const cycle = findCycle(taskIds, dependencies);
-  if (cycle) {
-    issues.push(issue({ code: "enum_value_invalid", source, field: "local_tasks.depends_on", expected: "acyclic dependency graph", actual: cycle, message: `Task dependency graph contains a cycle through '${cycle}'.` }));
-  }
-
-  for (const criterionId of criterionIds) {
-    if (!referencedCriteria.has(criterionId)) {
-      issues.push(issue({ code: "required_field_missing", source, field: "local_tasks.criteria_refs", expected: `coverage for ${criterionId}`, actual: "uncovered", message: `Criterion '${criterionId}' is not owned by any task.` }));
-    }
-  }
-  for (const criterionId of referencedCriteria) {
-    if (!criterionIds.has(criterionId)) {
-      issues.push(issue({ code: "enum_value_invalid", source, field: "local_tasks.criteria_refs", expected: "known criterion id", actual: criterionId, message: `Task references unknown criterion '${criterionId}'.` }));
-    }
-  }
-  for (const evidenceType of asStringArray(document.expected_evidence)) {
-    if (!ownedEvidence.has(evidenceType)) {
-      issues.push(issue({ code: "required_field_missing", source, field: "local_tasks.expected_evidence", expected: `owner for ${evidenceType}`, actual: "unowned", message: `Expected evidence '${evidenceType}' is not owned by any task.` }));
-    }
-  }
-
-  for (const [groupKey, members] of groups.entries()) {
-    if (members.length < 2) {
-      issues.push(issue({ code: "enum_value_invalid", source, field: `${members[0].field}.execution_hints.group_key`, expected: "group shared by at least two tasks", actual: groupKey, message: `Execution group '${groupKey}' has only one task.` }));
-      continue;
-    }
-    const baseline = members[0];
-    const memberIds = new Set(members.map((member) => member.taskId).filter(Boolean));
-    const baselineExternalDependencies = baseline.dependsOn.filter((dependency) => !memberIds.has(dependency));
-    for (const member of members.slice(1)) {
-      const compatible = stableArrayKey(member.repoIds) === stableArrayKey(baseline.repoIds)
-        && stableArrayKey(member.allowedPaths) === stableArrayKey(baseline.allowedPaths)
-        && stableArrayKey(member.forbiddenPaths) === stableArrayKey(baseline.forbiddenPaths);
-      if (!compatible) {
-        issues.push(issue({ code: "enum_value_invalid", source, field: `${member.field}.execution_hints.group_key`, expected: "compatible repository and path scope", actual: groupKey, message: `Execution group '${groupKey}' contains incompatible task scopes.` }));
-      }
-      const memberExternalDependencies = member.dependsOn.filter((dependency) => !memberIds.has(dependency));
-      if (
-        member.dependsOn.some((dependency) => memberIds.has(dependency))
-        || baseline.dependsOn.some((dependency) => memberIds.has(dependency))
-        || stableArrayKey(memberExternalDependencies) !== stableArrayKey(baselineExternalDependencies)
-      ) {
-        issues.push(issue({ code: "enum_value_invalid", source, field: `${member.field}.execution_hints.group_key`, expected: "compatible external dependencies and no intra-group dependency", actual: groupKey, message: `Execution group '${groupKey}' contains incompatible task dependencies.` }));
-      }
-    }
-  }
+  issues.push(...validateTaskDag({ taskIds, dependencies, source }));
+  issues.push(...validateCriterionCoverage({ criterionIds, referencedCriteria, source }));
+  issues.push(...validateEvidenceOwnership({
+    expectedEvidence: asStringArray(document.expected_evidence),
+    ownedEvidence,
+    source,
+  }));
+  issues.push(...validateExecutionGroups({ groups, source }));
 
   if (planStatus === "revision-required" || planStatus === "revision-requested") {
     const readableDraftFields = new Set([

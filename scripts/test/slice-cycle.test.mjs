@@ -10,6 +10,7 @@ import {
   getSlicePlan,
   loadBacklogModel,
   parseMasterBacklog,
+  parseWaveSlices,
   selectNextSlice,
   summarizeStates,
 } from "../slice-cycle-lib.mjs";
@@ -189,4 +190,55 @@ test("getSlicePlan returns local tasks and acceptance criteria for documented sl
   assert.ok(plan.localTasks.length > 0);
   assert.ok(plan.acceptanceCriteria.length > 0);
   assert.ok(plan.doneEvidence.length > 0);
+});
+
+test("slice plan preserves multiline Purpose, Changes, and Validation detail losslessly", () => {
+  const content = `## W99-S01 — Detailed slice
+
+- **Epic:** EPIC-0 Repository development system
+- **State:** ready
+- **Hard dependencies:** none
+
+### Local tasks
+
+1. **Keep the complete task.**
+   - Purpose: Explain why the task exists.
+   - Changes: Preserve nested detail,
+     including wrapped lines.
+   - Validation: Prove the parsed output is complete.
+
+### Acceptance criteria
+
+1. Detail survives.
+
+### Done evidence
+
+- fixture
+`;
+  const parsed = parseWaveSlices(content, "docs/backlog/wave-99-implementation-slices.md");
+  const task = parsed.get("W99-S01").localTasks[0];
+  assert.equal(task.title, "**Keep the complete task.**");
+  assert.equal(task.purpose, "Explain why the task exists.");
+  assert.equal(task.changes, "Preserve nested detail, including wrapped lines.");
+  assert.equal(task.validation, "Prove the parsed output is complete.");
+  assert.match(task.markdown, /including wrapped lines\./u);
+});
+
+test("backlog model rejects title and epic drift with an actionable source", () => {
+  const waveContent = `## W99-S01 — Wave title
+
+- **Epic:** EPIC-2 Packet lifecycle
+- **State:** ready
+- **Hard dependencies:** none
+
+### Local tasks
+
+1. **Task.**
+   - Purpose: Purpose.
+   - Changes: Changes.
+   - Validation: Validation.
+`;
+  const parsed = parseWaveSlices(waveContent, "docs/backlog/wave-99-implementation-slices.md");
+  assert.equal(parsed.get("W99-S01").title, "Wave title");
+  assert.deepEqual(parsed.get("W99-S01").epicIds, ["EPIC-2"]);
 });

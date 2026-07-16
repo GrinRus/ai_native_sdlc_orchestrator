@@ -1,0 +1,188 @@
+ticket_id: wave-checkout-multirepo-001
+project_id: checkout-platform
+objective: Coordinate a bounded checkout contract update across web and payments repositories.
+scope:
+  repo_scopes:
+    - web
+    - payments
+  allowed_paths:
+    - apps/checkout/**
+    - packages/payment-contract/**
+dependencies:
+  - checkout-platform.artifact.intake.checkout-multirepo.v1
+risk_tier: high
+status: ready-for-handoff
+task_model_version: 1
+plan_id: checkout-platform.plan.checkout-multirepo
+plan_version: 1
+plan_status: proposed
+plan_size: medium
+plan_digest: sha256:fixture-checkout-multirepo-v1
+previous_plan_ref: null
+revision_summary:
+  reason: Initial bounded multirepo plan.
+  material_change: true
+criteria_catalog:
+  - criterion_id: goal.shared-contract
+    kind: goal
+    text: Web and payments consume the same versioned checkout error contract.
+    source_ref: packet://intake-request-body@checkout-multirepo
+  - criterion_id: dod.integration
+    kind: definition-of-done
+    text: Repository checks and the bounded integration check pass.
+    source_ref: packet://intake-request-body@checkout-multirepo
+  - criterion_id: acceptance.scope
+    kind: acceptance
+    text: No files outside the approved repositories and paths change.
+    source_ref: packet://spec@checkout-multirepo
+local_tasks:
+  - task_id: task.payment-contract
+    title: Update the payment error contract
+    type: implementation
+    objective: Add the approved error identity in the payments repository.
+    rationale: The provider-facing contract must be authoritative before the web consumer changes.
+    scope:
+      repo_ids:
+        - payments
+      component_ids: []
+      allowed_paths:
+        - packages/payment-contract/**
+      forbidden_paths: []
+    depends_on: []
+    work_items:
+      - Add the bounded contract value and compatibility behavior.
+    criteria_refs:
+      - goal.shared-contract
+      - acceptance.scope
+    verification:
+      command_group_refs:
+        - payments-test
+      validators:
+        - repo-scope
+      manual_checks: []
+      success_conditions:
+        - Payments contract tests pass.
+    expected_evidence:
+      - verify-summary
+    risks:
+      - Existing consumers may not recognize the new value.
+    stop_conditions:
+      - Backward compatibility cannot be preserved.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+  - task_id: task.web-consumer
+    title: Consume the payment error contract
+    type: implementation
+    objective: Render the approved contract value in the web repository.
+    rationale: The UI must use the authoritative contract rather than duplicate provider logic.
+    scope:
+      repo_ids:
+        - web
+      component_ids: []
+      allowed_paths:
+        - apps/checkout/**
+      forbidden_paths: []
+    depends_on:
+      - task.payment-contract
+    work_items:
+      - Add the mapped checkout recovery message.
+    criteria_refs:
+      - goal.shared-contract
+      - acceptance.scope
+    verification:
+      command_group_refs:
+        - web-test
+      validators:
+        - repo-scope
+      manual_checks: []
+      success_conditions:
+        - Web checkout tests pass.
+    expected_evidence:
+      - verify-summary
+    risks:
+      - The consumer may drift from the contract version.
+    stop_conditions:
+      - The approved contract is unavailable.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+  - task_id: task.integration-proof
+    title: Verify the bounded repository integration
+    type: integration
+    objective: Prove both repositories agree on the contract and remain in scope.
+    rationale: Per-repository success does not prove the combined checkout path.
+    scope:
+      repo_ids:
+        - web
+        - payments
+      component_ids: []
+      allowed_paths:
+        - apps/checkout/**
+        - packages/payment-contract/**
+      forbidden_paths: []
+    depends_on:
+      - task.payment-contract
+      - task.web-consumer
+    work_items:
+      - Run the bounded integration fixture.
+      - Verify exact changed paths.
+    criteria_refs:
+      - dod.integration
+      - acceptance.scope
+    verification:
+      command_group_refs:
+        - integration-test
+      validators:
+        - repo-scope
+        - evidence-complete
+      manual_checks: []
+      success_conditions:
+        - The integration fixture and path validation pass.
+    expected_evidence:
+      - integration-report
+    risks:
+      - Repository versions may be stale relative to one another.
+    stop_conditions:
+      - Exact repository revisions cannot be resolved.
+    execution_hints:
+      group_key: null
+      group_reason: null
+      parallel_candidate: false
+acceptance_criteria:
+  - Web and payments consume the same versioned checkout error contract.
+  - Repository checks and the bounded integration check pass.
+  - No files outside the approved repositories and paths change.
+expected_evidence:
+  - verify-summary
+  - integration-report
+verification_plan:
+  command_groups:
+    - id: payments-test
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - pnpm --filter payments test
+    - id: web-test
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      commands:
+        - pnpm --filter web test
+    - id: integration-test
+      role: e2e
+      phase: post-change
+      enforcement: required
+      timeout_class: full-suite
+      commands:
+        - pnpm test:checkout-integration
+approved_input_ref: evidence://artifacts/checkout-platform.artifact.intake.checkout-multirepo.v1
+source_refs:
+  artifact_packet_ref: evidence://artifacts/checkout-platform.artifact.intake.checkout-multirepo.v1
+  spec_ref: evidence://steps/spec-checkout-multirepo.json
+  project_analysis_ref: evidence://reports/project-analysis-checkout-platform.json

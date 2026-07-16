@@ -42,7 +42,7 @@ profiles.
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-2 Packet lifecycle;
   EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Define portable topology, machine-local binding, component, and
   workspace-set boundaries before persistence or UI behavior depends on them.
 - **Primary modules:** `docs/product/**`, `docs/architecture/**`,

@@ -535,8 +535,8 @@ This is the master index for the implementation slices across all defined waves.
 ## W60 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W60-S01 | Structured task contract and backlog detail baseline | EPIC-0, EPIC-2, EPIC-4 | ready | `docs/product/**`, `docs/contracts/**`, `docs/backlog/**`, `packages/contracts/**`, `examples/packets/**`, `.agents/skills/backlog-workflow/**`, tests | W59-S07 |
-| W60-S02 | Planner decomposition and task quality gate | EPIC-2, EPIC-3, EPIC-4 | blocked | `examples/prompts/**`, `examples/context/**`, `packages/orchestrator-core/src/handoff-packets.mjs`, `packages/contracts/**`, planning tests | W60-S01, W44-S03 |
+| W60-S01 | Structured task contract and backlog detail baseline | EPIC-0, EPIC-2, EPIC-4 | done | `docs/product/**`, `docs/contracts/**`, `docs/backlog/**`, `packages/contracts/**`, `examples/packets/**`, `.agents/skills/backlog-workflow/**`, tests | W59-S07 |
+| W60-S02 | Planner decomposition and task quality gate | EPIC-2, EPIC-3, EPIC-4 | ready | `examples/prompts/**`, `examples/context/**`, `packages/orchestrator-core/src/handoff-packets.mjs`, `packages/contracts/**`, planning tests | W60-S01, W44-S03 |
 | W60-S03 | Execution plan and evidence-derived task progress | EPIC-2, EPIC-3, EPIC-6 | blocked | `docs/contracts/**`, `packages/contracts/**`, `packages/orchestrator-core/**`, `packages/observability/**`, `examples/reports/**`, tests | W60-S02 |
 | W60-S04 | Plan workbench UX and approval flow | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, control-plane tests | W60-S03 |
 | W60-S05 | Structured planning proof and documentation closure | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W60-S04 |
@@ -544,7 +544,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W61 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W61-S01 | Project topology and local binding contract baseline | EPIC-1, EPIC-2, EPIC-5 | blocked | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, tests | W60-S01 |
+| W61-S01 | Project topology and local binding contract baseline | EPIC-1, EPIC-2, EPIC-5 | ready | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, tests | W60-S01 |
 | W61-S02 | Persistent local workspace registry and topology discovery | EPIC-1, EPIC-6 | blocked | `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, local registry and project-analysis tests | W61-S01 |
 | W61-S03 | Project topology CLI/API management and validation | EPIC-1, EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, OpenAPI/examples, tests | W61-S02 |
 | W61-S04 | Add Project and Project Structure UX | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, browser tests | W61-S03 |

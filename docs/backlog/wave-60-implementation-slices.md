@@ -40,7 +40,7 @@ evidence, and completion state remain traceable through execution attempts.
 
 - **Epic:** EPIC-0 Repository development system; EPIC-2 Packet lifecycle;
   EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Define the source-of-truth structured task shape, completeness
   policy, and contributor planning format before planner/runtime behavior
   depends on them.
@@ -125,7 +125,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S02 — Planner decomposition and task quality gate
 
 - **Epic:** EPIC-2 Packet lifecycle; EPIC-3 Routed execution; EPIC-4 Quality platform
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Generate mission-specific structured tasks from current planning
   evidence instead of the generic implementation/verification/lineage fallback.
 - **Primary modules:** `examples/prompts/**`, `examples/context/**`,
