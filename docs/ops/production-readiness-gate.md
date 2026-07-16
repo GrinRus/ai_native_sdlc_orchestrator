@@ -30,6 +30,12 @@ This mode exits successfully only for `blocked` plus
 `gate_execution_status=pass`; it still fails for `fail`, `unknown`, or an
 unexpected cleared state.
 
+Executable local-console acceptance runs separately as
+`pnpm test:web:browser`. It launches the built SPA through the public loopback
+`aor app` entrypoint, blocks external browser requests, and writes failure
+artifacts under ignored `.aor/quality`. Source and bundle marker tests are
+packaging smoke only; they do not certify browser behavior.
+
 To verify another sanitized proof fixture:
 
 ```bash

@@ -21,7 +21,7 @@ function withTempProject(callback) {
   }
 }
 
-test("packaged SPA exposes installed-user guided mission controls", () => {
+test("packaging-only marker smoke exposes installed-user guided mission controls", () => {
   const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
   const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 

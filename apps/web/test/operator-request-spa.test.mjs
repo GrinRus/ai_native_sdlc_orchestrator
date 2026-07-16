@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
-test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
+test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
   const source = fs.readFileSync(path.join(webRoot, "src/spa.jsx"), "utf8");
   const css = fs.readFileSync(path.join(webRoot, "src/spa.css"), "utf8");
   const stageSubtitleRule = css.match(/\.stage-copy em\s*\{[\s\S]*?\}/u)?.[0] ?? "";

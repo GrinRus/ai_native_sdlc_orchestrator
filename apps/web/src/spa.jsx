@@ -4751,7 +4751,18 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
 }
 
 function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, busy }) {
-  const selectedInteraction = interactions[0] ?? null;
+  const [selectedInteractionKey, setSelectedInteractionKey] = useState(null);
+  const selectedInteraction =
+    interactions.find((interaction) => interactionKey(interaction) === selectedInteractionKey)
+    ?? interactions[0]
+    ?? null;
+  useEffect(() => {
+    if (!selectedInteraction) {
+      setSelectedInteractionKey(null);
+      return;
+    }
+    setSelectedInteractionKey(interactionKey(selectedInteraction));
+  }, [selectedInteraction?.run_id, selectedInteraction?.interaction_id]);
   return (
     <section className="work-card inbox">
       <div className="work-heading compact-heading">
@@ -4766,11 +4777,17 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
         <div className="interactions-layout">
           <div className="interaction-list">
             {interactions.map((interaction) => (
-              <div className="interaction-summary-row" key={interactionKey(interaction)}>
+              <button
+                className={`interaction-summary-row${interactionKey(interaction) === interactionKey(selectedInteraction) ? " selected" : ""}`}
+                key={interactionKey(interaction)}
+                type="button"
+                onClick={() => setSelectedInteractionKey(interactionKey(interaction))}
+                aria-pressed={interactionKey(interaction) === interactionKey(selectedInteraction)}
+              >
                 <strong>{interaction.prompt_summary ?? "Runtime requested input"}</strong>
                 <span>{interaction.run_id}</span>
                 <span className="artifact-ref-label" title={interaction.step_result_ref}>{titleFromRef(interaction.step_result_ref)}</span>
-              </div>
+              </button>
             ))}
           </div>
           {selectedInteraction ? (() => {
@@ -5074,7 +5091,11 @@ function operatorDecisionCorrectionPlan(selectedRequest, selectedActionEntry, de
 }
 
 function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHealth = null, publicRepairDecision = null }) {
-  const selectedRequest = decisionRequests[0] ?? null;
+  const [selectedRequestRef, setSelectedRequestRef] = useState(null);
+  const selectedRequest =
+    decisionRequests.find((request) => request.ref === selectedRequestRef)
+    ?? decisionRequests[0]
+    ?? null;
   const hasPublicRepairDecision = !selectedRequest && Boolean(publicRepairDecision?.command);
   const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
   const preferredAction = preferredOperatorDecisionAction(externalRunHealth, supportedActions, selectedRequest);
@@ -5090,6 +5111,9 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
   useEffect(() => {
     setSelectedAction(preferredAction);
   }, [preferredAction, selectedRequest?.ref]);
+  useEffect(() => {
+    setSelectedRequestRef(selectedRequest?.ref ?? null);
+  }, [selectedRequest?.ref]);
   return (
     <section className="work-card operator-decision-drawer">
       <div className="work-heading compact-heading">
@@ -5099,6 +5123,21 @@ function OperatorDecisionDrawer({ decisionRequests, copyRef, busy, externalRunHe
         </div>
         <StatusPill state={selectedRequest ? selectedRequest.status : hasPublicRepairDecision ? "repair needed" : "no request"} />
       </div>
+      {decisionRequests.length > 1 ? (
+        <div className="decision-request-list" aria-label="Pending operator decisions">
+          {decisionRequests.map((request) => (
+            <button
+              key={request.ref}
+              className="secondary compact"
+              type="button"
+              aria-pressed={request.ref === selectedRequest?.ref}
+              onClick={() => setSelectedRequestRef(request.ref)}
+            >
+              {request.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {selectedRequest ? (
         <>
           <div className="decision-request-summary">
@@ -6658,6 +6697,40 @@ function App() {
     return () => window.clearInterval(interval);
   }, [apiProjectBase, providerStepStatus?.status, providerStepStatus?.updated_at, providerStepStatus?.last_progress_at, providerStepStatus?.last_output_at]);
 
+  const liveRunId = useMemo(() => {
+    const active = (Array.isArray(runs) ? runs : []).find((run) =>
+      ["queued", "running", "paused", "waiting-input", "canceling"].includes(String(run?.status ?? run?.job_status ?? "")),
+    );
+    return active?.run_id ?? active?.document?.run_id ?? null;
+  }, [runs]);
+
+  useEffect(() => {
+    if (!apiProjectBase || !liveRunId || typeof EventSource === "undefined") return undefined;
+    let closed = false;
+    let cursor = "";
+    let source = null;
+    const connect = () => {
+      const query = new URLSearchParams({ maxReplay: "0" });
+      if (cursor) query.set("after_event_id", cursor);
+      source = new EventSource(`${apiProjectBase}/runs/${encodeURIComponent(liveRunId)}/events?${query}`);
+      source.onmessage = (event) => {
+        if (event.lastEventId) cursor = event.lastEventId;
+        refresh({ silent: true, selectionVersion: flowSelectionVersion.current }).catch((err) =>
+          setError(err instanceof Error ? err.message : String(err)),
+        );
+      };
+      source.onerror = () => {
+        source?.close();
+        if (!closed) window.setTimeout(connect, 1000);
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      source?.close();
+    };
+  }, [apiProjectBase, liveRunId]);
+
   function chooseStage(stageId) {
     didChooseStage.current = true;
     setSelectedStage(stageId);
@@ -6711,6 +6784,17 @@ function App() {
     setAddProjectDrawerOpen(false);
     setAddProjectResult(null);
   }
+
+  useEffect(() => {
+    if (!addProjectDrawerOpen) return undefined;
+    function handleKeyDown(event) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeAddProjectDrawer();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [addProjectDrawerOpen]);
 
   async function addLocalProject({ initializeAfterAdd = false } = {}) {
     if (busy || !addProjectForm.projectRef.trim()) return;

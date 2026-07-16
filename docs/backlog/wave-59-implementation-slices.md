@@ -31,7 +31,7 @@ hard dependencies nor makes any W60 slice done.
 - **Outcome:** Web acceptance executes the packaged SPA and asserts user-visible
   behavior instead of treating JSX/bundle marker strings as functional proof.
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/test/**`, browser/component harness,
@@ -101,7 +101,7 @@ hard dependencies nor makes any W60 slice done.
   the operator handle every pending interaction/decision with truthful action,
   lifecycle-stage, error, and durable-result presentation.
 - **Epic:** EPIC-1, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/**`, local control-plane client, web fixtures,

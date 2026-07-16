@@ -39,5 +39,11 @@ jobs:
       - name: Run repository integrity gate
         run: pnpm check
 
+      - name: Install Chromium for executable web acceptance
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run executable browser acceptance
+        run: pnpm test:web:browser
+
       - name: Run production readiness gate
         run: pnpm production:ready --json --expect-audit-hold
