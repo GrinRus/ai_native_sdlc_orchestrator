@@ -599,8 +599,8 @@ const workflowExpectations = new Map([
       "npm@11.15.0",
       "node ./scripts/release-event-guard.mjs",
       "pnpm release:gate",
-      "--prerelease",
-      "npm publish --access public --tag alpha --provenance",
+      "RELEASE_COMMIT_SHA",
+      "node ./scripts/release-publish-transaction.mjs",
     ],
   ],
 ]);

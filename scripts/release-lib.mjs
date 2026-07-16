@@ -263,8 +263,8 @@ export function validateReleaseState(options = {}) {
     ensureIncludes(findings, workflow, `npm@${RELEASE_NPM_VERSION}`, workflowPath);
     if (workflowPath.endsWith("release-publish.yml")) {
       ensureIncludes(findings, workflow, "id-token: write", workflowPath);
-      ensureIncludes(findings, workflow, "--prerelease", workflowPath);
-      ensureIncludes(findings, workflow, "npm publish --access public --tag alpha --provenance", workflowPath);
+      ensureIncludes(findings, workflow, "release-publish-transaction.mjs", workflowPath);
+      ensureIncludes(findings, workflow, "RELEASE_COMMIT_SHA", workflowPath);
     }
   }
 
