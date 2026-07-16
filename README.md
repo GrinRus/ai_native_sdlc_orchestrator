@@ -453,7 +453,7 @@ Core rules:
 
 ## Command surface status
 
-The CLI command surface currently includes **64 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
+The CLI command surface currently includes **65 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
 
 ## Repository map
 
@@ -524,8 +524,12 @@ delivery program are tracked through `W65` and focus on:
   clones, preserve primary-checkout immutability, and collect per-repository
   change/cleanup evidence. Topology-aware execution DAGs preserve approved task
   identity, impacted scope, criteria/verification coverage, and deterministic
-  serialization reasons. Bounded parent/child execution, integration and
-  stale-work recovery, and truthful coordinated multirepo delivery remain.
+  serialization reasons. A durable parent-run scheduler now starts normal
+  child Runtime Harness jobs only when dependencies and conflict keys allow,
+  enforces concurrency and child-start budgets, propagates revisioned
+  pause/resume/cancel, and keeps integration gates outside partial child
+  success. Integration patching, stale-work repair, and coordinated
+  multirepo delivery remain.
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a
   semantic design system, and installed-package acceptance proof.

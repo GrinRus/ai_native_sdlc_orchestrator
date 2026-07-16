@@ -28,6 +28,7 @@ const LIFECYCLE_COMMANDS = new Set([
   "run resume",
   "run steer",
   "run cancel",
+  "run retry",
   "review run",
   "review decide",
   "deliver prepare",
@@ -414,6 +415,17 @@ export function runLifecycleCommand(options) {
   ];
   if (command === "run start") {
     const runId = asString(flagResult.cliFlags["run-id"]);
+    if (flagResult.cliFlags["workspace-set-ref"] && !runId) {
+      return {
+        ok: false,
+        statusCode: 400,
+        error: lifecycleError(
+          "invalid_lifecycle_flags",
+          "Parent run start requires '--run-id' to match the run-owned workspace set.",
+          command,
+        ),
+      };
+    }
     const acceptedRunId = runId ?? derivePublicId(["run", Date.now(), process.pid], "run");
     const workerArgs = runId ? args : [...args, "--run-id", acceptedRunId];
     const started = startRunJob({

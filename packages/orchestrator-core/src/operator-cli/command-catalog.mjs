@@ -1,3 +1,5 @@
+import { RUN_RETRY_COMMAND_DEFINITION, RUN_START_COMMAND_DEFINITION } from "./scheduler-command-definitions.mjs";
+
 export const RUNTIME_ROOT_DIRNAME = ".aor";
 
 const COMMAND_DEFINITIONS = Object.freeze([
@@ -916,66 +918,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     requiredFlags: ["project-ref"],
     contractFamilies: ["wave-ticket", "handoff-packet"],
   },
-  {
-    command: "run start",
-    category: "execution-lifecycle",
-    status: "implemented",
-    summary: "Start one execution run, emit control-plane events, and materialize routed execution evidence.",
-    inputs: [
-      "--project-ref <path>",
-      "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
-      "--run-id <id> (optional)",
-      "--command-id <id> (optional, generated when omitted)",
-      "--expected-revision <integer> (optional)",
-      "--target-step <step_class> (optional, defaults to implement)",
-      "--require-validation-pass <true|false> (optional, defaults to true)",
-      "--approved-handoff-ref <ref> (optional)",
-      "--execution-plan-ref <ref> (optional, paired with --execution-unit-id)",
-      "--execution-unit-id <id> (optional, paired with --execution-plan-ref)",
-      "--promotion-evidence-refs <ref[,ref...]> (optional)",
-      "--route-overrides <step=route_id,...> (optional)",
-      "--policy-overrides <step=policy_id,...> (optional)",
-      "--reason <text> (optional)",
-      "--approval-ref <ref> (optional)",
-      "--unsafe-development-override <true|false> (optional, default false)",
-      "--help",
-    ],
-    outputs: [
-      "resolved_project_ref",
-      "resolved_runtime_root",
-      "run_control_action",
-      "run_control_command_id",
-      "run_control_revision",
-      "run_control_run_id",
-      "run_control_state",
-      "run_control_state_file",
-      "run_control_audit_id",
-      "run_control_audit_file",
-      "run_control_blocked",
-      "run_control_guardrails",
-      "run_control_transition",
-      "primary_event_id",
-      "evidence_event_id",
-      "routed_step_result_id",
-      "routed_step_result_file",
-      "unsafe_development_override",
-      "runtime_harness_report_id",
-      "runtime_harness_report_file",
-      "runtime_harness_overall_decision",
-      "execution_plan",
-      "execution_plan_file",
-      "task_progress",
-      "task_progress_file",
-      "stream_log_file",
-      "read_only",
-      "future_control_hooks",
-      "contract_families",
-      "command_catalog_alignment",
-    ],
-    requiredFlags: ["project-ref"],
-    contractFamilies: ["run-job", "live-run-event", "step-result", "runtime-harness-report", "execution-plan", "task-progress-report"],
-  },
+  RUN_START_COMMAND_DEFINITION,
   {
     command: "run pause",
     category: "execution-lifecycle",
@@ -1137,6 +1080,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     requiredFlags: ["project-ref", "run-id"],
     contractFamilies: ["live-run-event"],
   },
+  RUN_RETRY_COMMAND_DEFINITION,
   {
     command: "run answer",
     category: "execution-lifecycle",
@@ -1188,6 +1132,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "run_summaries",
       "run_event_history",
       "run_policy_history",
+      "parent_run",
+      "parent_run_file",
       "strategic_snapshot",
       "follow_mode",
       "stream_protocol",
@@ -1950,7 +1896,11 @@ function parseInputDefinition(input, requiredFlags) {
   const [, name, valueHint] = flagMatch;
   const enumValues = valueHint?.includes("|") ? valueHint.split("|").map((value) => value.trim()) : [];
   const booleanEnum = enumValues.length > 0 && enumValues.every((value) => value === "true" || value === "false");
-  const type = !valueHint || booleanEnum ? "boolean" : /number|count|revision|limit|port|timeout|replay/iu.test(valueHint) ? "integer" : "string";
+  const type = !valueHint || booleanEnum
+    ? "boolean"
+    : /integer|number|count|revision|limit|port|timeout|replay/iu.test(valueHint)
+      ? "integer"
+      : "string";
   return {
     name,
     type,

@@ -7,7 +7,7 @@ import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
-import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs";
+import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -890,7 +890,7 @@ function validateVerificationCommandGroups(record, source, field, issues, requir
  */
 function validateRuntimeHarnessReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
-  const issues = [];
+  const issues = []; issues.push(...validateRuntimeHarnessParentRelation(document, source));
   validateQualityRepairLineage({
     record: document,
     source,

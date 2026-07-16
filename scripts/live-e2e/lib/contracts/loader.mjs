@@ -8,7 +8,7 @@ import {
   LIVE_E2E_OBSERVATION_STATUS_VALUES,
 } from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
-import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
+import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs"; import { validateRuntimeHarnessParentRelation } from "../../../../packages/contracts/src/runtime-harness-validation.mjs";
 
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
@@ -386,7 +386,7 @@ export function validateContractDocument({ family, document, source = "<in-memor
  */
 function validateRuntimeHarnessReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
-  const issues = [];
+  const issues = []; issues.push(...validateRuntimeHarnessParentRelation(document, source));
 
   const runController = validateOptionalObjectField({
     record: document,

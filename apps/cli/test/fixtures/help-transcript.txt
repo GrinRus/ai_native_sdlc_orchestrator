@@ -52,6 +52,7 @@ Run control:
   - aor run resume
   - aor run steer
   - aor run cancel
+  - aor run retry
   - aor run answer
   - aor run status
 
