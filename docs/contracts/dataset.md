@@ -19,6 +19,10 @@ Naming and scoping guidance:
 - `subject_type` should map to the target asset family (`run`, `wrapper`, `route`, or `adapter`).
 - `version` should be immutable and monotonically increasing (timestamp or semantic version) so suites can pin deterministic snapshots.
 - incident-driven additions should start as `incident-backfill-proposal` artifacts; stable dataset files are updated only after reviewer approval and a separate dataset revision.
+- every case pins immutable `evaluation-case-input` and
+  `evaluation-case-expected` artifacts. Relative POSIX refs are resolved from
+  the project root; `evidence://` refs are resolved from the owning project
+  runtime. Missing, cross-project, stale, or wrong-family artifacts fail closed.
 
 ## Example
 See `examples/eval/dataset-run-regression.yaml`,

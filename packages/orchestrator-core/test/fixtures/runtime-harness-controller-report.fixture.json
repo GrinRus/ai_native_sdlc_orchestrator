@@ -5,6 +5,14 @@
   "generated_at": "2026-04-26T00:00:00.000Z",
   "mission_type": "code-changing",
   "strictness_profile": "strict-code-changing",
+  "mission_lineage": {
+    "status": "resolved",
+    "run_id": "runtime-harness-controller-fixture",
+    "intake_packet_ref": "evidence://packets/intake.json",
+    "intake_body_ref": "evidence://packets/intake-body.json",
+    "mission_type": "code-changing",
+    "strictness_profile": "strict-code-changing"
+  },
   "overall_decision": "pass",
   "run_controller": {
     "controller_id": "runtime-harness-run-controller",

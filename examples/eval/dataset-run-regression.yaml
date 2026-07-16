@@ -14,8 +14,8 @@ cases:
     tags:
       - multirepo
       - release-packet
-    input_ref: evidence://datasets/run-regression/case-run-0091/input.json
-    expected_ref: evidence://datasets/run-regression/case-run-0091/expected.json
+    input_ref: examples/eval/cases/run-regression/case-run-0091/input.yaml
+    expected_ref: examples/eval/cases/run-regression/case-run-0091/expected.yaml
     source_ref: incident://INC-009
 flake_policy:
   default_retry_count: 1

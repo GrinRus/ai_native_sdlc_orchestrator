@@ -1,0 +1,8 @@
+family: evaluation-case-input
+case_id: case-gov-0001
+version: 1
+subject_type: run
+content:
+  scenario: governance
+  required_evidence: policy-and-delivery
+

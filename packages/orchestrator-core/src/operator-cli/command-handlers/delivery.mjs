@@ -247,6 +247,9 @@ export function handleDeliveryCommand(context) {
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
         runId,
+        ...(strictDeliveryGateRequired
+          ? {}
+          : { missionType: "no-write-rehearsal", strictnessProfile: "soft-no-write" }),
       });
     }
     outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;

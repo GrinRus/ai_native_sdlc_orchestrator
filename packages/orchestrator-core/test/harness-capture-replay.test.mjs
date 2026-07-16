@@ -9,6 +9,7 @@ import {
   captureHarnessReplayArtifact,
   replayHarnessCapture,
 } from "../src/harness-capture-replay.mjs";
+import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -29,8 +30,16 @@ function withTempRepo(callback) {
   }
 }
 
+function writeRunSubject(repoRoot, runId, status = "pass") {
+  const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+  const filePath = path.join(init.runtimeLayout.reportsRoot, `run-subject-${runId}.json`);
+  fs.writeFileSync(filePath, `${JSON.stringify({ run_id: runId, status })}\n`, "utf8");
+  return filePath;
+}
+
 test("captureHarnessReplayArtifact writes reusable harness capture with routed trace evidence", () => {
   withTempRepo((repoRoot) => {
+    writeRunSubject(repoRoot, "harness-candidate");
     const capture = captureHarnessReplayArtifact({
       cwd: repoRoot,
       projectRef: repoRoot,
@@ -41,6 +50,7 @@ test("captureHarnessReplayArtifact writes reusable harness capture with routed t
 
     assert.equal(fs.existsSync(capture.capturePath), true);
     assert.equal(capture.capture.capture_kind, "harness-step-execution");
+    assert.equal(capture.capture.schema_version, 2);
     assert.equal(capture.capture.compatibility.route_id, "route.implement.default");
     assert.equal(typeof capture.capture.trace.step_input, "object");
     assert.equal(typeof capture.capture.trace.selected_assets, "object");
@@ -51,6 +61,7 @@ test("captureHarnessReplayArtifact writes reusable harness capture with routed t
 
 test("replayHarnessCapture replays through eval scoring path and produces comparable output", () => {
   withTempRepo((repoRoot) => {
+    writeRunSubject(repoRoot, "harness-candidate");
     const capture = captureHarnessReplayArtifact({
       cwd: repoRoot,
       projectRef: repoRoot,
@@ -76,6 +87,7 @@ test("replayHarnessCapture replays through eval scoring path and produces compar
 
 test("replayHarnessCapture rejects incompatible captures explicitly", () => {
   withTempRepo((repoRoot) => {
+    writeRunSubject(repoRoot, "harness-candidate");
     const capture = captureHarnessReplayArtifact({
       cwd: repoRoot,
       projectRef: repoRoot,
@@ -98,5 +110,16 @@ test("replayHarnessCapture rejects incompatible captures explicitly", () => {
     assert.equal(replay.replayReport.compatibility.compatible, false);
     assert.ok(replay.replayReport.compatibility.mismatches.some((entry) => entry.field === "adapter_id"));
     assert.match(replay.replayReport.blocked_next_step, /Refresh harness capture/);
+  });
+});
+
+test("replayHarnessCapture rejects same-id changed subject content", () => {
+  withTempRepo((repoRoot) => {
+    const subjectFile = writeRunSubject(repoRoot, "harness-candidate");
+    const capture = captureHarnessReplayArtifact({ cwd: repoRoot, projectRef: repoRoot, stepClass: "implement", suiteRef: "suite.release.core@v1", subjectRef: "run://harness-candidate" });
+    fs.writeFileSync(subjectFile, `${JSON.stringify({ run_id: "harness-candidate", status: "changed" })}\n`, "utf8");
+    const replay = replayHarnessCapture({ cwd: repoRoot, projectRef: repoRoot, capturePath: capture.capturePath });
+    assert.equal(replay.replayReport.status, "incompatible");
+    assert.ok(replay.replayReport.compatibility.mismatches.some((entry) => entry.field === "subject_digest"));
   });
 });

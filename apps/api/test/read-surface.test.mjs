@@ -221,6 +221,8 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         subject_ref: "wrapper://wrapper.runner.default@v3",
         subject_type: "wrapper-profile",
         subject_fingerprint: "wrapper.runner.default-v3",
+        subject_snapshot: { reference: "wrapper://wrapper.runner.default@v3", family: "wrapper-profile", version: 3, digest: "sha256:wrapper", source_refs: ["evidence://wrapper.yaml"] },
+        case_resolution: [{ case_id: "case-api", status: "resolved", input_digest: "sha256:input", expected_digest: "sha256:expected" }],
         suite_ref: "suite.release.core@v1",
         dataset_ref: "dataset://dataset.release.core@v1",
         scorer_metadata: [{ scorer: "deterministic", version: "1" }],
@@ -1331,6 +1333,7 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
           generated_at: new Date().toISOString(),
           mission_type: "code-changing",
           strictness_profile: "strict-code-changing",
+          mission_lineage: { status: "resolved", run_id: runId, intake_packet_ref: "evidence://intake.json", intake_body_ref: "evidence://intake-body.json", mission_type: "code-changing", strictness_profile: "strict-code-changing" },
           overall_decision: decision,
           step_decisions: [
             {

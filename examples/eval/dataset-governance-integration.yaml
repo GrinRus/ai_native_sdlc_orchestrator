@@ -14,8 +14,8 @@ cases:
       - no-upstream-write
       - policy-gates
       - delivery-manifest
-    input_ref: evidence://datasets/governance-integration/case-gov-0001/input.json
-    expected_ref: evidence://datasets/governance-integration/case-gov-0001/expected.json
+    input_ref: examples/eval/cases/governance-integration/case-gov-0001/input.yaml
+    expected_ref: examples/eval/cases/governance-integration/case-gov-0001/expected.yaml
     source_ref: profile://full-journey-governance
 flake_policy:
   default_retry_count: 0

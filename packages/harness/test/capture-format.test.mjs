@@ -45,6 +45,8 @@ function fixtureEvaluationReport() {
     scorer_metadata: [{ scorer_id: "deterministic", scorer_mode: "deterministic" }],
     grader_results: { deterministic: { status: "pass" } },
     summary_metrics: { aggregate_pass_rate: 1 },
+    subject_snapshot: { digest: "sha256:subject", version: "run-v1" },
+    case_resolution: [{ case_id: "case-1", input_digest: "sha256:input", expected_digest: "sha256:expected" }],
   };
 }
 
@@ -60,7 +62,7 @@ test("createHarnessCapture records step input, assets, tool activity, and normal
   });
 
   assert.equal(capture.capture_id, "capture-001");
-  assert.equal(capture.schema_version, 1);
+  assert.equal(capture.schema_version, 2);
   assert.equal(capture.compatibility.route_id, "route.implement.default");
   assert.equal(capture.trace.step_input.request_id, "request-001");
   assert.equal(capture.trace.selected_assets.asset_resolution.wrapper.wrapper_ref, "wrapper.runner.default@v3");
@@ -72,6 +74,7 @@ test("createHarnessCapture records step input, assets, tool activity, and normal
 test("compareHarnessCompatibility passes when runtime assets match capture metadata", () => {
   const stepResult = fixtureStepResult();
   const capture = {
+    schema_version: 2,
     compatibility: extractHarnessCompatibility(stepResult),
   };
 
@@ -90,6 +93,7 @@ test("compareHarnessCompatibility reports explicit mismatch when runtime assets 
   driftedStepResult.routed_execution.asset_resolution.wrapper.wrapper_ref = "wrapper.runner.experimental@v99";
 
   const capture = {
+    schema_version: 2,
     compatibility: extractHarnessCompatibility(stepResult),
   };
   const comparison = compareHarnessCompatibility({
@@ -99,4 +103,10 @@ test("compareHarnessCompatibility reports explicit mismatch when runtime assets 
 
   assert.equal(comparison.compatible, false);
   assert.ok(comparison.mismatches.some((entry) => entry.field === "wrapper_ref"));
+});
+
+test("legacy capture is readable but never replay-compatible", () => {
+  const comparison = compareHarnessCompatibility({ capture: { schema_version: 1, compatibility: extractHarnessCompatibility(fixtureStepResult()) }, currentStepResult: fixtureStepResult() });
+  assert.equal(comparison.compatible, false);
+  assert.equal(comparison.mismatches[0].field, "schema_version");
 });

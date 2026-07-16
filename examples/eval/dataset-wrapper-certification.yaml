@@ -14,8 +14,8 @@ cases:
     tags:
       - wrapper-change
       - evidence-discipline
-    input_ref: evidence://datasets/wrapper-certification/case-wrap-0023/input.json
-    expected_ref: evidence://datasets/wrapper-certification/case-wrap-0023/expected.json
+    input_ref: examples/eval/cases/wrapper-certification/case-wrap-0023/input.yaml
+    expected_ref: examples/eval/cases/wrapper-certification/case-wrap-0023/expected.yaml
     source_ref: review://CERT-GOLDEN-023
 flake_policy:
   default_retry_count: 1

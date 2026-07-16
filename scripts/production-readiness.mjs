@@ -527,8 +527,6 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
   }
 
   const auditInvalidatedRows = new Map([
-    ["AIP-06", ["W58-S04"]],
-    ["SEC-04", ["W58-S04"]],
     ["FIN-03", ["W59-S07"]],
   ]);
   for (const [storyId, requiredGaps] of auditInvalidatedRows) {

@@ -8,6 +8,8 @@ Suite-based or grader-based report that scores a run, wrapper, route, adapter, o
 - `subject_ref`
 - `subject_type`
 - `subject_fingerprint`
+- `subject_snapshot`
+- `case_resolution`
 - `suite_ref`
 - `dataset_ref`
 - `scorer_metadata`
@@ -22,6 +24,12 @@ Evaluation reports should preserve thresholds, regressions, and baseline compari
 `grader_results` should keep per-scorer case outcomes.
 `summary_metrics` should include at least total cases, pass/fail counts, and aggregated pass rate so
 comparisons across asset versions are deterministic.
+
+`subject_snapshot` records the canonical subject reference, family, version,
+content digest, and immutable source refs used for scoring. `case_resolution[]`
+records input/expected family, version, digest, and resolution status for every
+dataset case. Scorer outcomes must be derived from these resolved bytes; the
+presence of a reference alone is never a passing assertion.
 
 When a suite evaluates a compiler revision, `subject_ref` may use `compiler-revision://...` and `subject_type` should identify the compiler/revision family. `compiler-revision-status.compatibility.evaluation_refs` is the queryable lifecycle link back to those reports.
 

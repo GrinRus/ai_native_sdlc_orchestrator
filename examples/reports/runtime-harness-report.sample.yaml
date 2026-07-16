@@ -4,6 +4,13 @@ run_id: run.sample
 generated_at: 2026-04-26T00:00:00.000Z
 mission_type: code-changing
 strictness_profile: strict-code-changing
+mission_lineage:
+  status: resolved
+  run_id: run.bootstrap.20260420.001
+  intake_packet_ref: evidence://packets/intake-run.bootstrap.20260420.001.json
+  intake_body_ref: evidence://packets/intake-run.bootstrap.20260420.001.body.json
+  mission_type: code-changing
+  strictness_profile: strict-code-changing
 overall_decision: repair
 run_controller:
   controller_id: runtime-harness-run-controller

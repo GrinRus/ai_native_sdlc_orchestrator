@@ -17,6 +17,8 @@ export type ContractFamily =
   | "step-result"
   | "validation-report"
   | "evaluation-report"
+  | "evaluation-case-input"
+  | "evaluation-case-expected"
   | "review-report"
   | "review-decision"
   | "quality-repair-request"

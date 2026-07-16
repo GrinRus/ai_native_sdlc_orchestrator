@@ -110,6 +110,21 @@ function materializePlanSemanticEvaluation(options, result) {
     subject_ref: planRef,
     subject_type: "wave-ticket",
     subject_fingerprint: result.waveTicket.plan_digest,
+    subject_snapshot: {
+      reference: planRef,
+      family: "wave-ticket",
+      version: result.waveTicket.plan_version,
+      digest: result.waveTicket.plan_digest,
+      source_refs: [planRef],
+    },
+    case_resolution: [{
+      case_id: "semantic-plan-quality",
+      status: "resolved",
+      input_ref: planRef,
+      expected_ref: "policy://plan-semantic-quality",
+      input_digest: result.waveTicket.plan_digest,
+      expected_digest: "policy://plan-semantic-quality@v1",
+    }],
     suite_ref: "suite.plan.semantic-quality@v1",
     dataset_ref: "dataset://plan-semantic-quality/runtime",
     scorer_metadata: [{
