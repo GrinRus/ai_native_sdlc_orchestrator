@@ -124,10 +124,9 @@ The `OPS-11` baseline is limited to bounded operator-request creation and execut
 
 Bounded multirepo means one AOR project profile can coordinate several explicit repositories, such as backend services, mobile, and frontend repos. It does not mean MVP portfolio orchestration across multiple independent AOR `project_id` profiles. W36 adds a local app workspace that can switch between explicitly added projects, but each project still owns separate runtime state, flows, and evidence.
 
-W60 has a landed provisional baseline for the detailed structured-plan contract,
-completeness and semantic checks, exact-version approval, evidence-derived task
-progress, and Plan workbench. Its slices remain blocked by W59-S07 and require
-post-remediation requalification before acceptance or story-status advancement.
+W60 now provides the requalified structured-plan contract, mission-specific
+decomposition, deterministic completeness before semantic checks, exact-version
+approval, evidence-derived task progress, and the accessible Plan workbench.
 W61-W62 still track project topology, workspace-set,
 safe-concurrency, integration, and recovery gaps. Until those later slices
 close, topology and parallel-step coverage remains a bounded contract/proof

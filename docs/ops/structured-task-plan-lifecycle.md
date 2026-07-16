@@ -56,6 +56,11 @@ attempt under the same task IDs. Adapter success advances a task only to
 `verification-pending`; required verification, criteria, and evidence must be
 present before progress becomes `complete`.
 
+The W60 closure proof is reproducible with the public plan commands, flow-plan
+HTTP routes, `pnpm test:web:browser`, and `pnpm slice:gate -- W60-S05`. It does
+not exercise provider credentials, parallel scheduling, multirepo provisioning,
+or upstream writes.
+
 ## Recovery
 
 - `plan-incomplete`: inspect the validation report and request revision.

@@ -189,4 +189,50 @@ test.describe.serial("installed local operator console", () => {
     await page.getByRole("button", { name: /Choose the second answer/ }).click();
     await expect(page.getByText("interaction-two", { exact: true })).toBeVisible();
   });
+
+  test("structured plan task details remain keyboard accessible at mobile width", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const flow = { flow_id: "plan-proof-flow", status: "active", selected_stage: "planning", evidence_refs: [] };
+    await page.route(new RegExp(`/api/projects/${state.project_id}/flows$`, "u"), (route) => route.fulfill({
+      contentType: "application/json", body: JSON.stringify({ flows: [flow], selected_flow_id: flow.flow_id }),
+    }));
+    await page.route("**/flows/selected", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(flow) }));
+    await page.route("**/flows/plan-proof-flow/plan", (route) => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        plan_ref: "evidence://artifacts/wave-ticket-plan-proof.json",
+        plan: {
+          plan_id: "plan.browser-proof", plan_version: 2, plan_status: "approved",
+          local_tasks: [{
+            task_id: "task.browser-proof", title: "Verify structured planning", type: "verification",
+            objective: "Prove task detail access.", rationale: "Operators need inspectable evidence.",
+            scope: { repo_ids: ["main"], component_ids: [], allowed_paths: ["apps/web/**"], forbidden_paths: [] },
+            depends_on: [], work_items: ["Inspect the task."], criteria_refs: ["acceptance.browser"],
+            verification: { command_group_refs: ["test-web-browser"], validators: [], manual_checks: [], success_conditions: ["Dialog is accessible."] },
+            expected_evidence: ["browser-proof"], risks: [], stop_conditions: [],
+            execution_hints: { group_key: null, group_reason: null, parallel_candidate: false },
+          }],
+          criteria_catalog: [{ criterion_id: "acceptance.browser", kind: "acceptance", text: "Plan detail is accessible.", source_ref: "packet://proof" }],
+          revision_summary: { reason: "Approved proof revision.", material_change: true },
+        },
+        handoff_packet: { approval_state: { state: "approved" } },
+      }),
+    }));
+    await page.route("**/flows/plan-proof-flow/plan/progress", (route) => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ task_progress: { tasks: [{ task_id: "task.browser-proof", status: "verification-pending", attempt_refs: ["run.proof.1"], evidence_refs: [], blocking_findings: [], next_action: "Run browser proof." }] } }),
+    }));
+    await page.goto(state.app_url);
+    const task = page.getByRole("button", { name: "Verify structured planning" });
+    await expect(task).toBeVisible();
+    await task.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Verify structured planning" });
+    await expect(dialog.getByText("run.proof.1")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(task).toBeFocused();
+  });
 });

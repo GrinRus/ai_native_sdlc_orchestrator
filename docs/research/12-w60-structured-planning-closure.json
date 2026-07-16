@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "wave_id": "W60",
+  "title": "Structured task planning and operator workbench closure",
+  "status": "passed",
+  "closed_at": "2026-07-16",
+  "provisional_baseline": "392f94c",
+  "compatibility": {
+    "task_model_version": 1,
+    "legacy_compact_packets": "supported",
+    "public_command_names": "unchanged",
+    "package_exports": "unchanged"
+  },
+  "proof_scenarios": [
+    {
+      "id": "small-compatibility",
+      "evidence_refs": [
+        "packages/contracts/test/contracts-loader.test.mjs",
+        "packages/orchestrator-core/test/task-plan-service.test.mjs"
+      ]
+    },
+    {
+      "id": "medium-revision-retry-completion",
+      "sequence": [
+        "invalid-v1",
+        "revision-request",
+        "valid-v2",
+        "exact-version-approval",
+        "execution-unit-mapping",
+        "failed-attempt",
+        "retry-same-task-id",
+        "verification",
+        "evidence-derived-completion"
+      ],
+      "evidence_refs": [
+        "packages/orchestrator-core/test/task-plan-service.test.mjs",
+        "apps/api/test/http-transport.test.mjs"
+      ]
+    },
+    {
+      "id": "installed-plan-workbench",
+      "evidence_refs": [
+        "apps/web/browser/operator-console.spec.mjs",
+        "apps/web/src/plan-workbench.jsx",
+        "apps/web/src/plan-workbench-views.jsx"
+      ]
+    }
+  ],
+  "reproducible_commands": [
+    "pnpm check",
+    "pnpm test:web:browser",
+    "pnpm release:pack",
+    "pnpm release:smoke",
+    "pnpm audit:prod:bulk",
+    "pnpm production:ready --json",
+    "pnpm slice:gate -- W60-S05"
+  ],
+  "excluded_surfaces": [
+    "parallel scheduler",
+    "multirepo workspace provisioning",
+    "hosted collaboration",
+    "credentialed provider calls",
+    "upstream writes"
+  ]
+}

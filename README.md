@@ -509,10 +509,10 @@ delivery program are tracked through `W65` and focus on:
   remain outside the current product scope.
 - Replacing marker-based readiness with executable API, browser, concurrency,
   package, and independent audit-closure evidence.
-- A provisional structured-task baseline for decomposition, deterministic
-  completeness, post-pass semantic evaluation, exact-version approval,
-  evidence-derived task progress, and a flow-scoped Plan workbench; W60 remains
-  blocked until post-audit requalification and acceptance evidence close.
+- Requalified structured-task planning with mission-specific decomposition,
+  deterministic completeness before semantic evaluation, exact-version
+  approval, evidence-derived progress, and an accessible flow Plan workbench.
+  Parallel scheduling and multirepo workspace provisioning remain W62 work.
 - Planned portable project/repository/component topology, persistent
   machine-local bindings, and installed-user Project Structure management.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,

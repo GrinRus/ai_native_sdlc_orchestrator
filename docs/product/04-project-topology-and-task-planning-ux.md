@@ -309,9 +309,8 @@ which locks remain active, and the recovery or rollback action.
   topology management, and Project Structure UX.
 - W62 owns workspace sets, impact DAGs, parent/child execution, integration,
   repair, coordinated delivery, and end-to-end proof.
-- W59 audit closure remains the declared entry dependency for planner
-  materialization. The current W60 implementation was performed under an
-  explicit dependency override; it does not mark W57-W59 complete or remove
-  their release-readiness blockers.
+- W60 planning was requalified after W59 audit closure with headless, API, and
+  installed-browser evidence. This does not imply W61 topology management or
+  W62 parallel/multirepo execution readiness.
 - W45 quality repair state is reused for failed or stale execution units rather
   than replaced by a second repair model.
