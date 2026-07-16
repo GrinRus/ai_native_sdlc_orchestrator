@@ -16,8 +16,30 @@ import {
 import { handleReadRoute } from "./http-read-handlers.mjs";
 import { matchControlPlaneRoute } from "./http-router.mjs";
 import { handleRunEventStream } from "./http-stream-handlers.mjs";
-import { asPositiveInteger, asString, attachResponseRedactionPolicy, sendError, sendJson } from "./http-utils.mjs";
+import {
+  MAX_MUTATION_BODY_BYTES,
+  asPositiveInteger,
+  asString,
+  attachResponseRedactionPolicy,
+  sendError,
+  sendJson,
+} from "./http-utils.mjs";
 import { createLocalProjectRegistry, summarizeProjectContext } from "../local-project-registry.mjs";
+
+const LOCAL_TRUSTED_HOSTS = new Set(["127.0.0.1", "::1"]);
+
+function listenerAuthority(host, port) {
+  return `${host.includes(":") ? `[${host}]` : host}:${port}`;
+}
+
+function hasBrowserFetchMetadata(request) {
+  return ["sec-fetch-site", "sec-fetch-dest", "sec-fetch-user"].some((name) => request.headers[name] !== undefined);
+}
+
+function isJsonMediaType(value) {
+  const mediaType = asString(Array.isArray(value) ? value[0] : value)?.split(";", 1)[0]?.trim().toLowerCase();
+  return mediaType === "application/json" || /^application\/[a-z0-9!#$&^_.+-]+\+json$/u.test(mediaType ?? "");
+}
 
 /**
  * @param {{
@@ -52,6 +74,10 @@ import { createLocalProjectRegistry, summarizeProjectContext } from "../local-pr
  */
 export function createControlPlaneHttpServer(options) {
   const host = asString(options.host) ?? "127.0.0.1";
+  const securityMode = asString(options.auth?.mode ?? options.auth?.security_mode) ?? "local-trusted";
+  if (securityMode === "local-trusted" && !LOCAL_TRUSTED_HOSTS.has(host)) {
+    throw new Error("Local-trusted control-plane bind must use literal loopback host '127.0.0.1' or '::1'.");
+  }
   const requestedPort = asPositiveInteger(options.port);
   const port = requestedPort ?? 0;
   const projectInputs = Array.isArray(options.projects) && options.projects.length > 0
@@ -75,18 +101,50 @@ export function createControlPlaneHttpServer(options) {
     throw new Error(`AOR app static bundle is missing at '${appStaticRoot}'. Run the web build before launching the app.`);
   }
   const authPolicy = normalizeAuthPolicy(options.auth, projectId);
+  let canonicalAuthority = null;
+  let canonicalOrigin = null;
 
   const server = http.createServer(async (request, response) => {
     try {
       attachResponseRedactionPolicy(response, authPolicy.redactionPolicy);
-      const baseOrigin = `http://${request.headers.host ?? `${host}:${port}`}`;
-      const requestUrl = new URL(request.url ?? "/", baseOrigin);
+      if (!canonicalAuthority || !canonicalOrigin) {
+        sendError(response, 503, "listener_not_ready", "Control-plane listener authority is not ready.");
+        return;
+      }
+      if (request.headers.host !== canonicalAuthority) {
+        sendError(response, 400, "invalid_host", "Host header must match the canonical loopback listener authority.");
+        return;
+      }
+      const requestUrl = new URL(request.url ?? "/", canonicalOrigin);
       const method = request.method ?? "GET";
 
       if (method !== "GET" && method !== "POST") {
         response.setHeader("allow", "GET, POST");
         sendError(response, 405, "method_not_allowed", "Detached control-plane supports only GET and POST.");
         return;
+      }
+
+      if (method === "POST") {
+        const origin = asString(request.headers.origin);
+        if ((origin && origin !== canonicalOrigin) || (!origin && hasBrowserFetchMetadata(request))) {
+          sendError(response, 403, "cross_origin_mutation_denied", "Browser mutations must use the exact local app listener origin.");
+          return;
+        }
+        if (!isJsonMediaType(request.headers["content-type"])) {
+          sendError(response, 415, "unsupported_media_type", "Mutation requests require application/json or application/*+json.");
+          return;
+        }
+        const contentLength = asString(request.headers["content-length"]);
+        if (contentLength) {
+          if (!/^\d+$/u.test(contentLength)) {
+            sendError(response, 400, "invalid_content_length", "Content-Length must be a non-negative integer.");
+            return;
+          }
+          if (Number(contentLength) > MAX_MUTATION_BODY_BYTES) {
+            sendError(response, 413, "request_body_too_large", "Request body exceeds the 1 MiB limit.");
+            return;
+          }
+        }
       }
 
       if (appStaticRoot && method === "GET") {
@@ -96,7 +154,7 @@ export function createControlPlaneHttpServer(options) {
           staticRoot: appStaticRoot,
           registry,
           packageVersion: asString(options.app?.packageVersion) ?? "0.0.0",
-          baseUrl: `http://${request.headers.host ?? `${host}:${port}`}`,
+          baseUrl: canonicalOrigin,
         });
         if (served) {
           return;
@@ -227,7 +285,9 @@ export function createControlPlaneHttpServer(options) {
       server.off("error", onError);
       const address = server.address();
       const resolvedPort = typeof address === "object" && address !== null ? address.port : port;
-      const baseUrl = `http://${host}:${resolvedPort}`;
+      canonicalAuthority = listenerAuthority(host, resolvedPort);
+      canonicalOrigin = `http://${canonicalAuthority}`;
+      const baseUrl = canonicalOrigin;
       resolve({
         server,
         host,
@@ -301,26 +361,15 @@ function serveAppRoute(options) {
     const defaultProject =
       workspace.projects.find((project) => project.project_id === workspace.default_project_id) ??
       workspace.projects[0];
-    options.response.statusCode = 200;
-    options.response.setHeader("content-type", "application/json; charset=utf-8");
-    options.response.end(
-      `${JSON.stringify(
-        {
-          app: "aor-operator-console",
-          version: options.packageVersion,
-          project_id: defaultProject?.project_id,
-          default_project_id: workspace.default_project_id,
-          projects: workspace.projects,
-          project_profile_ref: defaultProject?.project_profile_ref,
-          project_ref: defaultProject?.project_ref,
-          runtime_root: defaultProject?.runtime_root,
-          api_base_url: options.baseUrl,
-          control_plane: options.baseUrl,
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    sendJson(options.response, 200, {
+      app: "aor-operator-console",
+      version: options.packageVersion,
+      project_id: defaultProject?.project_id,
+      default_project_id: workspace.default_project_id,
+      projects: workspace.projects.map((project) => ({ project_id: project.project_id, label: project.label })),
+      api_base_url: options.baseUrl,
+      control_plane: options.baseUrl,
+    });
     return true;
   }
 

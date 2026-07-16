@@ -38,6 +38,20 @@ same-origin `/api/projects/:projectId/**` control-plane routes, exposes
 `GET /api/projects` for the explicit local project registry, opens the browser
 by default, and stops when the foreground process exits.
 
+The local-trusted listener binds only to literal `127.0.0.1` or `::1`, derives
+one canonical listener authority after bind, and validates `Host` before static,
+config, or API routing. Browser mutations require the exact listener `Origin`;
+foreign/null origins and browser fetch metadata without Origin fail closed.
+Mutation bodies are JSON-only, capped at 1 MiB, and bounded to five seconds.
+`/app-config.json` is redacted, no-store, and omits absolute project paths.
+
+The trust boundary includes processes running as the same OS account: a trusted
+local CLI/curl request may omit Origin when it also omits browser fetch metadata.
+LAN clients, hostile local accounts, multi-user hosts, hosted deployments, and
+remote browsers are not covered. Supporting any of those modes requires a new
+ADR with an authentication boundary; loopback address checks alone are not an
+OS sandbox or tenant-isolation mechanism.
+
 The SPA may guide first-run onboarding by previewing project context without
 initializing `.aor/`, calling the existing runtime initialization command only
 after explicit user action, and then guiding the first Mission intake flow by
@@ -69,4 +83,5 @@ surface to a hosted service, permitting an arbitrary remote control-plane
 attachment, storing bearer tokens in a browser, adding SSO/OAuth/OIDC, TLS
 termination, reverse-proxy trust, tenant isolation, public CORS, a WAF, or
 internet-facing rate limiting, replacing the shared HTTP transport with a
-framework-owned server, or adding UI-only packet schema fields.
+framework-owned server, supporting hostile-local or multi-user operation, or
+adding UI-only packet schema fields.

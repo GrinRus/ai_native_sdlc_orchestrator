@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { request as httpRequest } from "node:http";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,35 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
  */
 async function withTempRepo(callback) {
   await withTempRepoHelper({ prefix: "aor-w9-s07-api-http-", workspaceRoot }, callback);
+}
+
+function rawHttp(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    let responseStarted = false;
+    const request = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: `${target.pathname}${target.search}`,
+      method: options.method ?? "GET",
+      headers: options.headers,
+      agent: false,
+    }, (response) => {
+      responseStarted = true;
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => resolve({
+        status: response.statusCode,
+        headers: response.headers,
+        body: Buffer.concat(chunks).toString("utf8"),
+      }));
+    });
+    request.once("error", (error) => {
+      if (!responseStarted) reject(error);
+    });
+    for (const chunk of options.bodyChunks ?? []) request.write(chunk);
+    if (options.end !== false) request.end();
+  });
 }
 
 function byteSnapshot(root) {
@@ -115,6 +145,97 @@ test("detached control-plane source checkout smoke command verifies local API tr
     assert.equal(payload.init_blocked, false);
     assert.equal(payload.initialized, true);
     assert.equal(fs.existsSync(path.join(runtimeRoot, "projects", payload.project_id, "state", "project-init-state.json")), true);
+  });
+});
+
+test("local-trusted transport accepts only literal IPv4 and IPv6 loopback binds", async () => {
+  await withTempRepo(async (repoRoot) => {
+    for (const host of ["localhost", "0.0.0.0", "::", "127.0.0.2", "::ffff:127.0.0.1"]) {
+      await assert.rejects(
+        async () => createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host, port: 0 }),
+        /literal loopback/u,
+      );
+      assert.equal(fs.existsSync(path.join(repoRoot, ".aor")), false);
+    }
+
+    const ipv6 = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "::1", port: 0 });
+    try {
+      assert.match(ipv6.baseUrl, /^http:\/\/\[::1\]:\d+$/u);
+      const response = await fetch(`${ipv6.baseUrl}/api/projects`);
+      assert.equal(response.status, 200);
+    } finally {
+      await ipv6.close();
+    }
+  });
+});
+
+test("local app rejects spoofed Host, cross-origin browser writes, and unsafe media types before mutation", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const before = byteSnapshot(repoRoot);
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const mutationUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`;
+    try {
+      const spoofedHost = await rawHttp(`${transport.baseUrl}/api/projects`, { headers: { host: "attacker.invalid" } });
+      assert.equal(spoofedHost.status, 400);
+
+      for (const headers of [
+        { origin: "http://attacker.invalid", "content-type": "application/json" },
+        { origin: "null", "content-type": "application/json" },
+        { "sec-fetch-site": "cross-site", "content-type": "application/json" },
+      ]) {
+        const rejected = await rawHttp(mutationUrl, { method: "POST", headers, bodyChunks: [JSON.stringify({ action: "attach" })] });
+        assert.equal(rejected.status, 403);
+      }
+
+      const textPlain = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { origin: transport.baseUrl, "content-type": "text/plain" },
+        bodyChunks: [JSON.stringify({ action: "attach" })],
+      });
+      assert.equal(textPlain.status, 415);
+      assert.deepEqual(byteSnapshot(repoRoot), before);
+
+      const sameOrigin = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { origin: transport.baseUrl, "content-type": "application/merge-patch+json" },
+        bodyChunks: [JSON.stringify({ action: "attach" })],
+      });
+      assert.equal(sameOrigin.status, 200);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("mutation bodies enforce declared, incremental, and time bounds without domain writes", { timeout: 15000 }, async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const mutationUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`;
+    try {
+      const declared = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": String(1024 * 1024 + 1) },
+      });
+      assert.equal(declared.status, 413);
+
+      const incremental = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        bodyChunks: [Buffer.alloc(700000, 0x20), Buffer.alloc(400000, 0x20)],
+      });
+      assert.equal(incremental.status, 413, incremental.body);
+
+      const timedOut = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        bodyChunks: ["{"],
+        end: false,
+      });
+      assert.equal(timedOut.status, 408);
+      assert.equal(fs.existsSync(path.join(repoRoot, ".aor")), false);
+    } finally {
+      await transport.close();
+    }
   });
 });
 
@@ -1337,9 +1458,11 @@ test("local app server serves SPA config and existing control-plane routes", asy
 
       const configResponse = await getJson(`${transport.baseUrl}/app-config.json`);
       assert.equal(configResponse.status, 200);
+      assert.equal(configResponse.headers.get("cache-control"), "no-store");
       const config = await configResponse.json();
       assert.equal(config.project_id, transport.projectId);
       assert.equal(config.api_base_url, transport.baseUrl);
+      assert.equal(JSON.stringify(config).includes(projectRoot), false, "app config must not disclose absolute project paths");
 
       const stateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
       assert.equal(stateResponse.status, 200);

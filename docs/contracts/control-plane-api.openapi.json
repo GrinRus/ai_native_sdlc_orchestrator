@@ -71,6 +71,9 @@
               "schema": {
                 "$ref": "#/components/schemas/ProjectActionRequest"
               }
+            },
+            "application/*+json": {
+              "schema": { "$ref": "#/components/schemas/ProjectActionRequest" }
             }
           }
         },
@@ -86,7 +89,10 @@
           },
           "403": {
             "$ref": "#/components/responses/AuthError"
-          }
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
         }
       }
     },
@@ -661,7 +667,10 @@
           },
           "403": {
             "$ref": "#/components/responses/AuthError"
-          }
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
         }
       }
     },
@@ -703,6 +712,9 @@
           "403": {
             "$ref": "#/components/responses/AuthError"
           },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
           "404": {
             "$ref": "#/components/responses/JsonError"
           },
@@ -923,6 +935,9 @@
           "400": { "$ref": "#/components/responses/JsonError" },
           "401": { "$ref": "#/components/responses/AuthError" },
           "403": { "$ref": "#/components/responses/AuthError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
           "404": { "$ref": "#/components/responses/JsonError" },
           "409": { "$ref": "#/components/responses/JsonError" }
         }
@@ -958,6 +973,9 @@
           "403": {
             "$ref": "#/components/responses/AuthError"
           },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
           "409": {
             "$ref": "#/components/responses/RunControlActionError"
           }
@@ -994,6 +1012,9 @@
           "403": {
             "$ref": "#/components/responses/AuthError"
           },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
           "409": {
             "$ref": "#/components/responses/JsonError"
           }
@@ -1033,6 +1054,9 @@
           "403": {
             "$ref": "#/components/responses/AuthError"
           },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
           "409": {
             "$ref": "#/components/responses/LifecycleCommandActionError"
           }
@@ -1069,6 +1093,9 @@
           "403": {
             "$ref": "#/components/responses/AuthError"
           },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
           "409": {
             "$ref": "#/components/responses/InteractionAnswerError"
           }
@@ -1134,6 +1161,9 @@
             "schema": {
               "$ref": "#/components/schemas/JsonObject"
             }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/JsonObject" }
           }
         }
       },
@@ -1145,6 +1175,9 @@
             "schema": {
               "$ref": "#/components/schemas/RunControlActionRequest"
             }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/RunControlActionRequest" }
           }
         }
       },
@@ -1156,6 +1189,9 @@
             "schema": {
               "$ref": "#/components/schemas/UiLifecycleActionRequest"
             }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/UiLifecycleActionRequest" }
           }
         }
       },
@@ -1167,6 +1203,9 @@
             "schema": {
               "$ref": "#/components/schemas/LifecycleCommandActionRequest"
             }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/LifecycleCommandActionRequest" }
           }
         }
       },
@@ -1188,6 +1227,9 @@
             "schema": {
               "$ref": "#/components/schemas/InteractionAnswerRequest"
             }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/InteractionAnswerRequest" }
           }
         }
       }
@@ -1212,6 +1254,18 @@
             }
           }
         }
+      },
+      "RequestTimeout": {
+        "description": "Mutation body did not complete within five seconds.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "Mutation body exceeded the 1 MiB declared or incremental limit.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "UnsupportedMediaType": {
+        "description": "Mutation body media type is not application/json or application/*+json.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
       },
       "AuthError": {
         "description": "Authentication or authorization denial. Transport-level denials do not invoke mutation handlers.",

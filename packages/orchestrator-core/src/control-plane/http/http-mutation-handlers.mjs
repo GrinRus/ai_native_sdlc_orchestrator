@@ -1,4 +1,4 @@
-import { asString, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
+import { HttpRequestBodyError, asString, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
 import {
   toInteractionAnswerResponse,
   toLifecycleCommandResponse,
@@ -33,6 +33,10 @@ async function readMutationPayload(request, response) {
   try {
     return await readJsonRequestBody(request);
   } catch (error) {
+    if (error instanceof HttpRequestBodyError) {
+      sendError(response, error.statusCode, error.code, error.message);
+      return null;
+    }
     if (error instanceof Error && error.message === "invalid_json") {
       sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
       return null;

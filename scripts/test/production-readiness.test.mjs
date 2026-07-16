@@ -56,7 +56,9 @@ test("production readiness gate enforces the committed audit hold with healthy i
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-006"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-009"));
-  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-020"));
+  assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-020"));
+  assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-046"));
+  assert.ok(result.blocking_invariants.some((entry) => entry.finding_id === "AUD-039"));
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
@@ -321,6 +323,13 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
   assert.equal(openApi.paths["/api/projects/{projectId}/ui-lifecycle/actions"].post.requestBody.$ref, "#/components/requestBodies/UiLifecycleAction");
   assert.equal(openApi.paths["/api/projects/{projectId}/lifecycle-command/actions"].post.requestBody.$ref, "#/components/requestBodies/LifecycleCommandAction");
   assert.equal(openApi.paths["/api/projects/{projectId}/interactions/answers"].post.requestBody.$ref, "#/components/requestBodies/InteractionAnswer");
+
+  for (const [pathName, pathItem] of Object.entries(openApi.paths)) {
+    if (!pathItem.post) continue;
+    assert.equal(pathItem.post.responses["408"].$ref, "#/components/responses/RequestTimeout", pathName);
+    assert.equal(pathItem.post.responses["413"].$ref, "#/components/responses/PayloadTooLarge", pathName);
+    assert.equal(pathItem.post.responses["415"].$ref, "#/components/responses/UnsupportedMediaType", pathName);
+  }
 
   for (const responseName of [
     "ProjectState",

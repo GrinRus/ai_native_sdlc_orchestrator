@@ -4,7 +4,7 @@ Use this runbook when a connected operator surface attaches to the detached HTTP
 
 ## Modes
 
-- `local-trusted`: default loopback mode for local CLI, tests, and harness workflows. Auth may be disabled, but route permission metadata and redaction helpers still exist.
+- `local-trusted`: default same-account mode for local CLI, tests, and harness workflows. It binds only to literal `127.0.0.1` or `::1`, validates canonical Host and browser Origin, and bounds JSON mutation bodies. Auth may be disabled because other processes under the same OS account are inside this topology's trust boundary.
 - `production-hardened`: connected transport mode that requires bearer credentials for reads, streams, and mutations.
 
 ## Operator checks
