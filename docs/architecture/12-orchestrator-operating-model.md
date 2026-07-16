@@ -27,6 +27,13 @@ definitions; a Project Binding owns machine-local checkout resolution; and a
 Workspace Set freezes exact repository identities for a later run. Components
 inside a monorepo never become synthetic Git repositories.
 
+At run start, workspace-set schema v2 resolves every binding and base ref
+before writing, provisions one isolated worktree or independent clone per
+repository, and publishes a run-owned manifest with exact commits, mounts,
+execution roots, cleanup ownership, and repository-local Git evidence.
+Execution and downstream quality/delivery stages use that manifest rather than
+launcher state or the operator's primary checkout.
+
 The default Local Workspace registry is persisted under AOR-owned user state,
 uses atomic revisioned writes, and stores only explicitly connected projects
 and redacted bindings. Reads never scan the filesystem. A neutral launcher has

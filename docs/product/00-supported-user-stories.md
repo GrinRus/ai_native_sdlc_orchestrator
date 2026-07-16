@@ -127,10 +127,11 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 W60 now provides the requalified structured-plan contract, mission-specific
 decomposition, deterministic completeness before semantic checks, exact-version
 approval, evidence-derived task progress, and the accessible Plan workbench.
-W61-W62 still track project topology, workspace-set,
-safe-concurrency, integration, and recovery gaps. Until those later slices
-close, topology and parallel-step coverage remains a bounded contract/proof
-baseline rather than the full operator workflow in
+W61 closes project topology and installed execution setup. W62-S01 adds the
+run-owned isolated workspace-set provisioner and per-repository change
+evidence; safe concurrency, integration, and coordinated recovery remain open.
+Until those later slices close, parallel-step coverage remains a bounded
+contract/proof baseline rather than the full operator workflow in
 `docs/product/04-project-topology-and-task-planning-ux.md`.
 
 ### Incident / improvement owner

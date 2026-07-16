@@ -1,4 +1,14 @@
 compiled_context_id: compiled-context.aor-core.implement.runner-default
+workspace_set_provenance:
+  workspace_set_ref: evidence://reports/workspace-set.run-sample.json
+  workspace_root: .aor/projects/aor-core/workspace-sets/run-sample
+  repository_map:
+    main:
+      mount_path: repos/main
+      execution_root: .aor/projects/aor-core/workspace-sets/run-sample/repos/main
+      base_commit: "1111111111111111111111111111111111111111"
+      access_mode: write
+  cleanup_state: pending
 version: 2
 step: implement
 compiler_revision: runtime-context-compiler@v2

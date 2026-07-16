@@ -26,6 +26,9 @@ the existing result. In-progress reuse and payload conflicts are rejected.
 Subsequent controller updates use a per-result lock, revision sidecar, atomic
 replacement, and optional expected-revision CAS.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
+Repo-aware steps may add `workspace_set_provenance` copied from the compiled
+context. Verification, Runtime Harness, review, and delivery must retain the
+same `workspace_set_ref` and repository execution-root map.
 `project verify` runner step results may add command-level evidence so bounded verification is machine-readable in addition to the transcript evidence:
 - `command_group_id`, `command_group_role`, `command_group_phase`, `command_group_enforcement`, `command_group_timeout_class`, and `enforcement_result`;
 - `command_group_outcome` when generic verification needs to preserve

@@ -21,6 +21,12 @@ Runtime artifact that captures the selected prompt bundle, resolved context bund
 - `budget_report`
 - `compaction_report`
 
+Run-scoped repo-aware execution may add `workspace_set_provenance` with the
+canonical `workspace_set_ref`, workspace root, repository map, exact base
+commits, execution roots, access modes, and cleanup state. Once present, every
+packet and tool path must resolve through that map; launcher or primary-checkout
+fallback is invalid.
+
 ## Notes
 This contract family is introduced in `W6-S02` so downstream runtime, harness, and promotion contracts can refer to one stable compiled-context shape before the compiler exists.
 

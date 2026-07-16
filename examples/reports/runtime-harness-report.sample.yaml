@@ -4,6 +4,16 @@ run_id: run.sample
 generated_at: 2026-04-26T00:00:00.000Z
 mission_type: code-changing
 strictness_profile: strict-code-changing
+workspace_set_provenance:
+  workspace_set_ref: evidence://reports/workspace-set.run-sample.json
+  workspace_root: .aor/projects/aor-core/workspace-sets/run-sample
+  repository_map:
+    main:
+      mount_path: repos/main
+      execution_root: .aor/projects/aor-core/workspace-sets/run-sample/repos/main
+      base_commit: "1111111111111111111111111111111111111111"
+      access_mode: write
+  cleanup_state: pending
 mission_lineage:
   status: resolved
   run_id: run.bootstrap.20260420.001
