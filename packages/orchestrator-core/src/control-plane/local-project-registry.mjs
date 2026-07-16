@@ -6,6 +6,7 @@ import { previewProjectRuntime } from "../project-init.mjs";
 import { listFlowProjections } from "./flow-projections.mjs";
 import { buildOnboardingSummary } from "./onboarding-summary.mjs";
 import { createProjectContext, rekeyProjectContext } from "./project-context.mjs";
+import { createWorkspaceRegistryStore } from "./workspace-registry-store.mjs";
 
 /**
  * @param {unknown} value
@@ -233,13 +234,38 @@ export function summarizeProjectContext(context) {
  *     projectProfile?: string,
  *     runtimeRoot?: string,
  *     label?: string,
+ *     bindings?: unknown[],
  *   }>,
+ *   persistence?: { mode: "ephemeral" | "persistent", root?: string },
  * }} options
  */
 export function createLocalProjectRegistry(options) {
   const cwd = options.cwd ?? process.cwd();
   const contexts = new Map();
+  const inputs = new Map();
+  const store = options.persistence?.mode === "persistent"
+    ? createWorkspaceRegistryStore({ root: options.persistence.root })
+    : null;
+  const stored = store?.read() ?? { revision: 0, projects: [], selected_project_id: null };
+  let registryRevision = stored.revision;
   let defaultProjectId = null;
+
+  function persist() {
+    if (!store) return;
+    const next = store.update(registryRevision, (document) => ({
+      ...document,
+      selected_project_id: null,
+      projects: [...inputs.entries()].map(([projectId, input]) => ({
+        project_id: projectId,
+        project_ref: input.projectRef,
+        project_profile: input.projectProfile ?? null,
+        runtime_root: input.runtimeRoot ?? null,
+        label: input.label ?? null,
+        bindings: Array.isArray(input.bindings) ? input.bindings : [],
+      })),
+    }));
+    registryRevision = next.revision;
+  }
 
   /**
    * @param {{
@@ -249,34 +275,50 @@ export function createLocalProjectRegistry(options) {
    *   label?: string,
    * }} input
    */
-  function addProject(input) {
+  function addProject(input, settings = {}) {
     const nextContext = createProjectContext({ ...input, cwd });
     const existing = [...contexts.values()].find((context) => isSameRegisteredTarget(context, nextContext));
     let selectedProjectId;
     if (existing) {
       contexts.set(existing.projectId, rekeyProjectContext(existing, existing.projectId, optionalString(input.label) ?? existing.label));
+      inputs.set(existing.projectId, { ...inputs.get(existing.projectId), ...input });
+      if (settings.select !== false) defaultProjectId ??= existing.projectId;
       selectedProjectId = existing.projectId;
     } else {
       const registryProjectId = resolveRegistryProjectId(nextContext, contexts);
       const context = rekeyProjectContext(nextContext, registryProjectId);
       contexts.set(context.projectId, context);
-      defaultProjectId ??= context.projectId;
+      inputs.set(context.projectId, { ...input, projectRef: context.projectRoot });
+      if (settings.select !== false) defaultProjectId ??= context.projectId;
       selectedProjectId = context.projectId;
     }
+    if (settings.persist !== false) persist();
     return contexts.get(selectedProjectId);
   }
 
-  for (const project of options.projects) {
-    addProject(project);
+  for (const project of stored.projects) {
+    if (typeof project.project_ref !== "string") continue;
+    addProject({
+      projectRef: project.project_ref,
+      projectProfile: optionalString(project.project_profile),
+      runtimeRoot: optionalString(project.runtime_root),
+      label: optionalString(project.label),
+      bindings: Array.isArray(project.bindings) ? project.bindings : [],
+    }, { persist: false, select: false });
   }
-
-  if (!defaultProjectId) {
-    throw new Error("At least one local project must be registered before starting the app server.");
+  for (const project of options.projects) {
+    addProject(project, { persist: true, select: true });
   }
 
   return {
     get defaultProjectId() {
       return defaultProjectId;
+    },
+    get revision() {
+      return registryRevision;
+    },
+    get persistent() {
+      return store !== null;
     },
     listContexts() {
       return [...contexts.values()];
@@ -285,8 +327,14 @@ export function createLocalProjectRegistry(options) {
       return contexts.get(projectId) ?? null;
     },
     addProject,
+    getProjectInput(projectId) {
+      return inputs.get(projectId) ?? null;
+    },
     summarize() {
       return {
+        workspace_id: "default",
+        revision: registryRevision,
+        selected_project_id: defaultProjectId,
         default_project_id: defaultProjectId,
         projects: [...contexts.values()].map((context) => summarizeProjectContext(context)),
         read_only: true,

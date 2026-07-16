@@ -153,6 +153,11 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Flow projection | `control-plane-api`, `intake-request-body`, `next-action-report`, `operator-request`, closure artifacts | W34-S01 defines active/completed flow semantics; W34-S02 implements runtime/control-plane flow list/detail/selected reads, `New Flow` evidence preservation, and completed-flow read-only request guards without adding UI-owned state; W34-S05 links learning closure to follow-up flow creation. |
 | Proof | Internal installed-user proof artifacts and quality assessment reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions; W34-S06 extends it with browser-task proof, first-flow completion, second-flow creation, flow-targeted operator requests, accepted skill-agent decisions, and post-run quality assessment refs. |
 
+Bare `aor app` from a neutral non-Git directory opens the operator-local Local
+Workspace without selecting a project or creating launcher state. Explicitly
+added projects persist across restarts; repo-attached launch remains a
+session-scoped compatibility shortcut.
+
 ## Out of scope for the guided journey contract
 - implementing `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, or `aor app`;
 - changing low-level command output shapes;

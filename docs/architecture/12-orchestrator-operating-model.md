@@ -27,6 +27,12 @@ definitions; a Project Binding owns machine-local checkout resolution; and a
 Workspace Set freezes exact repository identities for a later run. Components
 inside a monorepo never become synthetic Git repositories.
 
+The default Local Workspace registry is persisted under AOR-owned user state,
+uses atomic revisioned writes, and stores only explicitly connected projects
+and redacted bindings. Reads never scan the filesystem. A neutral launcher has
+no selected project; an attached repository is a current-session selection
+rather than a persisted ambient project.
+
 Query ingress derives an immutable `ProjectReadContext` from that project
 context and a non-materializing runtime preview. It resolves the same canonical
 paths but represents missing runtime state as `initialized=false`; it never

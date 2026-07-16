@@ -97,6 +97,16 @@ function parseHost(value) {
 
 const APP_FLAGS = new Set(["project-ref", "project-profile", "runtime-root", "host", "port", "open", "json", "smoke"]);
 
+function findAttachedProjectRoot(cwd) {
+  let cursor = path.resolve(cwd);
+  while (true) {
+    if (fs.existsSync(path.join(cursor, ".git"))) return cursor;
+    const parent = path.dirname(cursor);
+    if (parent === cursor) return null;
+    cursor = parent;
+  }
+}
+
 /**
  * @param {string[]} args
  * @returns {Record<string, string | boolean>}
@@ -351,9 +361,12 @@ export async function runAppCommand(args, options = {}) {
   try {
     const flags = parseAppFlags(args);
     const cwd = options.cwd ?? process.cwd();
-    const projectRef = path.resolve(cwd, optionalString(flags, "project-ref") ?? ".");
+    const explicitProjectRef = optionalString(flags, "project-ref");
+    const projectRef = explicitProjectRef
+      ? path.resolve(cwd, explicitProjectRef)
+      : findAttachedProjectRoot(cwd);
     const projectProfile = optionalString(flags, "project-profile");
-    if (!fs.existsSync(projectRef) || !fs.statSync(projectRef).isDirectory()) {
+    if (projectRef && (!fs.existsSync(projectRef) || !fs.statSync(projectRef).isDirectory())) {
       throw new Error(`Project path '${projectRef}' does not exist or is not a directory.`);
     }
 
@@ -372,6 +385,7 @@ export async function runAppCommand(args, options = {}) {
       projectRef,
       projectProfile,
       runtimeRoot: runtimeRootInput,
+      workspaceRegistry: { mode: smoke ? "ephemeral" : "persistent" },
       host,
       port,
       app: {
@@ -393,7 +407,9 @@ export async function runAppCommand(args, options = {}) {
       project_id: transport.projectId,
       project_profile_ref: transport.projectProfileRef,
       project_ref: transport.projectRef,
-      runtime_root: transport.runtimeRoot ?? (runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor")),
+      runtime_root: transport.runtimeRoot ?? (projectRef
+        ? (runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor"))
+        : null),
       host: transport.host,
       port: transport.port,
       open,
@@ -407,6 +423,7 @@ export async function runAppCommand(args, options = {}) {
         const html = await getText(appUrl);
         const config = await getJson(`${transport.baseUrl}/app-config.json`);
         const projectIndex = await getJson(`${transport.baseUrl}/api/projects`);
+        if (!transport.projectId) throw new Error("App smoke requires an attached project.");
         const state = await getJson(`${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/state`);
         const packagedSpa = inspectPackagedSpa(staticRoot, html);
         const renderGuard = await buildRenderGuard({ html, appUrl });
@@ -450,7 +467,7 @@ export async function runAppCommand(args, options = {}) {
       stdout.write(`${formatJson(summary, jsonMode)}\n`);
     } else {
       stdout.write(`AOR Operator Console: ${appUrl}\n`);
-      stdout.write(`Project: ${projectRef}\n`);
+      stdout.write(projectRef ? `Project: ${projectRef}\n` : "Local Workspace: no project selected\n");
       stdout.write("Press Ctrl+C to stop the local app server.\n");
     }
     if (open) {

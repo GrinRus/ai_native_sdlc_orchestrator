@@ -545,8 +545,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W61-S01 | Project topology and local binding contract baseline | EPIC-1, EPIC-2, EPIC-5 | done | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, tests | W60-S01 |
-| W61-S02 | Persistent local workspace registry and topology discovery | EPIC-1, EPIC-6 | ready | `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, local registry and project-analysis tests | W61-S01 |
-| W61-S03 | Project topology CLI/API management and validation | EPIC-1, EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, OpenAPI/examples, tests | W61-S02 |
+| W61-S02 | Persistent local workspace registry and topology discovery | EPIC-1, EPIC-6 | done | `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, local registry and project-analysis tests | W61-S01 |
+| W61-S03 | Project topology CLI/API management and validation | EPIC-1, EPIC-6 | ready | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, OpenAPI/examples, tests | W61-S02 |
 | W61-S04 | Add Project and Project Structure UX | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, browser tests | W61-S03 |
 | W61-S06 | Project execution profile and runner-readiness contract | EPIC-1, EPIC-3, EPIC-6 | blocked | execution-profile/readiness contracts, project profile, provider routing, CLI/API/control plane, tests | W61-S03 |
 | W61-S07 | Execution Setup UX and browser proof | EPIC-1, EPIC-6 | blocked | `apps/web/**`, control-plane client, execution setup/readiness projections, browser/accessibility tests | W61-S04, W61-S06 |
