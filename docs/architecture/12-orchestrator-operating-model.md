@@ -129,6 +129,12 @@ Quality boundaries are explicit:
 
 The local app path is an operator surface, not a runtime dependency. It serves `/`, `/app-config.json`, and same-origin `/api/projects/:projectId/**` routes from the CLI-launched process, then invokes the same lifecycle-command handlers as the CLI. Stopping the app server must not stop runs or mutate workflow state beyond the explicit commands the operator submitted.
 
+Core application entrypoints are stable, bounded facades. Routed execution,
+review-report materialization, and CLI command-family dispatch delegate to
+transport-neutral implementations; HTTP, CLI, and the app launcher remain
+one-way adapters and never become orchestration owners. Repository quality
+checks enforce the facade size ceiling and the transport dependency boundary.
+
 Flow projections are read models, not a new orchestration owner. Active flows
 can advance only through the existing runtime command path. Completed flows
 remain read-only. Follow-up flows start from fresh mission/intake evidence and

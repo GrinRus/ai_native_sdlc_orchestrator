@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
-
 import { initializeProjectRuntime } from "./project-init.mjs";
 import {
   collectMissionChangeEvidence,
@@ -761,7 +759,7 @@ function isChangedPathInsideApprovedScope(changedPath, allowedPaths) {
  *   executionRoot?: string | null,
  * }} options
  */
-export function materializeReviewReport(options) {
+function materializeReviewReportImplementation(options) {
   const init = initializeProjectRuntime(options);
   const evidenceRoot = asString(options.executionRoot)
     ? path.resolve(init.projectRoot, /** @type {string} */ (options.executionRoot))
@@ -1334,3 +1332,5 @@ export function materializeReviewReport(options) {
     reviewReportFile,
   };
 }
+
+export function materializeReviewReport(options) { return materializeReviewReportImplementation(options); }

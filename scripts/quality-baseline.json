@@ -2,6 +2,12 @@
   "schema_version": 1,
   "typecheck_max_diagnostics": 0,
   "new_file_max_lines": 1000,
+  "facade_function_max_lines": 100,
+  "facade_functions": [
+    {"file":"packages/orchestrator-core/src/step-execution-engine.mjs","name":"executeRoutedStep"},
+    {"file":"packages/orchestrator-core/src/review-run.mjs","name":"materializeReviewReport"},
+    {"file":"packages/orchestrator-core/src/operator-cli/command-handlers/operations.mjs","name":"handleOperationsCommand"}
+  ],
   "file_line_ceiling_overrides": {
     "apps/web/src/spa.jsx": 7565,
     "apps/web/src/spa.css": 5022,

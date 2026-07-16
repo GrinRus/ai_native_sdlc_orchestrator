@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-
 import {
   createAdapterRequestEnvelope,
   resolveAdapterForRoute,
@@ -998,7 +997,7 @@ function writeRuntimeRepairInput(options) {
  *   requestKey?: string,
  * }} options
  */
-export function executeRoutedStep(options) {
+function executeRoutedStepImplementation(options) {
   for (const [field, value] of [["runId", options.runId], ["stepId", options.stepId]]) {
     if (value === undefined) continue;
     const validation = validatePublicId(value);
@@ -1972,6 +1971,7 @@ export function executeRoutedStep(options) {
   return result;
 }
 
+export function executeRoutedStep(options) { return executeRoutedStepImplementation(options); }
 function continueInOwnedWorkspace(options, result) {
   const workspace = asRecord(asRecord(result.stepResult.routed_execution).workspace_isolation);
   const executionRoot = asString(workspace.execution_root);

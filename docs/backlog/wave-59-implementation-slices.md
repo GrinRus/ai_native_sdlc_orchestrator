@@ -300,7 +300,7 @@ hard dependencies nor makes any W60 slice done.
   by stable behavior boundaries without changing contracts or reintroducing
   transport cycles.
 - **Epic:** EPIC-0, EPIC-3, EPIC-6
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P2
 - **Estimated effort:** XL
 - **Primary modules:** step execution, review-report materialization, adapter
