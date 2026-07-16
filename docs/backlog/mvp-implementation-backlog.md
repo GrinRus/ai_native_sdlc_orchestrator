@@ -539,7 +539,7 @@ This is the master index for the implementation slices across all defined waves.
 | W60-S02 | Planner decomposition and task quality gate | EPIC-2, EPIC-3, EPIC-4 | done | `examples/prompts/**`, `examples/context/**`, `packages/orchestrator-core/src/handoff-packets.mjs`, `packages/contracts/**`, planning tests | W60-S01, W44-S03 |
 | W60-S03 | Execution plan and evidence-derived task progress | EPIC-2, EPIC-3, EPIC-6 | done | `docs/contracts/**`, `packages/contracts/**`, `packages/orchestrator-core/**`, `packages/observability/**`, `examples/reports/**`, tests | W60-S02 |
 | W60-S04 | Plan workbench UX and approval flow | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, control-plane tests | W60-S03 |
-| W60-S05 | Structured planning proof and documentation closure | EPIC-0, EPIC-7 | ready | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W60-S04 |
+| W60-S05 | Structured planning proof and documentation closure | EPIC-0, EPIC-7 | done | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W60-S04 |
 
 ## W61 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

@@ -353,7 +353,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S05 — Structured planning proof and documentation closure
 
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove the detailed planning path through public headless and web
   surfaces and align documentation with implemented behavior.
 - **Primary modules:** `README.md`, `docs/product/**`, `docs/architecture/**`,
