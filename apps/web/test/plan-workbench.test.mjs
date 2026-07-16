@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const component = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/plan-workbench.jsx"), "utf8");
+const views = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/plan-workbench-views.jsx"), "utf8");
 const spa = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
 const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 
@@ -14,10 +15,10 @@ test("Plan workbench exposes accessible task, traceability, dependency, and revi
     assert.equal(component.includes(`"${label}"`), true);
   }
   assert.match(component, /role="tablist"/u);
-  assert.match(component, /role="dialog"/u);
-  assert.match(component, /aria-modal="true"/u);
-  assert.match(component, /event\.key !== "Escape"/u);
-  assert.match(component, /openerRef\.current\?\.focus/u);
+  assert.match(views, /<Dialog/u);
+  assert.match(views, /TaskDetailDialog/u);
+  assert.match(component, /TaskTable/u);
+  assert.match(component, /TraceabilityView/u);
   assert.doesNotMatch(component, /Mark complete/iu);
   assert.doesNotMatch(component, /contentEditable/iu);
 });
