@@ -20,6 +20,7 @@ import {
   resolveExecutionUnitContext,
 } from "../../task-plan-service.mjs";
 import { applyTopologyAction, TopologyManagementError } from "../topology-management.mjs";
+import { applyExecutionProfileAction, ExecutionProfileError } from "../execution-profile.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
 const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
@@ -301,6 +302,28 @@ export async function handleProjectTopologyAction({ request, response, params, r
     sendJson(response, payload.action === "reanalyze" ? 202 : 200, result);
   } catch (error) {
     if (error instanceof TopologyManagementError) {
+      sendError(response, error.statusCode, error.code, error.message);
+      return;
+    }
+    throw error;
+  }
+}
+
+export async function handleExecutionProfileAction({ request, response, params, registry }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+  try {
+    const result = applyExecutionProfileAction({
+      registry,
+      projectId: params.projectId,
+      action: asString(payload.action) ?? "",
+      step: asString(payload.step) ?? undefined,
+      routeId: asString(payload.route_id) ?? undefined,
+      expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+    });
+    sendJson(response, payload.action === "check" ? 202 : 200, result);
+  } catch (error) {
+    if (error instanceof ExecutionProfileError) {
       sendError(response, error.statusCode, error.code, error.message);
       return;
     }

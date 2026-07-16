@@ -157,6 +157,51 @@
         }
       }
     },
+    "/api/projects/{projectId}/execution-profile": {
+      "get": {
+        "operationId": "getExecutionProfile",
+        "tags": ["read"],
+        "x-aor-route-id": "execution-profile",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/execution-profile/actions": {
+      "post": {
+        "operationId": "applyExecutionProfileAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "execution-profile-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExecutionProfileActionRequest" } },
+            "application/*+json": { "schema": { "$ref": "#/components/schemas/ExecutionProfileActionRequest" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
     "/api/projects/{projectId}/state": {
       "get": {
         "operationId": "getProjectState",
@@ -4001,6 +4046,20 @@
           },
           "expected_revision": { "type": "integer", "minimum": 0 },
           "value": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
+      },
+      "ExecutionProfileActionRequest": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": { "type": "string", "enum": ["select", "reset", "check"] },
+          "step": {
+            "type": "string",
+            "enum": ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"]
+          },
+          "route_id": { "type": "string" },
+          "expected_revision": { "type": "integer", "minimum": 0 }
         },
         "additionalProperties": false
       },

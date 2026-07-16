@@ -169,8 +169,21 @@ The W61-S04 implementation provides Overview, Repositories, Components,
 Dependencies, and Validation views through the canonical topology API.
 Repository and component disable actions show a write-effect confirmation;
 validation, refresh, and navigation remain read-only with respect to project
-runtime state. Execution-route setup and its readiness states remain owned by
-W61-S06 and W61-S07.
+runtime state.
+
+### Execution Setup
+
+W61-S06 provides the headless contract and control-plane baseline used by the
+future installed UI. `project-profile.default_route_profiles` remains the only
+persisted route selection. `execution-profile` derives approved route, runner,
+provider, requested/effective model, model source, capabilities, fallback, and
+readiness without exposing credentials or initializing `.aor`.
+
+CLI and API support show, revisioned select/reset, and explicit check. Check
+persists only runner/auth availability summaries in the Local Workspace
+registry and fails closed before provider spawn for missing runner/auth,
+unsupported model, capability mismatch, or policy denial. W61-S07 remains
+responsible for the accessible Execution Setup browser surface and proof.
 
 ### Flow Plan workbench
 

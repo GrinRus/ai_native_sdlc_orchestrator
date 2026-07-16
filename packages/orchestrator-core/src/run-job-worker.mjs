@@ -11,12 +11,38 @@ if (!jobFile) process.exit(2);
 let job = readRunJobFile(jobFile);
 if (!job) process.exit(2);
 
+function recordWorkerFailure(error) {
+  try {
+    const current = readRunJobFile(jobFile);
+    if (!current || ["succeeded", "failed", "canceled"].includes(current.status)) return;
+    const message = error instanceof Error ? error.message : String(error);
+    updateRunJobFile(jobFile, {
+      status: "failed",
+      heartbeat_at: new Date().toISOString(),
+      terminal_at: new Date().toISOString(),
+      terminal_evidence_refs: [current.status_ref, current.event_ref],
+      worker_result: { exit_code: 1, signal: null, stdout_tail: "", stderr_tail: message.slice(-32768) },
+    });
+  } catch {
+    // A later recovery probe can classify a worker that failed during persistence.
+  }
+}
+
+process.on("uncaughtException", (error) => {
+  recordWorkerFailure(error);
+  process.exit(1);
+});
+process.on("unhandledRejection", (error) => {
+  recordWorkerFailure(error);
+  process.exit(1);
+});
+
 job = updateRunJobFile(jobFile, {
   status: "running",
   started_at: new Date().toISOString(),
   heartbeat_at: new Date().toISOString(),
   worker: { pid: process.pid, identity: `node-worker-${process.pid}` },
-}, job.revision);
+});
 
 const request = job.worker_request;
 const cliBin = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../apps/cli/bin/aor.mjs");
@@ -29,6 +55,10 @@ let stdout = "";
 let stderr = "";
 child.stdout.on("data", (chunk) => { stdout = `${stdout}${chunk}`.slice(-32768); });
 child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-32768); });
+child.on("error", (error) => {
+  recordWorkerFailure(error);
+  process.exit(1);
+});
 
 let stopped = false;
 let killTimer = null;

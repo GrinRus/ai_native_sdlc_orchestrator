@@ -103,6 +103,11 @@ export {
 export { RUNTIME_ROOT_DIRNAME };
 export { createLocalProjectRegistry, summarizeProjectContext } from "../control-plane/local-project-registry.mjs";
 export { applyTopologyAction, readProjectTopology, TopologyManagementError } from "../control-plane/topology-management.mjs";
+export {
+  applyExecutionProfileAction,
+  readExecutionProfile,
+  ExecutionProfileError,
+} from "../control-plane/execution-profile.mjs";
 
 export class CliUsageError extends Error {
   /**

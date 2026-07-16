@@ -26,3 +26,11 @@ export { runLifecycleCommand } from "./lifecycle-command.mjs";
 export { submitInteractionAnswer } from "./interaction-answer.mjs";
 export { createControlPlaneHttpServer } from "./http-transport.mjs";
 export { createOperatorError, RECOVERY_ACTION_CATALOG } from "../../../packages/orchestrator-core/src/control-plane/operator-error.mjs";
+export {
+  applyTopologyAction,
+  readProjectTopology,
+} from "../../../packages/orchestrator-core/src/control-plane/topology-management.mjs";
+export {
+  applyExecutionProfileAction,
+  readExecutionProfile,
+} from "../../../packages/orchestrator-core/src/control-plane/execution-profile.mjs";

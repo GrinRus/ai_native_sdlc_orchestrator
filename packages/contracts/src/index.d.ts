@@ -2,6 +2,8 @@ export type ContractFamily =
   | "project-profile"
   | "project-binding"
   | "workspace-set"
+  | "execution-profile"
+  | "execution-readiness-report"
   | "onboarding-report"
   | "next-action-report"
   | "project-analysis-report"

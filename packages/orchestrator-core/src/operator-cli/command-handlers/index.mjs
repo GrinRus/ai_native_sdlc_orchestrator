@@ -7,10 +7,12 @@ import { QUALITY_COMMAND_GROUP, handleQualityCommand } from "./quality.mjs";
 import { REQUEST_COMMAND_GROUP, handleRequestCommand } from "./request.mjs";
 import { RUN_CONTROL_COMMAND_GROUP, handleRunControlCommand } from "./run-control.mjs";
 import { TOPOLOGY_COMMAND_GROUP, handleTopologyCommand } from "./topology.mjs";
+import { ROUTE_COMMAND_GROUP, handleRouteCommand } from "./routes.mjs";
 
 export const COMMAND_HANDLER_GROUPS = Object.freeze([
   GUIDED_COMMAND_GROUP,
   TOPOLOGY_COMMAND_GROUP,
+  ROUTE_COMMAND_GROUP,
   BOOTSTRAP_COMMAND_GROUP,
   PLAN_COMMAND_GROUP,
   QUALITY_COMMAND_GROUP,
@@ -29,6 +31,7 @@ const COMMAND_TO_GROUP = new Map(
 const GROUP_HANDLERS = new Map([
   ["guided-first-run", handleGuidedCommand],
   ["project-topology", handleTopologyCommand],
+  ["execution-routes", handleRouteCommand],
   ["bootstrap", handleBootstrapCommand],
   ["structured-plans", handlePlanCommand],
   ["quality", handleQualityCommand],

@@ -141,6 +141,14 @@ Quality boundaries are explicit:
 
 The local app path is an operator surface, not a runtime dependency. It serves `/`, `/app-config.json`, and same-origin `/api/projects/:projectId/**` routes from the CLI-launched process, then invokes the same lifecycle-command handlers as the CLI. Stopping the app server must not stop runs or mutate workflow state beyond the explicit commands the operator submitted.
 
+Execution setup follows the same headless boundary. Portable route selections
+live only in `project-profile.default_route_profiles`; the derived
+`execution-profile` resolves canonical route and adapter metadata for reads.
+Explicit readiness checks write credential-free summaries to the machine-local
+Workspace registry. Reads do not initialize project runtime, and route
+selection, model compatibility, runner/auth readiness, capability, and policy
+failures are resolved before any provider process can spawn.
+
 Core application entrypoints are stable, bounded facades. Routed execution,
 review-report materialization, and CLI command-family dispatch delegate to
 transport-neutral implementations; HTTP, CLI, and the app launcher remain

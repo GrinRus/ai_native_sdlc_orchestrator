@@ -428,7 +428,7 @@ profiles.
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-3 Execution;
   EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Operators can inspect, select, reset, and check an approved
   project execution route through one contract-owned CLI/API surface, with
   truthful runner/provider/model readiness and no credential disclosure.
@@ -531,7 +531,7 @@ profiles.
 ## W61-S07 — Execution Setup UX and browser proof
 
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Installed users can select an approved execution route, inspect
   the effective runner/provider/model, check readiness, and recover from setup
   blockers without editing raw profiles or mistaking simulation for live work.

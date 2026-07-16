@@ -36,6 +36,10 @@ const TOP_LEVEL_HELP_GROUPS = Object.freeze([
     ],
   },
   {
+    title: "Execution setup",
+    commands: ["route show", "route select", "route reset", "route check"],
+  },
+  {
     title: "Core lifecycle",
     commands: [
       "project init",

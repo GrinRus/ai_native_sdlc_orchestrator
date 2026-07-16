@@ -18,6 +18,16 @@ blocking validation, and active-flow conflicts fail before publication. `GET
 without initializing project runtime state. The compatibility
 `POST /api/projects/actions` add action remains workspace-scoped.
 
+Execution setup uses the same boundary. `GET
+/api/projects/:projectId/execution-profile` derives approved route, adapter,
+provider, requested/effective model, capability, fallback, revision, and latest
+readiness state from `project-profile.default_route_profiles`; it does not
+initialize runtime state. `POST
+/api/projects/:projectId/execution-profile/actions` accepts only `select`,
+`reset`, or `check`. Select/reset mutate the portable project profile under
+revision and active-run guards. Check writes a credential-free readiness
+summary to the Local Workspace registry and never spawns a provider.
+
 All operator failures use one `OperatorError`: `code`, `title`, `detail`, the compatibility alias `message`, operation/phase/resource/consequence/retryability, scoped refs, field errors, evidence refs, and typed recovery actions. Recovery identifiers come only from the canonical catalog and are never inferred from provider text, stack traces, or shell commands.
 
 Control-plane collection limits are centralized: list responses default to 200 and cap at 1000; SSE replay defaults to 0 and caps at 1000.
@@ -35,7 +45,7 @@ the accepted alpha transport boundary. A future NestJS-backed transport requires
 a new ADR before implementation work changes this contract.
 
 Implemented operation families:
-- read: local app project index, project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report, flow projections;
+- read: local app project index, project topology, execution profile, project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report, flow projections;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - operator requests: create/list/run bounded operator-initiated runtime interventions with sanitized read payloads;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
