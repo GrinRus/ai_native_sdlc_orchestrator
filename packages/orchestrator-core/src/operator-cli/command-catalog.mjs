@@ -324,6 +324,22 @@ const COMMAND_DEFINITIONS = Object.freeze([
     contractFamilies: ["project-profile", "project-binding", "workspace-set"],
   },
   {
+    command: "route show", category: "execution-routes", status: "implemented", summary: "Show the derived execution profile without initializing project runtime.", inputs: ["--project-id <id>", "--help"],
+    outputs: ["execution_profile", "contract_families", "command_catalog_alignment"], requiredFlags: ["project-id"], contractFamilies: ["execution-profile", "provider-route-profile"],
+  },
+  {
+    command: "route select", category: "execution-routes", status: "implemented", summary: "Select an approved route for one step in the portable project profile.", inputs: ["--project-id <id>", "--step <step>", "--route <route_id>", "--expected-revision <revision>", "--help"],
+    outputs: ["execution_profile", "contract_families", "command_catalog_alignment"], requiredFlags: ["project-id", "step", "route", "expected-revision"], contractFamilies: ["execution-profile", "project-profile", "provider-route-profile"],
+  },
+  {
+    command: "route reset", category: "execution-routes", status: "implemented", summary: "Remove one explicit route selection using revision protection.", inputs: ["--project-id <id>", "--step <step>", "--expected-revision <revision>", "--help"],
+    outputs: ["execution_profile", "contract_families", "command_catalog_alignment"], requiredFlags: ["project-id", "step", "expected-revision"], contractFamilies: ["execution-profile", "project-profile"],
+  },
+  {
+    command: "route check", category: "execution-routes", status: "implemented", summary: "Check runner, auth, model, capability, and policy readiness without provider spawn.", inputs: ["--project-id <id>", "--step <step> (optional)", "--help"],
+    outputs: ["execution_profile", "execution_readiness_report", "contract_families", "command_catalog_alignment"], requiredFlags: ["project-id"], contractFamilies: ["execution-profile", "execution-readiness-report"],
+  },
+  {
     command: "project analyze",
     category: "project-bootstrap",
     status: "implemented",

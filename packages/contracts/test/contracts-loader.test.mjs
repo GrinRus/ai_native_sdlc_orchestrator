@@ -1792,3 +1792,21 @@ test("contract index mapping covers every docs/contracts/00-index entry", () => 
   assert.equal(controlPlaneEntry.status, "implemented");
   assert.equal(controlPlaneEntry.exampleGlob, "examples/control-plane-api/*.yaml");
 });
+
+test("execution readiness contracts reject secret-bearing top-level fields", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/execution/execution-readiness-report.ready.yaml"),
+    family: "execution-readiness-report",
+  });
+  assert.equal(loaded.ok, true);
+  const invalid = { ...loaded.document, token: "secret-canary" };
+  assertValidationIssue(
+    validateContractDocument({
+      family: "execution-readiness-report",
+      document: invalid,
+      source: "test://execution-readiness-secret",
+    }),
+    "unsupported_field_present",
+    "token",
+  );
+});

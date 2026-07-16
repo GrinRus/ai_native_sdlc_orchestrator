@@ -1,0 +1,23 @@
+profile_id: execution-profile.aor-core
+project_id: aor-core
+revision: 12
+initialized: true
+routes:
+  - step: implement
+    route_id: route.implement.default
+    runner: codex
+    adapter: codex-cli
+    provider: openai
+    requested_model: coding-primary
+    effective_model: gpt-5.5
+    model_source: policy-approved-alias
+    required_capabilities:
+      - repo_write
+      - shell_commands
+      - live_logs
+    fallback:
+      count: 1
+      route_ids: []
+    readiness: ready
+latest_readiness_ref: evidence://execution-readiness/aor-core/revision-12
+read_only: true

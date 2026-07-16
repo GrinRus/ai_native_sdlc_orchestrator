@@ -264,6 +264,9 @@ export function createLocalProjectRegistry(options) {
         bindings: Array.isArray(input.bindings) ? input.bindings : [],
         latest_validation: input.latestValidation ?? null,
         topology_history: Array.isArray(input.topologyHistory) ? input.topologyHistory : [],
+        latest_execution_readiness: input.latestExecutionReadiness ?? null,
+        runner_readiness: input.runnerReadiness && typeof input.runnerReadiness === "object" ? input.runnerReadiness : {},
+        route_history: Array.isArray(input.routeHistory) ? input.routeHistory : [],
       })),
     }));
     registryRevision = next.revision;
@@ -308,6 +311,9 @@ export function createLocalProjectRegistry(options) {
       bindings: Array.isArray(project.bindings) ? project.bindings : [],
       latestValidation: project.latest_validation ?? null,
       topologyHistory: Array.isArray(project.topology_history) ? project.topology_history : [],
+      latestExecutionReadiness: project.latest_execution_readiness ?? null,
+      runnerReadiness: project.runner_readiness && typeof project.runner_readiness === "object" ? project.runner_readiness : {},
+      routeHistory: Array.isArray(project.route_history) ? project.route_history : [],
     }, { persist: false, select: false });
   }
   for (const project of options.projects) {

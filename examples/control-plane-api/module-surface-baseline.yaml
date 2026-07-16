@@ -157,6 +157,24 @@ project_topology_operations:
     - project-binding
     - workspace-set
 
+execution_profile_operations:
+  owning_slice: W61-S06
+  status: implemented
+  project_routes:
+    - GET /api/projects/:projectId/execution-profile
+    - POST /api/projects/:projectId/execution-profile/actions
+  actions:
+    - select
+    - reset
+    - check
+  persisted_route_source: project-profile.default_route_profiles
+  machine_summary_store: local-workspace-registry
+  provider_spawn_allowed: false
+  contract_families:
+    - execution-profile
+    - execution-readiness-report
+    - provider-route-profile
+
 run_control_operations:
   - operation_id: run.start
     action: start

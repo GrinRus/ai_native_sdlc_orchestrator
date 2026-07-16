@@ -112,6 +112,28 @@ export function spawnRunJobWorker(options) {
     detached: true,
     stdio: "ignore",
   });
+  const persistUnexpectedExit = (code, signal, error = null) => {
+    try {
+      const current = readRunJobFile(options.jobFile);
+      if (!current || TERMINAL_STATUSES.has(current.status) || current.status === "waiting-input") return;
+      updateRunJobFile(options.jobFile, {
+        status: "failed",
+        heartbeat_at: new Date().toISOString(),
+        terminal_at: new Date().toISOString(),
+        terminal_evidence_refs: [current.status_ref, current.event_ref],
+        worker_result: {
+          exit_code: Number.isInteger(code) ? code : 1,
+          signal: signal ?? null,
+          stdout_tail: "",
+          stderr_tail: error instanceof Error ? error.message.slice(-32768) : "Run job worker exited before terminal persistence.",
+        },
+      });
+    } catch {
+      // The durable heartbeat remains available for stale-worker recovery.
+    }
+  };
+  child.once("error", (error) => persistUnexpectedExit(1, null, error));
+  child.once("exit", (code, signal) => persistUnexpectedExit(code, signal));
   child.unref();
   return child.pid;
 }

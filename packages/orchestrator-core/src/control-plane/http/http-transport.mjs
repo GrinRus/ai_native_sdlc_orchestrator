@@ -11,10 +11,12 @@ import {
   handleOperatorRequestCreate,
   handleProjectAction,
   handleProjectTopologyAction,
+  handleExecutionProfileAction,
   handleRunControlAction,
   handleUiLifecycleAction,
 } from "./http-mutation-handlers.mjs";
 import { readProjectTopology } from "../topology-management.mjs";
+import { readExecutionProfile } from "../execution-profile.mjs";
 import { handleReadRoute } from "./http-read-handlers.mjs";
 import { matchControlPlaneRoute } from "./http-router.mjs";
 import { handleRunEventStream } from "./http-stream-handlers.mjs";
@@ -217,6 +219,10 @@ export function createControlPlaneHttpServer(options) {
           });
           return;
         }
+        if (route.id === "execution-profile") {
+          sendJson(response, 200, readExecutionProfile({ registry, projectId: routeProjectId }));
+          return;
+        }
         handleReadRoute({
           routeId: route.id,
           params,
@@ -233,6 +239,10 @@ export function createControlPlaneHttpServer(options) {
       }
       if (route.id === "project-topology-actions") {
         await handleProjectTopologyAction({ request, response, params, registry });
+        return;
+      }
+      if (route.id === "execution-profile-actions") {
+        await handleExecutionProfileAction({ request, response, params, registry });
         return;
       }
 

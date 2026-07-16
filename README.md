@@ -453,7 +453,7 @@ Core rules:
 
 ## Command surface status
 
-The CLI command surface currently includes **60 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
+The CLI command surface currently includes **64 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
 
 ## Repository map
 
@@ -515,7 +515,8 @@ delivery program are tracked through `W65` and focus on:
   Parallel scheduling and multirepo workspace provisioning remain W62 work.
 - Portable project/repository/component topology, persistent machine-local
   bindings, revisioned topology control, and installed-user `Add AOR Project`
-  plus Project Structure management. Execution-route setup remains W61 work.
+  plus Project Structure management. Headless execution-route selection and
+  runner readiness are available; the installed Execution Setup UI remains W61 work.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,
   integration and stale-work recovery, and truthful coordinated multirepo
   delivery.

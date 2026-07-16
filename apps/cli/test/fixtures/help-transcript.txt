@@ -22,6 +22,12 @@ Project topology:
   - aor project dependency
   - aor project topology
 
+Execution setup:
+  - aor route show
+  - aor route select
+  - aor route reset
+  - aor route check
+
 Core lifecycle:
   - aor project init
   - aor project analyze

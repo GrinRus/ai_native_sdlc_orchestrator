@@ -548,8 +548,8 @@ This is the master index for the implementation slices across all defined waves.
 | W61-S02 | Persistent local workspace registry and topology discovery | EPIC-1, EPIC-6 | done | `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, local registry and project-analysis tests | W61-S01 |
 | W61-S03 | Project topology CLI/API management and validation | EPIC-1, EPIC-6 | done | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, OpenAPI/examples, tests | W61-S02 |
 | W61-S04 | Add Project and Project Structure UX | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, browser tests | W61-S03 |
-| W61-S06 | Project execution profile and runner-readiness contract | EPIC-1, EPIC-3, EPIC-6 | ready | execution-profile/readiness contracts, project profile, provider routing, CLI/API/control plane, tests | W61-S03 |
-| W61-S07 | Execution Setup UX and browser proof | EPIC-1, EPIC-6 | blocked | `apps/web/**`, control-plane client, execution setup/readiness projections, browser/accessibility tests | W61-S04, W61-S06 |
+| W61-S06 | Project execution profile and runner-readiness contract | EPIC-1, EPIC-3, EPIC-6 | done | execution-profile/readiness contracts, project profile, provider routing, CLI/API/control plane, tests | W61-S03 |
+| W61-S07 | Execution Setup UX and browser proof | EPIC-1, EPIC-6 | ready | `apps/web/**`, control-plane client, execution setup/readiness projections, browser/accessibility tests | W61-S04, W61-S06 |
 | W61-S05 | Topology onboarding proof and documentation closure | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W61-S07 |
 
 ## W62 slices
