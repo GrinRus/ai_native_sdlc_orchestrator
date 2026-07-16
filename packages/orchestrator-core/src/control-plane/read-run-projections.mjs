@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-
 import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../../../observability/src/index.mjs";
 import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs";
 import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
@@ -8,6 +7,7 @@ import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { createProjectReadContext } from "./project-context.mjs";
 import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
+import { runProjectionCoordinator } from "../operator-projection-services.mjs";
 import {
   applyReadModelLimit,
   listPacketArtifacts,
@@ -16,10 +16,8 @@ import {
   listRunControlStateFiles,
   listStepResults,
 } from "./read-artifact-readers.mjs";
-
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
-
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -492,7 +490,7 @@ function listRunControlStateRecords(options = {}) {
  *   runtimeRoot?: string,
  * }} options
  */
-export function listRuns(options = {}) {
+function executeRunReadProjection(options = {}) {
   const init = createProjectReadContext(options);
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
@@ -947,6 +945,8 @@ export function listRuns(options = {}) {
     };
   });
 }
+
+export function listRuns(options = {}) { return runProjectionCoordinator(executeRunReadProjection, options); }
 
 /**
  * @param {{
