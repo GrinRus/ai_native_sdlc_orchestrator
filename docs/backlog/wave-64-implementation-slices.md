@@ -135,7 +135,7 @@ behavior.
 ## W64-S02 — Verification-to-delivery transaction decomposition
 
 - **Epic:** EPIC-0 Repository development system; EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Project verification and delivery orchestration are split into
   focused transaction services while preserving exact verification, no-write,
   diff, delivery, failure, and rollback behavior.

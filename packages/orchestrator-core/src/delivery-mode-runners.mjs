@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 
 /**
  * @param {unknown} value
@@ -438,7 +439,7 @@ export function runLocalBranchDeliveryMode(options) {
  *   expectedChangedPaths?: string[],
  * }} options
  */
-export function runForkFirstPrDeliveryMode(options) {
+function executeForkFirstPrDeliveryTransaction(options) {
   const commands = [];
   commands.push("git remote get-url origin");
   const originUrl = runGitChecked({
@@ -738,6 +739,10 @@ export function runForkFirstPrDeliveryMode(options) {
       },
     },
   };
+}
+
+export function runForkFirstPrDeliveryMode(options) {
+  return runTransactionCoordinator(executeForkFirstPrDeliveryTransaction, options);
 }
 
 /**

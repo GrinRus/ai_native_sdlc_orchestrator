@@ -6,12 +6,8 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
-import {
-  captureCheckoutSnapshot,
-  compareCheckoutSnapshots,
-  isSupportedWorkspaceMode,
-  prepareWorkspaceIsolation,
-} from "./workspace-isolation.mjs";
+import { captureCheckoutSnapshot, compareCheckoutSnapshots, isSupportedWorkspaceMode, prepareWorkspaceIsolation } from "./workspace-isolation.mjs";
+import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
 const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
@@ -1361,7 +1357,7 @@ function readValidationGateStatus(runtimeLayout) {
  *  verificationCommandTimeoutMs?: number,
  * }} options
  */
-export function verifyProjectRuntime(options = {}) {
+function executeProjectVerificationTransaction(options = {}) {
   const init = initializeProjectRuntime(options);
 
   const loadedProfile = loadContractFile({
@@ -2112,4 +2108,8 @@ export function verifyProjectRuntime(options = {}) {
     stepResultFiles,
     validationGateStatus,
   };
+}
+
+export function verifyProjectRuntime(options = {}) {
+  return runTransactionCoordinator(executeProjectVerificationTransaction, options);
 }

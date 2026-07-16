@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { captureDeliveryDiff } from "./delivery-integrity.mjs";
+import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 
 export const CANONICAL_DELIVERY_MODES = Object.freeze([
   "no-write",
@@ -194,7 +195,7 @@ function resolveGovernanceSource(policyResolution) {
  *   deliveryPlanFile: string,
  * }}
  */
-export function materializeDeliveryPlan(options) {
+function executeDeliveryPlanTransaction(options) {
   const modeSource = resolveModeSource(asRecord(options.policyResolution));
   const governance = resolveGovernanceSource(asRecord(options.policyResolution));
   const canonicalMode = normalizeDeliveryMode(modeSource.resolvedMode);
@@ -436,4 +437,8 @@ export function materializeDeliveryPlan(options) {
     deliveryPlan,
     deliveryPlanFile,
   };
+}
+
+export function materializeDeliveryPlan(options) {
+  return runTransactionCoordinator(executeDeliveryPlanTransaction, options);
 }

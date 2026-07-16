@@ -578,7 +578,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W64-S01 | Idempotent alpha publish transaction and partial-failure recovery | EPIC-0, EPIC-5 | done | release workflow/state inspection, release tests, npm alpha runbook | W29-S01, W59-S07 |
-| W64-S02 | Verification-to-delivery transaction decomposition | EPIC-0, EPIC-5 | ready | project verification, delivery plan/driver, fork-first flow, characterization tests | W59-S07 |
+| W64-S02 | Verification-to-delivery transaction decomposition | EPIC-0, EPIC-5 | done | project verification, delivery plan/driver, fork-first flow, characterization tests | W59-S07 |
 | W64-S03 | Operator decision projection decomposition | EPIC-0, EPIC-4, EPIC-6 | ready | next-action/read projections, asset certification, golden fixtures | W59-S07 |
 
 ## W65 slices
