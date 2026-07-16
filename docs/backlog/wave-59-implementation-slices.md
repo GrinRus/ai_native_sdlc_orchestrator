@@ -232,7 +232,7 @@ hard dependencies nor makes any W60 slice done.
   lint/type/dependency/dead-code debt while allowing the recorded baseline to
   decrease incrementally.
 - **Epic:** EPIC-0
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** root lint/test/build scripts, ESLint/JS typecheck config,
@@ -300,7 +300,7 @@ hard dependencies nor makes any W60 slice done.
   by stable behavior boundaries without changing contracts or reintroducing
   transport cycles.
 - **Epic:** EPIC-0, EPIC-3, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P2
 - **Estimated effort:** XL
 - **Primary modules:** step execution, review-report materialization, adapter
@@ -359,7 +359,7 @@ hard dependencies nor makes any W60 slice done.
   decomposed, while duplicated public/private contract logic has a mechanically
   enforced versioned parity model.
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P2
 - **Estimated effort:** XL
 - **Primary modules:** `packages/adapter-sdk/**`, `scripts/live-e2e/**`,

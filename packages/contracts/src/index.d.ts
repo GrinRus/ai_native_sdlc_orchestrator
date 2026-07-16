@@ -171,7 +171,9 @@ export function loadContractFile(options: LoadContractFileOptions): LoadedContra
 
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
 
-export function validateExampleReferences(options?: LoadExampleContractsOptions): ReferenceValidationResult;
+export function validateExampleReferences(
+  options?: LoadExampleContractsOptions & { loadedExamples?: LoadedExampleContracts },
+): ReferenceValidationResult;
 
 export const PUBLIC_ID_PATTERN: RegExp;
 export const PUBLIC_ID_FIELDS: readonly string[];

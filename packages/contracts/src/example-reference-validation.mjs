@@ -19,11 +19,11 @@ import {
 } from "./reference-registry.mjs";
 
 /**
- * @param {{ workspaceRoot?: string, examplesRoot?: string }} [options]
+ * @param {{ workspaceRoot?: string, examplesRoot?: string, loadedExamples?: import("./index.d.ts").LoadedExampleContracts }} [options]
  * @returns {import("./index.d.ts").ReferenceValidationResult}
  */
 export function validateExampleReferences(options = {}) {
-  const loaded = loadExampleContracts(options);
+  const loaded = options.loadedExamples ?? loadExampleContracts(options);
   const registry = buildReferenceRegistry(loaded.results, loaded.workspaceRoot);
   /** @type {import("./index.d.ts").ReferenceValidationIssue[]} */
   const issues = [];

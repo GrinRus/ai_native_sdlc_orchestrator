@@ -55,8 +55,10 @@ function runCommand(label, command, args, options = {}) {
     killSignal: "SIGKILL",
   });
   if (run.status !== 0) {
-    const timeout = run.error?.code === "ETIMEDOUT";
-    const error = new Error(`${label} failed${timeout ? ` after timeout ${options.timeout}ms` : ""}.`);
+    const timeout = /** @type {NodeJS.ErrnoException | undefined} */ (run.error)?.code === "ETIMEDOUT";
+    const error = /** @type {Error & { durationMs?: number }} */ (
+      new Error(`${label} failed${timeout ? ` after timeout ${options.timeout}ms` : ""}.`)
+    );
     error.durationMs = Date.now() - groupStarted;
     throw error;
   }

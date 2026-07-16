@@ -468,13 +468,16 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
 function checkBaselineBoundary(rootDir) {
   const packageJson = readJson(rootDir, "package.json");
   const findings = [];
-  if (packageJson.scripts?.check !== "node ./scripts/lint.mjs && node ./scripts/test-runner.mjs && node ./scripts/build.mjs") {
-    findings.push("package.json scripts.check must remain the repository-integrity gate.");
+  const checkScript = String(packageJson.scripts?.check ?? "");
+  for (const requiredStage of ["pnpm lint", "pnpm typecheck", "pnpm test", "pnpm build", "pnpm quality:ratchet", "pnpm release:verify"]) {
+    if (!checkScript.includes(requiredStage)) {
+      findings.push(`package.json scripts.check must include canonical stage '${requiredStage}'.`);
+    }
   }
   if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-readiness.mjs") {
     findings.push("package.json must expose production:ready as the separate production-readiness gate.");
   }
-  if (String(packageJson.scripts?.check ?? "").includes("production-readiness")) {
+  if (checkScript.includes("production-readiness") || checkScript.includes("production:ready")) {
     findings.push("pnpm check must not invoke the production-readiness gate.");
   }
 

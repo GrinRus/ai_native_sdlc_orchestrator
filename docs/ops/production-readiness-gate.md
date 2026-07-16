@@ -36,6 +36,12 @@ Executable local-console acceptance runs separately as
 artifacts under ignored `.aor/quality`. Source and bundle marker tests are
 packaging smoke only; they do not certify browser behavior.
 
+The canonical repository pipeline is `pnpm check`. It executes lint, the scoped
+JavaScript typecheck ratchet, complete test discovery, build, dependency and
+hotspot policy, and package verification once. `pnpm slice:gate` delegates to
+that pipeline instead of repeating root stages. Raw analyzer reports stay under
+ignored `.aor/quality`.
+
 To verify another sanitized proof fixture:
 
 ```bash
