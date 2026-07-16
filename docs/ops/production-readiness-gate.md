@@ -4,7 +4,8 @@
 
 `pnpm production:ready` is the release-disposition gate. It is intentionally
 separate from `pnpm check`: the latter remains the repository-integrity baseline.
-The current expected result is an audit release hold, not a production claim.
+The current expected result is bounded self-hosted release clearance, not a
+hosted or universal production claim.
 
 The gate is review-oriented and fails closed. It must not create runtime state, target checkouts, upstream writes, or `.aor/` artifacts.
 
@@ -20,15 +21,14 @@ Machine-readable output:
 pnpm production:ready --json
 ```
 
-CI verifies the expected hold without weakening the default exit contract:
+CI uses the normal cleared-state exit contract:
 
 ```bash
-pnpm production:ready --json --expect-audit-hold
+pnpm production:ready --json
 ```
 
-This mode exits successfully only for `blocked` plus
-`gate_execution_status=pass`; it still fails for `fail`, `unknown`, or an
-unexpected cleared state.
+It exits successfully only for `status=pass`. Invalid evidence returns
+`status=fail`; a future open release blocker returns `status=blocked`.
 
 Executable local-console acceptance runs separately as
 `pnpm test:web:browser`. It launches the built SPA through the public loopback
@@ -68,11 +68,14 @@ The gate verifies:
   one-to-one to deterministic evaluation, context, route, worker/event,
   API/CLI/OpenAPI, loopback, package-smoke, and dependency-audit evidence while
   the remaining W59 set stays explicit;
+- W59 closure integrity: all 55 findings are resolved exactly once, every
+  original S1 has an independent passing regression review, and the exact audit
+  baseline-to-remediation commit range is pinned;
 
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
 - story honesty: all 116 stories remain machine-counted, partial PBO-10/OPS-12 rows retain their backlog gaps, proof-covered rows cite executable W25 fixture evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
-- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on current non-production status and gate usage;
+- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on current bounded self-hosted clearance and excluded surfaces;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;
 - W24 harness evidence: run-level Runtime Harness report fields, strict-delivery example evidence, and controller tests exist.
 - W30 alpha hardening: ADR index and accepted alpha-boundary ADRs exist, the OpenAPI 3.1 route contract matches the implemented HTTP/SSE router, self-hosted ops runbooks exist, W30 backlog source-of-truth docs are present, unsupported Docker/GHCR/SaaS/SSO/default-write-back claims remain out of scope, and OpenCode stories remain blocked without real certification proof.
@@ -94,6 +97,7 @@ Top-level meanings:
 | `audit-remediation-ledger` | The ledger is missing, malformed, incomplete, or contains an invalid resolved claim. | Restore the ledger and evidence; do not infer release status. |
 | `w57-remediation-closure` | The W57 finding set is missing, duplicated, regressed, or points at missing evidence. | Restore the closure report and its referenced deterministic suites; keep the audit hold. |
 | `w58-remediation-closure` | The W58 runtime-quality set, integration profile, remaining W59 map, or evidence paths drifted. | Restore the W58 closure report and rerun `pnpm w58:proof`; do not claim release clearance. |
+| `w59-audit-closure` | The final 55-finding map, independent S1 review, commit range, or direct evidence drifted. | Restore W59 closure evidence and keep readiness failed or blocked. |
 | `complete-test-execution` | The discovered-test report is missing, stale, incomplete, duplicated, or belongs to another HEAD/policy digest. | Run `pnpm test` or `pnpm check`, then rerun readiness without changing HEAD. |
 | `baseline-boundary` | `pnpm check` or `pnpm production:ready` no longer has the expected meaning. | Restore the script boundary before making any production claim. |
 | `w25-real-proof-fixture` | The proof fixture is missing, unsafe, mock-backed, non-passing, or no longer proves code-changing no-upstream-write execution. | Re-run or re-sanitize W25 proof evidence; do not replace it with mock output. |

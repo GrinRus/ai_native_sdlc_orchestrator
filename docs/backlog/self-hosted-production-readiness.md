@@ -2,7 +2,12 @@
 
 ## Status
 
-The historical **self-hosted CLI/API production candidate** verdict is under an audit release hold and is not the current AOR status. W22-W34 evidence remains useful as a historical bounded baseline, but the July 2026 audit found confirmed execution, permission, delivery, evidence, and quality-gate failures that invalidate the previous readiness verdict. W57-W59 own remediation and independent requalification. The machine-readable gate now distinguishes a healthy enforced hold (`status=blocked`, `gate_execution_status=pass`) from an invalid gate (`status=fail`, `release_disposition=unknown`).
+The July 2026 audit invalidated the historical self-hosted candidate verdict.
+W57-W59 have now completed remediation and independent requalification, yielding
+bounded self-hosted release clearance. The machine-readable gate returns
+`status=pass`, `gate_execution_status=pass`, and
+`release_disposition=cleared` only while the full ledger, closure reports, test
+manifest, package proof, and source-of-truth checks remain valid.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -22,14 +27,13 @@ Production readiness requires:
 - real non-mock full-journey proof with code-changing evidence and no upstream writes;
 - a separate production-readiness gate (`pnpm production:ready`) that cannot pass without that proof.
 
-## Current blockers
+## Clearance constraints
 
-| Blocker | Owning slice | Required evidence |
-|---|---|---|
-| Release/readiness sources and gates encode the July 2026 audit hold; post-W58 browser and maintainability fixes remain open. | `W59` | Machine-readable ledger, W57/W58 closure reports, and blocked readiness output that names every remaining invariant. |
-| W57 local trust-boundary closure must remain reproducible while later waves change runtime behavior. | `W57-S08`, preserved by `W58`/`W59` | `docs/research/08-w57-security-reliability-closure.json`, complete test discovery, adversarial suites, and isolated package smoke. |
-| W58 runtime context, evaluation, routing, control, event, API, and local HTTP behavior must remain reproducible while W59 changes product surfaces. | `W58-S08`, preserved by `W59` | `docs/research/09-w58-runtime-quality-closure.json`, `pnpm w58:proof`, package smoke, and dependency audit. |
-| Browser behavior, maintainability ratchets, hotspot decomposition, and independent audit closure remain open. | `W59-S01` through `W59-S07` | Executable browser evidence, quality baselines, finding-by-finding closure ledger, and a new readiness decision. |
+| Constraint | Evidence |
+|---|---|
+| W57 trust-boundary and W58 runtime-quality closure must remain reproducible. | `docs/research/08-w57-security-reliability-closure.json`, `docs/research/09-w58-runtime-quality-closure.json`, adversarial suites, and package smoke. |
+| All 55 audit findings and original S1 regressions must remain closed. | `docs/research/10-w59-audit-closure.json`, `docs/research/11-w59-independent-s1-review.json`, and the remediation ledger. |
+| The clearance remains bounded rather than hosted or universal. | Node 22, local filesystem runtime, loopback app or hardened headless API, no default upstream write, and explicit exclusions below. |
 
 ## Historical hardening and release evidence
 
@@ -60,7 +64,10 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-The W57-S01 matrix records `baseline-covered=102`, `proof-covered=3`, `partial=9`, and `blocked=2`. It reopens the seven audit-invalidated outcomes and limits PBO-09 to its demonstrated repo-attached first-Mission flow. PBO-10 and OPS-12 remain partial; W34/W56 evidence does not prove neutral launch, execution/model readiness, or a complete UI-only lifecycle. A story can move to `proof-covered` only when executable evidence proves the outcome at the required strength.
+The W59-S07 matrix records `baseline-covered=108`, `proof-covered=4`,
+`partial=2`, and `blocked=2`. FIN-03 now cites the final audit closure and
+independent S1 review. PBO-10 and OPS-12 remain partial, and OpenCode
+certification stories remain blocked.
 
 The current sanitized production proof fixture is configured by `pnpm production:ready`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
@@ -70,12 +77,17 @@ OpenCode is extended candidate coverage after W22-S03. It is not a required or c
 
 ## Requalification criteria
 
-The historical W22-W34 evidence does not by itself restore the production-candidate verdict. Requalification requires:
+The historical W22-W34 evidence did not by itself restore the bounded verdict.
+Requalification now consists of:
 
 1. W57 has closed its execution, filesystem, scope, permission, delivery, and concurrent-evidence trust-boundary scope with adversarial proof.
 2. W58 has proved non-materializing reads, effective context, real evaluation, executable routing, asynchronous control, durable events, canonical public surfaces, and the loopback HTTP boundary; its closure report remains a required regression input.
-3. W59 replaces marker checks with browser behavior, lands maintainability ratchets and bounded decomposition, and independently disposes every `AUD-001` through `AUD-055` finding.
-4. `W59-S07` updates the readiness, release, story, and roadmap sources only after all remaining S1 findings are resolved or an explicit narrower release claim is approved.
-5. A new production-readiness decision passes the full discovered test set, package/install smoke, no-upstream-write checks, and the audit closure ledger.
+3. W59 replaces marker checks with browser behavior, lands maintainability
+   ratchets and bounded decomposition, and independently disposes every
+   `AUD-001` through `AUD-055` finding.
+4. W59-S07 pins the closure range, independent S1 review, exclusions, and
+   algorithmic readiness decision.
+5. `pnpm production:ready --json` passes the current discovered test set,
+   package/install smoke, no-upstream-write checks, and closure ledger.
 
 Requalification still does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.

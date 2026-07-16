@@ -2,8 +2,9 @@
 
 ## Supported mode
 
-AOR is under an **audit release hold**. The previously recorded self-hosted
-CLI/API production-candidate evidence is historical and does not clear a release.
+AOR has **bounded self-hosted release clearance** after the W57-W59 audit
+remediation and independent requalification. This clearance is limited to the
+declared Node 22 CLI/API, loopback local app, and no-upstream-write defaults.
 
 - CLI and API/control-plane runtime are supported operator surfaces.
 - The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
@@ -43,7 +44,8 @@ pnpm production:ready
 The production gate validates its internal checks and the audit ledger. While a
 release-blocking invariant is open it exits nonzero with `status=blocked` and
 `gate_execution_status=pass`. An internal check failure instead returns
-`status=fail` and `release_disposition=unknown`. Use JSON output for review packets:
+`status=fail` and `release_disposition=unknown`. The cleared repository returns
+`status=pass` and `release_disposition=cleared`. Use JSON output for review packets:
 
 ```bash
 pnpm production:ready --json
@@ -62,9 +64,10 @@ The default production proof fixture is the sanitized fixture configured by `pnp
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 8. For installed-user UI validation, launch `aor app --project-ref <repo> --runtime-root <repo>/.aor` on loopback.
 9. For operator-initiated runtime work, use `aor request create/run/status` or the local UI Ask AOR drawer; keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
-10. Do not start credentialed write-capable live execution or network delivery
-    while the audit hold is open. Maintainer-only development probes require
-    `--unsafe-development-override true` and must preserve its evidence.
+10. Keep credentialed provider qualification and real network delivery outside
+    the cleared matrix unless a separate reviewed profile explicitly authorizes
+    them. The compatibility flag `--unsafe-development-override` remains
+    accepted but is not required when the release disposition is cleared.
 
 The production-hardened auth model is documented in `docs/ops/control-plane-production-hardening.md`.
 Environment, secrets, backup/restore, and incident procedures are documented in:
@@ -107,9 +110,9 @@ Rollback is workspace-local for this supported mode:
 4. Drop local branches created by `local-branch` delivery only after delivery manifests and audit refs are preserved.
 5. Re-run `pnpm check` and `pnpm production:ready` after restoring the workspace.
 
-Expected rollback verification remains `audit-hold` until all release-blocking
-ledger entries are independently resolved. A blocked result with passing
-internal checks is healthy hold enforcement, not permission to release.
+Expected rollback verification is `cleared` only when the restored checkout,
+ledger, closure reports, and current test manifest still validate. Any blocked
+or failed result suspends the bounded clearance until reviewed.
 
 No hosted rollback, tenant migration rollback, or enterprise identity rollback procedure is part of this release mode.
 

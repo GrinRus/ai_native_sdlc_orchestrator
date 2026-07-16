@@ -46,4 +46,4 @@ jobs:
         run: pnpm test:web:browser
 
       - name: Run production readiness gate
-        run: pnpm production:ready --json --expect-audit-hold
+        run: pnpm production:ready --json

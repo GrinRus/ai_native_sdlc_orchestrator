@@ -40,7 +40,7 @@ evidence, and completion state remain traceable through execution attempts.
 
 - **Epic:** EPIC-0 Repository development system; EPIC-2 Packet lifecycle;
   EPIC-4 Quality platform
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Define the source-of-truth structured task shape, completeness
   policy, and contributor planning format before planner/runtime behavior
   depends on them.

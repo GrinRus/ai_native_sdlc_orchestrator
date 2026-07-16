@@ -13,16 +13,17 @@ researchers. The repository remains docs-first and includes implemented CLI,
 API, web, and runtime baselines, but it is not a production-ready
 general-purpose orchestrator runtime.
 
-The previous bounded verdict, labeled a self-hosted CLI/API production candidate,
-is under an audit release hold. The July 2026 baseline review found confirmed execution,
-permission, delivery, evidence, and quality-gate failures, so AOR is not ready
-for production or unattended write-capable runs. W57 has closed its local
-trust-boundary scope and W58 has closed runtime-quality and loopback transport
-remediation with machine-readable evidence maps; W59 still owns browser,
-maintainability, and release requalification. `pnpm production:ready --json` reports this as
-`status=blocked`, `gate_execution_status=pass`, and
-`release_disposition=audit-hold`; historical W25/W26 evidence is not release
-clearance.
+The July 2026 audit invalidated the previous self-hosted candidate verdict until
+W57-W59 repaired and independently requalified the affected surfaces. That
+remediation is now closed with bounded self-hosted release clearance for the
+supported Node 22 CLI/API runtime, literal-loopback local app, and explicit
+no-upstream-write delivery defaults. `pnpm production:ready --json` reports
+`status=pass`, `gate_execution_status=pass`,
+`release_disposition=cleared`, and `release_clearance=true`.
+
+This is not a general hosted-production claim. Hosted SaaS, Windows
+certification, enterprise identity, credentialed provider certification, paid
+calls, default upstream writes, and automatic publication remain excluded.
 
 The first package channel is the npm CLI alpha package `@grinrus/aor`. Internal
 workspace apps and packages remain private implementation modules and are not
@@ -53,8 +54,8 @@ AOR turns SDLC work into explicit packets and evidence:
   first local path.
 
 Use AOR when you want to study or operate an SDLC control plane around existing
-repositories. Do not expect it to replace your coding agent, CI system, issue
-tracker, or release platform yet.
+repositories within the bounded self-hosted scope. Do not expect it to replace
+your coding agent, CI system, issue tracker, or release platform.
 
 ## Requirements
 

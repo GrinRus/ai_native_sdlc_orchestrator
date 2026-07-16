@@ -1211,6 +1211,11 @@ parity, and independently close the audit.
 - Every AUD-001 through AUD-055 item has independent evidence or an explicit
   accepted/open disposition, and readiness/story/release claims match the result.
 
+**Closure status:** W59 is evidence-complete. The remediation ledger has no open
+release blockers, the independent S1 matrix passes, and bounded self-hosted
+readiness is `cleared`. Hosted, Windows, credentialed-provider, paid-call,
+default-upstream-write, and automatic-publication surfaces remain excluded.
+
 **Detailed slices:** `docs/backlog/wave-59-implementation-slices.md`
 
 ## W60 - structured task planning and operator workbench
