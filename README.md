@@ -513,8 +513,9 @@ delivery program are tracked through `W65` and focus on:
   deterministic completeness before semantic evaluation, exact-version
   approval, evidence-derived progress, and an accessible flow Plan workbench.
   Parallel scheduling and multirepo workspace provisioning remain W62 work.
-- Planned portable project/repository/component topology, persistent
-  machine-local bindings, and installed-user Project Structure management.
+- Portable project/repository/component topology, persistent machine-local
+  bindings, revisioned topology control, and installed-user `Add AOR Project`
+  plus Project Structure management. Execution-route setup remains W61 work.
 - Planned repo-aware workspace sets, bounded parent/child concurrency,
   integration and stale-work recovery, and truthful coordinated multirepo
   delivery.

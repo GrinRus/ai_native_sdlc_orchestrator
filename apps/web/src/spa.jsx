@@ -5,6 +5,7 @@ import { createProjectGeneration, readControlPlaneJson as readJson, readProjectR
 import { Dialog } from "./dialog.jsx";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
+import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js";
 import "./spa.css";
 
@@ -2875,7 +2876,7 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
         </details>
       </div>
       <button className="utility-button compact" type="button" onClick={onOpenAddProject} disabled={busy}>
-        <Icon name="folder" />Add another AOR project
+        <Icon name="folder" />Add AOR Project
       </button>
     </div>
   );
@@ -3871,7 +3872,7 @@ function FlowCockpit({
             {onOpenAddProject ? (
               <button className="secondary" type="button" onClick={onOpenAddProject} disabled={busy}>
                 <Icon name="folder" />
-                Add another AOR project
+                Add AOR Project
               </button>
             ) : null}
             <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
@@ -5947,85 +5948,6 @@ function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCo
   );
 }
 
-function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, onAddAndInitialize }) {
-  if (!open) return null;
-  const projectPath = form.projectRef.trim();
-  const runtimePreview = form.runtimeRoot.trim() || (projectPath ? `${projectPath.replace(/\/+$/u, "")}/.aor` : "<project>/.aor");
-  const profilePreview = form.projectProfile.trim() || "Default discovery or generated bundled profile";
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      labelledBy="add-project-drawer-title"
-      className="request-drawer add-project-drawer"
-      backdropClassName="add-project-backdrop"
-    >
-        <div className="drawer-header">
-          <div>
-            <p className="eyebrow">Local workspace</p>
-            <h2 id="add-project-drawer-title">Add another AOR project</h2>
-          </div>
-          <button className="secondary compact" type="button" onClick={onClose}>Close</button>
-        </div>
-        <div className="request-scope-card">
-          <label>
-            Project path
-            <input
-              value={form.projectRef}
-              onChange={(event) => setForm({ ...form, projectRef: event.target.value })}
-              placeholder="/path/to/local-project"
-            />
-          </label>
-          <label>
-            Label
-            <input
-              value={form.label}
-              onChange={(event) => setForm({ ...form, label: event.target.value })}
-              placeholder="Optional display name"
-            />
-          </label>
-          <label>
-            Runtime root
-            <input
-              value={form.runtimeRoot}
-              onChange={(event) => setForm({ ...form, runtimeRoot: event.target.value })}
-              placeholder="Defaults to <project>/.aor"
-            />
-          </label>
-          <label>
-            Project profile
-            <input
-              value={form.projectProfile}
-              onChange={(event) => setForm({ ...form, projectProfile: event.target.value })}
-              placeholder="Optional project.aor.yaml path"
-            />
-          </label>
-          <div className="runtime-root-preview" aria-label="Runtime root preview">
-            <span>Runtime root preview</span>
-            <code>{runtimePreview}</code>
-          </div>
-          <div className="runtime-root-preview" aria-label="Project profile preview">
-            <span>Project profile</span>
-            <code>{profilePreview}</code>
-          </div>
-        </div>
-        {result ? (
-          <div className={result.status === "error" ? "alert" : "success-note"} role="status">
-            {result.message}
-          </div>
-        ) : null}
-        <div className="drawer-actions">
-          <button className="secondary drawer-submit" type="button" onClick={onAdd} disabled={busy || !projectPath}>
-            Add project to workspace
-          </button>
-          <button className="primary drawer-submit" type="button" onClick={onAddAndInitialize} disabled={busy || !projectPath}>
-            Add and initialize
-          </button>
-        </div>
-    </Dialog>
-  );
-}
-
 function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose, onRun }) {
   if (!open) return null;
   const completed = isCompletedFlow(flow);
@@ -6237,8 +6159,9 @@ function App() {
   const [form, setForm] = useState(SAFE_TEMPLATE);
   const [requestDrawerOpen, setRequestDrawerOpen] = useState(false);
   const [addProjectDrawerOpen, setAddProjectDrawerOpen] = useState(false);
-  const [addProjectForm, setAddProjectForm] = useState({ projectRef: "", label: "", runtimeRoot: "", projectProfile: "" });
+  const [addProjectForm, setAddProjectForm] = useState({ ...EMPTY_PROJECT_SETUP });
   const [addProjectResult, setAddProjectResult] = useState(null);
+  const [topologyState, setTopologyState] = useState({ status: "idle", data: null, error: null });
   const [requestForm, setRequestForm] = useState(DEFAULT_REQUEST);
   const [requestResult, setRequestResult] = useState(null);
   const [selectedRef, setSelectedRef] = useState("");
@@ -6489,6 +6412,27 @@ function App() {
       : current);
   }
 
+  async function loadProjectTopology(projectId, options = {}) {
+    if (!projectId) {
+      setTopologyState({ status: "empty", data: null, error: null });
+      return null;
+    }
+    const generation = options.generation ?? projectGeneration.current.current().revision;
+    if (!options.silent) setTopologyState((current) => ({ ...current, status: "loading", error: null }));
+    try {
+      const topology = await readJson(`/api/projects/${encodeURIComponent(projectId)}/topology`, {
+        signal: projectGeneration.current.current().signal,
+      });
+      if (!projectGeneration.current.isCurrent(generation)) return null;
+      setTopologyState({ status: "ready", data: topology, error: null });
+      return topology;
+    } catch (topologyError) {
+      if (!projectGeneration.current.isCurrent(generation)) return null;
+      setTopologyState((current) => ({ status: "error", data: current.data, error: topologyError }));
+      return null;
+    }
+  }
+
   async function refresh(options = {}) {
     if (!options.silent) setError("");
     const refreshGeneration = options.projectGeneration ?? projectGeneration.current.current().revision;
@@ -6514,6 +6458,8 @@ function App() {
       appConfig.project_id;
     const selectedProject = projects.find((project) => project.project_id === selectedProjectId) ?? projects[0] ?? null;
     const effectiveProjectId = selectedProject?.project_id ?? selectedProjectId;
+    await loadProjectTopology(effectiveProjectId, { silent: Boolean(options.silent), generation: refreshGeneration });
+    if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
     const statePreviewRoute = effectiveProjectId ? `/api/projects/${encodeURIComponent(effectiveProjectId)}/state` : null;
     const onboarding = selectedProject?.onboarding_summary ?? {};
     const needsStatePreview = statePreviewRoute && onboarding.initialized !== true && onboarding.state_exists !== true;
@@ -6743,6 +6689,7 @@ function App() {
     setSelectedStage("readiness");
     setRequestDrawerOpen(false);
     setRequestResult(null);
+    setTopologyState({ status: "idle", data: null, error: null });
   }
 
   async function selectProject(projectId) {
@@ -6793,12 +6740,39 @@ function App() {
         projects: Array.isArray(payload.projects) ? payload.projects : [],
       });
       let resultMessage = "Project added to this local app session.";
-      setAddProjectForm({ projectRef: "", label: "", runtimeRoot: "", projectProfile: "" });
       if (nextProjectId) {
+        const projectBase = `/api/projects/${encodeURIComponent(nextProjectId)}`;
+        let revision = payload.revision;
+        const mutateTopology = async (family, action, value) => {
+          const result = await readJson(`${projectBase}/topology/actions`, {
+            method: "POST",
+            headers: { "content-type": "application/json; charset=utf-8" },
+            body: JSON.stringify({ family, action, value, expected_revision: revision }),
+          });
+          revision = result.topology?.revision ?? revision;
+          return result;
+        };
+        await mutateTopology("topology", "update", {
+          repo_topology: addProjectForm.topology === "bounded-multirepo" ? "bounded-multirepo" : "monorepo",
+        });
+        for (const repository of parseSetupRows(addProjectForm.repositories, ["repo_id", "workspace_mount"])) {
+          await mutateTopology("repository", "add", {
+            repo_id: repository.repo_id,
+            name: repository.repo_id,
+            source: { kind: "local", root: "." },
+            workspace_mount: repository.workspace_mount,
+            role: "application",
+          });
+        }
+        for (const component of parseSetupRows(addProjectForm.components, ["component_id", "repo_id", "root", "role"])) {
+          await mutateTopology("component", "add", { ...component, name: component.component_id, command_group_refs: [] });
+        }
+        for (const dependency of parseSetupRows(addProjectForm.dependencies, ["from_component_id", "to_component_id"])) {
+          await mutateTopology("dependency", "upsert", { ...dependency, relationship: "depends-on", validation_refs: [] });
+        }
         resetProjectScopedState();
         setActiveProjectId(nextProjectId);
         if (initializeAfterAdd) {
-          const projectBase = `/api/projects/${encodeURIComponent(nextProjectId)}`;
           await readJson(`${projectBase}/lifecycle-command/actions`, {
             method: "POST",
             headers: { "content-type": "application/json; charset=utf-8" },
@@ -6809,12 +6783,38 @@ function App() {
         }
         await refresh({ projectId: nextProjectId, selectionVersion: flowSelectionVersion.current });
       }
+      setAddProjectForm({ ...EMPTY_PROJECT_SETUP });
       setAddProjectResult({ status: "ok", message: resultMessage });
       setAddProjectDrawerOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAddProjectResult({ status: "error", message });
       setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runTopologyAction(family, action, value) {
+    if (!apiProjectBase || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/topology/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({
+          family,
+          action,
+          value,
+          expected_revision: topologyState.data?.revision,
+        }),
+      });
+      if (result.topology) setTopologyState({ status: "ready", data: result.topology, error: null });
+      pushActivity(`topology.${family}.${action}`, result.revision_event?.after_digest ?? "validated");
+    } catch (topologyError) {
+      setTopologyState((current) => ({ ...current, status: "error", error: topologyError }));
+      setError(topologyError instanceof Error ? topologyError.message : String(topologyError));
     } finally {
       setBusy(false);
     }
@@ -7395,6 +7395,16 @@ function App() {
           ) : null}
           </>
         )}
+        {activeProjectDisplay ? (
+          <ProjectStructure
+            topology={topologyState.data}
+            status={topologyState.status}
+            error={topologyState.error}
+            busy={busy}
+            onRefresh={() => loadProjectTopology(activeProjectDisplay.project_id)}
+            onAction={runTopologyAction}
+          />
+        ) : null}
       </main>
 
       {!firstRunFocusMode ? (
@@ -7475,15 +7485,14 @@ function App() {
         onClose={closeRequestDrawer}
         onRun={createAndRunRequest}
       />
-      <AddProjectDrawer
+      <AddAorProjectDialog
         open={addProjectDrawerOpen}
         form={addProjectForm}
         setForm={setAddProjectForm}
         busy={busy}
         result={addProjectResult}
         onClose={closeAddProjectDrawer}
-        onAdd={() => addLocalProject()}
-        onAddAndInitialize={() => addLocalProject({ initializeAfterAdd: true })}
+        onSubmit={(initializeAfterAdd) => addLocalProject({ initializeAfterAdd })}
       />
     </div>
   );

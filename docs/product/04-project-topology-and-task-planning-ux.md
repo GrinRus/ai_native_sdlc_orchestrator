@@ -90,7 +90,7 @@ state before loading the next project.
 ## Main journey
 
 1. The operator launches `aor app` and selects an existing project or chooses
-   **Add project**.
+   **Add AOR Project**.
 2. The setup flow captures project identity and selects `single-repo`,
    `monorepo`, or `bounded-multirepo`.
 3. The operator explicitly adds local paths or Git sources. AOR validates each
@@ -140,6 +140,12 @@ The primary action advances one step. Back preserves entered values. Closing a
 dirty draft asks for confirmation. Initialization is never triggered by merely
 opening, validating, or navigating the flow.
 
+W61-S04 implements this baseline in the installed SPA. The setup dialog owns
+the six-step portable-topology review, keeps machine-local binding information
+separate, and exposes initialization only as an explicit confirmed action.
+Project Structure reads remain non-materializing when the approved profile is
+absent and return a stable empty model rather than creating `.aor`.
+
 ### Project Structure
 
 Project Structure uses compact tabs or equivalent navigation:
@@ -158,6 +164,13 @@ Project Structure uses compact tabs or equivalent navigation:
 Destructive removal is replaced by disable/deprecate when historical evidence
 references the repository or component. Raw paths and refs are secondary debug
 details, not primary labels.
+
+The W61-S04 implementation provides Overview, Repositories, Components,
+Dependencies, and Validation views through the canonical topology API.
+Repository and component disable actions show a write-effect confirmation;
+validation, refresh, and navigation remain read-only with respect to project
+runtime state. Execution-route setup and its readiness states remain owned by
+W61-S06 and W61-S07.
 
 ### Flow Plan workbench
 

@@ -78,6 +78,32 @@ test("topology application service preserves revision history and fails closed",
   });
 });
 
+test("topology reads return a stable empty model without materializing a missing profile", async () => {
+  await withTempRepo({ prefix: "aor-topology-empty-", workspaceRoot }, (projectRoot) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aor-topology-empty-home-"));
+    try {
+      const registry = createLocalProjectRegistry({
+        cwd: projectRoot,
+        projects: [{ projectRef: projectRoot }],
+        persistence: { mode: "persistent", root: home },
+      });
+      const projectId = registry.defaultProjectId;
+      const profilePath = registry.getContext(projectId).canonicalProfilePath;
+      fs.rmSync(profilePath);
+      const before = fs.readdirSync(projectRoot).sort();
+      const topology = readProjectTopology({ registry, projectId });
+      assert.equal(topology.initialized, false);
+      assert.deepEqual(topology.repositories, []);
+      assert.deepEqual(topology.components, []);
+      assert.deepEqual(topology.dependencies, []);
+      assert.equal(fs.existsSync(profilePath), false);
+      assert.deepEqual(fs.readdirSync(projectRoot).sort(), before);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
 test("topology HTTP reads and mutations are project scoped and revision protected", async () => {
   await withTempRepo({ prefix: "aor-topology-http-", workspaceRoot }, async (projectRoot) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "aor-topology-http-home-"));

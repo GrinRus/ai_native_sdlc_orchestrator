@@ -28,6 +28,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "dialog.jsx",
     "project-snapshot.js",
     "operator-error-card.jsx",
+    "project-structure.jsx",
+    "project-structure-model.js",
   ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
   const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 
@@ -400,7 +402,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     'id="project-switcher-control"',
     'name="project-switcher"',
     'aria-label="Project switcher"',
-    "Add another AOR project",
+    "Add AOR Project",
     "Runtime root preview",
     "Project profile",
     "projectProfile",
@@ -408,7 +410,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "profile_mismatch_candidate_project_ids",
     "Profile mismatch detected",
     "Add Matching Project Profile",
-    "Add and initialize",
+    "Confirm writes and initialize",
     "/api/projects/actions",
     "/runs",
     "graph-context-tabs",
