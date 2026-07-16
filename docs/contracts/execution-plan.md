@@ -34,6 +34,13 @@ Attempt identity is not stored as mutable plan state. Run evidence cites
 `execution_plan_ref` and `execution_unit_id`; task-progress reports project the
 resulting attempt refs.
 
+The lifecycle remains deliberately split:
+
+- plan approval controls whether an immutable execution plan may be materialized;
+- unit readiness is derived from preserved task dependencies;
+- each run reserves a separate attempt identity for one unit;
+- retry creates another attempt for the same task and unit references.
+
 ## Validation
 
 - Plan identity and digest must cite one approved structured plan.

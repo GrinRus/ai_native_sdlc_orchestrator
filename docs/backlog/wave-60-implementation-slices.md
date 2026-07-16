@@ -202,7 +202,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S03 — Execution plan and evidence-derived task progress
 
 - **Epic:** EPIC-2 Packet lifecycle; EPIC-3 Routed execution; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Add a durable execution plan and progress projection that map
   stable tasks to execution units, attempts, verification, and completion.
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`,
@@ -276,7 +276,7 @@ evidence, and completion state remain traceable through execution attempts.
 ## W60-S04 — Plan workbench UX and approval flow
 
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make proposed and approved task plans understandable, reviewable,
   and safely revisable in the flow-centric local console.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,
