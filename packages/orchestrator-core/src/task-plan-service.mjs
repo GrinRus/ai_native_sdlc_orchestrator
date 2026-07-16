@@ -8,6 +8,7 @@ import { prepareHandoffArtifacts } from "./handoff-packets.mjs";
 import { buildPlanningInputManifest, selectPlannerCandidate } from "./planner-decomposition.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
+import { enrichExecutionDag, executionDagDigest, validateExecutionDagCoverage } from "./execution-dag-planner.mjs";
 import { resolveOverallTaskProgressStatus, resolveTaskProgressStatus } from "./task-progress-projection.mjs";
 
 function asRecord(value) {
@@ -320,7 +321,7 @@ function unionScope(tasks) {
   };
 }
 
-export function buildExecutionPlan({ projectId, projectRoot, plan, planFile, createdAt = new Date().toISOString() }) {
+export function buildExecutionPlan({ projectId, projectRoot, plan, planFile, projectProfile = {}, createdAt = new Date().toISOString() }) {
   const tasks = asRecordArray(plan.local_tasks);
   const grouped = new Map();
   for (const task of tasks) {
@@ -356,7 +357,25 @@ export function buildExecutionPlan({ projectId, projectRoot, plan, planFile, cre
       .filter((unitId) => unitId && unitId !== unit.unit_id);
   }
 
+  const dag = enrichExecutionDag({
+    units,
+    tasks,
+    topology: projectProfile,
+    integrationVerification: asRecordArray(plan.integration_verification),
+  });
+  const coverage = validateExecutionDagCoverage({
+    tasks,
+    units: dag.units,
+    nonRunTasks: [],
+    approvedScope: asRecord(plan.approved_scope),
+  });
+  const dagMaterial = {
+    execution_units: dag.units,
+    non_run_tasks: [],
+    integration_gates: dag.integrationGates,
+  };
   return {
+    schema_version: 2,
     execution_plan_id: derivePublicId(
       [projectId, "execution-plan", String(plan.plan_id), `v${plan.plan_version}`],
       "execution-plan",
@@ -366,8 +385,26 @@ export function buildExecutionPlan({ projectId, projectRoot, plan, planFile, cre
     plan_version: plan.plan_version,
     plan_ref: evidenceRef(projectRoot, planFile),
     plan_digest: plan.plan_digest,
-    status: "ready",
-    execution_units: units,
+    dag_version: 1,
+    dag_digest: executionDagDigest(dagMaterial),
+    source_plan_refs: [evidenceRef(projectRoot, planFile)],
+    status: coverage.ok ? "ready" : "blocked",
+    impacted_scope: unionScope(tasks),
+    execution_units: dag.units,
+    non_run_tasks: [],
+    integration_gates: dag.integrationGates,
+    validation_findings: coverage.findings,
+    concurrency_summary: {
+      parallel_candidates: dag.units.filter((unit) => unit.concurrency.classification === "parallel-candidate").map((unit) => unit.unit_id),
+      serialized_units: dag.units.filter((unit) => unit.concurrency.classification === "serialized").map((unit) => unit.unit_id),
+    },
+    risks: unique(tasks.flatMap((task) => asStringArray(task.risks))),
+    approval: {
+      state: "approved",
+      plan_digest: plan.plan_digest,
+      dag_digest: executionDagDigest(dagMaterial),
+      invalidated: false,
+    },
     created_at: createdAt,
   };
 }
@@ -383,6 +420,7 @@ export function materializeExecutionPlan(options) {
     context.runtimeLayout.artifactsRoot,
     `execution-plan-${safeSegment(context.plan.plan_id)}.v${context.plan.plan_version}.json`,
   );
+  const candidateExecutionPlan = buildExecutionPlan(context);
   const existingExecutionPlan = readJson(executionPlanFile);
   if (existingExecutionPlan) {
     const existingValidation = validateContractDocument({ family: "execution-plan", document: existingExecutionPlan, source: "runtime://execution-plan-existing" });
@@ -391,15 +429,27 @@ export function materializeExecutionPlan(options) {
       && existingExecutionPlan.plan_id === context.plan.plan_id
       && existingExecutionPlan.plan_version === context.plan.plan_version
       && existingExecutionPlan.plan_digest === context.plan.plan_digest
+      && existingExecutionPlan.dag_digest === candidateExecutionPlan.dag_digest
     ) {
       return { ...context, executionPlan: existingExecutionPlan, executionPlanFile };
+    }
+    if (
+      existingValidation.ok
+      && existingExecutionPlan.plan_digest === context.plan.plan_digest
+      && existingExecutionPlan.dag_digest !== candidateExecutionPlan.dag_digest
+    ) {
+      const error = new Error("Execution DAG changed materially and requires a new approved plan revision.");
+      error.code = "execution-plan-approval-invalidated";
+      error.previousDagDigest = existingExecutionPlan.dag_digest;
+      error.candidateDagDigest = candidateExecutionPlan.dag_digest;
+      throw error;
     }
     const error = new Error("Existing execution plan is invalid or stale and cannot be overwritten.");
     error.code = "execution-plan-immutable";
     error.validation = existingValidation;
     throw error;
   }
-  const executionPlan = buildExecutionPlan(context);
+  const executionPlan = candidateExecutionPlan;
   const validation = validateContractDocument({ family: "execution-plan", document: executionPlan, source: "runtime://execution-plan" });
   if (!validation.ok) {
     const error = new Error("Generated execution plan failed contract validation.");

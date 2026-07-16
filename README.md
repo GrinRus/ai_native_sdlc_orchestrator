@@ -522,7 +522,9 @@ delivery program are tracked through `W65` and focus on:
   project-isolation, and route-readiness closure without provider or upstream calls.
 - Run-owned repo-aware workspace sets now provision exact isolated worktrees or
   clones, preserve primary-checkout immutability, and collect per-repository
-  change/cleanup evidence. Bounded parent/child concurrency, integration and
+  change/cleanup evidence. Topology-aware execution DAGs preserve approved task
+  identity, impacted scope, criteria/verification coverage, and deterministic
+  serialization reasons. Bounded parent/child execution, integration and
   stale-work recovery, and truthful coordinated multirepo delivery remain.
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a

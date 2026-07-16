@@ -7,6 +7,7 @@ import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
+import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -89,14 +90,12 @@ const PRIVATE_PROOF_HARNESS_COMMAND_GROUP_FIELDS = [
   privateCommandGroupField("step", "quality"),
   privateCommandGroupField("diagnostic", "health"),
 ];
-
 /**
  * @returns {import("./index.d.ts").ContractFamilyIndexEntry[]}
  */
 export function getContractFamilyIndex() {
   return cloneJson(CONTRACT_FAMILY_INDEX);
 }
-
 /**
  * @param {{ family: import("./index.d.ts").ContractFamily, document: unknown, source?: string }} options
  * @returns {import("./index.d.ts").ContractValidationResult}
@@ -660,6 +659,7 @@ function validateExecutionPlan(document, source) {
       }
     }
   }
+  issues.push(...validateExecutionPlanV2(document, source));
   return issues;
 }
 

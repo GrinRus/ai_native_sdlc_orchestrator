@@ -34,6 +34,13 @@ execution roots, cleanup ownership, and repository-local Git evidence.
 Execution and downstream quality/delivery stages use that manifest rather than
 launcher state or the operator's primary checkout.
 
+An approved structured task plan is then materialized as execution-plan schema
+v2. The plan maps every task exactly once to a unit or explicit non-run entry,
+derives repository/component impact, preserves dependency order, assigns unit
+and integration verification, and records why each unit is a parallel
+candidate or must remain serialized. Parallel candidacy is planning evidence;
+only the bounded scheduler may start work.
+
 The default Local Workspace registry is persisted under AOR-owned user state,
 uses atomic revisioned writes, and stores only explicitly connected projects
 and redacted bindings. Reads never scan the filesystem. A neutral launcher has
