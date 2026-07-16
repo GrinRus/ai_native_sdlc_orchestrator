@@ -31,7 +31,7 @@ hard dependencies nor makes any W60 slice done.
 - **Outcome:** Web acceptance executes the packaged SPA and asserts user-visible
   behavior instead of treating JSX/bundle marker strings as functional proof.
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/test/**`, browser/component harness,
@@ -232,7 +232,7 @@ hard dependencies nor makes any W60 slice done.
   lint/type/dependency/dead-code debt while allowing the recorded baseline to
   decrease incrementally.
 - **Epic:** EPIC-0
-- **State:** blocked
+- **State:** ready
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** root lint/test/build scripts, ESLint/JS typecheck config,

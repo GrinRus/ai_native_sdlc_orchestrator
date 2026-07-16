@@ -18,12 +18,18 @@ const defaultOpenApiPath = "docs/contracts/control-plane-api.openapi.json";
 const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
 const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledger-2026-07.json";
 const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure.json";
+const defaultW58ClosurePath = "docs/research/09-w58-runtime-quality-closure.json";
 const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
 const ALLOWED_AUDIT_STATES = new Set(["open", "in-progress", "resolved", "accepted-risk", "superseded"]);
 const W57_CLOSURE_FINDINGS = [
   "AUD-001", "AUD-002", "AUD-003", "AUD-004", "AUD-005", "AUD-007", "AUD-008", "AUD-009",
   "AUD-011", "AUD-013", "AUD-014", "AUD-015", "AUD-016", "AUD-017", "AUD-022", "AUD-023",
   "AUD-029", "AUD-030", "AUD-031", "AUD-052", "project-context-cwd-divergence",
+];
+const W58_CLOSURE_FINDINGS = [
+  "AUD-006", "AUD-009", "AUD-010", "AUD-012", "AUD-018", "AUD-019", "AUD-020", "AUD-021",
+  "AUD-024", "AUD-025", "AUD-026", "AUD-027", "AUD-028", "AUD-032", "AUD-033", "AUD-034",
+  "AUD-035", "AUD-036", "AUD-037", "AUD-038", "AUD-045", "AUD-046", "AUD-048", "AUD-052",
 ];
 
 function resolvePath(rootDir, file) {
@@ -215,6 +221,78 @@ function checkW57ClosureReport(rootDir, auditLedgerPath, closureReportPath = def
     "W57 trust-boundary findings map one-to-one to reproducible evidence; shared W58 work remains open.",
     [auditLedgerPath, closureReportPath],
   );
+}
+
+function checkW58ClosureReport(rootDir, auditLedgerPath, closureReportPath = defaultW58ClosurePath) {
+  const findings = [];
+  let ledger;
+  let report;
+  try {
+    ledger = readJson(rootDir, auditLedgerPath);
+    report = readJson(rootDir, closureReportPath);
+  } catch (error) {
+    return fail("w58-remediation-closure", "W58 remediation closure evidence is missing or invalid.", [error.message], [auditLedgerPath, closureReportPath]);
+  }
+  if (report.schema_version !== 1 || report.wave_id !== "W58" || report.status !== "passed") {
+    findings.push("W58 closure report must declare schema_version=1, wave_id=W58, and status=passed.");
+  }
+  if (report.release_disposition_after_wave !== "audit-hold" || report.release_clearance !== false) {
+    findings.push("W58 closure must preserve audit-hold and release_clearance=false for W59 findings.");
+  }
+  if (report.integration_profile?.implementation !== "scripts/w58-runtime-quality-proof.mjs" || !fileExists(rootDir, report.integration_profile?.implementation ?? "")) {
+    findings.push("W58 closure must cite the reproducible runtime-quality proof implementation.");
+  }
+  if (!fileExists(rootDir, "scripts/dependency-audit-bulk.mjs")) {
+    findings.push("W58 closure requires the supported production dependency bulk-audit helper.");
+  }
+
+  const ledgerById = new Map((ledger.findings ?? []).map((entry) => [entry.finding_id, entry]));
+  const reportEntries = Array.isArray(report.findings) ? report.findings : [];
+  const reportById = new Map();
+  for (const entry of reportEntries) {
+    if (reportById.has(entry.finding_id)) findings.push(`W58 closure finding '${entry.finding_id}' is duplicated.`);
+    reportById.set(entry.finding_id, entry);
+  }
+  const expected = new Set(W58_CLOSURE_FINDINGS);
+  for (const findingId of W58_CLOSURE_FINDINGS) {
+    const entry = reportById.get(findingId);
+    const ledgerEntry = ledgerById.get(findingId);
+    if (!entry) {
+      findings.push(`W58 closure report is missing '${findingId}'.`);
+      continue;
+    }
+    if (!ledgerEntry || !CLOSED_AUDIT_STATES.has(ledgerEntry.state) || entry.disposition !== "resolved") {
+      findings.push(`W58 closure finding '${findingId}' must be resolved in both report and ledger.`);
+    }
+    const evidenceRefs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
+    if (evidenceRefs.length === 0) findings.push(`W58 closure finding '${findingId}' must cite evidence.`);
+    for (const evidenceRef of evidenceRefs) {
+      if (!fileExists(rootDir, String(evidenceRef).split("#", 1)[0])) {
+        findings.push(`W58 closure evidence '${evidenceRef}' for '${findingId}' does not exist.`);
+      }
+    }
+  }
+  for (const findingId of reportById.keys()) {
+    if (!expected.has(findingId)) findings.push(`Unexpected finding '${findingId}' appears in the W58 closure report.`);
+  }
+  const openW59 = (ledger.findings ?? [])
+    .filter((entry) => !CLOSED_AUDIT_STATES.has(entry.state) && entry.owner_slices?.some((slice) => String(slice).startsWith("W59-")))
+    .map((entry) => entry.finding_id)
+    .sort();
+  const reportedRemaining = new Set(Array.isArray(report.remaining_w59_findings) ? report.remaining_w59_findings : []);
+  for (const findingId of openW59) {
+    if (!reportedRemaining.has(findingId)) findings.push(`W58 closure is missing remaining W59 finding '${findingId}'.`);
+  }
+  for (const findingId of reportedRemaining) {
+    const ledgerEntry = ledgerById.get(findingId);
+    if (!ledgerEntry?.owner_slices?.some((slice) => String(slice).startsWith("W59-"))) {
+      findings.push(`W58 closure remaining finding '${findingId}' is not owned by W59.`);
+    }
+  }
+  if (findings.length > 0) {
+    return fail("w58-remediation-closure", "W58 remediation closure evidence is incomplete or drifting.", findings, [auditLedgerPath, closureReportPath]);
+  }
+  return pass("w58-remediation-closure", "W58 runtime-quality findings are evidence-backed and remaining release work is isolated to W59.", [auditLedgerPath, closureReportPath]);
 }
 
 function splitMarkdownTableRow(line) {
@@ -895,10 +973,12 @@ export function runProductionReadinessGate(options = {}) {
   const storyMatrixPath = options.storyMatrixPath ?? defaultStoryMatrixPath;
   const auditLedgerPath = options.auditLedgerPath ?? defaultAuditLedgerPath;
   const w57ClosurePath = options.w57ClosurePath ?? defaultW57ClosurePath;
+  const w58ClosurePath = options.w58ClosurePath ?? defaultW58ClosurePath;
   const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
   const checks = [
     auditLedgerCheck,
     checkW57ClosureReport(rootDir, auditLedgerPath, w57ClosurePath),
+    checkW58ClosureReport(rootDir, auditLedgerPath, w58ClosurePath),
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
     checkStoryHonesty(rootDir, storyMatrixPath),
@@ -927,6 +1007,7 @@ export function runProductionReadinessGate(options = {}) {
     remediation_ledger_path: auditLedgerPath,
     remediation_closure_reports: {
       W57: w57ClosurePath,
+      W58: w58ClosurePath,
     },
     checks,
   };

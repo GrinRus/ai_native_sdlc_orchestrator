@@ -437,7 +437,7 @@ contracts, implementation, regression tests, and source-of-truth documentation.
   context/evaluation truth, asynchronous control, canonical APIs, and loopback
   transport match their contracts.
 - **Epic:** EPIC-0, EPIC-7
-- **State:** ready
+- **State:** done
 - **Remediation priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** cross-package integration tests, package smoke, proof
