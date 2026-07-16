@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "73b2dad8b595e50803dbf52c3e868732d97bc03796a1ad72cdb00bbb84ba9e14",
+  "source_hash": "7d4105855325e89d3cf6a91578d2d231b69f4bc26f00353034bb10d027fee37f",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -10,18 +10,21 @@
     "apps/web/src/plan-workbench-views.jsx",
     "apps/web/src/plan-workbench.jsx",
     "apps/web/src/project-snapshot.js",
+    "apps/web/src/project-structure-model.js",
+    "apps/web/src/project-structure.css",
+    "apps/web/src/project-structure.jsx",
     "apps/web/src/spa.css",
     "apps/web/src/spa.jsx",
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-bLwKmRV9.css",
-    "apps/web/dist/assets/index-vxw7pgBX.js",
+    "apps/web/dist/assets/index-A_eqYydt.js",
+    "apps/web/dist/assets/index-DuNMQjAe.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-bLwKmRV9.css": "72ad802e2640272c18dbf7ef5f91632532544e8be253fa571a74165beb6caaf3",
-    "apps/web/dist/assets/index-vxw7pgBX.js": "a5f3e4e8c4259ecb2e6444bb63545e7ce890340a51bcbc8553f8830f3072979c",
-    "apps/web/dist/index.html": "53a500619dd35c0b91f3591f249deab825a7d8dc420562728b266c0f415e86ed"
+    "apps/web/dist/assets/index-A_eqYydt.js": "46d588b6ec6dbe5179a19365c5bf20f1360f7241db3331cdddeff4f7b6079ebd",
+    "apps/web/dist/assets/index-DuNMQjAe.css": "6e224c20bd7e748b5e69be099f151608c8547962135362752f449d45712b5396",
+    "apps/web/dist/index.html": "64d91629270c43cb819f10acef8e2e6a63d68823d2f1da8681535f0bb6bc152d"
   }
 }

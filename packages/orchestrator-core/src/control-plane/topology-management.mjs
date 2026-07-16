@@ -110,10 +110,26 @@ export function readProjectTopology({ registry, projectId }) {
   const context = registry.getContext(projectId);
   if (!context) throw new TopologyManagementError("project.not_found", `Project '${projectId}' is not registered.`, 404);
   const input = registry.getProjectInput(projectId) ?? {};
+  if (!fs.existsSync(context.canonicalProfilePath)) {
+    return {
+      project_id: projectId,
+      initialized: false,
+      revision: registry.revision,
+      profile_ref: context.canonicalProfilePath,
+      profile_digest: null,
+      repositories: [],
+      components: [],
+      dependencies: [],
+      bindings: [],
+      latest_validation: null,
+      read_only: true,
+    };
+  }
   const { profilePath, profile } = readProfile(context);
   const bindings = Array.isArray(input.bindings) ? input.bindings : [];
   return {
     project_id: projectId,
+    initialized: true,
     revision: registry.revision,
     profile_ref: profilePath,
     profile_digest: digest(profile),
@@ -173,7 +189,8 @@ export function applyTopologyAction({ registry, projectId, expectedRevision, act
     else nextBindings.push(payload);
     validation = validateTopology(profile, nextBindings);
   } else {
-    mutateEntity(profile, family, action, payload);
+    if (family === "topology" && action === "update") Object.assign(profile, payload);
+    else mutateEntity(profile, family, action, payload);
     validation = validateTopology(profile, input.bindings ?? []);
     if (validation.blocking) {
       throw new TopologyManagementError("topology.validation_failed", "Topology mutation would produce a blocking validation report.", 409);

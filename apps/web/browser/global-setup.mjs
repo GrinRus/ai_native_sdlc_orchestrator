@@ -38,7 +38,12 @@ export default async function globalSetup() {
       "false",
       "--json",
     ],
-    { cwd: tempRoot, stdio: ["ignore", "pipe", "pipe"], detached: true },
+    {
+      cwd: tempRoot,
+      env: { ...process.env, AOR_HOME: path.join(tempRoot, "aor-home") },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    },
   );
   let stdout = "";
   let stderr = "";

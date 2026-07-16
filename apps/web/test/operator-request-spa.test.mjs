@@ -8,7 +8,7 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
-  const source = ["spa.jsx", "dialog.jsx"]
+  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js"]
     .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
     .join("\n");
   const css = fs.readFileSync(path.join(webRoot, "src/spa.css"), "utf8");
@@ -110,11 +110,11 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /externalRunSignalState/u);
   assert.match(source, /deterministicRunEvidenceStatus/u);
   assert.match(source, /signal-state/u);
-  assert.match(source, /Add another AOR project/u);
+  assert.match(source, /Add AOR Project/u);
   assert.match(source, /Runtime root preview/u);
   assert.match(source, /Project profile/u);
   assert.match(source, /project_profile/u);
-  assert.match(source, /Add and initialize/u);
+  assert.match(source, /Confirm writes and initialize/u);
   assert.match(source, /No active flow/u);
   assert.match(source, /Readiness prepares the runtime before a flow is created/u);
   assert.match(source, /selectedStageRuntimeState/u);

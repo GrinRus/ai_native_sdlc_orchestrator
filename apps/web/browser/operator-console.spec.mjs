@@ -45,6 +45,18 @@ test.describe.serial("installed local operator console", () => {
     expect(failures).toEqual([]);
   });
 
+  test("Project Structure is readable without initialization", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    await page.goto(state.app_url);
+    await expect(page.getByRole("heading", { name: "Project Structure" })).toBeVisible();
+    await page.getByRole("tab", { name: "Repositories" }).click();
+    await expect(page.getByRole("button", { name: "Add repository" })).toBeVisible();
+    await page.getByRole("tab", { name: "Validation" }).click();
+    await expect(page.getByRole("button", { name: "Validate topology" })).toBeVisible();
+    expect(fs.existsSync(state.runtime_root)).toBe(false);
+  });
+
   test("explicit initialization has durable readback and truthful action semantics", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
@@ -86,14 +98,15 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.locator("#project-switcher-control")).toBeVisible();
     await expect(page.getByText("Some live resources are unavailable.")).toBeVisible();
     await expect(page.getByText(/Existing project state remains visible/)).toBeVisible();
-    const opener = page.getByRole("button", { name: /Add another AOR project/i }).first();
+    const opener = page.getByRole("button", { name: /Add AOR Project/i }).first();
     await opener.click();
-    const dialog = page.getByRole("dialog", { name: "Add another AOR project" });
+    const dialog = page.getByRole("dialog", { name: "Add AOR Project" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
     await expect.poll(() => page.locator("header.topbar").evaluate((element) => element.inert)).toBe(true);
     await dialog.getByLabel("Project path").fill("/tmp/aor-dialog-focus-fixture");
-    const lastAction = dialog.getByRole("button", { name: "Add and initialize" });
+    for (let step = 0; step < 5; step += 1) await dialog.getByRole("button", { name: "Continue" }).click();
+    const lastAction = dialog.getByRole("button", { name: "Confirm writes and initialize" });
     await lastAction.focus();
     await page.keyboard.press("Tab");
     await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
@@ -101,6 +114,10 @@ test.describe.serial("installed local operator console", () => {
     await expect(lastAction).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
+    const discardDialog = page.getByRole("dialog", { name: "Discard project draft?" });
+    await expect(discardDialog).toBeVisible();
+    await discardDialog.getByRole("button", { name: "Discard draft" }).click();
+    await expect(discardDialog).toBeHidden();
     await expect(opener).toBeFocused();
   });
 

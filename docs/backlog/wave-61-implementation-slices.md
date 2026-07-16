@@ -275,7 +275,7 @@ profiles.
 ## W61-S04 — Add Project and Project Structure UX
 
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Let installed users configure and recover project topology through
   an accessible setup flow and project-scoped management surface.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,
