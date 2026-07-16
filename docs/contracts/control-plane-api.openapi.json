@@ -3133,6 +3133,26 @@
               }
             ]
           },
+          "parent_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentRunProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_relation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentRunRelation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "provider_step_status": {
             "anyOf": [
               {
@@ -3675,6 +3695,60 @@
         },
         "additionalProperties": true
       },
+      "ParentRunProjection": {
+        "type": "object",
+        "required": [
+          "parent_run_id",
+          "status",
+          "revision",
+          "execution_plan_ref",
+          "workspace_set_ref",
+          "max_concurrency",
+          "capacity",
+          "budgets",
+          "consumed",
+          "units",
+          "integration_gates"
+        ],
+        "properties": {
+          "parent_run_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["queued", "running", "paused", "canceling", "canceled", "blocked", "integration-pending", "succeeded"]
+          },
+          "revision": { "type": "integer", "minimum": 0 },
+          "execution_plan_ref": { "type": "string" },
+          "workspace_set_ref": { "type": "string" },
+          "max_concurrency": { "type": "integer", "minimum": 1 },
+          "capacity": { "$ref": "#/components/schemas/JsonObject" },
+          "budgets": { "$ref": "#/components/schemas/JsonObject" },
+          "consumed": { "$ref": "#/components/schemas/JsonObject" },
+          "units": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/JsonObject" }
+          },
+          "integration_gates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/JsonObject" }
+          },
+          "state_file": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "ParentRunRelation": {
+        "type": "object",
+        "required": ["parent_run_id", "execution_unit_id", "task_refs", "attempt"],
+        "properties": {
+          "parent_run_id": { "type": "string" },
+          "execution_unit_id": { "type": "string" },
+          "task_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "attempt": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      },
       "UiLifecycleActionRequest": {
         "type": "object",
         "required": [
@@ -3757,6 +3831,17 @@
           },
           "flags": {
             "type": "object",
+            "properties": {
+              "run_id": { "type": "string" },
+              "parent_run_id": { "type": "string" },
+              "execution_plan_ref": { "type": "string" },
+              "execution_unit_id": { "type": "string" },
+              "workspace_set_ref": { "type": "string" },
+              "command_id": { "type": "string" },
+              "expected_revision": { "type": "integer", "minimum": 0 },
+              "max_concurrency": { "type": "integer", "minimum": 1 },
+              "max_child_starts": { "type": "integer", "minimum": 1 }
+            },
             "additionalProperties": true
           },
           "unsafe_development_override": {

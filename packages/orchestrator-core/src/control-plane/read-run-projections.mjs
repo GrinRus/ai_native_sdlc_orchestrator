@@ -5,17 +5,11 @@ import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs"
 import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { createProjectReadContext } from "./project-context.mjs";
+import { attachParentRunProjections } from "./parent-run-read-model.mjs";
 import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import { runProjectionCoordinator } from "../operator-projection-services.mjs";
-import {
-  applyReadModelLimit,
-  listPacketArtifacts,
-  listQualityArtifacts,
-  listRunControlAudits,
-  listRunControlStateFiles,
-  listStepResults,
-} from "./read-artifact-readers.mjs";
+import { applyReadModelLimit, listPacketArtifacts, listQualityArtifacts, listRunControlAudits, listRunControlStateFiles, listStepResults } from "./read-artifact-readers.mjs";
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
 /**
@@ -552,6 +546,7 @@ function executeRunReadProjection(options = {}) {
  *     }>,
  *   },
  *   run_control_state: Record<string, unknown> | null,
+ *   parent_run: Record<string, unknown> | null, parent_relation: Record<string, unknown> | null,
  *   provider_step_status: Record<string, unknown> | null,
  *   run_health: Record<string, unknown> | null,
  *   execution_documents: {
@@ -608,6 +603,7 @@ function executeRunReadProjection(options = {}) {
           decision_trail: [],
         },
         run_control_state: null,
+        parent_run: null, parent_relation: null,
         provider_step_status: null,
         run_health: null,
         execution_documents: {
@@ -863,6 +859,8 @@ function executeRunReadProjection(options = {}) {
     run.provider_step_status = normalizeProviderStepStatus(asRecord(record.state.provider_step_status));
   }
 
+  attachParentRunProjections(options, ensureRun, normalizeRunRef);
+
   for (const health of externalRunHealth) {
     const runId = asString(health.run_id);
     if (!runId) continue;
@@ -928,6 +926,7 @@ function executeRunReadProjection(options = {}) {
         decision_trail: decisionTrail,
       },
       run_control_state: entry.run_control_state,
+      parent_run: entry.parent_run, parent_relation: entry.parent_relation,
       provider_step_status: entry.provider_step_status,
       run_health: entry.run_health,
       execution_evidence: buildExecutionEvidenceSummary({

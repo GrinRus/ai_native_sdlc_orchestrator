@@ -163,7 +163,7 @@ recoverable coordinated delivery.
 ## W62-S03 — Parent/child Runtime Harness scheduler and bounded concurrency
 
 - **Epic:** EPIC-3 Routed execution; EPIC-4 Quality platform; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Execute approved units under one parent run with bounded child
   attempts and safe parallelism while preserving runner-agnostic Runtime Harness decisions.
 - **Primary modules:** `packages/orchestrator-core/**`,
@@ -230,7 +230,7 @@ recoverable coordinated delivery.
 ## W62-S04 — Integration, stale-task invalidation, and bounded repair
 
 - **Epic:** EPIC-4 Quality platform; EPIC-5 Delivery and release; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Integrate child outputs in dependency order, invalidate affected
   downstream work, and reuse bounded review/QA repair semantics before delivery.
 - **Primary modules:** `packages/orchestrator-core/**`,

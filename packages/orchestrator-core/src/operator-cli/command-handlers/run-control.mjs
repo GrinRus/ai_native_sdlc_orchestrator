@@ -40,6 +40,13 @@ import {
   materializeTaskProgress,
   executeRuntimeHarnessRun,
   resolveExecutionUnitContext,
+  controlParentRun,
+  readParentRun,
+  requestRunJobCancel,
+  retryParentUnit,
+  scheduleParentRun,
+  startRunJob,
+  startParentRun,
   submitInteractionAnswer,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
@@ -80,6 +87,7 @@ export const RUN_CONTROL_COMMANDS = Object.freeze([
   "run resume",
   "run steer",
   "run cancel",
+  "run retry",
   "run answer",
   "run status",
   "ui attach",
@@ -134,6 +142,41 @@ function errorMessage(error) {
  */
 export function handleRunControlCommand(context) {
   const { command, flags, cwd, outputState } = context;
+  if (command === "run retry") {
+    ensureRequiredFlags(command, flags);
+    const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const parentRunId = /** @type {string} */ (flags["parent-run-id"]);
+    const executionUnitId = /** @type {string} */ (flags["execution-unit-id"]);
+    const commandId = /** @type {string} */ (flags["command-id"]);
+    const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
+    const current = readParentRun({ cwd, projectRef, runtimeRoot, parentRunId });
+    if (!current.parent) throw new CliUsageError(`Parent run '${parentRunId}' was not found.`);
+    const parent = retryParentUnit({
+      parentFile: current.file,
+      executionUnitId,
+      commandId,
+      expectedRevision,
+    });
+    outputState.resolvedProjectRef = current.init.projectRoot;
+    outputState.resolvedRuntimeRoot = current.init.runtimeRoot;
+    outputState.parentRun = parent;
+    outputState.parentRunFile = current.file;
+    const retryEvent = appendRunEvent({
+      cwd,
+      projectRef,
+      runtimeRoot,
+      runId: parentRunId,
+      eventType: "parent.unit.retry-requested",
+      requestKey: commandId,
+      payload: { execution_unit_id: executionUnitId, revision: parent.revision },
+    });
+    outputState.primaryEventId = retryEvent.event.event_id;
+    outputState.streamLogFile = retryEvent.logFile;
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [`run status --run-id ${parentRunId}`];
+    return true;
+  }
   if (
     command === "run start" ||
     command === "run pause" ||
@@ -153,6 +196,9 @@ export function handleRunControlCommand(context) {
     const approvedHandoffRef = resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]);
     const executionPlanRef = resolveOptionalStringFlag("execution-plan-ref", flags["execution-plan-ref"]);
     const executionUnitId = resolveOptionalStringFlag("execution-unit-id", flags["execution-unit-id"]);
+    const workspaceSetRef = resolveOptionalStringFlag("workspace-set-ref", flags["workspace-set-ref"]);
+    const maxConcurrency = resolveOptionalIntegerFlag("max-concurrency", flags["max-concurrency"], { min: 1 });
+    const maxChildStarts = resolveOptionalIntegerFlag("max-child-starts", flags["max-child-starts"], { min: 1 });
     const promotionEvidenceRefs = resolveOptionalCsvFlag(
       "promotion-evidence-refs",
       flags["promotion-evidence-refs"],
@@ -179,11 +225,25 @@ export function handleRunControlCommand(context) {
     if (runAction !== "start" && approvedHandoffRef) {
       throw new CliUsageError(`Flag '--approved-handoff-ref' is only valid for 'aor run start'.`);
     }
-    if (runAction !== "start" && (executionPlanRef || executionUnitId)) {
-      throw new CliUsageError("Flags '--execution-plan-ref' and '--execution-unit-id' are only valid for 'aor run start'.");
+    if (runAction !== "start" && (executionPlanRef || executionUnitId || workspaceSetRef)) {
+      throw new CliUsageError(
+        "Flags '--execution-plan-ref', '--execution-unit-id', and '--workspace-set-ref' are only valid for 'aor run start'.",
+      );
     }
-    if (runAction === "start" && Boolean(executionPlanRef) !== Boolean(executionUnitId)) {
-      throw new CliUsageError("Flags '--execution-plan-ref' and '--execution-unit-id' must be supplied together.");
+    if (runAction !== "start" && (maxConcurrency !== undefined || maxChildStarts !== undefined)) {
+      throw new CliUsageError("Flags '--max-concurrency' and '--max-child-starts' are only valid for 'aor run start'.");
+    }
+    const childStart = runAction === "start" && Boolean(executionPlanRef && executionUnitId && !workspaceSetRef);
+    const parentStart = runAction === "start" && Boolean(executionPlanRef && workspaceSetRef && !executionUnitId);
+    if (
+      runAction === "start" &&
+      (executionPlanRef || executionUnitId || workspaceSetRef) &&
+      !childStart &&
+      !parentStart
+    ) {
+      throw new CliUsageError(
+        "Use '--execution-plan-ref' with either '--execution-unit-id' for one child run or '--workspace-set-ref' for one parent run.",
+      );
     }
     if (runAction !== "start" && promotionEvidenceRefs.length > 0) {
       throw new CliUsageError(`Flag '--promotion-evidence-refs' is only valid for 'aor run start'.`);
@@ -196,7 +256,7 @@ export function handleRunControlCommand(context) {
     }
 
     let executionContext = null;
-    if (runAction === "start" && executionPlanRef && executionUnitId) {
+    if (childStart) {
       try {
         executionContext = resolveExecutionUnitContext({
           cwd,
@@ -207,6 +267,53 @@ export function handleRunControlCommand(context) {
         });
       } catch (error) {
         throw new CliUsageError(errorMessage(error));
+      }
+    }
+
+    if (runAction !== "start" && runId && (runAction === "pause" || runAction === "resume" || runAction === "cancel")) {
+      const currentParent = readParentRun({ cwd, projectRef, runtimeRoot, parentRunId: runId });
+      if (currentParent.parent) {
+        if (!commandId) throw new CliUsageError(`Flag '--command-id' is required for parent run ${runAction}.`);
+        if (expectedRevision === undefined) {
+          throw new CliUsageError(`Flag '--expected-revision' is required for parent run ${runAction}.`);
+        }
+        const parent = controlParentRun({
+          parentFile: currentParent.file,
+          action: runAction,
+          commandId,
+          expectedRevision,
+          controlChild: ({ action, childRunId }) => {
+            applyRunControlAction({
+              cwd,
+              projectRef,
+              runtimeRoot,
+              runId: childRunId,
+              action,
+              commandId: `${commandId}-${childRunId}`,
+            });
+            if (action === "cancel") {
+              requestRunJobCancel({ cwd, projectRef, runtimeRoot, runId: childRunId });
+            }
+          },
+        });
+        outputState.resolvedProjectRef = currentParent.init.projectRoot;
+        outputState.resolvedRuntimeRoot = currentParent.init.runtimeRoot;
+        outputState.parentRun = parent;
+        outputState.parentRunFile = currentParent.file;
+        const parentEvent = appendRunEvent({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          runId,
+          eventType: `parent.${runAction}`,
+          requestKey: commandId,
+          payload: { status: parent.status, revision: parent.revision },
+        });
+        outputState.primaryEventId = parentEvent.event.event_id;
+        outputState.streamLogFile = parentEvent.logFile;
+        outputState.readOnly = false;
+        outputState.futureControlHooks = [`run status --run-id ${runId}`];
+        return true;
       }
     }
 
@@ -275,6 +382,116 @@ export function handleRunControlCommand(context) {
           return true;
         }
       }
+    }
+
+    if (parentStart) {
+      const projectRoot = resolveProjectRef(projectRef, cwd);
+      const executionPlanPath = resolveOptionalRefOrPathFlag({
+        cwd,
+        projectRoot,
+        flagName: "execution-plan-ref",
+        flagValue: executionPlanRef,
+      });
+      const loadedPlan = loadContractFile({
+        filePath: /** @type {string} */ (executionPlanPath),
+        family: "execution-plan",
+      });
+      if (!loadedPlan.ok) {
+        const issues = loadedPlan.validation.issues.map((issue) => issue.message).join("; ");
+        throw new CliUsageError(`Execution plan '${executionPlanRef}' failed validation: ${issues}`);
+      }
+      const workspaceSetPath = resolveOptionalRefOrPathFlag({
+        cwd,
+        projectRoot: workspaceSetRef.startsWith("evidence://") &&
+          !workspaceSetRef.slice("evidence://".length).startsWith(".aor/")
+          ? /** @type {{ projectRuntimeRoot: string }} */ (
+              readProjectState({ cwd, projectRef, runtimeRoot }).runtime_layout
+            ).projectRuntimeRoot
+          : projectRoot,
+        flagName: "workspace-set-ref",
+        flagValue: workspaceSetRef,
+      });
+      const loadedWorkspaceSet = loadContractFile({
+        filePath: /** @type {string} */ (workspaceSetPath),
+        family: "workspace-set",
+      });
+      if (!loadedWorkspaceSet.ok) {
+        const issues = loadedWorkspaceSet.validation.issues.map((issue) => issue.message).join("; ");
+        throw new CliUsageError(`Workspace set '${workspaceSetRef}' failed validation: ${issues}`);
+      }
+      const started = startParentRun({
+        cwd,
+        projectRef,
+        runtimeRoot,
+        parentRunId: runId,
+        executionPlan: loadedPlan.document,
+        executionPlanRef,
+        workspaceSet: loadedWorkspaceSet.document,
+        workspaceSetRef,
+        maxConcurrency,
+        budgets: maxChildStarts === undefined ? undefined : { max_child_starts: maxChildStarts },
+      });
+      const scheduled = scheduleParentRun({
+        parentFile: started.file,
+        startChild: (child) => {
+          const childArgs = [
+            "run",
+            "start",
+            "--project-ref",
+            started.init.projectRoot,
+            "--run-id",
+            child.child_run_id,
+            "--execution-plan-ref",
+            executionPlanRef,
+            "--execution-unit-id",
+            child.execution_unit_id,
+            "--require-validation-pass",
+            "false",
+            ...(runtimeRoot ? ["--runtime-root", runtimeRoot] : []),
+          ];
+          const job = startRunJob({
+            cwd: started.init.projectRoot,
+            projectRef: started.init.projectRoot,
+            runtimeRoot,
+            runId: child.child_run_id,
+            args: childArgs,
+          });
+          return {
+            ...child,
+            job_id: job.job.job_id,
+            job_status: job.job.status,
+            status_ref: job.job.status_ref,
+            event_ref: job.job.event_ref,
+          };
+        },
+      });
+      outputState.resolvedProjectRef = started.init.projectRoot;
+      outputState.resolvedRuntimeRoot = started.init.runtimeRoot;
+      outputState.parentRun = scheduled.parent;
+      outputState.parentRunFile = started.file;
+      outputState.scheduledChildren = scheduled.started;
+      const parentEvent = appendRunEvent({
+        cwd,
+        projectRef,
+        runtimeRoot,
+        runId: scheduled.parent.parent_run_id,
+        eventType: "parent.started",
+        requestKey: commandId ?? `parent-start-${scheduled.parent.request_digest}`,
+        payload: {
+          revision: scheduled.parent.revision,
+          execution_plan_ref: executionPlanRef,
+          workspace_set_ref: workspaceSetRef,
+          scheduled_children: scheduled.started,
+        },
+      });
+      outputState.primaryEventId = parentEvent.event.event_id;
+      outputState.streamLogFile = parentEvent.logFile;
+      outputState.readOnly = false;
+      outputState.futureControlHooks = [
+        `run status --run-id ${scheduled.parent.parent_run_id}`,
+        `run pause --run-id ${scheduled.parent.parent_run_id} --command-id <id> --expected-revision ${scheduled.parent.revision}`,
+      ];
+      return true;
     }
 
     const controlResult = applyRunControlAction({
@@ -552,6 +769,16 @@ export function handleRunControlCommand(context) {
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     }).filter((summary) => !runId || summary.run_id === runId);
+    if (runId) {
+      const parent = readParentRun({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        parentRunId: runId,
+      });
+      outputState.parentRun = parent.parent;
+      outputState.parentRunFile = parent.parent ? parent.file : null;
+    }
     outputState.strategicSnapshot = readStrategicSnapshot({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),

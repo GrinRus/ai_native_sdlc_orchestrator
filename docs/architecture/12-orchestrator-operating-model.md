@@ -41,6 +41,15 @@ and integration verification, and records why each unit is a parallel
 candidate or must remain serialized. Parallel candidacy is planning evidence;
 only the bounded scheduler may start work.
 
+The scheduler persists one parent-run projection bound to the approved
+execution-plan digest and ready run-owned workspace set. Each runnable unit is
+reserved atomically and launched through the existing durable run-job worker,
+so adapters, permissions, retries, repair, evidence, and Runtime Harness
+semantics remain child-run concerns. Dependency order, conflict keys,
+`max_concurrency`, provider/tool capacity, and child-start budgets govern the
+ready queue. Parent completion additionally requires all integration gates;
+partial child success is never mission closure.
+
 The default Local Workspace registry is persisted under AOR-owned user state,
 uses atomic revisioned writes, and stores only explicitly connected projects
 and redacted bindings. Reads never scan the filesystem. A neutral launcher has

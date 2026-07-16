@@ -1,6 +1,12 @@
 report_id: run.sample.runtime-harness-report.v1
 project_id: aor-core
 run_id: run.sample
+parent_relation:
+  parent_run_id: parent.run.sample
+  execution_unit_id: unit.implement.sample
+  task_refs:
+    - task.implement.sample
+  attempt: 1
 generated_at: 2026-04-26T00:00:00.000Z
 mission_type: code-changing
 strictness_profile: strict-code-changing
