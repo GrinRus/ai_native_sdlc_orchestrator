@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { createProjectGeneration, readControlPlaneJson as readJson, readProjectResourceSnapshot } from "./control-plane-client.js";
+import { Dialog } from "./dialog.jsx";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js";
@@ -5952,12 +5953,17 @@ function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, o
   const runtimePreview = form.runtimeRoot.trim() || (projectPath ? `${projectPath.replace(/\/+$/u, "")}/.aor` : "<project>/.aor");
   const profilePreview = form.projectProfile.trim() || "Default discovery or generated bundled profile";
   return (
-    <div className="drawer-backdrop add-project-backdrop" role="presentation">
-      <aside className="request-drawer add-project-drawer" aria-label="Add another AOR project drawer">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      labelledBy="add-project-drawer-title"
+      className="request-drawer add-project-drawer"
+      backdropClassName="add-project-backdrop"
+    >
         <div className="drawer-header">
           <div>
             <p className="eyebrow">Local workspace</p>
-            <h2>Add another AOR project</h2>
+            <h2 id="add-project-drawer-title">Add another AOR project</h2>
           </div>
           <button className="secondary compact" type="button" onClick={onClose}>Close</button>
         </div>
@@ -6016,20 +6022,11 @@ function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, o
             Add and initialize
           </button>
         </div>
-      </aside>
-    </div>
+    </Dialog>
   );
 }
 
 function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose, onRun }) {
-  const drawerRef = useRef(null);
-
-  useEffect(() => {
-    if (open) {
-      drawerRef.current?.focus();
-    }
-  }, [open]);
-
   if (!open) return null;
   const completed = isCompletedFlow(flow);
   const targetStep = form.targetStep || STAGE_TO_TARGET_STEP[stage.id] || "discovery";
@@ -6066,15 +6063,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
         ? `AOR will compile this request into the ${targetStep} step and create no-write analysis/proposal evidence.`
         : `AOR will record the requested ${form.deliveryMode} mode, validate explicit scope, and create proposal evidence; v1 will not silently mutate files.`;
   return (
-    <div className="drawer-backdrop" role="presentation">
-      <aside
-        ref={drawerRef}
-        className="request-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="request-drawer-title"
-        tabIndex="-1"
-      >
+    <Dialog open={open} onClose={onClose} labelledBy="request-drawer-title" className="request-drawer">
         <div className="drawer-header">
           <div>
             <h2 id="request-drawer-title">Ask AOR</h2>
@@ -6209,8 +6198,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
             ) : null}
           </div>
         ) : null}
-      </aside>
-    </div>
+    </Dialog>
   );
 }
 
@@ -6260,8 +6248,6 @@ function App() {
   const didAutoSelectStage = useRef(false);
   const flowSelectionVersion = useRef(0);
   const projectGeneration = useRef(createProjectGeneration());
-  const requestDrawerOpenerRef = useRef(null);
-  const pendingRequestDrawerFocusRestore = useRef(false);
 
   const apiProjectBase = useMemo(() => {
     const projectId = activeProjectId ?? config?.default_project_id ?? config?.project_id;
@@ -6784,17 +6770,6 @@ function App() {
     setAddProjectResult(null);
   }
 
-  useEffect(() => {
-    if (!addProjectDrawerOpen) return undefined;
-    function handleKeyDown(event) {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      closeAddProjectDrawer();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addProjectDrawerOpen]);
-
   async function addLocalProject({ initializeAfterAdd = false } = {}) {
     if (busy || !addProjectForm.projectRef.trim()) return;
     setBusy(true);
@@ -6945,12 +6920,6 @@ function App() {
   }
 
   function openRequestDrawer(prefillRef = "") {
-    if (typeof document !== "undefined") {
-      const opener = document.activeElement;
-      if (opener && opener !== document.body && typeof opener.focus === "function") {
-        requestDrawerOpenerRef.current = opener;
-      }
-    }
     const completed = isCompletedFlow(selectedFlow);
     const targetFlowId = selectedFlow?.flow_id ?? "";
     const sameFlow = requestForm.targetFlowId === targetFlowId;
@@ -6983,51 +6952,10 @@ function App() {
     setRequestDrawerOpen(true);
   }
 
-  function restoreRequestDrawerFocus() {
-    if (typeof window === "undefined" || typeof document === "undefined") return;
-    const restore = (attempt = 0) => {
-      const opener = requestDrawerOpenerRef.current;
-      if (opener && opener.isConnected && typeof opener.focus === "function" && !opener.disabled) {
-        opener.focus();
-        requestDrawerOpenerRef.current = null;
-        return;
-      }
-      if (opener && opener.isConnected && attempt < 6) {
-        window.setTimeout(() => restore(attempt + 1), 50);
-        return;
-      }
-      const fallback = document.querySelector(
-        ".topbar-ask-button:not(:disabled), .flow-cockpit button.secondary:not(:disabled), .mission-form button[aria-label='Ask AOR for selected flow']:not(:disabled)",
-      );
-      if (fallback && typeof fallback.focus === "function") fallback.focus();
-      requestDrawerOpenerRef.current = null;
-    };
-    window.setTimeout(() => restore(), 0);
-  }
-
-  function closeRequestDrawer({ clearResult = true, restoreFocus = true } = {}) {
-    if (restoreFocus) pendingRequestDrawerFocusRestore.current = true;
+  function closeRequestDrawer({ clearResult = true } = {}) {
     setRequestDrawerOpen(false);
     if (clearResult) setRequestResult(null);
   }
-
-  useEffect(() => {
-    if (!requestDrawerOpen) return undefined;
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeRequestDrawer();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [requestDrawerOpen]);
-
-  useEffect(() => {
-    if (requestDrawerOpen || !pendingRequestDrawerFocusRestore.current) return;
-    pendingRequestDrawerFocusRestore.current = false;
-    restoreRequestDrawerFocus();
-  }, [requestDrawerOpen]);
 
   async function runLifecycle(command, flags = {}) {
     if (!apiProjectBase) {

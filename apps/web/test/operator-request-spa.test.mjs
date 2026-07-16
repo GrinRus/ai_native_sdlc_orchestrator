@@ -8,7 +8,9 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
-  const source = fs.readFileSync(path.join(webRoot, "src/spa.jsx"), "utf8");
+  const source = ["spa.jsx", "dialog.jsx"]
+    .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
+    .join("\n");
   const css = fs.readFileSync(path.join(webRoot, "src/spa.css"), "utf8");
   const stageSubtitleRule = css.match(/\.stage-copy em\s*\{[\s\S]*?\}/u)?.[0] ?? "";
 
@@ -170,9 +172,9 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /operator-requests/u);
   assert.match(source, /interactions\/answers/u);
   assert.match(source, /Create and run request/u);
-  assert.match(source, /requestDrawerOpenerRef/u);
-  assert.match(source, /pendingRequestDrawerFocusRestore/u);
-  assert.match(source, /restoreRequestDrawerFocus/u);
+  assert.match(source, /openerRef/u);
+  assert.match(source, /element\.inert = true/u);
+  assert.match(source, /event\.shiftKey/u);
   assert.match(source, /clearResult: false/u);
   assert.match(source, /syncExpandedToViewport/u);
   assert.match(source, /Latest run/u);

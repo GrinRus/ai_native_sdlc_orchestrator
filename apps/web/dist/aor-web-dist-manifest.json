@@ -1,10 +1,11 @@
 {
   "manifest_version": 2,
-  "source_hash": "26465692a68729f3bd4b08c4c5176957b5e95dd6a90d56a41908a62db693a5f4",
+  "source_hash": "cc50c9f7aa264ea13c2811b56c8f998abf1e61f4f5c541fe624fec35cc469772",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
     "apps/web/src/control-plane-client.js",
+    "apps/web/src/dialog.jsx",
     "apps/web/src/operator-error-card.jsx",
     "apps/web/src/plan-workbench.jsx",
     "apps/web/src/project-snapshot.js",
@@ -13,13 +14,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-D96cvxPz.js",
+    "apps/web/dist/assets/index-Dj3U_EwU.js",
     "apps/web/dist/assets/index-bLwKmRV9.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-D96cvxPz.js": "4154cc2a53887584db35274c6fd702914d5f26a05bdf460124b206676c4e7e6d",
+    "apps/web/dist/assets/index-Dj3U_EwU.js": "f7e9b14694b0e2b91ff4f524dee4ed5a026c0597503948aaec58115386a6d680",
     "apps/web/dist/assets/index-bLwKmRV9.css": "72ad802e2640272c18dbf7ef5f91632532544e8be253fa571a74165beb6caaf3",
-    "apps/web/dist/index.html": "1c1355b42e11446a13e8e36996b73994ae51c7bde62ca62f3239553fe7d77183"
+    "apps/web/dist/index.html": "b340b5a66c3872fa40dfce0437f6e69c5518ee62a181e0f6bac5e265707590ad"
   }
 }
