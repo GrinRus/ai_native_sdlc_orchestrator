@@ -529,8 +529,8 @@ This is the master index for the implementation slices across all defined waves.
 | W59-S03 | Accessible local dialogs and web state decomposition | EPIC-0, EPIC-6 | done | web components/styles/state modules, browser tests | W59-S01, W59-S02 |
 | W59-S04 | Code-quality, dependency, and dead-code ratchet | EPIC-0 | done | root quality gates, ESLint/typecheck, dependency/dead-code baselines | W58-S08 |
 | W59-S05 | Core, CLI, and control-plane decomposition | EPIC-0, EPIC-3, EPIC-6 | done | execution services, CLI handlers, lifecycle/control-plane modules | W58-S08, W59-S04 |
-| W59-S06 | Adapter/live-E2E decomposition and contract-kernel parity | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | ready | adapter SDK, live E2E stages, public/private contract kernels | W58-S08, W59-S04 |
-| W59-S07 | Independent audit closure and readiness decision | EPIC-0, EPIC-5, EPIC-7 | blocked | audit ledger/report, story/readiness/release sources, full gates | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
+| W59-S06 | Adapter/live-E2E decomposition and contract-kernel parity | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | done | adapter SDK, live E2E stages, public/private contract kernels | W58-S08, W59-S04 |
+| W59-S07 | Independent audit closure and readiness decision | EPIC-0, EPIC-5, EPIC-7 | ready | audit ledger/report, story/readiness/release sources, full gates | W59-S02, W59-S03, W59-S04, W59-S05, W59-S06 |
 
 ## W60 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

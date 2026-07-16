@@ -3610,7 +3610,7 @@ function writeAorRunControlState(options) {
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  * }}
  */
-export function writeProofRunnerArtifacts(options) {
+function writeProofRunnerArtifactsImplementation(options) {
   const summaryFile = path.join(
     options.layout.reportsRoot,
     `live-e2e-run-summary-${normalizeId(options.runId)}.json`,
@@ -4094,6 +4094,8 @@ export function writeProofRunnerArtifacts(options) {
     learningLoop,
   };
 }
+
+export function writeProofRunnerArtifacts(options) { return writeProofRunnerArtifactsImplementation(options); }
 
 /**
  * @param {string[]} rawArgs

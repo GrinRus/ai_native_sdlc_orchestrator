@@ -205,6 +205,23 @@ unless a real `quality-repair-request` was materialized and closed.
 
 When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a resumable `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime resumes from that boundary when `continuation.next_action=resume_from_boundary`; if validation, policy, or an unsupported boundary blocks continuation, the run remains blocked with the same interaction, `state_history[]`, and reason evidence.
 
+## Adapter and internal rehearsal boundaries
+
+The adapter SDK keeps process supervision, packet transport, permission
+projection, and evidence normalization in provider-neutral leaf modules.
+Provider-specific stream interpretation stays inside the adapter boundary and is
+normalized before it reaches orchestrator evidence.
+
+The internal installed-user rehearsal remains a black-box caller of public AOR
+commands. Its contract loader composes a versioned, content-hashed snapshot of
+the public contract kernel with internal-only families. Public families retain
+their source identity, and any public kernel drift fails the parity gate until
+the snapshot version and hashes are intentionally regenerated.
+
+`executeFullJourneyFlow` and `writeProofRunnerArtifacts` are stable bounded
+orchestrator facades. Private stage implementation and artifact projection stay
+behind those facades and cannot be imported by production packages.
+
 ## Delivery model
 AOR should support these delivery modes:
 - `no-write`

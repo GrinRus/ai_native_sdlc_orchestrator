@@ -127,7 +127,7 @@ export const EXTERNAL_REFERENCE_PREFIXES = [
 ];
 
 /** @type {ReadonlyArray<import("./index.d.ts").ContractFamilyIndexEntry>} */
-export const CONTRACT_FAMILY_INDEX = Object.freeze([
+export const PRIVATE_CONTRACT_FAMILY_INDEX = Object.freeze([
   {
     family: "project-profile",
     familyGroup: "core-packets-and-profiles",
@@ -1826,7 +1826,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
   },
 ]);
 
-export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
+export const PRIVATE_EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/adapters\/[^/]+\.ya?ml$/, family: "adapter-capability-profile" },
   { regex: /^examples\/context\/bundles\/[^/]+\.ya?ml$/, family: "context-bundle" },
   { regex: /^examples\/context\/compiled\/[^/]+\.ya?ml$/, family: "compiled-context-artifact" },

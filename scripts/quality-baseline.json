@@ -6,12 +6,14 @@
   "facade_functions": [
     {"file":"packages/orchestrator-core/src/step-execution-engine.mjs","name":"executeRoutedStep"},
     {"file":"packages/orchestrator-core/src/review-run.mjs","name":"materializeReviewReport"},
-    {"file":"packages/orchestrator-core/src/operator-cli/command-handlers/operations.mjs","name":"handleOperationsCommand"}
+    {"file":"packages/orchestrator-core/src/operator-cli/command-handlers/operations.mjs","name":"handleOperationsCommand"},
+    {"file":"scripts/live-e2e/lib/flows.mjs","name":"executeFullJourneyFlow"},
+    {"file":"scripts/live-e2e/run-profile.mjs","name":"writeProofRunnerArtifacts"}
   ],
   "file_line_ceiling_overrides": {
     "apps/web/src/spa.jsx": 7565,
     "apps/web/src/spa.css": 5022,
-    "packages/adapter-sdk/src/index.mjs": 3591,
+    "packages/adapter-sdk/src/index.mjs": 3498,
     "packages/contracts/src/families.mjs": 1618,
     "packages/contracts/src/loader.mjs": 4004,
     "packages/orchestrator-core/src/certification-decision.mjs": 1274,
@@ -30,8 +32,8 @@
     "packages/orchestrator-core/src/step-execution-engine.mjs": 2204,
     "scripts/live-e2e/lib/contracts/families.mjs": 1895,
     "scripts/live-e2e/lib/contracts/loader.mjs": 5689,
-    "scripts/live-e2e/run-profile.mjs": 5000,
-    "scripts/live-e2e/lib/flows.mjs": 8000,
+    "scripts/live-e2e/run-profile.mjs": 4473,
+    "scripts/live-e2e/lib/flows.mjs": 7715,
     "scripts/live-e2e/lib/step-controller.mjs": 1875,
     "scripts/live-e2e/quality-assessment.mjs": 1306,
     "scripts/production-readiness.mjs": 1085

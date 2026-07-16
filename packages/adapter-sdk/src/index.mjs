@@ -2,22 +2,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
-
 import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
+import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
+import { isSupportedRequestTransport, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
+import { runSupervisedProcessSync } from "./supervisor.mjs";
 
 export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
 const ADAPTER_RESPONSE_STATUSES = Object.freeze(["success", "failed", "blocked"]);
-const EXTERNAL_REQUEST_TRANSPORTS = Object.freeze([
-  "request-artifact",
-  "stdin-json",
-  "file-attachment",
-  "argv-json",
-  "none",
-]);
 const DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS = 180_000;
 const CONTEXT_BUDGET_WARN_RATIO = 0.8;
 const SHORT_EXECUTION_ROOT_MODES = Object.freeze(["short-symlink", "short_symlink"]);
@@ -673,27 +667,6 @@ function asPositiveInteger(value, fallback) {
 }
 
 /**
- * @param {Record<string, unknown>} externalRuntime
- * @param {boolean} requestViaStdin
- * @returns {string}
- */
-function resolveRequestTransport(externalRuntime, requestViaStdin) {
-  const configuredTransport = asOptionalString(externalRuntime.request_transport);
-  if (configuredTransport) {
-    return configuredTransport;
-  }
-  return requestViaStdin ? "stdin-json" : "none";
-}
-
-/**
- * @param {string} requestTransport
- * @returns {boolean}
- */
-function isSupportedRequestTransport(requestTransport) {
-  return EXTERNAL_REQUEST_TRANSPORTS.includes(requestTransport);
-}
-
-/**
  * @param {Record<string, unknown>} request
  * @param {number} fallback
  * @returns {number}
@@ -819,70 +792,7 @@ export function resolveExternalRuntimeExecutionRoot(options) {
  * }}
  */
 export function runExternalRuntimeProcessSync(options) {
-  const timeoutMs = asPositiveInteger(options.timeout, 30000);
-  const maxBuffer = asPositiveInteger(options.maxBuffer, 10 * 1024 * 1024);
-  const supervisorPayload = {
-    command: options.command,
-    args: Array.isArray(options.args) ? options.args : [],
-    cwd: options.cwd,
-    env: options.env,
-    input: options.input,
-    timeout_ms: timeoutMs,
-    max_buffer: maxBuffer,
-    provider_step_status: options.providerStepStatus ?? null,
-  };
-  const supervisor = spawnSync(process.execPath, ["-e", EXTERNAL_RUNTIME_SUPERVISOR_SOURCE], {
-    cwd: options.cwd,
-    env: process.env,
-    encoding: "utf8",
-    input: JSON.stringify(supervisorPayload),
-    timeout: timeoutMs + 5000,
-    killSignal: "SIGKILL",
-    maxBuffer: Math.max(maxBuffer * 2 + 1024 * 1024, 1024 * 1024),
-  });
-
-  if (supervisor.error instanceof Error) {
-    return {
-      status: supervisor.status,
-      signal: supervisor.signal,
-      stdout: "",
-      stderr: typeof supervisor.stderr === "string" ? supervisor.stderr : "",
-      error: supervisor.error,
-      providerProgressEvents: [],
-    };
-  }
-
-  const supervisorStdout = typeof supervisor.stdout === "string" ? supervisor.stdout.trim() : "";
-  try {
-    const parsed = asRecord(JSON.parse(supervisorStdout));
-    const errorCode = asOptionalString(parsed.error_code);
-    const errorMessage = asOptionalString(parsed.error_message);
-    const error = errorCode || errorMessage ? new Error(errorMessage ?? errorCode ?? "External runtime failed.") : null;
-    if (error && errorCode) {
-      Object.assign(error, { code: errorCode });
-    }
-    return {
-      status: typeof parsed.status === "number" ? parsed.status : null,
-      signal: asOptionalString(parsed.signal),
-      stdout: typeof parsed.stdout === "string" ? parsed.stdout : "",
-      stderr: typeof parsed.stderr === "string" ? parsed.stderr : "",
-      error,
-      providerProgressEvents: Array.isArray(parsed.provider_progress_events)
-        ? parsed.provider_progress_events.map((event) => asRecord(event))
-        : [],
-    };
-  } catch (error) {
-    const parseError = error instanceof Error ? error : new Error(String(error));
-    Object.assign(parseError, { code: "SUPERVISOR_RESULT_INVALID" });
-    return {
-      status: supervisor.status,
-      signal: supervisor.signal,
-      stdout: "",
-      stderr: [typeof supervisor.stderr === "string" ? supervisor.stderr : "", supervisorStdout].filter(Boolean).join("\n"),
-      error: parseError,
-      providerProgressEvents: [],
-    };
-  }
+  return runSupervisedProcessSync({ ...options, supervisorSource: EXTERNAL_RUNTIME_SUPERVISOR_SOURCE });
 }
 
 /**
@@ -2701,18 +2611,7 @@ export function createAdapterResponseEnvelope(input) {
   }
 
   const output = asRecord(input.output);
-  const failureKind = asOptionalString(output.failure_kind);
-  const semanticType =
-    failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
-      ? "permission-denial"
-      : failureKind === "interactive-question-requested"
-        ? "interaction-request"
-        : failureKind === "external-runner-timeout"
-          ? "timeout"
-          : "terminal-result";
-  const semanticEvents = Array.isArray(output.semantic_events)
-    ? output.semantic_events.map((event) => asRecord(event))
-    : [{ event_type: semanticType, status, failure_kind: failureKind }];
+  const semanticEvents = normalizeSemanticEvents(output, status);
   return {
     request_id: requireString("request_id", input.request_id),
     adapter_id: requireString("adapter_id", input.adapter_id),
@@ -2733,7 +2632,7 @@ export function createMockAdapter(options = {}) {
       ? options.adapterId.trim()
       : "mock-runner";
 
-  return {
+  const adapter = {
     adapter_id: adapterId,
     lifecycle_hooks: STEP_LIFECYCLE_HOOKS,
     /**
@@ -2750,7 +2649,10 @@ export function createMockAdapter(options = {}) {
      *   context?: Record<string, unknown>,
      * }} request
      */
-    execute(request) {
+    execute(request) { return executeMockAdapterRequest(request); },
+  };
+
+  function executeMockAdapterRequest(request) {
       const envelope = createAdapterRequestEnvelope(request);
       const route = asRecord(envelope.route);
       const routeId =
@@ -2779,8 +2681,9 @@ export function createMockAdapter(options = {}) {
           },
         ],
       });
-    },
-  };
+  }
+
+  return adapter;
 }
 
 /**
@@ -2816,7 +2719,7 @@ export function createLiveAdapter(options) {
       : path.resolve(process.cwd(), requestedExecutionRoot)
     : process.cwd();
 
-  return {
+  const adapter = {
     adapter_id: adapterId,
     lifecycle_hooks: STEP_LIFECYCLE_HOOKS,
     /**
@@ -2833,7 +2736,10 @@ export function createLiveAdapter(options) {
      *   context?: Record<string, unknown>,
      * }} request
      */
-    execute(request) {
+    execute(request) { return executeLiveAdapterRequest(request); },
+  };
+
+  function executeLiveAdapterRequest(request) {
       const envelope = createAdapterRequestEnvelope(request);
       const route = asRecord(envelope.route);
       const routeId =
@@ -3585,6 +3491,7 @@ export function createLiveAdapter(options) {
         evidence_refs: evidenceRefs,
         tool_traces: toolTraces,
       });
-    },
-  };
+  }
+
+  return adapter;
 }

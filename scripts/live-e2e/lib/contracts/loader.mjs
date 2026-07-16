@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
+import { CONTRACT_FAMILY_INDEX } from "./contract-kernel.mjs";
 import {
-  CONTRACT_FAMILY_INDEX,
   INTAKE_SOURCE_KIND_VALUES,
   LIVE_E2E_OBSERVATION_STATUS_VALUES,
 } from "./families.mjs";

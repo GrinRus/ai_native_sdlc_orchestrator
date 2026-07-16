@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { EXAMPLE_FAMILY_RESOLUTION_RULES } from "./families.mjs";
+import { EXAMPLE_FAMILY_RESOLUTION_RULES } from "./contract-kernel.mjs";
 import { normalizePath } from "./utils.mjs";
 
 /**

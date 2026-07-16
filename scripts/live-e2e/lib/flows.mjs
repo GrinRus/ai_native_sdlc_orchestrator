@@ -5105,7 +5105,7 @@ export function executeInstalledUserFlow(options) {
  *   stepController?: ReturnType<import("./step-controller.mjs").createLiveE2eStepController>,
  * }} options
  */
-export function executeFullJourneyFlow(options) {
+function executeFullJourneyFlowImplementation(options) {
   const stageMap = createStageMap(getProfileStages(options.profile));
   const commandResults = [];
   const transcriptsRoot = path.join(options.layout.reportsRoot, `live-e2e-command-traces-${normalizeId(options.runId)}`);
@@ -7710,3 +7710,5 @@ export function executeFullJourneyFlow(options) {
     };
   }
 }
+
+export function executeFullJourneyFlow(options) { return executeFullJourneyFlowImplementation(options); }
