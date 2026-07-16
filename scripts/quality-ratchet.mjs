@@ -26,11 +26,31 @@ for (const sourceRoot of sourceRoots) walk(sourceRoot);
 
 const violations = [];
 const fileMetrics = {};
+function functionLineCount(file, functionName) {
+  const source = fs.readFileSync(path.join(root, file), "utf8");
+  const start = source.search(new RegExp(`export\\s+function\\s+${functionName}\\s*\\(`, "u"));
+  if (start < 0) return null;
+  const bodyStart = source.indexOf("{", start);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") depth -= 1;
+    if (depth === 0) return source.slice(start, index + 1).split("\n").length;
+  }
+  return null;
+}
 for (const file of files.sort()) {
   const lines = fs.readFileSync(path.join(root, file), "utf8").split("\n").length;
   fileMetrics[file] = { lines };
   const allowed = baseline.file_line_ceiling_overrides[file] ?? baseline.new_file_max_lines;
   if (lines > allowed) violations.push(`${file}: ${lines} lines exceeds ceiling ${allowed}`);
+}
+for (const entry of baseline.facade_functions ?? []) {
+  const lines = functionLineCount(entry.file, entry.name);
+  if (lines === null) violations.push(`${entry.file}: exported facade '${entry.name}' was not found`);
+  else if (lines > baseline.facade_function_max_lines) {
+    violations.push(`${entry.file}: exported facade '${entry.name}' has ${lines} lines; maximum is ${baseline.facade_function_max_lines}`);
+  }
 }
 
 const eslintTargets = ["scripts/slice-cycle.mjs", "scripts/typecheck-ratchet.mjs", "scripts/quality-ratchet.mjs", "scripts/dependency-policy.mjs"];

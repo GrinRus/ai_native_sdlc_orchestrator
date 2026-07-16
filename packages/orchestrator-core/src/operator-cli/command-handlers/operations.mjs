@@ -96,7 +96,7 @@ export const OPERATIONS_COMMAND_GROUP = Object.freeze({
  * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
  * @returns {boolean}
  */
-export function handleOperationsCommand(context) {
+function handleOperationsCommandImplementation(context) {
   const { command, flags, cwd, outputState } = context;
   if (command === "packet show") {
     ensureRequiredFlags(command, flags);
@@ -910,4 +910,15 @@ export function handleOperationsCommand(context) {
     return false;
   }
   return true;
+}
+
+/**
+ * Stable operations command-family facade.
+ *
+ * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
+ * @returns {boolean}
+ */
+export function handleOperationsCommand(context) {
+  if (!OPERATIONS_COMMANDS.includes(context.command)) return false;
+  return handleOperationsCommandImplementation(context);
 }
