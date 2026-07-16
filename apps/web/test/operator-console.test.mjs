@@ -25,6 +25,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
   const source = [
     "spa.jsx",
     "control-plane-client.js",
+    "dialog.jsx",
     "project-snapshot.js",
     "operator-error-card.jsx",
   ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
@@ -417,9 +418,9 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "trace-timeline-strip",
     "Create and run request",
     "Create no-write inspection request",
-    "requestDrawerOpenerRef",
-    "pendingRequestDrawerFocusRestore",
-    "restoreRequestDrawerFocus",
+    "openerRef",
+    "element.inert = true",
+    "event.shiftKey",
     "clearResult: false",
     "Add at least one target ref",
     "Initialize Project Runtime",

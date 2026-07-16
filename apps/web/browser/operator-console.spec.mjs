@@ -86,10 +86,22 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.locator("#project-switcher-control")).toBeVisible();
     await expect(page.getByText("Some live resources are unavailable.")).toBeVisible();
     await expect(page.getByText(/Existing project state remains visible/)).toBeVisible();
-    await page.getByRole("button", { name: /Add another AOR project/i }).first().click();
-    await expect(page.getByLabel("Add another AOR project drawer")).toBeVisible();
+    const opener = page.getByRole("button", { name: /Add another AOR project/i }).first();
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: "Add another AOR project" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
+    await expect.poll(() => page.locator("header.topbar").evaluate((element) => element.inert)).toBe(true);
+    await dialog.getByLabel("Project path").fill("/tmp/aor-dialog-focus-fixture");
+    const lastAction = dialog.getByRole("button", { name: "Add and initialize" });
+    await lastAction.focus();
+    await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(lastAction).toBeFocused();
     await page.keyboard.press("Escape");
-    await expect(page.getByLabel("Add another AOR project drawer")).toBeHidden();
+    await expect(dialog).toBeHidden();
+    await expect(opener).toBeFocused();
   });
 
   test("durable event delivery refreshes browser state", async ({ page }) => {
