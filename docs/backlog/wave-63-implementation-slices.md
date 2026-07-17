@@ -414,7 +414,7 @@ W57 and the control-plane semantics closed by W58/W59.
   and inspect supporting evidence without duplicated next-action, blocker,
   safety, and artifact panels competing for attention.
 - **Epic:** EPIC-1, EPIC-4, EPIC-6
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/**`, flow projections/read models,
@@ -482,7 +482,7 @@ W57 and the control-plane semantics closed by W58/W59.
   while the legacy installed default remains available; canonical lifecycle
   story closure remains owned by W63-S08.
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** installed SPA browser suite, package smoke, UX quality

@@ -23,6 +23,7 @@ openapi_contract:
     - ExternalRunHealthProjection
     - FlowListResponse
     - FlowDetailResponse
+    - AttentionProjection
     - RunsResponse
     - RunEventHistoryResponse
     - RunControlActionRequest
@@ -100,6 +101,16 @@ read_operations:
       - runtime-harness-report
       - delivery-manifest
       - release-packet
+  - operation_id: read.flow-attention
+    operation_family: read
+    materializes_artifacts: false
+    output_projection: attention-projection
+    output_contract_families:
+      - step-result
+      - review-decision
+      - review-report
+      - quality-repair-request
+      - runtime-harness-report
   - operation_id: read.flow-plan
     operation_family: read
     output_contract_families:

@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "53dd63107ab121eb15751d7514b6f90f0de4942e6ee467c7a55493a82fce2bb6",
+  "source_hash": "9f77f3e7f02a77b2c52e97e1ece15d5a48cfb4c1b1fe9363272506800d8d1c99",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -24,6 +24,9 @@
     "apps/web/src/project-structure-model.js",
     "apps/web/src/project-structure.css",
     "apps/web/src/project-structure.jsx",
+    "apps/web/src/quiet-modes-model.js",
+    "apps/web/src/quiet-modes.css",
+    "apps/web/src/quiet-modes.jsx",
     "apps/web/src/quiet-shell.css",
     "apps/web/src/quiet-shell.jsx",
     "apps/web/src/spa.css",
@@ -35,13 +38,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-CnEN6TbJ.js",
-    "apps/web/dist/assets/index-DnLYiu5e.css",
+    "apps/web/dist/assets/index-DMrlQ-mI.js",
+    "apps/web/dist/assets/index-WxKKYvh4.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-CnEN6TbJ.js": "8ad7959fbdff6cd592b71af6c7411658f7d14063595e29179af95c819e0fa300",
-    "apps/web/dist/assets/index-DnLYiu5e.css": "849a9e2bb45a7918aeb0ef28101f213caaefacf310cfc3ca9170b538049c91c6",
-    "apps/web/dist/index.html": "9f5679f9f71fcb0b626df2d816e2d38a8ea625fcfbb85846f9d472669fe4ad91"
+    "apps/web/dist/assets/index-DMrlQ-mI.js": "545a26478eede9ec615c2fd0d42cc49bdddaa13f51419737308015946db1c060",
+    "apps/web/dist/assets/index-WxKKYvh4.css": "b8569258cc063a9570c33753b9748bd4de62ffb38c5ab626f127e7ebf3a1b8d0",
+    "apps/web/dist/index.html": "8e7126a50ffa810422cadbd7fce5837008655490e6948c04d056268d01fb38f7"
   }
 }

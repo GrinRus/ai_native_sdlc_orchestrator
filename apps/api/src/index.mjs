@@ -9,6 +9,7 @@ export {
   listRunControlAudits,
   readFinanceMonitoringSnapshot,
   readFlowProjection,
+  readAttentionProjection,
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,

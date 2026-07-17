@@ -12,6 +12,7 @@ import {
   readFlowRuntimeTrace,
   readSelectedFlowProjection,
 } from "../src/control-plane/flow-projections.mjs";
+import { readAttentionProjection } from "../src/control-plane/attention-projection.mjs";
 import { appendRunEvent } from "../src/control-plane/live-event-stream.mjs";
 import { resolveNextAction } from "../src/next-action.mjs";
 import { createOperatorRequest } from "../src/operator-request.mjs";
@@ -507,5 +508,31 @@ test("flow projections expose active quality repair gates", () => {
     assert.equal(flow?.active_quality_gate.delivery_release_blocked, true);
     assert.equal(flow?.active_quality_gate.next_action.action_id, "hold-exhausted-quality-repair");
     assert.equal(flow?.active_quality_gate.attempt_budget.remaining_attempts, 0);
+  });
+});
+
+test("attention projection is stable, ordered, flow scoped, and non-materializing", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeMission(init, "attention-proof", "patch-only");
+    const runId = "run.attention-proof";
+    writeExecutionEvidence(init, runId);
+    writeReviewEvidence(init, runId);
+    writeQualityRepairRequest(init, runId, { sourceStage: "review" });
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot, runId });
+    const flowId = `flow.${init.projectId}.attention-proof`;
+    const before = runtimeJsonSnapshot(init);
+    const first = readAttentionProjection({ cwd: repoRoot, projectRef: repoRoot, flowId });
+    const second = readAttentionProjection({ cwd: repoRoot, projectRef: repoRoot, flowId });
+    assert.ok(first);
+    assert.equal(first.read_only, true);
+    assert.equal(first.freshness, "current");
+    assert.ok(first.items.some((item) => item.source_family === "quality-repair-request"));
+    assert.deepEqual(second, first);
+    assert.deepEqual(runtimeJsonSnapshot(init), before);
+    const order = new Map(["needs-attention", "running", "upcoming", "resolved"].map((state, index) => [state, index]));
+    assert.deepEqual(first.items.map((item) => item.item_id), [...new Set(first.items.map((item) => item.item_id))]);
+    assert.ok(first.items.every((item, index) => index === 0 || order.get(first.items[index - 1].state) <= order.get(item.state)));
+    assert.equal(readAttentionProjection({ cwd: repoRoot, projectRef: repoRoot, flowId: "flow.missing" }), null);
   });
 });

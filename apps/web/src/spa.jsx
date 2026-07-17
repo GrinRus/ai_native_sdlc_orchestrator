@@ -10,7 +10,7 @@ import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPL
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
-import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, writeQuietPresentation } from "./quiet-shell.jsx";
+import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css";
 
 const STAGES = [
@@ -6134,7 +6134,7 @@ function App() {
   const [draftSourceFlow, setDraftSourceFlow] = useState(null);
   const [draftFollowUpHandoffRef, setDraftFollowUpHandoffRef] = useState(null);
   const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
-  const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null);
+  const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null); const [attentionState, setAttentionState] = useState({ scopeKey: "none", status: "idle", data: null, error: null });
   const [planWorkbenchState, setPlanWorkbenchState] = useState({
     scopeKey: "none",
     status: "idle",
@@ -6374,16 +6374,16 @@ function App() {
   async function loadFlowWorkbench(base, flow) {
     if (!flow?.flow_id) {
       setFlowEvidenceGraph(null);
-      setFlowRuntimeTrace(null);
+      setFlowRuntimeTrace(null); setAttentionState({ scopeKey: `${base}:none`, status: "idle", data: null, error: null });
       setPlanWorkbenchState({ scopeKey: `${base}:none`, status: "idle", plan: null, progress: null, error: "" });
       return;
     }
-    const encodedFlowId = encodeURIComponent(flow.flow_id);
-    const scopeKey = `${base}:${flow.flow_id}`;
-    setPlanWorkbenchState({ scopeKey, status: "loading", plan: null, progress: null, error: "" });
-    const [graph, trace, planResult] = await Promise.all([
+    const encodedFlowId = encodeURIComponent(flow.flow_id); const scopeKey = `${base}:${flow.flow_id}`;
+    setPlanWorkbenchState({ scopeKey, status: "loading", plan: null, progress: null, error: "" }); setAttentionState({ scopeKey, status: "loading", data: null, error: null });
+    const [graph, trace, attentionResult, planResult] = await Promise.all([
       readJson(`${base}/flows/${encodedFlowId}/evidence-graph`).catch(() => null),
       readJson(`${base}/flows/${encodedFlowId}/runtime-trace`).catch(() => null),
+      readJson(`${base}/flows/${encodedFlowId}/attention`).then((data) => ({ status: "ready", data, error: null })).catch((error) => ({ status: "error", data: null, error })),
       Promise.all([
         readJson(`${base}/flows/${encodedFlowId}/plan`),
         readJson(`${base}/flows/${encodedFlowId}/plan/progress`).catch((error) => {
@@ -6401,8 +6401,7 @@ function App() {
         error: error instanceof Error ? error.message : String(error),
       })),
     ]);
-    setFlowEvidenceGraph(graph);
-    setFlowRuntimeTrace(trace);
+    setFlowEvidenceGraph(graph); setFlowRuntimeTrace(trace); setAttentionState((current) => current.scopeKey === scopeKey ? { scopeKey, ...attentionResult } : current);
     setPlanWorkbenchState((current) => current.scopeKey === scopeKey
       ? { scopeKey, ...planResult }
       : current);
@@ -6515,7 +6514,7 @@ function App() {
       setConnectionState("connected");
       setResourceErrors({});
       setFlowEvidenceGraph(null);
-      setFlowRuntimeTrace(null);
+      setFlowRuntimeTrace(null); setAttentionState({ scopeKey: `${effectiveProjectId ?? "project"}:none`, status: "idle", data: null, error: null });
       setPlanWorkbenchState({ scopeKey: `${effectiveProjectId ?? "project"}:none`, status: "idle", plan: null, progress: null, error: "" });
       if (selectionStillCurrent && !didChooseStage.current) {
         setSelectedStage("readiness");
@@ -6693,7 +6692,7 @@ function App() {
     setDraftSourceFlow(null);
     setDraftFollowUpHandoffRef(null);
     setFlowEvidenceGraph(null);
-    setFlowRuntimeTrace(null);
+    setFlowRuntimeTrace(null); setAttentionState({ scopeKey: "none", status: "idle", data: null, error: null });
     setPlanWorkbenchState({ scopeKey: "none", status: "idle", plan: null, progress: null, error: "" });
     setPackets([]);
     setStepResults([]);
@@ -7294,7 +7293,7 @@ function App() {
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
 
   return (
-    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} ${consoleExperience === "quiet-cockpit" ? "quiet-cockpit-preview" : ""}`} data-console-experience={consoleExperience}>
+    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} ${consoleExperience === "quiet-cockpit" ? "quiet-cockpit-preview" : ""}`} data-console-experience={consoleExperience} data-quiet-mode={consoleExperience === "quiet-cockpit" ? quietMode : undefined}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">A</div>
@@ -7366,7 +7365,7 @@ function App() {
         </section>
       ) : null}
 
-        {consoleExperience === "quiet-cockpit" ? <QuietShell project={activeProjectDisplay} flow={selectedFlow} connection={connectionState} safetyMode={selectedFlow?.writeback_policy?.mode ?? "no-write"} attentionCount={interactions.length + operatorDecisionRequests.length} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode}/> : null}
+        {consoleExperience === "quiet-cockpit" ? <QuietShell project={activeProjectDisplay} flow={selectedFlow} connection={connectionState} safetyMode={selectedFlow?.writeback_policy?.mode ?? "no-write"} attentionCount={(attentionState.data?.items?.length ?? 0) + Object.keys(resourceErrors).length} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode}/> : null}
         <StageRail
           selectedStage={selectedStage}
           currentStage={currentStage}
@@ -7380,6 +7379,7 @@ function App() {
         />
 
       <main className="main">
+        {consoleExperience === "quiet-cockpit" ? <QuietModeSurface mode={quietMode} attention={attentionState.data} attentionStatus={attentionState.status} resourceErrors={resourceErrors} planState={planWorkbenchState} runs={runs} deliveryManifests={deliveryManifests} graph={selectedFlowEvidenceGraph} trace={selectedFlowRuntimeTrace} onResolve={(item) => runOperatorControl(item.operator_control)} onInspect={(item) => { setSelectedRef(item.source_ref); focusAdvancedWorkbench("evidence"); }}/> : null}
         {error ? <div className="alert" role="alert">{error}</div> : null}
         <ResourceErrorCard errors={resourceErrors} />
         {consoleExperience === "quiet-cockpit" && !draftSurface ? <MissionDurableSummary flow={selectedFlow} /> : null}
