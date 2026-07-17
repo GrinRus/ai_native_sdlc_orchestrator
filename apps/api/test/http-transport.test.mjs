@@ -976,6 +976,22 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(runtimeTracePayload.flow_id, selectedFlowPayload.flow_id);
       assert.equal(runtimeTracePayload.read_only, true);
 
+      const attentionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/attention`,
+      );
+      assert.equal(attentionResponse.status, 200);
+      const attentionPayload = await attentionResponse.json();
+      assert.equal(attentionPayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(attentionPayload.read_only, true);
+      assert.equal(attentionPayload.freshness, "current");
+      assert.ok(Array.isArray(attentionPayload.items));
+
+      const missingAttentionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/flow.missing/attention`,
+      );
+      assert.equal(missingAttentionResponse.status, 404);
+      assert.equal((await missingAttentionResponse.json()).error.code, "flow.not_found");
+
       const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
       assert.equal(typeof runtimeLayout.reportsRoot, "string");
       assert.equal(typeof runtimeLayout.artifactsRoot, "string");

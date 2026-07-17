@@ -22,6 +22,8 @@ export {
   readSelectedFlowProjection,
 } from "./flow-projections.mjs";
 
+export { readAttentionProjection } from "./attention-projection.mjs";
+
 export {
   readFinanceMonitoringSnapshot,
   listRuns,

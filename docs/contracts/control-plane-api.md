@@ -240,8 +240,23 @@ Implemented detached read routes:
   selected-flow-only trace that links live run events, step results, Runtime
   Harness decisions, delivery manifests, release packets, learning artifacts,
   and operator requests that belong to the selected flow.
+- `GET /api/projects/:projectId/flows/:flowId/attention` returns a read-only,
+  non-materializing projection over existing interaction, decision,
+  assessment, verification, repair, policy, and run evidence. The response
+  includes `project_id`, `flow_id`, `initialized`, `read_only`, `freshness`,
+  `latest_source_at`, and deterministically ordered `items[]`. Each item has a
+  stable `item_id`, source family/ref, lifecycle stage, state, severity, title,
+  consequence, optional structured `operator_control`, evidence refs, and
+  source timestamps. Browser selection, drafts, dismissal, and completion are
+  not part of this projection; completion is accepted only after durable
+  source readback.
 
 Flow list and detail reads must be deterministic and must not create artifacts.
+Attention item ordering is `state -> severity -> newest source timestamp ->
+item_id`, with state order `needs-attention`, `running`, `upcoming`, `resolved`
+and severity order `danger`, `warning`, `information`, `neutral`. A known flow
+with no attention evidence returns an empty `items[]`; an unknown flow returns
+`404 flow.not_found` without initializing the project runtime.
 `New Flow` is a lifecycle action through `mission create` plus `next`; it
 creates fresh mission/intake evidence, refreshes `next-action-report`, and
 archives mission-specific next-action evidence so a completed source flow remains

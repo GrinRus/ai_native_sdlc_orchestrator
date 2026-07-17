@@ -640,6 +640,26 @@
         }
       }
     },
+    "/api/projects/{projectId}/flows/{flowId}/attention": {
+      "get": {
+        "operationId": "getFlowAttention",
+        "tags": ["read"],
+        "x-aor-route-id": "flow-attention",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } },
+          { "$ref": "#/components/parameters/readModelLimit" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/FlowAttention" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
     "/api/projects/{projectId}/flows/{flowId}/plan": {
       "get": {
         "operationId": "getFlowPlan",
@@ -1468,6 +1488,14 @@
           }
         }
       },
+      "FlowAttention": {
+        "description": "Flow-scoped attention projection derived from existing durable evidence without materializing runtime state.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/AttentionProjection" }
+          }
+        }
+      },
       "Runs": {
         "description": "Read-only run summary list built from filesystem runtime artifacts.",
         "content": {
@@ -1583,6 +1611,39 @@
           },
           "target_surface": { "type": ["string", "null"], "enum": ["cockpit", "attention", "journey", "evidence", null] },
           "requires_confirmation": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "AttentionItem": {
+        "type": "object",
+        "required": ["item_id", "source_family", "source_ref", "stage", "state", "severity", "title", "consequence", "operator_control", "evidence_refs", "created_at", "updated_at"],
+        "properties": {
+          "item_id": { "type": "string", "minLength": 1 },
+          "source_family": { "type": "string", "minLength": 1 },
+          "source_ref": { "type": "string", "minLength": 1 },
+          "stage": { "type": ["string", "null"] },
+          "state": { "type": "string", "enum": ["needs-attention", "running", "upcoming", "resolved"] },
+          "severity": { "type": "string", "enum": ["danger", "warning", "information", "neutral"] },
+          "title": { "type": "string", "minLength": 1 },
+          "consequence": { "type": "string", "minLength": 1 },
+          "operator_control": { "oneOf": [{ "type": "null" }, { "$ref": "#/components/schemas/OperatorControl" }] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "created_at": { "type": ["string", "null"] },
+          "updated_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "AttentionProjection": {
+        "type": "object",
+        "required": ["project_id", "flow_id", "initialized", "read_only", "freshness", "latest_source_at", "items"],
+        "properties": {
+          "project_id": { "type": ["string", "null"] },
+          "flow_id": { "type": "string", "minLength": 1 },
+          "initialized": { "type": "boolean" },
+          "read_only": { "const": true },
+          "freshness": { "type": "string", "enum": ["current", "stale", "partial", "offline"] },
+          "latest_source_at": { "type": ["string", "null"] },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AttentionItem" } }
         },
         "additionalProperties": false
       },

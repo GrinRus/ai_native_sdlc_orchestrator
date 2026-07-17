@@ -15,6 +15,7 @@ import {
   readFlowEvidenceGraph,
   readFlowProjection,
   readFlowRuntimeTrace,
+  readAttentionProjection,
   readNextActionReport,
   listStepResults,
   readPlannerMetrics,
@@ -115,6 +116,18 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
         return;
       }
       sendJson(response, 200, trace);
+      return;
+    }
+    case "flow-attention": {
+      const attention = readAttentionProjection({
+        ...withReadModelLimit(runtimeOptions, requestUrl.searchParams),
+        flowId: params.flowId,
+      });
+      if (!attention) {
+        sendError(response, 404, "flow.not_found", `Flow '${params.flowId}' was not found.`);
+        return;
+      }
+      sendJson(response, 200, attention);
       return;
     }
     case "flow-plan":

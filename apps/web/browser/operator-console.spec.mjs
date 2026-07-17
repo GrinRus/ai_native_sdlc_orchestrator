@@ -211,6 +211,23 @@ test.describe.serial("installed local operator console", () => {
     }
   });
 
+  test("Quiet Cockpit keeps multiple attention drafts and flow-scoped Journey and Evidence", async ({ page }) => {
+    const state = readHarnessState(); await blockExternalNetwork(page, state.app_url);
+    const flow = { flow_id: `flow.${state.project_id}.attention-proof`, status: "active", selected_stage: "execution", evidence_refs: [] };
+    await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", stage: "execution", runtime_root: state.runtime_root, state_file: `${state.runtime_root}/project-state.json`, onboarding_summary: { initialized: true, state_exists: true } }) }));
+    await page.route(new RegExp(`/api/projects/${state.project_id}/flows$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ flows: [flow], selected_flow_id: flow.flow_id }) }));
+    await page.route("**/flows/selected", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(flow) }));
+    await page.route(new RegExp(`/api/projects/${state.project_id}/flows/.+/attention$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, flow_id: `flow.${state.project_id}.safe-walkthrough`, initialized: true, read_only: true, freshness: "current", latest_source_at: "2026-07-17T00:00:00.000Z", items: [{ item_id: "attention.interaction.one", source_family: "interaction-request", source_ref: "evidence://interaction-one", stage: "execution", state: "needs-attention", severity: "warning", title: "Answer implementation question", consequence: "Execution is waiting for operator input.", operator_control: null, evidence_refs: ["evidence://interaction-one"], created_at: "2026-07-17T00:00:00.000Z", updated_at: "2026-07-17T00:00:00.000Z" }, { item_id: "attention.decision.two", source_family: "review-decision", source_ref: "evidence://decision-two", stage: "review", state: "needs-attention", severity: "danger", title: "Review failed verification", consequence: "Delivery remains blocked.", operator_control: null, evidence_refs: ["evidence://decision-two"], created_at: "2026-07-17T00:01:00.000Z", updated_at: "2026-07-17T00:01:00.000Z" }] }) }));
+    await page.goto(`${state.app_url}?console=quiet-cockpit`);
+    await page.getByRole("tab", { name: "Attention" }).click();
+    await expect(page.getByRole("region", { name: "Attention queue" })).toBeVisible();
+    await page.getByRole("button", { name: /Answer implementation question/u }).click(); await page.getByLabel("Operator draft").fill("first draft");
+    await page.getByRole("button", { name: /Review failed verification/u }).click(); await page.getByLabel("Operator draft").fill("second draft");
+    await page.getByRole("button", { name: /Answer implementation question/u }).click(); await expect(page.getByLabel("Operator draft")).toHaveValue("first draft");
+    await page.getByRole("tab", { name: "Journey" }).click(); await expect(page.getByRole("region", { name: "Journey" })).toBeVisible();
+    await page.getByRole("tab", { name: "Evidence" }).click(); await expect(page.getByRole("region", { name: "Evidence" })).toBeVisible();
+  });
+
   test("partial endpoint failure preserves project state and keyboard modal behavior", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
