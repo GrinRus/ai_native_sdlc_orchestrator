@@ -746,7 +746,9 @@ implemented package.
   they intentionally do not close the full-lifecycle `OPS-12` claim.
 - **W63-S08** closes browser-operable canonical safe lifecycle parity and the
   UI-only story evidence through the installed mock/deterministic no-write
-  golden path.
+  golden path. The executable manifest and exact evidence boundary are recorded
+  in `apps/web/browser/fixtures/golden-lifecycle.json` and
+  `docs/research/16-w63-canonical-lifecycle-closure.md`.
 - After W63-S08, **W65-S01 through W65-S04** freeze parity, add a reversible
   presentation selector, and pilot Mission/Cockpit plus
   Attention/Journey/Evidence outcomes without implementing missing lifecycle
@@ -755,9 +757,9 @@ implemented package.
 - **W65-S06 through W65-S07** remove the legacy renderer and prove the final
   single-renderer installed package.
 
-W63 and W65 remain blocked by their declared dependencies. This target design
-can be reviewed and refined now, but implementation, packaged-default, and
-story-coverage claims remain owned by the backlog and executable evidence.
+W63 is implemented behind the explicit selector and closed by executable
+installed evidence. W65 remains responsible for parity freeze, reversible
+cutover, packaged-default activation, and legacy retirement.
 
 ## Out of scope
 

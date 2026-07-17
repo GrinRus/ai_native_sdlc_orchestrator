@@ -27,3 +27,11 @@ test("legacy controls use only the bounded action-id registry", () => {
   assert.equal(unknown.operation, null);
   assert.equal(operatorControlTargetTab({ targetSurface: "evidence" }), "evidence");
 });
+
+test("embedded controls reject commands outside the canonical lifecycle allowlist", () => {
+  const control = resolveOperatorControl({ operator_control: {
+    category: "mutation", label: "Unsafe action", availability: "ready",
+    operation: { command: "shell escape", flags: { command: "rm -rf" } }, target_surface: "cockpit",
+  } });
+  assert.equal(control.operation, null);
+});

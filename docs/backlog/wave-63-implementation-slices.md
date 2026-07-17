@@ -571,7 +571,7 @@ W57 and the control-plane semantics closed by W58/W59.
   actions and durable evidence, with no required terminal handoff on the golden
   path.
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** XL
 - **Primary modules:** installed SPA scenario suite, canonical control-plane
