@@ -488,7 +488,7 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/JsonObject"
+            "$ref": "#/components/responses/NextActionReport"
           },
           "401": {
             "$ref": "#/components/responses/AuthError"
@@ -1341,6 +1341,14 @@
       }
     },
     "responses": {
+      "NextActionReport": {
+        "description": "Current durable next-action report or null before the first next projection.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/NextActionReportResponse" }
+          }
+        }
+      },
       "JsonObject": {
         "description": "Route-specific JSON response backed by the documented AOR contract families.",
         "content": {
@@ -1552,6 +1560,61 @@
       }
     },
     "schemas": {
+      "OperatorControl": {
+        "type": "object",
+        "required": ["category", "label", "availability", "operation", "target_surface", "requires_confirmation"],
+        "properties": {
+          "category": { "type": "string", "enum": ["mutation", "workbench", "evidence", "copy", "refresh", "unavailable"] },
+          "label": { "type": "string", "minLength": 1 },
+          "availability": { "type": "string", "enum": ["ready", "blocked"] },
+          "operation": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["command", "flags"],
+                "properties": {
+                  "command": { "type": "string", "minLength": 1 },
+                  "flags": { "type": "object", "additionalProperties": true }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "target_surface": { "type": ["string", "null"], "enum": ["cockpit", "attention", "journey", "evidence", null] },
+          "requires_confirmation": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "NextActionReportResponse": {
+        "oneOf": [
+          { "type": "null" },
+          {
+            "type": "object",
+            "required": ["report_id", "project_id", "primary_action", "status", "evidence_refs"],
+            "properties": {
+              "report_id": { "type": "string" },
+              "project_id": { "type": "string" },
+              "status": { "type": "string", "enum": ["ready", "blocked"] },
+              "evidence_refs": { "type": "array", "items": { "type": "string" } },
+              "primary_action": {
+                "type": "object",
+                "required": ["action_id", "command", "reason", "low_level_command", "evidence_refs"],
+                "properties": {
+                  "action_id": { "type": "string" },
+                  "command": { "type": "string" },
+                  "reason": { "type": "string" },
+                  "low_level_command": { "type": "string" },
+                  "evidence_refs": { "type": "array", "items": { "type": "string" } },
+                  "operator_control": { "$ref": "#/components/schemas/OperatorControl" }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      },
       "JsonObject": {
         "type": "object",
         "additionalProperties": true

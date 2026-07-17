@@ -275,7 +275,7 @@ W57 and the control-plane semantics closed by W58/W59.
   whose behavior matches its label, while terminal handoffs, workbench opens,
   refreshes, and copied commands are visibly distinct and auditable.
 - **Epic:** EPIC-3, EPIC-4, EPIC-6
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, next-action and run-health examples,
@@ -348,7 +348,7 @@ W57 and the control-plane semantics closed by W58/W59.
   primary action remain understandable and operable across supported desktop,
   tablet, and mobile widths without hiding authoritative state.
 - **Epic:** EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Delivery priority:** P1
 - **Estimated effort:** M
 - **Primary modules:** `apps/web/src/**`, responsive styles, browser fixtures

@@ -112,6 +112,16 @@ primary_action:
     - evidence://.aor/projects/aor-core/reports/onboarding-report.json
     - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
     - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+  operator_control:
+    category: mutation
+    label: Create discovery evidence
+    availability: ready
+    operation:
+      command: discovery run
+      flags:
+        input-packet: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+    target_surface: cockpit
+    requires_confirmation: false
 blockers: []
 bounded_execution:
   requested_delivery_mode: patch-only

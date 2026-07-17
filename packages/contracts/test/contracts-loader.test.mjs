@@ -593,6 +593,18 @@ test("next action report validates artifact readiness statuses", () => {
   );
 });
 
+test("next action report validates additive structured operator controls", () => {
+  const source = path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "next-action-report" });
+  assert.equal(loaded.document.primary_action.operator_control.category, "mutation");
+  assert.equal(loaded.document.primary_action.operator_control.operation.command, "discovery run");
+  const invalid = structuredClone(loaded.document);
+  invalid.primary_action.operator_control.category = "shell";
+  const result = validateContractDocument({ document: invalid, family: "next-action-report", source });
+  assert.equal(result.ok, false);
+  assert.ok(result.issues.some((entry) => entry.field === "primary_action.operator_control.category"));
+});
+
 test("verification command groups accept W54 authoring metadata", () => {
   const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
   const loaded = loadContractFile({ filePath: source, family: "project-profile" });
