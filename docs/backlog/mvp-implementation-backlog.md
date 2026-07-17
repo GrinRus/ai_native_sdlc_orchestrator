@@ -589,8 +589,8 @@ This is the master index for the implementation slices across all defined waves.
 | W65-S03 | Mission and Quiet Cockpit pilot activation | EPIC-1, EPIC-2, EPIC-6 | done | Mission/Cockpit pilot scenarios, canonical mutations, browser/a11y/durable readback | W65-S02 |
 | W65-S04 | Attention, Journey, and Evidence pilot activation | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | done | specialist modes, W60-W62 projections, evidence/trace reads, comparison fixtures | W65-S02 |
 | W65-S05 | Default-on cutover and explicit rollback rehearsal | EPIC-0, EPIC-6 | done | app-config/default resolution, installed package proof, rollback runbook | W65-S03, W65-S04 |
-| W65-S06 | Legacy console retirement and compatibility cleanup | EPIC-0, EPIC-6 | ready | legacy web source/CSS/fixtures, selector compatibility, packaged assets | W65-S05 |
-| W65-S07 | Post-cutover installed-console acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | blocked | installed browser proof, guided profile, a11y/comparison evidence, product/story/runbook docs | W65-S06 |
+| W65-S06 | Legacy console retirement and compatibility cleanup | EPIC-0, EPIC-6 | done | legacy web source/CSS/fixtures, selector compatibility, packaged assets | W65-S05 |
+| W65-S07 | Post-cutover installed-console acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | ready | installed browser proof, guided profile, a11y/comparison evidence, product/story/runbook docs | W65-S06 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New

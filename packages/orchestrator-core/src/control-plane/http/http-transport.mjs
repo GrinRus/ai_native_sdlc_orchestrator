@@ -103,10 +103,11 @@ export function createControlPlaneHttpServer(options) {
   const projectId = defaultSummary?.project_id ?? null;
   const projectProfileRef = defaultSummary?.project_profile_ref ?? null;
   const appStaticRoot = asString(options.app?.staticRoot);
-  const appConsoleExperience = asString(options.app?.consoleExperience) ?? "quiet-cockpit";
-  if (!["legacy", "quiet-cockpit"].includes(appConsoleExperience)) {
+  const requestedConsoleExperience = asString(options.app?.consoleExperience) ?? "quiet-cockpit";
+  if (!["legacy", "quiet-cockpit"].includes(requestedConsoleExperience)) {
     throw new Error("AOR app console experience must be 'legacy' or 'quiet-cockpit'.");
   }
+  const appConsoleExperience = "quiet-cockpit";
   const appIndexFile = appStaticRoot ? path.join(appStaticRoot, "index.html") : null;
   if (appStaticRoot && !fs.existsSync(appIndexFile ?? "")) {
     throw new Error(`AOR app static bundle is missing at '${appStaticRoot}'. Run the web build before launching the app.`);

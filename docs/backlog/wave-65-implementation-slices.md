@@ -626,7 +626,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S06 — Legacy console retirement and compatibility cleanup
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Outcome:** The packaged app contains one operator-console renderer, while
   historical W34 product evidence remains documented and unsupported legacy
   selectors fail or redirect transparently without reviving old runtime logic.
@@ -689,7 +689,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S07 — Post-cutover installed-console acceptance and story closure
 
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** One clean installed-package proof demonstrates that the
   single-renderer Quiet Cockpit default preserves target user outcomes,
   accessibility, responsive behavior, durable evidence, and public-repo safety

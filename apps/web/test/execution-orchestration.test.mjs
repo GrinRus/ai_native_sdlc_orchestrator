@@ -86,8 +86,8 @@ test("installed acceptance fixtures cover every scenario and blocking environmen
   assert.equal(fixtures.package_mode, "installed-tarball");
   assert.equal(fixtures.viewports.length, 7);
   assert.deepEqual(fixtures.environment_modes, ["keyboard-only", "reduced-motion", "zoom-200"]);
-  assert.ok(fixtures.safety_assertions.includes("quiet-default-on"));
-  assert.ok(fixtures.safety_assertions.includes("legacy-presentation-rollback"));
+  assert.ok(fixtures.safety_assertions.includes("single-quiet-renderer"));
+  assert.ok(fixtures.safety_assertions.includes("legacy-link-migrates-context"));
 });
 
 test("golden lifecycle is ordered, canonical, no-write, and evidence complete", () => {
