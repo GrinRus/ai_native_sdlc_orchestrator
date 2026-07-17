@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from "node:fs"; import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES } from "./families.mjs";
 import { validateCanonicalContractValues } from "./canonical-values.mjs";
@@ -7,7 +6,7 @@ import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
-import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs";
+import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs"; import { validateOperatorControl } from "./operator-control-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -471,6 +470,7 @@ function validateProjectProfile(document, source) {
 function validateNextActionReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  issues.push(...validateOperatorControl(document, source));
   validateQualityRepairLineage({
     record: document,
     source,

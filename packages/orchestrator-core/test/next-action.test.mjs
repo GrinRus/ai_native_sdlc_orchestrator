@@ -458,6 +458,17 @@ test("resolveNextAction recommends discovery for complete guided mission intake"
     assert.equal(report.project_state.stage, "discovery");
     assert.equal(report.primary_action.action_id, "discovery-run");
     assert.match(report.primary_action.command, /aor discovery run/);
+    assert.deepEqual(report.primary_action.operator_control, {
+      category: "mutation",
+      label: "Create discovery evidence",
+      availability: "ready",
+      operation: {
+        command: "discovery run",
+        flags: { "input-packet": report.mission_state.intake_packet_ref },
+      },
+      target_surface: "cockpit",
+      requires_confirmation: false,
+    });
     assert.equal(report.mission_state.completeness_status, "complete");
     assert.equal(report.mission_state.delivery_mode, "patch-only");
     assert.deepEqual(report.mission_state.allowed_paths, ["apps/web/**"]);

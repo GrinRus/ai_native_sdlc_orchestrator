@@ -1,9 +1,8 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from "node:fs"; import path from "node:path";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
-import { runProjectionCoordinator } from "./operator-projection-services.mjs";
+import { runProjectionCoordinator } from "./operator-projection-services.mjs"; import { operatorControlForAction } from "./next-action-operator-control.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 const DEFAULT_RUNTIME_ROOT = ".aor"; const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
 /**
@@ -1954,6 +1953,7 @@ function executeNextActionProjection(options = {}) {
   artifactReadiness ??= buildArtifactReadiness({ init, intake: latestIntake, missionState });
 
   primaryAction = withRuntimeRootActionCommand(primaryAction, init.runtimeRoot, includeRuntimeRoot);
+  primaryAction = { ...primaryAction, operator_control: operatorControlForAction(primaryAction, missionState, closureState) };
   blockers = withRuntimeRootBlockerCommands(blockers, init.runtimeRoot, includeRuntimeRoot);
   const qualityRepairLineage = asRecord(asRecord(closureState.quality_repair).lineage);
 

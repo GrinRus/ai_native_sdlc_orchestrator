@@ -193,6 +193,9 @@ test.describe.serial("installed local operator console", () => {
     await page.reload();
     await expect(page.getByText("Mission evidence is durable.")).toBeVisible();
     expect(lifecycleCommands.filter((command) => command === "mission create")).toHaveLength(1);
+    await page.getByRole("button", { name: "Create discovery evidence" }).click();
+    await expect.poll(() => lifecycleCommands.slice(-2)).toEqual(["discovery run", "next"]);
+    await expect(page.getByText(/Create discovery evidence completed/u)).toBeVisible();
   });
 
   test("partial endpoint failure preserves project state and keyboard modal behavior", async ({ page }) => {

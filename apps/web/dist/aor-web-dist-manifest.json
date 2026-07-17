@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "be2b21aafa6c15945e10447ec44d2c928e407c5bf5ff44fbd27efe9085609bc7",
+  "source_hash": "0606e59b082768cca2c87aa9f9b04b39b78ccde19b322ec4607a37a6355c2c19",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -15,7 +15,9 @@
     "apps/web/src/mission-builder.css",
     "apps/web/src/mission-builder.jsx",
     "apps/web/src/mission-model.js",
+    "apps/web/src/operator-control.js",
     "apps/web/src/operator-error-card.jsx",
+    "apps/web/src/operator-operations.js",
     "apps/web/src/plan-workbench-views.jsx",
     "apps/web/src/plan-workbench.jsx",
     "apps/web/src/project-snapshot.js",
@@ -32,12 +34,12 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-BMN1V0Wz.css",
-    "apps/web/dist/assets/index-CNpdCjr6.js",
+    "apps/web/dist/assets/index-C3vB4ga5.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
     "apps/web/dist/assets/index-BMN1V0Wz.css": "cdeccb8edd388f908ea0bc12a676ce8f1eb500e3ef293845b831fdc3c89b416d",
-    "apps/web/dist/assets/index-CNpdCjr6.js": "30df89079510ecca6abae88266f7259680c18b4b13c81d04dc52cf3333c08ccd",
-    "apps/web/dist/index.html": "028133d4a8139fad450641b18fe32d753f84810f6c2b21be4f7f54d6244cf855"
+    "apps/web/dist/assets/index-C3vB4ga5.js": "54eef25002ceb78252dcb36e65d3fab12fa1c88a59dc1cf7b8d3fa4916dfc76c",
+    "apps/web/dist/index.html": "7dd528e53b9be06381383274a30e696a1fa87aa1ce908d60dc553c68fcbc24d8"
   }
 }

@@ -31,6 +31,18 @@ It resolves exactly one safe primary action for the current project state while 
 - `reason`
 - `low_level_command`
 - `evidence_refs`
+- optional `operator_control`, an additive browser-safe projection with:
+  - `category`: `mutation | workbench | evidence | copy | refresh | unavailable`;
+  - an outcome-specific `label`;
+  - `availability`: `ready | blocked`;
+  - `operation`: a canonical lifecycle `{ command, flags }` object or `null`;
+  - `target_surface`: `cockpit | attention | journey | evidence | null`;
+  - `requires_confirmation`.
+
+`operator_control.operation` is authoritative when present. Consumers must not
+parse `command` or `low_level_command` to infer a mutation. Legacy reports
+without this object may use only a bounded compatibility registry keyed by
+`action_id`.
 
 Only one primary action is allowed. Additional suggestions belong in guided UI copy or future reports, not this contract.
 

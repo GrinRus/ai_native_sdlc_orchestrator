@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
+import React, { useEffect, useMemo, useRef, useState } from "react"; import { createRoot } from "react-dom/client";
 import { createProjectGeneration, readControlPlaneJson as readJson, readProjectResourceSnapshot } from "./control-plane-client.js";
 import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
 import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution-orchestration.jsx";
 import { resolveConsoleExperience } from "./console-experience.js";
 import { MissionBuilder, MissionDurableSummary } from "./mission-builder.jsx";
+import { operatorControlTargetTab, resolveOperatorControl } from "./operator-control.js"; import { createOrResumeOperatorRequest, executeOperatorControl } from "./operator-operations.js";
 import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPLATE as EMPTY_TEMPLATE, missionFlagsFromDraft, SAFE_MISSION_TEMPLATE as SAFE_TEMPLATE, SAFE_MISSION_TEMPLATE_ID as SAFE_TEMPLATE_ID } from "./mission-model.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
@@ -3791,6 +3791,7 @@ function FlowCockpit({
   providerFocus = false,
   evidenceRows = [],
   repairCompletion = null,
+  quietCockpit = false, onOperatorControl = null, operatorActionResult = null,
 }) {
   const projectLevelProviderFocus = !flow && Boolean(providerStepStatus || externalRunHealth);
   if (!flow && !projectLevelProviderFocus) {
@@ -4043,6 +4044,7 @@ function FlowCockpit({
       providerFocusActive ? externalRunHealth : null,
       hasOpenDecisionRequest,
     );
+  const operatorControl = quietCockpit ? resolveOperatorControl(nextPrimary) : null;
   const primaryActionButton = completed
     ? {
         label: "Inspect Evidence",
@@ -4066,6 +4068,15 @@ function FlowCockpit({
         : onRefresh,
       disabled: busy,
     }
+    : operatorControl
+    ? { label: operatorControl.label,
+      icon: operatorControl.category === "refresh" ? "refresh" : operatorControl.category === "evidence" ? "eye" : "play",
+      onClick: operatorControl.category === "mutation"
+        ? () => onOperatorControl?.(operatorControl)
+        : operatorControl.category === "refresh"
+          ? onRefresh
+          : () => openAdvancedWorkbench(operatorControlTargetTab(operatorControl)),
+      disabled: busy || operatorControl.availability !== "ready" }
     : {
       label: "Refresh next action",
       icon: "play",
@@ -4214,10 +4225,11 @@ function FlowCockpit({
           <StatusPill state={recommendedActionStatus} />
         </div>
         <div className="cockpit-actions">
-          <button className="primary" type="button" onClick={primaryActionButton.onClick} disabled={primaryActionButton.disabled}>
+          <button className="primary" type="button" onClick={primaryActionButton.onClick} disabled={primaryActionButton.disabled} aria-busy={busy ? "true" : undefined}>
             <Icon name={primaryActionButton.icon} />
             {primaryActionButton.label}
           </button>
+          {quietCockpit && operatorActionResult ? <span className="action-operation-status" role="status" aria-live="polite">{operatorActionResult.message}</span> : null}
           {completed ? (
             <button className="secondary workbench-jump" type="button" onClick={followUpEligible ? onCreateFollowUp : onStartNewFlow} disabled={busy}>
               <Icon name={followUpEligible ? "target" : "plus"} />
@@ -5929,7 +5941,7 @@ function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCo
   );
 }
 
-function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose, onRun }) {
+function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operation, onClose, onRun }) {
   if (!open) return null;
   const completed = isCompletedFlow(flow);
   const targetStep = form.targetStep || STAGE_TO_TARGET_STEP[stage.id] || "discovery";
@@ -6067,7 +6079,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
         </div>
         <button className="primary drawer-submit" type="button" onClick={onRun} disabled={busy || flowMissing || targetRefsMissing || requestTextMissing || scopeMissing || !readOnlyAllowed}>
           <Icon name="play" />
-          {completed ? "Create no-write inspection request" : "Create and run request"}
+          {operation?.phase === "run-pending" ? "Resume request run" : completed ? "Create no-write inspection request" : "Create and run request"}
         </button>
         {result ? (
           <div className="run-result" role="status" aria-live="polite">
@@ -6139,7 +6151,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(SAFE_TEMPLATE);
-  const [missionOperation, setMissionOperation] = useState(null);
+  const [missionOperation, setMissionOperation] = useState(null); const [operatorActionResult, setOperatorActionResult] = useState(null);
   const [requestDrawerOpen, setRequestDrawerOpen] = useState(false);
   const [addProjectDrawerOpen, setAddProjectDrawerOpen] = useState(false);
   const [addProjectForm, setAddProjectForm] = useState({ ...EMPTY_PROJECT_SETUP });
@@ -6147,7 +6159,7 @@ function App() {
   const [topologyState, setTopologyState] = useState({ status: "idle", data: null, error: null });
   const [executionSetupState, setExecutionSetupState] = useState({ status: "idle", data: null, error: null });
   const [requestForm, setRequestForm] = useState(DEFAULT_REQUEST);
-  const [requestResult, setRequestResult] = useState(null);
+  const [requestResult, setRequestResult] = useState(null); const [requestOperation, setRequestOperation] = useState(null);
   const [selectedRef, setSelectedRef] = useState("");
   const [answers, setAnswers] = useState({});
   const [copyFeedback, setCopyFeedback] = useState(null);
@@ -6695,6 +6707,7 @@ function App() {
     setSelectedStage("readiness");
     setRequestDrawerOpen(false);
     setRequestResult(null);
+    setRequestOperation(null); setOperatorActionResult(null);
     setTopologyState({ status: "idle", data: null, error: null });
     setExecutionSetupState({ status: "idle", data: null, error: null });
   }
@@ -6893,6 +6906,7 @@ function App() {
     setSelectedStage("mission");
     setForm(sourceFlow && (followUp || duplicate) ? formFromFlowSettings(sourceFlow, { followUp }) : SAFE_TEMPLATE);
     setMissionOperation(null);
+    setRequestOperation(null); setOperatorActionResult(null);
     setRequestDrawerOpen(false);
     pushActivity(
       followUp ? "flow.follow-up-draft" : duplicate ? "flow.duplicate-draft" : "flow.new-draft",
@@ -6911,6 +6925,7 @@ function App() {
     setDraftSourceFlow(null);
     setDraftFollowUpHandoffRef(null);
     setMissionOperation(null);
+    setRequestOperation(null); setOperatorActionResult(null);
     setSelectedFlow(fallbackFlow);
     setSelectedFlowId(fallbackFlow?.flow_id ?? null);
     setSelectedStage(flowStageId(fallbackFlow, nextAction, projectState));
@@ -6985,7 +7000,6 @@ function App() {
       allowedPaths: completed ? "" : requestForm.allowedPaths,
       targetStep: sameFlow && sameStage && requestForm.targetStep ? requestForm.targetStep : defaultTargetStep,
     });
-    setRequestResult(null);
     setRequestDrawerOpen(true);
   }
 
@@ -7105,44 +7119,29 @@ function App() {
     }
   }
 
+  async function runOperatorControl(control) {
+    if (busy || control?.availability !== "ready" || !control?.operation) return;
+    setBusy(true); setError(""); setOperatorActionResult({ status: "pending", message: `${control.label} is running.` });
+    try {
+      const refs = await executeOperatorControl({ control, runLifecycle, refresh });
+      setOperatorActionResult({ status: "complete", message: `${control.label} completed${refs.length ? ` with ${refs.length} durable evidence reference${refs.length === 1 ? "" : "s"}.` : "."}` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setOperatorActionResult({ status: "error", message: `${control.label} failed: ${message}` }); setError(message);
+    } finally { setBusy(false); }
+  }
+
   async function createAndRunRequest() {
     if (!apiProjectBase || busy) return;
-    setBusy(true);
-    setError("");
+    setBusy(true); setError("");
     try {
-      const create = await readJson(`${apiProjectBase}/operator-requests`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          source_surface: "web",
-          target_stage: activeStage.id,
-          intent_type: requestForm.intent,
-          request_text: requestForm.requestText,
-          ...(selectedFlow?.flow_id ? { target_flow_id: selectedFlow.flow_id } : {}),
-          target_refs: splitRefs(requestForm.targetRefs),
-          allowed_paths: splitRefs(requestForm.allowedPaths),
-          delivery_mode: requestForm.deliveryMode,
-        }),
-      });
-      const request = create.operator_request;
-      const run = await readJson(`${apiProjectBase}/operator-requests/${encodeURIComponent(request.request_id)}/actions`, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          action: "run",
-          request_ref: request.operator_request_ref,
-          target_step: requestForm.targetStep || STAGE_TO_TARGET_STEP[activeStage.id] || "discovery",
-        }),
-      });
-      pushActivity("operator-request.completed", run.operator_request_run?.compiled_context_ref ?? request.operator_request_ref);
-      setRequestResult(run.operator_request_run ?? null);
-      await refresh();
-      closeRequestDrawer({ clearResult: false });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+      const preparedForm = { ...requestForm, targetRefs: splitRefs(requestForm.targetRefs), allowedPaths: splitRefs(requestForm.allowedPaths), targetStep: requestForm.targetStep || STAGE_TO_TARGET_STEP[activeStage.id] || "discovery" };
+      const { request, result } = await createOrResumeOperatorRequest({ apiProjectBase, operation: requestOperation, form: preparedForm, stage: activeStage, flow: selectedFlow, readJson, onCreated: (created) => setRequestOperation({ phase: "run-pending", request: created }) });
+      pushActivity("operator-request.completed", result?.compiled_context_ref ?? request.operator_request_ref);
+      setRequestResult(result); setRequestOperation({ phase: "complete", request, result });
+      await refresh(); closeRequestDrawer({ clearResult: false });
+    } catch (err) { setError(err instanceof Error ? err.message : String(err));
+    } finally { setBusy(false); }
   }
 
   async function submitAnswer(interaction) {
@@ -7384,6 +7383,7 @@ function App() {
         {error ? <div className="alert" role="alert">{error}</div> : null}
         <ResourceErrorCard errors={resourceErrors} />
         {consoleExperience === "quiet-cockpit" && !draftSurface ? <MissionDurableSummary flow={selectedFlow} /> : null}
+        {consoleExperience === "quiet-cockpit" && requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
         ) : draftSurface ? (
@@ -7439,6 +7439,7 @@ function App() {
             providerFocus={providerWorkbenchFocus}
             evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}
             repairCompletion={qualityRepairCompletion}
+            quietCockpit={consoleExperience === "quiet-cockpit"} onOperatorControl={runOperatorControl} operatorActionResult={operatorActionResult}
           />
           {selectedStage === "discovery" && selectedFlow ? (
             <PlanWorkbench state={planWorkbenchState} busy={busy} onAction={runPlanAction} />
@@ -7543,6 +7544,7 @@ function App() {
         setForm={setRequestForm}
         busy={busy}
         result={requestResult}
+        operation={requestOperation}
         onClose={closeRequestDrawer}
         onRun={createAndRunRequest}
       />
