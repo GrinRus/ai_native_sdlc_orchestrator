@@ -563,7 +563,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S05 — Default-on cutover and explicit rollback rehearsal
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Outcome:** The packaged app resolves to Quiet Cockpit by default, retains
   one explicit temporary legacy override, and proves deterministic rollback
   without changing runtime or evidence state.
@@ -626,7 +626,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S06 — Legacy console retirement and compatibility cleanup
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Outcome:** The packaged app contains one operator-console renderer, while
   historical W34 product evidence remains documented and unsupported legacy
   selectors fail or redirect transparently without reviving old runtime logic.

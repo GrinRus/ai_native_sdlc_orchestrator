@@ -43,7 +43,7 @@ test("installed Quiet Cockpit passes the blocking shell acceptance matrix", asyn
   expect(state.package_name).toBe("@grinrus/aor");
 
   await page.goto(state.app_url);
-  await expect(page.locator('[data-console-experience="legacy"]')).toBeVisible();
+  await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const viewport of manifest.viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -68,10 +68,7 @@ test("installed Quiet Cockpit passes the blocking shell acceptance matrix", asyn
 test("presentation selector and Quiet navigation survive history without runtime mutation", async ({ page }) => {
   const state = readHarnessState();
   await page.goto(state.app_url);
-  await expect(page.locator('[data-console-experience="legacy"]')).toBeVisible();
-  await page.getByRole("button", { name: "Switch to Quiet Cockpit" }).click();
   await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
-  await expect(page).toHaveURL(/console=quiet-cockpit/u);
   await page.getByRole("tab", { name: "Attention" }).click();
   await expect(page).toHaveURL(/mode=attention/u);
   const projectId = await page.locator("#project-switcher-control").inputValue();
@@ -80,9 +77,14 @@ test("presentation selector and Quiet navigation survive history without runtime
   await expect(page.locator("#project-switcher-control")).toHaveValue(projectId);
   await page.getByRole("button", { name: "Switch to legacy console" }).click();
   await expect(page.locator('[data-console-experience="legacy"]')).toBeVisible();
-  await page.goBack();
+  await expect(page.locator("#project-switcher-control")).toHaveValue(projectId);
+  await page.getByRole("button", { name: "Switch to Quiet Cockpit" }).click();
   await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
   await expect(page.locator("#project-switcher-control")).toHaveValue(projectId);
+  await page.goBack();
+  await expect(page.locator('[data-console-experience="legacy"]')).toBeVisible();
+  await page.goForward();
+  await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
 });
 
 test("installed Quiet Cockpit executes the canonical no-write lifecycle with durable readback", async ({ page }) => {
