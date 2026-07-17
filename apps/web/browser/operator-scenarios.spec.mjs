@@ -65,6 +65,26 @@ test("installed Quiet Cockpit passes the blocking shell acceptance matrix", asyn
   expect(remotes.stdout).toBe("");
 });
 
+test("presentation selector and Quiet navigation survive history without runtime mutation", async ({ page }) => {
+  const state = readHarnessState();
+  await page.goto(state.app_url);
+  await expect(page.locator('[data-console-experience="legacy"]')).toBeVisible();
+  await page.getByRole("button", { name: "Switch to Quiet Cockpit" }).click();
+  await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
+  await expect(page).toHaveURL(/console=quiet-cockpit/u);
+  await page.getByRole("tab", { name: "Attention" }).click();
+  await expect(page).toHaveURL(/mode=attention/u);
+  const projectId = await page.locator("#project-switcher-control").inputValue();
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "Attention" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#project-switcher-control")).toHaveValue(projectId);
+  await page.getByRole("button", { name: "Switch to legacy console" }).click();
+  await expect(page.locator('[data-console-experience="legacy"]')).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
+  await expect(page.locator("#project-switcher-control")).toHaveValue(projectId);
+});
+
 test("installed Quiet Cockpit executes the canonical no-write lifecycle with durable readback", async ({ page }) => {
   test.setTimeout(120_000);
   const state = readHarnessState();

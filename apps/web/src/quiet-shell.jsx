@@ -1,5 +1,6 @@
 import React from "react";
 import { CountBadge, Disclosure, StatusBadge, Tabs } from "./ui/components.jsx";
+export { readQuietPresentation, writeQuietPresentation } from "./quiet-presentation.js";
 import "./quiet-shell.css";
 
 export const QUIET_MODES = Object.freeze([{ id: "cockpit", label: "Cockpit" }, { id: "attention", label: "Attention" }, { id: "journey", label: "Journey" }, { id: "evidence", label: "Evidence" }]);
@@ -12,14 +13,4 @@ export function QuietShell({ project, flow, connection, safetyMode, attentionCou
     <nav className="quiet-stage-path" aria-label="Lifecycle stages">{stages.map((stage) => <button type="button" key={stage.id} aria-current={stage.id === currentStage ? "step" : undefined} data-selected={stage.id === viewingStage} onClick={() => onStage(stage.id)}>{stage.label}</button>)}</nav>
     <Disclosure label="Technical context"><dl><dt>Project ID</dt><dd>{project?.project_id ?? "none"}</dd><dt>Flow ID</dt><dd>{flow?.flow_id ?? "none"}</dd></dl></Disclosure>
   </section>;
-}
-
-export function readQuietPresentation(projectId, flowId) {
-  if (typeof sessionStorage === "undefined") return null;
-  try { return JSON.parse(sessionStorage.getItem(`aor.quiet.${projectId ?? "none"}.${flowId ?? "none"}`)); } catch { return null; }
-}
-
-export function writeQuietPresentation(projectId, flowId, value) {
-  if (typeof sessionStorage === "undefined") return;
-  sessionStorage.setItem(`aor.quiet.${projectId ?? "none"}.${flowId ?? "none"}`, JSON.stringify(value));
 }

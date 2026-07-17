@@ -195,7 +195,7 @@ test.describe.serial("installed local operator console", () => {
     expect(lifecycleCommands.filter((command) => command === "mission create")).toHaveLength(1);
     await page.getByRole("button", { name: "Create discovery evidence" }).click();
     await expect.poll(() => lifecycleCommands.slice(-2)).toEqual(["discovery run", "next"]);
-    await expect(page.getByText(/Create discovery evidence completed/u)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Build specification evidence" })).toBeVisible();
   });
 
   test("Quiet Cockpit lifecycle navigation reflows without hiding state", async ({ page }) => {
@@ -291,6 +291,7 @@ test.describe.serial("installed local operator console", () => {
     });
     await page.route("**/runs/browser-live-run/events?*", async (route) => {
       eventStreamOpened = true;
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await route.fulfill({
         contentType: "text/event-stream",
         body: 'id: browser-live-run:1\ndata: {"event_type":"run.progress"}\n\n',
