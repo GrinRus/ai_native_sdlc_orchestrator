@@ -438,7 +438,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S03 — Mission and Quiet Cockpit pilot activation
 
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
-- **State:** ready
+- **State:** done
 - **Outcome:** Opt-in installed users can complete first run, Mission creation,
   active work, blocked recovery, completed inspection, and follow-up creation
   entirely through Quiet Cockpit with parity to accepted W34 outcomes.

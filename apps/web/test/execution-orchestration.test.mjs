@@ -107,3 +107,13 @@ test("W65 cutover baseline maps every legacy outcome and required runtime state"
   assert.deepEqual(new Set(baseline.outcomes.map((row) => row.disposition)), new Set(["preserved", "replaced"]));
   assert.deepEqual(new Set(baseline.states), new Set(["loading", "empty", "partial", "stale", "offline", "permission", "blocked", "error", "active", "completed"]));
 });
+
+test("W65 Mission and Cockpit pilot covers resumability, action truth, and presentation identity", () => {
+  const pilot = JSON.parse(fs.readFileSync(new URL("../browser/fixtures/w65-mission-cockpit-pilot.json", import.meta.url), "utf8"));
+  assert.equal(pilot.schema_version, 1);
+  assert.deepEqual(new Set(pilot.action_categories), new Set(["mutation", "workbench", "evidence", "copy", "refresh", "unavailable"]));
+  assert.equal(pilot.scenarios.every((scenario) => scenario.canonical_route && scenario.durable_readback && scenario.presentation_switch_identity), true);
+  assert.ok(pilot.scenarios.some((scenario) => scenario.scenario_id === "partial-mission-next-retry" && scenario.exactly_once));
+  assert.ok(pilot.scenarios.some((scenario) => scenario.scenario_id === "completed-follow-up" && scenario.source_flow_immutable));
+  assert.deepEqual(pilot.safety, { external_network: false, target_source_writes: false, upstream_writes: false });
+});
