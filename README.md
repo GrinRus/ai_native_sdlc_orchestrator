@@ -394,9 +394,9 @@ Start here when you need deeper context:
 - `docs/product/06-quiet-cockpit-ui-foundation.md` - semantic tokens and component contracts used by the W63 experience
 - `docs/product/07-quiet-cockpit-action-contract.md` - truthful action labels and their canonical control-plane effects
   for the Quiet Cockpit shell and Attention, Journey, and Evidence modes, with
-  installed golden-path proof recorded by W63-S08. W65 owns installed-default
-  cutover and legacy retirement; the packaged default remains the legacy
-  renderer until then.
+  installed golden-path proof recorded by W63-S08 and post-cutover
+  single-renderer acceptance recorded by W65-S07. Quiet Cockpit is the
+  packaged default; W34 is historical before-state evidence.
 - `docs/research/16-w63-canonical-lifecycle-closure.md` - executable installed
   Quiet Cockpit lifecycle evidence and the exact W65 parity handoff.
 - `docs/architecture/14-cli-command-catalog.md` - implemented and planned CLI

@@ -4,24 +4,23 @@
 
 - **Design name:** AOR Quiet Cockpit Operator Console v2.
 - **Decision date:** 2026-07-14.
-- **Status:** adopted product and UX target; not implemented or release-qualified.
+- **Status:** implemented packaged default and accepted through W65-S07.
 - **W63-S01 baseline:** journey, action, ownership, state, and executable
   scenario contract accepted; visual migration remains unimplemented.
 - **Owning implementation wave:** W63 - operator-console UX and UI maturity.
 - **Owning migration wave:** W65 - installed-console migration and cutover.
-- **Current implemented baseline:** W34 Flow-Centric Operator Console v1 in
+- **Historical before-state:** W34 Flow-Centric Operator Console v1 in
   `03-flow-centric-console-design.md`.
 - **Primary surface:** the packaged responsive local console launched through
   `aor app`.
 
-This document defines the intended successor to the W34 visual and interaction
-model. It does not claim that W63 or W65 is active or complete, and it does not
-change the current release hold, runtime contracts, slice dependencies, or
-packaged SPA behavior.
+This document defines the shipped successor to the W34 visual and interaction
+model. W63 established the behavior and W65 completed the single-renderer
+installed cutover without changing runtime ownership or no-write policy.
 
 ## Decision
 
-After W65 cutover, the console uses **Quiet Cockpit** as its installed default
+The console uses **Quiet Cockpit** as its installed default
 shell and exposes three flow-scoped specialist modes:
 
 1. **Attention** for pending human decisions, interactions, failures, and

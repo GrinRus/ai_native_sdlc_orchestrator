@@ -322,11 +322,12 @@ Learning handoff aggregates evidence refs and next actions. It may recommend bac
 
 ## Quiet Cockpit presentation boundary
 
-The opt-in Quiet Cockpit is a projection and control surface over the canonical
+Quiet Cockpit is the packaged local-console projection and control surface over the canonical
 application services. It does not own lifecycle state, completion, evidence, or
 shell-command interpretation. W63-S08 proves the safe no-write installed path
 by mapping each visible label to an allowlisted structured mutation and a
 durable server-owned readback ref. The deterministic simulation proof does not
 extend the supported boundary to credentialed providers, hosted UI, paid calls,
-target-source edits, or upstream writes. The legacy renderer remains the
-packaged default until W65 performs the reversible cutover.
+target-source edits, or upstream writes. W65-S07 proves the installed
+single-renderer default; W34 remains historical evidence and rollback requires
+the previous package version.

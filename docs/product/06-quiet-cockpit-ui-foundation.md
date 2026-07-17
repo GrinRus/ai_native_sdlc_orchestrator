@@ -2,7 +2,8 @@
 
 ## Status
 
-This document is the W63-S02 implementation contract for the opt-in Quiet Cockpit experience. It does not change the packaged default, lifecycle ownership, or the W34 compatibility surface.
+This document is the W63-S02 implementation contract for Quiet Cockpit. W65
+made this foundation the single packaged renderer without changing lifecycle ownership.
 
 ## Source of truth
 

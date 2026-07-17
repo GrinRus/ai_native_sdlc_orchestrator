@@ -75,10 +75,10 @@ or after headless `aor onboard`.
 
 ## Quiet Cockpit installed acceptance
 
-The W63-S07 gate packs the current package once, installs it into a disposable
+The W65-S07 gate packs the current package once, installs it into a disposable
 prefix, and starts `aor app` from a neutral launcher with a disposable
-`AOR_HOME`. The opt-in URL is `?console=quiet-cockpit`; an omitted or invalid
-selector still opens the legacy renderer. The blocking Chromium matrix covers
+`AOR_HOME`. Quiet Cockpit opens without a selector; the retired legacy input
+normalizes to the single renderer with a migration notice. The blocking Chromium matrix covers
 the twelve operator scenarios, seven responsive widths, keyboard focus,
 reduced motion, and 200% zoom while blocking external browser requests. Raw
 artifacts stay under ignored `.aor/quality/w63/s07/`; the reproducible summary
@@ -89,8 +89,8 @@ W63-S08 adds the versioned canonical safe no-write journey in
 drives all fifteen transitions through structured same-origin mutations,
 checks durable readback after reload and stale-revision recovery, and requires
 no terminal continuation. The exact proof boundary and W65 handoff are recorded
-in `docs/research/16-w63-canonical-lifecycle-closure.md`. The legacy renderer
-remains the packaged default until the W65 cutover.
+in `docs/research/16-w63-canonical-lifecycle-closure.md`, with post-cutover
+readback indexed by `docs/research/23-w65-post-cutover-evidence-index.json`.
 
 ## W43 alpha.10 validation notes
 W43-S02 re-validates the published `0.1.0-alpha.10` package from a neutral

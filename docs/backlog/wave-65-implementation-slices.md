@@ -689,7 +689,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S07 — Post-cutover installed-console acceptance and story closure
 
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** One clean installed-package proof demonstrates that the
   single-renderer Quiet Cockpit default preserves target user outcomes,
   accessibility, responsive behavior, durable evidence, and public-repo safety

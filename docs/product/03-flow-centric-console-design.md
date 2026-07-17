@@ -15,20 +15,16 @@ orchestration state.
 
 ## Status and successor direction
 
-This document remains the implemented W34 product baseline and preserves the
-history needed to explain the current packaged console. It must not be rewritten
-as though a later visual concept already shipped.
+This document is the historical W34 before-state and preserves the history
+needed to explain the previous packaged console. It is not a current renderer.
 
 The adopted W63 target successor is
-`05-quiet-cockpit-console-design.md`: Quiet Cockpit is the eventual installed
+`05-quiet-cockpit-console-design.md`: Quiet Cockpit is the installed
 default shell, with flow-scoped Attention, Journey, and Evidence modes. That target keeps the Flow
 semantics in this document, but changes information hierarchy, action
-semantics, responsive navigation, and the visual system. W63-S01 now supplies
-the executable journey/action scenario baseline without changing this
-renderer. W34 remains the
-installed default while W63 implements and accepts the successor behind an
-explicit selector. W65 owns the packaged-default cutover, rollback rehearsal,
-legacy removal, and final installed-package acceptance.
+semantics, responsive navigation, and the visual system. W63 supplied the
+executable journey/action baseline and W65 completed cutover, rollback rehearsal,
+legacy removal, and installed-package acceptance.
 
 ## Baseline
 

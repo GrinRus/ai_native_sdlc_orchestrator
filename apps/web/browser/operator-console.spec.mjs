@@ -168,7 +168,7 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByText("Configure First Flow").first()).toBeVisible();
   });
 
-  test("opt-in Quiet Cockpit creates one structured Mission and restores durable refs", async ({ page }) => {
+  test("default Quiet Cockpit creates one structured Mission and restores durable refs", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
     const lifecycleCommands = [];
@@ -176,7 +176,7 @@ test.describe.serial("installed local operator console", () => {
       if (!request.url().endsWith("/lifecycle-command/actions") || request.method() !== "POST") return;
       lifecycleCommands.push(request.postDataJSON()?.command);
     });
-    await page.goto(`${state.app_url}?console=quiet-cockpit`);
+    await page.goto(state.app_url);
     await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
     await page.getByRole("button", { name: "Configure First Flow" }).click();
     await expect(page.getByRole("form", { name: "Guided Mission intake" })).toBeVisible();
@@ -202,7 +202,7 @@ test.describe.serial("installed local operator console", () => {
     test.setTimeout(90_000);
     const state = readHarnessState(); await blockExternalNetwork(page, state.app_url);
     for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1180, height: 900 }, { width: 1181, height: 900 }, { width: 1440, height: 900 }]) {
-      await page.setViewportSize(viewport); await page.goto(`${state.app_url}?console=quiet-cockpit`);
+      await page.setViewportSize(viewport); await page.goto(state.app_url);
       await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toBeVisible();
       await expect(page.getByText("Current lifecycle stage", { exact: true })).toBeVisible();
       await page.getByRole("tab", { name: "Evidence", exact: true }).click();
@@ -218,7 +218,7 @@ test.describe.serial("installed local operator console", () => {
     await page.route(new RegExp(`/api/projects/${state.project_id}/flows$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ flows: [flow], selected_flow_id: flow.flow_id }) }));
     await page.route("**/flows/selected", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(flow) }));
     await page.route(new RegExp(`/api/projects/${state.project_id}/flows/.+/attention$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, flow_id: `flow.${state.project_id}.safe-walkthrough`, initialized: true, read_only: true, freshness: "current", latest_source_at: "2026-07-17T00:00:00.000Z", items: [{ item_id: "attention.interaction.one", source_family: "interaction-request", source_ref: "evidence://interaction-one", stage: "execution", state: "needs-attention", severity: "warning", title: "Answer implementation question", consequence: "Execution is waiting for operator input.", operator_control: null, evidence_refs: ["evidence://interaction-one"], created_at: "2026-07-17T00:00:00.000Z", updated_at: "2026-07-17T00:00:00.000Z" }, { item_id: "attention.decision.two", source_family: "review-decision", source_ref: "evidence://decision-two", stage: "review", state: "needs-attention", severity: "danger", title: "Review failed verification", consequence: "Delivery remains blocked.", operator_control: null, evidence_refs: ["evidence://decision-two"], created_at: "2026-07-17T00:01:00.000Z", updated_at: "2026-07-17T00:01:00.000Z" }] }) }));
-    await page.goto(`${state.app_url}?console=quiet-cockpit`);
+    await page.goto(state.app_url);
     await page.getByRole("tab", { name: "Attention" }).click();
     await expect(page.getByRole("region", { name: "Attention queue" })).toBeVisible();
     await page.getByRole("button", { name: /Answer implementation question/u }).click(); await page.getByLabel("Operator draft").fill("first draft");
@@ -291,7 +291,9 @@ test.describe.serial("installed local operator console", () => {
     });
     await page.route("**/runs/browser-live-run/events?*", async (route) => {
       eventStreamOpened = true;
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Let the initial project snapshot settle before the durable event asks
+      // the client to refresh it. This keeps the fixture independent of CI I/O.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await route.fulfill({
         contentType: "text/event-stream",
         body: 'id: browser-live-run:1\ndata: {"event_type":"run.progress"}\n\n',

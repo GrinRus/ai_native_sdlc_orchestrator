@@ -1295,11 +1295,10 @@ and complete the canonical safe no-write lifecycle on desktop or mobile without
 a required terminal handoff.
 
 **Adopted target design:** `docs/product/05-quiet-cockpit-console-design.md`
-defines Quiet Cockpit as the eventual installed default with flow-scoped
-Attention, Journey, and Evidence modes. W63 implements and accepts the target
-under an explicit reversible selector while W34 remains the packaged default;
-W65 owns cutover and retirement. The concept does not change W63 dependencies,
-slice states, or implementation/readiness claims.
+defines Quiet Cockpit with flow-scoped Attention, Journey, and Evidence modes.
+W63 implemented and accepted the target under an explicit reversible selector;
+W65 subsequently completed the packaged cutover and retirement. The concept
+does not change lifecycle ownership or headless behavior.
 
 **Exit criteria:**
 - the operator journey, action taxonomy, deterministic scenario catalog, and
@@ -1354,6 +1353,10 @@ W64 does not delay those product waves through an artificial dependency.
 Cockpit experience through a reversible presentation boundary, outcome parity
 pilots, default-on activation, explicit rollback rehearsal, legacy retirement,
 and single-renderer package proof.
+
+**Closure:** W65-S07 re-runs the combined installed scenario catalog and the
+safe no-write golden lifecycle without a selector. Quiet Cockpit is the only
+packaged renderer; W34 is historical before-state evidence.
 
 **Ownership boundary:** W63 owns Quiet Cockpit product behavior and acceptance
 under an explicit selector. W65 starts only after W63-S08 and owns migration;
