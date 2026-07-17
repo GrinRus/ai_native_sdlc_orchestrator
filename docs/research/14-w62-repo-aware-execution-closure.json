@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "wave_id": "W62",
+  "title": "Repo-aware execution and coordinated delivery closure",
+  "status": "passed",
+  "closed_at": "2026-07-17",
+  "proof_command": "pnpm w62:proof",
+  "proof_scenarios": [
+    {
+      "id": "monorepo-components",
+      "evidence_refs": [
+        "scripts/w62-full-flow-proof.mjs",
+        "packages/orchestrator-core/test/execution-dag-planner.test.mjs",
+        "packages/orchestrator-core/test/integration-service.test.mjs"
+      ]
+    },
+    {
+      "id": "bounded-multirepo-contract-dependency",
+      "evidence_refs": [
+        "scripts/w62-full-flow-proof.mjs",
+        "packages/orchestrator-core/test/workspace-set-provisioner.test.mjs",
+        "packages/orchestrator-core/test/parent-run-scheduler.test.mjs",
+        "packages/orchestrator-core/test/delivery-driver.test.mjs"
+      ]
+    },
+    {
+      "id": "installed-operator-console",
+      "evidence_refs": [
+        "apps/web/test/execution-orchestration.test.mjs",
+        "apps/web/browser/operator-console.spec.mjs"
+      ]
+    }
+  ],
+  "required_behaviors": {
+    "parallel_approved_pair": "passed",
+    "serialized_conflict": "passed",
+    "failed_attempt_retry_identity": "passed",
+    "transitive_stale_invalidation": "passed",
+    "bounded_repair_exhaustion": "passed",
+    "integration_gate": "passed",
+    "aggregate_and_per_repository_delivery": "passed",
+    "no_upstream_write": "passed"
+  },
+  "reproducible_commands": [
+    "pnpm w62:proof",
+    "pnpm test:web:browser",
+    "pnpm check",
+    "pnpm release:pack",
+    "pnpm release:smoke",
+    "pnpm slice:gate -- W62-S06"
+  ],
+  "excluded_surfaces": [
+    "credentialed provider calls",
+    "provider network calls",
+    "automatic conflict resolution",
+    "unbounded repair",
+    "upstream writes"
+  ]
+}

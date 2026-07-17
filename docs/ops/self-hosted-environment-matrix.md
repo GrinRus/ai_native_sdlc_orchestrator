@@ -27,6 +27,7 @@ local AOR run.
 pnpm check
 pnpm production:ready --json
 pnpm w61:proof
+pnpm w62:proof
 pnpm aor doctor --project-ref <repo> --json
 pnpm aor onboard --project-ref <repo> --json
 pnpm aor app --help
@@ -43,6 +44,12 @@ local package context and produce a false bin-resolution failure.
 Use `no-write` for inspection and rehearsal. Use `patch-only` only when a
 code-changing delivery proof is explicitly intended and reviewable local patch
 artifacts are acceptable.
+
+`pnpm w62:proof` writes only ignored proof output under
+`node_modules/.cache/aor`. It verifies the two curated repo-aware execution
+models, stable task/unit/attempt identity, bounded recovery, and coordinated
+delivery projections. Run `pnpm test:web:browser` separately for the installed
+loopback UI evidence referenced by the closure report.
 
 Outside the bounded cleared matrix, external credentialed write-capable execution and
 credentialed network delivery are blocked by default. Maintainer-only source

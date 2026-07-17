@@ -71,6 +71,7 @@
     "production:ready": "node ./scripts/production-readiness.mjs",
     "w58:proof": "node ./scripts/w58-runtime-quality-proof.mjs",
     "w61:proof": "node ./scripts/w61-topology-onboarding-proof.mjs",
+    "w62:proof": "node ./scripts/w62-full-flow-proof.mjs",
     "audit:prod:bulk": "node ./scripts/dependency-audit-bulk.mjs",
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
