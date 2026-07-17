@@ -348,7 +348,7 @@ W57 and the control-plane semantics closed by W58/W59.
   primary action remain understandable and operable across supported desktop,
   tablet, and mobile widths without hiding authoritative state.
 - **Epic:** EPIC-6
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** M
 - **Primary modules:** `apps/web/src/**`, responsive styles, browser fixtures
@@ -414,7 +414,7 @@ W57 and the control-plane semantics closed by W58/W59.
   and inspect supporting evidence without duplicated next-action, blocker,
   safety, and artifact panels competing for attention.
 - **Epic:** EPIC-1, EPIC-4, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/**`, flow projections/read models,

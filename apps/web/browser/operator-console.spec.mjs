@@ -198,6 +198,19 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByText(/Create discovery evidence completed/u)).toBeVisible();
   });
 
+  test("Quiet Cockpit lifecycle navigation reflows without hiding state", async ({ page }) => {
+    test.setTimeout(90_000);
+    const state = readHarnessState(); await blockExternalNetwork(page, state.app_url);
+    for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1024, height: 768 }, { width: 1180, height: 900 }, { width: 1181, height: 900 }, { width: 1440, height: 900 }]) {
+      await page.setViewportSize(viewport); await page.goto(`${state.app_url}?console=quiet-cockpit`);
+      await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toBeVisible();
+      await expect(page.getByText("Current lifecycle stage", { exact: true })).toBeVisible();
+      await page.getByRole("tab", { name: "Evidence", exact: true }).click();
+      await page.getByRole("button", { name: "Review / QA" }).focus(); await page.keyboard.press("Enter");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    }
+  });
+
   test("partial endpoint failure preserves project state and keyboard modal behavior", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
