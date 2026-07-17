@@ -4,6 +4,9 @@ import { createProjectGeneration, readControlPlaneJson as readJson, readProjectR
 import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
 import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution-orchestration.jsx";
+import { resolveConsoleExperience } from "./console-experience.js";
+import { MissionBuilder, MissionDurableSummary } from "./mission-builder.jsx";
+import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPLATE as EMPTY_TEMPLATE, missionFlagsFromDraft, SAFE_MISSION_TEMPLATE as SAFE_TEMPLATE, SAFE_MISSION_TEMPLATE_ID as SAFE_TEMPLATE_ID } from "./mission-model.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
@@ -80,32 +83,6 @@ const ADVANCED_WORKBENCH_TAB_IDS = new Set([
   "interactions",
   "decisions",
 ]);
-
-const SAFE_TEMPLATE_ID = "safe-walkthrough";
-
-const SAFE_TEMPLATE = {
-  templateId: SAFE_TEMPLATE_ID,
-  title: "First AOR walkthrough",
-  brief: "Inspect this repository and recommend the next safe SDLC step.",
-  goals: "Produce bounded next-action evidence for this project.",
-  constraints: "No upstream writes, no source file edits, no external runner execution.",
-  kpi: "first-run-ready:First run readiness:ready:status",
-  dod: "A next-action report exists under .aor and no project files were edited.",
-  deliveryMode: "no-write",
-  allowedPaths: "",
-};
-
-const EMPTY_TEMPLATE = {
-  ...SAFE_TEMPLATE,
-  templateId: "blank-mission",
-  title: "",
-  brief: "",
-  goals: "",
-  constraints: "",
-  kpi: "",
-  dod: "",
-  allowedPaths: "",
-};
 
 const DEFAULT_REQUEST = {
   intent: "analyze",
@@ -2258,8 +2235,11 @@ function formFromFlowSettings(flow, { followUp = false } = {}) {
     constraints: Array.isArray(settings.constraints) ? settings.constraints.join("\n") : "",
     kpi: Array.isArray(settings.kpis) ? settings.kpis.map(formatKpiForForm).filter(Boolean).join("\n") : "",
     dod: Array.isArray(settings.definition_of_done) ? settings.definition_of_done.join("\n") : "",
+    sourceRefs: Array.isArray(settings.source_refs) ? settings.source_refs.map((source) => ({ sourceKind: source.source_kind, ref: source.ref })) : [],
     deliveryMode: followUp ? "no-write" : settings.delivery_mode ?? flow?.writeback_policy?.mode ?? "no-write",
     allowedPaths: Array.isArray(settings.allowed_paths) ? settings.allowed_paths.join(",") : "",
+    forbiddenPaths: Array.isArray(settings.forbidden_paths) ? settings.forbidden_paths.join(",") : "",
+    acknowledgeIncomplete: false,
   };
 }
 
@@ -6126,6 +6106,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
 }
 
 function App() {
+  const consoleExperience = useMemo(() => resolveConsoleExperience(typeof window === "undefined" ? "" : window.location.search), []);
   const [config, setConfig] = useState(null);
   const [projectIndex, setProjectIndex] = useState({ projects: [], default_project_id: null });
   const [activeProjectId, setActiveProjectId] = useState(null);
@@ -6158,6 +6139,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(SAFE_TEMPLATE);
+  const [missionOperation, setMissionOperation] = useState(null);
   const [requestDrawerOpen, setRequestDrawerOpen] = useState(false);
   const [addProjectDrawerOpen, setAddProjectDrawerOpen] = useState(false);
   const [addProjectForm, setAddProjectForm] = useState({ ...EMPTY_PROJECT_SETUP });
@@ -6910,6 +6892,7 @@ function App() {
     setPlanWorkbenchState({ scopeKey: `${apiProjectBase ?? "project"}:draft`, status: "idle", plan: null, progress: null, error: "" });
     setSelectedStage("mission");
     setForm(sourceFlow && (followUp || duplicate) ? formFromFlowSettings(sourceFlow, { followUp }) : SAFE_TEMPLATE);
+    setMissionOperation(null);
     setRequestDrawerOpen(false);
     pushActivity(
       followUp ? "flow.follow-up-draft" : duplicate ? "flow.duplicate-draft" : "flow.new-draft",
@@ -6927,6 +6910,7 @@ function App() {
     setNewFlowDraft(false);
     setDraftSourceFlow(null);
     setDraftFollowUpHandoffRef(null);
+    setMissionOperation(null);
     setSelectedFlow(fallbackFlow);
     setSelectedFlowId(fallbackFlow?.flow_id ?? null);
     setSelectedStage(flowStageId(fallbackFlow, nextAction, projectState));
@@ -6960,6 +6944,7 @@ function App() {
     setNewFlowDraft(false);
     setDraftSourceFlow(null);
     setDraftFollowUpHandoffRef(null);
+    setMissionOperation(null);
     setSelectedFlow(flow);
     setSelectedFlowId(flow?.flow_id ?? null);
     setFlowEvidenceGraph(null);
@@ -7072,35 +7057,38 @@ function App() {
     if (busy) return;
     setBusy(true);
     try {
-      const flags = {
-        "mission-id": missionIdFromTitle(form.title),
-        title: form.title,
-        brief: form.brief,
-        goal: splitLines(form.goals),
-        constraint: splitLines(form.constraints),
-        kpi: splitLines(form.kpi),
-        dod: splitLines(form.dod),
-        "delivery-mode": form.deliveryMode,
-      };
-      if (form.allowedPaths.trim()) {
-        flags["allowed-path"] = form.allowedPaths;
-      }
-      if (draftFollowUpHandoffRef) {
-        flags["follow-up-source-handoff-ref"] = draftFollowUpHandoffRef;
-      }
-      await runLifecycle("mission create", flags);
-      await runLifecycle("next", { json: true });
+      const flags = missionFlagsFromDraft(form, { missionId: missionIdFromTitle(form.title), followUpSourceHandoffRef: draftFollowUpHandoffRef });
+      const created = await runLifecycle("mission create", flags);
+      const pendingOperation = createdMissionOperation(created, missionOperation);
+      setMissionOperation(pendingOperation);
+      const next = await runLifecycle("next", { json: true });
       setSelectedStage("discovery");
       setNewFlowDraft(false);
       setDraftSourceFlow(null);
       setDraftFollowUpHandoffRef(null);
       setSelectedFlowId(null);
-      await refresh({ newFlowDraft: false, selectedFlowId: null });
+      const refreshed = await refresh({ newFlowDraft: false, selectedFlowId: null });
+      setMissionOperation(completedMissionOperation(pendingOperation, next, refreshed?.selectedFlow));
     } catch (err) {
+      setMissionOperation((current) => current?.phase === "next-pending" ? { ...current, error: err instanceof Error ? err.message : String(err) } : current);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function resumeMissionNext() {
+    if (busy || missionOperation?.phase !== "next-pending") return;
+    setBusy(true); setError("");
+    try {
+      const next = await runLifecycle("next", { json: true });
+      const refreshed = await refresh({ newFlowDraft: false, selectedFlowId: null });
+      setMissionOperation(completedMissionOperation(missionOperation, next, refreshed?.selectedFlow));
+      setNewFlowDraft(false); setDraftSourceFlow(null); setDraftFollowUpHandoffRef(null); setSelectedFlowId(null); setSelectedStage("discovery");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setMissionOperation((current) => ({ ...current, error: message })); setError(message);
+    } finally { setBusy(false); }
   }
 
   async function resolveNextForSelectedFlow() {
@@ -7308,7 +7296,7 @@ function App() {
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
 
   return (
-    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
+    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} ${consoleExperience === "quiet-cockpit" ? "quiet-cockpit-preview" : ""}`} data-console-experience={consoleExperience}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">A</div>
@@ -7395,11 +7383,21 @@ function App() {
       <main className="main">
         {error ? <div className="alert" role="alert">{error}</div> : null}
         <ResourceErrorCard errors={resourceErrors} />
+        {consoleExperience === "quiet-cockpit" && !draftSurface ? <MissionDurableSummary flow={selectedFlow} /> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
         ) : draftSurface ? (
           <section className="work-card">
-            <MissionForm
+            {consoleExperience === "quiet-cockpit" ? <MissionBuilder
+              form={form}
+              setForm={setForm}
+              busy={busy}
+              onSubmit={submitMission}
+              onResume={resumeMissionNext}
+              operation={missionOperation}
+              onCancel={cancelNewFlowDraft}
+              followUpSourceHandoffRef={draftFollowUpHandoffRef}
+            /> : <MissionForm
               form={form}
               setForm={setForm}
               busy={busy}
@@ -7415,7 +7413,7 @@ function App() {
                   : "Create a fresh mission/intake packet, then let AOR resolve the first next action."
               }
               followUpSourceHandoffRef={draftFollowUpHandoffRef}
-            />
+            />}
           </section>
         ) : (
           <>

@@ -1002,6 +1002,10 @@ test("guided mission create writes intake evidence and next resolves mission sta
       "local-prd",
       "--source-ref",
       "docs/product/checkout-risk.md",
+      "--source-kind",
+      "local-rfc",
+      "--source-ref",
+      "docs/architecture/checkout-risk.md",
       "--json",
     ]);
     assert.equal(completeMission.exitCode, 0, completeMission.stderr);
@@ -1017,6 +1021,10 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.deepEqual(missionBody.mission_scope.allowed_paths, ["apps/web/**"]);
     assert.equal(missionBody.mission_scope.delivery_mode, "patch-only");
     assert.equal(missionBody.mission_scope.writeback_policy.upstream_writes_default, false);
+    assert.deepEqual(missionBody.product_intake.source_refs.map(({ source_kind, ref }) => ({ source_kind, ref })), [
+      { source_kind: "local-prd", ref: "docs/product/checkout-risk.md" },
+      { source_kind: "local-rfc", ref: "docs/architecture/checkout-risk.md" },
+    ]);
 
     const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
     assert.equal(nextJson.exitCode, 0, nextJson.stderr);

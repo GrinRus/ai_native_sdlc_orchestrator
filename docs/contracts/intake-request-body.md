@@ -29,6 +29,10 @@ Supported `source_refs[].source_kind` values are:
 - `local-note`
 - `local-mail`
 
+The public `mission create` surface accepts repeatable `--source-kind` and
+`--source-ref` values paired by position. Scalar legacy calls remain valid.
+Mismatched pair counts fail before intake evidence is written.
+
 External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook connectors is out of scope for this contract. Such sources must be represented only after they have been exported or mirrored into a local structured source reference.
 
 `product_intake_completeness.status` is `complete` when goals, constraints, KPIs, Definition of Done, and source refs are present; otherwise it is `incomplete` and `missing_fields` names the absent evidence groups.
