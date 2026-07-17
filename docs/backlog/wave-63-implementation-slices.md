@@ -204,7 +204,7 @@ W57 and the control-plane semantics closed by W58/W59.
   resulting blocker before mutation, and recover from a partial
   `mission create -> next` sequence without duplicate evidence.
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, canonical examples,

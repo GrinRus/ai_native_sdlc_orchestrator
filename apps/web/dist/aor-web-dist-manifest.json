@@ -1,9 +1,10 @@
 {
   "manifest_version": 2,
-  "source_hash": "f8f0b238467dd515634e75e94ba3588629b7d2ddc6e7a571f48672ddd9c5cffc",
+  "source_hash": "be2b21aafa6c15945e10447ec44d2c928e407c5bf5ff44fbd27efe9085609bc7",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
+    "apps/web/src/console-experience.js",
     "apps/web/src/control-plane-client.js",
     "apps/web/src/dialog.jsx",
     "apps/web/src/execution-orchestration-model.js",
@@ -11,6 +12,9 @@
     "apps/web/src/execution-orchestration.jsx",
     "apps/web/src/execution-setup.css",
     "apps/web/src/execution-setup.jsx",
+    "apps/web/src/mission-builder.css",
+    "apps/web/src/mission-builder.jsx",
+    "apps/web/src/mission-model.js",
     "apps/web/src/operator-error-card.jsx",
     "apps/web/src/plan-workbench-views.jsx",
     "apps/web/src/plan-workbench.jsx",
@@ -27,13 +31,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-BTfrSVlG.js",
-    "apps/web/dist/assets/index-DG6CJkxI.css",
+    "apps/web/dist/assets/index-BMN1V0Wz.css",
+    "apps/web/dist/assets/index-CNpdCjr6.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-BTfrSVlG.js": "0df1e1cbda4659bc0865d639a5453cdc3baca2f97a8bb6359527fca018c275da",
-    "apps/web/dist/assets/index-DG6CJkxI.css": "8b40158ba2cd5b0fa5e05756fed1fa59d8da1b71087c203c2394463e655f0837",
-    "apps/web/dist/index.html": "a8120c59070f7173639d1fd30147aab572de6c78747414b2918ca655b0f44a7d"
+    "apps/web/dist/assets/index-BMN1V0Wz.css": "cdeccb8edd388f908ea0bc12a676ce8f1eb500e3ef293845b831fdc3c89b416d",
+    "apps/web/dist/assets/index-CNpdCjr6.js": "30df89079510ecca6abae88266f7259680c18b4b13c81d04dc52cf3333c08ccd",
+    "apps/web/dist/index.html": "028133d4a8139fad450641b18fe32d753f84810f6c2b21be4f7f54d6244cf855"
   }
 }

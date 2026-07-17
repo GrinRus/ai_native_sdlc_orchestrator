@@ -233,6 +233,7 @@ function dedupeSourceRefs(sourceRefs) {
  *   requestFile: string | null,
  *   sourceKind?: string | null,
  *   sourceRef?: string | null,
+ *   sourceRefs?: Array<{ source_kind: string, ref: string, title?: string }>,
  * }} options
  */
 function buildProductIntake(options) {
@@ -259,6 +260,19 @@ function buildProductIntake(options) {
         : readOptionalStringArray(options.requestDocument, "dod");
   const requestedSourceKind = normalizeSourceKind(options.sourceKind) ?? "local-note";
   const sourceRefs = readOptionalSourceRefs(options.requestDocument);
+  const inlineSourceRefs = Array.isArray(options.sourceRefs) ? options.sourceRefs : [];
+  inlineSourceRefs.forEach((entry, index) => {
+    const sourceKind = normalizeSourceKind(entry?.source_kind);
+    const ref = typeof entry?.ref === "string" ? entry.ref.trim() : "";
+    const title = typeof entry?.title === "string" && entry.title.trim() ? entry.title.trim() : options.requestTitle;
+    if (!sourceKind || !ref) throw new Error(`Guided Mission source '${index}' requires source_kind and ref.`);
+    sourceRefs.push({
+      source_id: contentAddressedId("local-source", JSON.stringify([sourceKind, ref])),
+      source_kind: sourceKind,
+      title,
+      ref,
+    });
+  });
   const sourceRef = typeof options.sourceRef === "string" && options.sourceRef.trim().length > 0
     ? options.sourceRef.trim()
     : options.requestFile;
@@ -406,6 +420,7 @@ export function materializeBootstrapArtifactPacket(options) {
  *  requestFile?: string | null,
  *  sourceKind?: string | null,
  *  sourceRef?: string | null,
+ *  sourceRefs?: Array<{ source_kind: string, ref: string, title?: string }>,
  *  followUpSourceHandoffRef?: string | null,
  * }} options
  */
@@ -446,6 +461,7 @@ export function materializeIntakeArtifactPacket(options) {
     requestFile,
     sourceKind: options.sourceKind ?? null,
     sourceRef: options.sourceRef ?? null,
+    sourceRefs: options.sourceRefs ?? [],
   });
   const allowedPaths = [
     ...normalizeStringArray(options.allowedPaths),

@@ -567,7 +567,7 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W63-S01 | Operator journey, action semantics, and scenario baseline | EPIC-0, EPIC-6 | done | product/architecture/contracts docs, web scenario fixtures | W62-S06 |
 | W63-S02 | Semantic design system and component contracts | EPIC-0, EPIC-6 | done | `apps/web/src/**`, UI foundation docs/tests | W63-S01 |
-| W63-S03 | Guided Mission intake and resumable first-flow creation | EPIC-1, EPIC-2, EPIC-6 | ready | intake/scope contracts, Mission UI, lifecycle responses, browser tests | W63-S01, W63-S02 |
+| W63-S03 | Guided Mission intake and resumable first-flow creation | EPIC-1, EPIC-2, EPIC-6 | done | intake/scope contracts, Mission UI, lifecycle responses, browser tests | W63-S01, W63-S02 |
 | W63-S04 | Truthful action-first cockpit and recovery controls | EPIC-3, EPIC-4, EPIC-6 | ready | next-action/control-plane contracts, cockpit/recovery UI, browser tests | W63-S01, W63-S02 |
 | W63-S05 | Adaptive shell and lifecycle navigation | EPIC-6 | blocked | app shell, responsive navigation, accessibility/browser tests | W63-S03, W63-S04 |
 | W63-S06 | Attention queue, evidence workbench, and cockpit hierarchy | EPIC-1, EPIC-4, EPIC-6 | blocked | queue/workbench projections, responsive UI, browser tests | W63-S03, W63-S04, W63-S05 |

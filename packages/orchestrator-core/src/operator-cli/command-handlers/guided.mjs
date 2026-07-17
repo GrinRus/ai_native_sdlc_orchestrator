@@ -330,6 +330,11 @@ export function handleGuidedCommand(context) {
     const constraints = resolveOptionalStringListFlag("constraint", flags.constraint);
     const definitionOfDone = resolveOptionalStringListFlag("dod", flags.dod);
     const kpis = resolveKpiFlags(flags.kpi);
+    const sourceKinds = resolveOptionalStringListFlag("source-kind", flags["source-kind"]);
+    const sourceRefs = resolveOptionalStringListFlag("source-ref", flags["source-ref"]);
+    if (sourceKinds.length !== sourceRefs.length) {
+      throw new Error("Repeatable --source-kind and --source-ref values must have the same count and pair by position.");
+    }
     const intakePacket = materializeIntakeArtifactPacket({
       projectId: missionInit.projectId,
       projectRoot: missionInit.projectRoot,
@@ -352,8 +357,9 @@ export function handleGuidedCommand(context) {
       forbiddenPaths: resolveOptionalCsvFlag("forbidden-path", flags["forbidden-path"]),
       deliveryMode,
       requestFile: requestFile ?? null,
-      sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
-      sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
+      sourceKind: null,
+      sourceRef: null,
+      sourceRefs: sourceRefs.map((ref, index) => ({ source_kind: sourceKinds[index], ref })),
       followUpSourceHandoffRef:
         resolveOptionalStringFlag("follow-up-source-handoff-ref", flags["follow-up-source-handoff-ref"]) ?? null,
     });

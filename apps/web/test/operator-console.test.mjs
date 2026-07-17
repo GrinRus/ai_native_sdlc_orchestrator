@@ -30,6 +30,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "operator-error-card.jsx",
     "project-structure.jsx",
     "project-structure-model.js",
+    "mission-model.js",
+    "mission-builder.jsx",
   ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
   const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 

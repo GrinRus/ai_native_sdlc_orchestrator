@@ -168,6 +168,33 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByText("Configure First Flow").first()).toBeVisible();
   });
 
+  test("opt-in Quiet Cockpit creates one structured Mission and restores durable refs", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    const lifecycleCommands = [];
+    page.on("request", (request) => {
+      if (!request.url().endsWith("/lifecycle-command/actions") || request.method() !== "POST") return;
+      lifecycleCommands.push(request.postDataJSON()?.command);
+    });
+    await page.goto(`${state.app_url}?console=quiet-cockpit`);
+    await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
+    await page.getByRole("button", { name: "Configure First Flow" }).click();
+    await expect(page.getByRole("form", { name: "Guided Mission intake" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Clear form" }).click();
+    await page.getByRole("button", { name: "Create Mission evidence" }).click();
+    await expect(page.getByLabel("Mission title")).toBeFocused();
+    expect(lifecycleCommands).toEqual([]);
+
+    await page.getByRole("button", { name: "Load safe walkthrough" }).click();
+    await page.getByRole("button", { name: "Create Mission evidence" }).click();
+    await expect.poll(() => lifecycleCommands).toEqual(["mission create", "next"]);
+    await expect(page.getByText("Mission evidence is durable.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Mission evidence is durable.")).toBeVisible();
+    expect(lifecycleCommands.filter((command) => command === "mission create")).toHaveLength(1);
+  });
+
   test("partial endpoint failure preserves project state and keyboard modal behavior", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
