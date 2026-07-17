@@ -82,8 +82,15 @@ selector still opens the legacy renderer. The blocking Chromium matrix covers
 the twelve operator scenarios, seven responsive widths, keyboard focus,
 reduced motion, and 200% zoom while blocking external browser requests. Raw
 artifacts stay under ignored `.aor/quality/w63/s07/`; the reproducible summary
-is `docs/research/15-w63-installed-console-acceptance.md`. Full Mission-to-
-follow-up lifecycle parity remains owned by W63-S08.
+is `docs/research/15-w63-installed-console-acceptance.md`.
+
+W63-S08 adds the versioned canonical safe no-write journey in
+`apps/web/browser/fixtures/golden-lifecycle.json`. Its installed browser proof
+drives all fifteen transitions through structured same-origin mutations,
+checks durable readback after reload and stale-revision recovery, and requires
+no terminal continuation. The exact proof boundary and W65 handoff are recorded
+in `docs/research/16-w63-canonical-lifecycle-closure.md`. The legacy renderer
+remains the packaged default until the W65 cutover.
 
 ## W43 alpha.10 validation notes
 W43-S02 re-validates the published `0.1.0-alpha.10` package from a neutral

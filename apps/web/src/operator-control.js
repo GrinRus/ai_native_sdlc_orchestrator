@@ -1,5 +1,9 @@
 const CATEGORIES = new Set(["mutation", "workbench", "evidence", "copy", "refresh", "unavailable"]);
 const SURFACES = new Set(["cockpit", "attention", "journey", "evidence"]);
+const STRUCTURED_COMMANDS = new Set([
+  "project init", "route select", "route check", "mission create", "discovery run", "spec build", "plan create",
+  "handoff approve", "run start", "review run", "review decide", "deliver prepare", "release prepare", "learning handoff",
+]);
 
 const LEGACY_ACTION_REGISTRY = Object.freeze({
   "discovery-run": { category: "mutation", label: "Create discovery evidence", operation: { command: "discovery run", flags: {} } },
@@ -16,7 +20,7 @@ function normalizeOperation(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const command = typeof value.command === "string" ? value.command.trim() : "";
   const flags = value.flags && typeof value.flags === "object" && !Array.isArray(value.flags) ? value.flags : {};
-  return command ? { command, flags } : null;
+  return command && STRUCTURED_COMMANDS.has(command) ? { command, flags } : null;
 }
 
 export function resolveOperatorControl(primaryAction) {

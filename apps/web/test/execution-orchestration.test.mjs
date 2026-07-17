@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 import { deliveryTransactionRows, executeOrchestrationCommand, integrationCommand, parentRunRows } from "../src/execution-orchestration-model.js";
+import { loadGoldenLifecycle, validateGoldenLifecycle } from "../browser/golden-lifecycle-loader.mjs";
 import { loadOperatorAcceptanceFixtures, loadOperatorScenarioCatalog, validateOperatorAcceptanceFixtures, validateOperatorScenarioCatalog } from "../browser/operator-scenario-loader.mjs";
 
 const source = fs.readFileSync(new URL("../src/execution-orchestration.jsx", import.meta.url), "utf8");
@@ -85,4 +86,14 @@ test("installed acceptance fixtures cover every scenario and blocking environmen
   assert.equal(fixtures.viewports.length, 7);
   assert.deepEqual(fixtures.environment_modes, ["keyboard-only", "reduced-motion", "zoom-200"]);
   assert.ok(fixtures.safety_assertions.includes("legacy-default-preserved"));
+});
+
+test("golden lifecycle is ordered, canonical, no-write, and evidence complete", () => {
+  const journey = loadGoldenLifecycle();
+  const validation = validateGoldenLifecycle(journey);
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
+  assert.equal(journey.transitions.length, 15);
+  assert.equal(new Set(journey.transitions.map((transition) => transition.transition_id)).size, 15);
+  assert.equal(journey.transitions.every((transition) => transition.authoritative_family && transition.evidence_family && transition.recovery), true);
+  assert.deepEqual({ external_network: journey.external_network, target_source_writes: journey.target_source_writes, upstream_writes: journey.upstream_writes }, { external_network: false, target_source_writes: false, upstream_writes: false });
 });

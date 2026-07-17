@@ -572,7 +572,7 @@ This is the master index for the implementation slices across all defined waves.
 | W63-S05 | Adaptive shell and lifecycle navigation | EPIC-6 | done | app shell, responsive navigation, accessibility/browser tests | W63-S03, W63-S04 |
 | W63-S06 | Attention queue, evidence workbench, and cockpit hierarchy | EPIC-1, EPIC-4, EPIC-6 | done | queue/workbench projections, responsive UI, browser tests | W63-S03, W63-S04, W63-S05 |
 | W63-S07 | Installed-console UX/UI acceptance | EPIC-0, EPIC-6, EPIC-7 | done | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
-| W63-S08 | Browser-operable canonical lifecycle parity | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | ready | canonical lifecycle actions, installed SPA full-flow proof, durable readback, story closure | W63-S07 |
+| W63-S08 | Browser-operable canonical lifecycle parity | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | done | canonical lifecycle actions, installed SPA full-flow proof, durable readback, story closure | W63-S07 |
 
 ## W64 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -584,7 +584,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W65 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W65-S01 | Cutover contract, parity baseline, and migration ledger | EPIC-0, EPIC-6 | blocked | product/contract docs, W63 scenarios, selector/app-config compatibility, parity fixtures | W63-S08 |
+| W65-S01 | Cutover contract, parity baseline, and migration ledger | EPIC-0, EPIC-6 | ready | product/contract docs, W63 scenarios, selector/app-config compatibility, parity fixtures | W63-S08 |
 | W65-S02 | Reversible experience selector and navigation compatibility | EPIC-0, EPIC-6 | blocked | shared web bootstrap/client/action boundary, selector/navigation fixtures, packaged assets | W65-S01 |
 | W65-S03 | Mission and Quiet Cockpit pilot activation | EPIC-1, EPIC-2, EPIC-6 | blocked | Mission/Cockpit pilot scenarios, canonical mutations, browser/a11y/durable readback | W65-S02 |
 | W65-S04 | Attention, Journey, and Evidence pilot activation | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | blocked | specialist modes, W60-W62 projections, evidence/trace reads, comparison fixtures | W65-S02 |
