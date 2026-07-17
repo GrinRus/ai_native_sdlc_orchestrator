@@ -376,7 +376,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S02 — Reversible experience selector and navigation compatibility
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Outcome:** One shared app bootstrap can render legacy or Quiet Cockpit
   explicitly, preserve presentation navigation and selected runtime context,
   and switch experiences without duplicating clients, mutations, or evidence.
@@ -438,7 +438,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S03 — Mission and Quiet Cockpit pilot activation
 
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Opt-in installed users can complete first run, Mission creation,
   active work, blocked recovery, completed inspection, and follow-up creation
   entirely through Quiet Cockpit with parity to accepted W34 outcomes.
@@ -499,7 +499,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S04 — Attention, Journey, and Evidence pilot activation
 
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Opt-in operators can process all pending work, inspect plan and
   execution progress, and audit selected-Flow evidence through the three
   specialist modes without losing W34 workbench outcomes or runtime truth.

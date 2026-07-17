@@ -3,14 +3,14 @@ import { createProjectGeneration, readControlPlaneJson as readJson, readProjectR
 import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
 import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution-orchestration.jsx";
-import { resolveConsoleExperience } from "./console-experience.js";
+import { consoleExperienceSearch, resolveConsoleExperience } from "./console-experience.js";
 import { MissionBuilder, MissionDurableSummary } from "./mission-builder.jsx";
 import { operatorControlTargetTab, resolveOperatorControl } from "./operator-control.js"; import { createOrResumeOperatorRequest, executeOperatorControl } from "./operator-operations.js";
 import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPLATE as EMPTY_TEMPLATE, missionFlagsFromDraft, SAFE_MISSION_TEMPLATE as SAFE_TEMPLATE, SAFE_MISSION_TEMPLATE_ID as SAFE_TEMPLATE_ID } from "./mission-model.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
-import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
+import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css";
 
 const STAGES = [
@@ -6118,7 +6118,8 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operati
 }
 
 function App() {
-  const consoleExperience = useMemo(() => resolveConsoleExperience(typeof window === "undefined" ? "" : window.location.search), []);
+  const initialPresentation = useMemo(() => readQuietPresentation(typeof window === "undefined" ? "" : window.location.search, STAGES.map(({ id }) => id)), []);
+  const [consoleExperience, setConsoleExperience] = useState(() => resolveConsoleExperience({ search: typeof window === "undefined" ? "" : window.location.search }));
   const [config, setConfig] = useState(null);
   const [projectIndex, setProjectIndex] = useState({ projects: [], default_project_id: null });
   const [activeProjectId, setActiveProjectId] = useState(null);
@@ -6147,7 +6148,7 @@ function App() {
   const [runs, setRuns] = useState([]); const [deliveryManifests, setDeliveryManifests] = useState([]);
   const [operatorRequests, setOperatorRequests] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [selectedStage, setSelectedStage] = useState("readiness"); const [quietMode, setQuietMode] = useState("cockpit");
+  const [selectedStage, setSelectedStage] = useState(initialPresentation.stage ?? "readiness"); const [quietMode, setQuietMode] = useState(initialPresentation.mode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(SAFE_TEMPLATE);
@@ -6459,6 +6460,7 @@ function App() {
     }));
     if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
     setConfig(appConfig);
+    setConsoleExperience(resolveConsoleExperience({ search: window.location.search, configDefault: appConfig.console_experience }));
     const projects = Array.isArray(projectPayload.projects) && projectPayload.projects.length > 0
       ? projectPayload.projects
       : Array.isArray(appConfig.projects)
@@ -6674,10 +6676,14 @@ function App() {
     };
   }, [apiProjectBase, liveRunId]);
 
-  function chooseStage(stageId) { didChooseStage.current = true; setSelectedStage(stageId); if (consoleExperience === "quiet-cockpit") writeQuietPresentation(activeProjectId, selectedFlow?.flow_id, { mode: quietMode, stage: stageId }); }
-
-  function chooseQuietMode(mode) { setQuietMode(mode); writeQuietPresentation(activeProjectId, selectedFlow?.flow_id, { mode, stage: selectedStage }); }
-
+  function chooseStage(stageId) { didChooseStage.current = true; setSelectedStage(stageId); if (consoleExperience === "quiet-cockpit") writeQuietPresentation({ mode: quietMode, stage: stageId }); }
+  function chooseQuietMode(mode) { setQuietMode(mode); writeQuietPresentation({ mode, stage: selectedStage }); }
+  function chooseConsoleExperience(experience) { const search = consoleExperienceSearch(window.location.search, experience); window.history.pushState({}, "", `${window.location.pathname}${search}${window.location.hash}`); setConsoleExperience(experience); }
+  useEffect(() => {
+    const restorePresentation = () => { setConsoleExperience(resolveConsoleExperience({ search: window.location.search, configDefault: config?.console_experience })); const presentation = readQuietPresentation(window.location.search, STAGES.map(({ id }) => id)); setQuietMode(presentation.mode); if (presentation.stage) setSelectedStage(presentation.stage); };
+    window.addEventListener("popstate", restorePresentation);
+    return () => window.removeEventListener("popstate", restorePresentation);
+  }, [config?.console_experience]);
   function resetProjectScopedState() {
     projectGeneration.current.begin();
     flowSelectionVersion.current += 1;
@@ -7278,18 +7284,8 @@ function App() {
     )
     : null;
   const runtimeRoot = projectState?.runtime_root ?? activeProjectDisplay?.runtime_root ?? config?.runtime_root ?? ".aor";
-  const activeProjectStatusRuntimeReady =
-    activeProjectRuntimeReady ||
-    providerWorkbenchFocus ||
-    Boolean(providerStepStatus || externalRunHealth) ||
-    (Array.isArray(runs) && runs.length > 0);
-  const newFlowDisabledReason = projectSnapshotPending
-    ? "Project state is loading."
-    : busy
-      ? "Wait for the current console action to finish before starting a new flow."
-      : !activeProjectRuntimeReady
-        ? "Initialize the project runtime before starting a flow."
-        : newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason;
+  const activeProjectStatusRuntimeReady = activeProjectRuntimeReady || providerWorkbenchFocus || Boolean(providerStepStatus || externalRunHealth) || (Array.isArray(runs) && runs.length > 0);
+  const newFlowDisabledReason = projectSnapshotPending ? "Project state is loading." : busy ? "Wait for the current console action to finish before starting a new flow." : !activeProjectRuntimeReady ? "Initialize the project runtime before starting a flow." : newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason;
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
 
   return (
@@ -7332,6 +7328,7 @@ function App() {
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         </div>
         <div className="topbar-spacer" />
+        <button className="utility-button" type="button" onClick={() => chooseConsoleExperience(consoleExperience === "quiet-cockpit" ? "legacy" : "quiet-cockpit")}>Switch to {consoleExperience === "quiet-cockpit" ? "legacy console" : "Quiet Cockpit"}</button>
         <button
           className="utility-button topbar-ask-button"
           type="button"
