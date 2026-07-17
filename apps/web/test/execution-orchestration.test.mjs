@@ -117,3 +117,15 @@ test("W65 Mission and Cockpit pilot covers resumability, action truth, and prese
   assert.ok(pilot.scenarios.some((scenario) => scenario.scenario_id === "completed-follow-up" && scenario.source_flow_immutable));
   assert.deepEqual(pilot.safety, { external_network: false, target_source_writes: false, upstream_writes: false });
 });
+
+test("W65 specialist modes preserve durable truth and legacy workbench outcomes", () => {
+  const pilot = JSON.parse(fs.readFileSync(new URL("../browser/fixtures/w65-specialist-modes-pilot.json", import.meta.url), "utf8"));
+  assert.equal(pilot.schema_version, 1);
+  assert.deepEqual(pilot.modes.map((mode) => mode.mode), ["attention", "journey", "evidence"]);
+  assert.equal(pilot.modes.every((mode) => mode.authoritative_contracts.length > 0 && mode.outcomes.length > 0 && mode.aggregate_success_guard), true);
+  assert.equal(pilot.legacy_outcomes.every((outcome) => outcome.quiet_mode && outcome.disposition), true);
+  assert.equal(pilot.acceptance.browser_owned_completion, false);
+  assert.equal(pilot.acceptance.browser_owned_evidence, false);
+  assert.equal(pilot.acceptance.project_flow_isolation, true);
+  assert.deepEqual(pilot.safety, { external_network: false, target_source_writes: false, upstream_writes: false });
+});

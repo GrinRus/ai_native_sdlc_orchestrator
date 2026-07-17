@@ -499,7 +499,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S04 — Attention, Journey, and Evidence pilot activation
 
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-6
-- **State:** ready
+- **State:** done
 - **Outcome:** Opt-in operators can process all pending work, inspect plan and
   execution progress, and audit selected-Flow evidence through the three
   specialist modes without losing W34 workbench outcomes or runtime truth.
@@ -563,7 +563,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S05 — Default-on cutover and explicit rollback rehearsal
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Outcome:** The packaged app resolves to Quiet Cockpit by default, retains
   one explicit temporary legacy override, and proves deterministic rollback
   without changing runtime or evidence state.
