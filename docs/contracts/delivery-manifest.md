@@ -19,6 +19,14 @@ Durable description of how execution became an actual patch, branch, fork PR, or
 - `status`
 - `created_at`
 
+Newly materialized manifests use `schema_version: 2` and add
+`coordination_transaction`. Legacy manifests without a version remain readable.
+The transaction records aggregate `complete|partial|blocked` status, exact repo
+membership, completed/failed repo ids, integration and lock evidence, and
+rollback refs. Each repository records its transaction stage, failed step,
+rollback refs, and catalog-owned recovery action. Partial write effects are
+never represented as aggregate success.
+
 ## Notes
 A delivery manifest is required whenever a flow reaches delivery or release.
 Manifest materialization should happen only after a `delivery-plan` artifact is present with `status=ready`.

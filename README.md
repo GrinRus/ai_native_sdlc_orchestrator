@@ -528,8 +528,12 @@ delivery program are tracked through `W65` and focus on:
   child Runtime Harness jobs only when dependencies and conflict keys allow,
   enforces concurrency and child-start budgets, propagates revisioned
   pause/resume/cancel, and keeps integration gates outside partial child
-  success. Integration patching, stale-work repair, and coordinated
-  multirepo delivery remain.
+  success. Integration now applies immutable child outputs in a disposable
+  workspace, invalidates only transitively stale units, and retains bounded
+  repair evidence. Coordinated delivery requires that integration lineage and
+  reports one aggregate transaction plus exact per-repository results; the
+  installed console exposes parent/unit/attempt, recovery, and partial-delivery
+  truth without introducing a browser-owned lifecycle.
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a
   semantic design system, and installed-package acceptance proof.

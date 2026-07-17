@@ -735,6 +735,10 @@ function executeDeliveryDriverTransaction(options = {}) {
       diff_totals: summarizeDiffTotalsForPaths(diffStats, repoChangedPaths),
       commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
       writeback_result: writebackResult,
+      transaction_stage: status === "success" ? "complete" : "failed",
+      failed_step: status === "success" ? null : stepId,
+      rollback_refs: [],
+      recovery_action: status === "success" ? null : "inspect-delivery-transcript",
       coordination: {
         required: coordinationMetadata.required,
         status: coordinationMetadata.status,
@@ -760,6 +764,7 @@ function executeDeliveryDriverTransaction(options = {}) {
   });
 
   const deliveryManifest = {
+    schema_version: 2,
     manifest_id: `${init.projectId}.delivery-manifest.${normalizeForId(mode)}.${Date.now()}`,
     project_id: init.projectId,
     ticket_id: ticketId,
@@ -780,9 +785,20 @@ function executeDeliveryDriverTransaction(options = {}) {
       promotion_evidence: asRecord(asRecord(deliveryPlan.preconditions).promotion_evidence),
       runtime_harness: asRecord(asRecord(deliveryPlan.preconditions).runtime_harness),
       coordination_evidence: asRecord(asRecord(deliveryPlan.preconditions).coordination_evidence),
+      integration: asRecord(asRecord(deliveryPlan.preconditions).integration),
       evidence_refs: deliveryPlanEvidenceRefs,
     },
     coordination: coordinationMetadata,
+    coordination_transaction: {
+      transaction_id: `${init.projectId}.delivery-transaction.${normalizeForId(runId)}`,
+      status: status === "success" ? "complete" : repoDeliveries.some((repo) => repo.writeback_result !== "failed") ? "partial" : "blocked",
+      repo_ids: repoDeliveries.map((repo) => repo.repo_id),
+      completed_repo_ids: repoDeliveries.filter((repo) => repo.writeback_result !== "failed").map((repo) => repo.repo_id),
+      failed_repo_ids: repoDeliveries.filter((repo) => repo.writeback_result === "failed").map((repo) => repo.repo_id),
+      integration_report_ref: asString(asRecord(asRecord(deliveryPlan.preconditions).integration).report_ref),
+      lock_evidence_refs: coordinationMetadata.lock_evidence_refs,
+      rollback_refs: uniqueStrings(repoDeliveries.flatMap((repo) => asStringArray(repo.rollback_refs))),
+    },
     rerun_recovery: rerunMetadata,
     evidence_root: init.runtimeLayout.reportsRoot,
     source_refs: {

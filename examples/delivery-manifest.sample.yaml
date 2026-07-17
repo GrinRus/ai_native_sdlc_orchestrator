@@ -1,3 +1,4 @@
+schema_version: 2
 manifest_id: dm-004
 project_id: aor-core
 ticket_id: wave-004
@@ -148,6 +149,17 @@ coordination:
     - evidence://reports/multirepo-coordination-status.sample.yaml
   cross_repo_validation_refs:
     - validation://integration/backend-frontend/api-contract
+coordination_transaction:
+  transaction_id: aor-core.delivery-transaction.run-101
+  status: complete
+  repo_ids: [backend, mobile, frontend]
+  completed_repo_ids: [backend, mobile, frontend]
+  failed_repo_ids: []
+  integration_report_ref: evidence://reports/integration-report-parent-run.yaml
+  lock_evidence_refs:
+    - evidence://reports/multirepo-coordination-status.sample.yaml
+  rollback_refs:
+    - revert://9f3c2ab
 evidence_root: /workspace/aor-core/.aor/projects/aor-core/reports
 source_refs:
   delivery_plan_ref: evidence://packets/delivery-plan-implement-fork-first-pr.yaml

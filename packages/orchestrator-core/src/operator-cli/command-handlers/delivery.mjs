@@ -342,6 +342,27 @@ export function handleDeliveryCommand(context) {
       "cross-repo-validation-refs",
       flags["cross-repo-validation-refs"],
     );
+    const integrationReportValue = resolveOptionalStringFlag("integration-report", flags["integration-report"]);
+    const integrationReportFile = resolveOptionalRefOrPathFlag({
+      flagValue: integrationReportValue,
+      projectRoot: init.projectRoot,
+      cwd,
+    });
+    let integrationReport = {};
+    if (integrationReportFile) {
+      const loadedIntegration = loadContractFile({ filePath: integrationReportFile, family: "integration-report" });
+      if (!loadedIntegration.ok || loadedIntegration.document.project_id !== init.projectId || loadedIntegration.document.parent_run_id !== runId) {
+        throw new CliUsageError("Integration report is invalid or does not belong to the selected project and run.");
+      }
+      integrationReport = {
+        required: true,
+        status: loadedIntegration.document.status,
+        ref: toEvidenceRef(init.projectRoot, integrationReportFile),
+        parentRunId: loadedIntegration.document.parent_run_id,
+        executionPlanRef: loadedIntegration.document.execution_plan_ref,
+        workspaceSetRef: loadedIntegration.document.workspace_set_ref,
+      };
+    }
     const rerunOfRunId = resolveOptionalStringFlag("rerun-of-run-id", flags["rerun-of-run-id"]);
     const rerunFailedStep = resolveOptionalStringFlag("rerun-failed-step", flags["rerun-failed-step"]);
     const rerunPacketBoundary = resolveOptionalStringFlag(
@@ -400,6 +421,7 @@ export function handleDeliveryCommand(context) {
       coordinationEvidenceRefs,
       coordinationLockEvidenceRefs,
       crossRepoValidationRefs,
+      integrationReport,
       runtimeHarnessGate: {
         required: strictDeliveryGateRequired,
         enforced: deliveryQualityGateMode === "strict",

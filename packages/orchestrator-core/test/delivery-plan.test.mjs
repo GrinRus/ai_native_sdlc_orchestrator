@@ -277,6 +277,8 @@ test("materializeDeliveryPlan requires coordination evidence for non-no-write mu
     assert.deepEqual(result.deliveryPlan.coordination.repo_ids, ["main", "docs"]);
     assert.equal(result.deliveryPlan.status, "blocked");
     assert.ok(result.deliveryPlan.blocking_reasons.includes("multi-repo-coordination-evidence-required"));
+    assert.equal(result.deliveryPlan.preconditions.integration.required, true);
+    assert.ok(result.deliveryPlan.blocking_reasons.includes("integration-report-required"));
   });
 });
 

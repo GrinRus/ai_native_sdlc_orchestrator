@@ -559,8 +559,8 @@ This is the master index for the implementation slices across all defined waves.
 | W62-S02 | Impact scope and execution DAG planning | EPIC-2, EPIC-3, EPIC-4 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `examples/packets/**`, planner/scope tests | W60-S03, W61-S03 |
 | W62-S03 | Parent/child Runtime Harness scheduler and bounded concurrency | EPIC-3, EPIC-4, EPIC-6 | done | `packages/orchestrator-core/**`, `packages/observability/**`, `apps/cli/**`, `apps/api/**`, scheduler tests | W62-S01, W62-S02, W24-S01 |
 | W62-S04 | Integration, stale-task invalidation, and bounded repair | EPIC-4, EPIC-5, EPIC-6 | done | `packages/orchestrator-core/**`, `packages/observability/**`, `docs/contracts/**`, integration/repair tests | W62-S03, W45-S02 |
-| W62-S05 | Coordinated delivery and execution UX | EPIC-5, EPIC-6 | ready | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, `docs/product/**`, tests | W62-S04, W20-S01, W24-S03 |
-| W62-S06 | Monorepo and bounded multirepo full-flow proof | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W62-S05, W60-S05, W61-S05 |
+| W62-S05 | Coordinated delivery and execution UX | EPIC-5, EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, `docs/product/**`, tests | W62-S04, W20-S01, W24-S03 |
+| W62-S06 | Monorepo and bounded multirepo full-flow proof | EPIC-0, EPIC-7 | ready | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W62-S05, W60-S05, W61-S05 |
 
 ## W63 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

@@ -174,6 +174,7 @@ function resolveGovernanceSource(policyResolution) {
  *   coordinationEvidenceRefs?: string[],
  *   coordinationLockEvidenceRefs?: string[],
  *   crossRepoValidationRefs?: string[],
+ *   integrationReport?: { required?: boolean, status?: string, ref?: string | null, parentRunId?: string | null, executionPlanRef?: string | null, workspaceSetRef?: string | null },
  *   runtimeHarnessGate?: {
  *     required?: boolean,
  *     enforced?: boolean,
@@ -258,6 +259,10 @@ function executeDeliveryPlanTransaction(options) {
       ? "present"
       : "missing"
     : "not-required";
+  const integrationReport = asRecord(options.integrationReport ?? {});
+  const integrationRequired = nonReadOnlyMode && (multiRepoRequired || integrationReport.required === true);
+  const integrationRef = asString(integrationReport.ref);
+  const integrationStatus = integrationRequired ? asString(integrationReport.status) ?? "missing" : "not-required";
 
   const rerunOfRunRef = asString(options.rerunOfRunRef);
   const rerunFailedStepRef = asString(options.rerunFailedStepRef);
@@ -296,6 +301,9 @@ function executeDeliveryPlanTransaction(options) {
   if (nonReadOnlyMode && multiRepoRequired && coordinationStatus !== "present") {
     blockingReasons.push("multi-repo-coordination-evidence-required");
   }
+  if (integrationRequired && (integrationStatus !== "passed" || !integrationRef)) {
+    blockingReasons.push("integration-report-required");
+  }
   if (rerunStatus === "blocked") {
     blockingReasons.push(...rerunBlockingReasons);
   }
@@ -323,6 +331,7 @@ function executeDeliveryPlanTransaction(options) {
     ...(handoffRef ? [handoffRef] : []),
     ...promotionEvidenceRefs,
     ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),
+    ...(integrationRef ? [integrationRef] : []),
   ])];
   const planId = `${options.projectId}.delivery-plan.${normalizeForId(options.stepClass)}.${Date.now()}`;
   const createdAt = new Date().toISOString();
@@ -373,6 +382,14 @@ function executeDeliveryPlanTransaction(options) {
         lock_refs: coordinationLockEvidenceRefs,
         cross_repo_validation_refs: crossRepoValidationRefs,
       },
+      integration: {
+        required: integrationRequired,
+        status: integrationStatus,
+        report_ref: integrationRef,
+        parent_run_id: asString(integrationReport.parentRunId),
+        execution_plan_ref: asString(integrationReport.executionPlanRef),
+        workspace_set_ref: asString(integrationReport.workspaceSetRef),
+      },
     },
     governance,
     coordination: {
@@ -413,6 +430,7 @@ function executeDeliveryPlanTransaction(options) {
       ...evidenceRefs,
       ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),
       ...coordinationEvidenceRefs,
+      ...(integrationRef ? [integrationRef] : []),
     ]),
     created_at: createdAt,
   };

@@ -566,7 +566,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       "created_at",
     ],
     fieldTypes: {
-      manifest_id: "string",
+      schema_version: "number", manifest_id: "string",
       project_id: "string",
       ticket_id: "string",
       run_refs: "array",
@@ -580,6 +580,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       source_refs: "object",
       status: "string",
       created_at: "string",
+      coordination_transaction: "object",
     },
     enumChecks: [],
   },

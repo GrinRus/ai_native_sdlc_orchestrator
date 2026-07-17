@@ -297,7 +297,7 @@ recoverable coordinated delivery.
 ## W62-S05 — Coordinated delivery and execution UX
 
 - **Epic:** EPIC-5 Delivery and release; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make parent/child execution, integration, and coordinated
   per-repository delivery understandable and recoverable in the local console.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,
@@ -364,7 +364,7 @@ recoverable coordinated delivery.
 ## W62-S06 — Monorepo and bounded multirepo full-flow proof
 
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Prove detailed planning, topology, safe concurrency, integration,
   repair, and coordinated delivery end to end on monorepo and bounded multirepo targets.
 - **Primary modules:** `README.md`, `docs/product/**`, `docs/architecture/**`,

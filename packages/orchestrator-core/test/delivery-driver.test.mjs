@@ -147,6 +147,26 @@ function createReadyPlan(options) {
     }, null, 2)}\n`, "utf8");
     runtimeHarnessGate = { ...options.runtimeHarnessGate, reportRef: reportPath };
   }
+  let integrationReport = {};
+  if ((options.coordinationRepos?.length ?? 0) > 1) {
+    const integrationPath = path.join(options.init.runtimeLayout.reportsRoot, `integration-report-${options.runId}.json`);
+    const integration = {
+      schema_version: 1,
+      report_id: `integration-report-${options.runId}`,
+      project_id: options.init.projectId,
+      parent_run_id: options.runId,
+      execution_plan_ref: "evidence://execution-plan.json",
+      workspace_set_ref: "evidence://workspace-set.json",
+      status: "passed",
+      revision: 1,
+      source_attempts: [], repository_results: [], aggregate_gates: [], stale_units: [], repair_refs: [], blockers: [],
+      evidence_refs: [integrationPath],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    fs.writeFileSync(integrationPath, `${JSON.stringify(integration, null, 2)}\n`);
+    integrationReport = { required: true, status: "passed", ref: integrationPath, parentRunId: options.runId };
+  }
   const plan = materializeDeliveryPlan({
     runtimeLayout: options.init.runtimeLayout,
     executionRoot: options.init.projectRoot,
@@ -175,6 +195,7 @@ function createReadyPlan(options) {
     coordinationEvidenceRefs: options.coordinationEvidenceRefs,
     coordinationLockEvidenceRefs: options.coordinationLockEvidenceRefs,
     crossRepoValidationRefs: options.crossRepoValidationRefs,
+    integrationReport,
     runtimeHarnessGate,
     rerunOfRunRef: options.rerunOfRunRef,
     rerunFailedStepRef: options.rerunFailedStepRef,
@@ -735,6 +756,10 @@ test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo
     });
 
     assert.equal(result.status, "success");
+    assert.equal(result.deliveryManifest.schema_version, 2);
+    assert.equal(result.deliveryManifest.coordination_transaction.status, "complete");
+    assert.deepEqual(result.deliveryManifest.coordination_transaction.failed_repo_ids, []);
+    assert.ok(result.deliveryManifest.coordination_transaction.integration_report_ref);
     assert.deepEqual(result.deliveryManifest.coordination.repo_ids, ["backend", "mobile", "frontend"]);
     assert.ok(result.releasePacket.evidence_lineage.coordination_refs.includes("evidence://coordination/w18-s04"));
 

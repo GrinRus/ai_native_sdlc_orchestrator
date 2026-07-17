@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-
 import { createProjectGeneration, readControlPlaneJson as readJson, readProjectResourceSnapshot } from "./control-plane-client.js";
 import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
+import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution-orchestration.jsx";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
@@ -6151,7 +6151,7 @@ function App() {
   });
   const [packets, setPackets] = useState([]);
   const [stepResults, setStepResults] = useState([]);
-  const [runs, setRuns] = useState([]);
+  const [runs, setRuns] = useState([]); const [deliveryManifests, setDeliveryManifests] = useState([]);
   const [operatorRequests, setOperatorRequests] = useState([]);
   const [activity, setActivity] = useState([]);
   const [selectedStage, setSelectedStage] = useState("readiness");
@@ -6516,7 +6516,7 @@ function App() {
       setSelectedFlowId(null);
       setPackets([]);
       setStepResults([]);
-      setRuns(Array.isArray(previewRunList) ? previewRunList : []);
+      setRuns(Array.isArray(previewRunList) ? previewRunList : []); setDeliveryManifests([]);
       setOperatorRequests([]);
       setConnectionState("connected");
       setResourceErrors({});
@@ -6545,7 +6545,7 @@ function App() {
       requestOptions,
       previous: {
         state: projectState, next: nextAction, flowPayload: flowList, selectedFlowPayload: selectedFlow,
-        packetList: packets, stepList: stepResults, runList: runs, requestList: operatorRequests,
+        packetList: packets, stepList: stepResults, runList: runs, deliveryList: deliveryManifests, requestList: operatorRequests,
       },
     });
     if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
@@ -6556,7 +6556,7 @@ function App() {
       selectedFlowPayload,
       packetList,
       stepList,
-      runList,
+      runList, deliveryList,
       requestList,
     } = snapshot.data;
     setConnectionState(snapshot.status);
@@ -6587,7 +6587,7 @@ function App() {
     setFlowList({ ...flowPayload, flows });
     setPackets(Array.isArray(packetList) ? packetList : []);
     setStepResults(Array.isArray(stepList) ? stepList : []);
-    setRuns(Array.isArray(runList) ? runList : []);
+    setRuns(Array.isArray(runList) ? runList : []); setDeliveryManifests(Array.isArray(deliveryList) ? deliveryList : []);
     setOperatorRequests(Array.isArray(requestList) ? requestList : []);
     if (!draftMode && selectionStillCurrent) {
       setSelectedFlow(refreshedSelectedFlow);
@@ -6704,7 +6704,7 @@ function App() {
     setPlanWorkbenchState({ scopeKey: "none", status: "idle", plan: null, progress: null, error: "" });
     setPackets([]);
     setStepResults([]);
-    setRuns([]);
+    setRuns([]); setDeliveryManifests([]);
     setOperatorRequests([]);
     setProjectSnapshotLoaded(false);
     setSelectedRef("");
@@ -7445,6 +7445,7 @@ function App() {
           {selectedStage === "discovery" && selectedFlow ? (
             <PlanWorkbench state={planWorkbenchState} busy={busy} onAction={runPlanAction} />
           ) : null}
+          <ExecutionOrchestration runs={runs} deliveryManifests={deliveryManifests} flowId={selectedFlow?.flow_id ?? null} busy={busy} onCommand={(request) => executeOrchestrationCommand({ request, busy, runLifecycle, refresh, setBusy, setError })} />
           </>
         )}
         {activeProjectDisplay ? (
