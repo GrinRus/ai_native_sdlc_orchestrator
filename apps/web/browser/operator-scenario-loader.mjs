@@ -36,6 +36,39 @@ export function loadOperatorScenarioCatalog(url = new URL("./fixtures/operator-s
   return catalog;
 }
 
+export function validateOperatorAcceptanceFixtures(manifest, catalog) {
+  const errors = [];
+  if (manifest?.schema_version !== 1) errors.push("acceptance fixture schema_version must be 1");
+  if (manifest?.catalog_id !== catalog?.catalog_id) errors.push("acceptance fixture catalog_id must match the scenario catalog");
+  if (manifest?.package_mode !== "installed-tarball") errors.push("acceptance fixtures must use the installed tarball");
+  if (manifest?.transport !== "loopback-same-origin") errors.push("acceptance fixtures must use loopback same-origin transport");
+  const scenarioIds = new Set((catalog?.scenarios ?? []).map((scenario) => scenario.id));
+  const fixtureIds = new Set();
+  for (const fixture of manifest?.fixtures ?? []) {
+    if (!scenarioIds.has(fixture.scenario_id)) errors.push(`${fixture.scenario_id}: fixture has no catalog scenario`);
+    if (fixtureIds.has(fixture.scenario_id)) errors.push(`${fixture.scenario_id}: duplicate acceptance fixture`);
+    fixtureIds.add(fixture.scenario_id);
+    for (const field of ["expected_surfaces", "side_effects", "durable_readback"]) {
+      if (!Array.isArray(fixture[field])) errors.push(`${fixture.scenario_id}: ${field} must be an array`);
+    }
+    if (!fixture.seed_profile) errors.push(`${fixture.scenario_id}: seed_profile is required`);
+  }
+  for (const scenarioId of scenarioIds) if (!fixtureIds.has(scenarioId)) errors.push(`${scenarioId}: acceptance fixture is missing`);
+  if ((manifest?.viewports ?? []).length !== 7) errors.push("acceptance fixtures must declare the seven blocking viewports");
+  for (const mode of ["keyboard-only", "reduced-motion", "zoom-200"]) {
+    if (!manifest?.environment_modes?.includes(mode)) errors.push(`acceptance fixtures are missing ${mode}`);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+export function loadOperatorAcceptanceFixtures(url = new URL("./fixtures/operator-acceptance-fixtures.json", import.meta.url)) {
+  const catalog = loadOperatorScenarioCatalog();
+  const manifest = JSON.parse(fs.readFileSync(url, "utf8"));
+  const validation = validateOperatorAcceptanceFixtures(manifest, catalog);
+  if (!validation.ok) throw new Error(`Invalid operator acceptance fixtures:\n${validation.errors.join("\n")}`);
+  return manifest;
+}
+
 export async function applyOperatorScenarioFixture(page, scenario) {
   await page.evaluate((fixture) => {
     window.__AOR_OPERATOR_SCENARIO__ = structuredClone(fixture);

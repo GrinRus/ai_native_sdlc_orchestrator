@@ -14,8 +14,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   globalSetup: path.join(root, "apps/web/browser/global-setup.mjs"),
   globalTeardown: path.join(root, "apps/web/browser/global-teardown.mjs"),
-  outputDir: path.join(root, ".aor/quality/w59-s01-playwright"),
-  reporter: [["line"], ["json", { outputFile: path.join(root, ".aor/quality/w59-s01-playwright-report.json") }]],
+  outputDir: path.join(root, ".aor/quality/w63/s07/playwright"),
+  reporter: [["line"], ["json", { outputFile: path.join(root, ".aor/quality/w63/s07/playwright-report.json") }]],
   use: {
     browserName: "chromium",
     headless: true,

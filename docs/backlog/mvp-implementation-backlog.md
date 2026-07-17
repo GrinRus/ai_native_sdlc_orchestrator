@@ -571,8 +571,8 @@ This is the master index for the implementation slices across all defined waves.
 | W63-S04 | Truthful action-first cockpit and recovery controls | EPIC-3, EPIC-4, EPIC-6 | done | next-action/control-plane contracts, cockpit/recovery UI, browser tests | W63-S01, W63-S02 |
 | W63-S05 | Adaptive shell and lifecycle navigation | EPIC-6 | done | app shell, responsive navigation, accessibility/browser tests | W63-S03, W63-S04 |
 | W63-S06 | Attention queue, evidence workbench, and cockpit hierarchy | EPIC-1, EPIC-4, EPIC-6 | done | queue/workbench projections, responsive UI, browser tests | W63-S03, W63-S04, W63-S05 |
-| W63-S07 | Installed-console UX/UI acceptance | EPIC-0, EPIC-6, EPIC-7 | ready | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
-| W63-S08 | Browser-operable canonical lifecycle parity | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | blocked | canonical lifecycle actions, installed SPA full-flow proof, durable readback, story closure | W63-S07 |
+| W63-S07 | Installed-console UX/UI acceptance | EPIC-0, EPIC-6, EPIC-7 | done | installed SPA proof, accessibility, visual/browser evidence, docs | W63-S02, W63-S03, W63-S04, W63-S05, W63-S06 |
+| W63-S08 | Browser-operable canonical lifecycle parity | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | ready | canonical lifecycle actions, installed SPA full-flow proof, durable readback, story closure | W63-S07 |
 
 ## W64 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
