@@ -3,7 +3,7 @@ import { createProjectGeneration, readControlPlaneJson as readJson, readProjectR
 import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
 import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution-orchestration.jsx";
-import { consoleExperienceSearch, resolveConsoleExperience } from "./console-experience.js";
+import { legacyConsoleRequested, resolveConsoleExperience, retiredConsoleSearch } from "./console-experience.js";
 import { MissionBuilder, MissionDurableSummary } from "./mission-builder.jsx";
 import { operatorControlTargetTab, resolveOperatorControl } from "./operator-control.js"; import { createOrResumeOperatorRequest, executeOperatorControl } from "./operator-operations.js";
 import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPLATE as EMPTY_TEMPLATE, missionFlagsFromDraft, SAFE_MISSION_TEMPLATE as SAFE_TEMPLATE, SAFE_MISSION_TEMPLATE_ID as SAFE_TEMPLATE_ID } from "./mission-model.js";
@@ -11,6 +11,7 @@ import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
+import { Alert } from "./ui/components.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css";
 
 const STAGES = [
@@ -6119,7 +6120,8 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operati
 
 function App() {
   const initialPresentation = useMemo(() => readQuietPresentation(typeof window === "undefined" ? "" : window.location.search, STAGES.map(({ id }) => id)), []);
-  const [consoleExperience, setConsoleExperience] = useState(() => resolveConsoleExperience({ search: typeof window === "undefined" ? "" : window.location.search }));
+  const consoleExperience = resolveConsoleExperience();
+  const [legacyMigrationNotice, setLegacyMigrationNotice] = useState(() => legacyConsoleRequested(typeof window === "undefined" ? "" : window.location.search));
   const [config, setConfig] = useState(null);
   const [projectIndex, setProjectIndex] = useState({ projects: [], default_project_id: null });
   const [activeProjectId, setActiveProjectId] = useState(null);
@@ -6460,7 +6462,6 @@ function App() {
     }));
     if (!projectGeneration.current.isCurrent(refreshGeneration)) return { stale: true, selectionApplied: false };
     setConfig(appConfig);
-    setConsoleExperience(resolveConsoleExperience({ search: window.location.search, configDefault: appConfig.console_experience }));
     const projects = Array.isArray(projectPayload.projects) && projectPayload.projects.length > 0
       ? projectPayload.projects
       : Array.isArray(appConfig.projects)
@@ -6676,14 +6677,22 @@ function App() {
     };
   }, [apiProjectBase, liveRunId]);
 
-  function chooseStage(stageId) { didChooseStage.current = true; setSelectedStage(stageId); if (consoleExperience === "quiet-cockpit") writeQuietPresentation({ mode: quietMode, stage: stageId }); }
+  function chooseStage(stageId) { didChooseStage.current = true; setSelectedStage(stageId); writeQuietPresentation({ mode: quietMode, stage: stageId }); }
   function chooseQuietMode(mode) { setQuietMode(mode); writeQuietPresentation({ mode, stage: selectedStage }); }
-  function chooseConsoleExperience(experience) { const search = consoleExperienceSearch(window.location.search, experience); window.history.pushState({}, "", `${window.location.pathname}${search}${window.location.hash}`); setConsoleExperience(experience); }
   useEffect(() => {
-    const restorePresentation = () => { setConsoleExperience(resolveConsoleExperience({ search: window.location.search, configDefault: config?.console_experience })); const presentation = readQuietPresentation(window.location.search, STAGES.map(({ id }) => id)); setQuietMode(presentation.mode); if (presentation.stage) setSelectedStage(presentation.stage); };
+    const restorePresentation = () => {
+      if (legacyConsoleRequested(window.location.search)) {
+        setLegacyMigrationNotice(true);
+        window.history.replaceState({}, "", `${window.location.pathname}${retiredConsoleSearch(window.location.search)}${window.location.hash}`);
+      }
+      const presentation = readQuietPresentation(window.location.search, STAGES.map(({ id }) => id));
+      setQuietMode(presentation.mode);
+      if (presentation.stage) setSelectedStage(presentation.stage);
+    };
+    restorePresentation();
     window.addEventListener("popstate", restorePresentation);
     return () => window.removeEventListener("popstate", restorePresentation);
-  }, [config?.console_experience]);
+  }, []);
   function resetProjectScopedState() {
     projectGeneration.current.begin();
     flowSelectionVersion.current += 1;
@@ -7289,7 +7298,7 @@ function App() {
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
 
   return (
-    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} ${consoleExperience === "quiet-cockpit" ? "quiet-cockpit-preview" : ""}`} data-console-experience={consoleExperience} data-quiet-mode={consoleExperience === "quiet-cockpit" ? quietMode : undefined}>
+    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} quiet-cockpit-preview`} data-console-experience={consoleExperience} data-quiet-mode={quietMode}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">A</div>
@@ -7328,7 +7337,6 @@ function App() {
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
         </div>
         <div className="topbar-spacer" />
-        <button className="utility-button" type="button" onClick={() => chooseConsoleExperience(consoleExperience === "quiet-cockpit" ? "legacy" : "quiet-cockpit")}>Switch to {consoleExperience === "quiet-cockpit" ? "legacy console" : "Quiet Cockpit"}</button>
         <button
           className="utility-button topbar-ask-button"
           type="button"
@@ -7344,6 +7352,8 @@ function App() {
           <Icon name="folder" />Copy runtime path
         </button>
       </header>
+
+      {legacyMigrationNotice ? <Alert tone="information"><strong>Legacy console retired.</strong><span> Quiet Cockpit opened with the same Project and Flow context. Package-version rollback remains available.</span></Alert> : null}
 
       {copyFeedback ? (
         <section className={copyFeedbackClassName()} role="status" aria-live="polite">
@@ -7362,30 +7372,19 @@ function App() {
         </section>
       ) : null}
 
-        {consoleExperience === "quiet-cockpit" ? <QuietShell project={activeProjectDisplay} flow={selectedFlow} connection={connectionState} safetyMode={selectedFlow?.writeback_policy?.mode ?? "no-write"} attentionCount={(attentionState.data?.items?.length ?? 0) + Object.keys(resourceErrors).length} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode}/> : null}
-        <StageRail
-          selectedStage={selectedStage}
-          currentStage={currentStage}
-          onSelect={chooseStage}
-          flow={selectedFlow}
-          newFlowDraft={draftSurface}
-          providerStepStatus={providerStepStatus}
-          externalRunHealth={externalRunHealth}
-          repairCompletion={qualityRepairCompletion}
-          verificationPlan={projectState?.verification_plan ?? null}
-        />
+        <QuietShell project={activeProjectDisplay} flow={selectedFlow} connection={connectionState} safetyMode={selectedFlow?.writeback_policy?.mode ?? "no-write"} attentionCount={(attentionState.data?.items?.length ?? 0) + Object.keys(resourceErrors).length} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode}/>
 
       <main className="main">
-        {consoleExperience === "quiet-cockpit" ? <QuietModeSurface mode={quietMode} attention={attentionState.data} attentionStatus={attentionState.status} resourceErrors={resourceErrors} planState={planWorkbenchState} runs={runs} deliveryManifests={deliveryManifests} graph={selectedFlowEvidenceGraph} trace={selectedFlowRuntimeTrace} onResolve={(item) => runOperatorControl(item.operator_control)} onInspect={(item) => { setSelectedRef(item.source_ref); focusAdvancedWorkbench("evidence"); }}/> : null}
+        <QuietModeSurface mode={quietMode} attention={attentionState.data} attentionStatus={attentionState.status} resourceErrors={resourceErrors} planState={planWorkbenchState} runs={runs} deliveryManifests={deliveryManifests} graph={selectedFlowEvidenceGraph} trace={selectedFlowRuntimeTrace} onResolve={(item) => runOperatorControl(item.operator_control)} onInspect={(item) => { setSelectedRef(item.source_ref); focusAdvancedWorkbench("evidence"); }}/>
         {error ? <div className="alert" role="alert">{error}</div> : null}
         <ResourceErrorCard errors={resourceErrors} />
-        {consoleExperience === "quiet-cockpit" && !draftSurface ? <MissionDurableSummary flow={selectedFlow} /> : null}
-        {consoleExperience === "quiet-cockpit" && requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
+        {!draftSurface ? <MissionDurableSummary flow={selectedFlow} /> : null}
+        {requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
         ) : draftSurface ? (
           <section className="work-card">
-            {consoleExperience === "quiet-cockpit" ? <MissionBuilder
+            <MissionBuilder
               form={form}
               setForm={setForm}
               busy={busy}
@@ -7394,23 +7393,7 @@ function App() {
               operation={missionOperation}
               onCancel={cancelNewFlowDraft}
               followUpSourceHandoffRef={draftFollowUpHandoffRef}
-            /> : <MissionForm
-              form={form}
-              setForm={setForm}
-              busy={busy}
-              submitMission={submitMission}
-              applyTemplate={() => setForm(SAFE_TEMPLATE)}
-              onAsk={() => openRequestDrawer()}
-              onCancel={cancelNewFlowDraft}
-              askDisabled={!selectedFlow}
-              title={draftFollowUpHandoffRef ? "Create Follow-up Flow" : "Start New Flow"}
-              description={
-                draftSourceFlow
-                  ? "Create fresh mission/intake evidence from completed-flow settings; the source flow remains read-only."
-                  : "Create a fresh mission/intake packet, then let AOR resolve the first next action."
-              }
-              followUpSourceHandoffRef={draftFollowUpHandoffRef}
-            />}
+            />
           </section>
         ) : (
           <>
@@ -7436,7 +7419,7 @@ function App() {
             providerFocus={providerWorkbenchFocus}
             evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}
             repairCompletion={qualityRepairCompletion}
-            quietCockpit={consoleExperience === "quiet-cockpit"} onOperatorControl={runOperatorControl} operatorActionResult={operatorActionResult}
+            quietCockpit onOperatorControl={runOperatorControl} operatorActionResult={operatorActionResult}
           />
           {selectedStage === "discovery" && selectedFlow ? (
             <PlanWorkbench state={planWorkbenchState} busy={busy} onAction={runPlanAction} />

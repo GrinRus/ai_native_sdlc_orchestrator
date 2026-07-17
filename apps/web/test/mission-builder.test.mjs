@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { resolveConsoleExperience } from "../src/console-experience.js";
+import { legacyConsoleRequested, resolveConsoleExperience, retiredConsoleSearch } from "../src/console-experience.js";
 import {
   EMPTY_MISSION_TEMPLATE,
   SAFE_MISSION_TEMPLATE,
@@ -15,12 +15,20 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-test("Quiet Cockpit is default-on while explicit legacy remains reversible", () => {
+test("retired legacy input normalizes to the single Quiet Cockpit renderer", () => {
   assert.equal(resolveConsoleExperience(), "quiet-cockpit");
-  assert.equal(resolveConsoleExperience({ search: "?console=legacy", configDefault: "quiet-cockpit" }), "legacy");
+  assert.equal(resolveConsoleExperience({ search: "?console=legacy", configDefault: "legacy" }), "quiet-cockpit");
   assert.equal(resolveConsoleExperience({ search: "?console=unknown", configDefault: "quiet-cockpit" }), "quiet-cockpit");
-  assert.equal(resolveConsoleExperience({ search: "?console=quiet-cockpit" }), "quiet-cockpit");
-  assert.equal(resolveConsoleExperience({ search: "?console=unknown", configDefault: "legacy" }), "legacy");
+  assert.equal(legacyConsoleRequested("?console=legacy&mode=attention"), true);
+  assert.equal(retiredConsoleSearch("?console=legacy&mode=attention"), "?console=quiet-cockpit&mode=attention");
+});
+
+test("SPA source has one renderer branch and a bounded legacy migration notice", () => {
+  const source = fs.readFileSync(path.join(here, "../src/spa.jsx"), "utf8");
+  assert.match(source, /Legacy console retired/u);
+  assert.doesNotMatch(source, /Switch to legacy console|Switch to Quiet Cockpit/u);
+  assert.doesNotMatch(source, /consoleExperience === "quiet-cockpit"/u);
+  assert.doesNotMatch(source, /<StageRail|<MissionForm/u);
 });
 
 test("Mission validation separates structural validity from acknowledged incompleteness", () => {

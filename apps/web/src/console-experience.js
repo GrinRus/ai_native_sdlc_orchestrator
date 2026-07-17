@@ -3,12 +3,16 @@ export const COMPILED_CONSOLE_EXPERIENCE = "quiet-cockpit";
 
 function valid(value) { return CONSOLE_EXPERIENCES.includes(value) ? value : null; }
 
-export function resolveConsoleExperience({ search = "", configDefault = null, compiledDefault = COMPILED_CONSOLE_EXPERIENCE } = {}) {
-  return valid(new URLSearchParams(search).get("console")) ?? valid(configDefault) ?? valid(compiledDefault) ?? "quiet-cockpit";
+export function legacyConsoleRequested(search = "") {
+  return valid(new URLSearchParams(search).get("console")) === "legacy";
 }
 
-export function consoleExperienceSearch(search, experience) {
+export function retiredConsoleSearch(search = "") {
   const params = new URLSearchParams(search);
-  params.set("console", valid(experience) ?? COMPILED_CONSOLE_EXPERIENCE);
+  params.set("console", COMPILED_CONSOLE_EXPERIENCE);
   return `?${params.toString()}`;
+}
+
+export function resolveConsoleExperience() {
+  return COMPILED_CONSOLE_EXPERIENCE;
 }
