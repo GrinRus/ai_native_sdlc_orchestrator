@@ -48,6 +48,10 @@ export function listParentRunProjections(options = {}) {
             consumed: asRecord(parent.consumed),
             units: Array.isArray(parent.units) ? parent.units : [],
             integration_gates: Array.isArray(parent.integration_gates) ? parent.integration_gates : [],
+            integration_report_ref: asString(parent.integration_report_ref),
+            stale_units: Array.isArray(parent.stale_units) ? parent.stale_units : [],
+            repair_refs: asStringArray(parent.repair_refs),
+            blocker: asRecord(parent.blocker),
             state_file: file,
           }];
         } catch {

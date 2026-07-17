@@ -16,6 +16,7 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `execution-plan.md`
+- `integration-report.md`
 - `release-packet.md`
 - `delivery-plan.md`
 - `delivery-manifest.md`

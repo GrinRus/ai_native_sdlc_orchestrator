@@ -1,0 +1,37 @@
+schema_version: 1
+report_id: integration-report-parent-run-001
+project_id: aor-core
+parent_run_id: parent-run-001
+execution_plan_ref: evidence://.aor/projects/aor-core/plans/execution-plan-001.json
+workspace_set_ref: evidence://.aor/projects/aor-core/state/workspace-set-001.json
+status: passed
+revision: 3
+source_attempts:
+  - child_run_id: child-run-unit-a-attempt-1
+    execution_unit_id: unit-a
+    attempt: 1
+    repo_id: aor-core
+    output_kind: patch
+    output_ref: evidence://.aor/projects/aor-core/patches/unit-a.patch
+    output_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    changed_paths: [packages/core/src/unit-a.mjs]
+    status: applied
+repository_results:
+  - repo_id: aor-core
+    integration_root: runtime://integration-workspaces/parent-run-001/aor-core
+    changed_paths: [packages/core/src/unit-a.mjs]
+    conflicts: []
+    retained: false
+aggregate_gates:
+  - gate_id: integration-tests
+    kind: verification
+    required: true
+    status: passed
+    evidence_refs: [evidence://.aor/projects/aor-core/reports/integration-tests.json]
+stale_units: []
+repair_refs: []
+blockers: []
+evidence_refs:
+  - evidence://.aor/projects/aor-core/reports/integration-report-parent-run-001.json
+created_at: 2026-07-17T00:00:00.000Z
+updated_at: 2026-07-17T00:01:00.000Z

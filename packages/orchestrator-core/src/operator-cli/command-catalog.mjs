@@ -1,4 +1,4 @@
-import { RUN_RETRY_COMMAND_DEFINITION, RUN_START_COMMAND_DEFINITION } from "./scheduler-command-definitions.mjs";
+import { RUN_INTEGRATION_COMMAND_DEFINITION, RUN_RETRY_COMMAND_DEFINITION, RUN_START_COMMAND_DEFINITION } from "./scheduler-command-definitions.mjs";
 
 export const RUNTIME_ROOT_DIRNAME = ".aor";
 
@@ -1081,6 +1081,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     contractFamilies: ["live-run-event"],
   },
   RUN_RETRY_COMMAND_DEFINITION,
+  RUN_INTEGRATION_COMMAND_DEFINITION,
   {
     command: "run answer",
     category: "execution-lifecycle",

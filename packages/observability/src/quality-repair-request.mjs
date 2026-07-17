@@ -201,6 +201,7 @@ export function buildQualityRepairLineage(request, requestRef) {
  *   createdAt?: string,
  *   updatedAt?: string | null,
  *   operatorOverrideRef?: string | null,
+ *   originContext?: Record<string, unknown> | null,
  * }} options
  */
 export function materializeQualityRepairRequest(options) {
@@ -278,6 +279,9 @@ export function materializeQualityRepairRequest(options) {
     created_at: generatedAt,
     updated_at: options.updatedAt ?? generatedAt,
     operator_override_ref: asString(options.operatorOverrideRef),
+    origin_context: Object.keys(asRecord(options.originContext)).length > 0
+      ? asRecord(options.originContext)
+      : undefined,
   };
 
   const validation = validateContractDocument({

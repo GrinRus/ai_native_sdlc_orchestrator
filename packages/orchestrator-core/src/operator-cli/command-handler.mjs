@@ -62,7 +62,7 @@ const TOP_LEVEL_HELP_GROUPS = Object.freeze([
   },
   {
     title: "Run control",
-    commands: ["run start", "run pause", "run resume", "run steer", "run cancel", "run retry", "run answer", "run status"],
+    commands: ["run start", "run pause", "run resume", "run steer", "run cancel", "run retry", "run integration", "run answer", "run status"],
   },
   {
     title: "Review and QA",
@@ -360,7 +360,7 @@ export function formatCommandHelp(definition) {
             definition.command === "run resume" ||
             definition.command === "run steer" ||
             definition.command === "run cancel" ||
-            definition.command === "run retry"
+            definition.command === "run retry" || definition.command === "run integration"
           ? "Status: implemented in run-control shell (W6-S03)"
         : definition.command === "run answer"
           ? "Status: implemented in interactive continuation shell (W24-S02)"
