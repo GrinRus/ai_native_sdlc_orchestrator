@@ -10,7 +10,7 @@ import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPL
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
-import { mergeProjectPreview } from "./project-snapshot.js";
+import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, writeQuietPresentation } from "./quiet-shell.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css";
 
 const STAGES = [
@@ -6147,7 +6147,7 @@ function App() {
   const [runs, setRuns] = useState([]); const [deliveryManifests, setDeliveryManifests] = useState([]);
   const [operatorRequests, setOperatorRequests] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [selectedStage, setSelectedStage] = useState("readiness");
+  const [selectedStage, setSelectedStage] = useState("readiness"); const [quietMode, setQuietMode] = useState("cockpit");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(SAFE_TEMPLATE);
@@ -6675,10 +6675,9 @@ function App() {
     };
   }, [apiProjectBase, liveRunId]);
 
-  function chooseStage(stageId) {
-    didChooseStage.current = true;
-    setSelectedStage(stageId);
-  }
+  function chooseStage(stageId) { didChooseStage.current = true; setSelectedStage(stageId); if (consoleExperience === "quiet-cockpit") writeQuietPresentation(activeProjectId, selectedFlow?.flow_id, { mode: quietMode, stage: stageId }); }
+
+  function chooseQuietMode(mode) { setQuietMode(mode); writeQuietPresentation(activeProjectId, selectedFlow?.flow_id, { mode, stage: selectedStage }); }
 
   function resetProjectScopedState() {
     projectGeneration.current.begin();
@@ -7367,6 +7366,7 @@ function App() {
         </section>
       ) : null}
 
+        {consoleExperience === "quiet-cockpit" ? <QuietShell project={activeProjectDisplay} flow={selectedFlow} connection={connectionState} safetyMode={selectedFlow?.writeback_policy?.mode ?? "no-write"} attentionCount={interactions.length + operatorDecisionRequests.length} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode}/> : null}
         <StageRail
           selectedStage={selectedStage}
           currentStage={currentStage}
