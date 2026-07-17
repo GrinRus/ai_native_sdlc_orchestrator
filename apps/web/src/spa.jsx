@@ -8,7 +8,7 @@ import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js";
-import "./spa.css";
+import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css";
 
 const STAGES = [
   { id: "readiness", label: "Readiness", command: "project init", hint: "Environment and guardrails" },
@@ -7308,7 +7308,7 @@ function App() {
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
 
   return (
-    <div className={`app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
+    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"}`}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">A</div>

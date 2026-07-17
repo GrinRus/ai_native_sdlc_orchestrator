@@ -5,7 +5,7 @@
   --color-surface: #ffffff;
   --color-surface-muted: #f8fbfc;
   --color-surface-subtle: #f9fbfc;
-  --color-text: #1f2933;
+  --color-text: #1f2933; --color-text-muted: #65717d; --color-text-soft: #65717d;
   --color-heading: #111827;
   --color-muted: #65717d;
   --color-border: #dfe5ea;
