@@ -391,6 +391,7 @@ Start here when you need deeper context:
 - `docs/contracts/control-plane-api.openapi.json` - OpenAPI 3.1 contract for
   the implemented detached HTTP/SSE control-plane routes.
 - `docs/product/05-quiet-cockpit-console-design.md` - adopted W63 target design
+- `docs/product/06-quiet-cockpit-ui-foundation.md` - semantic tokens and component contracts used by the W63 experience
   for the Quiet Cockpit shell and Attention, Journey, and Evidence modes, with
   W65 owning installed-default cutover and legacy retirement; not yet an
   implemented package claim.

@@ -140,7 +140,7 @@ W57 and the control-plane semantics closed by W58/W59.
   contract that can support the W63 journeys without one-off colors, typography,
   cards, statuses, dialogs, or recovery paths.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/**`, `apps/web/test/**`, UI foundation docs
@@ -204,7 +204,7 @@ W57 and the control-plane semantics closed by W58/W59.
   resulting blocker before mutation, and recover from a partial
   `mission create -> next` sequence without duplicate evidence.
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, canonical examples,
@@ -275,7 +275,7 @@ W57 and the control-plane semantics closed by W58/W59.
   whose behavior matches its label, while terminal handoffs, workbench opens,
   refreshes, and copied commands are visibly distinct and auditable.
 - **Epic:** EPIC-3, EPIC-4, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `docs/contracts/**`, next-action and run-health examples,
