@@ -33,6 +33,11 @@ repair cycle.
 `finding_refs[]` points to the stable finding ids or evidence refs that must be
 closed before delivery can continue.
 
+`origin_context` is optional additive lineage for scheduled execution. It may
+carry `parent_run_id`, `execution_unit_id`, `integration_gate_id`, and
+`input_fingerprint`. It never changes `source_stage`, status transitions, or
+the policy-owned attempt budget.
+
 ## Repair scope
 `repair_scope` should preserve:
 - `target_step`, normally `implement` or `repair`;

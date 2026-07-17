@@ -13,6 +13,7 @@ export type ContractFamily =
   | "wave-ticket"
   | "handoff-packet"
   | "execution-plan"
+  | "integration-report"
   | "task-progress-report"
   | "release-packet"
   | "delivery-plan"

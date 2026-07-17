@@ -47,6 +47,7 @@ import {
   scheduleParentRun,
   startRunJob,
   startParentRun,
+  applyIntegrationToParent,
   submitInteractionAnswer,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
@@ -88,6 +89,7 @@ export const RUN_CONTROL_COMMANDS = Object.freeze([
   "run steer",
   "run cancel",
   "run retry",
+  "run integration",
   "run answer",
   "run status",
   "ui attach",
@@ -142,6 +144,59 @@ function errorMessage(error) {
  */
 export function handleRunControlCommand(context) {
   const { command, flags, cwd, outputState } = context;
+  if (command === "run integration") {
+    ensureRequiredFlags(command, flags);
+    const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const parentRunId = /** @type {string} */ (flags["parent-run-id"]);
+    const action = /** @type {string} */ (flags.action);
+    const current = readParentRun({ cwd, projectRef, runtimeRoot, parentRunId });
+    if (!current.parent) throw new CliUsageError(`Parent run '${parentRunId}' was not found.`);
+    outputState.resolvedProjectRef = current.init.projectRoot;
+    outputState.resolvedRuntimeRoot = current.init.runtimeRoot;
+    outputState.parentRunFile = current.file;
+    if (action === "show") {
+      outputState.parentRun = current.parent;
+      outputState.readOnly = true;
+      return true;
+    }
+    const commandId = resolveOptionalStringFlag("command-id", flags["command-id"]);
+    const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
+    if (!commandId || expectedRevision === null) throw new CliUsageError("Integration mutations require '--command-id' and '--expected-revision'.");
+    if (action === "apply" || action === "verify") {
+      const reportFile = resolveOptionalStringFlag("integration-report-file", flags["integration-report-file"]);
+      if (!reportFile) throw new CliUsageError(`Integration action '${action}' requires '--integration-report-file'.`);
+      const report = readJson(path.resolve(cwd, reportFile));
+      const validation = validateContractDocument({ family: "integration-report", document: report, source: reportFile });
+      if (!validation.ok || report.project_id !== current.init.projectId || report.parent_run_id !== parentRunId) {
+        throw new CliUsageError("Integration report is invalid or owned by another project/parent run.");
+      }
+      const reportRef = toEvidenceRef(current.init.projectRoot, path.resolve(cwd, reportFile));
+      outputState.parentRun = applyIntegrationToParent({
+        parentFile: current.file, expectedRevision, report, integrationReportRef: reportRef,
+      });
+      outputState.integrationReport = report;
+    } else if (action === "hold") {
+      outputState.parentRun = controlParentRun({ parentFile: current.file, expectedRevision, action: "pause", commandId });
+    } else if (action === "resume") {
+      outputState.parentRun = controlParentRun({ parentFile: current.file, expectedRevision, action: "resume", commandId });
+    } else if (action === "repair") {
+      const repairRef = resolveOptionalStringFlag("quality-repair-ref", flags["quality-repair-ref"]);
+      if (!repairRef) throw new CliUsageError("Integration repair requires '--quality-repair-ref'.");
+      const report = { ...current.parent, repair_refs: uniqueStrings([...(current.parent.repair_refs ?? []), repairRef]) };
+      outputState.parentRun = applyIntegrationToParent({
+        parentFile: current.file,
+        expectedRevision,
+        report: { aggregate_gates: report.integration_gates ?? [], stale_units: report.stale_units ?? [], repair_refs: report.repair_refs, status: "repair-required" },
+        integrationReportRef: report.integration_report_ref ?? repairRef,
+      });
+    } else {
+      throw new CliUsageError(`Unsupported integration action '${action}'.`);
+    }
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [`run integration --parent-run-id ${parentRunId} --action show`];
+    return true;
+  }
   if (command === "run retry") {
     ensureRequiredFlags(command, flags);
     const projectRef = /** @type {string} */ (flags["project-ref"]);

@@ -1,8 +1,6 @@
 import { TOPOLOGY_CONTRACT_FAMILIES, TOPOLOGY_EXAMPLE_RULES } from "./topology-contract-families.mjs";
-import {
-  EXECUTION_READINESS_CONTRACT_FAMILIES,
-  EXECUTION_READINESS_EXAMPLE_RULES,
-} from "./execution-readiness-contract-families.mjs";
+import { EXECUTION_READINESS_CONTRACT_FAMILIES, EXECUTION_READINESS_EXAMPLE_RULES } from "./execution-readiness-contract-families.mjs";
+import { INTEGRATION_CONTRACT_FAMILIES, INTEGRATION_EXAMPLE_RULES } from "./integration-contract-family.mjs";
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
 const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
@@ -431,6 +429,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     },
     enumChecks: [{ field: "status", allowedValues: ["ready", "blocked", "superseded", "complete"] }],
   },
+  ...INTEGRATION_CONTRACT_FAMILIES,
   {
     family: "task-progress-report",
     familyGroup: "execution-and-quality",
@@ -1609,6 +1608,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/project[^/]*\.aor\.ya?ml$/, family: "project-profile" },
   ...TOPOLOGY_EXAMPLE_RULES,
   ...EXECUTION_READINESS_EXAMPLE_RULES,
+  ...INTEGRATION_EXAMPLE_RULES,
   { regex: /^examples\/prompts\/[^/]+\.ya?ml$/, family: "prompt-bundle" },
   { regex: /^examples\/routes\/[^/]+\.ya?ml$/, family: "provider-route-profile" },
   { regex: /^examples\/skills\/[^/]+\.ya?ml$/, family: "skill-profile" },

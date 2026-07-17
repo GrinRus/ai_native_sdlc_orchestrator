@@ -230,7 +230,7 @@ recoverable coordinated delivery.
 ## W62-S04 — Integration, stale-task invalidation, and bounded repair
 
 - **Epic:** EPIC-4 Quality platform; EPIC-5 Delivery and release; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Integrate child outputs in dependency order, invalidate affected
   downstream work, and reuse bounded review/QA repair semantics before delivery.
 - **Primary modules:** `packages/orchestrator-core/**`,
@@ -297,7 +297,7 @@ recoverable coordinated delivery.
 ## W62-S05 — Coordinated delivery and execution UX
 
 - **Epic:** EPIC-5 Delivery and release; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make parent/child execution, integration, and coordinated
   per-repository delivery understandable and recoverable in the local console.
 - **Primary modules:** `apps/web/**`, `apps/api/**`,

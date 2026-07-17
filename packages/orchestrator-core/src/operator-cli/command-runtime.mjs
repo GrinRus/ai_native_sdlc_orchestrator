@@ -66,6 +66,7 @@ export {
   startParentRun,
   controlParentRun,
 } from "../parent-run-scheduler.mjs";
+export { applyIntegrationToParent } from "../integration-service.mjs";
 export { requestRunJobCancel, startRunJob } from "../run-job.mjs";
 export { certifyAssetPromotion } from "../certification-decision.mjs";
 export {

@@ -68,3 +68,28 @@ export const RUN_RETRY_COMMAND_DEFINITION = Object.freeze({
     requiredFlags: ["project-ref", "parent-run-id", "execution-unit-id", "command-id", "expected-revision"],
     contractFamilies: ["execution-plan", "run-job", "live-run-event"],
 });
+
+export const RUN_INTEGRATION_COMMAND_DEFINITION = Object.freeze({
+  command: "run integration",
+  category: "execution-lifecycle",
+  status: "implemented",
+  summary: "Inspect or apply revisioned integration, repair, and hold state for one parent run.",
+  inputs: [
+    "--project-ref <path>",
+    "--runtime-root <path> (optional)",
+    "--parent-run-id <id>",
+    "--action <show|apply|verify|repair|hold|resume>",
+    "--integration-report-file <path> (required for apply|verify)",
+    "--quality-repair-ref <ref> (required for repair)",
+    "--command-id <id> (required for mutations)",
+    "--expected-revision <integer> (required for mutations)",
+    "--help",
+  ],
+  outputs: [
+    "resolved_project_ref", "resolved_runtime_root", "parent_run", "parent_run_file",
+    "integration_report", "read_only", "future_control_hooks", "contract_families",
+    "command_catalog_alignment",
+  ],
+  requiredFlags: ["project-ref", "parent-run-id", "action"],
+  contractFamilies: ["integration-report", "quality-repair-request", "runtime-harness-report"],
+});

@@ -778,6 +778,10 @@ Detached mutation payload baseline:
 - ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.
 - lifecycle-command payload fields: `command`, `flags`;
 - lifecycle-command response reuses CLI command output fields under `command_output` and adds transport-level `artifact_refs`, `evidence_refs`, `blocked`, and `blocked_reason`;
+- `run integration` lifecycle commands use the same endpoint. `show` is read-only;
+  `apply`, `verify`, `repair`, `hold`, and `resume` require parent ownership,
+  `command_id`, and `expected_revision`. Run reads expose the additive
+  integration report ref, aggregate gates, stale units, repair refs, and blocker.
 - interaction answer payload fields: `run_id`, `interaction_id`, `answer`, `reason`, `approval_ref`, `answer_evidence_ref`;
 - interaction answer response writes and references durable answer audit evidence before reporting whether continuation remains blocked.
 - project action payload fields: `action=add`, `project_ref`, optional `runtime_root`, optional `project_profile`, and optional `label`;

@@ -53,6 +53,7 @@ Run control:
   - aor run steer
   - aor run cancel
   - aor run retry
+  - aor run integration
   - aor run answer
   - aor run status
 
