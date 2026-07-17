@@ -1,11 +1,14 @@
 {
   "manifest_version": 2,
-  "source_hash": "17605c321fd624fa199e76ce813defc54ecb7c085a6330b034a1e4ccb82c332d",
+  "source_hash": "e2227efe9a043d63b2eaf86ff355678a45640125b2c41e5dab7af3ba79f1a517",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
     "apps/web/src/control-plane-client.js",
     "apps/web/src/dialog.jsx",
+    "apps/web/src/execution-orchestration-model.js",
+    "apps/web/src/execution-orchestration.css",
+    "apps/web/src/execution-orchestration.jsx",
     "apps/web/src/execution-setup.css",
     "apps/web/src/execution-setup.jsx",
     "apps/web/src/operator-error-card.jsx",
@@ -20,13 +23,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-D8ga1wj9.css",
-    "apps/web/dist/assets/index-nT9BuDzH.js",
+    "apps/web/dist/assets/index-D3Aiesn_.css",
+    "apps/web/dist/assets/index-D_DhXCPH.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-D8ga1wj9.css": "a4e80a284bc244fc844cb04d84bd0e72a84d96ce31bd3b01b3774057c3412210",
-    "apps/web/dist/assets/index-nT9BuDzH.js": "e3292afbe63943caf063b013550e421ea7b0684e6f264d5174a8e6195e6c7d2c",
-    "apps/web/dist/index.html": "e88250bb61dd43fe2dfb29fee23524eaf9f43c70008b70f920726e089e55ca42"
+    "apps/web/dist/assets/index-D3Aiesn_.css": "7ece82bbc3e41b32692669003e1398ab28702ac39377c089e14bd2204aa9e76e",
+    "apps/web/dist/assets/index-D_DhXCPH.js": "88d4438465f6286cd1c5929e2695db29136efa8f2bfafca143c98f75c6b89cb6",
+    "apps/web/dist/index.html": "c6ddc9b59a404d4e92ed90f25256baf98b9d95995ecf71c026d1e2ceb1ce6113"
   }
 }

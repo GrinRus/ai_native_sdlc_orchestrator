@@ -1276,6 +1276,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--coordination-evidence-refs <ref[,ref...]> (optional)",
       "--coordination-lock-evidence-refs <ref[,ref...]> (optional)",
       "--cross-repo-validation-refs <ref[,ref...]> (optional)",
+      "--integration-report <path|evidence://ref> (required for write-capable bounded multirepo)",
       "--rerun-of-run-id <id> (optional)",
       "--rerun-failed-step <step_id> (optional)",
       "--rerun-packet-boundary <delivery-manifest|release-packet> (optional)",
@@ -1330,7 +1331,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "command_catalog_alignment",
     ],
     requiredFlags: ["project-ref"],
-    contractFamilies: ["delivery-plan", "delivery-manifest", "release-packet", "runtime-harness-report", "review-decision"],
+    contractFamilies: ["delivery-plan", "delivery-manifest", "release-packet", "runtime-harness-report", "review-decision", "integration-report"],
   },
   {
     command: "release prepare",

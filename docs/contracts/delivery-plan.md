@@ -76,6 +76,9 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
   - `lock_evidence_refs[]` for scoped multirepo lock status evidence;
   - `cross_repo_validation_refs[]` for per-repo and integration validation evidence.
 - For bounded multirepo non-`no-write` delivery, `coordination.evidence_refs[]` remains the guardrail field that unblocks write-back. `lock_evidence_refs[]` and `cross_repo_validation_refs[]` are narrower lineage fields that make the lock and validation chain auditable in the downstream manifest and release packet.
+- Write-capable bounded multirepo delivery also requires
+  `preconditions.integration.status=passed` with a locked `integration-report`
+  ref owned by the same parent run, execution plan, and workspace set.
 - `rerun_recovery` should preserve bounded retry semantics:
   - `rerun_of_run_ref`, `failed_step_ref`, and `packet_boundary`;
   - `status` (`not-requested|ready|blocked`) and `blocking_reasons[]`;
