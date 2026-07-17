@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { deliveryTransactionRows, executeOrchestrationCommand, integrationCommand, parentRunRows } from "../src/execution-orchestration-model.js";
 import { loadGoldenLifecycle, validateGoldenLifecycle } from "../browser/golden-lifecycle-loader.mjs";
+import { loadCutoverParityBaseline } from "../browser/cutover-parity-loader.mjs";
 import { loadOperatorAcceptanceFixtures, loadOperatorScenarioCatalog, validateOperatorAcceptanceFixtures, validateOperatorScenarioCatalog } from "../browser/operator-scenario-loader.mjs";
 
 const source = fs.readFileSync(new URL("../src/execution-orchestration.jsx", import.meta.url), "utf8");
@@ -96,4 +97,13 @@ test("golden lifecycle is ordered, canonical, no-write, and evidence complete", 
   assert.equal(new Set(journey.transitions.map((transition) => transition.transition_id)).size, 15);
   assert.equal(journey.transitions.every((transition) => transition.authoritative_family && transition.evidence_family && transition.recovery), true);
   assert.deepEqual({ external_network: journey.external_network, target_source_writes: journey.target_source_writes, upstream_writes: journey.upstream_writes }, { external_network: false, target_source_writes: false, upstream_writes: false });
+});
+
+test("W65 cutover baseline maps every legacy outcome and required runtime state", () => {
+  const baseline = loadCutoverParityBaseline();
+  assert.equal(baseline.selector.precedence.join(" > "), "query > app-config > compiled-default");
+  assert.equal(baseline.selector.current_default, "legacy");
+  assert.equal(baseline.outcomes.every((row) => row.contract_owner && row.read_route && row.durable_readback), true);
+  assert.deepEqual(new Set(baseline.outcomes.map((row) => row.disposition)), new Set(["preserved", "replaced"]));
+  assert.deepEqual(new Set(baseline.states), new Set(["loading", "empty", "partial", "stale", "offline", "permission", "blocked", "error", "active", "completed"]));
 });

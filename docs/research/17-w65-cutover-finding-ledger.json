@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "wave": "W65",
+  "baseline": "w65.quiet-cockpit-cutover.v1",
+  "blocking_policy": "Any open P1 product-safety, accessibility, lifecycle, or evidence finding blocks the next cutover gate.",
+  "findings": [
+    {"finding_id":"W65-001","severity":"P2","owner":"W65-S02","surface":"presentation navigation","summary":"Quiet presentation state still uses sessionStorage instead of the accepted URL descriptor.","blocks_gate":"G2","status":"planned","evidence":["apps/web/src/quiet-shell.jsx"]},
+    {"finding_id":"W65-002","severity":"P2","owner":"W65-S05","surface":"packaged default","summary":"Legacy remains the intentional packaged default before default-on rehearsal.","blocks_gate":"G3","status":"planned","evidence":["apps/web/src/console-experience.js"]}
+  ],
+  "open_p1_count": 0
+}

@@ -74,6 +74,7 @@ function isJsonMediaType(value) {
  *   app?: {
  *     staticRoot?: string,
  *     packageVersion?: string,
+ *     consoleExperience?: "legacy" | "quiet-cockpit",
  *   },
  * }} options
  */
@@ -102,6 +103,10 @@ export function createControlPlaneHttpServer(options) {
   const projectId = defaultSummary?.project_id ?? null;
   const projectProfileRef = defaultSummary?.project_profile_ref ?? null;
   const appStaticRoot = asString(options.app?.staticRoot);
+  const appConsoleExperience = asString(options.app?.consoleExperience) ?? "legacy";
+  if (!["legacy", "quiet-cockpit"].includes(appConsoleExperience)) {
+    throw new Error("AOR app console experience must be 'legacy' or 'quiet-cockpit'.");
+  }
   const appIndexFile = appStaticRoot ? path.join(appStaticRoot, "index.html") : null;
   if (appStaticRoot && !fs.existsSync(appIndexFile ?? "")) {
     throw new Error(`AOR app static bundle is missing at '${appStaticRoot}'. Run the web build before launching the app.`);
@@ -160,6 +165,7 @@ export function createControlPlaneHttpServer(options) {
           staticRoot: appStaticRoot,
           registry,
           packageVersion: asString(options.app?.packageVersion) ?? "0.0.0",
+          consoleExperience: appConsoleExperience,
           baseUrl: canonicalOrigin,
         });
         if (served) {
@@ -373,6 +379,7 @@ function contentTypeFor(filePath) {
  *   staticRoot: string,
  *   registry: ReturnType<typeof createLocalProjectRegistry>,
  *   packageVersion: string,
+ *   consoleExperience: "legacy" | "quiet-cockpit",
  *   baseUrl: string,
  * }} options
  * @returns {boolean}
@@ -391,6 +398,7 @@ function serveAppRoute(options) {
     sendJson(options.response, 200, {
       app: "aor-operator-console",
       version: options.packageVersion,
+      console_experience: options.consoleExperience,
       project_id: defaultProject?.project_id,
       default_project_id: workspace.default_project_id,
       projects: workspace.projects.map((project) => ({ project_id: project.project_id, label: project.label })),
