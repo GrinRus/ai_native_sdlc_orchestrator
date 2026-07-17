@@ -103,7 +103,7 @@ export function createControlPlaneHttpServer(options) {
   const projectId = defaultSummary?.project_id ?? null;
   const projectProfileRef = defaultSummary?.project_profile_ref ?? null;
   const appStaticRoot = asString(options.app?.staticRoot);
-  const appConsoleExperience = asString(options.app?.consoleExperience) ?? "legacy";
+  const appConsoleExperience = asString(options.app?.consoleExperience) ?? "quiet-cockpit";
   if (!["legacy", "quiet-cockpit"].includes(appConsoleExperience)) {
     throw new Error("AOR app console experience must be 'legacy' or 'quiet-cockpit'.");
   }

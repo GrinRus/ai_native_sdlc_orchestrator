@@ -15,11 +15,12 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-test("Quiet Cockpit is opt-in and invalid selectors preserve the legacy renderer", () => {
-  assert.equal(resolveConsoleExperience(), "legacy");
+test("Quiet Cockpit is default-on while explicit legacy remains reversible", () => {
+  assert.equal(resolveConsoleExperience(), "quiet-cockpit");
   assert.equal(resolveConsoleExperience({ search: "?console=legacy", configDefault: "quiet-cockpit" }), "legacy");
   assert.equal(resolveConsoleExperience({ search: "?console=unknown", configDefault: "quiet-cockpit" }), "quiet-cockpit");
   assert.equal(resolveConsoleExperience({ search: "?console=quiet-cockpit" }), "quiet-cockpit");
+  assert.equal(resolveConsoleExperience({ search: "?console=unknown", configDefault: "legacy" }), "legacy");
 });
 
 test("Mission validation separates structural validity from acknowledged incompleteness", () => {

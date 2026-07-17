@@ -2,7 +2,7 @@
   "schema_version": 1,
   "baseline_id": "w65.quiet-cockpit-cutover.v1",
   "source_baselines": ["docs/product/03-flow-centric-console-design.md", "apps/web/browser/fixtures/operator-scenarios.json", "apps/web/browser/fixtures/golden-lifecycle.json", "docs/research/16-w63-canonical-lifecycle-closure.md"],
-  "selector": {"precedence":["query","app-config","compiled-default"],"values":["legacy","quiet-cockpit"],"current_default":"legacy","authoritative":false,"old_payload_without_field":"compiled-default"},
+  "selector": {"precedence":["query","app-config","compiled-default"],"values":["legacy","quiet-cockpit"],"current_default":"quiet-cockpit","authoritative":false,"old_payload_without_field":"compiled-default"},
   "states": ["loading","empty","partial","stale","offline","permission","blocked","error","active","completed"],
   "outcomes": [
     {"outcome_id":"first-run","legacy_surface":"readiness wizard","quiet_surface":"Cockpit Mission intake","contract_owner":"project state and intake-request-body","read_route":"GET project state","mutation_route":"POST lifecycle command","side_effect":"initialize project or create Mission evidence","durable_readback":"project state and intake refs","recovery":"structured initialization or Mission retry","disposition":"replaced"},

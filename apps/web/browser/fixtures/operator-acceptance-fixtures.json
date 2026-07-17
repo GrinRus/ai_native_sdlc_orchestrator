@@ -14,7 +14,7 @@
     { "id": "desktop", "width": 1440, "height": 900 }
   ],
   "environment_modes": ["keyboard-only", "reduced-motion", "zoom-200"],
-  "safety_assertions": ["external-network-blocked", "credentials-absent", "target-tracked-files-unchanged", "upstream-remotes-unchanged", "legacy-default-preserved"],
+  "safety_assertions": ["external-network-blocked", "credentials-absent", "target-tracked-files-unchanged", "upstream-remotes-unchanged", "quiet-default-on", "legacy-presentation-rollback"],
   "fixtures": [
     { "scenario_id": "clean-first-run", "seed_profile": "clean-project", "expected_surfaces": ["Cockpit", "Project Structure"], "side_effects": [], "durable_readback": ["project-state" ] },
     { "scenario_id": "mission-invalid", "seed_profile": "mission-invalid", "expected_surfaces": ["Guided Mission intake", "error-summary"], "side_effects": [], "durable_readback": ["operator-error"] },

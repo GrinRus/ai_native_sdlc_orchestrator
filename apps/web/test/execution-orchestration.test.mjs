@@ -86,7 +86,8 @@ test("installed acceptance fixtures cover every scenario and blocking environmen
   assert.equal(fixtures.package_mode, "installed-tarball");
   assert.equal(fixtures.viewports.length, 7);
   assert.deepEqual(fixtures.environment_modes, ["keyboard-only", "reduced-motion", "zoom-200"]);
-  assert.ok(fixtures.safety_assertions.includes("legacy-default-preserved"));
+  assert.ok(fixtures.safety_assertions.includes("quiet-default-on"));
+  assert.ok(fixtures.safety_assertions.includes("legacy-presentation-rollback"));
 });
 
 test("golden lifecycle is ordered, canonical, no-write, and evidence complete", () => {
@@ -102,7 +103,7 @@ test("golden lifecycle is ordered, canonical, no-write, and evidence complete", 
 test("W65 cutover baseline maps every legacy outcome and required runtime state", () => {
   const baseline = loadCutoverParityBaseline();
   assert.equal(baseline.selector.precedence.join(" > "), "query > app-config > compiled-default");
-  assert.equal(baseline.selector.current_default, "legacy");
+  assert.equal(baseline.selector.current_default, "quiet-cockpit");
   assert.equal(baseline.outcomes.every((row) => row.contract_owner && row.read_route && row.durable_readback), true);
   assert.deepEqual(new Set(baseline.outcomes.map((row) => row.disposition)), new Set(["preserved", "replaced"]));
   assert.deepEqual(new Set(baseline.states), new Set(["loading", "empty", "partial", "stale", "offline", "permission", "blocked", "error", "active", "completed"]));
