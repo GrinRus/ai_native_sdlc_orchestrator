@@ -1478,6 +1478,7 @@ test("local app server serves SPA config and existing control-plane routes", asy
       const config = await configResponse.json();
       assert.equal(config.project_id, transport.projectId);
       assert.equal(config.api_base_url, transport.baseUrl);
+      assert.equal(config.console_experience, "legacy");
       assert.equal(JSON.stringify(config).includes(projectRoot), false, "app config must not disclose absolute project paths");
 
       const stateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);

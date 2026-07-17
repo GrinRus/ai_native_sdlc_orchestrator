@@ -278,7 +278,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S01 — Cutover contract, parity baseline, and migration ledger
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Outcome:** The current W34 and accepted W63 experiences have one
   reviewable route/action/state parity matrix, selector contract, cutover
   ledger, and rollback policy before the installed default can change.
@@ -376,7 +376,7 @@ Visual similarity alone cannot produce a pass.
 ## W65-S02 — Reversible experience selector and navigation compatibility
 
 - **Epic:** EPIC-0, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Outcome:** One shared app bootstrap can render legacy or Quiet Cockpit
   explicitly, preserve presentation navigation and selected runtime context,
   and switch experiences without duplicating clients, mutations, or evidence.

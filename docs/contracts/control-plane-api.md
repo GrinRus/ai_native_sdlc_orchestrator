@@ -741,7 +741,15 @@ implicit initialization is intentionally removed.
 
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /` for the packaged local SPA when the transport is started with an app static root;
-- `GET /app-config.json` for no-store, redacted same-origin app configuration (`project_id`, `default_project_id`, minimal `projects[]` identities, package version, canonical API base, and control-plane metadata);
+- `GET /app-config.json` for no-store, redacted same-origin app configuration (`project_id`, `default_project_id`, minimal `projects[]` identities, package version, canonical API base, control-plane metadata, and optional presentation-only `console_experience`);
+
+`console_experience` is additive and, while both renderers are packaged, accepts
+`legacy` or `quiet-cockpit`. Older payloads that omit it remain valid. Renderer
+selection uses explicit `?console=` first, then this config value, then the
+compiled package default. Selection is presentation metadata only: it cannot
+change Project, Flow, authorization, lifecycle, write-back, or evidence state.
+Invalid query/config values fall through to the next valid source and never
+trigger an automatic renderer fallback after a rendering or read failure.
 - `GET /api/projects` for local app-session project summaries;
 - `GET /api/projects/:projectId/state` including `verification_plan` plan/status read-model data when available
 - `GET /api/projects/:projectId/strategic-snapshot`
