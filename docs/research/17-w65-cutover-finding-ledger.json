@@ -3,6 +3,8 @@
   "wave": "W65",
   "baseline": "w65.quiet-cockpit-cutover.v1",
   "blocking_policy": "Any open P1 product-safety, accessibility, lifecycle, or evidence finding blocks the next cutover gate.",
+  "closure_status": "pass",
+  "closure_evidence": "docs/research/23-w65-post-cutover-evidence-index.json",
   "findings": [
     {"finding_id":"W65-001","severity":"P2","owner":"W65-S02","surface":"presentation navigation","summary":"Quiet presentation state now uses the accepted URL descriptor and browser history.","blocks_gate":"G2","status":"resolved","evidence":["apps/web/src/quiet-presentation.js","apps/web/browser/operator-scenarios.spec.mjs"]},
     {"finding_id":"W65-002","severity":"P2","owner":"W65-S05","surface":"packaged default","summary":"Quiet Cockpit is default-on and explicit legacy changes presentation only.","blocks_gate":"G3","status":"resolved","evidence":["apps/web/src/console-experience.js","apps/web/browser/operator-scenarios.spec.mjs","docs/ops/quiet-cockpit-cutover.md"]}

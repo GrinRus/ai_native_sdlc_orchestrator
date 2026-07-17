@@ -47,7 +47,7 @@ test("installed Quiet Cockpit passes the blocking shell acceptance matrix", asyn
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const viewport of manifest.viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto(`${state.app_url}?console=quiet-cockpit`);
+    await page.goto(state.app_url);
     await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
     await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
@@ -123,7 +123,7 @@ test("installed Quiet Cockpit executes the canonical no-write lifecycle with dur
     return json(route, { lifecycle_command: { command: transition.command, blocked: false, artifact_refs: [ref], evidence_refs: [] } });
   });
 
-  await page.goto(`${state.app_url}?console=quiet-cockpit`);
+  await page.goto(state.app_url);
   for (const [index, transition] of journey.transitions.entries()) {
     const action = page.getByRole("button", { name: transition.label, exact: true });
     await expect(action).toBeVisible();

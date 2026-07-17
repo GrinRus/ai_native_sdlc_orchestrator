@@ -104,7 +104,7 @@ W18 closes the connected operator-surface path for runner-requested questions: s
 
 `W32-S01` adds operator-initiated runtime intervention: CLI, API, and web can create a durable `operator-request`, compile it into the selected runtime step, and materialize proposal/patch evidence while keeping `run steer` as run-control only.
 
-The `OPS-11` baseline is limited to bounded operator-request creation and execution against a selected flow. It does not prove execution-route or model setup, nor does it prove that the complete lifecycle is operable through the installed UI. `OPS-12` remains partial until the current console, truthful action semantics, and browser-operable lifecycle gaps close in W59 and W63.
+The `OPS-11` baseline is limited to bounded operator-request creation and execution against a selected flow. `OPS-12` is proven by the W63 golden lifecycle and W65 post-cutover installed single-renderer acceptance; it remains bounded to deterministic no-write execution without credentialed providers or upstream writes.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
