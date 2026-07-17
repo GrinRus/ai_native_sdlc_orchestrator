@@ -50,6 +50,16 @@ semantics remain child-run concerns. Dependency order, conflict keys,
 ready queue. Parent completion additionally requires all integration gates;
 partial child success is never mission closure.
 
+Integration consumes only immutable child patch/commit evidence in dependency
+order inside a separate disposable workspace. Its report owns aggregate
+verification/review/QA gates, transitive stale boundaries, retained recovery
+state, and bounded repair lineage. Write-capable bounded multirepo delivery
+requires that passing integration report and emits one manifest-v2 aggregate
+transaction plus exact per-repository stages; partial effects remain aggregate
+failure until explicit recovery. `pnpm w62:proof` composes these invariants for
+monorepo components and a bounded contract-dependent multirepo without provider
+network or upstream writes.
+
 The default Local Workspace registry is persisted under AOR-owned user state,
 uses atomic revisioned writes, and stores only explicitly connected projects
 and redacted bindings. Reads never scan the filesystem. A neutral launcher has

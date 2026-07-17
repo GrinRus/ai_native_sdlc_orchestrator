@@ -512,7 +512,6 @@ delivery program are tracked through `W65` and focus on:
 - Requalified structured-task planning with mission-specific decomposition,
   deterministic completeness before semantic evaluation, exact-version
   approval, evidence-derived progress, and an accessible flow Plan workbench.
-  Parallel scheduling and multirepo workspace provisioning remain W62 work.
 - Portable project/repository/component topology, persistent machine-local
   bindings, revisioned topology control, and installed-user `Add AOR Project`
   plus Project Structure management. Headless execution-route selection and
@@ -533,7 +532,9 @@ delivery program are tracked through `W65` and focus on:
   repair evidence. Coordinated delivery requires that integration lineage and
   reports one aggregate transaction plus exact per-repository results; the
   installed console exposes parent/unit/attempt, recovery, and partial-delivery
-  truth without introducing a browser-owned lifecycle.
+  truth without introducing a browser-owned lifecycle. `pnpm w62:proof`
+  reproduces monorepo-component and bounded-multirepo DAG, scheduler,
+  stale/repair, integration, and no-upstream-write delivery lineage.
 - Post-execution operator-console UX/UI maturity: guided Mission intake,
   truthful recovery actions, adaptive navigation, attention/evidence work, a
   semantic design system, and installed-package acceptance proof.

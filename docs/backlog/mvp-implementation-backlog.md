@@ -560,12 +560,12 @@ This is the master index for the implementation slices across all defined waves.
 | W62-S03 | Parent/child Runtime Harness scheduler and bounded concurrency | EPIC-3, EPIC-4, EPIC-6 | done | `packages/orchestrator-core/**`, `packages/observability/**`, `apps/cli/**`, `apps/api/**`, scheduler tests | W62-S01, W62-S02, W24-S01 |
 | W62-S04 | Integration, stale-task invalidation, and bounded repair | EPIC-4, EPIC-5, EPIC-6 | done | `packages/orchestrator-core/**`, `packages/observability/**`, `docs/contracts/**`, integration/repair tests | W62-S03, W45-S02 |
 | W62-S05 | Coordinated delivery and execution UX | EPIC-5, EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, `docs/product/**`, tests | W62-S04, W20-S01, W24-S03 |
-| W62-S06 | Monorepo and bounded multirepo full-flow proof | EPIC-0, EPIC-7 | ready | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W62-S05, W60-S05, W61-S05 |
+| W62-S06 | Monorepo and bounded multirepo full-flow proof | EPIC-0, EPIC-7 | done | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, root checks | W62-S05, W60-S05, W61-S05 |
 
 ## W63 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W63-S01 | Operator journey, action semantics, and scenario baseline | EPIC-0, EPIC-6 | blocked | product/architecture/contracts docs, web scenario fixtures | W62-S06 |
+| W63-S01 | Operator journey, action semantics, and scenario baseline | EPIC-0, EPIC-6 | ready | product/architecture/contracts docs, web scenario fixtures | W62-S06 |
 | W63-S02 | Semantic design system and component contracts | EPIC-0, EPIC-6 | blocked | `apps/web/src/**`, UI foundation docs/tests | W63-S01 |
 | W63-S03 | Guided Mission intake and resumable first-flow creation | EPIC-1, EPIC-2, EPIC-6 | blocked | intake/scope contracts, Mission UI, lifecycle responses, browser tests | W63-S01, W63-S02 |
 | W63-S04 | Truthful action-first cockpit and recovery controls | EPIC-3, EPIC-4, EPIC-6 | blocked | next-action/control-plane contracts, cockpit/recovery UI, browser tests | W63-S01, W63-S02 |

@@ -364,7 +364,7 @@ recoverable coordinated delivery.
 ## W62-S06 — Monorepo and bounded multirepo full-flow proof
 
 - **Epic:** EPIC-0 Repository development system; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove detailed planning, topology, safe concurrency, integration,
   repair, and coordinated delivery end to end on monorepo and bounded multirepo targets.
 - **Primary modules:** `README.md`, `docs/product/**`, `docs/architecture/**`,
