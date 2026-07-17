@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "pilot_id": "w65.specialist-modes.v1",
+  "selector": "quiet-cockpit",
+  "modes": [
+    {
+      "mode": "attention",
+      "authoritative_contracts": ["attention-projection", "interaction-request", "decision-request", "quality-repair-request"],
+      "outcomes": ["multi-item-order", "independent-selection", "independent-drafts", "durable-completion", "partial-read"],
+      "completion_owner": "control-plane-readback",
+      "aggregate_success_guard": "required blockers remain visible"
+    },
+    {
+      "mode": "journey",
+      "authoritative_contracts": ["task-progress-report", "execution-plan", "run-job", "integration-report", "delivery-manifest"],
+      "outcomes": ["task-unit-attempt-lineage", "parent-child-status", "integration-repair", "coordinated-delivery", "accessible-list-table"],
+      "completion_owner": "runtime-projections",
+      "aggregate_success_guard": "partial or failed required child blocks aggregate success"
+    },
+    {
+      "mode": "evidence",
+      "authoritative_contracts": ["evidence-graph", "runtime-harness-report", "review-report", "quality-repair-request", "delivery-manifest", "release-manifest", "learning-handoff"],
+      "outcomes": ["packet-report-summary", "graph-trace-lineage", "raw-ref-disclosure", "completed-read-only", "flow-isolation"],
+      "completion_owner": "evidence-projections",
+      "aggregate_success_guard": "missing or stale required evidence remains explicit"
+    }
+  ],
+  "legacy_outcomes": [
+    {"outcome":"human-queue","quiet_mode":"attention","disposition":"preserved"},
+    {"outcome":"plan-and-progress-workbench","quiet_mode":"journey","disposition":"preserved"},
+    {"outcome":"execution-and-integration-workbench","quiet_mode":"journey","disposition":"preserved"},
+    {"outcome":"evidence-graph-and-trace","quiet_mode":"evidence","disposition":"preserved"},
+    {"outcome":"raw-identifiers-and-paths","quiet_mode":"evidence","disposition":"replaced-by-labelled-disclosure"}
+  ],
+  "acceptance": {
+    "viewports": ["desktop", "mobile"],
+    "input_modes": ["keyboard-only", "touch"],
+    "reduced_motion": true,
+    "zoom_percent": 200,
+    "project_flow_isolation": true,
+    "browser_owned_completion": false,
+    "browser_owned_evidence": false
+  },
+  "safety": {"external_network":false,"target_source_writes":false,"upstream_writes":false},
+  "evidence": ["apps/web/browser/operator-console.spec.mjs","apps/web/browser/operator-scenarios.spec.mjs","apps/web/src/quiet-modes.jsx","apps/web/src/execution-orchestration.jsx","docs/research/16-w63-canonical-lifecycle-closure.md"]
+}

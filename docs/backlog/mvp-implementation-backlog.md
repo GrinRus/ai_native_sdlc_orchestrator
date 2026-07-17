@@ -587,8 +587,8 @@ This is the master index for the implementation slices across all defined waves.
 | W65-S01 | Cutover contract, parity baseline, and migration ledger | EPIC-0, EPIC-6 | done | product/contract docs, W63 scenarios, selector/app-config compatibility, parity fixtures | W63-S08 |
 | W65-S02 | Reversible experience selector and navigation compatibility | EPIC-0, EPIC-6 | done | shared web bootstrap/client/action boundary, selector/navigation fixtures, packaged assets | W65-S01 |
 | W65-S03 | Mission and Quiet Cockpit pilot activation | EPIC-1, EPIC-2, EPIC-6 | done | Mission/Cockpit pilot scenarios, canonical mutations, browser/a11y/durable readback | W65-S02 |
-| W65-S04 | Attention, Journey, and Evidence pilot activation | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | ready | specialist modes, W60-W62 projections, evidence/trace reads, comparison fixtures | W65-S02 |
-| W65-S05 | Default-on cutover and explicit rollback rehearsal | EPIC-0, EPIC-6 | blocked | app-config/default resolution, installed package proof, rollback runbook | W65-S03, W65-S04 |
+| W65-S04 | Attention, Journey, and Evidence pilot activation | EPIC-2, EPIC-3, EPIC-4, EPIC-6 | done | specialist modes, W60-W62 projections, evidence/trace reads, comparison fixtures | W65-S02 |
+| W65-S05 | Default-on cutover and explicit rollback rehearsal | EPIC-0, EPIC-6 | ready | app-config/default resolution, installed package proof, rollback runbook | W65-S03, W65-S04 |
 | W65-S06 | Legacy console retirement and compatibility cleanup | EPIC-0, EPIC-6 | blocked | legacy web source/CSS/fixtures, selector compatibility, packaged assets | W65-S05 |
 | W65-S07 | Post-cutover installed-console acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | blocked | installed browser proof, guided profile, a11y/comparison evidence, product/story/runbook docs | W65-S06 |
 
