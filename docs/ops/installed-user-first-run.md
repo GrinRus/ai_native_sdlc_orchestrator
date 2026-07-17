@@ -73,6 +73,18 @@ For a clean target, the app smoke should pass without creating `$TMP/target/.aor
 runtime state is created only after the user explicitly initializes the project
 or after headless `aor onboard`.
 
+## Quiet Cockpit installed acceptance
+
+The W63-S07 gate packs the current package once, installs it into a disposable
+prefix, and starts `aor app` from a neutral launcher with a disposable
+`AOR_HOME`. The opt-in URL is `?console=quiet-cockpit`; an omitted or invalid
+selector still opens the legacy renderer. The blocking Chromium matrix covers
+the twelve operator scenarios, seven responsive widths, keyboard focus,
+reduced motion, and 200% zoom while blocking external browser requests. Raw
+artifacts stay under ignored `.aor/quality/w63/s07/`; the reproducible summary
+is `docs/research/15-w63-installed-console-acceptance.md`. Full Mission-to-
+follow-up lifecycle parity remains owned by W63-S08.
+
 ## W43 alpha.10 validation notes
 W43-S02 re-validates the published `0.1.0-alpha.10` package from a neutral
 temporary runner and browser-driven installed-user UI path. The slice produced

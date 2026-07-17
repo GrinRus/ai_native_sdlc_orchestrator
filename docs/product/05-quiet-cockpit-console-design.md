@@ -741,7 +741,9 @@ implemented package.
   deduplicated Cockpit hierarchy.
 - **W63-S07** proves the opt-in installed experience through browser,
   accessibility, responsive, durable-evidence, and safety acceptance while W34
-  remains the installed default.
+  remains the installed default. The executable matrix and residual finding
+  disposition are recorded in `docs/research/15-w63-installed-console-acceptance.md`;
+  they intentionally do not close the full-lifecycle `OPS-12` claim.
 - **W63-S08** closes browser-operable canonical safe lifecycle parity and the
   UI-only story evidence through the installed mock/deterministic no-write
   golden path.

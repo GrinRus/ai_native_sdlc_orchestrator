@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "slice_id": "W63-S07",
+  "status": "pass",
+  "package_mode": "installed-tarball",
+  "renderer": "quiet-cockpit-opt-in",
+  "legacy_default_preserved": true,
+  "scenario_count": 12,
+  "browser_case_count": 13,
+  "viewport_count": 7,
+  "environment_modes": ["keyboard-only", "reduced-motion", "zoom-200"],
+  "safety": {
+    "external_browser_network": false,
+    "credentialed_provider_calls": false,
+    "target_tracked_writes": false,
+    "upstream_writes": false,
+    "neutral_launcher_writes": false
+  },
+  "committed_evidence_refs": [
+    "apps/web/browser/fixtures/operator-scenarios.json",
+    "apps/web/browser/fixtures/operator-acceptance-fixtures.json",
+    "apps/web/browser/operator-scenarios.spec.mjs",
+    "docs/research/15-w63-installed-console-acceptance.md",
+    "docs/research/15-w63-installed-console-finding-ledger.json"
+  ],
+  "ignored_raw_evidence_root": ".aor/quality/w63/s07"
+}

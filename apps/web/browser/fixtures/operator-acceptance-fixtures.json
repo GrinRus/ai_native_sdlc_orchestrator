@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "catalog_id": "quiet-cockpit.operator-journeys.v1",
+  "package_mode": "installed-tarball",
+  "transport": "loopback-same-origin",
+  "raw_evidence_root": ".aor/quality/w63/s07",
+  "viewports": [
+    { "id": "compact", "width": 320, "height": 700 },
+    { "id": "mobile", "width": 390, "height": 844 },
+    { "id": "tablet-portrait", "width": 768, "height": 1024 },
+    { "id": "tablet-landscape", "width": 1024, "height": 768 },
+    { "id": "shell-before-breakpoint", "width": 1180, "height": 900 },
+    { "id": "shell-after-breakpoint", "width": 1181, "height": 900 },
+    { "id": "desktop", "width": 1440, "height": 900 }
+  ],
+  "environment_modes": ["keyboard-only", "reduced-motion", "zoom-200"],
+  "safety_assertions": ["external-network-blocked", "credentials-absent", "target-tracked-files-unchanged", "upstream-remotes-unchanged", "legacy-default-preserved"],
+  "fixtures": [
+    { "scenario_id": "clean-first-run", "seed_profile": "clean-project", "expected_surfaces": ["Cockpit", "Project Structure"], "side_effects": [], "durable_readback": ["project-state" ] },
+    { "scenario_id": "mission-invalid", "seed_profile": "mission-invalid", "expected_surfaces": ["Guided Mission intake", "error-summary"], "side_effects": [], "durable_readback": ["operator-error"] },
+    { "scenario_id": "mission-complete", "seed_profile": "mission-complete", "expected_surfaces": ["Guided Mission intake", "Cockpit"], "side_effects": ["mission-create", "next"], "durable_readback": ["mission-packet", "next-action-report"] },
+    { "scenario_id": "active-flow", "seed_profile": "active-flow", "expected_surfaces": ["Cockpit", "Journey"], "side_effects": ["discovery-run"], "durable_readback": ["flow-projection", "next-action-report"] },
+    { "scenario_id": "partial-mutation", "seed_profile": "partial-mutation", "expected_surfaces": ["Cockpit", "operator-error"], "side_effects": ["next-resume"], "durable_readback": ["mission-packet", "next-action-report"] },
+    { "scenario_id": "queued-human-work", "seed_profile": "attention-queue", "expected_surfaces": ["Attention", "operator-draft"], "side_effects": ["interaction-answer", "decision"], "durable_readback": ["attention-projection"] },
+    { "scenario_id": "provider-progress", "seed_profile": "provider-progress", "expected_surfaces": ["Cockpit", "Journey"], "side_effects": [], "durable_readback": ["run-job", "live-run-event"] },
+    { "scenario_id": "verification-failure", "seed_profile": "verification-failure", "expected_surfaces": ["Attention", "Journey"], "side_effects": [], "durable_readback": ["verification-report", "next-action-report"] },
+    { "scenario_id": "bounded-repair", "seed_profile": "bounded-repair", "expected_surfaces": ["Attention", "Journey"], "side_effects": ["run-retry"], "durable_readback": ["quality-repair-request", "runtime-harness-report"] },
+    { "scenario_id": "completed-read-only", "seed_profile": "completed-flow", "expected_surfaces": ["Cockpit", "Evidence"], "side_effects": [], "durable_readback": ["flow-projection", "learning-loop-handoff"] },
+    { "scenario_id": "follow-up-flow", "seed_profile": "follow-up-flow", "expected_surfaces": ["Cockpit", "Guided Mission intake"], "side_effects": ["mission-create"], "durable_readback": ["flow-projection", "intake-request-body"] },
+    { "scenario_id": "partial-offline-reads", "seed_profile": "offline-flow", "expected_surfaces": ["Cockpit", "Attention"], "side_effects": ["refresh"], "durable_readback": ["project-snapshot", "operator-error"] }
+  ]
+}

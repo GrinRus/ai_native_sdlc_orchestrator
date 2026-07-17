@@ -10,9 +10,31 @@ function run(command, args, cwd) {
   if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed:\n${result.stderr}`);
 }
 
+function installPackedCli(root, tempRoot) {
+  const packRoot = path.join(tempRoot, "pack");
+  const installRoot = path.join(tempRoot, "installed package");
+  fs.mkdirSync(packRoot, { recursive: true });
+  fs.mkdirSync(installRoot, { recursive: true });
+  const packed = spawnSync("npm", ["pack", "--json", "--pack-destination", packRoot], { cwd: root, encoding: "utf8" });
+  if (packed.status !== 0) throw new Error(`npm pack failed:\n${packed.stderr}`);
+  const metadata = JSON.parse(packed.stdout.slice(packed.stdout.indexOf("[")))[0];
+  const tarball = path.join(packRoot, metadata.filename);
+  fs.writeFileSync(path.join(installRoot, "package.json"), '{"private":true,"type":"module"}\n');
+  run("npm", ["install", "--no-audit", "--ignore-scripts", "--no-fund", tarball], installRoot);
+  return {
+    installedBin: path.join(installRoot, "node_modules/@grinrus/aor/apps/cli/bin/aor.mjs"),
+    packageName: metadata.name,
+    packageVersion: metadata.version,
+  };
+}
+
 export default async function globalSetup() {
   const root = process.cwd();
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w59-browser-"));
+  const launcherRoot = path.join(tempRoot, "neutral launcher");
+  const aorHome = path.join(tempRoot, "aor-home");
+  fs.mkdirSync(launcherRoot, { recursive: true });
+  const installed = installPackedCli(root, tempRoot);
   const projectRoot = path.join(tempRoot, "browser target Δ");
   fs.mkdirSync(projectRoot, { recursive: true });
   fs.writeFileSync(path.join(projectRoot, "README.md"), "# Browser target\n");
@@ -26,7 +48,7 @@ export default async function globalSetup() {
   const child = spawn(
     process.execPath,
     [
-      path.join(root, "apps/cli/bin/aor.mjs"),
+      installed.installedBin,
       "app",
       "--project-ref",
       projectRoot,
@@ -39,8 +61,8 @@ export default async function globalSetup() {
       "--json",
     ],
     {
-      cwd: tempRoot,
-      env: { ...process.env, AOR_HOME: path.join(tempRoot, "aor-home") },
+      cwd: launcherRoot,
+      env: { ...process.env, AOR_HOME: aorHome },
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,
     },
@@ -83,6 +105,11 @@ export default async function globalSetup() {
       runtime_root: path.join(projectRoot, ".aor"),
       app_url: summary.app_url,
       project_id: summary.project_id,
+      installed_bin: installed.installedBin,
+      package_name: installed.packageName,
+      package_version: installed.packageVersion,
+      launcher_root: launcherRoot,
+      aor_home: aorHome,
     }, null, 2)}\n`,
   );
   child.unref();

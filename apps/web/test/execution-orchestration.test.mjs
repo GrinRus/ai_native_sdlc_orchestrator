@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 import { deliveryTransactionRows, executeOrchestrationCommand, integrationCommand, parentRunRows } from "../src/execution-orchestration-model.js";
-import { loadOperatorScenarioCatalog, validateOperatorScenarioCatalog } from "../browser/operator-scenario-loader.mjs";
+import { loadOperatorAcceptanceFixtures, loadOperatorScenarioCatalog, validateOperatorAcceptanceFixtures, validateOperatorScenarioCatalog } from "../browser/operator-scenario-loader.mjs";
 
 const source = fs.readFileSync(new URL("../src/execution-orchestration.jsx", import.meta.url), "utf8");
 
@@ -73,4 +73,16 @@ test("operator journey scenarios declare authoritative state, truthful actions, 
   assert.equal(catalog.scenarios.every((scenario) => scenario.success_signal && scenario.expected_recovery), true);
   assert.equal(catalog.external_network, false);
   assert.equal(catalog.upstream_writes, false);
+});
+
+test("installed acceptance fixtures cover every scenario and blocking environment", () => {
+  const catalog = loadOperatorScenarioCatalog();
+  const fixtures = loadOperatorAcceptanceFixtures();
+  const validation = validateOperatorAcceptanceFixtures(fixtures, catalog);
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
+  assert.deepEqual(fixtures.fixtures.map((fixture) => fixture.scenario_id), catalog.scenarios.map((scenario) => scenario.id));
+  assert.equal(fixtures.package_mode, "installed-tarball");
+  assert.equal(fixtures.viewports.length, 7);
+  assert.deepEqual(fixtures.environment_modes, ["keyboard-only", "reduced-motion", "zoom-200"]);
+  assert.ok(fixtures.safety_assertions.includes("legacy-default-preserved"));
 });
