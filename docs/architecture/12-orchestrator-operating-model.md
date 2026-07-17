@@ -99,6 +99,13 @@ cursor. Reconnect resumes after `after_event_id`, replay is explicitly bounded,
 and slow clients disconnect with a recovery cursor instead of creating an
 unbounded memory queue.
 
+The operator console is a projection over these same owners. Its accepted W63
+reading order is current state, one safe action, then evidence on demand.
+Mutation, workbench, evidence, copy, refresh, and unavailable controls have
+distinct semantics; presentation cannot infer an operation from display text.
+The W63 scenario catalog exercises those semantics through the disposable W59
+installed-app harness and is never materialized as runtime or project state.
+
 Quality boundaries are explicit:
 - feature result quality is owned by review, eval, delivery, and release evidence;
 - AOR runtime quality is owned by Runtime Harness decisions and `runtime-harness-report`;

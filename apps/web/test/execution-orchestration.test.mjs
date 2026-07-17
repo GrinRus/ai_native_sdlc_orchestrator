@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 import { deliveryTransactionRows, executeOrchestrationCommand, integrationCommand, parentRunRows } from "../src/execution-orchestration-model.js";
+import { loadOperatorScenarioCatalog, validateOperatorScenarioCatalog } from "../browser/operator-scenario-loader.mjs";
 
 const source = fs.readFileSync(new URL("../src/execution-orchestration.jsx", import.meta.url), "utf8");
 
@@ -57,4 +58,19 @@ test("orchestration mutations refresh durable state and release busy state", asy
     ["busy", true], ["error", ""], ["run integration", { action: "verify" }],
     ["refresh", { silent: true }], ["busy", false],
   ]);
+});
+
+test("operator journey scenarios declare authoritative state, truthful actions, and recovery coverage", () => {
+  const catalog = loadOperatorScenarioCatalog();
+  const validation = validateOperatorScenarioCatalog(catalog);
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
+  assert.deepEqual(catalog.scenarios.map((scenario) => scenario.id), [
+    "clean-first-run", "mission-invalid", "mission-complete", "active-flow", "partial-mutation",
+    "queued-human-work", "provider-progress", "verification-failure", "bounded-repair",
+    "completed-read-only", "follow-up-flow", "partial-offline-reads",
+  ]);
+  assert.equal(catalog.scenarios.every((scenario) => scenario.authoritative_evidence.length > 0), true);
+  assert.equal(catalog.scenarios.every((scenario) => scenario.success_signal && scenario.expected_recovery), true);
+  assert.equal(catalog.external_network, false);
+  assert.equal(catalog.upstream_writes, false);
 });

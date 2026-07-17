@@ -5,6 +5,8 @@
 - **Design name:** AOR Quiet Cockpit Operator Console v2.
 - **Decision date:** 2026-07-14.
 - **Status:** adopted product and UX target; not implemented or release-qualified.
+- **W63-S01 baseline:** journey, action, ownership, state, and executable
+  scenario contract accepted; visual migration remains unimplemented.
 - **Owning implementation wave:** W63 - operator-console UX and UI maturity.
 - **Owning migration wave:** W65 - installed-console migration and cutover.
 - **Current implemented baseline:** W34 Flow-Centric Operator Console v1 in
@@ -394,6 +396,23 @@ ledger.
 | Evidence ledger | Flow `evidence_refs[]`, graph/trace, validation, review, delivery, release, incident, and learning artifacts | Human summary first; raw refs on demand. |
 | Live state | run health and `live-run-event` | Show freshness, stale/offline status, and last known evidence. |
 
+### Executable ownership decisions
+
+| Surface | Packet/report owner | Read/route owner | Mutation owner | Recovery owner and compatibility |
+|---|---|---|---|---|
+| Mission intake | `intake-request-body`, Mission/intake packets | selected Flow plus project state | existing `mission create`, then `next` | `OperatorError`; partial retry reuses created refs. No new field in S01. |
+| Quiet Cockpit | `next-action-report`, run health, closure evidence | existing project/Flow reads | existing lifecycle command catalog only | Catalog recovery actions; W34 output remains compatible until W65 cutover. |
+| Attention | interaction, decision, verification, repair and policy evidence | existing per-family reads in S01 | existing answer/decision/repair operations | A unified projection is an additive contract gap owned by W63-S06 if deterministic composition remains insufficient. |
+| Journey | task/execution plan, progress, workspace set, parent run, integration and delivery reports | W60-W62 plan/run/delivery reads | revisioned plan/run/integration/delivery operations | Existing typed conflicts and recovery refs; no new orchestration truth. |
+| Evidence | Flow evidence refs, graph/trace, quality, delivery, incident and learning artifacts | existing evidence/quality/history reads | inspect/copy only, except contract-owned follow-up creation | Sanitized summaries remain compatible; raw refs are disclosed on demand. |
+| Presentation mode | none; presentation-only | URL/local view selection | none | No durable lifecycle effect. A shareable descriptor requires a later additive read-only contract decision. |
+
+S01 resolves the earlier Journey uncertainty through the accepted W60-W62
+contracts. It deliberately leaves two registered additive gaps: deterministic
+unified Attention aggregation and structured action-category metadata. Later
+slices must update their owning read/report contracts before the SPA depends on
+either; command-string parsing and browser-owned recovery remain forbidden.
+
 ## State and recovery matrix
 
 | State | Required UI behavior | Recovery |
@@ -411,6 +430,32 @@ ledger.
 | Partial read | Show loaded sections and label unavailable sections; do not collapse to empty healthy state. | Retry only failed reads. |
 | Offline / stale | Keep last-known state visibly stale and disable unsafe mutations. | Reconnect, refresh, and revalidate before acting. |
 | Completed | Render immutable outcome and evidence chain. | Inspect or create a new follow-up Flow. |
+
+## Executable scenario baseline
+
+`apps/web/browser/fixtures/operator-scenarios.json` is the deterministic W63
+scenario catalog. Its loader rejects duplicate IDs, missing evidence, unknown
+action categories, misleading copy/workbench/refresh labels, available actions
+without operations, unavailable actions without blockers, and missing
+viewport/keyboard coverage. Browser fixtures are injected only into the W59
+disposable installed-app harness; they are not runtime packets or product data.
+
+| Scenario | Entry and primary outcome | Required recovery/success proof |
+|---|---|---|
+| `clean-first-run` | Uninitialized readiness -> Initialize project runtime | Write preview; no implicit runtime creation. |
+| `mission-invalid` / `mission-complete` | Invalid fields or complete Mission -> focus error or create evidence | No invalid mutation; durable Mission/intake refs. |
+| `active-flow` | Active discovery -> Create discovery evidence | One stable Flow and one next-action transition. |
+| `partial-mutation` | Mission exists, next action incomplete -> Resolve next action | Resume only unfinished work; no duplicate refs. |
+| `queued-human-work` | Multiple interactions/decisions -> Review selected item | Independent drafts/IDs and durable queue advance. |
+| `provider-progress` | Active provider -> Inspect active run | Durable heartbeat, terminal state, and reconnect cursor. |
+| `verification-failure` | Required check failed -> Review failed verification | Structured consequence and fresh passing replacement. |
+| `bounded-repair` | Repair required -> Run approved repair | Stable task/unit identity and exhausted-budget block. |
+| `completed-read-only` / `follow-up-flow` | Immutable closure -> inspect or start follow-up | Source closure unchanged; new Flow cites handoff. |
+| `partial-offline-reads` | Last-known state is partial/offline -> Refresh state | Failed-resource retry and safety revalidation. |
+
+Every scenario names entry state, authoritative evidence, exactly one primary
+action category, blockers, expected recovery, success signal, and viewport plus
+keyboard coverage. The catalog disables external network and upstream writes.
 
 ## Responsive behavior
 

@@ -68,7 +68,7 @@ W57 and the control-plane semantics closed by W58/W59.
   primary users, top jobs, information hierarchy, action semantics, state
   matrix, and deterministic UI scenarios used by every later W63 slice.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** ready
+- **State:** done
 - **Delivery priority:** P1
 - **Estimated effort:** M
 - **Primary modules:** `docs/product/**`, `docs/architecture/**`,
@@ -140,7 +140,7 @@ W57 and the control-plane semantics closed by W58/W59.
   contract that can support the W63 journeys without one-off colors, typography,
   cards, statuses, dialogs, or recovery paths.
 - **Epic:** EPIC-0, EPIC-6
-- **State:** blocked
+- **State:** ready
 - **Delivery priority:** P1
 - **Estimated effort:** L
 - **Primary modules:** `apps/web/src/**`, `apps/web/test/**`, UI foundation docs
