@@ -592,6 +592,11 @@ This is the master index for the implementation slices across all defined waves.
 | W65-S06 | Legacy console retirement and compatibility cleanup | EPIC-0, EPIC-6 | done | legacy web source/CSS/fixtures, selector compatibility, packaged assets | W65-S05 |
 | W65-S07 | Post-cutover installed-console acceptance and story closure | EPIC-0, EPIC-6, EPIC-7 | done | installed browser proof, guided profile, a11y/comparison evidence, product/story/runbook docs | W65-S06 |
 
+## W66 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W66-S01 | Catalog identity, bootstrap health, and qualification recovery | EPIC-0, EPIC-1, EPIC-7 | active | `scripts/live-e2e/**`, live E2E contracts/tests, backlog/runbook evidence | W65-S07 |
+
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work

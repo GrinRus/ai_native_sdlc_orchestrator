@@ -350,6 +350,7 @@ export function executeRuntimeHarnessRun(options) {
   const runtimeHarness = materializeRuntimeHarnessReport({
     projectRef: routedExecution.projectRoot,
     cwd: routedExecution.projectRoot,
+    projectProfile: options.projectProfile,
     runtimeRoot: routedExecution.runtimeRoot,
     runId,
     executionRoot: asString(options.executionRoot),

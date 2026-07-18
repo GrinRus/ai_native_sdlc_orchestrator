@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { deriveRuntimeRunId } from "../lib/common.mjs";
 import { loadContractFile } from "../lib/contracts/index.mjs";
 import {
   discoverHostProjectId,
@@ -30,6 +31,7 @@ import { buildProviderQualificationMatrix } from "../lib/provider-qualification-
 import { applyProductionProofEvidence } from "../lib/production-proof.mjs";
 import {
   archivedNextActionReportForMission,
+  buildHandoffApprovalArgs,
   buildTargetPreExecutionStatusReport,
   collectGuidedBrowserTaskProof,
   collectReviewFindingDetails,
@@ -49,6 +51,7 @@ import {
   resolveActiveAcceptanceRepairDrill,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
 } from "../lib/flows.mjs";
+import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
 import {
   REQUIRED_GUIDED_COMMAND_LABELS,
   buildGuidedJourneyProof,
@@ -60,7 +63,11 @@ import {
   resolveEvaluatorRunProfileArgs,
   shouldAwaitFirstControllerObservation,
 } from "../step-evaluator.mjs";
-import { buildArtifactReadinessProof, writeProofRunnerArtifacts } from "../run-profile.mjs";
+import {
+  buildArtifactReadinessProof,
+  resolveRunHealthFailure,
+  writeProofRunnerArtifacts,
+} from "../run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
@@ -356,6 +363,8 @@ test("proof runner TMPDIR stays short for socket-sensitive target verification",
     });
 
     assert.equal(env.TMPDIR, sessionRoots.tmpRoot);
+    assert.equal(env.npm_config_cpu, process.arch);
+    assert.equal(env.npm_config_os, process.platform);
     assert.equal(sessionRoots.tmpRoot.startsWith(sessionRoots.sessionRoot), false);
     assert.ok(sessionRoots.tmpRoot.length < 80, `expected short TMPDIR, got ${sessionRoots.tmpRoot}`);
     assert.equal(fs.existsSync(sessionRoots.tmpRoot), true);
@@ -1275,7 +1284,7 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
       providerVariant: resolved.providerVariant,
       runId: "ky-small-bounded-target-setup",
       targetCheckout: {
-        targetRepoId: "ky",
+        targetRepoId: "sindresorhus/ky",
         targetRepoRef: "main",
       },
       generatedAssetsRoot,
@@ -1286,6 +1295,8 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
       family: "project-profile",
     });
     assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.repos[0].repo_id, "ky");
+    assert.equal(loaded.document.repos[0].name, "sindresorhus/ky");
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
     assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
@@ -1295,6 +1306,84 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
       "npx ava test/headers.ts",
     ]);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+  });
+});
+
+test("run-health keeps failed project bootstrap ahead of controller-incomplete fallback", () => {
+  const failure = resolveRunHealthFailure({
+    observationReport: { report_status: "in_progress" },
+    commandHealth: {
+      status: "fail",
+      failed_commands: [{ command_surface: "aor project init" }],
+    },
+    controllerHealth: { status: "pass" },
+    providerHealth: { status: "pass" },
+    targetReadiness: { status: "not_attempted" },
+    targetEnvironmentHealth: { status: "pass" },
+    diagnosticHealth: { status: "pass" },
+    evidenceHealth: { status: "pass", weak_evidence_refs: [] },
+    resumeInteractionHealth: { status: "pass" },
+    lifecycleCompletion: { continuation_status: "blocked" },
+    artifacts: {},
+  });
+
+  assert.deepEqual(failure, {
+    owner: "aor",
+    phase: "project_bootstrap",
+    class: "public_command_failed",
+    summary: "Public project bootstrap failed before live E2E controller execution.",
+  });
+});
+
+test("full journey materializes the structured plan before handoff approval", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
+  assert.match(source, /runCommand\("plan-create", \[\s*"plan",\s*"create"/u);
+  assert.doesNotMatch(source, /runCommand\("wave-create"/u);
+});
+
+test("provider workspace setup materializes disposable dependencies with bounded evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const result = prepareProviderWorkspaceDependencies({
+      targetCheckoutRoot,
+      reportsRoot,
+      runId: "dependency-setup-pass",
+      setupCommands: [
+        `${JSON.stringify(process.execPath)} -e "require('fs').mkdirSync('node_modules/example', {recursive:true})"`,
+      ],
+      env: process.env,
+      timeoutMs: 10_000,
+    });
+
+    assert.equal(result.status, "pass");
+    assert.equal(fs.existsSync(path.join(targetCheckoutRoot, "node_modules/example")), true);
+    assert.deepEqual(result.report.dependency_roots, ["node_modules"]);
+    assert.equal(result.report.setup_commands[0].status, "pass");
+    assert.equal(fs.existsSync(result.reportFile), true);
+  });
+});
+
+test("provider workspace setup fails closed before provider execution", () => {
+  withTempRoot((tempRoot) => {
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const result = prepareProviderWorkspaceDependencies({
+      targetCheckoutRoot,
+      reportsRoot,
+      runId: "dependency-setup-fail",
+      setupCommands: [`${JSON.stringify(process.execPath)} -e "process.exit(7)"`],
+      env: process.env,
+      timeoutMs: 10_000,
+    });
+
+    assert.equal(result.status, "fail");
+    assert.equal(result.report.setup_commands[0].exit_code, 7);
+    assert.match(result.report.summary, /failed before provider execution/u);
   });
 });
 
@@ -1349,6 +1438,43 @@ test("generated live E2E profile falls back to mission-scoped primary verificati
       "npx ava test/headers.ts",
     ]);
     assert.equal(loaded.document.repos[0].test_commands.includes("npm test"), false);
+  });
+});
+
+test("generated ky medium profile covers both permitted hook and retry test surfaces", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "assets");
+    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+    const result = materializeGeneratedProjectProfile({
+      hostRoot: repoRoot,
+      profilePath: loadedProfile.profilePath,
+      profile: resolved.resolvedProfile,
+      catalogEntry: resolved.catalogEntry,
+      mission: resolved.mission,
+      providerVariant: resolved.providerVariant,
+      runId: "ky-medium-complete-primary-coverage",
+      targetCheckout: { targetRepoId: "ky", targetRepoRef: "main" },
+      generatedAssetsRoot,
+    });
+    const loaded = loadContractFile({
+      filePath: result.generatedProjectProfileFile,
+      family: "project-profile",
+    });
+
+    assert.equal(loaded.ok, true);
+    assert.deepEqual(loaded.document.repos[0].test_commands, [
+      "npx xo",
+      "npm run build",
+      "npx ava test/hooks.ts",
+      "npx ava test/retry.ts --match='*shouldRetry*'",
+    ]);
   });
 });
 
@@ -2477,6 +2603,38 @@ test("live E2E post-run verification selects generic project-profile command gro
   assert.doesNotMatch(flowsSource, /label\.includes\(["']diagnostic["']\)/u);
   assert.doesNotMatch(flowsSource, /buildVerifyOverrideArgs/u);
   assert.doesNotMatch(flowsSource, /applyTargetToolchainPolicyToOverrideCommands/u);
+});
+
+test("live E2E handoff approval preserves the generated project profile context", () => {
+  assert.deepEqual(buildHandoffApprovalArgs({
+    projectProfileFile: "/tmp/generated-project.yaml",
+    handoffPacketFile: "/tmp/runtime/handoff.json",
+    approvalRef: "approval://qualification/run",
+  }), [
+    "handoff",
+    "approve",
+    "--project-ref",
+    ".",
+    "--project-profile",
+    "/tmp/generated-project.yaml",
+    "--runtime-root",
+    ".aor",
+    "--handoff-packet",
+    "/tmp/runtime/handoff.json",
+    "--approval-ref",
+    "approval://qualification/run",
+  ]);
+});
+
+test("live E2E derives canonical public run ids from qualification ids", () => {
+  assert.equal(
+    deriveRuntimeRunId("live-e2e-ky-medium-codex-20260718T080810Z"),
+    "live-e2e-ky-medium-codex-20260718t080810z",
+  );
+  assert.equal(
+    deriveRuntimeRunId("live-e2e-ky-medium-codex-20260718T080810Z", 2),
+    "live-e2e-ky-medium-codex-20260718t080810z.repair-2",
+  );
 });
 
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
@@ -4495,6 +4653,28 @@ test("source install proof force-refreshes dependencies and smokes intake CLI", 
 test("full journey requests repair only for actionable review or QA findings before delivery approval", () => {
   const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
 
+  const runOwnedExecutionRootUsages = flowsSource.match(
+    /"--execution-root",\s+asNonEmptyString\(asRecord\(readJson\(artifacts\.routed_step_result_file\)\)\.mission_semantics\.git_status_root\)/gu,
+  );
+  assert.equal(
+    runOwnedExecutionRootUsages?.length,
+    2,
+    "review and delivery must both inspect the retained run-owned execution workspace",
+  );
+  const auditRunCommands = [...flowsSource.matchAll(/runCommand\("audit-runs", \[([\s\S]*?)\]\)/gu)];
+  assert.equal(auditRunCommands.length, 2);
+  for (const [, auditArgs] of auditRunCommands) {
+    assert.doesNotMatch(auditArgs, /--project-profile/u, "audit runs does not accept a project profile flag");
+  }
+  const learningHandoffCommands = [...flowsSource.matchAll(/runCommand\("learning-handoff", \[([\s\S]*?)\]\)/gu)];
+  assert.equal(learningHandoffCommands.length, 2);
+  for (const [, learningHandoffArgs] of learningHandoffCommands) {
+    assert.doesNotMatch(
+      learningHandoffArgs,
+      /--project-profile/u,
+      "learning handoff does not accept a project profile flag",
+    );
+  }
   assert.match(flowsSource, /const reviewNeedsRepair = reviewRequiresActionableRepair\(reviewReport, reviewOverallStatus\)/u);
   assert.match(flowsSource, /const reviewHasNonRepairWarnings = reviewOverallStatus === "warn" && !reviewNeedsRepair/u);
   assert.match(flowsSource, /reviewNeedsRepair[\s\S]*reviewRepairActions\.has\("request-repair"\)/u);

@@ -45,6 +45,8 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W63:** `W63-S01` Operator journey, action semantics, and scenario baseline; `W63-S02` Semantic design system and component contracts; `W63-S07` Installed-console UX/UI acceptance; `W63-S08` Browser-operable canonical lifecycle parity
 - **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition; `W64-S03` Operator decision projection decomposition
 - **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
+- **W66:** `W66-S01` Catalog identity, bootstrap health, and qualification recovery
+
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
@@ -68,6 +70,8 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W61:** `W61-S01` Project topology and local binding contract baseline; `W61-S02` Persistent local workspace registry and topology discovery; `W61-S03` Project topology CLI/API management and validation; `W61-S06` Project execution profile and runner-readiness contract; `W61-S07` Execution Setup UX and browser proof
 - **W63:** `W63-S03` Guided Mission intake and resumable first-flow creation; `W63-S06` Attention queue, evidence workbench, and cockpit hierarchy
 - **W65:** `W65-S03` Mission and Quiet Cockpit pilot activation
+- **W66:** `W66-S01` Catalog identity, bootstrap health, and qualification recovery
+
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
@@ -265,3 +269,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W62:** `W62-S06` Monorepo and bounded multirepo full-flow proof
 - **W63:** `W63-S07` Installed-console UX/UI acceptance; `W63-S08` Browser-operable canonical lifecycle parity
 - **W65:** `W65-S07` Post-cutover installed-console acceptance and story closure
+- **W66:** `W66-S01` Catalog identity, bootstrap health, and qualification recovery

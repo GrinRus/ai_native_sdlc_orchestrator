@@ -51,6 +51,12 @@ Non-passing reports must classify the primary run blocker in `failure_summary`:
 
 Passing reports must set `failure_summary.owner` and `failure_summary.phase` to `null`.
 
+Failed public bootstrap commands take precedence over the generic in-progress
+controller fallback. A failed `aor project init` is classified as
+`owner=aor`, `phase=project_bootstrap`, and `class=public_command_failed`; it is
+not an operator decision gap because controller continuation cannot repair an
+invalid generated project profile.
+
 ## Section expectations
 `lifecycle_completion` should include included steps, observed step count, accepted step count, pending steps, blocked step id, and continuation status.
 

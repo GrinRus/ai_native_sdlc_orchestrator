@@ -116,6 +116,35 @@ test("workspace cleanup refuses a symlink replacement and preserves its external
   }
 });
 
+test("workspace isolation preserves relative dependency symlinks inside the disposable checkout", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03-relative-links-"));
+  try {
+    const binRoot = path.join(projectRoot, "node_modules", ".bin");
+    const packageBinRoot = path.join(projectRoot, "node_modules", "fixture", "bin");
+    fs.mkdirSync(binRoot, { recursive: true });
+    fs.mkdirSync(packageBinRoot, { recursive: true });
+    fs.writeFileSync(path.join(packageBinRoot, "fixture.mjs"), "export default true;\n", "utf8");
+    fs.symlinkSync("../fixture/bin/fixture.mjs", path.join(binRoot, "fixture"));
+    const projectRuntimeRoot = path.join(projectRoot, ".aor", "projects", "project-one");
+    fs.mkdirSync(projectRuntimeRoot, { recursive: true });
+
+    const isolation = prepareWorkspaceIsolation({
+      projectRoot,
+      runtimeRoot: path.join(projectRoot, ".aor"),
+      projectRuntimeRoot,
+      runtimeDefaults: { workspace_mode: "ephemeral" },
+      runId: "project-one.relative-links",
+    });
+    const copiedLink = path.join(isolation.executionRoot, "node_modules", ".bin", "fixture");
+
+    assert.equal(fs.readlinkSync(copiedLink), "../fixture/bin/fixture.mjs");
+    assert.equal(fs.realpathSync(copiedLink), path.join(isolation.executionRoot, "node_modules", "fixture", "bin", "fixture.mjs"));
+    assert.equal(isolation.cleanup("success", "delete").status, "deleted");
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test("verifyProjectRuntime records passing bounded command execution", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

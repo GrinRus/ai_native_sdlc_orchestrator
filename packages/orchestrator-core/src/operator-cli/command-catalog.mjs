@@ -695,6 +695,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Approve a handoff; structured v2 packets delegate to exact plan approval and execution-plan materialization.",
     inputs: [
       "--project-ref <path>",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--handoff-packet <path> (optional)",
       "--approval-ref <ref>",
@@ -926,6 +927,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Pause one active run-control lifecycle with deterministic transition and durable audit trace.",
     inputs: [
       "--project-ref <path>",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
@@ -966,6 +968,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Resume one paused run-control lifecycle with deterministic transition and durable audit trace.",
     inputs: [
       "--project-ref <path>",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
@@ -1006,6 +1009,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Steer one active run toward an explicit target step with policy and approval guardrails.",
     inputs: [
       "--project-ref <path>",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
@@ -1047,6 +1051,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Cancel one active run-control lifecycle with explicit policy gating and audit evidence.",
     inputs: [
       "--project-ref <path>",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
@@ -1120,6 +1125,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Inspect run summaries, selected-run event/policy history, and optionally follow live events.",
     inputs: [
       "--project-ref <path>",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--follow <true|false> (optional)",

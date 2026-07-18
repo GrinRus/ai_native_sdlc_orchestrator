@@ -1890,7 +1890,7 @@ test("run start validation failure records blocked evidence before durable runni
   });
 });
 
-test("run start runtime exception records terminal failed state before returning error", () => {
+test("run start rejects an invalid explicit project profile before durable state", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
@@ -1909,23 +1909,16 @@ test("run start runtime exception records terminal failed state before returning
       "false",
     ]);
     assert.equal(startResult.exitCode, 1);
-    assert.match(startResult.stderr, /Run start failed after durable start transition/);
+    assert.match(startResult.stderr, /Project profile 'missing-project\.aor\.yaml' was not found/u);
 
     const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
     assert.equal(statusResult.exitCode, 0, statusResult.stderr);
     const statusPayload = JSON.parse(statusResult.stdout);
     const stateRoot = path.join(projectRoot, ".aor/projects/aor-core/state");
     const stateFile = path.join(stateRoot, "run-control-state-run-start-runtime-exception.json");
-    assert.equal(fs.existsSync(stateFile), true);
-    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-    assert.equal(state.status, "failed");
-    assert.equal(state.failure.code, "runtime_execution.error");
-    assert.deepEqual(
-      statusPayload.run_event_history.events.map((event) => event.event_type),
-      ["run.started", "evidence.linked", "run.terminal"],
-    );
-    assert.equal(statusPayload.run_event_history.events[2].status, "failed");
-    assert.match(statusPayload.run_event_history.events[2].summary, /missing-project\.aor\.yaml/);
+    assert.equal(fs.existsSync(stateFile), false);
+    assert.equal(statusPayload.run_control_state, null);
+    assert.deepEqual(statusPayload.run_event_history.events, []);
   });
 });
 
@@ -2291,6 +2284,41 @@ test("delivery prepare observe mode materializes evidence with Runtime Harness f
     assert.match(payload.delivery_quality_gate_findings.join("\n"), /has no routed step decisions/u);
     assert.equal(fs.existsSync(payload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(payload.runtime_harness_report_file), true);
+  });
+});
+
+test("delivery prepare preserves an explicitly selected project profile", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+    const profilePath = path.join(projectRoot, "custom-delivery.aor.yaml");
+    const profile = fs.readFileSync(path.join(projectRoot, "examples/project.aor.yaml"), "utf8")
+      .replace(/^project_id:\s*aor-core$/mu, "project_id: custom-delivery");
+    fs.writeFileSync(profilePath, profile, "utf8");
+
+    const result = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      profilePath,
+      "--run-id",
+      "custom-delivery-run",
+      "--mode",
+      "no-write",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.project_profile_ref, "custom-delivery.aor.yaml");
+    assert.match(payload.runtime_layout.projectRuntimeRoot, /\/custom-delivery$/u);
+    assert.equal(payload.delivery_mode, "no-write");
+    assert.equal(payload.delivery_blocking, false);
   });
 });
 
@@ -5852,6 +5880,102 @@ test("project validate enforces approved handoff gate when required", () => {
     assert.equal(afterPayload.handoff_gate_status, "pass");
     assert.equal(afterPayload.handoff_gate_blocking, false);
     assert.notEqual(afterPayload.validation_status, "fail");
+  });
+});
+
+test("handoff approve preserves an explicitly selected project profile", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const profilePath = path.join(projectRoot, "examples", "project.qualification.aor.yaml");
+    const defaultProfile = fs.readFileSync(path.join(projectRoot, "examples", "project.aor.yaml"), "utf8");
+    fs.writeFileSync(
+      profilePath,
+      defaultProfile.replace("project_id: aor-core", "project_id: qualification-target"),
+      "utf8",
+    );
+
+    const planResult = invokeCli([
+      "plan",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      profilePath,
+      "--runtime-root",
+      ".aor-live",
+    ]);
+    assert.equal(planResult.exitCode, 0, planResult.stderr);
+    const plan = JSON.parse(planResult.stdout);
+
+    const approveResult = invokeCli([
+      "handoff",
+      "approve",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      profilePath,
+      "--runtime-root",
+      ".aor-live",
+      "--handoff-packet",
+      plan.handoff_packet_file,
+      "--approval-ref",
+      "approval://qualification/profile-context",
+    ]);
+    assert.equal(approveResult.exitCode, 0, approveResult.stderr);
+    const approved = JSON.parse(approveResult.stdout);
+    assert.equal(approved.handoff_status, "approved");
+    assert.equal(approved.project_profile_ref, "examples/project.qualification.aor.yaml");
+    assert.match(approved.handoff_packet_file, /qualification-target/u);
+
+    const statusResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      profilePath,
+      "--runtime-root",
+      ".aor-live",
+      "--run-id",
+      "qualification-run-1",
+    ]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const status = JSON.parse(statusResult.stdout);
+    assert.equal(status.project_profile_ref, "examples/project.qualification.aor.yaml");
+    assert.deepEqual(status.run_event_history.events, []);
+
+    const cancelResult = invokeCli([
+      "run",
+      "cancel",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      profilePath,
+      "--runtime-root",
+      ".aor-live",
+      "--run-id",
+      "qualification-run-1",
+    ]);
+    assert.equal(cancelResult.exitCode, 0, cancelResult.stderr);
+
+    const canceledStatusResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      profilePath,
+      "--runtime-root",
+      ".aor-live",
+      "--run-id",
+      "qualification-run-1",
+    ]);
+    assert.equal(canceledStatusResult.exitCode, 0, canceledStatusResult.stderr);
+    const canceledStatus = JSON.parse(canceledStatusResult.stdout);
+    assert.equal(canceledStatus.run_control_state, null);
+    assert.ok(canceledStatus.run_event_history.events.length >= 2);
+    assert.match(JSON.parse(cancelResult.stdout).run_control_audit_file, /qualification-target/u);
   });
 });
 

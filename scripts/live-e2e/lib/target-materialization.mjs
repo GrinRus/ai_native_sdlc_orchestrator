@@ -567,7 +567,14 @@ export function materializeGeneratedProjectProfile(options) {
     ? /** @type {Array<Record<string, unknown>>} */ (JSON.parse(JSON.stringify(generatedProjectProfile.repos)))
     : [];
   const selectedRepo = asRecord(repos[0] ?? {});
-  selectedRepo.repo_id = options.targetCheckout.targetRepoId;
+  const catalogRepoId = asNonEmptyString(asRecord(options.catalogEntry).catalog_id);
+  const generatedRepoId = catalogRepoId || normalizeId(options.targetCheckout.targetRepoId);
+  if (!generatedRepoId) {
+    throw new Error(
+      `Live E2E target repository locator '${options.targetCheckout.targetRepoId}' cannot produce a canonical project repository id.`,
+    );
+  }
+  selectedRepo.repo_id = generatedRepoId;
   selectedRepo.name = options.targetCheckout.targetRepoId;
   selectedRepo.default_branch = options.targetCheckout.targetRepoRef;
   selectedRepo.role = asNonEmptyString(selectedRepo.role) || "application";

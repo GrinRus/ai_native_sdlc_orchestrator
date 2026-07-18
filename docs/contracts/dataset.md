@@ -21,8 +21,10 @@ Naming and scoping guidance:
 - incident-driven additions should start as `incident-backfill-proposal` artifacts; stable dataset files are updated only after reviewer approval and a separate dataset revision.
 - every case pins immutable `evaluation-case-input` and
   `evaluation-case-expected` artifacts. Relative POSIX refs are resolved from
-  the project root; `evidence://` refs are resolved from the owning project
-  runtime. Missing, cross-project, stale, or wrong-family artifacts fail closed.
+  the project root, or from the canonical explicit evaluation registry root
+  when the project does not materialize those fixtures. `evidence://` refs are
+  resolved from the owning project runtime. Missing, cross-project, stale, or
+  wrong-family artifacts fail closed.
 
 ## Example
 See `examples/eval/dataset-run-regression.yaml`,

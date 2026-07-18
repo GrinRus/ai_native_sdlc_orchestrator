@@ -14,6 +14,7 @@ const SUBJECT_FAMILIES = { wrapper: "wrapper-profile", route: "provider-route-pr
 const SUBJECT_ID_FIELDS = { wrapper: "wrapper_id", route: "route_id", adapter: "adapter_id" };
 const SUBJECT_ROOT_FIELDS = { wrapper: "wrappers", route: "routes", adapter: "adapters" };
 const MAX_SUBJECT_FILES = 100;
+const MAX_RUN_EVIDENCE_SCAN_FILES = 10_000;
 const MAX_SUBJECT_FILE_BYTES = 1024 * 1024;
 
 function hashBytes(value) {
@@ -42,11 +43,11 @@ function resolveDefaultSuiteRef(profile) {
   return typeof evalPolicy.default_release_suite_ref === "string" ? evalPolicy.default_release_suite_ref : null;
 }
 
-function listFilesRecursive(root, extensionPattern = /\.(?:json|ya?ml)$/iu) {
+function listFilesRecursive(root, extensionPattern = /\.(?:json|ya?ml)$/iu, maxFiles = MAX_SUBJECT_FILES) {
   if (!fs.existsSync(root)) return [];
   const files = [];
   const pending = [root];
-  while (pending.length > 0 && files.length < MAX_SUBJECT_FILES) {
+  while (pending.length > 0 && files.length < maxFiles) {
     const current = pending.pop();
     for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const child = path.join(current, entry.name);
@@ -68,9 +69,17 @@ function resolveRunSubject(context, subjectRef, subjectVersion) {
   const runId = subjectRef.slice("run://".length);
   const documents = [];
   const sourceRefs = [];
-  for (const filePath of listFilesRecursive(context.projectRuntimeRoot, /\.json$/u)) {
+  const candidateFiles = listFilesRecursive(
+    context.projectRuntimeRoot,
+    /\.json$/u,
+    MAX_RUN_EVIDENCE_SCAN_FILES,
+  );
+  for (const filePath of candidateFiles) {
     const document = readJsonObject(filePath);
     if (document?.run_id !== runId) continue;
+    if (documents.length >= MAX_SUBJECT_FILES) {
+      throw new Error(`Run subject '${subjectRef}' exceeds the ${MAX_SUBJECT_FILES}-document evidence limit.`);
+    }
     documents.push(document);
     sourceRefs.push(filePath);
   }
@@ -120,10 +129,27 @@ function hasContradictoryAssertions(expected) {
   return false;
 }
 
-function resolveCaseArtifact({ context, reference, family }) {
+function resolveRegistryFixturePath(registryRoot, reference) {
+  if (typeof registryRoot !== "string" || !registryRoot) return null;
+  const segments = reference.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) return null;
+  const relativeSegments = segments[0] === "examples" ? segments.slice(1) : segments;
+  const canonicalRoot = fs.realpathSync.native(registryRoot);
+  const candidate = path.join(canonicalRoot, ...relativeSegments);
+  if (!fs.existsSync(candidate)) return null;
+  const canonicalCandidate = fs.realpathSync.native(candidate);
+  const relative = path.relative(canonicalRoot, canonicalCandidate);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
+  return canonicalCandidate;
+}
+
+function resolveCaseArtifact({ context, reference, family, registryRoot }) {
   if (typeof reference !== "string") throw new Error(`Missing ${family} reference.`);
   const base = reference.startsWith("evidence://") ? "evidence-relative" : "repository-bound";
-  const filePath = resolveProjectContextReference(context, reference, base);
+  const projectFilePath = resolveProjectContextReference(context, reference, base);
+  const filePath = fs.existsSync(projectFilePath) || base === "evidence-relative"
+    ? projectFilePath
+    : resolveRegistryFixturePath(registryRoot, reference) ?? projectFilePath;
   if (!fs.existsSync(filePath)) throw new Error(`${family} artifact '${reference}' was not found.`);
   const loaded = loadContractFile({ filePath, family });
   if (!loaded.ok) throw new Error(`${family} artifact '${reference}' failed contract validation.`);
@@ -131,13 +157,13 @@ function resolveCaseArtifact({ context, reference, family }) {
   return { document: loaded.document, filePath, digest: hashBytes(bytes) };
 }
 
-function resolveCases({ context, dataset, subjectType }) {
+function resolveCases({ context, dataset, subjectType, registryRoot }) {
   const cases = Array.isArray(dataset.cases) ? dataset.cases : [];
   return cases.map((testCase) => {
     const caseId = typeof testCase.case_id === "string" ? testCase.case_id : "unknown-case";
     try {
-      const input = resolveCaseArtifact({ context, reference: testCase.input_ref, family: "evaluation-case-input" });
-      const expected = resolveCaseArtifact({ context, reference: testCase.expected_ref, family: "evaluation-case-expected" });
+      const input = resolveCaseArtifact({ context, reference: testCase.input_ref, family: "evaluation-case-input", registryRoot });
+      const expected = resolveCaseArtifact({ context, reference: testCase.expected_ref, family: "evaluation-case-expected", registryRoot });
       for (const artifact of [input.document, expected.document]) {
         if (artifact.case_id !== caseId) throw new Error(`Case identity mismatch for '${caseId}'.`);
         if (artifact.subject_type !== subjectType) throw new Error(`Case '${caseId}' has wrong subject family '${artifact.subject_type}'.`);
@@ -177,7 +203,12 @@ export function runEvaluationSuite(options) {
   if (resolved.suite.subject_type && resolved.suite.subject_type !== subjectType) throw new Error(`Suite '${suiteRef}' subject_type '${resolved.suite.subject_type}' does not match subject_ref type '${subjectType}'.`);
   const documents = loadSuiteDatasetDocuments(init.projectRoot, resolved.suite.source, resolved.dataset.source);
   const subjectSnapshot = resolveSubjectSnapshot({ context, registryRoots: registryResolution.roots, subjectRef, subjectType, subjectVersion: options.subjectVersion });
-  const resolvedCases = resolveCases({ context, dataset: documents.dataset, subjectType });
+  const resolvedCases = resolveCases({
+    context,
+    dataset: documents.dataset,
+    subjectType,
+    registryRoot: registry.examplesRoot,
+  });
   const scorecard = scoreEvaluationSuite({ suite: documents.suite, dataset: documents.dataset, resolvedCases, subjectSnapshot, subjectRef, subjectType, scorerRegistry: options.scorerRegistry, judge: options.judge });
   const generatedAt = new Date().toISOString();
   const reportId = `${init.projectId}.evaluation.${sanitizeForFileName(suiteRef)}.${Date.now()}`;

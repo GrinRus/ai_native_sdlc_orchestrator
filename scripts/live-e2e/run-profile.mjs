@@ -1215,7 +1215,7 @@ function assertInstallModeAllowed(options) {
 function getObservationCommandLabelPriority(step) {
   if (step === "discovery") return ["discovery-run", "project-analyze"];
   if (step === "spec") return ["spec-build", "project-validate"];
-  if (step === "planning") return ["wave-create", "handoff-prepare"];
+  if (step === "planning") return ["plan-create", "wave-create", "handoff-prepare"];
   if (step === "handoff") return ["handoff-approve"];
   if (step === "execution") return ["run-start", "project-verify-routed-live"];
   if (step === "review") return ["review-run", "harness-certify", "eval-run"];
@@ -3183,7 +3183,7 @@ function buildResumeInteractionHealth(observationReport) {
  * }} options
  * @returns {Record<string, unknown>}
  */
-function resolveRunHealthFailure(options) {
+export function resolveRunHealthFailure(options) {
   const readinessFailure = targetReadinessPreExecutionFailure(options.targetReadiness);
   if (readinessFailure) {
     return readinessFailure;
@@ -3258,6 +3258,14 @@ function resolveRunHealthFailure(options) {
       summary: "Target setup or target verification failed during the run.",
     };
   }
+  if (asNonEmptyString(options.commandHealth.status) === "fail") {
+    const failedProjectBootstrap = (Array.isArray(options.commandHealth.failed_commands) ? options.commandHealth.failed_commands : []).some(
+      (entry) => asNonEmptyString(asRecord(entry).command_surface) === "aor project init");
+    return {
+      owner: "aor", phase: failedProjectBootstrap ? "project_bootstrap" : "unknown",
+      class: "public_command_failed", summary: failedProjectBootstrap ? "Public project bootstrap failed before live E2E controller execution." : "One or more public live E2E commands failed.",
+    };
+  }
   if (asNonEmptyString(options.observationReport.report_status) === "in_progress") {
     return {
       owner: "operator",
@@ -3288,14 +3296,6 @@ function resolveRunHealthFailure(options) {
       phase: "target_verification",
       class: "post_run_diagnostic_failed",
       summary: "Post-run diagnostic verification failed under diagnostic_failure_mode=fail.",
-    };
-  }
-  if (asNonEmptyString(options.commandHealth.status) === "fail") {
-    return {
-      owner: "aor",
-      phase: "unknown",
-      class: "public_command_failed",
-      summary: "One or more public live E2E commands failed.",
     };
   }
   if (

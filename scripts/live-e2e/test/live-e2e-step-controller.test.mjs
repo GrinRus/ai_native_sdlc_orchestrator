@@ -2921,7 +2921,7 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
     for (const [stage, label] of [
       ["discovery", "discovery-run"],
       ["spec", "spec-build"],
-      ["planning", "wave-create"],
+      ["planning", "plan-create"],
       ["handoff", "handoff-approve"],
       ["execution", "run-start"],
       ["review", "review-run"],
