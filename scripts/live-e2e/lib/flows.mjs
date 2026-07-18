@@ -8,6 +8,7 @@ import {
   asNonEmptyString,
   asRecord,
   asStringArray,
+  deriveRuntimeRunId,
   evidenceRefMaterialized,
   fileExists,
   normalizeId,
@@ -43,6 +44,7 @@ import {
 } from "./target-materialization.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
 import { collectMissionChangeEvidence } from "./mission-scope.mjs";
+import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
@@ -3960,6 +3962,17 @@ export function collectCanonicalTargetChangeEvidence(targetCheckoutRoot) {
   });
 }
 
+export function buildHandoffApprovalArgs(options) {
+  return [
+    "handoff", "approve",
+    "--project-ref", ".",
+    "--project-profile", options.projectProfileFile,
+    "--runtime-root", options.runtimeRoot ?? ".aor",
+    "--handoff-packet", options.handoffPacketFile,
+    "--approval-ref", options.approvalRef,
+  ];
+}
+
 /**
  * @param {string[]} changedPaths
  * @param {{ targetCheckoutRoot?: string | null }} options
@@ -4622,16 +4635,11 @@ export function executeInstalledUserFlow(options) {
       "Handoff packet prepared through the public CLI.",
     );
 
-    const handoffApprove = runCommand("handoff-approve", [
-      "handoff",
-      "approve",
-      "--project-ref",
-      ".",
-      "--handoff-packet",
-      /** @type {string} */ (artifacts.handoff_packet_file),
-      "--approval-ref",
-      `approval://installed-user-live-e2e/${normalizeId(options.runId)}`,
-    ]);
+    const handoffApprove = runCommand("handoff-approve", buildHandoffApprovalArgs({
+      projectProfileFile: generatedProfile.generatedProjectProfileFile,
+      handoffPacketFile: /** @type {string} */ (artifacts.handoff_packet_file),
+      approvalRef: `approval://installed-user-live-e2e/${normalizeId(options.runId)}`,
+    }));
     artifacts.approved_handoff_packet_file = getStringField(handoffApprove.payload, "handoff_packet_file");
     markStage(
       stageMap,
@@ -4971,8 +4979,6 @@ export function executeInstalledUserFlow(options) {
         "runs",
         "--project-ref",
         ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -4985,8 +4991,6 @@ export function executeInstalledUserFlow(options) {
         "handoff",
         "--project-ref",
         ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -5938,6 +5942,11 @@ function executeFullJourneyFlowImplementation(options) {
         );
         throw new Error(asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.");
       }
+      requireProviderWorkspaceDependencies({
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot, reportsRoot: options.layout.reportsRoot,
+        runId: options.runId, setupCommands: repoLintCommands, env, artifacts,
+        timeoutMs: resolveLiveE2eTargetCommandTimeoutMs(options.profile),
+      });
       const targetCleanliness = writeTargetCleanlinessReport({
         targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
         reportsRoot: options.layout.reportsRoot,
@@ -5969,6 +5978,7 @@ function executeFullJourneyFlowImplementation(options) {
       baselineEvidenceRefs = uniqueStrings([
         verifyPreflight.transcriptFile,
         baselineVerifySummaryPath,
+        asNonEmptyString(artifacts.provider_workspace_setup_file),
         ...asStringArray(artifacts.baseline_verify_preserved_files),
         ...collectStringRefs(verifyPreflight.payload),
         targetCleanliness.reportFile,
@@ -6055,8 +6065,8 @@ function executeFullJourneyFlowImplementation(options) {
       "Spec build produced feature-traceable dry-run evidence.",
     );
 
-    const waveCreate = runCommand("wave-create", [
-      "wave",
+    const planCreate = runCommand("plan-create", [
+      "plan",
       "create",
       "--project-ref",
       ".",
@@ -6065,34 +6075,27 @@ function executeFullJourneyFlowImplementation(options) {
       "--runtime-root",
       ".aor",
     ]);
-    artifacts.wave_ticket_file = getStringField(waveCreate.payload, "wave_ticket_file");
-    artifacts.handoff_packet_file = getStringField(waveCreate.payload, "handoff_packet_file");
-    artifacts.handoff_status = getStringField(waveCreate.payload, "handoff_status");
+    artifacts.wave_ticket_file = getStringField(planCreate.payload, "wave_ticket_file");
+    artifacts.handoff_packet_file = getStringField(planCreate.payload, "handoff_packet_file");
+    artifacts.handoff_status = getStringField(planCreate.payload, "handoff_status");
     const planningReadinessSnapshot = recordArtifactReadinessSnapshot("planning");
     markStage(
       stageMap,
       "planning",
       "pass",
       uniqueStrings([
-        waveCreate.transcriptFile,
-        ...collectStringRefs(waveCreate.payload),
+        planCreate.transcriptFile,
+        ...collectStringRefs(planCreate.payload),
         ...asStringArray(planningReadinessSnapshot.evidence_refs),
       ]),
-      "Wave and handoff packets were materialized from the public planning flow.",
+      "Structured plan and handoff packets were materialized from the public planning flow.",
     );
 
-    const handoffApprove = runCommand("handoff-approve", [
-      "handoff",
-      "approve",
-      "--project-ref",
-      ".",
-      "--runtime-root",
-      ".aor",
-      "--handoff-packet",
-      /** @type {string} */ (artifacts.handoff_packet_file),
-      "--approval-ref",
-      `approval://live-e2e/full-journey/${normalizeId(options.runId)}`,
-    ]);
+    const handoffApprove = runCommand("handoff-approve", buildHandoffApprovalArgs({
+      projectProfileFile: generatedProfile.generatedProjectProfileFile,
+      handoffPacketFile: /** @type {string} */ (artifacts.handoff_packet_file),
+      approvalRef: `approval://live-e2e/full-journey/${normalizeId(options.runId)}`,
+    }));
     artifacts.approved_handoff_packet_file = getStringField(handoffApprove.payload, "handoff_packet_file");
     if (internalTestHooks.block_approved_handoff_validation === true) {
       markStage(
@@ -6168,10 +6171,10 @@ function executeFullJourneyFlowImplementation(options) {
     let qaOverallStatus = "skipped";
     let featureSizeFitStatus = "fail";
     let latestPromotionEvidenceRefs = [...promotionEvidenceRefs];
-    let latestImplementationRunId = options.runId;
+    let latestImplementationRunId = deriveRuntimeRunId(options.runId);
     const evalSuites = getEvalSuites(options.profile);
     for (let iteration = 1; iteration <= implementationLoopPolicy.maxIterations; iteration += 1) {
-      const iterationRunId = iteration === 1 ? options.runId : `${options.runId}.repair-${iteration}`;
+      const iterationRunId = deriveRuntimeRunId(options.runId, iteration);
       latestImplementationRunId = iterationRunId;
       artifacts.latest_implementation_run_id = iterationRunId;
       const runStart = runCommand("run-start", [
@@ -6270,6 +6273,7 @@ function executeFullJourneyFlowImplementation(options) {
         "status",
         "--project-ref",
         ".",
+        "--project-profile", generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -6354,8 +6358,7 @@ function executeFullJourneyFlowImplementation(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
-        "--execution-root",
-        targetCheckout.targetCheckoutRoot,
+        "--execution-root", asNonEmptyString(asRecord(readJson(artifacts.routed_step_result_file)).mission_semantics.git_status_root),
       ], { allowNonZeroWithPayload: true, iteration });
       artifacts.review_report_file = getStringField(reviewRun.payload, "review_report_file");
       artifacts.latest_runtime_harness_report_file =
@@ -7033,7 +7036,6 @@ function executeFullJourneyFlowImplementation(options) {
         throw new Error("Harness certification did not pass.");
       }
     }
-
     let deliverPrepare;
     try {
       deliverPrepare = runCommand("deliver-prepare", [
@@ -7047,6 +7049,8 @@ function executeFullJourneyFlowImplementation(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
+        "--execution-root",
+        asNonEmptyString(asRecord(readJson(artifacts.routed_step_result_file)).mission_semantics.git_status_root),
         "--step-class",
         "implement",
         "--mode",
@@ -7231,8 +7235,6 @@ function executeFullJourneyFlowImplementation(options) {
       "runs",
       "--project-ref",
       ".",
-      "--project-profile",
-      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--run-id",
@@ -7279,8 +7281,6 @@ function executeFullJourneyFlowImplementation(options) {
         "handoff",
         "--project-ref",
         ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",

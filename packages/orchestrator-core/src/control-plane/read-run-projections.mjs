@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validatePublicId } from "../../../contracts/src/index.mjs";
 import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../../../observability/src/index.mjs";
 import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs";
 import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
@@ -1169,7 +1170,7 @@ export function readPlannerMetrics(options = {}) {
 function listRunEventsForSummaries(options, runs) {
   return runs.flatMap((run) => {
     const runId = asString(run.run_id);
-    if (!runId) return [];
+    if (!runId || !validatePublicId(runId).ok) return [];
     return readRunEvents({
       cwd: options.cwd,
       projectRef: options.projectRef,

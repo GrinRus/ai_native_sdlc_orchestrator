@@ -143,6 +143,8 @@ export function createProofRunnerEnvironment(options) {
     ...process.env,
     AOR_HOME: options.sessionRoots.aorHome,
     TMPDIR: options.sessionRoots.tmpRoot,
+    npm_config_cpu: process.arch,
+    npm_config_os: process.platform,
   };
   if (options.runnerAuthMode === "isolated") {
     env.CODEX_HOME = options.sessionRoots.codexHome;

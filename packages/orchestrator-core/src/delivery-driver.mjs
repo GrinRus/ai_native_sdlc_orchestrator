@@ -296,7 +296,9 @@ function verifyLockedDeliveryEvidence(deliveryPlan, projectRoot) {
     if (digest !== lock.sha256) {
       throw new Error(`Delivery evidence '${ref}' changed after plan authorization.`);
     }
-    const candidateFamilies = declaredFamily ? [declaredFamily] : ["promotion-decision", "review-decision", "step-result"];
+    const candidateFamilies = declaredFamily
+      ? [declaredFamily]
+      : ["promotion-decision", "review-decision", "evaluation-report", "step-result"];
     const loadedCandidates = candidateFamilies.map((family) => ({ family, loaded: loadContractFile({ filePath, family }) }));
     const match = loadedCandidates.find((entry) => entry.loaded.ok);
     if (!match) throw new Error(`Delivery evidence '${ref}' does not match an allowed authorization contract family.`);
@@ -314,6 +316,10 @@ function verifyLockedDeliveryEvidence(deliveryPlan, projectRoot) {
     if (family === "review-decision" && (asString(document.decision) !== "approve" ||
         asString(asRecord(document.delivery_gate).status) !== "pass")) {
       throw new Error(`Delivery review evidence '${ref}' is not approved for delivery.`);
+    }
+    if (family === "evaluation-report" && (asString(document.status) !== "pass" ||
+        asString(document.subject_ref) !== `run://${asString(deliveryPlan.run_id)}`)) {
+      throw new Error(`Delivery evaluation evidence '${ref}' is not pass-level evidence for the requested run.`);
     }
     if (family === "step-result" && asString(document.status) !== "passed") {
       throw new Error(`Delivery step evidence '${ref}' is not pass-level.`);

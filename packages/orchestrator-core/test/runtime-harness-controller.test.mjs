@@ -67,11 +67,13 @@ function configureCodexExternalRuntime(repoRoot, args) {
 /**
  * @param {string} repoRoot
  * @param {string} runId
+ * @param {string | undefined} projectProfile
  */
-function executeController(repoRoot, runId) {
+function executeController(repoRoot, runId, projectProfile = undefined) {
   return executeRuntimeHarnessRun({
     projectRef: repoRoot,
     cwd: repoRoot,
+    projectProfile,
     stepClass: "implement",
     dryRun: false,
     runId,
@@ -104,6 +106,26 @@ test("run-level Runtime Harness controller closes a pass flow with run decision 
     assert.equal(result.runtimeHarness.report.run_decision.overall_decision, "pass");
     assert.equal(result.runtimeHarness.report.run_transitions.at(-1).stage, "close");
     assert.equal(result.runtimeHarness.report.step_decisions.at(-1).runtime_harness_decision, "pass");
+  });
+});
+
+test("run-level Runtime Harness report preserves an explicit project profile", () => {
+  withTempRepo((repoRoot) => {
+    const projectProfile = path.join(repoRoot, "project.aor.yaml");
+    fs.copyFileSync(path.join(repoRoot, "examples/project.aor.yaml"), projectProfile);
+    fs.writeFileSync(
+      projectProfile,
+      fs.readFileSync(projectProfile, "utf8").replace("project_id: aor-core", "project_id: live-profile"),
+    );
+    configureCodexExternalRuntime(repoRoot, [
+      "-e",
+      "process.stdout.write(JSON.stringify({summary:'pass',output:{result:'pass'},evidence_refs:['evidence://runner/pass']}));",
+    ]);
+
+    const result = executeController(repoRoot, "runtime-harness-profile-pass", projectProfile);
+
+    assert.equal(result.runtimeHarness.report.project_id, "live-profile");
+    assert.match(result.runtimeHarness.reportPath, /\.aor\/projects\/live-profile\/reports\//u);
   });
 });
 

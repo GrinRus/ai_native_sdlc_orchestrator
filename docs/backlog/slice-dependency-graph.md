@@ -336,6 +336,7 @@ graph TD
   W65S05[W65-S05 Default-on cutover and explicit rollback rehearsal]
   W65S06[W65-S06 Legacy console retirement and compatibility cleanup]
   W65S07[W65-S07 Post-cutover installed-console acceptance and story closure]
+  W66S01[W66-S01 Catalog identity, bootstrap health, and qualification recovery]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -832,6 +833,7 @@ graph TD
   W65S04 --> W65S05
   W65S05 --> W65S06
   W65S06 --> W65S07
+  W65S07 --> W66S01
 ```
 
 ## W0 hard dependencies
@@ -1433,6 +1435,11 @@ own the stricter terminal control proof evidence for this lane.
 | W65-S05 | W65-S03, W65-S04 |
 | W65-S06 | W65-S05 |
 | W65-S07 | W65-S06 |
+
+## W66 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W66-S01 | W65-S07 |
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1766,6 +1773,7 @@ own the stricter terminal control proof evidence for this lane.
 330. W65-S05
 331. W65-S06
 332. W65-S07
+333. W66-S01
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

@@ -360,7 +360,7 @@ Run `pnpm check` first: it discovers every tracked `*.test.mjs` file through
 current HEAD. Readiness rejects a missing, stale, duplicated, or incomplete test
 report and currently returns the explicit July 2026 audit hold.
 
-The current roadmap source of truth extends through W65 in
+The current roadmap source of truth extends through W66 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -405,6 +405,8 @@ Start here when you need deeper context:
 - `docs/backlog/mvp-roadmap.md` - roadmap and readiness story.
 - `docs/backlog/wave-65-implementation-slices.md` - detailed Quiet Cockpit
   migration, rollback, legacy-retirement, and comparison-reference plan.
+- `docs/backlog/wave-66-implementation-slices.md` - installed-user catalog
+  identity, bootstrap health, and fresh provider-qualification remediation.
 - `docs/ops/self-hosted-release.md` - bounded self-hosted release operating
   model.
 - `docs/ops/self-hosted-environment-matrix.md` - supported alpha operating
@@ -484,7 +486,7 @@ The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
 The current alpha distribution, audit-remediation queue, and planned post-audit
-delivery program are tracked through `W65` and focus on:
+delivery program are tracked through `W66` and focus on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.

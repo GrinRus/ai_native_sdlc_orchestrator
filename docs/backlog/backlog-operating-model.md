@@ -171,7 +171,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W65`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W66`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, project-context anchoring, and concurrent
 evidence integrity. W58 continues with non-materializing reads, effective

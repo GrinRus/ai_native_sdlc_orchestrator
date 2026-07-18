@@ -48,6 +48,10 @@ For canonical setup and verification dependency details per profile, use `script
   - `ky-fetch-options-regression`
     - `medium`, `regress|repair`
     - bounded multi-file regression across `source/**`, `test/**`, and `index.d.ts`
+    - post-run primary gate uses `test/hooks.ts` and focused
+      `test/retry.ts --match='*shouldRetry*'` so any permitted hook or retry
+      regression test is explicitly exercised without promoting unrelated
+      timing-heavy `test/main.ts` cases into the required medium gate
   - `ky-release-doc-typing`
     - `medium`, `release|governance`
     - release-shaped mission inside `source/**`, `test/**`, and `index.d.ts`

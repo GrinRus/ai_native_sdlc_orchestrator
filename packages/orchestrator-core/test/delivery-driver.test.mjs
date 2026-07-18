@@ -71,6 +71,7 @@ function withTempRepo(callback) {
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
  *   runtimeHarnessGate?: Record<string, unknown>,
+ *   additionalPromotionEvidenceRefs?: string[],
  * }} options
  * @returns {{ deliveryPlanFile: string }}
  */
@@ -190,6 +191,7 @@ function createReadyPlan(options) {
     },
     promotionEvidenceRefs: [
       promotionPath,
+      ...(options.additionalPromotionEvidenceRefs ?? []),
     ],
     coordinationRepos: options.coordinationRepos,
     coordinationEvidenceRefs: options.coordinationEvidenceRefs,
@@ -310,6 +312,71 @@ test("runDeliveryDriver emits patch artifact and transcript for patch-only mode"
     const patchBody = fs.readFileSync(result.outputs.patch_file, "utf8");
     assert.match(patchBody, /examples\/project\.aor\.yaml/);
     assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver accepts a pass-level run-owned evaluation report as delivery evidence", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "run.delivery.evaluation.v1";
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# evaluation-backed delivery test\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const evaluationPath = path.join(init.runtimeLayout.reportsRoot, `evaluation-report-${runId}.json`);
+    fs.writeFileSync(evaluationPath, `${JSON.stringify({
+      report_id: "aor-core.eval.delivery.v1",
+      subject_ref: `run://${runId}`,
+      subject_type: "run",
+      subject_fingerprint: `sha256:${"1".repeat(64)}`,
+      subject_snapshot: {
+        reference: `run://${runId}`,
+        family: "run",
+        version: "run-v1",
+        digest: `sha256:${"1".repeat(64)}`,
+        source_refs: [`runtime://runs/${runId}.json`],
+      },
+      case_resolution: [{
+        case_id: "case-delivery-authorization",
+        status: "resolved",
+        input_digest: `sha256:${"2".repeat(64)}`,
+        expected_digest: `sha256:${"3".repeat(64)}`,
+      }],
+      suite_ref: "suite.regress.short@v1",
+      dataset_ref: "dataset://delivery-authorization@v1",
+      scorer_metadata: [{
+        scorer_id: "deterministic",
+        scorer_mode: "deterministic",
+        scorer_impl: "harness.scorer.deterministic.v1",
+      }],
+      grader_results: {
+        deterministic: { status: "pass", evaluated_cases: 1, passed_cases: 1, failed_cases: 0, pass_rate: 1 },
+      },
+      summary_metrics: {
+        total_cases: 1,
+        passed_cases: 1,
+        failed_cases: 0,
+        aggregate_pass_rate: 1,
+        threshold_checks: [{ name: "min_pass_rate", expected: 1, actual: 1, passed: true }],
+      },
+      status: "pass",
+      evidence_refs: [evaluationPath],
+    }, null, 2)}\n`, "utf8");
+
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId,
+      mode: "patch-only",
+      additionalPromotionEvidenceRefs: [evaluationPath],
+    });
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "success");
+    assert.ok(result.changedPaths.includes("examples/project.aor.yaml"));
   });
 });
 

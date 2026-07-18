@@ -25,7 +25,7 @@ const TERMINAL_LIFECYCLE_STEPS = Object.freeze(["release", "learning"]);
 const STEP_COMMAND_LABELS = Object.freeze({
   discovery: ["discovery-run", "project-analyze"],
   spec: ["spec-build", "project-validate"],
-  planning: ["wave-create", "handoff-prepare"],
+  planning: ["plan-create", "wave-create", "handoff-prepare"],
   handoff: ["handoff-approve"],
   execution: ["run-start", "project-verify-routed-live"],
   review: ["review-run", "harness-certify", "eval-run"],

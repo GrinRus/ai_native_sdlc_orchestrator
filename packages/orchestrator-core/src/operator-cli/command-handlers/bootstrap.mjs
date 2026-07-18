@@ -526,6 +526,7 @@ export function handleBootstrapCommand(context) {
     const approvalOptions = {
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       handoffPacketPath: resolveOptionalStringFlag("handoff-packet", flags["handoff-packet"]),
       approvalRef,

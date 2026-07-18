@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { readProjectState, listRuns } from "../src/control-plane/read-surface.mjs";
+import { readProjectState, listRuns, readStrategicSnapshot } from "../src/control-plane/read-surface.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 test("control-plane read model projects sibling live E2E run-health for target checkouts", () => {
   const tempRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-read-model-")));
   try {
-    const runId = "live-e2e.test.run";
+    const runId = "live-e2e.test.run.T20260718Z";
     const liveProjectRoot = path.join(tempRoot, "runtime", "projects", "aor-core");
     const reportsRoot = path.join(liveProjectRoot, "reports");
     const targetRoot = path.join(liveProjectRoot, "target-checkouts", "sample-target");
@@ -258,6 +258,8 @@ test("control-plane read model projects sibling live E2E run-health for target c
     assert.equal(runSummary.provider_step_status.status, "running");
     assert.equal(runSummary.run_health.status, "blocked");
     assert.ok(runSummary.artifact_display_summaries.some((summary) => summary.label === "Run health"));
+    const strategic = readStrategicSnapshot({ projectRef: targetRoot, cwd: targetRoot, runtimeRoot: targetRuntimeRoot });
+    assert.equal(typeof strategic.generated_at, "string");
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

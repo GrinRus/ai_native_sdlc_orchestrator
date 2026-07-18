@@ -350,6 +350,7 @@ function executeDeliveryPlanTransaction(options) {
   }
   const finalExecutionAllowed = blockingReasons.length === 0;
   const finalWritebackAllowed = writebackAuthorizationRequired && finalExecutionAllowed;
+  const targetEditsAllowed = nonReadOnlyMode && finalExecutionAllowed;
   const deliveryPlan = {
     schema_version: 2,
     plan_id: planId,
@@ -421,9 +422,9 @@ function executeDeliveryPlanTransaction(options) {
     evidence_locks: evidenceLocks,
     execution_allowed: finalExecutionAllowed,
     writeback_allowed: finalWritebackAllowed,
-    target_write_allowed: finalWritebackAllowed,
-    direct_edits_allowed: finalWritebackAllowed,
-    meaningful_change_required: finalWritebackAllowed && options.stepClass === "implement",
+    target_write_allowed: targetEditsAllowed,
+    direct_edits_allowed: targetEditsAllowed,
+    meaningful_change_required: targetEditsAllowed && options.stepClass === "implement",
     blocking_reasons: blockingReasons,
     status: finalExecutionAllowed ? "ready" : "blocked",
     evidence_refs: uniqueStrings([

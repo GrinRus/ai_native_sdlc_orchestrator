@@ -572,7 +572,12 @@ function applyRunControlActionUnlocked(options) {
 
 export function applyRunControlAction(options) {
   const cwd = options.cwd ?? process.cwd();
-  const init = initializeProjectRuntime({ cwd, projectRef: options.projectRef, runtimeRoot: options.runtimeRoot });
+  const init = initializeProjectRuntime({
+    cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
   const runId = asString(options.runId) ?? (options.action === "start" ? `run-control-${Date.now()}` : null);
   if (!runId) throw new Error(`Run-control action '${options.action}' requires 'runId'.`);
   requirePublicId("run_id", runId);

@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-65-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-66-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -76,8 +76,9 @@ The authoritative planning model for implementation lives in:
 | W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, a reusable visual system, and browser-operable safe lifecycle parity. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
+| W66 | Restore catalog-backed live E2E qualification with canonical generated identities and honest bootstrap failure attribution. | 1 | EPIC-0, EPIC-1, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 
-The current roadmap contains **332 slices across 66 waves**.
+The current roadmap contains **333 slices across 67 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -298,6 +299,7 @@ The current roadmap contains **332 slices across 66 waves**.
 | W65-S05 | default-on and rollback target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-10, SEC-02, SEC-04 |
 | W65-S06 | legacy retirement and compatibility target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W65-S07 | post-cutover installed acceptance target: PBO-09, PBO-10, OPS-01, OPS-02, OPS-04, OPS-06, OPS-10, OPS-11, OPS-12, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
+| W66-S01 | live E2E catalog identity and qualification recovery target: DEV-01, OPS-06, SEC-04 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1386,6 +1388,20 @@ contracts, examples, source/tests, runbooks, and current official external
 console benchmarks.
 
 **Detailed slices:** `docs/backlog/wave-65-implementation-slices.md`
+
+## W66 - live E2E qualification remediation
+
+**Goal:** Restore catalog-backed installed-user qualification after canonical ID
+hardening exposed a locator/identity mismatch in generated project profiles.
+
+**Exit criteria:**
+- generated repository IDs satisfy the public contract without changing catalog
+  locator identity;
+- bootstrap public-command failures retain AOR ownership and phase;
+- the requested medium/large Codex and Claude cells are rerun from isolated
+  source installs with no upstream writes.
+
+**Detailed slices:** `docs/backlog/wave-66-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

@@ -194,6 +194,7 @@ function mirrorProjectTree(sourceRoot, targetRoot, runtimeRoot) {
     fs.cpSync(sourceEntry, path.join(targetRoot, entry), {
       recursive: true,
       dereference: false,
+      verbatimSymlinks: true,
       filter: (sourcePath) => !isPathInsideRoot(sourcePath, runtimeRoot) && !isPythonVirtualEnvironmentRoot(sourcePath),
     });
   }

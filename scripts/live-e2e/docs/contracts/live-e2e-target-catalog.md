@@ -16,6 +16,13 @@ Optional manual-only coverage lives under `manual_matrix_cells`. These cells are
 visible matrix entries for operator-run rehearsals, but they never close
 required acceptance coverage and must not be consumed by the qualification loop.
 
+`catalog_id` is the canonical AOR identity for the target. `repo.repo_id` is a
+stable external repository locator and may use the familiar `owner/repository`
+form. When the runner builds a public `project-profile`, it uses `catalog_id`
+for `repos[].repo_id` and retains the external locator only as descriptive or
+source metadata. The runner must not weaken public ID validation to admit an
+external repository locator.
+
 ## Feature mission expectations
 Each mission should carry:
 - `mission_id`

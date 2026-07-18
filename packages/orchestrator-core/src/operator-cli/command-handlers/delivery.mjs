@@ -498,6 +498,7 @@ export function handleDeliveryCommand(context) {
     const deliveryResult = runDeliveryDriver({
       projectRef: init.projectRoot,
       cwd,
+      projectProfile,
       runtimeRoot: init.runtimeRoot,
       runId,
       stepId: command === "deliver prepare" ? "deliver.prepare" : "release.prepare",

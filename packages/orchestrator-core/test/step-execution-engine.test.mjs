@@ -1037,8 +1037,19 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.no_write_enforced, false);
     assert.equal(result.stepResult.routed_execution.delivery_plan.status, "ready");
     assert.equal(result.stepResult.routed_execution.delivery_plan.writeback_allowed, false);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.target_write_allowed, true);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.direct_edits_allowed, true);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.meaningful_change_required, true);
     assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(result.stepResult.routed_execution.adapter_request.dry_run, false);
+    assert.deepEqual(result.stepResult.routed_execution.adapter_request.context.execution_permissions, {
+      execution_allowed: true,
+      writeback_allowed: false,
+      target_write_allowed: true,
+      direct_edits_allowed: true,
+      meaningful_change_required: true,
+      delivery_mode: "fork-first-pr",
+    });
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
     assert.equal(result.stepResult.routed_execution.adapter_response.status, "success");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");

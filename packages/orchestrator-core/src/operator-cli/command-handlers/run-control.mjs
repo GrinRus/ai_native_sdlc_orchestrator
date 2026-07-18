@@ -261,6 +261,7 @@ export function handleRunControlCommand(context) {
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
     const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
     const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
     const reason = resolveOptionalStringFlag("reason", flags.reason);
     const approvalRef = resolveOptionalStringFlag("approval-ref", flags["approval-ref"]);
@@ -377,6 +378,7 @@ export function handleRunControlCommand(context) {
         ? readRunControlState({
             cwd,
             projectRef,
+            projectProfile,
             runtimeRoot,
             runId,
           })
@@ -392,12 +394,14 @@ export function handleRunControlCommand(context) {
           validationGate = validateProjectRuntime({
             cwd,
             projectRef,
+            projectProfile,
             runtimeRoot,
           });
         } catch (error) {
           const controlResult = applyRunControlAction({
             cwd,
             projectRef,
+            projectProfile,
             runtimeRoot,
             runId,
             action: runAction,
@@ -419,6 +423,7 @@ export function handleRunControlCommand(context) {
           const controlResult = applyRunControlAction({
             cwd,
             projectRef,
+            projectProfile,
             runtimeRoot,
             runId,
             action: runAction,
@@ -552,6 +557,7 @@ export function handleRunControlCommand(context) {
     const controlResult = applyRunControlAction({
       cwd,
       projectRef,
+      projectProfile,
       runtimeRoot,
       runId,
       action: runAction,
@@ -573,7 +579,7 @@ export function handleRunControlCommand(context) {
         routedExecution = executeRuntimeHarnessRun({
           cwd,
           projectRef,
-          projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+          projectProfile,
           runtimeRoot,
           stepClass: targetStep ?? "implement",
           dryRun: false,
@@ -662,6 +668,7 @@ export function handleRunControlCommand(context) {
       const stepEvent = appendRunEvent({
         cwd,
         projectRef,
+        projectProfile,
         runtimeRoot,
         runId: controlResult.runId,
         eventType: "step.updated",
@@ -676,6 +683,7 @@ export function handleRunControlCommand(context) {
       const terminalEvent = appendRunEvent({
         cwd,
         projectRef,
+        projectProfile,
         runtimeRoot,
         runId: controlResult.runId,
         eventType: "run.terminal",
@@ -798,59 +806,43 @@ export function handleRunControlCommand(context) {
       throw new CliUsageError("Flag '--run-id' is required when '--follow' is enabled.");
     }
 
-    const projectState = readProjectState({
+    const readOptions = {
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
+    };
+    const projectState = readProjectState(readOptions);
     outputState.resolvedProjectRef = projectState.project_root;
     outputState.resolvedRuntimeRoot = projectState.runtime_root;
     outputState.runtimeLayout = projectState.runtime_layout;
     outputState.runtimeStateFile = projectState.state_file;
     outputState.projectProfileRef = projectState.project_profile_ref;
-    const uiState = readUiLifecycleState({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
+    const uiState = readUiLifecycleState(readOptions);
     outputState.uiLifecycleState = uiState.state;
     outputState.uiLifecycleStateFile = uiState.stateFile;
     outputState.uiLifecycleConnectionState =
       typeof uiState.state.connection_state === "string" ? uiState.state.connection_state : null;
     outputState.uiLifecycleHeadlessSafe = uiState.state.headless_safe === true;
 
-    outputState.runSummaries = listRuns({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    }).filter((summary) => !runId || summary.run_id === runId);
+    outputState.runSummaries = listRuns(readOptions).filter((summary) => !runId || summary.run_id === runId);
     if (runId) {
       const parent = readParentRun({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         parentRunId: runId,
       });
       outputState.parentRun = parent.parent;
       outputState.parentRunFile = parent.parent ? parent.file : null;
     }
-    outputState.strategicSnapshot = readStrategicSnapshot({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
+    outputState.strategicSnapshot = readStrategicSnapshot(readOptions);
     if (runId) {
       outputState.runEventHistory = readRunEventHistory({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         runId,
         limit: maxReplay ?? 50,
       });
       outputState.runPolicyHistory = readRunPolicyHistory({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         runId,
       });
     }
@@ -863,9 +855,7 @@ export function handleRunControlCommand(context) {
 
     if (follow) {
       const stream = openRunEventStream({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         runId: /** @type {string} */ (runId),
         afterEventId,
         maxReplay,

@@ -105,6 +105,7 @@ function buildPrimaryPayload(result) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId?: string,
  *   action: "start" | "pause" | "resume" | "steer" | "cancel",
@@ -127,6 +128,7 @@ export function applyRunControlAction(options) {
   const primaryEvent = appendRunEvent({
     cwd: options.cwd,
     projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
     redactionPolicy: options.redactionPolicy,
     runId: result.runId,
@@ -138,6 +140,7 @@ export function applyRunControlAction(options) {
   const evidenceEvent = appendRunEvent({
     cwd: options.cwd,
     projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
     redactionPolicy: options.redactionPolicy,
     runId: result.runId,

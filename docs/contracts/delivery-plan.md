@@ -35,7 +35,9 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
   plan has `execution_allowed=true`, while `writeback_allowed`,
   `target_write_allowed`, `direct_edits_allowed`, and
   `meaningful_change_required` are all `false`.
-- `patch-only` — produce patch output only.
+- `patch-only` — allow implementation edits only inside the disposable target
+  workspace and produce patch output without writing those edits back to the
+  primary checkout or upstream.
 - `local-branch` — write changes to a local branch in an isolated checkout.
 - `fork-first-pr` — plan fork-first branch + pull request style delivery.
 
@@ -43,13 +45,20 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 - Version 2 separates authorization for execution, artifact materialization,
   local commits, fork pushes, and direct upstream writes. Direct upstream write
   is denied by default and is not implied by any other permission.
+- During the execution phase, a ready non-`no-write` plan may set
+  `target_write_allowed=true` and `direct_edits_allowed=true` for its disposable
+  workspace while `writeback_allowed=false`. Exact-diff authorization is still
+  required before a later delivery phase can materialize or write back changes.
 - `diff_authorization.baseline.head_sha` binds the plan to one Git baseline.
   Its `changes` object contains the exact additions, modifications, deletions,
   and rename endpoint pairs plus their canonical `all_paths` union. Delivery
   fails before materialization or staging when the live diff differs.
 - `evidence_locks[]` binds every authorization ref to a SHA-256 digest. The
   driver reloads the declared contract family and checks project/run ownership
-  and pass-level status before executing a delivery mode.
+  and pass-level status before executing a delivery mode. Promotion evidence
+  may be a `promotion-decision`, approved `review-decision`, passed
+  `step-result`, or passed `evaluation-report`; an evaluation report is
+  authorized only when its `subject_ref` is the plan's exact `run://<run_id>`.
 - A plan without `schema_version` is read as v1 for compatibility. A v1
   `no-write` plan remains readable; every write-capable v1 plan fails with an
   explicit migration error.

@@ -28,6 +28,11 @@ export function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+export function deriveRuntimeRunId(qualificationRunId, iteration = 1) {
+  const base = normalizeId(qualificationRunId);
+  return iteration === 1 ? base : `${base}.repair-${iteration}`;
+}
+
 /**
  * @param {string} filePath
  * @param {Record<string, unknown>} document

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { runEvaluationSuite } from "../src/eval-runner.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
@@ -30,6 +31,7 @@ function withTempRepo(callback) {
 function writeRunSubject(repoRoot, runId, status = "pass") {
   const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
   fs.writeFileSync(path.join(init.runtimeLayout.reportsRoot, `run-subject-${runId}.json`), `${JSON.stringify({ run_id: runId, status })}\n`, "utf8");
+  return init;
 }
 
 test("runEvaluationSuite executes suite and writes durable evaluation report", () => {
@@ -52,6 +54,64 @@ test("runEvaluationSuite executes suite and writes durable evaluation report", (
     assert.ok(result.evaluationReport.subject_fingerprint.startsWith("sha256:"));
     assert.ok(Array.isArray(result.evaluationReport.scorer_metadata));
     assert.ok(result.evaluationReport.scorer_metadata.some((scorer) => scorer.scorer_id === "deterministic"));
+  });
+});
+
+test("runEvaluationSuite finds run-owned evidence after unrelated runtime documents", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    for (let index = 0; index < 150; index += 1) {
+      fs.writeFileSync(
+        path.join(init.runtimeLayout.reportsRoot, `noise-${String(index).padStart(3, "0")}.json`),
+        `${JSON.stringify({ report_id: `noise-${index}` })}\n`,
+        "utf8",
+      );
+    }
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "run-subject-zzz.json"),
+      `${JSON.stringify({ run_id: "candidate-after-noise", status: "pass" })}\n`,
+      "utf8",
+    );
+
+    const result = runEvaluationSuite({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      suiteRef: "suite.release.core@v1",
+      subjectRef: "run://candidate-after-noise",
+    });
+
+    assert.equal(result.evaluationReport.status, "pass");
+    assert.equal(result.evaluationReport.subject_snapshot.source_refs.length, 1);
+    assert.match(result.evaluationReport.subject_snapshot.source_refs[0], /run-subject-zzz\.json$/u);
+  });
+});
+
+test("runEvaluationSuite resolves repository fixtures from an external evaluation registry", () => {
+  withTempRepo((repoRoot) => {
+    const init = writeRunSubject(repoRoot, "candidate-external-registry");
+    const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-eval-registry-"));
+    fs.cpSync(path.join(repoRoot, "examples"), externalRoot, { recursive: true });
+    const profilePath = path.join(repoRoot, "project.aor.yaml");
+    const profile = parseYaml(fs.readFileSync(init.projectProfilePath, "utf8"));
+    profile.registry_roots.evaluation = externalRoot;
+    fs.writeFileSync(profilePath, stringifyYaml(profile), "utf8");
+    fs.rmSync(path.join(repoRoot, "examples/eval/cases"), { recursive: true });
+
+    try {
+      const result = runEvaluationSuite({
+        cwd: repoRoot,
+        projectRef: repoRoot,
+        projectProfile: profilePath,
+        suiteRef: "suite.release.core@v1",
+        subjectRef: "run://candidate-external-registry",
+      });
+
+      assert.equal(result.evaluationReport.status, "pass");
+      assert.equal(result.evaluationReport.case_resolution[0].status, "resolved");
+      assert.ok(result.evaluationReport.subject_snapshot.source_refs.length > 0);
+    } finally {
+      fs.rmSync(externalRoot, { recursive: true, force: true });
+    }
   });
 });
 
