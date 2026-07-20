@@ -41,6 +41,7 @@ import {
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
+import { runGuidedBrowserTaskCollector } from "./browser-proof-collector.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
@@ -2174,10 +2175,9 @@ export function collectGuidedBrowserTaskProof(options) {
     screenshot_file: screenshotFile,
     timeout_ms: 30_000,
   };
-  const result = spawnSync(pythonBin, [collectorScriptFile, JSON.stringify(payload)], {
-    encoding: "utf8",
-    env: collectorEnv,
-    timeout: 45_000,
+  const { result, attempts } = runGuidedBrowserTaskCollector({
+    pythonBin, collectorScriptFile, payload, env: collectorEnv,
+    proofFile: options.browserTaskProofFile,
   });
   const stdout = asNonEmptyString(result.stdout);
   let parsedStdout = {};
@@ -2195,6 +2195,7 @@ export function collectGuidedBrowserTaskProof(options) {
           python_bin: pythonBin,
           proof_file: options.browserTaskProofFile,
           screenshot_file: screenshotFile,
+          attempts,
         }
       : {
           status: "blocked",
@@ -2207,6 +2208,7 @@ export function collectGuidedBrowserTaskProof(options) {
           stdout_summary: stdout.slice(0, 2000) || null,
           blocker_owner: "environment",
           blocker_class: "browser_task_proof_collector_failed",
+          attempts,
         };
   writeJson(outputFile, collectorResult);
   return collectorResult;

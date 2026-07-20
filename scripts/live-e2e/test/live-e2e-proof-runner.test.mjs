@@ -3702,6 +3702,60 @@ test("guided browser-task collector materializes proof through configured Python
   });
 });
 
+test("guided browser-task collector retries one transient environment failure", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const fakePython = path.join(tempRoot, "flaky-python.cjs");
+    const counterFile = path.join(tempRoot, "collector-attempts.txt");
+    fs.writeFileSync(
+      fakePython,
+      [
+        "#!/usr/bin/env node",
+        "const fs = require('fs');",
+        "const path = require('path');",
+        "if (process.argv[2] === '-c') process.exit(0);",
+        `const counterFile = ${JSON.stringify(counterFile)};`,
+        "const attempt = fs.existsSync(counterFile) ? Number(fs.readFileSync(counterFile, 'utf8')) + 1 : 1;",
+        "fs.writeFileSync(counterFile, String(attempt));",
+        "if (attempt === 1) process.exit(75);",
+        "const payload = JSON.parse(process.argv[3]);",
+        "fs.mkdirSync(path.dirname(payload.browser_task_proof_file), { recursive: true });",
+        "fs.writeFileSync(payload.browser_task_proof_file, JSON.stringify({ status: 'pass' }) + '\\n');",
+        "fs.writeFileSync(payload.screenshot_file, 'png');",
+        "console.log(JSON.stringify({ status: 'pass', proof_file: payload.browser_task_proof_file }));",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.chmodSync(fakePython, 0o755);
+
+    const runId = "guided-collector-retry";
+    const result = collectGuidedBrowserTaskProof({
+      enabled: true,
+      runId,
+      reportsRoot,
+      env: {
+        ...process.env,
+        AOR_LIVE_E2E_BROWSER_PROOF_PYTHON_BIN: fakePython,
+      },
+      appUrl: "http://127.0.0.1:61002/",
+      browserTaskProofRequestFile: path.join(reportsRoot, `browser-request-${runId}.json`),
+      browserTaskProofFile: path.join(reportsRoot, `browser-proof-${runId}.json`),
+      outputHtml: path.join(reportsRoot, `browser-${runId}.html`),
+      domSnapshotFile: path.join(reportsRoot, `browser-dom-${runId}.json`),
+      accessibilitySummaryFile: path.join(reportsRoot, `browser-a11y-${runId}.json`),
+      visualSnapshotFile: path.join(reportsRoot, `browser-visual-${runId}.json`),
+    });
+
+    assert.equal(result.status, "pass");
+    assert.deepEqual(result.attempts, [
+      { attempt: 1, status: 75, signal: null, proof_materialized: false },
+      { attempt: 2, status: 0, signal: null, proof_materialized: true },
+    ]);
+    assert.equal(fs.readFileSync(counterFile, "utf8"), "2");
+  });
+});
+
 test("guided flow loop prefers archived first-flow next-action evidence", () => {
   withTempRoot((tempRoot) => {
     const targetRoot = path.join(tempRoot, "target");
