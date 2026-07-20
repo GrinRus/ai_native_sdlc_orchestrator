@@ -1538,7 +1538,7 @@ function resolveTargetEvidencePath(targetCheckoutRoot, value) {
  * @param {string | null | undefined} packetFile
  * @returns {{ flowId: string | null, projectId: string | null, missionId: string | null }}
  */
-function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile) {
+export function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile) {
   const resolvedPacketFile = resolveTargetEvidencePath(targetCheckoutRoot, packetFile);
   if (!resolvedPacketFile || !fileExists(resolvedPacketFile)) {
     return { flowId: null, projectId: null, missionId: null };
@@ -1547,7 +1547,7 @@ function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile) {
   const packetId = asNonEmptyString(packet.packet_id);
   const marker = ".artifact.intake.";
   const markerIndex = packetId.indexOf(marker);
-  const projectId = markerIndex > 0 ? packetId.slice(0, markerIndex) : null;
+  const projectId = asNonEmptyString(packet.project_id) || (markerIndex > 0 ? packetId.slice(0, markerIndex) : null);
   const invocationContext = asRecord(packet.invocation_context);
   const packetMissionId =
     asNonEmptyString(invocationContext.mission_id) ||

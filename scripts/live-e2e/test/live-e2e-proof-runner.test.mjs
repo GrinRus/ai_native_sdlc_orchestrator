@@ -45,6 +45,7 @@ import {
   nodeVersionSatisfiesRequiredRange,
   prepareAorInstallationProof,
   reconcileSummaryMeaningfulChangedPaths,
+  resolveFlowIdentityFromPacket,
   resolveAcceptanceRepairDrill,
   runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
@@ -2676,6 +2677,29 @@ test("live E2E derives canonical public run ids from qualification ids", () => {
     deriveRuntimeRunId("live-e2e-ky-medium-codex-20260718T080810Z", 2),
     "live-e2e-ky-medium-codex-20260718t080810z.repair-2",
   );
+});
+
+test("guided flow identity accepts opaque public packet ids", () => {
+  withTempRoot((tempRoot) => {
+    const packetFile = path.join(tempRoot, "packet-9b3a0478705a1cbe3cd169fb4cdaec11.json");
+    fs.writeFileSync(
+      packetFile,
+      `${JSON.stringify({
+        packet_id: "packet-9b3a0478705a1cbe3cd169fb4cdaec11",
+        project_id: "github-sandbox.run.qualification",
+        invocation_context: {
+          mission_id: "header-regression-follow-up",
+        },
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    assert.deepEqual(resolveFlowIdentityFromPacket(tempRoot, packetFile), {
+      flowId: "flow.github-sandbox.run.qualification.header-regression-follow-up",
+      projectId: "github-sandbox.run.qualification",
+      missionId: "header-regression-follow-up",
+    });
+  });
 });
 
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
