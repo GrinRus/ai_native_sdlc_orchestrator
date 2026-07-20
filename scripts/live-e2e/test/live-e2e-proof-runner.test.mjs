@@ -2635,11 +2635,11 @@ test("live E2E post-run verification selects generic project-profile command gro
   const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   assert.match(
     flowsSource,
-    /runCommand\("project-verify-post-run-primary", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--verification-label",\s+"post-run-primary"/u,
+    /runCommand\("project-verify-post-run-primary", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--execution-root",\s+latestExecutionRoot,[\s\S]*?"--verification-label",\s+"post-run-primary"/u,
   );
   assert.match(
     flowsSource,
-    /runCommand\("project-verify-post-run-diagnostic", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--verification-label",\s+"post-run-diagnostic"/u,
+    /runCommand\("project-verify-post-run-diagnostic", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--execution-root",\s+latestExecutionRoot,[\s\S]*?"--verification-label",\s+"post-run-diagnostic"/u,
   );
   assert.match(flowsSource, /diagnosticIntent: POST_RUN_DIAGNOSTIC_INTENT/u);
   assert.doesNotMatch(flowsSource, /label\.includes\(["']diagnostic["']\)/u);
@@ -4726,8 +4726,13 @@ test("full journey requests repair only for actionable review or QA findings bef
   const runOwnedExecutionRootUsages = flowsSource.match(/"--execution-root",\s+latestExecutionRoot/gu);
   assert.equal(
     runOwnedExecutionRootUsages?.length,
-    4,
-    "review, repair decisions, guided approval, and delivery must inspect the same run-owned execution workspace",
+    7,
+    "repair execution, verification, review, decisions, guided approval, and delivery must use the run-owned workspace",
+  );
+  assert.match(
+    flowsSource,
+    /\.\.\.\(iteration > 1 \? \["--execution-root", latestExecutionRoot\] : \[\]\)/u,
+    "repair run start must resume the accumulated run-owned execution workspace",
   );
   assert.match(
     flowsSource,
