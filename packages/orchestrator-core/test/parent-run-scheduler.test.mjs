@@ -140,6 +140,17 @@ test("CLI and lifecycle catalog expose typed parent start and retry controls", (
   assert.match(parentStart.error.detail, /requires '--run-id'/u);
 });
 
+test("public repair closure is cataloged as a typed lifecycle mutation", () => {
+  const close = getCommandDefinition("repair close");
+  assert.ok(close);
+  assert.deepEqual(close.requiredFlags, ["project-ref", "run-id", "request-ref", "evidence-ref"]);
+  assert.ok(close.flags.some((flag) => flag.name === "evidence-ref" && flag.repeatable === true));
+  assert.ok(close.flags.some((flag) => flag.name === "qa-evidence-ref" && flag.repeatable === true));
+  const lifecycle = runLifecycleCommand({ projectRef: ".", command: "repair close", flags: {} });
+  assert.equal(lifecycle.ok, false);
+  assert.equal(lifecycle.error.code, "invalid_lifecycle_flags");
+});
+
 test("Runtime Harness parent relation validation fails closed on unstable attempt lineage", () => {
   const issues = validateRuntimeHarnessParentRelation({
     parent_relation: {

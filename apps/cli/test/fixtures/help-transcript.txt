@@ -66,6 +66,7 @@ Review and QA:
   - aor compiler revision
   - aor review run
   - aor review decide
+  - aor repair close
 
 Delivery:
   - aor deliver prepare

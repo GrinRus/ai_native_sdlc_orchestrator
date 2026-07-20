@@ -671,6 +671,7 @@ Review run baseline:
 
 Review decision baseline:
 - `review decide` writes one durable `review-decision` artifact for `approve`, `hold`, or `request-repair`;
+- `repair close` closes a matching bounded repair request only after refreshed passing review and Runtime Harness evidence, plus QA evidence when required;
 - `request-repair` also returns the linked `quality_repair_request_ref`,
   request file, status, cycle id, source stage, attempt budget, blockers,
   evidence refs, and the `next-action-report` primary action that operators
