@@ -17,36 +17,17 @@ import {
   writeStepQualityAssessmentRequest,
   writeStepQualityAssessmentReport,
 } from "./step-quality-assessment.mjs";
+import {
+  getLiveE2eCommandLabelPriority,
+  resolveLiveE2eCommandStep,
+  resolveResumeOnlyCommandStep,
+} from "./step-command-ownership.mjs";
+
+export { getLiveE2eCommandLabelPriority, resolveLiveE2eCommandStep } from "./step-command-ownership.mjs";
 
 const DELIVERY_STEPS = Object.freeze(["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"]);
 const FULL_LIFECYCLE_STEPS = Object.freeze([...DELIVERY_STEPS, "release", "learning"]);
 const TERMINAL_LIFECYCLE_STEPS = Object.freeze(["release", "learning"]);
-
-const STEP_COMMAND_LABELS = Object.freeze({
-  discovery: ["discovery-run", "project-analyze"],
-  spec: ["spec-build", "project-validate"],
-  planning: ["plan-create", "wave-create", "handoff-prepare"],
-  handoff: ["handoff-approve"],
-  execution: ["run-start", "project-verify-routed-live"],
-  review: ["review-run", "harness-certify", "eval-run"],
-  qa: ["eval-run", "project-verify-post-run-primary", "project-verify-post-run-diagnostic"],
-  delivery: ["deliver-prepare", "delivery-harness-certify"],
-  release: ["release-prepare"],
-  learning: [
-    "learning-handoff",
-    "audit-runs",
-    "guided-next-after-learning",
-    "follow-up-mission-create",
-    "guided-next-after-follow-up",
-    "flow-targeted-request-create",
-  ],
-});
-
-const COMMAND_LABEL_STEP = Object.freeze(
-  Object.fromEntries(
-    Object.entries(STEP_COMMAND_LABELS).flatMap(([step, labels]) => labels.map((label) => [label, step])),
-  ),
-);
 
 const STEP_OBJECTIVES = Object.freeze({
   discovery: "Observe project analysis and discovery evidence through installed public flow surfaces.",
@@ -207,10 +188,6 @@ export function resolveLiveE2eOperatorContext(profile) {
  * @param {string} step
  * @returns {string[]}
  */
-export function getLiveE2eCommandLabelPriority(step) {
-  return [...(STEP_COMMAND_LABELS[step] ?? [])];
-}
-
 /**
  * @param {string} step
  * @param {Record<string, unknown> | null | undefined} command
@@ -259,14 +236,6 @@ export function findLiveE2eCommandByPreferredLabel(commandResults, labels, step 
     if (command) return command;
   }
   return undefined;
-}
-
-/**
- * @param {string} label
- * @returns {string}
- */
-export function resolveLiveE2eCommandStep(label) {
-  return COMMAND_LABEL_STEP[asNonEmptyString(label)] ?? "";
 }
 
 /**
@@ -1236,7 +1205,7 @@ export function createLiveE2eStepController(options) {
    * @returns {Record<string, unknown> | null}
    */
   function planCommand(input) {
-    const step = COMMAND_LABEL_STEP[asNonEmptyString(input.label)];
+    const step = resolveLiveE2eCommandStep(asNonEmptyString(input.label));
     if (!step || !includedSteps.includes(step)) return null;
     const iteration = Number(input.iteration) || 1;
     const stepInstanceId = buildStepInstanceId(step, iteration);
@@ -1767,6 +1736,7 @@ export function createLiveE2eStepController(options) {
       return entryStep === step && entryIteration === normalizedIteration;
     });
     if (exact) return exact;
+    if (matchingCommands.length === 1 && resolveResumeOnlyCommandStep(normalizedLabel)) return matchingCommands[0];
 
     const persistedEntry = asRecord(entryByStep[stepInstanceId]);
     const persistedTranscriptRef = asNonEmptyString(persistedEntry.transcript_ref);
@@ -1800,7 +1770,7 @@ export function createLiveE2eStepController(options) {
       }
     }
 
-    return matchingCommands.length === 1 ? matchingCommands[0] : null;
+    return null;
   };
 
   return {
