@@ -48,6 +48,7 @@ import {
 } from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
 import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
+import { buildCommandHealth } from "./lib/run-health.mjs";
 import {
   buildLiveE2eStepPlan,
   createLiveE2eStepController,
@@ -2003,7 +2004,10 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "evaluation_report_file",
     "post_run_verify_summary_file",
     "post_run_verify_status",
+    "post_run_quality_policy",
     "post_run_diagnostic_verify_summary_file",
+    "post_run_diagnostic_verify_step_result_files",
+    "post_run_diagnostic_transcript_file",
     "post_run_diagnostic_status",
     "guided_journey_enabled",
     "guided_web_smoke",
@@ -2521,60 +2525,6 @@ function resolveSummaryRunTier(profile) {
     return "acceptance";
   }
   return "bounded-live";
-}
-
-/**
- * @param {Record<string, unknown>} diagnostic
- * @returns {boolean}
- */
-function commandCompletedForRunHealth(diagnostic) {
-  return ["pass", "warn", "interaction_required", "resumed"].includes(asNonEmptyString(diagnostic.status)) ||
-    diagnostic.accepted_nonzero_payload === true;
-}
-
-/**
- * @param {{ flowResult: { commandResults: Array<Record<string, unknown>> }, observationReport?: Record<string, unknown> }} options
- * @returns {Record<string, unknown>}
- */
-function buildCommandHealth(options) {
-  const commandResults =
-    options.flowResult.commandResults.length > 0
-      ? options.flowResult.commandResults
-      : Array.isArray(options.observationReport?.step_journal)
-        ? options.observationReport.step_journal
-            .map((entry) => asRecord(entry))
-            .filter((entry) => asNonEmptyString(entry.transcript_ref))
-            .map((entry) => ({
-              command_surface: asNonEmptyString(entry.public_surface) || asNonEmptyString(entry.step_id) || "unknown",
-              status: ["pass", "warn", "interaction_required", "resumed"].includes(
-                asNonEmptyString(asRecord(entry.deterministic_analysis).status),
-              )
-                ? asNonEmptyString(asRecord(entry.deterministic_analysis).status)
-                : "fail",
-              exit_code:
-                typeof asRecord(entry.deterministic_analysis).exit_code === "number"
-                  ? asRecord(entry.deterministic_analysis).exit_code
-                  : null,
-              transcript_ref: asNonEmptyString(entry.transcript_ref),
-              summary: asNonEmptyString(asRecord(entry.stage_result).summary) || asNonEmptyString(entry.step_id) || null,
-            }))
-        : [];
-  const failedCommands = commandResults
-    .filter((entry) => !commandCompletedForRunHealth(entry))
-    .map((entry) => ({
-      command_surface: asNonEmptyString(entry.command_surface) || asNonEmptyString(entry.command) || "unknown",
-      diagnostic_intent: asNonEmptyString(entry.diagnostic_intent) || null,
-      status: asNonEmptyString(entry.status) || "unknown",
-      exit_code: typeof entry.exit_code === "number" ? entry.exit_code : null,
-      transcript_ref: asNonEmptyString(entry.transcript_ref) || null,
-      summary: asNonEmptyString(entry.summary) || asNonEmptyString(entry.stderr) || "Public command did not complete.",
-    }));
-  return {
-    status: failedCommands.length === 0 ? "pass" : "fail",
-    command_count: commandResults.length,
-    failed_command_count: failedCommands.length,
-    failed_commands: failedCommands,
-  };
 }
 
 /**
