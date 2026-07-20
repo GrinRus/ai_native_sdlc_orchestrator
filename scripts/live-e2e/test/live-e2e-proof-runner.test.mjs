@@ -4694,13 +4694,21 @@ test("source install proof force-refreshes dependencies and smokes intake CLI", 
 test("full journey requests repair only for actionable review or QA findings before delivery approval", () => {
   const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
 
-  const runOwnedExecutionRootUsages = flowsSource.match(
-    /"--execution-root",\s+asNonEmptyString\(asRecord\(readJson\(artifacts\.routed_step_result_file\)\)\.mission_semantics\.git_status_root\)/gu,
+  assert.match(
+    flowsSource,
+    /latestExecutionRoot\s*=\s*asNonEmptyString\(asRecord\(stepResult\.mission_semantics\)\.git_status_root\) \|\| latestExecutionRoot/u,
+    "the runner must derive one retained execution root from public step evidence",
   );
+  const runOwnedExecutionRootUsages = flowsSource.match(/"--execution-root",\s+latestExecutionRoot/gu);
   assert.equal(
     runOwnedExecutionRootUsages?.length,
-    2,
-    "review and delivery must both inspect the retained run-owned execution workspace",
+    4,
+    "review, repair decisions, guided approval, and delivery must inspect the same run-owned execution workspace",
+  );
+  assert.match(
+    flowsSource,
+    /closeSatisfiedQualityRepairRequests\(\{[\s\S]*?executionRoot: latestExecutionRoot/gu,
+    "repair closure must preserve the run-owned execution workspace lineage",
   );
   const auditRunCommands = [...flowsSource.matchAll(/runCommand\("audit-runs", \[([\s\S]*?)\]\)/gu)];
   assert.equal(auditRunCommands.length, 2);

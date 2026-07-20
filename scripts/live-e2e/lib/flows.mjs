@@ -6155,6 +6155,7 @@ function executeFullJourneyFlowImplementation(options) {
     let featureSizeFitStatus = "fail";
     let latestPromotionEvidenceRefs = [...promotionEvidenceRefs];
     let latestImplementationRunId = deriveRuntimeRunId(options.runId);
+    let latestExecutionRoot = targetCheckout.targetCheckoutRoot;
     const evalSuites = getEvalSuites(options.profile);
     for (let iteration = 1; iteration <= implementationLoopPolicy.maxIterations; iteration += 1) {
       const iterationRunId = deriveRuntimeRunId(options.runId, iteration);
@@ -6202,6 +6203,8 @@ function executeFullJourneyFlowImplementation(options) {
           : null;
       if (artifacts.routed_step_result_file && fileExists(artifacts.routed_step_result_file)) {
         const stepResult = readJson(artifacts.routed_step_result_file);
+        latestExecutionRoot =
+          asNonEmptyString(asRecord(stepResult.mission_semantics).git_status_root) || latestExecutionRoot;
         const routedExecution = asRecord(stepResult.routed_execution);
         artifacts.compiled_context_ref = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_ref) || null;
         artifacts.compiled_context_file = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_file) || null;
@@ -6341,7 +6344,7 @@ function executeFullJourneyFlowImplementation(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
-        "--execution-root", asNonEmptyString(asRecord(readJson(artifacts.routed_step_result_file)).mission_semantics.git_status_root),
+        "--execution-root", latestExecutionRoot,
       ], { allowNonZeroWithPayload: true, iteration });
       artifacts.review_report_file = getStringField(reviewRun.payload, "review_report_file");
       artifacts.latest_runtime_harness_report_file =
@@ -6829,7 +6832,7 @@ function executeFullJourneyFlowImplementation(options) {
         "--run-id",
         latestImplementationRunId,
         "--execution-root",
-        targetCheckout.targetCheckoutRoot,
+        latestExecutionRoot,
         "--decision",
         "request-repair",
         "--decider-ref",
@@ -6933,7 +6936,7 @@ function executeFullJourneyFlowImplementation(options) {
         projectProfileFile: generatedProfile.generatedProjectProfileFile,
         requestRunIdFallback: latestImplementationRunId,
         closureRunId: latestImplementationRunId,
-        executionRoot: targetCheckout.targetCheckoutRoot,
+        executionRoot: latestExecutionRoot,
         evidenceRefs: uniqueStrings([
           asNonEmptyString(artifacts.review_report_file),
           asNonEmptyString(artifacts.evaluation_report_file),
@@ -6977,7 +6980,7 @@ function executeFullJourneyFlowImplementation(options) {
         "--run-id",
         latestImplementationRunId,
         "--execution-root",
-        targetCheckout.targetCheckoutRoot,
+        latestExecutionRoot,
         "--decision",
         "approve",
         "--decider-ref",
@@ -7036,7 +7039,7 @@ function executeFullJourneyFlowImplementation(options) {
         "--run-id",
         latestImplementationRunId,
         "--execution-root",
-        asNonEmptyString(asRecord(readJson(artifacts.routed_step_result_file)).mission_semantics.git_status_root),
+        latestExecutionRoot,
         "--step-class",
         "implement",
         "--mode",
