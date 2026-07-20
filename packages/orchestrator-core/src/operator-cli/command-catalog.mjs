@@ -1348,6 +1348,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path>",
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
+      "--execution-root <path> (optional, canonical retained workspace root for changed-path evidence)",
       "--run-id <id> (optional)",
       "--step-class <step_class> (optional, defaults to implement)",
       "--mode <mode> (optional, one of no-write, patch-only, local-branch, fork-first-pr)",
@@ -1985,7 +1986,6 @@ function decorateCommandDefinition(definition) {
 export function getCliCommandCatalog() {
   return COMMAND_DEFINITIONS.map(decorateCommandDefinition);
 }
-
 export function getImplementedCommands() {
   return getCliCommandCatalog().filter((definition) => definition.status === "implemented");
 }

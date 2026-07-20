@@ -4756,8 +4756,18 @@ test("full journey requests repair only for actionable review or QA findings bef
   const runOwnedExecutionRootUsages = flowsSource.match(/"--execution-root",\s+latestExecutionRoot/gu);
   assert.equal(
     runOwnedExecutionRootUsages?.length,
-    7,
-    "repair execution, verification, review, decisions, guided approval, and delivery must use the run-owned workspace",
+    9,
+    "repair execution, verification, review, decisions, guided approval, delivery, and release must use the run-owned workspace",
+  );
+  const releasePrepareCommands = [...flowsSource.matchAll(/runCommand\("release-prepare", \[([\s\S]*?)\]\s*,/gu)];
+  assert.equal(releasePrepareCommands.length >= 2, true);
+  for (const [, releaseArgs] of releasePrepareCommands.slice(-2)) {
+    assert.match(releaseArgs, /"--execution-root",\s+latestExecutionRoot/u);
+  }
+  assert.match(
+    flowsSource,
+    /release_packet_status === "ready-for-close"/u,
+    "private qualification must not treat a blocked release packet as passing merely because a file exists",
   );
   assert.match(
     flowsSource,

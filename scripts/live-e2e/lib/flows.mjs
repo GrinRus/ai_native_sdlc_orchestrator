@@ -7138,7 +7138,6 @@ function executeFullJourneyFlowImplementation(options) {
         markStage(stageMap, "release", "fail", [], "Release prepare failed before release-packet evidence materialized.");
         throw new Error("Release prepare did not materialize release-packet evidence.");
       }
-
       const releasePrepare = runCommand("release-prepare", [
         "release",
         "prepare",
@@ -7150,6 +7149,8 @@ function executeFullJourneyFlowImplementation(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
+        "--execution-root",
+        latestExecutionRoot,
         "--step-class",
         "implement",
         "--mode",
@@ -7160,31 +7161,26 @@ function executeFullJourneyFlowImplementation(options) {
           : []),
         ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
       ], { allowNonZeroWithPayload: true });
-      artifacts.release_delivery_manifest_file = getStringField(releasePrepare.payload, "delivery_manifest_file");
-      artifacts.release_delivery_transcript_file = getStringField(releasePrepare.payload, "delivery_transcript_file");
-      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
-      artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
+      artifacts.release_delivery_manifest_file = getStringField(releasePrepare.payload, "delivery_manifest_file"); artifacts.release_delivery_transcript_file = getStringField(releasePrepare.payload, "delivery_transcript_file");
+      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file"); artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
       artifacts.guided_release_prepare_transcript_file = releasePrepare.transcriptFile;
-      artifacts.release_status = artifacts.release_packet_file ? "pass" : "fail";
+      artifacts.release_status = artifacts.release_packet_file && artifacts.release_packet_status === "ready-for-close" ? "pass" : "fail";
       markStage(
         stageMap,
         "release",
         artifacts.release_status,
         uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
-        artifacts.release_packet_file
+        artifacts.release_status === "pass"
           ? "Release prepare materialized release packet evidence under the review gate."
-          : "Release prepare did not materialize release packet evidence.",
+          : "Release prepare did not materialize ready-for-close release packet evidence.",
       );
-      if (!artifacts.release_packet_file) {
-        throw new Error("Release prepare did not materialize release packet evidence.");
-      }
+      if (artifacts.release_status !== "pass") throw new Error("Release prepare did not materialize ready-for-close release packet evidence.");
     } else if (options.scenarioPolicy.release_required === true && getProfileStages(options.profile).includes("release")) {
       if (internalTestHooks.fail_release_prepare === true) {
         artifacts.release_status = "fail";
         markStage(stageMap, "release", "fail", [], "Release prepare failed before release-packet evidence materialized.");
         throw new Error("Release prepare did not materialize release-packet evidence.");
       }
-
       const releasePrepare = runCommand("release-prepare", [
         "release",
         "prepare",
@@ -7196,6 +7192,8 @@ function executeFullJourneyFlowImplementation(options) {
         ".aor",
         "--run-id",
         latestImplementationRunId,
+        "--execution-root",
+        latestExecutionRoot,
         "--step-class",
         "implement",
         "--mode",
@@ -7210,16 +7208,17 @@ function executeFullJourneyFlowImplementation(options) {
       artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
       artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
       artifacts.release_prepare_transcript_file = releasePrepare.transcriptFile;
-      artifacts.release_status = artifacts.release_packet_file ? "pass" : "fail";
+      artifacts.release_status = artifacts.release_packet_file && artifacts.release_packet_status === "ready-for-close" ? "pass" : "fail";
       markStage(
         stageMap,
         "release",
         artifacts.release_status,
         uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
-        artifacts.release_packet_file
+        artifacts.release_status === "pass"
           ? "Release prepare materialized strict release-packet evidence."
-          : "Release prepare did not materialize strict release-packet evidence.",
+          : "Release prepare did not materialize ready-for-close strict release-packet evidence.",
       );
+      if (artifacts.release_status !== "pass") throw new Error("Release prepare did not materialize ready-for-close strict release-packet evidence.");
     } else {
       artifacts.release_status = options.scenarioPolicy.release_required === true ? "fail" : "skipped";
       markStage(stageMap, "release", "skipped", [], "Delivery-default flow range excludes release.");
