@@ -17,6 +17,7 @@ import {
   writeStepQualityAssessmentRequest,
   writeStepQualityAssessmentReport,
 } from "./step-quality-assessment.mjs";
+import { mergeLiveE2eCommandResults } from "./command-result-cache.mjs";
 import {
   getLiveE2eCommandLabelPriority,
   resolveLiveE2eCommandStep,
@@ -961,7 +962,9 @@ export function createLiveE2eStepController(options) {
     state.artifacts_snapshot = JSON.parse(
       JSON.stringify(mergeArtifactSnapshots(asRecord(state.artifacts_snapshot), artifacts ?? {})),
     );
-    state.command_results = JSON.parse(JSON.stringify(commandResults ?? []));
+    state.command_results = JSON.parse(
+      JSON.stringify(mergeLiveE2eCommandResults(state.command_results, commandResults)),
+    );
     writeJson(stateFile, state);
   }
 
@@ -1629,7 +1632,9 @@ export function createLiveE2eStepController(options) {
     state.artifacts_snapshot = JSON.parse(
       JSON.stringify(mergeArtifactSnapshots(asRecord(state.artifacts_snapshot), input.artifacts ?? {})),
     );
-    state.command_results = JSON.parse(JSON.stringify(input.commandResults ?? []));
+    state.command_results = JSON.parse(
+      JSON.stringify(mergeLiveE2eCommandResults(state.command_results, input.commandResults)),
+    );
     writeJson(stateFile, state);
 
     input.artifacts.live_e2e_controller_state_file = stateFile;
