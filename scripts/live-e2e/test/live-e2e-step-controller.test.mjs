@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { mergeLiveE2eCommandResults } from "../lib/command-result-cache.mjs";
 import {
   LiveE2eControllerStop,
   createLiveE2eStepController,
@@ -2780,6 +2781,36 @@ test("live E2E command cache resolves repeated labels by iteration", () => {
     assert.equal(resumed.getCachedCommandResult("run-start", 1).transcript_file, firstTranscript);
     assert.equal(resumed.getCachedCommandResult("run-start", 2).transcript_file, repairTranscript);
   });
+});
+
+test("live E2E command history preserves later repair iterations during partial replay", () => {
+  const first = {
+    label: "run-start",
+    step_id: "execution",
+    step_instance_id: "execution",
+    iteration: 1,
+    transcript_file: "11-run-start.json",
+  };
+  const repaired = {
+    label: "run-start",
+    step_id: "execution",
+    step_instance_id: "execution#2",
+    iteration: 2,
+    transcript_file: "15-run-start.json",
+  };
+  const replayedFirst = {
+    ...first,
+    transcript_file: "11-run-start-replayed.json",
+  };
+
+  const merged = mergeLiveE2eCommandResults([first, repaired], [replayedFirst]);
+  assert.deepEqual(
+    merged.map((entry) => [entry.step_instance_id, entry.transcript_file]),
+    [
+      ["execution", "11-run-start-replayed.json"],
+      ["execution#2", "15-run-start.json"],
+    ],
+  );
 });
 
 test("live E2E command cache can resume from persisted journal when command snapshot is missing", () => {
