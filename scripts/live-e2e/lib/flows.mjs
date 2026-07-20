@@ -40,6 +40,7 @@ import {
 } from "./target-materialization.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
+import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
@@ -7355,7 +7356,11 @@ function executeFullJourneyFlowImplementation(options) {
       artifacts.completed_flow_read_only = artifacts.first_flow_status === "completed";
       artifacts.follow_up_source_handoff_ref = asNonEmptyString(artifacts.learning_loop_handoff_file);
 
-      const followUpMissionId = `${asNonEmptyString(firstFlowIdentity.missionId) || "guided-flow"}-follow-up-${normalizeId(options.runId)}`;
+      const followUpMissionId = deriveGuidedFollowUpMissionId({
+        projectId: asNonEmptyString(firstFlowIdentity.projectId),
+        missionId: firstFlowIdentity.missionId,
+        runId: options.runId,
+      });
       const followUpMissionCreate = runCommand("follow-up-mission-create", buildGuidedMissionCreateArgs({
         mission: options.mission,
         featureRequest,

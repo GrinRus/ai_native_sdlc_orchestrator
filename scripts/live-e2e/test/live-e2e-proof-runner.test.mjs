@@ -52,6 +52,7 @@ import {
   resolveActiveAcceptanceRepairDrill,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
 } from "../lib/flows.mjs";
+import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
 import {
   REQUIRED_GUIDED_COMMAND_LABELS,
@@ -2700,6 +2701,35 @@ test("guided flow identity accepts opaque public packet ids", () => {
       missionId: "header-regression-follow-up",
     });
   });
+});
+
+test("guided follow-up identity stays inside the public flow-id boundary", () => {
+  const projectId = "github-sandbox.run.w66-guided-ui-20260720t150129-f42f572";
+  const missionId = deriveGuidedFollowUpMissionId({
+    projectId,
+    missionId: "ky-header-regression",
+    runId: "w66-guided-ui-20260720t150129-f42f572",
+  });
+  const flowId = `flow.${projectId}.${missionId}`;
+
+  assert.match(missionId, /^ky-header-regression-follow-up-[a-f0-9]{12}$/u);
+  assert.ok(flowId.length <= 128, `Expected bounded flow id, received ${flowId.length} characters.`);
+  assert.equal(
+    missionId,
+    deriveGuidedFollowUpMissionId({
+      projectId,
+      missionId: "ky-header-regression",
+      runId: "w66-guided-ui-20260720t150129-f42f572",
+    }),
+  );
+  assert.notEqual(
+    missionId,
+    deriveGuidedFollowUpMissionId({
+      projectId,
+      missionId: "ky-header-regression",
+      runId: "w66-guided-ui-20260720t150130-f42f572",
+    }),
+  );
 });
 
 test("guided journey proof requires flow-loop and browser-task evidence", () => {
