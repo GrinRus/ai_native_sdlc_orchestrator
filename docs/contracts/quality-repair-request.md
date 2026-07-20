@@ -89,6 +89,11 @@ fails closed unless the latest review and Runtime Harness evidence pass. A
 request originating from QA, or currently in `qa-required`, also requires an
 explicit QA evidence ref.
 
+When refreshed evidence belongs to a later repair attempt, `--run-id` remains
+the request-owning run and `--closure-run-id` identifies that attempt. Both
+runs stay in the same project and the closure artifacts are appended to the
+original request evidence; this does not transfer request ownership.
+
 The transition is idempotent for an already closed matching request. Requests
 in `requested`, `in-progress`, or `budget-exhausted` cannot be closed. Internal
 rehearsal tooling must call this public mutation rather than updating the

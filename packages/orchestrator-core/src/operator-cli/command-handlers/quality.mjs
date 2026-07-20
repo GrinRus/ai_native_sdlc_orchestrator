@@ -520,6 +520,7 @@ export function handleQualityCommand(context) {
   } else if (command === "repair close") {
     ensureRequiredFlags(command, flags);
     const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const closureRunId = resolveOptionalStringFlag("closure-run-id", flags["closure-run-id"]) ?? runId;
     const requestRef = resolveOptionalStringFlag("request-ref", flags["request-ref"]);
     if (!runId || !requestRef) {
       throw new CliUsageError("Repair closure requires '--run-id' and '--request-ref'.");
@@ -565,7 +566,7 @@ export function handleQualityCommand(context) {
         projectRef: projectState.project_root,
         projectProfile,
         runtimeRoot,
-        runId,
+        runId: /** @type {string} */ (closureRunId),
         executionRoot,
       });
       const runtimeHarness = materializeRuntimeHarnessReport({
@@ -573,7 +574,7 @@ export function handleQualityCommand(context) {
         projectRef: projectState.project_root,
         projectProfile,
         runtimeRoot,
-        runId,
+        runId: /** @type {string} */ (closureRunId),
         executionRoot,
       });
       if (reviewResult.reviewReport.overall_status !== "pass") {

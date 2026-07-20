@@ -1850,6 +1850,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
+      "--closure-run-id <id> (optional, refreshed repair attempt run)",
       "--request-ref <evidence-ref|request-id>",
       "--evidence-ref <ref> (repeatable)",
       "--qa-evidence-ref <ref> (optional, repeatable)",

@@ -3957,6 +3957,7 @@
             "type": "object",
             "properties": {
               "run_id": { "type": "string" },
+              "closure_run_id": { "type": "string" },
               "parent_run_id": { "type": "string" },
               "execution_plan_ref": { "type": "string" },
               "execution_unit_id": { "type": "string" },
