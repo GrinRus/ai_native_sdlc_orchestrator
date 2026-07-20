@@ -318,16 +318,7 @@ function collectNamedRefs(record, fields) {
  * @param {string[]} refs
  */
 function collectRefsDeep(value, refs) {
-  if (typeof value === "string") {
-    const trimmed = asNonEmptyString(value);
-    if (
-      trimmed &&
-      /^(?:[a-z]+:\/\/|\/|\.\.?\/)/iu.test(trimmed)
-    ) {
-      refs.push(trimmed);
-    }
-    return;
-  }
+  if (typeof value === "string") return;
   if (Array.isArray(value)) {
     for (const entry of value) collectRefsDeep(entry, refs);
     return;
@@ -337,6 +328,7 @@ function collectRefsDeep(value, refs) {
     if (/(?:_file|_ref|_refs|_files|evidence_refs|artifact_refs|screenshot_refs)$/iu.test(key)) {
       if (typeof entry === "string") refs.push(entry);
       if (Array.isArray(entry)) refs.push(...asStringArray(entry));
+      if (typeof entry === "string" || Array.isArray(entry)) continue;
     }
     collectRefsDeep(entry, refs);
   }
@@ -424,6 +416,11 @@ function attachPairedAorOperatorUiEvidence(request, pairedRunSummaryFile, baseDi
     throw new UsageError(`Paired AOR operator UI run summary file '${resolvedPairedSummary}' was not found.`);
   }
   const pairedRunSummary = asRecord(readJson(resolvedPairedSummary));
+  const sourceCommitSha = asNonEmptyString(asRecord(request.run_identity).commit_sha);
+  const pairedCommitSha = asNonEmptyString(pairedRunSummary.commit_sha);
+  if (!sourceCommitSha || !pairedCommitSha || sourceCommitSha !== pairedCommitSha) {
+    throw new UsageError("Paired AOR operator UI proof must come from the exact same AOR commit SHA.");
+  }
   const pairedObservationFile = asNonEmptyString(pairedRunSummary.live_e2e_observation_report_file);
   const pairedRunHealthFile =
     asNonEmptyString(pairedRunSummary.live_e2e_run_health_report_file) ||

@@ -12,10 +12,10 @@ test("private live-E2E contracts extend the versioned public contract kernel", (
   assert.equal(result.public_family_count, publicFamilies.length);
 });
 
-test("public contract families retain source-of-truth identity in the private loader", () => {
+test("public contract families retain source-of-truth metadata in the private loader", () => {
   const privateByFamily = new Map(privateFamilies.map((entry) => [entry.family, entry]));
   for (const family of publicFamilies) {
-    assert.equal(privateByFamily.get(family.family), family);
+    assert.deepEqual(privateByFamily.get(family.family), family);
   }
   assert.ok(privateFamilies.length > publicFamilies.length);
 });

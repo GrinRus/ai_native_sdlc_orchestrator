@@ -131,7 +131,7 @@ function runGitChecked(options) {
     encoding: "utf8",
   });
   if (run.status === 0) {
-    return;
+    return run;
   }
   const stderr = (run.stderr ?? run.stdout ?? "").trim();
   throw new Error(
@@ -184,6 +184,10 @@ export function materializeTargetCheckout(options) {
   const targetRepoRef = asNonEmptyString(targetRepo.ref) || "main";
   const targetRepoId = asNonEmptyString(targetRepo.repo_id) || "target";
   const checkoutStrategy = asNonEmptyString(targetRepo.checkout_strategy) || "full";
+  const pinnedCommit = asNonEmptyString(process.env.AOR_LIVE_E2E_TARGET_COMMIT);
+  if (pinnedCommit && !/^[a-f0-9]{40}$/u.test(pinnedCommit)) {
+    throw new Error("AOR_LIVE_E2E_TARGET_COMMIT must be one full lowercase Git commit SHA.");
+  }
   if (!targetRepoUrl) {
     throw new Error("Proof runner profile must declare target_repo.repo_url.");
   }
@@ -195,11 +199,16 @@ export function materializeTargetCheckout(options) {
     targetRepoId,
   });
   if (options.reuseExistingCheckout === true && fileExists(path.join(targetCheckoutRoot, ".git"))) {
+    const currentCommit = runGitChecked({ cwd: targetCheckoutRoot, args: ["rev-parse", "HEAD"], operation: "target checkout identity" }).stdout.trim();
+    if (pinnedCommit && currentCommit !== pinnedCommit) {
+      throw new Error(`Existing target checkout is '${currentCommit}', not pinned commit '${pinnedCommit}'.`);
+    }
     return {
       targetCheckoutRoot,
       targetRepoId,
       targetRepoRef,
       targetRepoUrl,
+      targetCommitSha: currentCommit,
     };
   }
   fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
@@ -221,12 +230,21 @@ export function materializeTargetCheckout(options) {
     args: ["checkout", targetRepoRef],
     operation: "target checkout ref resolution",
   });
+  if (pinnedCommit) {
+    const probe = spawnSync("git", ["cat-file", "-e", `${pinnedCommit}^{commit}`], { cwd: targetCheckoutRoot, encoding: "utf8" });
+    if (probe.status !== 0) {
+      runGitChecked({ cwd: targetCheckoutRoot, args: ["fetch", "--depth", "1", "origin", pinnedCommit], operation: "pinned target commit fetch" });
+    }
+    runGitChecked({ cwd: targetCheckoutRoot, args: ["checkout", "--detach", pinnedCommit], operation: "pinned target commit checkout" });
+  }
+  const targetCommitSha = runGitChecked({ cwd: targetCheckoutRoot, args: ["rev-parse", "HEAD"], operation: "target checkout identity" }).stdout.trim();
 
   return {
     targetCheckoutRoot,
     targetRepoId,
     targetRepoRef,
     targetRepoUrl,
+    targetCommitSha,
   };
 }
 
@@ -329,8 +347,8 @@ function materializeSelectedAdapterLiveE2eDefaults(options) {
  * @param {Record<string, unknown>} verification
  */
 function hydrateRepoVerificationCommands(repoRecord, verification) {
-  const setupCommands = asStringArray(verification.setup_commands);
-  const verificationCommands = asStringArray(verification.commands);
+  const setupCommands = applyTargetExecutionEnvironmentToCommands(verification, asStringArray(verification.setup_commands));
+  const verificationCommands = applyTargetExecutionEnvironmentToCommands(verification, asStringArray(verification.commands));
   const buildEnabled = verification.build === true;
   const testsEnabled = verification.tests !== false;
 
@@ -359,17 +377,18 @@ function applyTargetToolchainPolicyToCommands(profile, commands) {
  * @returns {Array<Record<string, unknown>>}
  */
 function buildGeneratedVerificationCommandGroups(options) {
-  const setupCommands = asStringArray(options.verification.setup_commands);
-  const baselineCommands = asStringArray(options.verification.commands);
+  const applyEnvironment = (commands) => applyTargetExecutionEnvironmentToCommands(options.verification, commands);
+  const setupCommands = applyEnvironment(asStringArray(options.verification.setup_commands));
+  const baselineCommands = applyEnvironment(asStringArray(options.verification.commands));
   const missionQuality = asRecord(options.mission.post_run_quality);
   const primaryCommands = asStringArray(missionQuality.primary_commands);
-  const diagnosticCommands = applyTargetToolchainPolicyToCommands(
+  const diagnosticCommands = applyEnvironment(applyTargetToolchainPolicyToCommands(
     options.profile,
     asStringArray(missionQuality.diagnostic_commands),
-  );
+  ));
   const diagnosticFailureMode = asNonEmptyString(missionQuality.diagnostic_failure_mode) === "fail" ? "fail" : "warn";
   const primaryGateCommands = primaryCommands.length > 0
-    ? applyTargetToolchainPolicyToCommands(options.profile, primaryCommands)
+    ? applyEnvironment(applyTargetToolchainPolicyToCommands(options.profile, primaryCommands))
     : baselineCommands;
   return [
     {
@@ -407,6 +426,16 @@ function buildGeneratedVerificationCommandGroups(options) {
   ].filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
 }
 
+function wrapCommandWithTargetExecutionEnvironment(command) {
+  return `CI=1 ${command}`;
+}
+
+function applyTargetExecutionEnvironmentToCommands(verification, commands) {
+  return asNonEmptyString(verification.execution_environment) === "ci"
+    ? commands.map(wrapCommandWithTargetExecutionEnvironment)
+    : commands;
+}
+
 /**
  * @param {string} command
  * @returns {string}
@@ -433,6 +462,18 @@ function applyTargetToolchainPolicy(options) {
     },
     setup_commands: asStringArray(options.verification.setup_commands).map(wrapCommandWithTargetNodeEnv),
     commands: asStringArray(options.verification.commands).map(wrapCommandWithTargetNodeEnv),
+  };
+}
+
+function applyTargetExecutionEnvironment(verification) {
+  const mode = asNonEmptyString(verification.execution_environment) || "default";
+  if (!new Set(["default", "ci"]).has(mode)) {
+    throw new Error(`Unsupported target execution environment '${mode}'.`);
+  }
+  if (mode === "default") return verification;
+  return {
+    ...verification,
+    effective_environment: { mode, variable_names: ["CI"] },
   };
 }
 
@@ -582,14 +623,14 @@ export function materializeGeneratedProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  const generatedVerification = applyTargetToolchainPolicy({
+  const generatedVerification = applyTargetExecutionEnvironment(applyTargetToolchainPolicy({
     profile: options.profile,
     verification: resolveGeneratedProfileVerification({
       catalogVerification: asRecord(asRecord(options.catalogEntry).verification),
       profileVerification: asRecord(options.profile.verification),
       mission: asRecord(options.mission),
     }),
-  });
+  }));
   hydrateRepoVerificationCommands(selectedRepo, generatedVerification);
   generatedProjectProfile.repos = [selectedRepo];
   generatedProjectProfile.verification = {
@@ -665,6 +706,7 @@ export function materializeGeneratedProjectProfile(options) {
   return {
     generatedProjectProfileFile,
     templateProjectProfilePath,
+    targetExecutionEnvironment: asRecord(generatedVerification.effective_environment),
   };
 }
 

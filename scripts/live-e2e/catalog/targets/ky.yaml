@@ -5,6 +5,7 @@ repo:
   ref: main
   checkout_strategy: shallow
 verification:
+  execution_environment: ci
   setup_commands:
     - npm install --prefer-offline --no-audit --no-fund
     - npx playwright install

@@ -17,10 +17,6 @@ import {
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
-import {
-  closeQualityRepairRequest,
-  listQualityRepairRequests,
-} from "../../../packages/observability/src/index.mjs";
 import { createStageMap, flattenStageMap, getProfileStages, markStage as markStageRaw } from "./stages.mjs";
 import {
   buildLiveE2eStepInstanceId,
@@ -43,7 +39,6 @@ import {
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
-import { collectMissionChangeEvidence } from "./mission-scope.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
@@ -2821,8 +2816,11 @@ export function evaluateRepairProofExpectations(options) {
 /**
  * @param {{
  *   artifacts: Record<string, unknown>,
- *   projectRoot: string,
- *   runtimeLayout: { reportsRoot?: string, reports_root?: string },
+ *   runCommand: (label: string, args: string[], options?: Record<string, unknown>) => { payload?: unknown },
+ *   projectProfileFile: string,
+ *   requestRunIdFallback: string,
+ *   closureRunId: string,
+ *   executionRoot: string,
  *   evidenceRefs: string[],
  * }} options
  */
@@ -2835,59 +2833,37 @@ function closeSatisfiedQualityRepairRequests(options) {
     };
   }
 
-  const requestRefs = new Set(evidence.quality_repair_request_refs);
-  const requests = listQualityRepairRequests({
-    projectRoot: options.projectRoot,
-    runtimeLayout: options.runtimeLayout,
-  });
-  const matchingRequests = requests.filter(
-    (request) =>
-      requestRefs.has(request.artifact_ref) ||
-      [...requestRefs].some((requestRef) => requestRef.endsWith(path.basename(request.file))),
-  );
-  const matchedRequestFiles = new Set(matchingRequests.map((request) => request.file));
-  const directRequestFiles = evidence.quality_repair_request_files
-    .filter((requestFile) => path.isAbsolute(requestFile) && fileExists(requestFile))
-    .filter((requestFile) => !matchedRequestFiles.has(requestFile));
   /** @type {string[]} */
   const closedRefs = [];
   /** @type {string[]} */
   const closedFiles = [];
-
-  for (const request of matchingRequests) {
-    if (asNonEmptyString(request.document.status) === "closed") {
-      closedRefs.push(request.artifact_ref);
-      closedFiles.push(request.file);
-      continue;
-    }
-    const closed = closeQualityRepairRequest({
-      projectRoot: options.projectRoot,
-      runtimeLayout: options.runtimeLayout,
-      requestFile: request.file,
-      request: request.document,
-      evidenceRefs: options.evidenceRefs,
-      summary: "Quality repair request closed by live E2E refreshed review and QA evidence.",
-    });
-    closedRefs.push(closed.requestRef);
-    closedFiles.push(closed.requestFile);
-  }
-  for (const requestFile of directRequestFiles) {
+  const requestFiles = uniqueStrings(evidence.quality_repair_request_files)
+    .filter((requestFile) => path.isAbsolute(requestFile) && fileExists(requestFile));
+  for (const [index, requestFile] of requestFiles.entries()) {
     const request = readJson(requestFile);
-    if (asNonEmptyString(request.status) === "closed") {
-      closedRefs.push(asNonEmptyString(request.artifact_ref) || `evidence://${path.basename(requestFile)}`);
-      closedFiles.push(requestFile);
-      continue;
+    const requestRef = asNonEmptyString(request.artifact_ref) ||
+      evidence.quality_repair_request_refs.find((entry) => entry.endsWith(path.basename(requestFile))) ||
+      requestFile;
+    const requestRunId = asNonEmptyString(request.run_id) || options.requestRunIdFallback;
+    const result = options.runCommand(`repair-close-${index + 1}`, [
+      "repair", "close",
+      "--project-ref", ".",
+      "--project-profile", options.projectProfileFile,
+      "--runtime-root", ".aor",
+      "--run-id", requestRunId,
+      "--closure-run-id", options.closureRunId,
+      "--request-ref", requestRef,
+      "--execution-root", options.executionRoot,
+      ...options.evidenceRefs.flatMap((ref) => ["--evidence-ref", ref]),
+      ...evidence.qa_rerun_refs.flatMap((ref) => ["--qa-evidence-ref", ref]),
+      "--summary", "Quality repair request closed through the installed public AOR CLI.",
+    ]);
+    const payload = asRecord(result.payload);
+    if (asNonEmptyString(payload.quality_repair_request_status) !== "closed") {
+      throw new Error(`Public repair close did not close '${requestRef}'.`);
     }
-    const closed = closeQualityRepairRequest({
-      projectRoot: options.projectRoot,
-      runtimeLayout: options.runtimeLayout,
-      requestFile,
-      request,
-      evidenceRefs: options.evidenceRefs,
-      summary: "Quality repair request closed by live E2E refreshed review and QA evidence.",
-    });
-    closedRefs.push(closed.requestRef);
-    closedFiles.push(closed.requestFile);
+    closedRefs.push(asNonEmptyString(payload.quality_repair_request_ref) || requestRef);
+    closedFiles.push(asNonEmptyString(payload.quality_repair_request_file) || requestFile);
   }
 
   return {
@@ -3292,6 +3268,7 @@ function normalizeTargetCommandForComparison(command) {
   if (!value) return "";
   const collapsed = value.replace(/\s+/gu, " ").trim();
   return collapsed
+    .replace(/^CI=1\s+/u, "")
     .replace(
       /^\[ -z "\$\{[A-Z0-9_]+:-\}" \] \|\| export PATH="\$\(dirname "\$[A-Z0-9_]+"\):\$PATH";\s*/u,
       "",
@@ -3947,19 +3924,17 @@ export function changedPathsHaveMissionRelevantChanges(changedPaths, mission = {
 }
 
 /**
- * @param {string | null | undefined} targetCheckoutRoot
- * @returns {ReturnType<typeof collectMissionChangeEvidence> | null}
+ * @param {string | null | undefined} deliveryManifestFile
+ * @returns {string[]}
  */
-export function collectCanonicalTargetChangeEvidence(targetCheckoutRoot) {
-  const root = asNonEmptyString(targetCheckoutRoot);
-  if (!root || !fs.existsSync(root)) {
-    return null;
-  }
-  return collectMissionChangeEvidence({
-    projectRoot: root,
-    evidenceRoot: root,
-    artifactsRoot: path.join(root, ".aor/artifacts"),
-  });
+export function collectDeliveryManifestChangedPaths(deliveryManifestFile) {
+  const file = asNonEmptyString(deliveryManifestFile);
+  if (!file || !fileExists(file)) return [];
+  const manifest = asRecord(readJson(file));
+  const repoDeliveries = Array.isArray(manifest.repo_deliveries)
+    ? manifest.repo_deliveries.map((entry) => asRecord(entry))
+    : [];
+  return uniqueStrings(repoDeliveries.flatMap((entry) => asStringArray(entry.changed_paths)).map(normalizeChangedPath)).filter(Boolean);
 }
 
 export function buildHandoffApprovalArgs(options) {
@@ -3975,24 +3950,19 @@ export function buildHandoffApprovalArgs(options) {
 
 /**
  * @param {string[]} changedPaths
- * @param {{ targetCheckoutRoot?: string | null }} options
+ * @param {{ authorizedChangedPaths?: string[] }} options
  * @returns {string[]}
  */
 export function reconcileSummaryMeaningfulChangedPaths(changedPaths, options = {}) {
   const candidates = uniqueStrings(changedPaths.map(normalizeChangedPath)).filter(Boolean);
-  const canonicalEvidence = collectCanonicalTargetChangeEvidence(options.targetCheckoutRoot);
-  if (!canonicalEvidence?.gitStatusAvailable) {
-    return candidates;
-  }
-  const canonicalMeaningfulPaths = uniqueStrings(
-    canonicalEvidence.meaningfulChangedPaths.map(normalizeChangedPath),
-  ).filter(Boolean);
-  if (canonicalMeaningfulPaths.length === 0) {
-    return [];
-  }
+  const authorized = uniqueStrings(asStringArray(options.authorizedChangedPaths).map(normalizeChangedPath)).filter(Boolean);
+  if (authorized.length === 0) return candidates;
   const candidateSet = new Set(candidates);
-  const intersection = canonicalMeaningfulPaths.filter((candidate) => candidateSet.has(candidate));
-  return intersection.length > 0 ? intersection : canonicalMeaningfulPaths;
+  const missingEvidence = authorized.filter((candidate) => !candidateSet.has(candidate));
+  if (missingEvidence.length > 0) {
+    throw new Error(`Delivery changed-path evidence disagrees with Runtime Harness/review evidence: ${missingEvidence.join(", ")}.`);
+  }
+  return authorized;
 }
 
 /**
@@ -4470,6 +4440,7 @@ export function executeInstalledUserFlow(options) {
     artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
+    artifacts.target_commit_sha = targetCheckout.targetCommitSha;
     const installedBrowserCachePreflight = prepareBrowserCachePreflight({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
       reportsRoot: options.layout.reportsRoot,
@@ -4512,6 +4483,7 @@ export function executeInstalledUserFlow(options) {
     });
     artifacts.generated_project_profile_file = generatedProfile.generatedProjectProfileFile;
     artifacts.project_profile_template_file = generatedProfile.templateProjectProfilePath;
+    artifacts.target_execution_environment = generatedProfile.targetExecutionEnvironment;
     markStage(
       stageMap,
       "bootstrap",
@@ -5183,6 +5155,7 @@ function executeFullJourneyFlowImplementation(options) {
     artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
+    artifacts.target_commit_sha = targetCheckout.targetCommitSha;
     artifacts.guided_journey_enabled = guidedJourneyEnabled;
     targetHeadBefore = runGitOutput({
       cwd: targetCheckout.targetCheckoutRoot,
@@ -5193,9 +5166,18 @@ function executeFullJourneyFlowImplementation(options) {
       ...catalogVerification,
       ...asRecord(options.profile.verification),
     };
-    const repoLintCommands = asStringArray(resolvedVerification.setup_commands);
-    const repoVerificationCommands = asStringArray(resolvedVerification.commands);
-    const postRunQualityPolicy = resolvePostRunQualityPolicy(options.mission, catalogVerification);
+    const targetEnvironmentMode = asNonEmptyString(catalogVerification.execution_environment) || "default";
+    const applyTargetEnvironment = (commands) => targetEnvironmentMode === "ci"
+      ? commands.map((command) => `CI=1 ${command}`)
+      : commands;
+    const repoLintCommands = applyTargetEnvironment(asStringArray(resolvedVerification.setup_commands));
+    const repoVerificationCommands = applyTargetEnvironment(asStringArray(resolvedVerification.commands));
+    const rawPostRunQualityPolicy = resolvePostRunQualityPolicy(options.mission, catalogVerification);
+    const postRunQualityPolicy = {
+      ...rawPostRunQualityPolicy,
+      primaryCommands: applyTargetEnvironment(rawPostRunQualityPolicy.primaryCommands),
+      diagnosticCommands: applyTargetEnvironment(rawPostRunQualityPolicy.diagnosticCommands),
+    };
     artifacts.post_run_quality_policy = postRunQualityPolicy;
     const browserCachePreflight = prepareBrowserCachePreflight({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
@@ -5476,6 +5458,7 @@ function executeFullJourneyFlowImplementation(options) {
     });
     artifacts.generated_project_profile_file = generatedProfile.generatedProjectProfileFile;
     artifacts.project_profile_template_file = generatedProfile.templateProjectProfilePath;
+    artifacts.target_execution_environment = generatedProfile.targetExecutionEnvironment;
 
     const projectInit = runCommand("project-init", [
       "project",
@@ -6946,8 +6929,11 @@ function executeFullJourneyFlowImplementation(options) {
     if (asStringArray(artifacts.review_repair_decision_files).length > 0) {
       const repairClosure = closeSatisfiedQualityRepairRequests({
         artifacts,
-        projectRoot: targetCheckout.targetCheckoutRoot,
-        runtimeLayout: options.layout,
+        runCommand,
+        projectProfileFile: generatedProfile.generatedProjectProfileFile,
+        requestRunIdFallback: latestImplementationRunId,
+        closureRunId: latestImplementationRunId,
+        executionRoot: targetCheckout.targetCheckoutRoot,
         evidenceRefs: uniqueStrings([
           asNonEmptyString(artifacts.review_report_file),
           asNonEmptyString(artifacts.evaluation_report_file),
@@ -7548,7 +7534,7 @@ function executeFullJourneyFlowImplementation(options) {
     const meaningfulChangedPaths = reconcileSummaryMeaningfulChangedPaths(uniqueStrings([
       ...runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
       ...collectReviewChangedPaths(artifacts.review_report_file),
-    ]), { targetCheckoutRoot: targetCheckout.targetCheckoutRoot });
+    ]), { authorizedChangedPaths: collectDeliveryManifestChangedPaths(artifacts.delivery_manifest_file) });
     const runtimeHarnessDecision =
       asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
       asNonEmptyString(artifacts.runtime_harness_overall_decision) ||

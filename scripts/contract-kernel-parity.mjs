@@ -3,7 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { CONTRACT_FAMILY_INDEX as publicFamilies } from "../packages/contracts/src/families.mjs";
+import {
+  CONTRACT_FAMILY_INDEX as publicFamilies,
+  EXAMPLE_FAMILY_RESOLUTION_RULES as publicRules,
+} from "../packages/contracts/src/families.mjs";
 import { CONTRACT_FAMILY_INDEX as privateFamilies } from "./live-e2e/lib/contracts/contract-kernel.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,19 +19,28 @@ function sha256(file) {
 export function inspectContractKernelParity() {
   const snapshot = JSON.parse(fs.readFileSync(snapshotFile, "utf8"));
   const errors = [];
-  if (snapshot.schema_version !== 1 || !Number.isInteger(snapshot.kernel_version)) {
-    errors.push("contract kernel snapshot must declare schema_version=1 and an integer kernel_version");
+  if (snapshot.schema_version !== 2 || !Number.isInteger(snapshot.kernel_version)) {
+    errors.push("contract kernel snapshot must declare schema_version=2 and an integer kernel_version");
   }
   for (const [relativeFile, expectedHash] of Object.entries(snapshot.files ?? {})) {
     const sourceFile = path.join(root, snapshot.source, relativeFile);
     if (!fs.existsSync(sourceFile)) errors.push(`missing public kernel source: ${relativeFile}`);
     else if (sha256(sourceFile) !== expectedHash) errors.push(`public kernel drift requires snapshot regeneration: ${relativeFile}`);
   }
-  const privateByFamily = new Map(privateFamilies.map((entry) => [entry.family, entry]));
+  const pinnedByFamily = new Map((snapshot.contract_families ?? []).map((entry) => [entry.family, entry]));
   for (const entry of publicFamilies) {
-    if (privateByFamily.get(entry.family) !== entry) {
-      errors.push(`private contract kernel does not extend pinned public family: ${entry.family}`);
+    if (JSON.stringify(pinnedByFamily.get(entry.family)) !== JSON.stringify(entry)) {
+      errors.push(`public contract metadata snapshot drift requires regeneration: ${entry.family}`);
     }
+  }
+  const pinnedRules = snapshot.example_family_resolution_rules ?? [];
+  const effectivePublicRules = publicRules.map((entry) => ({
+    regex_source: entry.regex.source,
+    regex_flags: entry.regex.flags,
+    family: entry.family,
+  }));
+  if (JSON.stringify(pinnedRules) !== JSON.stringify(effectivePublicRules)) {
+    errors.push("public example resolution metadata snapshot drift requires regeneration");
   }
   return {
     ok: errors.length === 0,
