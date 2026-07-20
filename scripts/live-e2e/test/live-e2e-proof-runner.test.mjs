@@ -587,7 +587,7 @@ function writeGuidedProofFixture(tempRoot) {
     targetHeadAfter: "0000000000000000000000000000000000000000",
     targetGitStatusWithoutRuntime: [],
   });
-  return { proof, targetCheckoutRoot };
+  return { proof, targetCheckoutRoot, reportsRoot, commandResults, artifacts };
 }
 
 test("full-journey execution status fails closed for blocking Runtime Harness decisions", () => {
@@ -2760,6 +2760,44 @@ test("guided journey proof requires flow-loop and browser-task evidence", () => 
   });
 });
 
+test("guided journey proof recovers an installed mission command from durable resume transcripts", () => {
+  withTempRoot((tempRoot) => {
+    const fixture = writeGuidedProofFixture(tempRoot);
+    const runId = "w34-flow-loop";
+    const transcriptRoot = path.join(fixture.reportsRoot, `live-e2e-command-traces-${runId}`);
+    fs.mkdirSync(transcriptRoot, { recursive: true });
+    const missionTranscript = path.join(transcriptRoot, "06-mission-create.json");
+    writeJsonFixture(missionTranscript, {
+      label: "mission-create",
+      exit_code: 0,
+      timed_out: false,
+      parsed_json: {
+        artifact_packet_file: fixture.artifacts.intake_artifact_packet_file,
+        artifact_packet_body_file: fixture.artifacts.intake_artifact_packet_body_file,
+      },
+    });
+
+    const proof = buildGuidedJourneyProof({
+      runId,
+      profile: {
+        profile_id: "live-e2e.installed-user.guided-journey",
+        output_policy: { write_back_to_remote: false, preferred_delivery_mode: "patch-only" },
+      },
+      commandResults: fixture.commandResults.filter((entry) => entry.label !== "mission-create"),
+      artifacts: fixture.artifacts,
+      targetCheckoutRoot: fixture.targetCheckoutRoot,
+      reportsRoot: fixture.reportsRoot,
+      targetHeadBefore: "0000000000000000000000000000000000000000",
+      targetHeadAfter: "0000000000000000000000000000000000000000",
+      targetGitStatusWithoutRuntime: [],
+    });
+
+    assert.ok(proof.command_labels.includes("mission-create"));
+    assert.ok(proof.command_transcript_files.includes(missionTranscript));
+    assert.deepEqual(validateGuidedJourneyProof(proof, { targetCheckoutRoot: fixture.targetCheckoutRoot }), []);
+  });
+});
+
 test("proof runner hydrates guided UI refs and blocks missing browser-task proof", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
@@ -3820,7 +3858,7 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.ok(guidedWebSmokeIndex < deferredDiagnosticRunIndex);
   assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
   assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
-  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 120/u);
+  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 600/u);
 });
 
 test("flow-health regress profiles report policy-excluded QA as passing evidence", () => {
@@ -7512,6 +7550,15 @@ test("proof runner run-health uses hydrated delivery, verification, and diagnost
             transcript_file: files["delivery-artifact.json"],
             artifact_refs: [files["delivery-artifact.json"]],
           },
+          {
+            label: "project-verify-post-run-diagnostic",
+            command_surface: "aor project verify",
+            diagnostic_intent: "post-run-diagnostic",
+            status: "fail",
+            exit_code: -1,
+            transcript_file: files["post-run-diagnostic-step-result.json"],
+            summary: "Diagnostic command timed out.",
+          },
         ],
         artifacts: {
           host_runtime_root: runtimeRoot,
@@ -7554,6 +7601,7 @@ test("proof runner run-health uses hydrated delivery, verification, and diagnost
       "tests/test_httpie_cli.py",
     ]);
     assert.equal(written.runHealthReport.overall_status, "warn");
+    assert.equal(written.runHealthReport.command_health.failed_command_count, 0);
     assert.equal(written.runHealthReport.diagnostic_health.status, "warn");
     assert.equal(written.runHealthReport.diagnostic_health.timed_out_command_count, 1);
     assert.equal(written.runHealthReport.diagnostic_health.failed_command_count, 1);

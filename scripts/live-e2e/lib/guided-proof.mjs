@@ -267,6 +267,41 @@ function findCommand(commandResults, label) {
 }
 
 /**
+ * Recover required guided commands from their durable private transcripts after
+ * a manual controller resume. The transcript is evidence of an already-run
+ * installed CLI command; this never replays product behavior.
+ *
+ * @param {{ runId: string, reportsRoot: string, commandResults: Array<Record<string, unknown>> }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function hydrateGuidedCommandResults(options) {
+  const results = [...options.commandResults];
+  const observedLabels = new Set(results.map((entry) => asNonEmptyString(entry.label)).filter(Boolean));
+  const transcriptRoot = path.join(
+    options.reportsRoot,
+    `live-e2e-command-traces-${normalizeId(options.runId)}`,
+  );
+  if (!fs.existsSync(transcriptRoot)) return results;
+
+  for (const name of fs.readdirSync(transcriptRoot).filter((entry) => entry.endsWith(".json")).sort()) {
+    const transcriptFile = path.join(transcriptRoot, name);
+    const transcript = readJsonIfPresent(transcriptFile);
+    const label = asNonEmptyString(transcript.label);
+    if (!REQUIRED_GUIDED_COMMAND_LABELS.includes(label) || observedLabels.has(label)) continue;
+    if (transcript.timed_out === true || Number(transcript.exit_code) !== 0) continue;
+    results.push({
+      label,
+      status: "pass",
+      exit_code: 0,
+      transcript_file: transcriptFile,
+      parsed_payload: asRecord(transcript.parsed_json),
+    });
+    observedLabels.add(label);
+  }
+  return results;
+}
+
+/**
  * @param {Array<Record<string, unknown>>} commandResults
  * @returns {Record<string, string>}
  */
@@ -385,13 +420,14 @@ function buildFlowLoopProof(artifacts) {
  * }} options
  */
 export function buildGuidedJourneyProof(options) {
-  const commandLabels = options.commandResults.map((entry) => asNonEmptyString(entry.label)).filter(Boolean);
-  const transcriptFiles = options.commandResults
+  const commandResults = hydrateGuidedCommandResults(options);
+  const commandLabels = commandResults.map((entry) => asNonEmptyString(entry.label)).filter(Boolean);
+  const transcriptFiles = commandResults
     .filter((entry) => REQUIRED_GUIDED_COMMAND_LABELS.includes(asNonEmptyString(entry.label)))
     .map((entry) => asNonEmptyString(entry.transcript_file))
     .filter(Boolean);
   const outputPolicy = asRecord(options.profile.output_policy);
-  const requiredArtifactFiles = collectRequiredArtifactFiles(options.commandResults, options.artifacts);
+  const requiredArtifactFiles = collectRequiredArtifactFiles(commandResults, options.artifacts);
   const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
 
   return {

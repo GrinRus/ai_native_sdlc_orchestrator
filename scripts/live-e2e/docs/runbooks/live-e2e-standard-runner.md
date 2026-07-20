@@ -598,7 +598,14 @@ the transcript remains evidence and run-health records
 `failure_owner=target_repository`, `failure_phase=target_verification`, and
 `failure_class=post_run_diagnostic_timeout` on the diagnostic command entry.
 Diagnostic classification is based on this explicit intent metadata, not on
-command labels containing the word `diagnostic`.
+command-label substring matching.
+
+Manual controller resumes rebuild guided proof command coverage from successful,
+durable installed-CLI transcripts when an earlier in-memory command result is no
+longer present. This is evidence hydration only: the private runner does not
+replay the public command or import product runtime logic. A diagnostic with
+`diagnostic_failure_mode=warn` remains in `diagnostic_health` and does not also
+count as a failed public control-plane command.
 
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 
