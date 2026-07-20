@@ -83,7 +83,9 @@ export { runEvaluationSuite } from "../eval-runner.mjs";
 export { replayHarnessCapture } from "../harness-capture-replay.mjs";
 export {
   applyIncidentRecertification,
+  closeQualityRepairRequest,
   listReviewDecisions,
+  listQualityRepairRequests,
   materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
   materializeReviewDecision,

@@ -496,6 +496,8 @@ lifecycle_command_operations:
       command: review run
     - operation_id: review.decide
       command: review decide
+    - operation_id: repair.close
+      command: repair close
     - operation_id: deliver.prepare
       command: deliver prepare
     - operation_id: release.prepare

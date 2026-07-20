@@ -80,6 +80,20 @@ is `requested`, `in-progress`, `review-required`, `qa-required`, or
 `budget-exhausted`. A `budget-exhausted` request may be bypassed only by an
 explicit operator approval artifact referenced from `operator_override_ref`.
 
+## Public closure transition
+
+`aor repair close` is the canonical public mutation for closing a repair
+request. It requires matching project, run, and request identities plus the
+refreshed evidence refs that prove the repair cycle completed. The mutation
+fails closed unless the latest review and Runtime Harness evidence pass. A
+request originating from QA, or currently in `qa-required`, also requires an
+explicit QA evidence ref.
+
+The transition is idempotent for an already closed matching request. Requests
+in `requested`, `in-progress`, or `budget-exhausted` cannot be closed. Internal
+rehearsal tooling must call this public mutation rather than updating the
+artifact or importing observability helpers directly.
+
 ## Status history
 `status_history[]` may record status transitions with `status`, `changed_at`,
 `summary`, and `evidence_refs[]`. It is additive read evidence; the current
