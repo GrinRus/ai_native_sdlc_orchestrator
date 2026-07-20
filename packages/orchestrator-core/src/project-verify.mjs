@@ -6,9 +6,9 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
-import { captureCheckoutSnapshot, compareCheckoutSnapshots, isSupportedWorkspaceMode, prepareWorkspaceIsolation } from "./workspace-isolation.mjs";
+import { captureCheckoutSnapshot, compareCheckoutSnapshots, isSupportedWorkspaceMode } from "./workspace-isolation.mjs";
+import { finalizeVerificationWorkspaceIsolation, resolveVerificationWorkspaceIsolation } from "./verification-workspace-isolation.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
-
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
 const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 const MIN_VERIFICATION_COMMAND_TIMEOUT_MS = 1000;
@@ -1387,13 +1387,10 @@ function executeProjectVerificationTransaction(options = {}) {
   const verificationFailureBaselineIndex = collectVerificationFailureBaselineIndex(outputQualityBaselineFiles);
   const runId = `${init.projectId}.verify.${verificationLabel}.v1`;
   const sourceSnapshotBefore = captureCheckoutSnapshot(init.projectRoot);
-  const workspaceIsolation = prepareWorkspaceIsolation({
-    projectRoot: init.projectRoot,
-    runtimeRoot: init.runtimeRoot,
-    projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
-    runtimeDefaults: preflightSafety.runtimeDefaults,
-    runId,
-  });
+  const verificationWorkspace = resolveVerificationWorkspaceIsolation(
+    { init, runtimeDefaults: preflightSafety.runtimeDefaults, executionRoot: options.executionRoot, runId },
+  );
+  const workspaceIsolation = verificationWorkspace.isolation;
   const commandGroups = collectVerificationCommandGroups(profile, {
     repoBuildCommands: options.repoBuildCommands,
     repoLintCommands: options.repoLintCommands,
@@ -1865,7 +1862,9 @@ function executeProjectVerificationTransaction(options = {}) {
     (result) => result.status === "failed" && result.command_group_enforcement === "observe",
   );
   const summaryStatus = requiredFailures.length > 0 ? "failed" : warningFailures.length > 0 ? "warn" : "passed";
-  const cleanupResult = workspaceIsolation.finalize(summaryStatus === "passed" ? "success" : "failure");
+  const cleanupResult = finalizeVerificationWorkspaceIsolation(
+    { isolation: workspaceIsolation, reused: verificationWorkspace.reused, outcome: summaryStatus === "passed" ? "success" : "failure" },
+  );
   const commandGroupResults = commandGroups.map((group) => {
     const groupSteps = stepResults.filter((result) => result.command_group_id === group.groupId);
     const failedSteps = groupSteps.filter((result) => result.status === "failed");

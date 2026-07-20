@@ -516,6 +516,56 @@ test("verifyProjectRuntime supports worktree isolation mode and retains workspac
   });
 });
 
+test("verifyProjectRuntime resumes and retains the owned workspace that contains repair output", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    const markerCheck =
+      'node -e "process.exit(require(\\"node:fs\\").existsSync(\\"repair-marker.txt\\") ? 0 : 7)"';
+    const patched = profileContent
+      .replace("workspace_mode: ephemeral", "workspace_mode: workspace-clone")
+      .replace("- pnpm build", `- '${markerCheck}'`)
+      .replace("- pnpm test", "- 'node -e \"process.exit(0)\"'")
+      .replace("- pnpm lint", "- 'node -e \"process.exit(0)\"'");
+    fs.writeFileSync(profilePath, patched, "utf8");
+
+    const initial = verifyProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const retainedRoot = initial.verifySummary.execution_isolation.execution_root;
+    assert.equal(initial.verifySummary.status, "failed");
+    assert.equal(initial.verifySummary.execution_isolation.cleanup.status, "retained");
+    fs.writeFileSync(path.join(retainedRoot, "repair-marker.txt"), "repair output\n", "utf8");
+
+    const resumed = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      executionRoot: retainedRoot,
+    });
+
+    assert.equal(resumed.verifySummary.status, "passed");
+    assert.equal(resumed.verifySummary.execution_isolation.execution_root, retainedRoot);
+    assert.equal(resumed.verifySummary.execution_isolation.provisioning, "resumed-owned-workspace");
+    assert.deepEqual(resumed.verifySummary.execution_isolation.cleanup, {
+      outcome: "success",
+      action: "retain",
+      status: "retained",
+      performed: false,
+      exists_after: true,
+      error: null,
+    });
+    assert.equal(fs.existsSync(path.join(retainedRoot, "repair-marker.txt")), true);
+    assert.equal(fs.existsSync(path.join(repoRoot, "repair-marker.txt")), false);
+  });
+});
+
+test("verifyProjectRuntime rejects the primary checkout as a repair execution root", () => {
+  withTempRepo((repoRoot) => {
+    assert.throws(
+      () => verifyProjectRuntime({ projectRef: repoRoot, cwd: repoRoot, executionRoot: repoRoot }),
+      /Only an owned disposable workspace can be resumed/u,
+    );
+  });
+});
+
 test("verifyProjectRuntime reports blocked next step when bounded command fails", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

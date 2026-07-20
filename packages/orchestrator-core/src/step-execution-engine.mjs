@@ -981,6 +981,7 @@ function writeRuntimeRepairInput(options) {
  *   adaptersRoot?: string,
  *   skillsRoot?: string,
  *   executionRoot?: string,
+ *   reuseDisposableWorkspace?: boolean,
  *   requireDiscoveryCompleteness?: boolean,
  *   approvedHandoffRef?: string,
  *   promotionEvidenceRefs?: string[],

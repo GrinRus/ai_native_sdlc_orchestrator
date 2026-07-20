@@ -1922,6 +1922,29 @@ test("run start rejects an invalid explicit project profile before durable state
   });
 });
 
+test("run start accepts repair workspace lineage but rejects the primary checkout", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli([
+      "run",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "repair-primary-checkout-rejected",
+      "--execution-root",
+      projectRoot,
+      "--require-validation-pass",
+      "false",
+    ]);
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.stderr, /Only an owned disposable workspace can be resumed/u);
+  });
+});
+
 test("W6 ui attach/detach command pack reports lifecycle state and preserves headless operation", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
@@ -3768,6 +3791,26 @@ test("project verify --plan exposes command-group plan without executing target 
     );
     const serializedPlan = JSON.stringify(parsed.verification_plan);
     assert.equal(privatePattern.test(serializedPlan), false);
+  });
+});
+
+test("project verify rejects repair workspace lineage in plan-only mode", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--execution-root",
+      projectRoot,
+      "--plan",
+    ]);
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.stderr, /cannot be combined with '--plan'/u);
   });
 });
 

@@ -13,6 +13,7 @@ export const RUN_START_COMMAND_DEFINITION = Object.freeze({
       "--target-step <step_class> (optional, defaults to implement)",
       "--require-validation-pass <true|false> (optional, defaults to true)",
       "--approved-handoff-ref <ref> (optional)",
+      "--execution-root <path> (optional, resume owned repair workspace)",
       "--execution-plan-ref <ref> (optional, paired with either --execution-unit-id or --workspace-set-ref)",
       "--execution-unit-id <id> (optional, selects one child unit)",
       "--workspace-set-ref <ref> (optional, starts one parent run)",

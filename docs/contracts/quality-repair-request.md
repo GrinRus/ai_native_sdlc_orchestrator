@@ -132,5 +132,13 @@ This path follows the same route, wrapper, prompt bundle, context bundle,
 policy, and adapter resolution as other routed steps. It does not introduce
 provider-specific behavior or a private repair channel.
 
+Repair execution resumes the owner-marked disposable workspace that produced
+the finding. A new repair run may add an attempt and new evidence, but it must
+not start from a clean primary checkout, discard prior changed paths, or verify
+a different tree. `run start --execution-root <owned-workspace>` and
+`project verify --execution-root <owned-workspace>` are the canonical public
+surfaces for this lineage; both reject primary, external, and wrong-project
+roots before provider or verification commands run.
+
 ## Example
 See `examples/reports/quality-repair-request*.yaml`.

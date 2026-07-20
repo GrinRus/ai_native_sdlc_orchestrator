@@ -180,6 +180,7 @@ Project bootstrap baseline:
 - `project verify` enforces a bounded per-command timeout derived from the project profile and records command evidence through `command_timeout_ms`, `timed_out`, `started_at`, `finished_at`, `duration_ms`, `exit_code`, `signal`, `error_code`, bounded output excerpts, transcripts, and `timed_out_commands`.
 - `project verify` treats high-signal warning output in stderr as a failed command even when the process exits 0. Step results record bounded `output_quality_findings[]`, and verify summaries aggregate `output_quality_failed_commands[]` plus the active `output_quality_warning_patterns[]`.
 - `project verify` accepts repeatable `output_quality_baseline` inputs that point to previous verify summaries. Matching warning classes remain in `output_quality_findings[]` with `baseline_status=pre_existing` and are aggregated under `output_quality_baseline_matches[]`, but only non-baseline warning findings fail the current verify. Matching failed baseline commands are reported through `baseline_failure_status=pre_existing` on the current step-result and aggregated under `verification_failure_baseline_matches[]`, allowing read models to separate broken-baseline evidence from new post-change regressions.
+- `project verify` accepts an optional `execution_root` only when it identifies an owner-marked disposable workspace inside the selected project runtime. Verification runs against that exact retained tree and does not delete it; primary checkout, launcher directory, and arbitrary external paths are rejected as execution roots.
 - `project verify` disables inherited Node compile-cache state for target commands so AOR runtime/session caches cannot contaminate package-manager, lint, test, or build execution in target checkouts.
 - Run summaries include source metadata (`commit_sha`, `branch_name`) so qualification accounting can reject stale or cross-branch evidence before counting a run.
 
@@ -548,6 +549,7 @@ Command payload baseline:
 - `target_step` (optional for `start`, required for `steer`);
 - `require_validation_pass` (optional start-only boolean, defaults to true for public execution runs);
 - `approved_handoff_ref` (optional start-only evidence ref for bounded execution provenance);
+- `execution_root` (optional start-only owned disposable workspace to resume for a repair attempt);
 - `promotion_evidence_refs` (optional start-only evidence refs for delivery/release-safe execution start);
 - `approval_ref` (required by high-risk policy guardrails when applicable).
 
@@ -569,6 +571,7 @@ Durable audit baseline:
 
 Full-journey execution baseline (W13):
 - `run start` is the canonical public execution entrypoint for full-journey live runs;
+- repair execution may pass the prior run's owned disposable `execution_root`; the runtime validates its owner marker, preserves the accumulated diff, and records the new attempt without falling back to the primary checkout;
 - successful execution emits one run-linked `step-result` plus terminal `live-run-event` lineage;
 - `run status` resolves that execution lineage without requiring harness-private execution state.
 - `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so provider-pinned routing can be applied deterministically through the public CLI surface.

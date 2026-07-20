@@ -249,6 +249,7 @@ export function handleRunControlCommand(context) {
         ? runAction === "start"
         : resolveOptionalBooleanFlag("require-validation-pass", flags["require-validation-pass"]);
     const approvedHandoffRef = resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]);
+    const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
     const executionPlanRef = resolveOptionalStringFlag("execution-plan-ref", flags["execution-plan-ref"]);
     const executionUnitId = resolveOptionalStringFlag("execution-unit-id", flags["execution-unit-id"]);
     const workspaceSetRef = resolveOptionalStringFlag("workspace-set-ref", flags["workspace-set-ref"]);
@@ -280,6 +281,9 @@ export function handleRunControlCommand(context) {
     }
     if (runAction !== "start" && approvedHandoffRef) {
       throw new CliUsageError(`Flag '--approved-handoff-ref' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && executionRoot) {
+      throw new CliUsageError(`Flag '--execution-root' is only valid for 'aor run start'.`);
     }
     if (runAction !== "start" && (executionPlanRef || executionUnitId || workspaceSetRef)) {
       throw new CliUsageError(
@@ -587,6 +591,8 @@ export function handleRunControlCommand(context) {
           stepId: `run.start.${targetStep ?? "implement"}`,
           requireDiscoveryCompleteness: true,
           approvedHandoffRef: approvedHandoffRef ?? undefined,
+          executionRoot: executionRoot ?? undefined,
+          reuseDisposableWorkspace: Boolean(executionRoot),
           promotionEvidenceRefs,
           routeOverrides,
           policyOverrides,

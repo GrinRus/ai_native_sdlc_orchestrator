@@ -1,7 +1,6 @@
 import { RUN_INTEGRATION_COMMAND_DEFINITION, RUN_RETRY_COMMAND_DEFINITION, RUN_START_COMMAND_DEFINITION } from "./scheduler-command-definitions.mjs";
 
 export const RUNTIME_ROOT_DIRNAME = ".aor";
-
 const COMMAND_DEFINITIONS = Object.freeze([
   {
     command: "doctor",
@@ -422,6 +421,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path>",
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
+      "--execution-root <path> (optional, owned retained workspace)",
       "--require-validation-pass (optional)",
       "--verification-label <label> (optional)",
       "--plan (optional)",

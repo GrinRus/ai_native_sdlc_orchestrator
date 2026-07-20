@@ -334,7 +334,16 @@ export function prepareWorkspaceIsolation(options) {
 export function resumeWorkspaceIsolation(options) {
   const sourceRoot = canonicalDirectory(options.projectRoot, "Primary checkout");
   const projectRuntimeRoot = canonicalDirectory(options.projectRuntimeRoot, "Project runtime root");
-  const workspacesRoot = canonicalDirectory(path.join(projectRuntimeRoot, "workspaces"), "Managed workspaces root");
+  const workspacesRootCandidate = path.join(projectRuntimeRoot, "workspaces");
+  const executionRootCandidate = path.resolve(options.executionRoot);
+  if (
+    !fs.existsSync(workspacesRootCandidate) ||
+    executionRootCandidate === sourceRoot ||
+    !isPathInsideRoot(executionRootCandidate, workspacesRootCandidate)
+  ) {
+    throw new Error("Only an owned disposable workspace can be resumed.");
+  }
+  const workspacesRoot = canonicalDirectory(workspacesRootCandidate, "Managed workspaces root");
   const executionRoot = canonicalDirectory(options.executionRoot, "Disposable execution root");
   if (executionRoot === sourceRoot || !isPathInsideRoot(executionRoot, workspacesRoot)) {
     throw new Error("Only an owned disposable workspace can be resumed.");
