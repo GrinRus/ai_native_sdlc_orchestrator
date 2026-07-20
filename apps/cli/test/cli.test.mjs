@@ -2243,6 +2243,59 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
   });
 });
 
+test("release prepare binds changed-path evidence to an explicit retained execution root", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    const retainedRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-release-root-")));
+    try {
+      runGitChecked({ cwd: projectRoot, args: ["worktree", "add", "--detach", retainedRoot, "HEAD"] });
+      fs.appendFileSync(path.join(retainedRoot, "examples/project.aor.yaml"), "\n# retained release evidence\n", "utf8");
+      seedStrictRuntimeHarnessReport({
+        projectRoot,
+        runId: "release-retained-root",
+        meaningfulChangedPaths: ["examples/project.aor.yaml"],
+      });
+
+      const result = invokeCli([
+        "release",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--execution-root",
+        retainedRoot,
+        "--run-id",
+        "release-retained-root",
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        "evidence://handoff/release-retained-root",
+        "--promotion-evidence-refs",
+        "evidence://promotion/release-retained-root",
+      ]);
+      assert.equal(result.exitCode, 0, result.stderr);
+      const payload = JSON.parse(result.stdout);
+      const manifest = JSON.parse(fs.readFileSync(payload.delivery_manifest_file, "utf8"));
+      assert.equal(payload.release_packet_status, "ready-for-close");
+      assert.deepEqual(manifest.repo_deliveries[0].changed_paths, ["examples/project.aor.yaml"]);
+      const primaryStatus = spawnSync("git", ["status", "--short", "--untracked-files=no"], {
+        cwd: projectRoot,
+        encoding: "utf8",
+      });
+      assert.equal(primaryStatus.status, 0, primaryStatus.stderr);
+      assert.equal(primaryStatus.stdout.trim(), "");
+    } finally {
+      runGitChecked({ cwd: projectRoot, args: ["worktree", "remove", "--force", retainedRoot] });
+      fs.rmSync(retainedRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 test("strict delivery prepare blocks without Runtime Harness execution evidence", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });

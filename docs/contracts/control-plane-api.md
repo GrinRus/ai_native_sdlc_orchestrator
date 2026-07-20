@@ -606,6 +606,7 @@ Answer validation baseline for W18:
 
 Delivery/release payload baseline:
 - `run_id` (optional command-scoped run identity; deterministic fallback when omitted);
+- `execution_root` (optional canonical retained workspace root; delivery and release inspect the same run-owned tree that produced the approved evidence);
 - `step_class` (optional, defaults to `implement`);
 - `mode` (optional override; must be one of `no-write | patch-only | local-branch | fork-first-pr`);
 - `quality_gate_mode` (optional for `deliver prepare`, defaults to `strict`; `release prepare` always uses strict semantics);
@@ -621,6 +622,7 @@ Delivery/release guardrail baseline:
 - non-`no-write` flows stay blocked when approved handoff or promotion evidence is missing;
 - route governance decisions resolve to `allow|deny|escalate` with explicit reason codes before write-back paths;
 - `release prepare` fails fast with explicit precondition blocking reasons and does not bypass delivery-plan guardrails.
+- `release prepare` uses the run-owned `execution_root` when approved Runtime Harness evidence reports meaningful changed paths; a clean primary checkout is not valid replacement lineage.
 
 Delivery/release response baseline:
 - `delivery_plan_file` and `delivery_plan_status` for policy traceability;
