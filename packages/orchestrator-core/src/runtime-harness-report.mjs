@@ -9,7 +9,7 @@ import {
   filterMeaningfulCodeChangedPaths,
   filterNonBootstrapChangedPaths,
 } from "./shared/mission-scope.mjs";
-
+import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
 const RUNTIME_HARNESS_DECISIONS = new Set(["pass", "retry", "repair", "escalate", "block", "fail"]);
 /**
  * @param {unknown} value
@@ -1083,7 +1083,7 @@ function resolveReviewFindings(qualityArtifacts) {
     .filter((artifact) => artifact.family === "review-report")
     .flatMap((artifact) =>
       asRecordArray(artifact.document.findings).map((finding) => ({
-        finding_id: asString(finding.finding_id) ?? `review.${normalizeId(asString(finding.category) ?? "finding")}`,
+        finding_id: asString(finding.finding_id) ?? boundedDerivedId("review-finding", `review.${normalizeId(asString(finding.category) ?? "finding")}`),
         severity: asString(finding.severity) ?? "warn",
         category: asString(finding.category) ?? "review",
         failure_class: failureClassForReviewFinding(finding),
@@ -1103,7 +1103,7 @@ function resolveEvaluationFindings(qualityArtifacts) {
     .map((artifact) => {
       const status = asString(artifact.document.status) ?? "unknown";
       return {
-        finding_id: `${asString(artifact.document.report_id) ?? "evaluation-report"}.eval-${normalizeId(status)}`,
+        finding_id: boundedDerivedId("evaluation-finding", `${asString(artifact.document.report_id) ?? "evaluation-report"}.eval-${normalizeId(status)}`),
         severity: status === "fail" || status === "failed" ? "fail" : "warn",
         category: "eval",
         failure_class: "eval-failed",
@@ -1134,7 +1134,7 @@ function resolveDeliveryFindings(deliveryArtifacts, missionSemantics) {
     const status = asString(artifact.document.status) ?? "unknown";
     if (status === "failed" || status === "blocked") {
       findings.push({
-        finding_id: `${manifestId}.delivery-${normalizeId(status)}`,
+        finding_id: boundedDerivedId("delivery-finding", `${manifestId}.delivery-${normalizeId(status)}`),
         severity: "fail",
         category: "delivery",
         failure_class: "delivery-failed",
@@ -1147,7 +1147,7 @@ function resolveDeliveryFindings(deliveryArtifacts, missionSemantics) {
     const nonBootstrapChangedPaths = filterMeaningfulCodeChangedPaths(filterNonBootstrapChangedPaths(changedPaths));
     if (missionSemantics.strictCodeChangingNoop && nonBootstrapChangedPaths.length === 0) {
       findings.push({
-        finding_id: `${manifestId}.delivery-empty-patch`,
+        finding_id: boundedDerivedId("delivery-finding", `${manifestId}.delivery-empty-patch`),
         severity: "fail",
         category: "delivery",
         failure_class: "delivery-empty-patch",
@@ -1275,7 +1275,7 @@ export function materializeRuntimeHarnessReport(options) {
   const stepFindings = stepDecisions
     .filter((decision) => asString(decision.runtime_harness_decision) !== "pass")
     .map((decision) => ({
-      finding_id: `${options.runId}.${normalizeId(asString(decision.step_id) ?? "step")}.${asString(decision.failure_class) ?? "unknown"}`,
+      finding_id: boundedDerivedId("runtime-finding", `${options.runId}.${normalizeId(asString(decision.step_id) ?? "step")}.${asString(decision.failure_class) ?? "unknown"}`),
       severity: ["block", "fail"].includes(asString(decision.runtime_harness_decision) ?? "") ? "fail" : "warn",
       category: "runtime",
       failure_class: asString(decision.failure_class) ?? "unknown",
@@ -1301,12 +1301,12 @@ export function materializeRuntimeHarnessReport(options) {
   const unresolvedGaps = runFindings
     .filter((finding) => finding.severity === "fail")
     .map((finding) => ({
-      gap_id: `${finding.finding_id}.gap`,
+      gap_id: boundedDerivedId("runtime-gap", `${finding.finding_id}.gap`),
       summary: finding.summary,
       evidence_refs: finding.evidence_refs,
     }));
   const recommendations = runFindings.map((finding) => ({
-    recommendation_id: `${finding.finding_id}.recommendation`,
+    recommendation_id: boundedDerivedId("runtime-recommendation", `${finding.finding_id}.recommendation`),
     action: recommendationActionForFinding(finding),
     summary: finding.summary,
     evidence_refs: finding.evidence_refs,
@@ -1322,7 +1322,7 @@ export function materializeRuntimeHarnessReport(options) {
     .find((lineage) => Object.keys(lineage).length > 0);
 
   const report = {
-    report_id: `${options.runId}.runtime-harness-report.v1`,
+    report_id: boundedDerivedId("runtime-harness-report", `${options.runId}.runtime-harness-report.v1`),
     project_id: init.projectId,
     run_id: options.runId,
     generated_at: new Date().toISOString(),

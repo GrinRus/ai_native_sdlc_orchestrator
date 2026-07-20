@@ -797,6 +797,60 @@ test("materializeRuntimeHarnessReport flags strict code-changing empty delivery 
   });
 });
 
+test("materializeRuntimeHarnessReport bounds generated IDs for long delivery lineage", () => {
+  withTempRepo((repoRoot) => {
+    const runId = `runtime-harness-${"long-".repeat(5)}case`;
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId,
+      stepId: "run.start.implement",
+    });
+    const manifestId = `${runId}.delivery-manifest.patch-only.${"9".repeat(24)}`;
+    const deliveryManifestPath = path.join(step.runtimeLayout.artifactsRoot, `delivery-manifest-${runId}.json`);
+    fs.writeFileSync(
+      deliveryManifestPath,
+      `${JSON.stringify(
+        {
+          manifest_id: manifestId,
+          project_id: "aor-core",
+          ticket_id: "ticket.runtime-harness-long-delivery",
+          run_refs: [`run://${runId}`],
+          step_ref: `step://${runId}/run.start.implement`,
+          delivery_mode: "patch-only",
+          writeback_policy: { mode: "patch-only", network_mode: "disabled" },
+          repo_deliveries: [{ repo_id: "main", changed_paths: ["src/implemented.js"], writeback_result: "failed" }],
+          verification_refs: [],
+          approval_context: {},
+          evidence_root: "evidence://delivery/failed",
+          source_refs: {},
+          status: "failed",
+          created_at: "2026-07-20T00:00:00.000Z",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const first = materializeRuntimeHarnessReport({ projectRef: repoRoot, cwd: repoRoot, runId });
+    const second = materializeRuntimeHarnessReport({ projectRef: repoRoot, cwd: repoRoot, runId });
+    const generatedIds = [
+      first.report.report_id,
+      ...first.report.run_findings.map((finding) => finding.finding_id),
+      ...first.report.recommendations.map((recommendation) => recommendation.recommendation_id),
+      ...first.report.unresolved_gaps.map((gap) => gap.gap_id),
+    ];
+
+    assert.equal(first.report.overall_decision, "fail");
+    assert.equal(generatedIds.every((identifier) => identifier.length >= 1 && identifier.length <= 128), true);
+    assert.deepEqual(second.report.recommendations, first.report.recommendations);
+    assert.deepEqual(second.report.unresolved_gaps, first.report.unresolved_gaps);
+  });
+});
+
 test("executeRoutedStep keeps same-step routed artifacts distinct for repeated executions in one runtime root", () => {
   withTempRepo((repoRoot) => {
     const first = executeRoutedStep({
