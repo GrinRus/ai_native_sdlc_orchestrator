@@ -1,5 +1,10 @@
 # Live E2E target catalog
 
+`verification.execution_environment` is optional and bounded to `default | ci`.
+The `ci` mode adds only `CI=1` to target setup and verification subprocesses;
+arbitrary environment maps and host-secret forwarding are forbidden. Private
+proof evidence records the effective mode and variable names, never values.
+
 ## Purpose
 Machine-readable internal catalog document that binds one curated repository to its live E2E missions, required matrix cells, and provider comparison expectations.
 

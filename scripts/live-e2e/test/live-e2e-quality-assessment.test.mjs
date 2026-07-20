@@ -455,6 +455,12 @@ test("quality assessment validate does not treat free-form file names as local e
     evidence_refs: [requestFile],
   });
   report.recommended_followups.push("Clarify README.md wording if this mission graduates from rehearsal to release.");
+  report.diagnostics = {
+    command: "/missing/bin/aor run start",
+    route_id: "route://not-a-local-file",
+    model: "claude-default",
+    inline_yaml: "./missing.yaml: this is diagnostic text",
+  };
   writeJson(assessmentFile, report);
 
   const result = runQualityAssessment(["validate", "--assessment-report-file", assessmentFile]);
@@ -462,6 +468,7 @@ test("quality assessment validate does not treat free-form file names as local e
   const output = JSON.parse(result.stdout);
   assert.equal(output.status, "ok");
   assert.equal(output.missing_local_refs.some((entry) => entry.ref.endsWith("README.md")), false);
+  assert.equal(output.missing_local_refs.some((entry) => entry.ref.includes("/missing/bin/aor")), false);
 });
 
 test("quality assessment validate fails when inspected local evidence is missing", () => {

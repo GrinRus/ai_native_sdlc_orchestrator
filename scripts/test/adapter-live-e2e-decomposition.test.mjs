@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -31,16 +32,23 @@ test("provider-neutral adapter boundaries remain focused and package-owned", () 
   }
 });
 
-test("private proof contracts consume the public kernel without production reverse imports", () => {
-  assert.match(
-    source("scripts/live-e2e/lib/contracts/contract-kernel.mjs"),
-    /packages\/contracts\/src\/families\.mjs/u,
-  );
-  for (const relativeFile of [
-    "packages/adapter-sdk/src/index.mjs",
-    "packages/contracts/src/index.mjs",
-    "packages/orchestrator-core/src/step-execution-engine.mjs",
-  ]) {
-    assert.doesNotMatch(source(relativeFile), /scripts\/live-e2e/u);
+test("production and private live-E2E runtime modules have no executable cross-boundary imports", () => {
+  const tracked = execFileSync("git", ["ls-files", "packages/*/src/**/*.mjs", "apps/*/src/**/*.mjs", "scripts/live-e2e/lib/**/*.mjs"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n").filter(Boolean);
+  for (const relativeFile of tracked) {
+    const text = source(relativeFile);
+    if (relativeFile.startsWith("scripts/live-e2e/lib/")) {
+      const imports = [...text.matchAll(/(?:from\s+|import\s*\()\s*["']([^"']+)["']/gu)].map((match) => match[1]);
+      for (const specifier of imports.filter((entry) => entry.startsWith("."))) {
+        const resolved = path.resolve(root, path.dirname(relativeFile), specifier);
+        assert.equal(resolved.startsWith(path.join(root, "packages")), false, `${relativeFile} imports ${specifier}`);
+        assert.equal(resolved.startsWith(path.join(root, "apps")), false, `${relativeFile} imports ${specifier}`);
+      }
+    } else {
+      assert.doesNotMatch(text, /scripts\/live-e2e/u, relativeFile);
+    }
   }
+  assert.doesNotMatch(source("scripts/live-e2e/lib/contracts/contract-kernel.mjs"), /packages\/|apps\//u);
 });

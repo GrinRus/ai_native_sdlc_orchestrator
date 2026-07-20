@@ -37,7 +37,7 @@ import {
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
 import {
-  changedPathsHaveMissionRelevantChanges,
+  changedPathsHaveMissionRelevantChanges, collectDeliveryManifestChangedPaths,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
   executeFullJourneyFlow,
@@ -2091,7 +2091,7 @@ function refreshRuntimeHarnessChangeEvidenceForSummary(artifacts, mission, produ
   const meaningfulChangedPaths = reconcileSummaryMeaningfulChangedPaths(uniqueStrings([
     ...runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
     ...reviewChangedPaths,
-  ]), { targetCheckoutRoot: asNonEmptyString(artifacts.target_checkout_root) });
+  ]), { authorizedChangedPaths: collectDeliveryManifestChangedPaths(artifacts.delivery_manifest_file) });
   if (meaningfulChangedPaths.length > 0) {
     artifacts.meaningful_changed_paths = meaningfulChangedPaths;
   }

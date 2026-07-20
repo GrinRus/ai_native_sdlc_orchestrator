@@ -3,12 +3,10 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { CONTRACT_FAMILY_INDEX } from "./contract-kernel.mjs";
-import {
-  INTAKE_SOURCE_KIND_VALUES,
-  LIVE_E2E_OBSERVATION_STATUS_VALUES,
-} from "./families.mjs";
+import { INTAKE_SOURCE_KIND_VALUES, LIVE_E2E_OBSERVATION_STATUS_VALUES } from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
-import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs"; import { validateRuntimeHarnessParentRelation } from "../../../../packages/contracts/src/runtime-harness-validation.mjs";
+import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
+import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs";
 
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
@@ -2896,6 +2894,8 @@ function validateTargetMatrixCell(options) {
 function validateLiveE2ETargetCatalog(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  const verification = isPlainObject(document.verification) ? document.verification : null;
+  if (verification && "execution_environment" in verification) validateNestedEnumStringField({ record: verification, source, field: "verification.execution_environment", allowedValues: ["default", "ci"], issues, required: false });
   const missions = Array.isArray(document.feature_missions) ? document.feature_missions : [];
   /** @type {Map<string, Record<string, unknown>>} */
   const missionById = new Map();

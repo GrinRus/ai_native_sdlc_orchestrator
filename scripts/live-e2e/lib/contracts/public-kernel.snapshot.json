@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "kernel_version": 9,
+  "schema_version": 2,
+  "kernel_version": 10,
   "source": "packages/contracts/src",
   "files": {
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
@@ -19,5 +19,2483 @@
     "runtime-harness-validation.mjs": "75cd2ee07e4f72ebb36261160e97eeb16e99b0d4d3a8075d0136bd65e44189df",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
-  }
+  },
+  "contract_families": [
+    {
+      "family": "project-profile",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/project-profile.md",
+      "exampleGlob": "examples/project*.aor.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "project_id",
+        "display_name",
+        "repo_topology",
+        "repos",
+        "allowed_providers",
+        "allowed_adapters",
+        "registry_roots",
+        "default_route_profiles",
+        "default_step_policies",
+        "default_wrapper_profiles",
+        "default_prompt_bundles",
+        "default_context_bundles",
+        "default_skill_profiles",
+        "skill_overrides",
+        "budget_policy",
+        "approval_policy",
+        "security_policy",
+        "runtime_defaults",
+        "writeback_policy"
+      ],
+      "fieldTypes": {
+        "project_id": "string",
+        "display_name": "string",
+        "repo_topology": "string",
+        "repos": "array",
+        "allowed_providers": "array",
+        "allowed_adapters": "array",
+        "registry_roots": "object",
+        "asset_mode": "string",
+        "default_route_profiles": "object",
+        "default_step_policies": "object",
+        "default_wrapper_profiles": "object",
+        "default_prompt_bundles": "object",
+        "default_context_bundles": "object",
+        "default_skill_profiles": "object",
+        "skill_overrides": "object",
+        "budget_policy": "object",
+        "approval_policy": "object",
+        "security_policy": "object",
+        "runtime_defaults": "object",
+        "writeback_policy": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "asset_mode",
+          "allowedValues": [
+            "bundled",
+            "materialized"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "project-binding",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/project-binding.md",
+      "exampleGlob": "examples/bindings/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "binding_id",
+        "project_id",
+        "profile_ref",
+        "revision",
+        "repositories"
+      ],
+      "fieldTypes": {
+        "binding_id": "string",
+        "project_id": "string",
+        "profile_ref": "string",
+        "revision": "number",
+        "repositories": "array"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "workspace-set",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/workspace-set.md",
+      "exampleGlob": "examples/workspace-sets/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "workspace_set_id",
+        "project_id",
+        "run_id",
+        "binding_ref",
+        "status",
+        "workspace_root",
+        "owner_marker",
+        "repositories",
+        "conflicts",
+        "cleanup",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "workspace_set_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "binding_ref": "string",
+        "status": "string",
+        "workspace_root": "string",
+        "owner_marker": "string",
+        "repositories": "array",
+        "conflicts": "array",
+        "cleanup": "object",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "planned",
+            "provisioning",
+            "ready",
+            "blocked",
+            "failed",
+            "released",
+            "cleaned"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "execution-profile",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/execution-profile.md",
+      "exampleGlob": "examples/execution/execution-profile*.yaml",
+      "status": "implemented",
+      "forbiddenFields": [
+        "credential",
+        "credentials",
+        "token",
+        "environment",
+        "auth_value"
+      ],
+      "requiredFields": [
+        "profile_id",
+        "project_id",
+        "revision",
+        "initialized",
+        "routes",
+        "read_only"
+      ],
+      "fieldTypes": {
+        "profile_id": "string",
+        "project_id": "string",
+        "revision": "number",
+        "initialized": "boolean",
+        "routes": "array",
+        "latest_readiness_ref": "string",
+        "read_only": "boolean"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "execution-readiness-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/execution-readiness-report.md",
+      "exampleGlob": "examples/execution/execution-readiness-report*.yaml",
+      "status": "implemented",
+      "forbiddenFields": [
+        "credential",
+        "credentials",
+        "token",
+        "environment",
+        "auth_value"
+      ],
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "revision",
+        "status",
+        "checked_at",
+        "step_results",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "revision": "number",
+        "status": "string",
+        "checked_at": "string",
+        "step_results": "array",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "unconfigured",
+            "runner-missing",
+            "auth-missing",
+            "model-unsupported",
+            "capability-mismatch",
+            "policy-denied",
+            "ready",
+            "stale"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "onboarding-report",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/onboarding-report.md",
+      "exampleGlob": "examples/reports/onboarding-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "version",
+        "generated_from",
+        "project_state",
+        "asset_mode",
+        "registry_roots",
+        "readiness",
+        "blockers",
+        "next_action",
+        "write_effects",
+        "status"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "version": "number",
+        "generated_from": "object",
+        "project_state": "object",
+        "asset_mode": "string",
+        "registry_roots": "object",
+        "readiness": "object",
+        "blockers": "array",
+        "next_action": "object",
+        "write_effects": "object",
+        "status": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "asset_mode",
+          "allowedValues": [
+            "bundled",
+            "materialized"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "ready",
+            "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "next-action-report",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/next-action-report.md",
+      "exampleGlob": "examples/reports/next-action-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "version",
+        "generated_from",
+        "project_state",
+        "mission_state",
+        "closure_state",
+        "primary_action",
+        "blockers",
+        "bounded_execution",
+        "evidence_refs",
+        "status",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "version": "number",
+        "generated_from": "object",
+        "project_state": "object",
+        "mission_state": "object",
+        "closure_state": "object",
+        "primary_action": "object",
+        "blockers": "array",
+        "bounded_execution": "object",
+        "evidence_refs": "array",
+        "status": "string",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "ready",
+            "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "project-analysis-report",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/project-analysis-report.md",
+      "exampleGlob": "examples/project-analysis-report.sample.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "version",
+        "generated_from",
+        "repo_facts",
+        "toolchain_facts",
+        "command_catalog",
+        "route_resolution",
+        "asset_resolution",
+        "policy_resolution",
+        "evaluation_registry",
+        "discovery_research",
+        "verification_plan",
+        "status"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "version": "number",
+        "generated_from": "object",
+        "repo_facts": "object",
+        "toolchain_facts": "object",
+        "command_catalog": "object",
+        "route_resolution": "object",
+        "asset_resolution": "object",
+        "policy_resolution": "object",
+        "evaluation_registry": "object",
+        "discovery_research": "object",
+        "verification_plan": "object",
+        "status": "string"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "discovery-research-report",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/discovery-research-report.md",
+      "exampleGlob": "examples/reports/discovery-research-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "version",
+        "generated_from",
+        "repository_facts",
+        "context_assets",
+        "research_inputs",
+        "open_questions",
+        "adr_ready_recommendations",
+        "completeness",
+        "status"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "version": "number",
+        "generated_from": "object",
+        "repository_facts": "object",
+        "context_assets": "object",
+        "research_inputs": "object",
+        "open_questions": "array",
+        "adr_ready_recommendations": "array",
+        "completeness": "object",
+        "status": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "adr-ready",
+            "incomplete"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "artifact-packet",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/artifact-packet.md",
+      "exampleGlob": "examples/packets/artifact-packet*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "packet_id",
+        "project_id",
+        "packet_type",
+        "version",
+        "status",
+        "summary",
+        "body_ref"
+      ],
+      "fieldTypes": {
+        "packet_id": "string",
+        "project_id": "string",
+        "packet_type": "string",
+        "version": "number",
+        "status": "string",
+        "summary": "string",
+        "body_ref": "string"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "intake-request-body",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/intake-request-body.md",
+      "exampleGlob": "examples/packets/intake-request-body*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "generated_from",
+        "project_identity",
+        "mission_traceability",
+        "product_intake",
+        "product_intake_completeness",
+        "mission_scope",
+        "feature_request",
+        "evidence_roots"
+      ],
+      "fieldTypes": {
+        "generated_from": "object",
+        "project_identity": "object",
+        "mission_traceability": "object",
+        "product_intake": "object",
+        "product_intake_completeness": "object",
+        "mission_scope": "object",
+        "feature_request": "object",
+        "evidence_roots": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "wave-ticket",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/wave-ticket.md",
+      "exampleGlob": "examples/packets/wave-ticket-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "ticket_id",
+        "project_id",
+        "objective",
+        "scope",
+        "dependencies",
+        "risk_tier",
+        "status",
+        "approved_input_ref"
+      ],
+      "fieldTypes": {
+        "ticket_id": "string",
+        "project_id": "string",
+        "objective": "string",
+        "scope": "object",
+        "dependencies": "array",
+        "risk_tier": "string",
+        "status": "string",
+        "approved_input_ref": "string"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "handoff-packet",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/handoff-packet.md",
+      "exampleGlob": "examples/packets/handoff-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "packet_id",
+        "project_id",
+        "ticket_id",
+        "version",
+        "status",
+        "risk_tier",
+        "approved_objective",
+        "repo_scopes",
+        "allowed_paths",
+        "allowed_commands",
+        "verification_plan",
+        "scope_constraints",
+        "command_policy",
+        "writeback_mode",
+        "approval_state"
+      ],
+      "fieldTypes": {
+        "packet_id": "string",
+        "project_id": "string",
+        "ticket_id": "string",
+        "version": "number",
+        "status": "string",
+        "risk_tier": "string",
+        "approved_objective": "string",
+        "repo_scopes": "array",
+        "allowed_paths": "array",
+        "allowed_commands": "array",
+        "verification_plan": "object",
+        "scope_constraints": "object",
+        "command_policy": "object",
+        "writeback_mode": "string",
+        "approval_state": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "execution-plan",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/execution-plan.md",
+      "exampleGlob": "examples/packets/execution-plan-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "execution_plan_id",
+        "project_id",
+        "plan_id",
+        "plan_version",
+        "plan_ref",
+        "plan_digest",
+        "status",
+        "execution_units",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "execution_plan_id": "string",
+        "project_id": "string",
+        "plan_id": "string",
+        "plan_version": "number",
+        "plan_ref": "string",
+        "plan_digest": "string",
+        "status": "string",
+        "execution_units": "array",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "ready",
+            "blocked",
+            "superseded",
+            "complete"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "integration-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/integration-report.md",
+      "exampleGlob": "examples/reports/integration-report-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "report_id",
+        "project_id",
+        "parent_run_id",
+        "execution_plan_ref",
+        "workspace_set_ref",
+        "status",
+        "revision",
+        "source_attempts",
+        "repository_results",
+        "aggregate_gates",
+        "stale_units",
+        "repair_refs",
+        "blockers",
+        "evidence_refs",
+        "created_at",
+        "updated_at"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "report_id": "string",
+        "project_id": "string",
+        "parent_run_id": "string",
+        "execution_plan_ref": "string",
+        "workspace_set_ref": "string",
+        "status": "string",
+        "revision": "number",
+        "source_attempts": "array",
+        "repository_results": "array",
+        "aggregate_gates": "array",
+        "stale_units": "array",
+        "repair_refs": "array",
+        "blockers": "array",
+        "evidence_refs": "array",
+        "created_at": "string",
+        "updated_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "pending",
+            "applying",
+            "verification-pending",
+            "blocked",
+            "repair-required",
+            "passed"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "task-progress-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/task-progress-report.md",
+      "exampleGlob": "examples/reports/task-progress-report-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "plan_id",
+        "plan_version",
+        "plan_ref",
+        "execution_plan_ref",
+        "overall_status",
+        "tasks",
+        "generated_at"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "plan_id": "string",
+        "plan_version": "number",
+        "plan_ref": "string",
+        "execution_plan_ref": "string",
+        "overall_status": "string",
+        "tasks": "array",
+        "generated_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "overall_status",
+          "allowedValues": [
+            "planned",
+            "in-progress",
+            "blocked",
+            "failed",
+            "stale",
+            "complete"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "release-packet",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/release-packet.md",
+      "exampleGlob": "examples/packets/release-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "packet_id",
+        "project_id",
+        "ticket_id",
+        "run_refs",
+        "change_summary",
+        "verification_refs",
+        "delivery_manifest_ref",
+        "evidence_lineage",
+        "status",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "packet_id": "string",
+        "project_id": "string",
+        "ticket_id": "string",
+        "run_refs": "array",
+        "change_summary": "string",
+        "verification_refs": "array",
+        "delivery_manifest_ref": "string",
+        "evidence_lineage": "object",
+        "status": "string",
+        "created_at": "string"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "delivery-plan",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/delivery-plan.md",
+      "exampleGlob": "examples/packets/delivery-plan-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "plan_id",
+        "project_id",
+        "run_id",
+        "step_class",
+        "delivery_mode",
+        "mode_source",
+        "preconditions",
+        "execution_allowed",
+        "writeback_allowed",
+        "target_write_allowed",
+        "direct_edits_allowed",
+        "meaningful_change_required",
+        "blocking_reasons",
+        "status",
+        "evidence_refs",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "plan_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "step_class": "string",
+        "delivery_mode": "string",
+        "mode_source": "object",
+        "preconditions": "object",
+        "permissions": "object",
+        "diff_authorization": "object",
+        "evidence_locks": "array",
+        "execution_allowed": "boolean",
+        "writeback_allowed": "boolean",
+        "target_write_allowed": "boolean",
+        "direct_edits_allowed": "boolean",
+        "meaningful_change_required": "boolean",
+        "blocking_reasons": "array",
+        "status": "string",
+        "evidence_refs": "array",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "delivery_mode",
+          "allowedValues": [
+            "no-write",
+            "patch-only",
+            "local-branch",
+            "fork-first-pr"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "ready",
+            "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "delivery-manifest",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/delivery-manifest.md",
+      "exampleGlob": "examples/delivery-manifest*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "manifest_id",
+        "project_id",
+        "ticket_id",
+        "run_refs",
+        "step_ref",
+        "delivery_mode",
+        "writeback_policy",
+        "repo_deliveries",
+        "verification_refs",
+        "approval_context",
+        "evidence_root",
+        "source_refs",
+        "status",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "manifest_id": "string",
+        "project_id": "string",
+        "ticket_id": "string",
+        "run_refs": "array",
+        "step_ref": "string",
+        "delivery_mode": "string",
+        "writeback_policy": "object",
+        "repo_deliveries": "array",
+        "verification_refs": "array",
+        "approval_context": "object",
+        "evidence_root": "string",
+        "source_refs": "object",
+        "status": "string",
+        "created_at": "string",
+        "coordination_transaction": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "incident-report",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/incident-report.md",
+      "exampleGlob": "examples/reports/incident-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "incident_id",
+        "project_id",
+        "severity",
+        "summary",
+        "linked_run_refs",
+        "linked_asset_refs",
+        "status"
+      ],
+      "fieldTypes": {
+        "incident_id": "string",
+        "project_id": "string",
+        "severity": "string",
+        "summary": "string",
+        "linked_run_refs": "array",
+        "linked_asset_refs": "array",
+        "status": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "severity",
+          "allowedValues": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "open",
+            "recertify",
+            "hold",
+            "re-enabled",
+            "closed"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "incident-backfill-proposal",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/incident-backfill-proposal.md",
+      "exampleGlob": "examples/reports/incident-backfill-proposal*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "proposal_id",
+        "project_id",
+        "proposal_state",
+        "source_artifacts",
+        "target",
+        "proposed_cases",
+        "mutation_policy",
+        "evidence_refs",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "proposal_id": "string",
+        "project_id": "string",
+        "proposal_state": "string",
+        "source_artifacts": "object",
+        "target": "object",
+        "proposed_cases": "array",
+        "mutation_policy": "object",
+        "evidence_refs": "array",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "proposal_state",
+          "allowedValues": [
+            "proposed",
+            "approved",
+            "rejected"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "step-result",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/step-result.md",
+      "exampleGlob": "examples/reports/step-result*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "step_result_id",
+        "run_id",
+        "step_id",
+        "step_class",
+        "status",
+        "summary",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "step_result_id": "string",
+        "run_id": "string",
+        "step_id": "string",
+        "step_class": "string",
+        "status": "string",
+        "summary": "string",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "step_class",
+          "allowedValues": [
+            "artifact",
+            "planner",
+            "runner",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "validation-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/validation-report.md",
+      "exampleGlob": "examples/reports/validation-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "subject_ref",
+        "validators",
+        "status",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "subject_ref": "string",
+        "validators": "array",
+        "status": "string",
+        "evidence_refs": "array"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "evaluation-case-input",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/evaluation-case-input.md",
+      "exampleGlob": "examples/eval/cases/**/input.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "family",
+        "case_id",
+        "version",
+        "subject_type",
+        "content"
+      ],
+      "fieldTypes": {
+        "family": "string",
+        "case_id": "string",
+        "version": "number",
+        "subject_type": "string",
+        "content": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "family",
+          "allowedValues": [
+            "evaluation-case-input"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "evaluation-case-expected",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/evaluation-case-expected.md",
+      "exampleGlob": "examples/eval/cases/**/expected.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "family",
+        "case_id",
+        "version",
+        "subject_type",
+        "assertions"
+      ],
+      "fieldTypes": {
+        "family": "string",
+        "case_id": "string",
+        "version": "number",
+        "subject_type": "string",
+        "assertions": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "family",
+          "allowedValues": [
+            "evaluation-case-expected"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "evaluation-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/evaluation-report.md",
+      "exampleGlob": "examples/eval/report-*.sample.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "subject_ref",
+        "subject_type",
+        "subject_fingerprint",
+        "subject_snapshot",
+        "case_resolution",
+        "suite_ref",
+        "dataset_ref",
+        "scorer_metadata",
+        "grader_results",
+        "summary_metrics",
+        "status",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "subject_ref": "string",
+        "subject_type": "string",
+        "subject_fingerprint": "string",
+        "subject_snapshot": "object",
+        "case_resolution": "array",
+        "suite_ref": "string",
+        "dataset_ref": "string",
+        "scorer_metadata": "array",
+        "grader_results": "object",
+        "summary_metrics": "object",
+        "status": "string",
+        "evidence_refs": "array"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "review-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/review-report.md",
+      "exampleGlob": "examples/reports/review-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "review_report_id",
+        "project_id",
+        "run_id",
+        "generated_at",
+        "overall_status",
+        "review_recommendation",
+        "feature_traceability",
+        "discovery_quality",
+        "artifact_quality",
+        "code_quality",
+        "feature_size_fit",
+        "provider_traceability",
+        "findings",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "review_report_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "generated_at": "string",
+        "overall_status": "string",
+        "review_recommendation": "string",
+        "feature_traceability": "object",
+        "discovery_quality": "object",
+        "artifact_quality": "object",
+        "code_quality": "object",
+        "feature_size_fit": "object",
+        "provider_traceability": "object",
+        "findings": "array",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "overall_status",
+          "allowedValues": [
+            "pass",
+            "warn",
+            "fail"
+          ]
+        },
+        {
+          "field": "review_recommendation",
+          "allowedValues": [
+            "proceed",
+            "repair",
+            "required-human-review"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "review-decision",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/review-decision.md",
+      "exampleGlob": "examples/reports/review-decision*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "decision_id",
+        "project_id",
+        "run_id",
+        "decision",
+        "decider_ref",
+        "reason",
+        "review_report_ref",
+        "runtime_harness_report_ref",
+        "delivery_manifest_refs",
+        "learning_handoff_refs",
+        "decision_basis",
+        "repair_context",
+        "delivery_gate",
+        "evidence_refs",
+        "decided_at"
+      ],
+      "fieldTypes": {
+        "decision_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "decision": "string",
+        "decider_ref": "string",
+        "reason": "string",
+        "review_report_ref": "string",
+        "runtime_harness_report_ref": "string",
+        "delivery_manifest_refs": "array",
+        "learning_handoff_refs": "array",
+        "decision_basis": "object",
+        "repair_context": "object",
+        "delivery_gate": "object",
+        "evidence_refs": "array",
+        "decided_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "decision",
+          "allowedValues": [
+            "approve",
+            "hold",
+            "request-repair"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "quality-repair-request",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/quality-repair-request.md",
+      "exampleGlob": "examples/reports/quality-repair-request*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "request_id",
+        "project_id",
+        "run_id",
+        "cycle_id",
+        "source_stage",
+        "source_ref",
+        "finding_refs",
+        "repair_scope",
+        "attempt_budget",
+        "status",
+        "blockers",
+        "evidence_refs",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "request_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "cycle_id": "string",
+        "source_stage": "string",
+        "source_ref": "string",
+        "finding_refs": "array",
+        "repair_scope": "object",
+        "attempt_budget": "object",
+        "status": "string",
+        "blockers": "array",
+        "evidence_refs": "array",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "source_stage",
+          "allowedValues": [
+            "review",
+            "qa"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "requested",
+            "in-progress",
+            "review-required",
+            "qa-required",
+            "budget-exhausted",
+            "closed"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "runtime-harness-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/runtime-harness-report.md",
+      "exampleGlob": "examples/reports/runtime-harness-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "project_id",
+        "run_id",
+        "generated_at",
+        "mission_type",
+        "strictness_profile",
+        "mission_lineage",
+        "overall_decision",
+        "step_decisions",
+        "run_findings",
+        "recommendations",
+        "impacted_asset_refs",
+        "promotion_recommendations",
+        "unresolved_gaps",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "generated_at": "string",
+        "mission_type": "string",
+        "strictness_profile": "string",
+        "mission_lineage": "object",
+        "overall_decision": "string",
+        "step_decisions": "array",
+        "runtime_permission_summary": "object",
+        "runtime_permission_decisions": "array",
+        "run_findings": "array",
+        "recommendations": "array",
+        "impacted_asset_refs": "array",
+        "promotion_recommendations": "array",
+        "unresolved_gaps": "array",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "overall_decision",
+          "allowedValues": [
+            "pass",
+            "retry",
+            "repair",
+            "escalate",
+            "block",
+            "fail"
+          ]
+        },
+        {
+          "field": "mission_type",
+          "allowedValues": [
+            "code-changing",
+            "docs-only",
+            "no-write-rehearsal",
+            "release",
+            "asset-certification",
+            "unknown"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "multirepo-coordination-status",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/multirepo-coordination-status.md",
+      "exampleGlob": "examples/reports/multirepo-coordination-status*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "status_id",
+        "project_id",
+        "run_id",
+        "version",
+        "generated_from",
+        "lock_scope",
+        "lock_state",
+        "cross_repo_validation",
+        "delivery_evidence",
+        "status",
+        "blocking_reasons",
+        "evidence_refs",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "status_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "version": "number",
+        "generated_from": "object",
+        "lock_scope": "object",
+        "lock_state": "object",
+        "cross_repo_validation": "object",
+        "delivery_evidence": "object",
+        "status": "string",
+        "blocking_reasons": "array",
+        "evidence_refs": "array",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "ready",
+            "blocked",
+            "released"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "dataset",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/dataset.md",
+      "exampleGlob": "examples/eval/dataset-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "dataset_id",
+        "version",
+        "subject_type",
+        "provenance",
+        "cases"
+      ],
+      "fieldTypes": {
+        "dataset_id": "string",
+        "version": "string",
+        "subject_type": "string",
+        "provenance": "object",
+        "cases": "array"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "evaluation-suite",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/evaluation-suite.md",
+      "exampleGlob": "examples/eval/suite-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "suite_id",
+        "version",
+        "subject_type",
+        "dataset_ref",
+        "graders",
+        "thresholds"
+      ],
+      "fieldTypes": {
+        "suite_id": "string",
+        "version": "number",
+        "subject_type": "string",
+        "dataset_ref": "string",
+        "graders": "array",
+        "thresholds": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "promotion-decision",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/promotion-decision.md",
+      "exampleGlob": "examples/packets/promotion-decision-*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "decision_id",
+        "subject_ref",
+        "from_channel",
+        "to_channel",
+        "evidence_refs",
+        "evidence_summary",
+        "status"
+      ],
+      "fieldTypes": {
+        "decision_id": "string",
+        "subject_ref": "string",
+        "from_channel": "string",
+        "to_channel": "string",
+        "evidence_refs": "array",
+        "evidence_summary": "object",
+        "status": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "from_channel",
+          "allowedValues": [
+            "draft",
+            "candidate",
+            "stable",
+            "frozen",
+            "demoted"
+          ]
+        },
+        {
+          "field": "to_channel",
+          "allowedValues": [
+            "draft",
+            "candidate",
+            "stable",
+            "frozen",
+            "demoted"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "pass",
+            "hold",
+            "fail"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "compiled-context-artifact",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/compiled-context-artifact.md",
+      "exampleGlob": "examples/context/compiled/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "compiled_context_id",
+        "version",
+        "step",
+        "compiler_revision",
+        "effective_assets",
+        "prompt_bundle_ref",
+        "context_bundle_refs",
+        "context_doc_refs",
+        "context_rule_refs",
+        "context_skill_refs",
+        "skill_refs",
+        "packet_refs",
+        "hashes",
+        "provenance",
+        "budget_report",
+        "compaction_report"
+      ],
+      "fieldTypes": {
+        "compiled_context_id": "string",
+        "version": "number",
+        "step": "string",
+        "compiler_revision": "string",
+        "effective_assets": "array",
+        "prompt_bundle_ref": "string",
+        "context_bundle_refs": "array",
+        "context_doc_refs": "array",
+        "context_rule_refs": "array",
+        "context_skill_refs": "array",
+        "skill_refs": "array",
+        "packet_refs": "array",
+        "hashes": "object",
+        "provenance": "object",
+        "budget_report": "object",
+        "compaction_report": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "operator-request",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/operator-request.md",
+      "exampleGlob": "examples/reports/operator-request*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "request_id",
+        "project_id",
+        "version",
+        "source_surface",
+        "target_stage",
+        "intent_type",
+        "request_text",
+        "request_summary",
+        "target_refs",
+        "allowed_paths",
+        "delivery_mode",
+        "status",
+        "created_at",
+        "result_refs",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "request_id": "string",
+        "project_id": "string",
+        "version": "number",
+        "source_surface": "string",
+        "target_stage": "string",
+        "target_flow_id": "string",
+        "intent_type": "string",
+        "request_text": "string",
+        "request_summary": "string",
+        "target_refs": "array",
+        "allowed_paths": "array",
+        "delivery_mode": "string",
+        "status": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "result_refs": "array",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "target_stage",
+          "allowedValues": [
+            "readiness",
+            "mission",
+            "discovery",
+            "research",
+            "spec",
+            "planning",
+            "implement",
+            "review",
+            "qa",
+            "repair",
+            "delivery",
+            "release",
+            "learning"
+          ]
+        },
+        {
+          "field": "intent_type",
+          "allowedValues": [
+            "analyze",
+            "explain",
+            "revise-document",
+            "create-document",
+            "repair",
+            "validate",
+            "plan",
+            "implement",
+            "review"
+          ]
+        },
+        {
+          "field": "delivery_mode",
+          "allowedValues": [
+            "no-write",
+            "patch-only",
+            "local-branch",
+            "fork-first-pr"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "created",
+            "running",
+            "completed",
+            "failed",
+            "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "provider-route-profile",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/provider-route-profile.md",
+      "exampleGlob": "examples/routes/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "route_id",
+        "step",
+        "route_class",
+        "risk_tier",
+        "primary"
+      ],
+      "forbiddenFields": [
+        "wrapper_profile_ref"
+      ],
+      "fieldTypes": {
+        "route_id": "string",
+        "step": "string",
+        "route_class": "string",
+        "risk_tier": "string",
+        "primary": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "wrapper-profile",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/wrapper-profile.md",
+      "exampleGlob": "examples/wrappers/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "wrapper_id",
+        "version",
+        "step_class",
+        "tool_policy",
+        "command_policy"
+      ],
+      "forbiddenFields": [
+        "prompt_bundle_ref",
+        "session_bootstrap"
+      ],
+      "fieldTypes": {
+        "wrapper_id": "string",
+        "version": "number",
+        "step_class": "string",
+        "tool_policy": "object",
+        "command_policy": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "step_class",
+          "allowedValues": [
+            "artifact",
+            "planner",
+            "runner",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "prompt-bundle",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/prompt-bundle.md",
+      "exampleGlob": "examples/prompts/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "prompt_bundle_id",
+        "version",
+        "step_class",
+        "objective",
+        "instructions",
+        "required_inputs"
+      ],
+      "fieldTypes": {
+        "prompt_bundle_id": "string",
+        "version": "number",
+        "step_class": "string",
+        "objective": "string",
+        "instructions": "object",
+        "required_inputs": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "step_class",
+          "allowedValues": [
+            "artifact",
+            "planner",
+            "runner",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "context-doc",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/context-doc.md",
+      "exampleGlob": "examples/context/docs/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "context_doc_id",
+        "version",
+        "title",
+        "metadata",
+        "source",
+        "applies_to"
+      ],
+      "fieldTypes": {
+        "context_doc_id": "string",
+        "version": "number",
+        "title": "string",
+        "metadata": "object",
+        "source": "object",
+        "applies_to": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "context-rule",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/context-rule.md",
+      "exampleGlob": "examples/context/rules/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "context_rule_id",
+        "version",
+        "title",
+        "metadata",
+        "instruction",
+        "source_refs",
+        "applies_to"
+      ],
+      "fieldTypes": {
+        "context_rule_id": "string",
+        "version": "number",
+        "title": "string",
+        "metadata": "object",
+        "instruction": "string",
+        "source_refs": "array",
+        "applies_to": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "context-skill",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/context-skill.md",
+      "exampleGlob": "examples/context/skills/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "context_skill_id",
+        "version",
+        "title",
+        "metadata",
+        "objective",
+        "workflow",
+        "source_refs",
+        "applies_to"
+      ],
+      "fieldTypes": {
+        "context_skill_id": "string",
+        "version": "number",
+        "title": "string",
+        "metadata": "object",
+        "objective": "string",
+        "workflow": "object",
+        "source_refs": "array",
+        "applies_to": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "context-bundle",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/context-bundle.md",
+      "exampleGlob": "examples/context/bundles/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "context_bundle_id",
+        "version",
+        "title",
+        "metadata",
+        "applies_to",
+        "context_doc_refs",
+        "context_rule_refs",
+        "context_skill_refs",
+        "source_refs",
+        "selection_policy"
+      ],
+      "fieldTypes": {
+        "context_bundle_id": "string",
+        "version": "number",
+        "title": "string",
+        "metadata": "object",
+        "applies_to": "object",
+        "context_doc_refs": "array",
+        "context_rule_refs": "array",
+        "context_skill_refs": "array",
+        "source_refs": "array",
+        "selection_policy": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "step-policy-profile",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/step-policy-profile.md",
+      "exampleGlob": "examples/policies/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "policy_id",
+        "step_class",
+        "pre_validators",
+        "post_validators",
+        "quality_gate"
+      ],
+      "fieldTypes": {
+        "policy_id": "string",
+        "step_class": "string",
+        "pre_validators": "array",
+        "post_validators": "array",
+        "quality_gate": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "step_class",
+          "allowedValues": [
+            "artifact",
+            "planner",
+            "runner",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "adapter-capability-profile",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/adapter-capability-profile.md",
+      "exampleGlob": "examples/adapters/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "adapter_id",
+        "version",
+        "capabilities",
+        "constraints"
+      ],
+      "fieldTypes": {
+        "adapter_id": "string",
+        "version": "number",
+        "capabilities": "object",
+        "constraints": "object"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "skill-profile",
+      "familyGroup": "platform-assets",
+      "sourceContract": "docs/contracts/skill-profile.md",
+      "exampleGlob": "examples/skills/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "skill_id",
+        "version",
+        "step_class",
+        "summary",
+        "workflow"
+      ],
+      "fieldTypes": {
+        "skill_id": "string",
+        "version": "number",
+        "step_class": "string",
+        "summary": "string",
+        "workflow": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "step_class",
+          "allowedValues": [
+            "artifact",
+            "planner",
+            "runner",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "run-job",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/run-job.md",
+      "exampleGlob": "examples/reports/run-job*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "job_id",
+        "run_id",
+        "project_id",
+        "status",
+        "revision",
+        "accepted_at",
+        "status_ref",
+        "event_ref"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "job_id": "string",
+        "run_id": "string",
+        "project_id": "string",
+        "status": "string",
+        "revision": "number",
+        "accepted_at": "string",
+        "status_ref": "string",
+        "event_ref": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "queued",
+            "running",
+            "paused",
+            "waiting-input",
+            "canceling",
+            "succeeded",
+            "failed",
+            "canceled"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "live-run-event",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/live-run-event.md",
+      "exampleGlob": "examples/reports/live-run-event*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "event_id",
+        "run_id",
+        "timestamp",
+        "event_type",
+        "payload"
+      ],
+      "fieldTypes": {
+        "event_id": "string",
+        "run_id": "string",
+        "timestamp": "string",
+        "event_type": "string",
+        "payload": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "event_type",
+          "allowedValues": [
+            "run.started",
+            "step.updated",
+            "provider.heartbeat",
+            "evidence.linked",
+            "warning.raised",
+            "run.terminal"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "planner-metrics-snapshot",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/planner-metrics-snapshot.md",
+      "exampleGlob": "examples/reports/planner-metrics-snapshot*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "snapshot_id",
+        "project_id",
+        "generated_at",
+        "status",
+        "no_data",
+        "metric_names",
+        "aggregation",
+        "source_artifacts",
+        "metrics",
+        "run_breakdown"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "snapshot_id": "string",
+        "project_id": "string",
+        "generated_at": "string",
+        "status": "string",
+        "no_data": "boolean",
+        "metric_names": "array",
+        "aggregation": "object",
+        "source_artifacts": "object",
+        "metrics": "object",
+        "run_breakdown": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "no-data",
+            "partial",
+            "ready"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "finance-monitoring-snapshot",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/finance-monitoring-snapshot.md",
+      "exampleGlob": "examples/reports/finance-monitoring-snapshot*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "snapshot_id",
+        "project_id",
+        "generated_at",
+        "status",
+        "no_data",
+        "telemetry_state",
+        "dimension_names",
+        "tenant_like_grouping",
+        "aggregation",
+        "finance",
+        "monitoring_loop",
+        "source_artifacts",
+        "run_breakdown"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "snapshot_id": "string",
+        "project_id": "string",
+        "generated_at": "string",
+        "status": "string",
+        "no_data": "boolean",
+        "telemetry_state": "string",
+        "dimension_names": "array",
+        "tenant_like_grouping": "object",
+        "aggregation": "object",
+        "finance": "object",
+        "monitoring_loop": "object",
+        "source_artifacts": "object",
+        "run_breakdown": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "no-data",
+            "partial",
+            "ready"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "compiler-revision-status",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/compiler-revision-status.md",
+      "exampleGlob": "examples/reports/compiler-revision-status*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "status_id",
+        "project_id",
+        "compiler_revision_ref",
+        "compiler_revision",
+        "lifecycle_state",
+        "compatibility",
+        "decision_history",
+        "evidence_links",
+        "status",
+        "blocking_reasons",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "status_id": "string",
+        "project_id": "string",
+        "compiler_revision_ref": "string",
+        "compiler_revision": "object",
+        "lifecycle_state": "string",
+        "compatibility": "object",
+        "decision_history": "array",
+        "evidence_links": "object",
+        "status": "string",
+        "blocking_reasons": "array",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "lifecycle_state",
+          "allowedValues": [
+            "draft",
+            "candidate",
+            "stable",
+            "frozen",
+            "demoted",
+            "blocked"
+          ]
+        },
+        {
+          "field": "status",
+          "allowedValues": [
+            "ready",
+            "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "learning-loop-scorecard",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/learning-loop-scorecard.md",
+      "exampleGlob": "examples/reports/learning-loop-scorecard*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "scorecard_id",
+        "project_id",
+        "run_id",
+        "source_kind",
+        "status",
+        "summary",
+        "evidence_refs",
+        "linked_scorecard_refs",
+        "linked_eval_suite_refs",
+        "linked_harness_capture_refs",
+        "linked_backlog_refs",
+        "matrix_cell",
+        "coverage_follow_up",
+        "generated_at"
+      ],
+      "fieldTypes": {
+        "scorecard_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "source_kind": "string",
+        "status": "string",
+        "summary": "string",
+        "evidence_refs": "array",
+        "linked_scorecard_refs": "array",
+        "linked_eval_suite_refs": "array",
+        "linked_harness_capture_refs": "array",
+        "linked_backlog_refs": "array",
+        "matrix_cell": "object",
+        "coverage_follow_up": "object",
+        "generated_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "pass",
+            "fail",
+            "aborted",
+            "running",
+            "unknown"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "learning-loop-handoff",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/learning-loop-handoff.md",
+      "exampleGlob": "examples/reports/learning-loop-handoff*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "handoff_id",
+        "project_id",
+        "run_id",
+        "run_status",
+        "source_kind",
+        "scorecard_ref",
+        "incident_ref",
+        "backlog_refs",
+        "quality_refs",
+        "evidence_refs",
+        "matrix_cell",
+        "coverage_follow_up",
+        "generated_at"
+      ],
+      "fieldTypes": {
+        "handoff_id": "string",
+        "project_id": "string",
+        "run_id": "string",
+        "run_status": "string",
+        "source_kind": "string",
+        "scorecard_ref": "string",
+        "backlog_refs": "array",
+        "quality_refs": "array",
+        "evidence_refs": "array",
+        "matrix_cell": "object",
+        "coverage_follow_up": "object",
+        "generated_at": "string"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "control-plane-api",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/control-plane-api.md",
+      "exampleGlob": "examples/control-plane-api/*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "api_id",
+        "version",
+        "binding_mode",
+        "deferred_transport_status",
+        "read_operations",
+        "run_control_operations",
+        "ui_lifecycle_operations",
+        "live_event_operations",
+        "deferred_transport"
+      ],
+      "fieldTypes": {
+        "api_id": "string",
+        "version": "number",
+        "binding_mode": "string",
+        "deferred_transport_status": "string",
+        "read_operations": "array",
+        "run_control_operations": "array",
+        "ui_lifecycle_operations": "array",
+        "live_event_operations": "array",
+        "deferred_transport": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "binding_mode",
+          "allowedValues": [
+            "hybrid-module-and-detached-http-sse"
+          ]
+        },
+        {
+          "field": "deferred_transport_status",
+          "allowedValues": [
+            "implemented"
+          ]
+        }
+      ]
+    }
+  ],
+  "example_family_resolution_rules": [
+    {
+      "regex_source": "^examples\\/adapters\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "adapter-capability-profile"
+    },
+    {
+      "regex_source": "^examples\\/context\\/bundles\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "context-bundle"
+    },
+    {
+      "regex_source": "^examples\\/context\\/compiled\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "compiled-context-artifact"
+    },
+    {
+      "regex_source": "^examples\\/context\\/docs\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "context-doc"
+    },
+    {
+      "regex_source": "^examples\\/context\\/rules\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "context-rule"
+    },
+    {
+      "regex_source": "^examples\\/context\\/skills\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "context-skill"
+    },
+    {
+      "regex_source": "^examples\\/control-plane-api\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "control-plane-api"
+    },
+    {
+      "regex_source": "^examples\\/delivery-manifest[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "delivery-manifest"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/artifact-packet[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "artifact-packet"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/onboarding-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "onboarding-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/next-action-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "next-action-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/operator-request[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "operator-request"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/discovery-research-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "discovery-research-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/incident-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "incident-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/incident-backfill-proposal[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "incident-backfill-proposal"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/step-result[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "step-result"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/validation-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "validation-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/review-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "review-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/quality-repair-request[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "quality-repair-request"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/live-run-event[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "live-run-event"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/run-job[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "run-job"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/learning-loop-scorecard[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "learning-loop-scorecard"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/learning-loop-handoff[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "learning-loop-handoff"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/planner-metrics-snapshot[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "planner-metrics-snapshot"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/finance-monitoring-snapshot[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "finance-monitoring-snapshot"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/compiler-revision-status[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "compiler-revision-status"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/delivery-plan-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "delivery-plan"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/intake-request-body[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "intake-request-body"
+    },
+    {
+      "regex_source": "^examples\\/eval\\/dataset-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "dataset"
+    },
+    {
+      "regex_source": "^examples\\/eval\\/cases\\/.+\\/input\\.ya?ml$",
+      "regex_flags": "",
+      "family": "evaluation-case-input"
+    },
+    {
+      "regex_source": "^examples\\/eval\\/cases\\/.+\\/expected\\.ya?ml$",
+      "regex_flags": "",
+      "family": "evaluation-case-expected"
+    },
+    {
+      "regex_source": "^examples\\/eval\\/report-[^/]+\\.sample\\.ya?ml$",
+      "regex_flags": "",
+      "family": "evaluation-report"
+    },
+    {
+      "regex_source": "^examples\\/eval\\/suite-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "evaluation-suite"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/multirepo-coordination-status[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "multirepo-coordination-status"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/review-decision[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "review-decision"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/runtime-harness-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "runtime-harness-report"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/wave-ticket-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "wave-ticket"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/handoff-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "handoff-packet"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/execution-plan-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "execution-plan"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/task-progress-report-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-progress-report"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/promotion-decision-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "promotion-decision"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/release-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "release-packet"
+    },
+    {
+      "regex_source": "^examples\\/policies\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "step-policy-profile"
+    },
+    {
+      "regex_source": "^examples\\/project-analysis-report\\.sample\\.ya?ml$",
+      "regex_flags": "",
+      "family": "project-analysis-report"
+    },
+    {
+      "regex_source": "^examples\\/project[^/]*\\.aor\\.ya?ml$",
+      "regex_flags": "",
+      "family": "project-profile"
+    },
+    {
+      "regex_source": "^examples\\/bindings\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "project-binding"
+    },
+    {
+      "regex_source": "^examples\\/workspace-sets\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "workspace-set"
+    },
+    {
+      "regex_source": "^examples\\/execution\\/execution-profile[^/]*\\.ya?ml$",
+      "regex_flags": "u",
+      "family": "execution-profile"
+    },
+    {
+      "regex_source": "^examples\\/execution\\/execution-readiness-report[^/]*\\.ya?ml$",
+      "regex_flags": "u",
+      "family": "execution-readiness-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/integration-report-[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "integration-report"
+    },
+    {
+      "regex_source": "^examples\\/prompts\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "prompt-bundle"
+    },
+    {
+      "regex_source": "^examples\\/routes\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "provider-route-profile"
+    },
+    {
+      "regex_source": "^examples\\/skills\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "skill-profile"
+    },
+    {
+      "regex_source": "^examples\\/wrappers\\/[^/]+\\.ya?ml$",
+      "regex_flags": "",
+      "family": "wrapper-profile"
+    }
+  ]
 }
