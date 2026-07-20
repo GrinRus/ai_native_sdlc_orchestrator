@@ -28,6 +28,13 @@ controller evidence.
 - `unresolved_gaps`
 - `evidence_refs`
 
+Identifiers derived by this producer (`report_id`, generated finding IDs,
+recommendation IDs, and unresolved-gap IDs) preserve their readable composed
+form while it satisfies the canonical public-ID grammar. If composition would
+exceed the 128-character public-ID limit, the producer emits a deterministic
+content-addressed ID with a semantic prefix. Caller-supplied IDs are never
+truncated or normalized by this rule.
+
 Repo-aware reports may add `workspace_set_provenance`. It must match the
 step-level compiled context and result provenance exactly, including
 `workspace_set_ref`, repository mounts, execution roots, base commits, and
