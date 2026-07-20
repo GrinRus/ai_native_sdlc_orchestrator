@@ -2112,7 +2112,12 @@ test("live E2E auto resume reuses cached setup commands after persisted progress
 test("live E2E delivery certification does not reuse review cached evidence", () => {
   withTempRoot((reportsRoot) => {
     const reviewTranscript = path.join(reportsRoot, "13-review-run.json");
-    fs.writeFileSync(reviewTranscript, "{}\n", "utf8");
+    const guidedNextTranscript = path.join(reportsRoot, "14-guided-next-after-review.json");
+    const reviewDecisionTranscript = path.join(reportsRoot, "15-review-decide-approve.json");
+    const repairCloseTranscript = path.join(reportsRoot, "16-repair-close-1.json");
+    for (const transcript of [reviewTranscript, guidedNextTranscript, reviewDecisionTranscript, repairCloseTranscript]) {
+      fs.writeFileSync(transcript, "{}\n", "utf8");
+    }
     const controller = createLiveE2eStepController({
       reportsRoot,
       runId: "controller-delivery-cert-cache",
@@ -2138,12 +2143,42 @@ test("live E2E delivery certification does not reuse review cached evidence", ()
           artifact_refs: [reviewTranscript],
           exit_code: 0,
         },
+        {
+          label: "guided-next-after-review",
+          command_surface: "aor next",
+          status: "pass",
+          transcript_file: guidedNextTranscript,
+          artifact_refs: [guidedNextTranscript],
+          exit_code: 0,
+        },
+        {
+          label: "review-decide-approve",
+          command_surface: "aor review decide",
+          status: "pass",
+          transcript_file: reviewDecisionTranscript,
+          artifact_refs: [reviewDecisionTranscript],
+          exit_code: 0,
+        },
+        {
+          label: "repair-close-1",
+          command_surface: "aor repair close",
+          status: "pass",
+          transcript_file: repairCloseTranscript,
+          artifact_refs: [repairCloseTranscript],
+          exit_code: 0,
+        },
       ],
       artifacts: {},
     });
 
     assert.equal(controller.shouldUseCachedCommand("harness-certify", 1), true);
     assert.equal(controller.getCachedCommandResult("harness-certify", 1).transcript_file, reviewTranscript);
+    assert.equal(controller.shouldUseCachedCommand("guided-next-after-review", 1), true);
+    assert.equal(controller.getCachedCommandResult("guided-next-after-review", 1).transcript_file, guidedNextTranscript);
+    assert.equal(controller.shouldUseCachedCommand("review-decide-approve", 1), true);
+    assert.equal(controller.getCachedCommandResult("review-decide-approve", 1).transcript_file, reviewDecisionTranscript);
+    assert.equal(controller.shouldUseCachedCommand("repair-close-1", 1), true);
+    assert.equal(controller.getCachedCommandResult("repair-close-1", 1).transcript_file, repairCloseTranscript);
     assert.equal(controller.shouldUseCachedCommand("delivery-harness-certify", 1), false);
     assert.equal(controller.getCachedCommandResult("delivery-harness-certify", 1), null);
   });
