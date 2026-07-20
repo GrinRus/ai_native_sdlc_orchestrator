@@ -348,6 +348,9 @@ export function handleBootstrapCommand(context) {
     if (planOnly && (routedDryRunStep || routedLiveStep)) {
       throw new CliUsageError("Flag '--plan' cannot be combined with routed step execution flags.");
     }
+    if (planOnly && flags["execution-root"] !== undefined) {
+      throw new CliUsageError("Flag '--execution-root' cannot be combined with '--plan'.");
+    }
 
     if (planOnly) {
       const planResult = planProjectVerification({
@@ -380,6 +383,7 @@ export function handleBootstrapCommand(context) {
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      executionRoot: resolveOptionalStringFlag("execution-root", flags["execution-root"]),
       requireValidationPass: outputState.validationGateEnforced,
       verificationLabel: outputState.verificationLabel,
       repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
