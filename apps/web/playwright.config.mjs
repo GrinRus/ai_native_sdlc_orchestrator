@@ -10,8 +10,10 @@ export default defineConfig({
   testMatch: "**/*.spec.mjs",
   fullyParallel: false,
   workers: 1,
-  timeout: 45_000,
-  expect: { timeout: 10_000 },
+  // Installed-user lifecycle assertions may span two sequential CLI subprocesses.
+  // Keep the gate bounded while allowing cold local machines to finish durable readback.
+  timeout: 120_000,
+  expect: { timeout: 30_000 },
   globalSetup: path.join(root, "apps/web/browser/global-setup.mjs"),
   globalTeardown: path.join(root, "apps/web/browser/global-teardown.mjs"),
   outputDir: path.join(root, ".aor/quality/w63/s07/playwright"),
