@@ -1242,6 +1242,7 @@ test("W13 review and learning command help documents verdict and closure semanti
   assert.equal(learningHelp.stderr, "");
   assert.match(learningHelp.stdout, /Status: implemented in learning-loop shell \(W13-S05\)/);
   assert.match(learningHelp.stdout, /public learning-loop scorecard and handoff artifacts/);
+  assert.match(learningHelp.stdout, /--project-profile <path>/);
   assert.match(learningHelp.stdout, /learning_loop_scorecard_file/);
   assert.match(learningHelp.stdout, /incident_report_file/);
 });
@@ -5395,6 +5396,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "handoff",
         "--project-ref",
         projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
         "--run-id",
         runId,
       ]);

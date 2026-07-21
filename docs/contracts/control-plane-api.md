@@ -688,6 +688,7 @@ Review decision baseline:
 
 Learning handoff baseline:
 - `learning handoff` writes one public `learning-loop-scorecard` and one public `learning-loop-handoff`;
+- the CLI accepts optional `--project-profile` at ingress so installed callers can preserve an explicitly selected project identity through closure;
 - existing public `incident-report` linkage is preserved instead of replaced when incident open/recertify already ran;
 - closure artifacts are derived from public run, review, eval, audit, and incident evidence, not from harness-private observability shortcuts;
 - closure artifacts preserve matrix-cell and coverage-follow-up metadata so the next required coverage cell remains machine-readable.

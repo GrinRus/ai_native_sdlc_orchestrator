@@ -112,6 +112,13 @@ qualification cells can reach provider execution and terminal quality closure.
      treating the legacy readable filename as lifecycle authority.
    - Validation: A `packet-<digest>.json` intake produces the same Flow,
      next-action, analysis, and handoff inputs as a readable packet filename.
+9. **Explicit learning project identity**
+   - Purpose: Keep public learning closure in the same explicitly selected
+     project as the source run.
+   - Changes: Expose the handler-supported optional `--project-profile` flag in
+     the canonical command catalog and installed CLI parser.
+   - Validation: Learning handoff help and lifecycle regression exercise the
+     explicit profile without private runner shortcuts.
 
 ### Acceptance criteria
 
@@ -130,6 +137,7 @@ qualification cells can reach provider execution and terminal quality closure.
     identifier violate the 128-character public-ID contract.
 13. Content-addressed intake packet filenames remain discoverable through the
     public Flow and next-action lifecycle.
+14. Public learning handoff preserves an explicitly selected project profile.
 
 ### Done evidence
 
