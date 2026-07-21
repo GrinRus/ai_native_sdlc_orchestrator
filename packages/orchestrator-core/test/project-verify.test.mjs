@@ -88,6 +88,35 @@ test("workspace isolation provisions a detached checkout for a linked worktree w
   }
 });
 
+test("checkout integrity ignores binary index rewrites but detects staged state changes", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-semantic-index-"));
+  try {
+    git(repoRoot, ["init"]);
+    git(repoRoot, ["config", "user.email", "aor@example.invalid"]);
+    git(repoRoot, ["config", "user.name", "AOR Test"]);
+    fs.writeFileSync(path.join(repoRoot, "source.txt"), "baseline\n", "utf8");
+    git(repoRoot, ["add", "source.txt"]);
+    git(repoRoot, ["commit", "-m", "fixture"]);
+
+    const before = captureCheckoutSnapshot(repoRoot);
+    git(repoRoot, ["update-index", "--index-version=4"]);
+    assert.deepEqual(compareCheckoutSnapshots(before, captureCheckoutSnapshot(repoRoot)), {
+      unchanged: true,
+      changed_fields: [],
+    });
+
+    fs.writeFileSync(path.join(repoRoot, "source.txt"), "staged change\n", "utf8");
+    git(repoRoot, ["add", "source.txt"]);
+    const stagedComparison = compareCheckoutSnapshots(before, captureCheckoutSnapshot(repoRoot));
+    assert.equal(stagedComparison.unchanged, false);
+    assert.ok(stagedComparison.changed_fields.includes("index_digest"));
+    assert.ok(stagedComparison.changed_fields.includes("status_digest"));
+    assert.ok(stagedComparison.changed_fields.includes("tracked"));
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("workspace cleanup refuses a symlink replacement and preserves its external target", () => {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03-cleanup-"));
   const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03-outside-"));

@@ -140,7 +140,11 @@ failures also require a planner revision before approval.
 
 No supported mode runs provider or project verification commands in the
 primary checkout. Source and execution checkout roots and Git directories must
-be distinct.
+be distinct. Primary-checkout integrity compares semantic Git state: HEAD,
+symbolic ref, staged object/stage/path entries and meaningful index flags,
+tracked and untracked content, and porcelain status. Git's binary index format
+and stat-cache bytes are not mutation evidence by themselves because read-only
+Git operations may rewrite them without changing repository state.
 
 Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
 
