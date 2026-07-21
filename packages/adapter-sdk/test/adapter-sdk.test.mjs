@@ -986,7 +986,7 @@ test("live adapter hard-kills external runners that ignore SIGTERM on timeout", 
   assert.equal(response.output.external_runner.signal, "SIGKILL");
 });
 
-test("live adapter kills external runner process groups on timeout", () => {
+test("live adapter kills detached descendant process groups on timeout", () => {
   const markerFile = path.join(os.tmpdir(), `aor-adapter-orphan-${process.pid}-${Date.now()}.txt`);
   const orphanScript = [
     "const fs = require('node:fs');",
@@ -995,7 +995,7 @@ test("live adapter kills external runner process groups on timeout", () => {
   ].join("");
   const runnerScript = [
     "const { spawn } = require('node:child_process');",
-    `spawn(process.execPath, ['-e', ${JSON.stringify(orphanScript)}], { stdio: 'ignore' });`,
+    `spawn(process.execPath, ['-e', ${JSON.stringify(orphanScript)}], { detached: true, stdio: 'ignore' }).unref();`,
     "setTimeout(() => {}, 1000);",
   ].join("");
   const adapter = createLiveAdapter({
