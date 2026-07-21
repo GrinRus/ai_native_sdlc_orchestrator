@@ -33,8 +33,6 @@ import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
   materializeHostLiveE2eAssets,
-  materializeProviderPinnedPolicyOverrides,
-  materializeProviderPinnedRouteOverrides,
   materializeTargetCheckout,
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
@@ -5446,9 +5444,20 @@ function executeFullJourneyFlowImplementation(options) {
       examplesRoot: options.examplesRoot,
       generatedAssetsRoot: path.join(options.layout.stateRoot, "live-e2e-assets", normalizeId(options.runId)),
       providerVariant: options.providerVariant,
+      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      profile: options.profile,
     });
     artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
     artifacts.live_e2e_adapter_defaults = hostAssets.liveE2eAdapterDefaults;
+
+    const providerRoutes = hostAssets.providerRoutes;
+    artifacts.provider_route_override_files = providerRoutes.routeFiles;
+    artifacts.provider_route_overrides = providerRoutes.routeOverrides;
+    const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
+    const providerPolicies = hostAssets.providerPolicies;
+    artifacts.provider_policy_override_files = providerPolicies.policyFiles;
+    artifacts.provider_policy_overrides = providerPolicies.policyOverrides;
+    const policyOverridesFlag = serializePolicyOverrides(providerPolicies.policyOverrides);
 
     const generatedProfile = materializeGeneratedProjectProfile({
       hostRoot: options.hostRoot,
@@ -5480,24 +5489,6 @@ function executeFullJourneyFlowImplementation(options) {
     ]);
     artifacts.bootstrap_artifact_packet_file = getStringField(projectInit.payload, "artifact_packet_file");
     artifacts.project_init_transcript_file = projectInit.transcriptFile;
-    const providerRoutes = materializeProviderPinnedRouteOverrides({
-      routesRoot: hostAssets.routesRoot,
-      providerVariant: options.providerVariant,
-      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
-      profile: options.profile,
-    });
-    artifacts.provider_route_override_files = providerRoutes.routeFiles;
-    artifacts.provider_route_overrides = providerRoutes.routeOverrides;
-    const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
-    const providerPolicies = materializeProviderPinnedPolicyOverrides({
-      policiesRoot: path.join(hostAssets.assetsRoot, "policies"),
-      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
-      providerVariant: options.providerVariant,
-      profile: options.profile,
-    });
-    artifacts.provider_policy_override_files = providerPolicies.policyFiles;
-    artifacts.provider_policy_overrides = providerPolicies.policyOverrides;
-    const policyOverridesFlag = serializePolicyOverrides(providerPolicies.policyOverrides);
     const cachedLiveAdapterPreflight = asRecord(artifacts.live_adapter_preflight);
     const cachedLiveAdapterPreflightFile = asNonEmptyString(artifacts.live_adapter_preflight_file);
     const shouldReuseLiveAdapterPreflight =

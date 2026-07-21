@@ -1262,6 +1262,42 @@ test("host assets pin Codex model defaults without changing other provider defau
   });
 });
 
+test("full-journey host assets atomically restore provider routes on every resume segment", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "resume-assets");
+    const materialize = () => materializeHostLiveE2eAssets({
+      examplesRoot: path.join(repoRoot, "examples"),
+      generatedAssetsRoot,
+      providerVariant: resolved.providerVariant,
+      providerVariantId: resolved.resolvedProfile.provider_variant_id,
+      profile: resolved.resolvedProfile,
+    });
+
+    for (const segment of ["initial", "resume"]) {
+      const assets = materialize();
+      assert.equal(
+        assets.providerRoutes.routeOverrides.discovery,
+        "route.discovery.default.openai-primary",
+        `${segment} segment exposes the pinned discovery route before project initialization`,
+      );
+      assert.equal(
+        loadContractFile({
+          filePath: path.join(assets.routesRoot, "discovery-openai-primary.yaml"),
+          family: "provider-route-profile",
+        }).ok,
+        true,
+      );
+      assert.ok(assets.providerPolicies.policyFiles.length > 0);
+    }
+  });
+});
+
 test("generated ky small Codex profile uses bounded target setup and mission-scoped verification", () => {
   withTempRoot((tempRoot) => {
     const profileRef = "scripts/live-e2e/profiles/full-journey-regress-ky-small-codex.yaml";
@@ -2627,8 +2663,9 @@ test("live E2E generated project profile wiring preserves provider variants in e
   for (const materializationCall of materializationCalls) {
     assert.match(materializationCall, /providerVariant: options\.providerVariant/u);
   }
-  assert.match(flowsSource, /materializeProviderPinnedPolicyOverrides/u);
-  assert.match(flowsSource, /providerVariant: options\.providerVariant/u);
+  assert.match(flowsSource, /providerVariantId: asNonEmptyString\(options\.profile\.provider_variant_id\)/u);
+  assert.match(flowsSource, /const providerRoutes = hostAssets\.providerRoutes/u);
+  assert.match(flowsSource, /const providerPolicies = hostAssets\.providerPolicies/u);
   assert.match(flowsSource, /--policy-overrides/u);
 });
 

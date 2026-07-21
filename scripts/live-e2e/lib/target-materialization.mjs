@@ -253,6 +253,8 @@ export function materializeTargetCheckout(options) {
  *   examplesRoot: string,
  *   generatedAssetsRoot: string,
  *   providerVariant?: Record<string, unknown>,
+ *   providerVariantId?: string,
+ *   profile?: Record<string, unknown>,
  * }} options
  */
 export function materializeHostLiveE2eAssets(options) {
@@ -264,11 +266,30 @@ export function materializeHostLiveE2eAssets(options) {
     assetsRoot,
     providerVariant: asRecord(options.providerVariant),
   });
+  const providerVariantId = asNonEmptyString(options.providerVariantId);
+  const providerRoutes = providerVariantId
+    ? materializeProviderPinnedRouteOverrides({
+        routesRoot: path.join(assetsRoot, "routes"),
+        providerVariant: asRecord(options.providerVariant),
+        providerVariantId,
+        profile: asRecord(options.profile),
+      })
+    : { routeOverrides: {}, routeFiles: [] };
+  const providerPolicies = providerVariantId
+    ? materializeProviderPinnedPolicyOverrides({
+        policiesRoot: path.join(assetsRoot, "policies"),
+        providerVariant: asRecord(options.providerVariant),
+        providerVariantId,
+        profile: asRecord(options.profile),
+      })
+    : { policyOverrides: {}, policyFiles: [] };
   return {
     assetsRoot,
     routesRoot: path.join(assetsRoot, "routes"),
     contextRoot: path.join(assetsRoot, "context"),
     liveE2eAdapterDefaults,
+    providerRoutes,
+    providerPolicies,
   };
 }
 
