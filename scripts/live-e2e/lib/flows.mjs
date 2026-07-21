@@ -4937,10 +4937,7 @@ export function executeInstalledUserFlow(options) {
       const learningHandoff = runCommand("learning-handoff", [
         "learning",
         "handoff",
-        "--project-ref",
-        ".",
-        "--runtime-root",
-        ".aor",
+        ...commandBaseArgs,
         "--run-id",
         options.runId,
       ]);
@@ -7244,6 +7241,8 @@ function executeFullJourneyFlowImplementation(options) {
         "handoff",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
