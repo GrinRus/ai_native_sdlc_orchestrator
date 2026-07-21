@@ -45,6 +45,7 @@ import {
   nodeVersionSatisfiesRequiredRange,
   prepareAorInstallationProof,
   reconcileSummaryMeaningfulChangedPaths,
+  reviewAllowsLiveE2eDelivery,
   resolveFlowIdentityFromPacket,
   resolveAcceptanceRepairDrill,
   runGuidedWebSmoke,
@@ -77,6 +78,29 @@ const fullJourneyFlowScript = path.join(repoRoot, "scripts/live-e2e/lib/flows.mj
 const manualLiveE2eScript = path.join(repoRoot, "scripts/live-e2e/manual-live-e2e.mjs");
 const qualityAssessmentScript = path.join(repoRoot, "scripts/live-e2e/quality-assessment.mjs");
 const qualificationLoopScript = path.join(repoRoot, "scripts/live-e2e/qualification-loop.mjs");
+
+test("private live E2E delivery preserves non-actionable review warnings without treating them as repair failures", () => {
+  const verificationWarning = {
+    overall_status: "warn",
+    findings: [
+      {
+        severity: "warn",
+        category: "verification-mapping",
+        summary: "Changed tests are covered by the deferred diagnostic verification command.",
+      },
+    ],
+  };
+  const actionableWarning = {
+    overall_status: "warn",
+    review_recommendation: "repair",
+    findings: [{ severity: "warn", category: "code-quality", summary: "Implementation change required." }],
+  };
+
+  assert.equal(reviewAllowsLiveE2eDelivery({}, "pass"), true);
+  assert.equal(reviewAllowsLiveE2eDelivery(verificationWarning, "warn"), true);
+  assert.equal(reviewAllowsLiveE2eDelivery(actionableWarning, "warn"), false);
+  assert.equal(reviewAllowsLiveE2eDelivery({ overall_status: "fail" }, "fail"), false);
+});
 
 function withTempRoot(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-proof-runner-"));

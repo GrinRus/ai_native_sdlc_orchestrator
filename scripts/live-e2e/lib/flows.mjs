@@ -315,6 +315,12 @@ function reviewRequiresActionableRepair(reviewReport, reviewOverallStatus) {
   return findings.some((finding) => reviewFindingRequiresImplementationChange(finding));
 }
 
+export function reviewAllowsLiveE2eDelivery(reviewReport, reviewOverallStatus) {
+  // Preserve public warnings without treating non-actionable evidence as a repair failure.
+  return reviewOverallStatus === "pass" ||
+    (reviewOverallStatus === "warn" && !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus));
+}
+
 /**
  * @param {Record<string, unknown>} proofExpectations
  * @returns {Record<string, unknown> | null}
@@ -6897,7 +6903,7 @@ function executeFullJourneyFlowImplementation(options) {
         if (
           artifacts.implementation_loop_blocked === true ||
           lastIteration.repair_requested === true ||
-          reviewOverallStatus !== "pass" ||
+          !reviewAllowsLiveE2eDelivery(reviewReport, reviewOverallStatus) ||
           qaOverallStatus === "fail" ||
           artifacts.post_run_verify_status === "fail"
         ) {
@@ -6911,7 +6917,8 @@ function executeFullJourneyFlowImplementation(options) {
     if (artifacts.implementation_loop_exhausted === true) {
       throw new Error("Implementation quality cycle exhausted before review, QA, and verification passed.");
     }
-    if (reviewOverallStatus !== "pass" && !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus)) {
+    const reviewAllowsDelivery = reviewAllowsLiveE2eDelivery(reviewReport, reviewOverallStatus);
+    if (!reviewAllowsDelivery) {
       artifacts.failure_owner = asNonEmptyString(artifacts.failure_owner) || "provider";
       artifacts.failure_phase = asNonEmptyString(artifacts.failure_phase) || "review";
       artifacts.failure_class =
@@ -6925,7 +6932,7 @@ function executeFullJourneyFlowImplementation(options) {
         "Implementation quality cycle stopped on non-repair review evidence before delivery.";
       throw new Error(artifacts.implementation_loop_failure_summary);
     }
-    if (reviewOverallStatus !== "pass" || qaOverallStatus === "fail" || artifacts.post_run_verify_status === "fail") {
+    if (!reviewAllowsDelivery || qaOverallStatus === "fail" || artifacts.post_run_verify_status === "fail") {
       throw new Error("Implementation review, QA, or post-run verification failed before delivery.");
     }
     if (asStringArray(artifacts.review_repair_decision_files).length > 0) {
