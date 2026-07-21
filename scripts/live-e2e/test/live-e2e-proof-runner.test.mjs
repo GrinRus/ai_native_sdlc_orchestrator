@@ -1526,6 +1526,7 @@ test("generated ky medium profile covers both permitted hook and retry test surf
     });
 
     assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
@@ -1533,6 +1534,16 @@ test("generated ky medium profile covers both permitted hook and retry test surf
       "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
     ]);
   });
+});
+
+test("W66 Ky medium qualification profiles budget the required full diagnostic suite", () => {
+  for (const profileRef of [
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
+  ]) {
+    const { profile } = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    assert.equal(profile.live_e2e.target_command_timeout_sec, 1800);
+  }
 });
 
 test("generated ky large Anthropic profile uses bounded governance verification", () => {
