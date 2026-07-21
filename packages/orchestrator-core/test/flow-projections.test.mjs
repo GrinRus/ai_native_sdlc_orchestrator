@@ -92,6 +92,27 @@ function writeMission(init, missionId, deliveryMode = "patch-only", options = {}
   });
 }
 
+test("flow and next-action reads discover content-addressed intake packet filenames", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    const missionId = "bounded-follow-up";
+    const materialized = writeMission(init, missionId, "no-write");
+    const contentAddressedPacketFile = path.join(
+      init.runtimeLayout.artifactsRoot,
+      "packet-0123456789abcdef0123456789abcdef.json",
+    );
+    fs.renameSync(materialized.packetFile, contentAddressedPacketFile);
+
+    const flowList = listFlowProjections({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(flowList.selected_flow_id, `flow.${init.projectId}.${missionId}`);
+    assert.equal(flowList.flows[0]?.mission_id, missionId);
+    assert.equal(flowList.flows[0]?.intake_packet_ref.endsWith(path.basename(contentAddressedPacketFile)), true);
+
+    const next = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(next.nextActionReport.primary_action.action_id, "discovery-run");
+  });
+});
+
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId

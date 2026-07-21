@@ -105,6 +105,13 @@ qualification cells can reach provider execution and terminal quality closure.
    - Validation: A long W66-style run ID completes patch-only manifest
      generation without relaxing public ID validation or changing private
      live-E2E contracts.
+8. **Content-addressed intake discovery**
+   - Purpose: Keep long-ID Mission and follow-up packets visible to canonical
+     Flow and next-action reads.
+   - Changes: Discover validated intake artifacts by `packet_type` instead of
+     treating the legacy readable filename as lifecycle authority.
+   - Validation: A `packet-<digest>.json` intake produces the same Flow,
+     next-action, analysis, and handoff inputs as a readable packet filename.
 
 ### Acceptance criteria
 
@@ -121,6 +128,8 @@ qualification cells can reach provider execution and terminal quality closure.
 11. Four fresh provider cells are recorded with no upstream writes.
 12. Long canonical run IDs cannot make a producer-owned delivery transaction
     identifier violate the 128-character public-ID contract.
+13. Content-addressed intake packet filenames remain discoverable through the
+    public Flow and next-action lifecycle.
 
 ### Done evidence
 

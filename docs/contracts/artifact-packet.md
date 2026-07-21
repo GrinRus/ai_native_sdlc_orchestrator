@@ -17,6 +17,11 @@ Artifact packets should be human-readable and machine-linkable. They are the def
 
 When `packet_type` is `intake-request`, `body_ref` points to an `intake-request-body` document. The packet carries lifecycle identity; the body carries product goals, constraints, KPIs, Definition of Done, local source references, and completeness evidence.
 
+Consumers identify intake packets from the validated `packet_type`, not from a
+historical filename pattern. Producer-owned content-addressed packet IDs and
+filenames remain fully discoverable when a readable derived ID would exceed the
+public identifier limit.
+
 ## Loader validation
 The shared contract loader validates the required packet identity fields and the optional nested fields used by runtime writers:
 - `evidence_refs[]` must contain strings when present.

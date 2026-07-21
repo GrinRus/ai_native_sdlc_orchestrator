@@ -206,6 +206,8 @@ without making the browser an orchestration owner.
 
 Flow projections are additive read models over existing durable artifacts:
 - `flow_id` is stable for one mission/intake lineage.
+- intake lineage is discovered from validated `artifact-packet` content with
+  `packet_type=intake-request`; filenames are not lifecycle authority.
 - `status` is `active` for mutable in-progress flows or `completed` for
   read-only evidence chains.
 - `selected_stage` is derived from the latest `next-action-report` and closure

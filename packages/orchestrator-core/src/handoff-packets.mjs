@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
 /**
  * @param {string[]} values
@@ -565,9 +565,9 @@ function resolveArtifactPacketPath(options) {
     .filter(
       (entry) =>
         entry.isFile() &&
-        entry.name.includes(".artifact.intake.") &&
         entry.name.endsWith(".json") &&
-        !entry.name.endsWith(".body.json"),
+        !entry.name.endsWith(".body.json") &&
+        loadValidatedIntakePacket(path.join(options.runtimeLayout.artifactsRoot, entry.name)),
     )
     .map((entry) => path.join(options.runtimeLayout.artifactsRoot, entry.name))
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);

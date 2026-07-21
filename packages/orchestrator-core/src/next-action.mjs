@@ -2,6 +2,7 @@ import fs from "node:fs"; import path from "node:path";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { runProjectionCoordinator } from "./operator-projection-services.mjs"; import { operatorControlForAction } from "./next-action-operator-control.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 const DEFAULT_RUNTIME_ROOT = ".aor"; const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
@@ -1132,9 +1133,8 @@ function withRuntimeRootBlockerCommands(blockers, runtimeRoot, includeRuntimeRoo
  */
 function findLatestIntakePacket(init) {
   for (const filePath of listJsonFiles(init.runtimeLayout.artifactsRoot)) {
-    if (!path.basename(filePath).includes(".artifact.intake.")) continue;
-    const packet = readJsonFile(filePath);
-    if (asString(packet?.packet_type) !== "intake-request") continue;
+    const packet = loadValidatedIntakePacket(filePath);
+    if (!packet) continue;
     const bodyFile = asString(packet?.body_ref);
     return {
       packetFile: filePath,
