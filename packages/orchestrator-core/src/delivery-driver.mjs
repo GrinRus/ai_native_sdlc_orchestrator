@@ -11,6 +11,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import { classifyChangedPathsByRepo } from "./repo-scope.mjs";
 import { assertExactDeliveryDiff } from "./delivery-integrity.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
+import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
@@ -796,7 +797,10 @@ function executeDeliveryDriverTransaction(options = {}) {
     },
     coordination: coordinationMetadata,
     coordination_transaction: {
-      transaction_id: `${init.projectId}.delivery-transaction.${normalizeForId(runId)}`,
+      transaction_id: boundedDerivedId(
+        "delivery-transaction",
+        `${init.projectId}.delivery-transaction.${normalizeForId(runId)}`,
+      ),
       status: status === "success" ? "complete" : repoDeliveries.some((repo) => repo.writeback_result !== "failed") ? "partial" : "blocked",
       repo_ids: repoDeliveries.map((repo) => repo.repo_id),
       completed_repo_ids: repoDeliveries.filter((repo) => repo.writeback_result !== "failed").map((repo) => repo.repo_id),
