@@ -59,6 +59,7 @@ verification:
   commands:
     - npx xo
     - npm run build
+    - npx ava test/fetch.ts
     - npx ava test/hooks.ts
     - "npx ava test/retry.ts --match='*shouldRetry*'"
   eval_suites:
