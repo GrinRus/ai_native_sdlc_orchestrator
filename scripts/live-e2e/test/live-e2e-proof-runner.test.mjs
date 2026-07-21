@@ -29,6 +29,7 @@ import {
 import { runLiveAdapterPreflight } from "../lib/preflight.mjs";
 import { buildProviderQualificationMatrix } from "../lib/provider-qualification-matrix.mjs";
 import { applyProductionProofEvidence } from "../lib/production-proof.mjs";
+import { collectTypedEvidenceRefs } from "../lib/evidence-ref-collector.mjs";
 import {
   archivedNextActionReportForMission,
   buildHandoffApprovalArgs,
@@ -73,6 +74,38 @@ import {
 } from "../run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+test("live E2E assessment refs include only typed evidence fields and known evidence groups", () => {
+  const refs = collectTypedEvidenceRefs({
+    command: "CI=1 npx ava test/headers.ts",
+    title: "Inspect docs/contracts/00-index.md before continuing",
+    route_id: "route.anthropic.primary",
+    requested_model: "claude-default",
+    inline_context: "context_doc_id: example\nsource:\n  ref: docs/architecture/runtime.md",
+    report_ref: "evidence://reports/review.json",
+    transcript_file: "/tmp/aor proof/command.json",
+    related_refs: ["packet://mission/example", "reports/verification.json"],
+    nested: {
+      evidence_refs: ["reports/runtime-harness.json"],
+      command: "aor review run --project-ref /tmp/project",
+    },
+    evidence: {
+      review: "reports/review.json",
+      summary: "Review passed without artifacts",
+    },
+  });
+
+  assert.deepEqual(refs, [
+    "evidence://reports/review.json",
+    "/tmp/aor proof/command.json",
+    "packet://mission/example",
+    "reports/verification.json",
+    "reports/runtime-harness.json",
+    "reports/review.json",
+  ]);
+  assert.equal(refs.some((ref) => ref.includes("npx ava")), false);
+  assert.equal(refs.some((ref) => ref.includes("context_doc_id")), false);
+});
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
 const fullJourneyFlowScript = path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs");
 const manualLiveE2eScript = path.join(repoRoot, "scripts/live-e2e/manual-live-e2e.mjs");

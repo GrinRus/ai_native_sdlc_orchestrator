@@ -40,6 +40,7 @@ import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.m
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
 import { runGuidedBrowserTaskCollector } from "./browser-proof-collector.mjs";
+import { collectTypedEvidenceRefs } from "./evidence-ref-collector.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
@@ -72,38 +73,6 @@ function serializePolicyOverrides(policyOverrides) {
     .filter(([, policyId]) => typeof policyId === "string" && policyId.length > 0)
     .map(([step, policyId]) => `${step}=${policyId}`);
   return pairs.length > 0 ? pairs.join(",") : null;
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
-function looksLikeEvidenceRef(value) {
-  return (
-    value.startsWith("evidence://") ||
-    value.startsWith("compiled-context://") ||
-    value.startsWith("packet://") ||
-    value.includes("/") ||
-    value.includes("\\") ||
-    /\.(json|jsonl|yaml|yml|patch|log)$/iu.test(value)
-  );
-}
-
-/**
- * @param {unknown} value
- * @returns {string[]}
- */
-function collectStringRefs(value) {
-  if (typeof value === "string") {
-    return looksLikeEvidenceRef(value.trim()) ? [value.trim()] : [];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => collectStringRefs(entry));
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.values(value).flatMap((entry) => collectStringRefs(entry));
-  }
-  return [];
 }
 
 /**
@@ -1060,7 +1029,7 @@ function buildCommandDiagnostic(result, options = {}) {
     timed_out: result.timedOut,
     timeout_budget_ms: result.timeoutMs,
     transcript_file: result.transcriptFile,
-    artifact_refs: uniqueStrings(collectStringRefs(result.payload)),
+    artifact_refs: uniqueStrings(collectTypedEvidenceRefs(result.payload)),
     failure_class: result.ok
       ? null
       : result.timedOut && isDiagnosticCommand
@@ -4572,7 +4541,7 @@ export function executeInstalledUserFlow(options) {
       stageMap,
       "discovery",
       "pass",
-      uniqueStrings([analyze.transcriptFile, ...collectStringRefs(analyze.payload)]),
+      uniqueStrings([analyze.transcriptFile, ...collectTypedEvidenceRefs(analyze.payload)]),
       "Project analysis completed through the public CLI.",
     );
 
@@ -4584,7 +4553,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "spec",
         "fail",
-        uniqueStrings([validate.transcriptFile, ...collectStringRefs(validate.payload)]),
+        uniqueStrings([validate.transcriptFile, ...collectTypedEvidenceRefs(validate.payload)]),
         "Project validation failed.",
       );
       throw new Error("Project validation failed.");
@@ -4593,7 +4562,7 @@ export function executeInstalledUserFlow(options) {
       stageMap,
       "spec",
       "pass",
-      uniqueStrings([validate.transcriptFile, ...collectStringRefs(validate.payload)]),
+      uniqueStrings([validate.transcriptFile, ...collectTypedEvidenceRefs(validate.payload)]),
       "Project validation completed.",
     );
 
@@ -4610,7 +4579,7 @@ export function executeInstalledUserFlow(options) {
       stageMap,
       "planning",
       "pass",
-      uniqueStrings([handoffPrepare.transcriptFile, ...collectStringRefs(handoffPrepare.payload)]),
+      uniqueStrings([handoffPrepare.transcriptFile, ...collectTypedEvidenceRefs(handoffPrepare.payload)]),
       "Handoff packet prepared through the public CLI.",
     );
 
@@ -4624,7 +4593,7 @@ export function executeInstalledUserFlow(options) {
       stageMap,
       "handoff",
       "pass",
-      uniqueStrings([handoffApprove.transcriptFile, ...collectStringRefs(handoffApprove.payload)]),
+      uniqueStrings([handoffApprove.transcriptFile, ...collectTypedEvidenceRefs(handoffApprove.payload)]),
       "Handoff packet approved.",
     );
 
@@ -4667,7 +4636,7 @@ export function executeInstalledUserFlow(options) {
           stageMap,
           "execution",
           "fail",
-          uniqueStrings([verifyPreflight.transcriptFile, verifySummaryPath, ...collectStringRefs(verifyPreflight.payload)]),
+          uniqueStrings([verifyPreflight.transcriptFile, verifySummaryPath, ...collectTypedEvidenceRefs(verifyPreflight.payload)]),
           "Preflight verify failed before live execution.",
         );
         throw new Error("Preflight verify failed before live execution.");
@@ -4693,7 +4662,7 @@ export function executeInstalledUserFlow(options) {
       preflightEvidenceRefs = uniqueStrings([
         verifyPreflight.transcriptFile,
         verifySummaryPath,
-        ...collectStringRefs(verifyPreflight.payload),
+        ...collectTypedEvidenceRefs(verifyPreflight.payload),
         targetCleanliness.reportFile,
       ]);
     } else {
@@ -4753,7 +4722,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "execution",
         "fail",
-        uniqueStrings([routedLive.transcriptFile, routedStepResultPath, ...collectStringRefs(routedStepResult)]),
+        uniqueStrings([routedLive.transcriptFile, routedStepResultPath, ...collectTypedEvidenceRefs(routedStepResult)]),
         failureSummary,
       );
       throw new Error(failureSummary);
@@ -4766,7 +4735,7 @@ export function executeInstalledUserFlow(options) {
         ...preflightEvidenceRefs,
         routedLive.transcriptFile,
         routedStepResultPath,
-        ...collectStringRefs(routedStepResult),
+        ...collectTypedEvidenceRefs(routedStepResult),
       ]),
       "Preflight verify and routed live execution passed.",
     );
@@ -4795,7 +4764,7 @@ export function executeInstalledUserFlow(options) {
           stageMap,
           "qa",
           "fail",
-          uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
+          uniqueStrings([evalRun.transcriptFile, ...collectTypedEvidenceRefs(evalRun.payload)]),
           "Evaluation report failed.",
         );
         throw new Error("Evaluation report failed.");
@@ -4804,7 +4773,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "qa",
         "pass",
-        uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
+        uniqueStrings([evalRun.transcriptFile, ...collectTypedEvidenceRefs(evalRun.payload)]),
         "Eval run passed.",
       );
       if (getHarnessCertification(options.profile) === null) {
@@ -4812,7 +4781,7 @@ export function executeInstalledUserFlow(options) {
           stageMap,
           "review",
           "pass",
-          uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
+          uniqueStrings([evalRun.transcriptFile, ...collectTypedEvidenceRefs(evalRun.payload)]),
           "Review reused evaluation evidence.",
         );
       }
@@ -4848,7 +4817,7 @@ export function executeInstalledUserFlow(options) {
           stageMap,
           "review",
           "fail",
-          uniqueStrings([certify.transcriptFile, ...collectStringRefs(certify.payload)]),
+          uniqueStrings([certify.transcriptFile, ...collectTypedEvidenceRefs(certify.payload)]),
           "Harness certification did not pass.",
         );
         throw new Error("Harness certification did not pass.");
@@ -4857,7 +4826,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "review",
         "pass",
-        uniqueStrings([certify.transcriptFile, ...collectStringRefs(certify.payload)]),
+        uniqueStrings([certify.transcriptFile, ...collectTypedEvidenceRefs(certify.payload)]),
         "Harness certification passed.",
       );
     } else if (stageMap.review?.status === "pending") {
@@ -4904,7 +4873,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "delivery",
         "fail",
-        uniqueStrings([deliver.transcriptFile, ...collectStringRefs(deliver.payload)]),
+        uniqueStrings([deliver.transcriptFile, ...collectTypedEvidenceRefs(deliver.payload)]),
         "Delivery prepare did not materialize delivery evidence.",
       );
       throw new Error("Delivery prepare did not materialize delivery evidence.");
@@ -4913,7 +4882,7 @@ export function executeInstalledUserFlow(options) {
       stageMap,
       "delivery",
       artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass" ? "warn" : "pass",
-      uniqueStrings([deliver.transcriptFile, ...collectStringRefs(deliver.payload)]),
+      uniqueStrings([deliver.transcriptFile, ...collectTypedEvidenceRefs(deliver.payload)]),
       artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
         ? "Delivery evidence materialized with observed quality findings."
         : "Delivery prepare materialized delivery evidence.",
@@ -4944,7 +4913,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "release",
         artifacts.release_status,
-        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        uniqueStrings([releasePrepare.transcriptFile, ...collectTypedEvidenceRefs(releasePrepare.payload)]),
         artifacts.release_packet_file
           ? "Release prepare materialized release packet evidence for the bounded full-lifecycle profile."
           : "Release prepare did not materialize release packet evidence.",
@@ -4990,7 +4959,7 @@ export function executeInstalledUserFlow(options) {
           stageMap,
           "learning",
           "fail",
-          uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+          uniqueStrings([learningHandoff.transcriptFile, ...collectTypedEvidenceRefs(learningHandoff.payload)]),
           "Learning handoff did not materialize the required public closure artifacts.",
         );
         throw new Error("Learning handoff did not materialize the required public closure artifacts.");
@@ -4999,7 +4968,7 @@ export function executeInstalledUserFlow(options) {
         stageMap,
         "learning",
         "pass",
-        uniqueStrings([auditRuns.transcriptFile, learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+        uniqueStrings([auditRuns.transcriptFile, learningHandoff.transcriptFile, ...collectTypedEvidenceRefs(learningHandoff.payload)]),
         "Public audit and learning-loop closure artifacts materialized for the bounded full-lifecycle profile.",
       );
     } else {
@@ -5311,7 +5280,7 @@ function executeFullJourneyFlowImplementation(options) {
         next_action_primary: getStringField(next.payload, "next_action_primary"),
         next_action_blockers: asStringArray(next.payload?.next_action_blockers),
         artifact_readiness: asRecord(next.payload?.next_action_artifact_readiness),
-        evidence_refs: uniqueStrings([next.transcriptFile, reportFile, ...collectStringRefs(next.payload)]),
+        evidence_refs: uniqueStrings([next.transcriptFile, reportFile, ...collectTypedEvidenceRefs(next.payload)]),
       };
       artifacts.artifact_readiness_snapshots = [
         ...(Array.isArray(artifacts.artifact_readiness_snapshots) ? artifacts.artifact_readiness_snapshots : []),
@@ -5537,7 +5506,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "bootstrap",
         liveAdapterPreflight.status === "interaction_required" ? "interaction_required" : "fail",
-        uniqueStrings([projectInit.transcriptFile, liveAdapterPreflight.reportFile, ...collectStringRefs(projectInit.payload)]),
+        uniqueStrings([projectInit.transcriptFile, liveAdapterPreflight.reportFile, ...collectTypedEvidenceRefs(projectInit.payload)]),
         liveAdapterPreflight.summary,
       );
       throw new Error(liveAdapterPreflight.summary);
@@ -5550,7 +5519,7 @@ function executeFullJourneyFlowImplementation(options) {
         projectInit.transcriptFile,
         liveAdapterPreflight.reportFile,
         browserCachePreflight.reportFile,
-        ...collectStringRefs(projectInit.payload),
+        ...collectTypedEvidenceRefs(projectInit.payload),
         ...providerRoutes.routeFiles,
         ...providerPolicies.policyFiles,
       ]),
@@ -5858,7 +5827,7 @@ function executeFullJourneyFlowImplementation(options) {
           stageMap,
           "execution",
           "fail",
-          uniqueStrings([verifyPreflight.transcriptFile, targetPreExecutionStatusFile, ...collectStringRefs(verifyPreflight.payload)]),
+          uniqueStrings([verifyPreflight.transcriptFile, targetPreExecutionStatusFile, ...collectTypedEvidenceRefs(verifyPreflight.payload)]),
           asNonEmptyString(targetPreExecutionStatus.blocker_reason) || "Dry-run verify summary was not materialized.",
         );
         throw new Error(asNonEmptyString(targetPreExecutionStatus.blocker_reason) || "Dry-run verify summary was not materialized.");
@@ -5921,7 +5890,7 @@ function executeFullJourneyFlowImplementation(options) {
             targetPreExecutionStatusFile,
             baselineVerifySummaryPath,
             ...asStringArray(artifacts.baseline_verify_preserved_files),
-            ...collectStringRefs(verifyPreflight.payload),
+            ...collectTypedEvidenceRefs(verifyPreflight.payload),
           ]),
           asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.",
         );
@@ -5965,7 +5934,7 @@ function executeFullJourneyFlowImplementation(options) {
         baselineVerifySummaryPath,
         asNonEmptyString(artifacts.provider_workspace_setup_file),
         ...asStringArray(artifacts.baseline_verify_preserved_files),
-        ...collectStringRefs(verifyPreflight.payload),
+        ...collectTypedEvidenceRefs(verifyPreflight.payload),
         targetCleanliness.reportFile,
         executionReadiness.decisionFile,
         asNonEmptyString(artifacts.target_pre_execution_status_file),
@@ -6001,7 +5970,7 @@ function executeFullJourneyFlowImplementation(options) {
         analyze.transcriptFile,
         validate.transcriptFile,
         discovery.transcriptFile,
-        ...collectStringRefs(discovery.payload),
+        ...collectTypedEvidenceRefs(discovery.payload),
         ...asStringArray(discoveryReadinessSnapshot.evidence_refs),
       ]),
       "Feature-driven discovery completed from catalog-backed intake request.",
@@ -6032,7 +6001,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "spec",
         "fail",
-        uniqueStrings([specBuild.transcriptFile, ...collectStringRefs(specBuild.payload)]),
+        uniqueStrings([specBuild.transcriptFile, ...collectTypedEvidenceRefs(specBuild.payload)]),
         "Spec build did not materialize a routed step-result artifact.",
       );
       throw new Error("Spec build did not materialize a routed step-result artifact.");
@@ -6044,7 +6013,7 @@ function executeFullJourneyFlowImplementation(options) {
       "pass",
       uniqueStrings([
         specBuild.transcriptFile,
-        ...collectStringRefs(specBuild.payload),
+        ...collectTypedEvidenceRefs(specBuild.payload),
         ...asStringArray(specReadinessSnapshot.evidence_refs),
       ]),
       "Spec build produced feature-traceable dry-run evidence.",
@@ -6070,7 +6039,7 @@ function executeFullJourneyFlowImplementation(options) {
       "pass",
       uniqueStrings([
         planCreate.transcriptFile,
-        ...collectStringRefs(planCreate.payload),
+        ...collectTypedEvidenceRefs(planCreate.payload),
         ...asStringArray(planningReadinessSnapshot.evidence_refs),
       ]),
       "Structured plan and handoff packets were materialized from the public planning flow.",
@@ -6087,7 +6056,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "handoff",
         "fail",
-        uniqueStrings([handoffApprove.transcriptFile, ...collectStringRefs(handoffApprove.payload)]),
+        uniqueStrings([handoffApprove.transcriptFile, ...collectTypedEvidenceRefs(handoffApprove.payload)]),
         "Approved handoff validation was blocked by internal test hook.",
       );
       throw new Error("Approved handoff validation was blocked by internal test hook.");
@@ -6123,7 +6092,7 @@ function executeFullJourneyFlowImplementation(options) {
       stageMap,
       "handoff",
       "pass",
-      uniqueStrings([handoffApprove.transcriptFile, validateApproved.transcriptFile, ...collectStringRefs(handoffApprove.payload)]),
+      uniqueStrings([handoffApprove.transcriptFile, validateApproved.transcriptFile, ...collectTypedEvidenceRefs(handoffApprove.payload)]),
       "Approved handoff validated for execution start.",
     );
 
@@ -6251,7 +6220,7 @@ function executeFullJourneyFlowImplementation(options) {
           stageMap,
           "execution",
           "fail",
-          uniqueStrings([runStart.transcriptFile, ...collectStringRefs(runStart.payload)]),
+          uniqueStrings([runStart.transcriptFile, ...collectTypedEvidenceRefs(runStart.payload)]),
           "Run start did not materialize routed execution evidence.",
           { iteration },
         );
@@ -6300,7 +6269,7 @@ function executeFullJourneyFlowImplementation(options) {
           stageMap,
           "execution",
           "fail",
-          uniqueStrings([postRunVerify.transcriptFile, ...collectStringRefs(postRunVerify.payload)]),
+          uniqueStrings([postRunVerify.transcriptFile, ...collectTypedEvidenceRefs(postRunVerify.payload)]),
           "Post-run verify summary was not materialized.",
           { iteration },
         );
@@ -6332,7 +6301,7 @@ function executeFullJourneyFlowImplementation(options) {
           runStatus.transcriptFile,
           postRunVerify.transcriptFile,
           postRunVerifySummaryPath,
-          ...collectStringRefs(runStart.payload),
+          ...collectTypedEvidenceRefs(runStart.payload),
         ]),
         executionStageSummary,
         { iteration },
@@ -6409,7 +6378,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "review",
         canRepair ? "warn" : terminalCycleFailure ? "fail" : reviewHasNonRepairWarnings ? "warn" : "pass",
-        uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
+        uniqueStrings([reviewRun.transcriptFile, ...collectTypedEvidenceRefs(reviewRun.payload)]),
         canRepair
           ? `Review requested public repair iteration ${iteration + 1}.`
           : terminalCycleFailure
@@ -6464,7 +6433,7 @@ function executeFullJourneyFlowImplementation(options) {
           artifacts.evaluation_report_file = getStringField(evalRun.payload, "evaluation_report_file");
           artifacts.evaluation_status = getStringField(evalRun.payload, "evaluation_status") === "pass" ? "pass" : "fail";
           qaEvaluationStatus = asNonEmptyString(artifacts.evaluation_status) || "fail";
-          qaEvidenceRefs = uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]);
+          qaEvidenceRefs = uniqueStrings([evalRun.transcriptFile, ...collectTypedEvidenceRefs(evalRun.payload)]);
         } else {
           artifacts.evaluation_status = "skipped";
           qaEvaluationStatus = "skipped";
@@ -7107,7 +7076,7 @@ function executeFullJourneyFlowImplementation(options) {
             ? "warn"
             : "pass"
           : "fail",
-        uniqueStrings([deliverPrepare.transcriptFile, ...collectStringRefs(deliverPrepare.payload)]),
+        uniqueStrings([deliverPrepare.transcriptFile, ...collectTypedEvidenceRefs(deliverPrepare.payload)]),
         artifacts.delivery_manifest_file
           ? artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
             ? "Delivery evidence materialized with observed quality findings."
@@ -7169,7 +7138,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "release",
         artifacts.release_status,
-        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        uniqueStrings([releasePrepare.transcriptFile, ...collectTypedEvidenceRefs(releasePrepare.payload)]),
         artifacts.release_status === "pass"
           ? "Release prepare materialized release packet evidence under the review gate."
           : "Release prepare did not materialize ready-for-close release packet evidence.",
@@ -7213,7 +7182,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "release",
         artifacts.release_status,
-        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        uniqueStrings([releasePrepare.transcriptFile, ...collectTypedEvidenceRefs(releasePrepare.payload)]),
         artifacts.release_status === "pass"
           ? "Release prepare materialized strict release-packet evidence."
           : "Release prepare did not materialize ready-for-close strict release-packet evidence.",
@@ -7308,7 +7277,7 @@ function executeFullJourneyFlowImplementation(options) {
         stageMap,
         "learning",
         "fail",
-        uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+        uniqueStrings([learningHandoff.transcriptFile, ...collectTypedEvidenceRefs(learningHandoff.payload)]),
         "Learning handoff did not materialize the required public closure artifacts.",
       );
       throw new Error("Learning handoff did not materialize the required public closure artifacts.");
@@ -7482,7 +7451,7 @@ function executeFullJourneyFlowImplementation(options) {
       stageMap,
       "learning",
       "pass",
-      uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+      uniqueStrings([learningHandoff.transcriptFile, ...collectTypedEvidenceRefs(learningHandoff.payload)]),
       "Public learning-loop closure artifacts materialized.",
     );
 
