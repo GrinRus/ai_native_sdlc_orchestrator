@@ -26,6 +26,10 @@ membership, completed/failed repo ids, integration and lock evidence, and
 rollback refs. Each repository records its transaction stage, failed step,
 rollback refs, and catalog-owned recovery action. Partial write effects are
 never represented as aggregate success.
+The producer derives `coordination_transaction.transaction_id` from project and
+run identity. When the readable form would exceed the canonical public-ID
+limit, it uses a stable content-addressed ID instead of emitting an invalid
+manifest or truncating user-supplied identity at ingress.
 
 ## Notes
 A delivery manifest is required whenever a flow reaches delivery or release.

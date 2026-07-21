@@ -96,6 +96,15 @@ qualification cells can reach provider execution and terminal quality closure.
      steps, every provider-visible local path is inside the disposable root,
      no-write packets remain read-only, and live execution cannot mutate the
      primary checkout or upstream.
+7. **Bounded delivery transaction identity**
+   - Purpose: Keep delivery manifest generation valid for long, otherwise
+     canonical qualification run IDs.
+   - Changes: Derive the coordination transaction through the shared bounded
+     content-addressed ID helper while preserving the original run identity in
+     `run_refs`.
+   - Validation: A long W66-style run ID completes patch-only manifest
+     generation without relaxing public ID validation or changing private
+     live-E2E contracts.
 
 ### Acceptance criteria
 
@@ -110,6 +119,8 @@ qualification cells can reach provider execution and terminal quality closure.
 9. Runtime Harness and review preserve that profile and inspect the disposable execution workspace identified by the routed step result.
 10. Patch-only execution permits direct edits only in the disposable workspace while writeback remains disabled until exact-diff delivery authorization.
 11. Four fresh provider cells are recorded with no upstream writes.
+12. Long canonical run IDs cannot make a producer-owned delivery transaction
+    identifier violate the 128-character public-ID contract.
 
 ### Done evidence
 

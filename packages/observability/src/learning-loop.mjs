@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
 
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
@@ -200,7 +200,10 @@ export function materializeLearningLoopArtifacts(options) {
         };
 
   const scorecard = {
-    scorecard_id: `${options.runId}.learning-loop.scorecard.v1`,
+    scorecard_id: derivePublicId(
+      [options.runId, "learning-loop", "scorecard", "v1"],
+      "learning-loop-scorecard",
+    ),
     project_id: options.projectId,
     run_id: options.runId,
     source_kind: options.sourceKind,
@@ -249,7 +252,10 @@ export function materializeLearningLoopArtifacts(options) {
 
   const incidentId =
     options.incidentId ??
-    `${options.projectId}.incident.${normalizeId(options.runId)}.${generatedAt.replace(/[^0-9]/g, "").slice(-12)}`;
+    derivePublicId(
+      [options.projectId, "incident", options.runId, generatedAt.replace(/[^0-9]/g, "").slice(-12)],
+      "incident-report",
+    );
   const handoffFile = path.join(
     options.runtimeLayout.reportsRoot,
     shouldCreateIncident
@@ -294,7 +300,10 @@ export function materializeLearningLoopArtifacts(options) {
   }
 
   const handoff = {
-    handoff_id: `${options.runId}.learning-loop.handoff.v1`,
+    handoff_id: derivePublicId(
+      [options.runId, "learning-loop", "handoff", "v1"],
+      "learning-loop-handoff",
+    ),
     project_id: options.projectId,
     run_id: options.runId,
     run_status: runStatus,

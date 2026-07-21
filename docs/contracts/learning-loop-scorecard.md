@@ -19,6 +19,11 @@ Durable scorecard that links one completed run to backlog, quality, and incident
 - `coverage_follow_up`
 - `generated_at`
 
+Producer-generated `scorecard_id` values preserve the readable run-derived form
+when it satisfies the public ID grammar. Long canonical run IDs use a stable
+content-addressed ID; the complete source identity remains available in
+`run_id`.
+
 ## Status semantics
 `status` should use the normalized run set:
 - `pass`

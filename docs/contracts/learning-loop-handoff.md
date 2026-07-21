@@ -18,6 +18,11 @@ Durable handoff that closes one run into backlog, incident, and follow-up qualit
 - `coverage_follow_up`
 - `generated_at`
 
+Producer-generated `handoff_id` values preserve the readable run-derived form
+when it satisfies the public ID grammar. Long canonical run IDs use a stable
+content-addressed ID; the complete source identity remains available in
+`run_id`.
+
 ## Optional fields
 - `summary`
 - `next_actions`
