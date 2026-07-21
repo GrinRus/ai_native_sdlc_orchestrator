@@ -1889,8 +1889,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "incident-and-audit",
     status: "implemented",
     summary: "Close one run into public learning-loop scorecard and handoff artifacts.",
-    inputs: [
-      "--project-ref <path>",
+    inputs: ["--project-ref <path>", "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--help",
