@@ -1531,42 +1531,47 @@ test("generated live E2E profile falls back to mission-scoped primary verificati
   });
 });
 
-test("generated ky medium profile covers both permitted hook and retry test surfaces", () => {
-  withTempRoot((tempRoot) => {
-    const profileRef = "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml";
-    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
-    const resolved = resolveFullJourneyProfile({
-      profile: loadedProfile.profile,
-      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
-    });
-    const generatedAssetsRoot = path.join(tempRoot, "assets");
-    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+test("generated ky medium profiles cover mission, hook, and retry test surfaces", () => {
+  for (const profileRef of [
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
+  ]) {
+    withTempRoot((tempRoot) => {
+      const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+      const resolved = resolveFullJourneyProfile({
+        profile: loadedProfile.profile,
+        catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+      });
+      const generatedAssetsRoot = path.join(tempRoot, "assets");
+      fs.mkdirSync(generatedAssetsRoot, { recursive: true });
 
-    const result = materializeGeneratedProjectProfile({
-      hostRoot: repoRoot,
-      profilePath: loadedProfile.profilePath,
-      profile: resolved.resolvedProfile,
-      catalogEntry: resolved.catalogEntry,
-      mission: resolved.mission,
-      providerVariant: resolved.providerVariant,
-      runId: "ky-medium-complete-primary-coverage",
-      targetCheckout: { targetRepoId: "ky", targetRepoRef: "main" },
-      generatedAssetsRoot,
-    });
-    const loaded = loadContractFile({
-      filePath: result.generatedProjectProfileFile,
-      family: "project-profile",
-    });
+      const result = materializeGeneratedProjectProfile({
+        hostRoot: repoRoot,
+        profilePath: loadedProfile.profilePath,
+        profile: resolved.resolvedProfile,
+        catalogEntry: resolved.catalogEntry,
+        mission: resolved.mission,
+        providerVariant: resolved.providerVariant,
+        runId: "ky-medium-complete-primary-coverage",
+        targetCheckout: { targetRepoId: "ky", targetRepoRef: "main" },
+        generatedAssetsRoot,
+      });
+      const loaded = loadContractFile({
+        filePath: result.generatedProjectProfileFile,
+        family: "project-profile",
+      });
 
-    assert.equal(loaded.ok, true);
-    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
-    assert.deepEqual(loaded.document.repos[0].test_commands, [
-      "CI=1 npx xo",
-      "CI=1 npm run build",
-      "CI=1 npx ava test/hooks.ts",
-      "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
-    ]);
-  });
+      assert.equal(loaded.ok, true);
+      assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
+      assert.deepEqual(loaded.document.repos[0].test_commands, [
+        "CI=1 npx xo",
+        "CI=1 npm run build",
+        "CI=1 npx ava test/fetch.ts",
+        "CI=1 npx ava test/hooks.ts",
+        "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
+      ]);
+    });
+  }
 });
 
 test("W66 Ky medium qualification profiles budget the required full diagnostic suite", () => {
