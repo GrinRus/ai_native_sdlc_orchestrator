@@ -803,6 +803,12 @@ The runner performs deterministic analysis for every step from public command tr
 The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis during the run comes only from accepted skill-agent step decisions. The runner/evaluator then materializes `live-e2e-step-quality-assessment-report` from public artifacts for each observed step. For `mission_class=product-change` and `feature_size=medium|large|xlarge`, continuation is forbidden unless the step report is accepted. For `mission_class=flow-regression` and `feature_size=small`, the step report is lightweight flow-health canary evidence. Outcome quality is assessed after the run in `live-e2e-quality-assessment-report`.
 
 Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. Use `manual-live-e2e.mjs --prepare-decision` as the default draft path so required refs and AOR operator UI refs are copied from the request rather than typed by hand. For UI-capable profiles, the decision must cite the AOR operator UI evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not replace `browser-task-proof` evidence.
+
+The private runner derives assessment inputs only from public payload fields whose
+names declare `*_ref`, `*_refs`, `*_file`, or `*_files`, plus known artifact and
+evidence groups. It does not infer evidence from arbitrary string values. Command
+text, route or model identifiers, titles, and inline YAML therefore never become
+inspection paths merely because they contain a slash or filename-like text.
 If browser-task proof is written after the decision request was created, the helper should hydrate the draft from the guided smoke/proof request files so the proof JSON and screenshots are also cited as inspected AOR operator UI evidence.
 
 Judge criteria:
