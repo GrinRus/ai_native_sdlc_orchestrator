@@ -88,9 +88,14 @@ qualification cells can reach provider execution and terminal quality closure.
      granting primary-checkout or upstream writeback.
    - Changes: Keep `patch-only` target edits scoped to the disposable workspace
      while exact-diff delivery authorization and all writeback remain separate.
+     Materialize the provider-visible work packet and required local inputs as
+     read-only snapshots inside that workspace, preserve canonical evidence
+     refs separately, and prohibit evidence paths from selecting an execution
+     checkout.
    - Validation: Provider work packets require meaningful edits for implement
-     steps, no-write packets remain read-only, and live execution cannot mutate
-     the primary checkout or upstream.
+     steps, every provider-visible local path is inside the disposable root,
+     no-write packets remain read-only, and live execution cannot mutate the
+     primary checkout or upstream.
 
 ### Acceptance criteria
 

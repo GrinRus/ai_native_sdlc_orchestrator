@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
 import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
-import { isSupportedRequestTransport, resolveRequestTransport } from "./packet-transport.mjs";
+import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 import { runSupervisedProcessSync } from "./supervisor.mjs";
 
@@ -2977,30 +2977,30 @@ export function createLiveAdapter(options) {
           },
         ];
       }
-      const executionContract = asRecord(providerWorkPacket.execution_contract);
+      const { packet: executionProviderWorkPacket, packetFile: executionProviderWorkPacketFile } =
+        materializeProviderInputSnapshot({ providerWorkPacket, canonicalPacketFile: providerWorkPacketFile, executionRoot: runnerExecutionRoot, projectRoot });
+      const executionContract = asRecord(executionProviderWorkPacket.execution_contract);
       const checkoutWritePolicy = asRecord(executionContract.target_checkout_write_policy);
       const defaultRequestArtifactMessage = checkoutWritePolicy.direct_edits_allowed === true
-        ? "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits only in the disposable target checkout when execution_contract.expected_meaningful_change.required is true, follow all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final implementation report with changed-files, commands-run, verification, and risks."
+        ? "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout. Evidence inputs are read-only and must never be treated as execution roots. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits only in the disposable execution root when execution_contract.expected_meaningful_change.required is true, follow all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final implementation report with changed-files, commands-run, verification, and risks."
         : "Perform the approved read-only AOR inspection using the provider work packet at {provider_work_packet_path}. Read that JSON first, open required resolved_local_refs[].local_path files, do not edit the target checkout, index, HEAD, or untracked files, do not write upstream, run only permitted read-only checks, and return an inspection report with findings, commands-run, verification, and risks.";
       const requestMessage = renderRequestArtifactMessage(
         asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
         {
-          provider_work_packet_path: providerWorkPacketFile,
+          provider_work_packet_path: executionProviderWorkPacketFile,
           provider_work_packet_ref: providerWorkPacketRef,
           request_artifact_ref: requestArtifactRef,
         },
       );
       const budgetLimitTokens = resolveContextBudgetLimitTokens(externalRuntime);
-      const providerWorkPacketText = `${JSON.stringify(providerWorkPacket, null, 2)}\n`;
+      const providerWorkPacketText = `${JSON.stringify(executionProviderWorkPacket, null, 2)}\n`;
       const contextBudgetReports = buildContextBudgetReports({
         runnerInput,
-        providerWorkPacket,
+        providerWorkPacket: executionProviderWorkPacket,
         providerWorkPacketText,
         launcherPrompt: requestMessage,
         budgetLimitTokens,
       });
-      fs.writeFileSync(providerWorkPacketFile, providerWorkPacketText, "utf8");
-
       const writeRawEvidence = (record) => {
         const rawEvidenceRoot = evidenceDir ?? requestArtifactDir;
         fs.mkdirSync(rawEvidenceRoot, { recursive: true });
@@ -3029,10 +3029,10 @@ export function createLiveAdapter(options) {
         runtimeArgs = [...runtimeArgs, serializedRunnerInput.trim()];
       } else if (requestTransport === "request-artifact") {
         const requestFileArgument = asOptionalString(requestFileProfile.argument);
-        requestFile = providerWorkPacketFile;
+        requestFile = executionProviderWorkPacketFile;
         requestFileRef = providerWorkPacketRef;
         runtimeArgs = requestFileArgument
-          ? [...runtimeArgs, requestMessage, requestFileArgument, providerWorkPacketFile]
+          ? [...runtimeArgs, requestMessage, requestFileArgument, executionProviderWorkPacketFile]
           : [...runtimeArgs, requestMessage];
       } else if (requestTransport === "file-attachment") {
         const requestMessage =

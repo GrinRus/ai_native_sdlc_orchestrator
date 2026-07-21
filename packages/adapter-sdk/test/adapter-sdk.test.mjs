@@ -1425,14 +1425,16 @@ test("live adapter supports file-attached request transport for argv prompt runn
 test("live adapter request-artifact transport sends bounded provider work packet", () => {
   withTempRepo((repoRoot) => {
     const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const executionRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "workspaces", "disposable");
     const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
     fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.mkdirSync(path.join(executionRoot, "source"), { recursive: true });
     fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
     const adapter = createLiveAdapter({
       adapterId: "claude-code",
       projectRoot: repoRoot,
       runtimeEvidenceRoot: evidenceRoot,
-      executionRoot: repoRoot,
+      executionRoot,
       adapterProfile: buildExternalRunnerProfile({
         command: process.execPath,
         args: [
@@ -1442,10 +1444,11 @@ test("live adapter request-artifact transport sends bounded provider work packet
             "const fileIndex=process.argv.indexOf('--work-packet');",
             "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
             "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "fs.writeFileSync('source/provider-edit.txt','workspace only\\n');",
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'request artifact ok',",
-            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content},",
+            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),resolved_local_paths:packet.resolved_local_refs.map(ref=>ref.local_path),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content,cwd:process.cwd(),packet_path:filePath},",
             "evidence_refs:['evidence://adapter-live/claude-code/request-artifact']",
             "}));",
           ].join(""),
@@ -1511,7 +1514,19 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.ok(response.output.runner_output.resolved_ref_roles.includes("full_request_artifact"));
     assert.ok(response.output.runner_output.resolved_ref_roles.includes("provider_work_packet"));
     assert.ok(response.output.runner_output.resolved_ref_roles.includes("compiled_context"));
+    assert.ok(
+      response.output.runner_output.resolved_local_paths.every((filePath) => {
+        const relative = path.relative(fs.realpathSync(executionRoot), filePath);
+        return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+      }),
+      JSON.stringify(response.output.runner_output.resolved_local_paths),
+    );
+    assert.equal(fs.realpathSync(response.output.runner_output.cwd), fs.realpathSync(executionRoot));
+    assert.ok(response.output.runner_output.packet_path.startsWith(path.join(fs.realpathSync(executionRoot), ".aor", "provider-inputs")));
+    assert.equal(fs.existsSync(path.join(executionRoot, "source", "provider-edit.txt")), true);
+    assert.equal(fs.existsSync(path.join(repoRoot, "source", "provider-edit.txt")), false);
     assert.equal(response.output.runner_output.execution_contract.mode, "execute-implementation");
+    assert.equal(response.output.runner_output.execution_contract.disposable_workspace_boundary.source_edits_must_remain_within_execution_root, true);
     assert.equal(response.output.runner_output.execution_contract.must_open_required_local_refs, true);
     assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.required, true);
     assert.deepEqual(response.output.runner_output.execution_contract.expected_meaningful_change.allowed_target_paths, [
