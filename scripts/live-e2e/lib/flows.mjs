@@ -5327,7 +5327,11 @@ function executeFullJourneyFlowImplementation(options) {
         timeoutMs:
           typeof runOptions.timeoutMs === "number" && Number.isFinite(runOptions.timeoutMs)
             ? Number(runOptions.timeoutMs)
-            : null,
+            : resolveProjectVerifyPreflightTimeoutMs({
+                profile: options.profile,
+                setupCommands: [],
+                verificationCommands: postRunQualityPolicy.diagnosticCommands,
+              }),
         allowFailureResult: runOptions.allowFailureResult === true,
       });
       artifacts.post_run_diagnostic_transcript_file = postRunDiagnosticVerify.transcriptFile;
