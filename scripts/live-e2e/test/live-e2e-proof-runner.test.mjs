@@ -2753,6 +2753,10 @@ test("live E2E post-run verification selects generic project-profile command gro
     /runCommand\("project-verify-post-run-diagnostic", \[[\s\S]*?"--project-profile",\s+generatedProfile\.generatedProjectProfileFile,[\s\S]*?"--execution-root",\s+latestExecutionRoot,[\s\S]*?"--verification-label",\s+"post-run-diagnostic"/u,
   );
   assert.match(flowsSource, /diagnosticIntent: POST_RUN_DIAGNOSTIC_INTENT/u);
+  assert.match(
+    flowsSource,
+    /verificationCommands: postRunQualityPolicy\.diagnosticCommands/u,
+  );
   assert.doesNotMatch(flowsSource, /label\.includes\(["']diagnostic["']\)/u);
   assert.doesNotMatch(flowsSource, /buildVerifyOverrideArgs/u);
   assert.doesNotMatch(flowsSource, /applyTargetToolchainPolicyToOverrideCommands/u);
