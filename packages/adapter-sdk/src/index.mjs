@@ -1806,13 +1806,13 @@ function buildExecutionContract(envelope, options = {}) {
       applies_to: [
         "required_commands",
         "verification_expectations.primary_commands",
-        "verification_expectations.diagnostic_commands",
       ],
+      controller_owned_diagnostics: ["verification_expectations.diagnostic_commands"],
       stderr_warning_tokens: ["ResourceWarning", "DeprecationWarning", "RuntimeWarning", "UnhandledPromiseRejectionWarning"],
       exit_zero_warning_output_is_failure: true,
       baseline_exception_requires_same_command_unchanged_baseline: true,
       required_runner_action:
-        "Inspect stdout/stderr from primary and diagnostic verification. Fix warning-producing code or tests before final reporting.",
+        "Run and inspect required and primary verification only. Do not run diagnostic commands unless they are also required_commands; the controller owns diagnostic verification after provider execution. Fix warning-producing code or tests before final reporting.",
     },
     final_report: {
       required_sections: ["summary", "changed-files", "commands-run", "verification", "risks"],
