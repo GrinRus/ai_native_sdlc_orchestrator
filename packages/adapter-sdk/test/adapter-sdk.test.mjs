@@ -1539,10 +1539,16 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.warning_clean_required, true);
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.exit_zero_warning_output_is_failure, true);
-    assert.ok(
-      response.output.runner_output.execution_contract.output_quality_policy.applies_to.includes(
-        "verification_expectations.diagnostic_commands",
-      ),
+    assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.applies_to, [
+      "required_commands",
+      "verification_expectations.primary_commands",
+    ]);
+    assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.controller_owned_diagnostics, [
+      "verification_expectations.diagnostic_commands",
+    ]);
+    assert.match(
+      response.output.runner_output.execution_contract.output_quality_policy.required_runner_action,
+      /controller owns diagnostic verification/u,
     );
     assert.ok(response.output.runner_output.execution_contract.output_quality_policy.stderr_warning_tokens.includes("ResourceWarning"));
 
