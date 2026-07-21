@@ -13,7 +13,7 @@ live_e2e:
   agent_decision_policy: required
   interaction_answer_policy: agent-required
   target_write_policy: aor-runtime-only-before-execution
-  target_command_timeout_sec: 300
+  target_command_timeout_sec: 1800
 implementation_loop:
   enabled: true
   max_iterations: 3
