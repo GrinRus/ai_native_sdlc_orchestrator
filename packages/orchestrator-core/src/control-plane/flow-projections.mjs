@@ -18,8 +18,8 @@ import {
   toEvidenceRef,
 } from "./read-artifact-readers.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
+import { loadValidatedIntakePacket } from "../intake-packet-discovery.mjs";
 
-const INTAKE_PACKET_REGEX = /^.+\.artifact\.intake\..+\.json$/u;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/u;
 const READ_ONLY_INSPECTION_INTENTS = new Set(["analyze", "explain", "review", "validate"]);
 
@@ -147,10 +147,9 @@ function resolveMissionKey(body, packet, packetFile) {
  */
 function loadIntakeFlowSeeds(init) {
   return listJsonFiles(init.runtimeLayout.artifactsRoot)
-    .filter((filePath) => INTAKE_PACKET_REGEX.test(path.basename(filePath)) && !path.basename(filePath).endsWith(".body.json"))
     .flatMap((packetFile) => {
-      const packet = readJsonFile(packetFile);
-      if (!packet || asString(packet.packet_type) !== "intake-request") {
+      const packet = loadValidatedIntakePacket(packetFile);
+      if (!packet) {
         return [];
       }
       const bodyRefValue = asString(packet.body_ref);

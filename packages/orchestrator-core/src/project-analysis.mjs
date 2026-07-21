@@ -8,7 +8,7 @@ import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
-import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { resolveProjectRepoScope } from "./repo-scope.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 
@@ -118,8 +118,8 @@ function resolveFeatureTraceability(options) {
         (entry) =>
           entry.isFile() &&
           /\.json$/u.test(entry.name) &&
-          entry.name.includes(".artifact.intake.") &&
-          !entry.name.endsWith(".body.json"),
+          !entry.name.endsWith(".body.json") &&
+          loadValidatedIntakePacket(path.join(options.runtimeLayout.artifactsRoot, entry.name)),
       )
       .map((entry) => path.join(options.runtimeLayout.artifactsRoot, entry.name))
       .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
