@@ -119,6 +119,13 @@ qualification cells can reach provider execution and terminal quality closure.
      the canonical command catalog and installed CLI parser.
    - Validation: Learning handoff help and lifecycle regression exercise the
      explicit profile without private runner shortcuts.
+10. **Private learning lineage propagation**
+   - Purpose: Prevent the installed-user proof runner from closing learning in
+     an adjacent bundled project runtime.
+   - Changes: Pass the generated profile only as a public installed CLI
+     argument in both full-lifecycle paths; import no product runtime logic.
+   - Validation: Private source regression requires profile lineage on both
+     learning handoff subprocesses and the bidirectional boundary scan passes.
 
 ### Acceptance criteria
 
@@ -138,6 +145,8 @@ qualification cells can reach provider execution and terminal quality closure.
 13. Content-addressed intake packet filenames remain discoverable through the
     public Flow and next-action lifecycle.
 14. Public learning handoff preserves an explicitly selected project profile.
+15. Private full-journey learning closure stays in the generated project by
+    invoking only the installed public CLI.
 
 ### Done evidence
 

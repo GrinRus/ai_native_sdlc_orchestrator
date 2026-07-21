@@ -4983,13 +4983,11 @@ test("full journey requests repair only for actionable review or QA findings bef
   }
   const learningHandoffCommands = [...flowsSource.matchAll(/runCommand\("learning-handoff", \[([\s\S]*?)\]\)/gu)];
   assert.equal(learningHandoffCommands.length, 2);
-  for (const [, learningHandoffArgs] of learningHandoffCommands) {
-    assert.doesNotMatch(
-      learningHandoffArgs,
-      /--project-profile/u,
-      "learning handoff does not accept a project profile flag",
-    );
-  }
+  assert.match(learningHandoffCommands[0][1], /\.\.\.commandBaseArgs/u);
+  assert.match(
+    learningHandoffCommands[1][1],
+    /"--project-profile",\s+generatedProfile\.generatedProjectProfileFile/u,
+  );
   assert.match(flowsSource, /const reviewNeedsRepair = reviewRequiresActionableRepair\(reviewReport, reviewOverallStatus\)/u);
   assert.match(flowsSource, /const reviewHasNonRepairWarnings = reviewOverallStatus === "warn" && !reviewNeedsRepair/u);
   assert.match(flowsSource, /reviewNeedsRepair[\s\S]*reviewRepairActions\.has\("request-repair"\)/u);
