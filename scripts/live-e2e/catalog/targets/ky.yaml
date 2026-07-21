@@ -10,7 +10,8 @@ verification:
     - npm install --prefer-offline --no-audit --no-fund
     - npx playwright install
   commands:
-    - npm test
+    - npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'
+    - npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: patch-only
@@ -138,7 +139,7 @@ feature_missions:
       - review-report
     acceptance_checks:
       - keep changes inside source and test folders only
-      - preserve Playwright setup and npm test as full-suite diagnostic evidence
+      - preserve Playwright setup and the complete split AVA suite as diagnostic evidence
       - pass the mission-scoped headers regression gate
     change_evidence:
       required_path_prefixes:
@@ -151,7 +152,8 @@ feature_missions:
         - npx ava test/headers.ts
       diagnostic_commands:
         - npx playwright install
-        - npm test
+        - npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'
+        - npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'
       diagnostic_failure_mode: warn
     supported_scenarios:
       - regress
@@ -182,7 +184,7 @@ feature_missions:
         - Do not mutate target files directly from the runner or evaluator outside the public AOR
           execution, review, and repair loop.
         - keep changes inside source and test folders only
-        - preserve Playwright setup and npm test as full-suite diagnostic evidence
+        - preserve Playwright setup and the complete split AVA suite as diagnostic evidence
         - pass the mission-scoped headers regression gate
       non_goals:
         - Do not expand this small canary into a product-quality acceptance mission.
@@ -207,7 +209,8 @@ feature_missions:
         - "Primary verification command: npm run build"
         - "Primary verification command: npx ava test/headers.ts"
         - "Diagnostic evidence command: npx playwright install"
-        - "Diagnostic evidence command: npm test"
+        - "Diagnostic evidence command: npm test with the timing-sensitive totalTimeout case excluded"
+        - "Diagnostic evidence command: isolated timing-sensitive totalTimeout case"
         - Meaningful changed path under source/
         - Meaningful changed path under test/
     final_code_rubric:
@@ -234,8 +237,8 @@ feature_missions:
         measurement: post-run primary verification
     definition_of_done:
       - The change stays inside source, tests, and public type surface.
-      - Bounded primary verification passes and Playwright-backed full npm test is recorded as
-        diagnostic evidence.
+      - Bounded primary verification passes and the Playwright-backed complete split AVA suite is
+        recorded as diagnostic evidence.
     expected_evidence: &a2
       - verify-summary
       - routed-step-result
@@ -243,7 +246,7 @@ feature_missions:
       - delivery-manifest
     acceptance_checks:
       - keep the fix inside source, tests, and type surface only
-      - preserve Playwright setup and npm test as full-suite diagnostic evidence
+      - preserve Playwright setup and the complete split AVA suite as diagnostic evidence
       - keep delivery evidence anchored to the target checkout
     change_evidence:
       required_path_prefixes:
@@ -258,7 +261,8 @@ feature_missions:
         - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
-        - npm test
+        - npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'
+        - npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'
       diagnostic_failure_mode: warn
     supported_scenarios:
       - regress
@@ -282,7 +286,7 @@ feature_missions:
       user_problem: Adjust one multi-file options-handling or retry-surface regression with matching tests
         and the smallest typing touch needed to keep the public API coherent.
       desired_outcome: The change stays inside source, tests, and public type surface. Bounded primary
-        verification passes and Playwright-backed full npm test is recorded as diagnostic evidence.
+        verification passes and the Playwright-backed complete split AVA suite is recorded as diagnostic evidence.
       constraints:
         - Deliver a real product change through the full public AOR flow, not a catalog-only or
           no-op patch.
@@ -292,7 +296,7 @@ feature_missions:
         - Do not mutate target files directly from the runner or evaluator outside the public AOR
           execution, review, and repair loop.
         - keep the fix inside source, tests, and type surface only
-        - preserve Playwright setup and npm test as full-suite diagnostic evidence
+        - preserve Playwright setup and the complete split AVA suite as diagnostic evidence
         - keep delivery evidence anchored to the target checkout
       non_goals:
         - Do not satisfy the mission with documentation-only, fixture-only, or metadata-only churn
@@ -319,7 +323,8 @@ feature_missions:
         - "Primary verification command: npm run build"
         - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
         - "Diagnostic evidence command: npx playwright install"
-        - "Diagnostic evidence command: npm test"
+        - "Diagnostic evidence command: npm test with the timing-sensitive totalTimeout case excluded"
+        - "Diagnostic evidence command: isolated timing-sensitive totalTimeout case"
         - Meaningful changed path under source/
         - Meaningful changed path under test/
         - Meaningful changed path under index.d.ts
@@ -355,7 +360,7 @@ feature_missions:
         target: lint, build, and targeted AVA coverage pass after the change
         measurement: post-run primary verification
     definition_of_done:
-      - Bounded primary verification passes and full npm test is preserved as diagnostic evidence.
+      - Bounded primary verification passes and the focused release AVA suite is preserved as diagnostic evidence.
       - Delivery and release packet evidence are anchored to the target checkout.
       - No upstream write-back is attempted.
     expected_evidence: &a3
@@ -397,7 +402,7 @@ feature_missions:
     agent_visible_request:
       user_problem: Land one bounded API or typing fix with matching regression coverage and release-ready
         lineage.
-      desired_outcome: Bounded primary verification passes and full npm test is preserved as diagnostic
+      desired_outcome: Bounded primary verification passes and the focused release AVA suite is preserved as diagnostic
         evidence. Delivery and release packet evidence are anchored to the target checkout. No
         upstream write-back is attempted.
       constraints:
@@ -491,7 +496,8 @@ feature_missions:
         - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
-        - npm test
+        - npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'
+        - npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'
       diagnostic_failure_mode: warn
     supported_scenarios:
       - governance
@@ -554,7 +560,8 @@ feature_missions:
         - "Primary verification command: npx ava test/main.ts test/hooks.ts"
         - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
         - "Diagnostic evidence command: npx playwright install"
-        - "Diagnostic evidence command: npm test"
+        - "Diagnostic evidence command: npm test with the timing-sensitive totalTimeout case excluded"
+        - "Diagnostic evidence command: isolated timing-sensitive totalTimeout case"
         - Meaningful changed path under source/
         - Meaningful changed path under test/
         - Meaningful changed path under index.d.ts
@@ -620,7 +627,8 @@ feature_missions:
         - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
-        - npm test
+        - npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'
+        - npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'
       diagnostic_failure_mode: warn
     supported_scenarios:
       - governance
@@ -690,7 +698,8 @@ feature_missions:
         - "Primary verification command: npx ava test/main.ts test/hooks.ts"
         - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
         - "Diagnostic evidence command: npx playwright install"
-        - "Diagnostic evidence command: npm test"
+        - "Diagnostic evidence command: npm test with the timing-sensitive totalTimeout case excluded"
+        - "Diagnostic evidence command: isolated timing-sensitive totalTimeout case"
     final_code_rubric:
       quality_gate: all-pass-product-quality
       required_changed_surfaces: []

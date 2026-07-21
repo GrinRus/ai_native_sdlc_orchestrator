@@ -44,7 +44,7 @@ For canonical setup and verification dependency details per profile, use `script
     - `small`, `regress`
     - bounded regression mission inside `source/**` and `test/**`
     - expected evidence: `verify-summary`, routed `step-result`, `review-report`
-    - post-run primary gate: `npx xo`, `npm run build`, `npx ava test/headers.ts`; full `npm test` remains diagnostic evidence
+    - post-run primary gate: `npx xo`, `npm run build`, `npx ava test/headers.ts`; the complete AVA suite remains diagnostic evidence
   - `ky-fetch-options-regression`
     - `medium`, `regress|repair`
     - bounded multi-file regression across `source/**`, `test/**`, and `index.d.ts`
@@ -68,8 +68,14 @@ For canonical setup and verification dependency details per profile, use `script
     - broader retry, hook, public type, and observability rehearsal with operator
       review required for every controller step
     - post-run primary gate uses `test/main.ts`, `test/hooks.ts`, and focused
-      `test/retry.ts --match='*shouldRetry*'`; the full `npm test` suite stays
+      `test/retry.ts --match='*shouldRetry*'`; the complete AVA suite stays
       manual/overnight diagnostic evidence with `diagnostic_failure_mode=warn`
+- Ky readiness and full-suite diagnostics preserve complete coverage with two
+  commands: `npm test` excludes only
+  `totalTimeout bounds a never-ending successful response body`, then AVA runs
+  that exact timing-sensitive case in isolation. This prevents unrelated
+  same-file concurrency from turning a passing behavior check into a flaky
+  qualification result; the isolated case is still mandatory evidence.
 - Best profiles:
   - full-journey required/candidate cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)

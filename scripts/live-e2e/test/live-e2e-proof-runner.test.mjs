@@ -956,6 +956,31 @@ test("ky Codex/Qwen/Anthropic profiles are loadable catalog-backed live E2E prof
   assert.equal(qwenProvider.document.coverage_tier, "extended");
 });
 
+test("ky readiness and full-suite diagnostics isolate the timing-sensitive totalTimeout case without dropping coverage", () => {
+  const catalogRoot = resolveCatalogRoot({ hostRoot: repoRoot, catalogRootOverride: null });
+  const target = loadCatalogTarget({ catalogRoot, targetCatalogId: "ky" });
+  const splitSuiteCommands = [
+    "npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'",
+    "npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'",
+  ];
+
+  assert.deepEqual(target.entry.verification.commands, splitSuiteCommands);
+  for (const missionId of [
+    "ky-header-regression",
+    "ky-fetch-options-regression",
+    "ky-retry-hooks-governance",
+    "ky-request-lifecycle-observability-xlarge",
+  ]) {
+    const mission = target.entry.feature_missions.find((entry) => entry.mission_id === missionId);
+    assert.ok(mission, `missing Ky mission ${missionId}`);
+    assert.deepEqual(mission.post_run_quality.diagnostic_commands, [
+      "npx playwright install",
+      ...splitSuiteCommands,
+    ]);
+    assert.equal(mission.post_run_quality.diagnostic_commands.includes("npm test"), false);
+  }
+});
+
 test("W35 silent provider UX proof fixture preserves fail-closed operator evidence", () => {
   const fixture = JSON.parse(
     fs.readFileSync(
@@ -1626,7 +1651,8 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
       "npx playwright install",
-      "npm test",
+      "npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'",
+      "npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'",
     ]);
     assert.equal(loaded.document.repos[0].test_commands.includes("npm test"), false);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
@@ -1672,7 +1698,8 @@ test("generated ky xlarge manual profile includes focused retry primary verifica
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
       "npx playwright install",
-      "npm test",
+      "npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'",
+      "npx ava test/main.ts --match='totalTimeout bounds a never-ending successful response body'",
     ]);
     assert.equal(resolved.mission.post_run_quality.diagnostic_failure_mode, "warn");
     assert.equal(loaded.document.repos[0].test_commands.includes("npm test"), false);
