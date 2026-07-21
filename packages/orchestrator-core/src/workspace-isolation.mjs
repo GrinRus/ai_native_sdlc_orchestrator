@@ -85,14 +85,6 @@ export function inspectGitCheckout(root) {
   };
 }
 
-function digestFile(filePath) {
-  const hash = crypto.createHash("sha256");
-  if (!fs.existsSync(filePath)) return null;
-  const stat = fs.lstatSync(filePath);
-  hash.update(stat.isSymbolicLink() ? `link:${fs.readlinkSync(filePath)}` : fs.readFileSync(filePath));
-  return hash.digest("hex");
-}
-
 function digestCheckoutFiles(root, gitArgs) {
   const result = runGit(root, gitArgs, true);
   if (result.status !== 0) return null;
@@ -107,6 +99,13 @@ function digestCheckoutFiles(root, gitArgs) {
     hash.update("\0");
   }
   return { count: files.length, digest: hash.digest("hex") };
+}
+
+function digestGitOutput(root, gitArgs) {
+  const result = runGit(root, gitArgs, true);
+  return result.status === 0
+    ? crypto.createHash("sha256").update(result.stdout ?? "").digest("hex")
+    : null;
 }
 
 function digestNonGitTree(root) {
@@ -142,12 +141,6 @@ export function captureCheckoutSnapshot(root) {
     const canonicalRoot = canonicalDirectory(root, "Checkout root");
     return { root: canonicalRoot, git_available: false, filesystem: digestNonGitTree(canonicalRoot) };
   }
-  const indexPathValue = gitValue(git.root, ["rev-parse", "--git-path", "index"]);
-  const indexPath = indexPathValue
-    ? path.isAbsolute(indexPathValue)
-      ? indexPathValue
-      : path.resolve(git.root, indexPathValue)
-    : null;
   const projectPathspec = ["--", ".", ":(exclude).aor/**"];
   const status = runGit(
     git.root,
@@ -161,7 +154,11 @@ export function captureCheckoutSnapshot(root) {
     symbolic_head: git.symbolic_head,
     git_dir: git.git_dir,
     common_dir: git.common_dir,
-    index_digest: indexPath ? digestFile(indexPath) : null,
+    // Hash semantic index entries rather than the binary index file. Git may
+    // rewrite stat-cache data or the on-disk index format during read-only
+    // operations without changing staged content. `--stage -v` preserves the
+    // object, stage, path, and meaningful assume-unchanged/skip-worktree flags.
+    index_digest: digestGitOutput(git.root, ["ls-files", "-z", "--stage", "-v", ...projectPathspec]),
     status_digest: crypto.createHash("sha256").update(status).digest("hex"),
     tracked: digestCheckoutFiles(git.root, ["ls-files", "-z", "--cached", ...projectPathspec]),
     untracked: digestCheckoutFiles(git.root, ["ls-files", "-z", "--others", "--exclude-standard", ...projectPathspec]),
