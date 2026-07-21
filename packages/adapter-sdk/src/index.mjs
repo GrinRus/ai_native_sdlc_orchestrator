@@ -7,6 +7,7 @@ import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolut
 import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
+import { PROCESS_TREE_SUPERVISION_SOURCE } from "./process-tree-supervision.mjs";
 import { runSupervisedProcessSync } from "./supervisor.mjs";
 
 export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
@@ -17,7 +18,7 @@ const CONTEXT_BUDGET_WARN_RATIO = 0.8;
 const SHORT_EXECUTION_ROOT_MODES = Object.freeze(["short-symlink", "short_symlink"]);
 
 const EXTERNAL_RUNTIME_SUPERVISOR_SOURCE = String.raw`
-const { spawn } = require("node:child_process");
+const { execFileSync, spawn } = require("node:child_process");
 const fs = require("node:fs");
 
 function emit(result) {
@@ -269,19 +270,7 @@ function summarizeProgressEvent(record, observedAt) {
   };
 }
 
-function killProcessTree(child, signal) {
-  if (!child || typeof child.pid !== "number") {
-    return;
-  }
-  if (process.platform !== "win32") {
-    try {
-      process.kill(-child.pid, signal);
-    } catch {}
-  }
-  try {
-    child.kill(signal);
-  } catch {}
-}
+${PROCESS_TREE_SUPERVISION_SOURCE}
 
 const options = readOptions();
 const timeoutMs = Number.isFinite(options.timeout_ms) && options.timeout_ms > 0 ? Math.floor(options.timeout_ms) : 30000;
