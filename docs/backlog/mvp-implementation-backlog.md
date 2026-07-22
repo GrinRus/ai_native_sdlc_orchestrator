@@ -595,7 +595,15 @@ This is the master index for the implementation slices across all defined waves.
 ## W66 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W66-S01 | Catalog identity, bootstrap health, and qualification recovery | EPIC-0, EPIC-1, EPIC-7 | active | `scripts/live-e2e/**`, live E2E contracts/tests, backlog/runbook evidence | W65-S07 |
+| W66-S01 | Catalog identity and bootstrap remediation baseline | EPIC-0, EPIC-1, EPIC-7 | active | `scripts/live-e2e/**`, public CLI contract surfaces, live E2E contracts/tests, backlog/runbook evidence | W65-S07 |
+| W66-S02 | Private/product boundary and contract parity | EPIC-0, EPIC-4, EPIC-7 | blocked | `scripts/live-e2e/**`, `packages/contracts/**`, generic control-plane projections, boundary/parity tests | W66-S01 |
+| W66-S03 | Qualification verdict and evidence truth | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification loop/contracts, run-health and assessment evidence, deterministic qualification tests | W66-S02 |
+| W66-S04 | Planner, controller, and provider outcome semantics | EPIC-2, EPIC-3, EPIC-4, EPIC-7 | blocked | planner services, adapter outcome normalization, private controller chronology, tests | W66-S03 |
+| W66-S05 | Atomic jobs, attempts, run control, and live events | EPIC-2, EPIC-3, EPIC-6, EPIC-7 | blocked | run jobs, attempts, run control, event journal/SSE, web live client, concurrency tests | W66-S04 |
+| W66-S06 | Parent/child integration and coordinated delivery correctness | EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | blocked | parent scheduler, workspace provisioner, integration service, delivery driver, tests | W66-S05 |
+| W66-S07 | Installed browser proof and design acceptance integrity | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | blocked | private browser collector, W63/W65 scenarios, `apps/web/**`, installed-package tests | W66-S06 |
+| W66-S08 | Deterministic remediation closure | EPIC-0, EPIC-4, EPIC-7 | blocked | root/package/browser gates, W66 finding ledger, deterministic fixture matrices, readiness docs | W66-S07 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | blocked | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S08 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New

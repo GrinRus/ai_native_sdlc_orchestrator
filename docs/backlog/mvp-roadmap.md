@@ -76,9 +76,9 @@ The authoritative planning model for implementation lives in:
 | W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, a reusable visual system, and browser-operable safe lifecycle parity. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
-| W66 | Restore catalog-backed live E2E qualification with canonical generated identities and honest bootstrap failure attribution. | 1 | EPIC-0, EPIC-1, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
+| W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, and same-commit Codex/Claude closure. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 
-The current roadmap contains **333 slices across 67 waves**.
+The current roadmap contains **341 slices across 67 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -299,7 +299,15 @@ The current roadmap contains **333 slices across 67 waves**.
 | W65-S05 | default-on and rollback target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-10, SEC-02, SEC-04 |
 | W65-S06 | legacy retirement and compatibility target: PBO-09, OPS-01, OPS-10, OPS-11 |
 | W65-S07 | post-cutover installed acceptance target: PBO-09, PBO-10, OPS-01, OPS-02, OPS-04, OPS-06, OPS-10, OPS-11, OPS-12, RQA-01, RQA-02, RQA-06, FIN-03, FIN-04 |
-| W66-S01 | live E2E catalog identity and qualification recovery target: DEV-01, OPS-06, SEC-04 |
+| W66-S01 | catalog/bootstrap remediation baseline target: DEV-01, OPS-06, SEC-04 |
+| W66-S02 | product/private boundary and contract-parity target: DEV-01, DEV-07, AIP-02, AIP-03, AIP-04, OPS-06, OPS-07 |
+| W66-S03 | qualification verdict and evidence-truth target: RQA-03, RQA-04, OPS-06, OPS-07, FIN-03 |
+| W66-S04 | planner/controller/provider outcome target: EMP-01, EMP-02, DEV-01, DEV-05, RQA-05, OPS-06, OPS-07 |
+| W66-S05 | atomic job/attempt/control/event target: EMP-03, EMP-05, DEV-01, OPS-01, OPS-02, OPS-04, OPS-10, SEC-03 |
+| W66-S06 | parent/integration/multirepo delivery correctness target: EMP-03, DEV-05, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, OPS-01, OPS-04, OPS-10 |
+| W66-S07 | installed browser-proof and design-acceptance target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-07, OPS-11, OPS-12 |
+| W66-S08 | deterministic remediation closure target: OPS-06, OPS-07, FIN-03 |
+| W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1391,15 +1399,26 @@ console benchmarks.
 
 ## W66 - live E2E qualification remediation
 
-**Goal:** Restore catalog-backed installed-user qualification after canonical ID
-hardening exposed a locator/identity mismatch in generated project profiles.
+**Goal:** Restore trustworthy installed-user qualification by preserving
+canonical catalog/bootstrap identity, enforcing the product/private boundary,
+making qualification verdicts evidence-complete, repairing deterministic
+runtime and coordinated-delivery behavior, and proving the installed console
+before same-commit Codex/Claude runs.
 
 **Exit criteria:**
 - generated repository IDs satisfy the public contract without changing catalog
   locator identity;
-- bootstrap public-command failures retain AOR ownership and phase;
-- the requested medium/large Codex and Claude cells are rerun from isolated
-  source installs with no upstream writes.
+- product modules know no private runner logic, filenames, or workspace layout,
+  and contract validation has no product/private behavior drift;
+- qualification cannot pass without terminal lifecycle, passing run health and
+  diagnostics, final validated all-pass quality, exact changed paths, and
+  no-upstream-write evidence;
+- atomic jobs, attempts, control, events, parent scheduling, integration, and
+  per-repository delivery pass deterministic stress and recovery fixtures;
+- installed browser acceptance proves durable actions across responsive,
+  accessibility, reload, reconnect, partial, and offline scenarios;
+- medium/large Codex and Claude cells pass from isolated installs against one
+  AOR commit and one pinned target commit with no upstream writes.
 
 **Detailed slices:** `docs/backlog/wave-66-implementation-slices.md`
 
