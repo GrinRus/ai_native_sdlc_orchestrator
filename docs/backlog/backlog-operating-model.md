@@ -202,6 +202,14 @@ repairs or the W60-W63/W65 product and cutover slices. W65 does not depend on
 W64; any shared projection change must instead be contract-first and explicitly
 sequenced so W64 remains behavior-preserving.
 
+W66 is the active learning-loop remediation lane. It first freezes the original
+catalog/bootstrap fixes, then restores the product/private contract boundary,
+qualification truth, planner/controller/provider outcomes, runtime atomicity,
+parent/integration/delivery correctness, and installed browser-proof integrity.
+Deterministic closure precedes the final same-commit medium/large Codex and
+Claude matrix; backlog state does not replace the ledger-derived production
+readiness decision.
+
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for
 sequencing and capacity; acceptance still depends on executable evidence, not an

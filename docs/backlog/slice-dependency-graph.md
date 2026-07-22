@@ -336,7 +336,15 @@ graph TD
   W65S05[W65-S05 Default-on cutover and explicit rollback rehearsal]
   W65S06[W65-S06 Legacy console retirement and compatibility cleanup]
   W65S07[W65-S07 Post-cutover installed-console acceptance and story closure]
-  W66S01[W66-S01 Catalog identity, bootstrap health, and qualification recovery]
+  W66S01[W66-S01 Catalog identity and bootstrap remediation baseline]
+  W66S02[W66-S02 Private/product boundary and contract parity]
+  W66S03[W66-S03 Qualification verdict and evidence truth]
+  W66S04[W66-S04 Planner, controller, and provider outcome semantics]
+  W66S05[W66-S05 Atomic jobs, attempts, run control, and live events]
+  W66S06[W66-S06 Parent/child integration and coordinated delivery correctness]
+  W66S07[W66-S07 Installed browser proof and design acceptance integrity]
+  W66S08[W66-S08 Deterministic remediation closure]
+  W66S09[W66-S09 Fresh four-cell live qualification closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -834,6 +842,14 @@ graph TD
   W65S05 --> W65S06
   W65S06 --> W65S07
   W65S07 --> W66S01
+  W66S01 --> W66S02
+  W66S02 --> W66S03
+  W66S03 --> W66S04
+  W66S04 --> W66S05
+  W66S05 --> W66S06
+  W66S06 --> W66S07
+  W66S07 --> W66S08
+  W66S08 --> W66S09
 ```
 
 ## W0 hard dependencies
@@ -1440,6 +1456,15 @@ own the stricter terminal control proof evidence for this lane.
 | Slice ID | Depends on |
 |---|---|
 | W66-S01 | W65-S07 |
+| W66-S02 | W66-S01 |
+| W66-S03 | W66-S02 |
+| W66-S04 | W66-S03 |
+| W66-S05 | W66-S04 |
+| W66-S06 | W66-S05 |
+| W66-S07 | W66-S06 |
+| W66-S08 | W66-S07 |
+| W66-S09 | W66-S08 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1774,6 +1799,14 @@ own the stricter terminal control proof evidence for this lane.
 331. W65-S06
 332. W65-S07
 333. W66-S01
+334. W66-S02
+335. W66-S03
+336. W66-S04
+337. W66-S05
+338. W66-S06
+339. W66-S07
+340. W66-S08
+341. W66-S09
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
