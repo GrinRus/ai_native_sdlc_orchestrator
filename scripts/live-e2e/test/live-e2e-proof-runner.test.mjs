@@ -1219,6 +1219,15 @@ test("catalog feature request materialization preserves required path prefixes",
           diagnostic_commands: ["npm test"],
           diagnostic_failure_mode: "warn",
         },
+        task_plan: {
+          local_tasks: [
+            {
+              task_id: "task.header-regression",
+              title: "Implement header regression",
+              objective: "Preserve bounded header behavior.",
+            },
+          ],
+        },
       },
     });
 
@@ -1227,9 +1236,11 @@ test("catalog feature request materialization preserves required path prefixes",
     assert.deepEqual(result.requestDocument.definition_of_done, ["Targeted header verification passes."]);
     assert.deepEqual(result.requestDocument.change_evidence.required_path_prefixes, ["source/", "test/"]);
     assert.deepEqual(result.requestDocument.post_run_quality.primary_commands, ["npx ava test/headers.ts"]);
+    assert.equal(result.requestDocument.task_plan.local_tasks[0].task_id, "task.header-regression");
     const persisted = JSON.parse(fs.readFileSync(result.requestFile, "utf8"));
     assert.deepEqual(persisted.change_evidence.required_path_prefixes, ["source/", "test/"]);
     assert.deepEqual(persisted.post_run_quality.primary_commands, ["npx ava test/headers.ts"]);
+    assert.equal(persisted.task_plan.local_tasks[0].task_id, "task.header-regression");
   });
 });
 

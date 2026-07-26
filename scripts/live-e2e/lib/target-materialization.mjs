@@ -77,6 +77,7 @@ export function materializeFeatureRequestFile(options) {
     acceptance_checks: asStringArray(options.mission.acceptance_checks),
     change_evidence: asRecord(options.mission.change_evidence),
     post_run_quality: asRecord(options.mission.post_run_quality),
+    task_plan: asRecord(options.mission.task_plan),
     scenario_family: options.scenarioFamily,
     provider_variant_id: options.providerVariantId,
     feature_size: options.featureSize,

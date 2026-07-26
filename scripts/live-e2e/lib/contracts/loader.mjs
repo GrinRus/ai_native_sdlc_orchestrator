@@ -8,6 +8,7 @@ import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } f
 import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs";
 import { isPublicContractFamily, validatePublicContractDocument } from "./public-validation-bridge.mjs";
 import { validateQualificationCellReport } from "./qualification-cell-validation.mjs";
+import { explicitCatalogTaskPlanMissionIds, validateExplicitCatalogTaskPlan } from "./catalog-task-plan-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -2894,6 +2895,7 @@ function validateLiveE2ETargetCatalog(document, source) {
   const verification = isPlainObject(document.verification) ? document.verification : null;
   if (verification && "execution_environment" in verification) validateNestedEnumStringField({ record: verification, source, field: "verification.execution_environment", allowedValues: ["default", "ci"], issues, required: false });
   const missions = Array.isArray(document.feature_missions) ? document.feature_missions : [];
+  const explicitTaskPlanMissionIds = explicitCatalogTaskPlanMissionIds(document);
   /** @type {Map<string, Record<string, unknown>>} */
   const missionById = new Map();
 
@@ -2976,6 +2978,7 @@ function validateLiveE2ETargetCatalog(document, source) {
         }),
       );
     }
+    if (explicitTaskPlanMissionIds.has(missionId)) issues.push(...validateExplicitCatalogTaskPlan({ mission: entry, parentField, source }));
 
     validateAgentVisibleRequest({ record: entry, source, parentField, issues });
     validateEvaluatorRubric({ record: entry, source, parentField, featureSize, missionClass, issues });

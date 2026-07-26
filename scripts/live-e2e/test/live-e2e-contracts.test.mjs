@@ -105,6 +105,31 @@ test("live e2e private catalog documents validate through the private loader", (
   );
 });
 
+test("medium and larger catalog missions require explicit structured local tasks", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "scripts/live-e2e/catalog/targets/ky.yaml", (document) => {
+      const mission = document.feature_missions.find(
+        (entry) => entry.mission_id === "ky-fetch-options-regression",
+      );
+      delete mission.task_plan;
+    });
+
+    const loaded = loadContractFile({
+      filePath: path.join(tempRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+      family: "live-e2e-target-catalog",
+    });
+    assert.equal(loaded.ok, false);
+    assert.ok(
+      loaded.validation.issues.some(
+        (candidate) =>
+          candidate.code === "required_field_missing" &&
+          candidate.field.endsWith(".task_plan.local_tasks"),
+      ),
+      "expected missing medium task plan to fail closed",
+    );
+  });
+});
+
 test("live e2e private report fixtures validate from the private fixture root", () => {
   const fixtureRoot = path.join(workspaceRoot, "scripts/live-e2e/fixtures/contracts");
   const fixtureFamilies = [
