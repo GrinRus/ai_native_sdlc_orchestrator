@@ -2157,6 +2157,39 @@ test("live adapter accepts Codex JSONL agent summaries that mention target Permi
   assert.equal(response.output.runner_output.jsonl_events.length, 2);
 });
 
+test("live adapter does not treat target listen EPERM diagnostics as runner permission denial", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({type:'thread.started',thread_id:'t1'})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'command_execution',command:'npm test',aggregated_output:'Error: listen EPERM: operation not permitted 0.0.0.0',exit_code:1,status:'failed'}})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Implemented source/utils/merge.ts and test/headers.ts. The target test was environment-blocked by a local listen permission denial; controller-owned verification remains authoritative.'}})+'\\n');",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-codex-jsonl-target-listen-eperm",
+    run_id: "run-codex-jsonl-target-listen-eperm",
+    step_id: "step-codex-jsonl-target-listen-eperm",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.failure_kind, undefined);
+  assert.equal(response.output.runner_output.jsonl_events.length, 3);
+});
+
 test("live adapter ignores successful Codex plugin warm auth noise", () => {
   const adapter = createLiveAdapter({
     adapterId: "codex-cli",

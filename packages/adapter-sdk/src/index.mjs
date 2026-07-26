@@ -1135,7 +1135,6 @@ export function classifyExternalRunnerFailure(options) {
     return "edit-denied";
   }
   if (
-    combined.includes("permission denial") ||
     combined.includes("tool_use_denied") ||
     combined.includes("tool use denied") ||
     combined.includes("tool denied") ||
