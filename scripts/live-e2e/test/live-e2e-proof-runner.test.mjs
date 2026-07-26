@@ -73,6 +73,7 @@ import {
 } from "../step-evaluator.mjs";
 import {
   buildArtifactReadinessProof,
+  isLiveE2eControllerStateInProgress,
   resolveRunHealthFailure,
   writeProofRunnerArtifacts,
 } from "../run-profile.mjs";
@@ -475,6 +476,20 @@ test("step evaluator keeps resuming when an included current step is still pendi
         included_steps: ["discovery", "qa", "delivery"],
         completed_steps: ["discovery", "qa", "delivery"],
       },
+    ),
+    false,
+  );
+});
+
+test("terminal controller state treats a successful repair instance as completing its base step", () => {
+  assert.equal(
+    isLiveE2eControllerStateInProgress(
+      {
+        completed_steps: ["execution", "review#2", "qa#2"],
+        current_step: null,
+        pending_decision: { action: "continue", next_step: null },
+      },
+      ["execution", "review", "qa"],
     ),
     false,
   );

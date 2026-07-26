@@ -571,13 +571,14 @@ function summarizeLearningHandoff(options) {
  * @param {string[]} includedSteps
  * @returns {boolean}
  */
-function isLiveE2eControllerStateInProgress(controllerState, includedSteps) {
+export function isLiveE2eControllerStateInProgress(controllerState, includedSteps) {
   const state = asRecord(controllerState);
   if (Object.keys(state).length === 0) return false;
 
   const completedSteps = new Set(asStringArray(state.completed_steps));
   const allIncludedStepsCompleted =
-    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+    includedSteps.length > 0 &&
+    includedSteps.every((step) => [...completedSteps].some((entry) => entry === step || entry.startsWith(`${step}#`)));
   const hasCurrentStep = Boolean(asNonEmptyString(state.current_step));
   const pendingDecision = asRecord(state.pending_decision);
   const pendingAction = asNonEmptyString(pendingDecision.action);
