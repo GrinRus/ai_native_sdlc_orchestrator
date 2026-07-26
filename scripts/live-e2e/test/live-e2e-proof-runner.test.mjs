@@ -53,6 +53,7 @@ import {
   runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
   resolveActiveAcceptanceRepairDrill,
+  resolveAuditHoldOverrideArgs,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
   sourceInstallCacheMatches,
 } from "../lib/flows.mjs";
@@ -1613,7 +1614,69 @@ test("W66 Ky medium qualification profiles budget the required full diagnostic s
   ]) {
     const { profile } = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
     assert.equal(profile.live_e2e.target_command_timeout_sec, 1800);
+    assert.deepEqual(resolveAuditHoldOverrideArgs(profile), [
+      "--unsafe-development-override",
+      "true",
+    ]);
   }
+});
+
+test("audit hold override is explicit, fail-closed, and constrained to no-write profiles", () => {
+  assert.deepEqual(resolveAuditHoldOverrideArgs({
+    live_e2e: { audit_hold_policy: "enforce" },
+  }), []);
+  assert.deepEqual(resolveAuditHoldOverrideArgs({
+    live_e2e: { audit_hold_policy: "maintainer-qualification-override" },
+  }), ["--unsafe-development-override", "true"]);
+
+  withTempRoot((tempRoot) => {
+    const profileFile = path.join(tempRoot, "unsafe-profile.yaml");
+    fs.writeFileSync(profileFile, [
+      "profile_id: unsafe-profile",
+      "journey_mode: full-journey",
+      "live_e2e:",
+      "  flow_range_policy: full_lifecycle",
+      "  installation_policy: source-install-required",
+      "  interaction_capability: public-control-plane",
+      "  frontend_capability: none",
+      "  safety_policy: no-upstream-write",
+      "  operator_mode: skill-agent",
+      "  agent_decision_policy: required",
+      "  interaction_answer_policy: agent-required",
+      "  target_write_policy: aor-runtime-only-before-execution",
+      "  audit_hold_policy: maintainer-qualification-override",
+      "implementation_loop:",
+      "  enabled: true",
+      "  max_iterations: 1",
+      "output_policy:",
+      "  write_back_to_remote: true",
+      "",
+    ].join("\n"));
+    assert.throws(
+      () => loadProofRunnerProfile({ hostRoot: tempRoot, profileRef: profileFile }),
+      /requires no-upstream-write and output_policy\.write_back_to_remote=false/u,
+    );
+  });
+});
+
+test("every frozen W66 baseline and qualification profile explicitly enables the reviewed hold override", () => {
+  for (const profileRef of [
+    "scripts/live-e2e/profiles/installed-user-guided-journey.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
+    "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
+    "scripts/live-e2e/profiles/full-journey-governance-ky-large-anthropic.yaml",
+  ]) {
+    const { profile } = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    assert.deepEqual(resolveAuditHoldOverrideArgs(profile), [
+      "--unsafe-development-override",
+      "true",
+    ]);
+    assert.equal(profile.live_e2e.safety_policy, "no-upstream-write");
+    assert.equal(profile.output_policy.write_back_to_remote, false);
+  }
+  const source = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
+  assert.match(source, /\.\.\.resolveAuditHoldOverrideArgs\(options\.profile\)/u);
 });
 
 test("generated ky large Anthropic profile uses bounded governance verification", () => {

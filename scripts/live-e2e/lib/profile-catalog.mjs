@@ -195,6 +195,7 @@ function assertLiveE2ePolicy(profile, source) {
   const agentDecisionPolicy = asNonEmptyString(policy.agent_decision_policy);
   const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
   const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
+  const auditHoldPolicy = asNonEmptyString(policy.audit_hold_policy) || "enforce";
   const implementationLoop = asRecord(profile.implementation_loop);
   const guidedJourney = asRecord(profile.guided_journey);
   const proofRequirements = asStringArray(guidedJourney.proof_requirements);
@@ -233,6 +234,17 @@ function assertLiveE2ePolicy(profile, source) {
   }
   if (targetWritePolicy !== "aor-runtime-only-before-execution") {
     problems.push("live_e2e.target_write_policy must be aor-runtime-only-before-execution");
+  }
+  if (!["enforce", "maintainer-qualification-override"].includes(auditHoldPolicy)) {
+    problems.push("live_e2e.audit_hold_policy must be enforce or maintainer-qualification-override");
+  }
+  if (
+    auditHoldPolicy === "maintainer-qualification-override" &&
+    (safetyPolicy !== "no-upstream-write" || asRecord(profile.output_policy).write_back_to_remote !== false)
+  ) {
+    problems.push(
+      "live_e2e.audit_hold_policy=maintainer-qualification-override requires no-upstream-write and output_policy.write_back_to_remote=false",
+    );
   }
   if (acceptanceLike) {
     if (implementationLoop.enabled !== true) {

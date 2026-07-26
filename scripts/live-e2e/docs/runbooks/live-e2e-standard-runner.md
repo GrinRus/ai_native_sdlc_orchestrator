@@ -9,6 +9,16 @@ Every run starts by proving the AOR launcher before target execution. Source-cha
 
 Profiles whose provider CLI, target test harness, or local tooling derives state from the checkout path may set `live_e2e.target_checkout_root_mode: short-physical`. In that mode the runner still stores AOR reports and state under the normal isolated workspace, but clones the target repository into a short physical temp checkout. Use this only for path-length-sensitive targets or providers; no-upstream-write, delivery guardrails, and target `.aor/` runtime ownership remain unchanged.
 
+The active release audit hold remains enforced by default. An explicitly
+reviewed private qualification profile may set
+`live_e2e.audit_hold_policy: maintainer-qualification-override`; the runner
+then passes `--unsafe-development-override true` only to public execution
+commands. This compatibility override is valid only together with
+`safety_policy: no-upstream-write` and
+`output_policy.write_back_to_remote: false`. It enables paid qualification
+under the hold, does not grant release clearance, and must never be inferred
+from provider, tier, or profile name.
+
 Small or medium provider smoke profiles may set `live_e2e.provider_step_timeouts_sec` as a map from step name to timeout seconds. Provider-pinned route materialization applies these values to generated route constraints before public execution starts, so bounded profiles can fail closed on provider latency instead of inheriting long full-lifecycle route caps.
 
 Profiles may also set `live_e2e.target_command_timeout_sec` for target setup and

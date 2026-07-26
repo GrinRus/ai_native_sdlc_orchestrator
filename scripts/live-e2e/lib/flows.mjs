@@ -1322,6 +1322,20 @@ function resolveImplementationLoopPolicy(profile) {
 }
 
 /**
+ * Resolve the explicit private-profile exception used for reviewed
+ * qualification while the product release hold remains active.
+ *
+ * @param {Record<string, unknown>} profile
+ * @returns {string[]}
+ */
+export function resolveAuditHoldOverrideArgs(profile) {
+  return asNonEmptyString(asRecord(profile.live_e2e).audit_hold_policy) ===
+    "maintainer-qualification-override"
+    ? ["--unsafe-development-override", "true"]
+    : [];
+}
+
+/**
  * @param {{ cwd: string, args: string[] }} options
  * @returns {string | null}
  */
@@ -6016,6 +6030,7 @@ function executeFullJourneyFlowImplementation(options) {
           : []),
         ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
         ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
+        ...resolveAuditHoldOverrideArgs(options.profile),
       ], { iteration });
       artifacts.routed_step_result_file = getStringField(runStart.payload, "routed_step_result_file");
       artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
