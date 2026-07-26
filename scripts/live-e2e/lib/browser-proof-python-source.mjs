@@ -21,9 +21,20 @@ def main():
         browser = playwright.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         console_errors = []
+        observed_optional_404_console = []
+        injection_active = {"value": False}
         external_requests = []
         app_origin = f"{urlparse(app_url).scheme}://{urlparse(app_url).netloc}"
-        page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
+        def record_console(message):
+            if message.type != "error":
+                return
+            if injection_active["value"]:
+                return
+            if message.text == "Failed to load resource: the server responded with a status of 404 (Not Found)":
+                observed_optional_404_console.append(message.text)
+                return
+            console_errors.append(message.text)
+        page.on("console", record_console)
         page.on("request", lambda request: external_requests.append(request.url) if not request.url.startswith(app_origin) else None)
         page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
         readiness = {"status": "not_pass", "observed_state": "timeout", "expected_state": "ready"}
@@ -199,18 +210,25 @@ def main():
             if active:
                 focus_sequence.append(active)
 
-        dialog_probe = {"opened": False, "focus_inside": False, "focus_restored": False}
-        ask_button = page.get_by_role("button", name="Ask AOR for selected flow")
-        if ask_button.count() == 1 and ask_button.is_enabled():
-            ask_button.focus()
-            ask_button.click()
+        dialog_probe = {"opened": False, "focus_inside": False, "focus_restored": False, "entry_point": None}
+        dialog_opener = page.get_by_role("button", name="Ask AOR for selected flow")
+        if dialog_opener.count() != 1 or not dialog_opener.is_enabled():
+            add_project_button = page.get_by_role("button", name="Add AOR Project", exact=True)
+            if add_project_button.count() == 1 and add_project_button.is_enabled():
+                dialog_opener = add_project_button
+                dialog_probe["entry_point"] = "add-project"
+        if dialog_opener.count() == 1 and dialog_opener.is_enabled():
+            if dialog_probe["entry_point"] is None:
+                dialog_probe["entry_point"] = "active-flow-ask-aor"
+            dialog_opener.focus()
+            dialog_opener.click()
             dialog = page.get_by_role("dialog")
             if dialog.count() == 1:
                 dialog_probe["opened"] = True
                 page.keyboard.press("Tab")
                 dialog_probe["focus_inside"] = page.evaluate("() => Boolean(document.activeElement?.closest('[role=\"dialog\"]'))")
                 page.keyboard.press("Escape")
-                dialog_probe["focus_restored"] = ask_button.evaluate("(el) => document.activeElement === el")
+                dialog_probe["focus_restored"] = dialog_opener.evaluate("(el) => document.activeElement === el")
 
         action_probe = page.evaluate("""async ({controlPlane, projectId}) => {
           const selectedResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected');
@@ -292,18 +310,32 @@ def main():
         reconnect_ok = page.evaluate("() => Boolean(document.querySelector('main,[role=\"main\"]'))")
 
         injected_error_observed = {"value": False}
-        def abort_state(route):
+        def abort_resource(route):
             injected_error_observed["value"] = True
             route.abort()
-        state_pattern = f"**/api/projects/{payload['project_id']}/state"
-        page.route(state_pattern, abort_state, times=1)
+        resource_url = f"{payload['control_plane']}/api/projects/{payload['project_id']}/execution-profile"
+        injection_active["value"] = True
+        page.route(resource_url, abort_resource, times=1)
         try:
-            page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
-            page.wait_for_timeout(500)
+            refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
+            if refresh_button.count() == 1 and refresh_button.is_enabled():
+                refresh_button.click()
+            else:
+                page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
+            page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="visible", timeout=3000)
         except Exception:
             pass
-        error_feedback = page.locator("[role='alert'],[role='status'],[aria-live]").count() > 0
-        page.unroute(state_pattern)
+        error_feedback = page.get_by_text("Some live resources are unavailable.", exact=True).count() > 0
+        page.unroute(resource_url)
+        injection_active["value"] = False
+        try:
+            refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
+            if refresh_button.count() == 1 and refresh_button.is_enabled():
+                refresh_button.click()
+                page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="hidden", timeout=3000)
+        except Exception:
+            pass
+        error_recovered = page.get_by_text("Some live resources are unavailable.", exact=True).count() == 0
         browser.close()
 
     distinct_targets = {entry.get("selector") or entry.get("label") for entry in focus_sequence if entry.get("selector") or entry.get("label")}
@@ -392,7 +424,13 @@ def main():
         {"id": "reconnect", "status": "pass" if offline_observed and reconnect_ok else "not_pass"},
         {"id": "partial-read", "status": "pass"},
         {"id": "offline-read", "status": "pass" if offline_observed else "not_pass"},
-        {"id": "injected-error", "status": "pass" if injected_error_observed["value"] and error_feedback else "not_pass", "injected": injected_error_observed["value"]},
+        {
+            "id": "injected-error",
+            "status": "pass" if injected_error_observed["value"] and error_feedback and error_recovered else "not_pass",
+            "injected": injected_error_observed["value"],
+            "error_feedback_observed": error_feedback,
+            "recovered": error_recovered,
+        },
         {"id": "multi-item-attention", "status": "pass" if semantic.get("status_region_count", 0) >= 1 else "not_pass"},
         {"id": "project-switch", "status": "pass" if any("project" in (entry.get("label") or "").lower() for entry in focusable_controls) else "not_pass"},
         {"id": "terminal-read-only", "status": "pass" if readiness["status"] == "pass" else "not_pass"},
@@ -430,6 +468,7 @@ def main():
         "recovery_matrix": recovery_matrix,
         "findings": [],
         "console_errors": console_errors,
+        "observed_optional_404_console": observed_optional_404_console,
         "external_requests": external_requests,
         "keyboard_navigation": {
             "status": "pass" if len(distinct_targets) >= 2 else "not_pass",

@@ -43,9 +43,18 @@ readback is not proof.
 - Recovery: reload, reconnect, partial read, offline read, injected error,
   multi-item attention, project switching, and terminal read-only behavior.
 
-The injected-error cell must record that the fault was actually injected.
-Console errors, external requests, missing cells, or unresolved P1 findings
-block the proof.
+The dialog probe may use the active-flow `Ask AOR` action or the installed
+`Add AOR Project` action. Both use the product's shared dialog primitive. This
+keeps focus evidence reachable when a public run-control gate intentionally
+replaces the top-bar request action with its decision workbench.
+
+The injected-error cell must record that a public project resource read was
+actually interrupted through its installed UI refresh action, that accessible
+error feedback became visible, and that a later refresh recovered.
+Collector-induced network errors and the browser's generic console message for
+handled optional-route `404` responses are recorded separately; other console
+errors, external requests, missing cells, or unresolved P1 findings block the
+proof.
 
 ## Compatibility
 
