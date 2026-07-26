@@ -49,6 +49,7 @@ import {
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
 import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
 import { buildCommandHealth } from "./lib/run-health.mjs";
+import { materializeExternalRunProjectionIngress } from "./lib/external-run-projection.mjs";
 import {
   buildLiveE2eStepPlan,
   createLiveE2eStepController,
@@ -3927,6 +3928,7 @@ function writeProofRunnerArtifactsImplementation(options) {
     live_e2e_observation_overall_status: observationReport.overall_status,
     live_e2e_run_health_report_file: runHealthReportFile,
     live_e2e_run_health_overall_status: runHealthReport.overall_status,
+    external_run_projection_files: [],
     operator_context: observationReport.operator_context,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
@@ -3999,6 +4001,13 @@ function writeProofRunnerArtifactsImplementation(options) {
 
   writeJson(observationReportFile, observationReport);
   writeJson(runHealthReportFile, runHealthReport);
+  summary.external_run_projection_files = materializeExternalRunProjectionIngress({
+    runId: options.runId,
+    profile: options.profile,
+    artifacts: options.flowResult.artifacts,
+    observationReport,
+    runHealthReport,
+  });
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
   summary.live_e2e_run_summary_file = summaryFile;

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/control-plane/http/http-router.mjs";
 import { validateTestExecutionReport } from "./test-discovery.mjs";
 import { checkW59ClosureReport } from "./readiness/w59-closure.mjs";
+import { checkReadinessSourceOfTruth } from "./readiness/source-of-truth.mjs";
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = path.posix.join(
   "scripts",
@@ -19,6 +20,12 @@ const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledg
 const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure.json";
 const defaultW58ClosurePath = "docs/research/09-w58-runtime-quality-closure.json";
 const defaultW59ClosurePath = "docs/research/10-w59-audit-closure.json", defaultW59IndependentReviewPath = "docs/research/11-w59-independent-s1-review.json";
+const ACTIVE_QUALIFICATION_HOLD = {
+  finding_id: "W66-QUALIFICATION",
+  state: "in-progress",
+  owner_slices: ["W66-S01", "W66-S02", "W66-S03", "W66-S04", "W66-S05", "W66-S06", "W66-S07", "W66-S08", "W66-S09"],
+  summary: "Fresh same-commit Codex and Claude qualification is incomplete; bounded release clearance remains suspended.",
+};
 const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
 const ALLOWED_AUDIT_STATES = new Set(["open", "in-progress", "resolved", "accepted-risk", "superseded"]);
 const W57_CLOSURE_FINDINGS = [
@@ -646,66 +653,6 @@ function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
   ]);
 }
 
-function checkSourceOfTruth(rootDir) {
-  const findings = [];
-  const readme = readText(rootDir, "README.md");
-  const readiness = readText(rootDir, "docs/backlog/self-hosted-production-readiness.md");
-  const opsRunbook = readText(rootDir, "docs/ops/production-readiness-gate.md");
-  const releaseRunbook = readText(rootDir, "docs/ops/self-hosted-release.md");
-
-  if (!readme.includes("bounded self-hosted release clearance")) {
-    findings.push("README.md must state the current bounded self-hosted release clearance.");
-  }
-  if (!readme.includes("pnpm production:ready")) {
-    findings.push("README.md must document the separate production-readiness gate command.");
-  }
-  if (!readme.includes("docs/ops/self-hosted-release.md")) {
-    findings.push("README.md must link the self-hosted release runbook.");
-  }
-  if (!readme.includes("hosted SaaS") || !readme.includes("enterprise identity")) {
-    findings.push("README.md must keep hosted SaaS and enterprise identity out of the supported mode.");
-  }
-  if (!readiness.includes("bounded self-hosted release clearance")) {
-    findings.push("self-hosted production readiness doc must state bounded self-hosted release clearance.");
-  }
-  if (!readiness.includes("pnpm production:ready")) {
-    findings.push("self-hosted production readiness doc must document the production gate command.");
-  }
-  if (!/sanitized production proof fixture/u.test(readiness)) {
-    findings.push("self-hosted production readiness doc must cite the sanitized production proof fixture.");
-  }
-  if (!opsRunbook.includes("pnpm production:ready") || !/sanitized (?:production )?proof fixture/u.test(opsRunbook)) {
-    findings.push("production-readiness runbook must document command usage and proof evidence.");
-  }
-  for (const required of [
-    "bounded self-hosted release clearance",
-    "pnpm production:ready",
-    "sanitized production proof fixture",
-    "hosted SaaS",
-    "enterprise identity",
-    "no-upstream-write",
-  ]) {
-    if (!releaseRunbook.includes(required)) {
-      findings.push(`self-hosted release runbook must mention '${required}'.`);
-    }
-  }
-
-  if (findings.length > 0) {
-    return fail("source-of-truth-alignment", "Production readiness source-of-truth docs are inconsistent.", findings, [
-      "README.md",
-      "docs/backlog/self-hosted-production-readiness.md",
-      "docs/ops/production-readiness-gate.md",
-      "docs/ops/self-hosted-release.md",
-    ]);
-  }
-  return pass("source-of-truth-alignment", "README, readiness source-of-truth, production gate, and release runbook align.", [
-    "README.md",
-    "docs/backlog/self-hosted-production-readiness.md",
-    "docs/ops/production-readiness-gate.md",
-    "docs/ops/self-hosted-release.md",
-  ]);
-}
-
 function checkAuthHardening(rootDir) {
   const contract = readText(rootDir, "docs/contracts/control-plane-api.md");
   const runbook = readText(rootDir, "docs/ops/control-plane-production-hardening.md");
@@ -987,7 +934,7 @@ export function runProductionReadinessGate(options = {}) {
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
     checkStoryHonesty(rootDir, storyMatrixPath),
-    checkSourceOfTruth(rootDir),
+    checkReadinessSourceOfTruth(rootDir),
     checkAuthHardening(rootDir),
     checkContractAndHarnessEvidence(rootDir),
     checkAlphaHardening(rootDir, openApiPath),
@@ -997,7 +944,10 @@ export function runProductionReadinessGate(options = {}) {
       : []),
   ];
   const gateExecutionStatus = checks.every((check) => check.status === "pass") ? "pass" : "fail";
-  const blockingInvariants = auditLedgerCheck.blocking_invariants ?? [];
+  const blockingInvariants = [
+    ...(auditLedgerCheck.blocking_invariants ?? []),
+    ACTIVE_QUALIFICATION_HOLD,
+  ];
   const releaseDisposition = gateExecutionStatus === "fail" ? "unknown" : blockingInvariants.length > 0 ? "audit-hold" : "cleared";
   const status = gateExecutionStatus === "fail" ? "fail" : releaseDisposition === "audit-hold" ? "blocked" : "pass";
   return {

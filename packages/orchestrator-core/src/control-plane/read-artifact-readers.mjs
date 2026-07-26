@@ -282,25 +282,7 @@ export function listRunControlStateFiles(init) {
         return listJsonFiles(stateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)));
       })
     : [];
-  const targetCheckoutsRoot = path.join(init.runtimeLayout.projectRuntimeRoot, "target-checkouts");
-  if (!fs.existsSync(targetCheckoutsRoot)) {
-    return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles]);
-  }
-
-  const nestedStateFiles = fs.readdirSync(targetCheckoutsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .flatMap((checkoutEntry) => {
-      const targetProjectsRoot = path.join(targetCheckoutsRoot, checkoutEntry.name, ".aor", "projects");
-      if (!fs.existsSync(targetProjectsRoot)) return [];
-      return fs.readdirSync(targetProjectsRoot, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .flatMap((projectEntry) => {
-          const targetStateRoot = path.join(targetProjectsRoot, projectEntry.name, "state");
-          return listJsonFiles(targetStateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)));
-        });
-    });
-
-  return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles, ...nestedStateFiles]);
+  return sortFilesByFreshness([...rootStateFiles, ...siblingStateFiles]);
 }
 
 /**

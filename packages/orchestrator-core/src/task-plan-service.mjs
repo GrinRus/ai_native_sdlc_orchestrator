@@ -9,6 +9,7 @@ import { buildPlanningInputManifest, selectPlannerCandidate } from "./planner-de
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { enrichExecutionDag, executionDagDigest, validateExecutionDagCoverage } from "./execution-dag-planner.mjs";
+import { resolveExecutionUnitWorkspace } from "./execution-unit-workspace.mjs";
 import { resolveOverallTaskProgressStatus, resolveTaskProgressStatus } from "./task-progress-projection.mjs";
 
 function asRecord(value) {
@@ -943,6 +944,14 @@ export function resolveExecutionUnitContext(options = {}) {
     error.code = "execution-unit-not-found";
     throw error;
   }
+  const workspace = resolveExecutionUnitWorkspace({
+    projectRoot: context.projectRoot,
+    projectId: context.projectId,
+    unit,
+    workspaceSetRef: options.workspaceSetRef,
+    resolveEvidencePath,
+    evidenceRef,
+  });
   return {
     ...context,
     executionPlan,
@@ -951,6 +960,7 @@ export function resolveExecutionUnitContext(options = {}) {
     executionUnit: unit,
     executionUnitId: unitId,
     taskRefs: asStringArray(unit.task_refs),
+    ...workspace,
     planDigest: context.plan.plan_digest,
     taskDigests: Object.fromEntries(
       asStringArray(unit.task_refs).map((taskId) => [taskId, taskDigest(asRecordArray(context.plan.local_tasks).find((task) => task.task_id === taskId) ?? {})]),

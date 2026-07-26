@@ -6,7 +6,7 @@ import {
 } from "./families.mjs";
 
 const snapshot = JSON.parse(fs.readFileSync(new URL("./public-kernel.snapshot.json", import.meta.url), "utf8"));
-if (snapshot.schema_version !== 2 || !Array.isArray(snapshot.contract_families)) {
+if (snapshot.schema_version !== 3 || !Array.isArray(snapshot.contract_families)) {
   throw new Error("Private live-E2E contract kernel requires a versioned public metadata snapshot.");
 }
 const PUBLIC_CONTRACT_FAMILY_INDEX = Object.freeze(snapshot.contract_families);

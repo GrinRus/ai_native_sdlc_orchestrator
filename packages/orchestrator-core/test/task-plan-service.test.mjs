@@ -19,6 +19,7 @@ import {
   buildPlanningInputManifest,
   revisionAdviceForValidationIssue,
   selectPlannerCandidate,
+  validateMissionSpecificPlannerCandidate,
 } from "../src/planner-decomposition.mjs";
 import {
   EXECUTION_PLAN_STAGES,
@@ -40,6 +41,38 @@ function withTempRepo(callback) {
   }
 }
 
+function missionPlannerCandidate(taskId = "task.mission") {
+  const tasks = ["design", "implement", "verify"].map((phase, index) => ({
+    task_id: `${taskId}.${phase}`,
+    title: `${phase[0].toUpperCase()}${phase.slice(1)} mission-specific behavior`,
+    type: phase === "design" ? "design" : phase === "verify" ? "verification" : "implementation",
+    objective: `${phase[0].toUpperCase()}${phase.slice(1)} and verify the approved mission behavior.`,
+    rationale: "The approved mission requires explicit bounded and independently verifiable work.",
+    scope: {
+      repo_ids: ["main"],
+      component_ids: [],
+      allowed_paths: ["src/**"],
+      forbidden_paths: [],
+    },
+    depends_on: index === 0 ? [] : [`${taskId}.${["design", "implement"][index - 1]}`],
+    work_items: [`${phase} the approved bounded behavior.`, "Preserve the approved mission boundary."],
+    criteria_refs: ["acceptance.bounded-objective"],
+    verification: {
+      command_group_refs: [],
+      validators: ["repo-scope"],
+      manual_checks: ["Inspect the behavior against the approved mission."],
+      success_conditions: ["The mission behavior is implemented and verified."],
+    },
+    expected_evidence: ["verify-summary", "review-report"],
+    risks: ["The implementation may reveal a narrower follow-up requirement."],
+    stop_conditions: ["The task requires work outside the approved mission scope."],
+    execution_hints: { group_key: null, group_reason: null, parallel_candidate: false },
+  }));
+  return {
+    local_tasks: tasks,
+  };
+}
+
 test("planner decomposition records input provenance and candidate precedence", () => {
   assert.deepEqual(buildPlanningInputManifest([
     "evidence://artifacts/intake.artifact.json",
@@ -51,6 +84,33 @@ test("planner decomposition records input provenance and candidate precedence", 
     adapterOutput: { wave_ticket_candidate: { local_tasks: [{ task_id: "task.runner" }] } },
   }).source, "explicit-candidate");
   assert.match(revisionAdviceForValidationIssue({ field: "local_tasks[0].depends_on" }), /dependencies/u);
+});
+
+test("planner fallback is small-only and medium/large candidates fail closed before evaluation", () => {
+  assert.equal(validateMissionSpecificPlannerCandidate({
+    candidate: {},
+    featureSize: "small",
+    source: "missing",
+  }).ok, true);
+  for (const featureSize of ["medium", "large"]) {
+    const missing = validateMissionSpecificPlannerCandidate({ candidate: {}, featureSize, source: "missing" });
+    assert.equal(missing.ok, false);
+    assert.equal(missing.blocker.code, "mission-specific-plan-required");
+  }
+  const malformed = validateMissionSpecificPlannerCandidate({
+    candidate: { local_tasks: [{ title: "Generic task" }] },
+    featureSize: "medium",
+    source: "runner-structured-plan",
+  });
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.blocker.code, "mission-specific-plan-malformed");
+  assert.equal(validateMissionSpecificPlannerCandidate({
+    candidate: {
+      local_tasks: [{ task_id: "task.api", title: "Implement API behavior", objective: "Close mission API behavior." }],
+    },
+    featureSize: "large",
+    source: "runner-structured-plan",
+  }).ok, true);
 });
 
 test("execution and progress projections keep lifecycle identities separate", () => {
@@ -84,16 +144,17 @@ test("execution and progress projections keep lifecycle identities separate", ()
 test("structured plan create is routed, idempotent, approvable, and materializes execution progress", () => {
   withTempRepo((repoRoot) => {
     const semanticEvaluation = { status: "warn", warnings: ["Keep the integration boundary explicit."] };
-    const first = createTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planningRunId: "plan.test.first", semanticEvaluation });
-    const second = createTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planningRunId: "plan.test.second", semanticEvaluation });
+    const plannerCandidate = missionPlannerCandidate();
+    const first = createTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planningRunId: "plan.test.first", semanticEvaluation, plannerCandidate });
+    const second = createTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planningRunId: "plan.test.second", semanticEvaluation, plannerCandidate });
 
     assert.equal(first.planningRun.status, "passed");
-    assert.equal(first.plan.plan_status, "proposed");
+    assert.equal(first.plan.plan_status, "proposed", JSON.stringify(first.planValidationReport.validators, null, 2));
     assert.equal(first.plan.semantic_evaluation.status, "warn");
     assert.equal(first.plan.semantic_evaluation.blocking, false);
     assert.equal(first.planEvaluationReport.status, "warn");
     assert.equal(first.plan.plan_version, 1);
-    assert.equal(first.plan.source_refs.planner_candidate_source, "mission-derived-fallback");
+    assert.equal(first.plan.source_refs.planner_candidate_source, "explicit-candidate");
     assert.equal(first.plan.source_refs.planning_input_manifest.length > 0, true);
     assert.equal(second.plan.plan_version, 1);
     assert.equal(second.plan.plan_digest, first.plan.plan_digest);
@@ -118,6 +179,57 @@ test("structured plan create is routed, idempotent, approvable, and materializes
       executionUnitId: unit.unit_id,
     });
     assert.deepEqual(resolvedUnit.taskRefs, unit.task_refs);
+    const workspaceSetRoot = path.join(repoRoot, ".aor", "projects", "aor-core", "workspace-sets", "parent-run-plan");
+    const executionRoot = path.join(workspaceSetRoot, "repos", "main");
+    const ownerMarker = path.join(workspaceSetRoot, ".aor-workspace-set-owner.json");
+    fs.mkdirSync(executionRoot, { recursive: true });
+    fs.writeFileSync(ownerMarker, `${JSON.stringify({
+      workspace_set_id: "workspace-set-parent-run-plan",
+      project_id: "aor-core",
+      run_id: "parent-run-plan",
+      workspace_root: workspaceSetRoot,
+    })}\n`);
+    const workspaceSetFile = path.join(repoRoot, ".aor", "projects", "aor-core", "reports", "workspace-set.parent-run-plan.json");
+    fs.writeFileSync(workspaceSetFile, `${JSON.stringify({
+      schema_version: 2,
+      workspace_set_id: "workspace-set-parent-run-plan",
+      project_id: "aor-core",
+      run_id: "parent-run-plan",
+      binding_ref: "binding://main",
+      status: "ready",
+      workspace_root: workspaceSetRoot,
+      owner_marker: ownerMarker,
+      repositories: [{
+        repo_id: "main",
+        mount_path: "repos/main",
+        base_ref: "main",
+        resolved_commit: "1".repeat(40),
+        execution_root: executionRoot,
+        provisioning: { strategy: "independent-clone", state: "ready" },
+      }],
+      conflicts: [],
+      cleanup: {
+        policy: { on_success: "delete", on_abort: "delete", on_failure: "retain" },
+        state: "pending",
+      },
+      evidence_refs: ["evidence://workspace-set.parent-run-plan.json"],
+    })}\n`);
+    const workspaceBoundUnit = resolveExecutionUnitContext({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      executionPlanRef: `evidence://${path.relative(repoRoot, approved.executionPlanFile)}`,
+      executionUnitId: unit.unit_id,
+      workspaceSetRef: `evidence://${path.relative(repoRoot, workspaceSetFile)}`,
+    });
+    assert.equal(workspaceBoundUnit.executionRoot, executionRoot);
+    fs.writeFileSync(ownerMarker, `${JSON.stringify({ workspace_set_id: "wrong" })}\n`);
+    assert.throws(() => resolveExecutionUnitContext({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      executionPlanRef: `evidence://${path.relative(repoRoot, approved.executionPlanFile)}`,
+      executionUnitId: unit.unit_id,
+      workspaceSetRef: `evidence://${path.relative(repoRoot, workspaceSetFile)}`,
+    }), /owner marker/u);
 
     const task = approved.plan.local_tasks[0];
     const pending = materializeTaskProgress({
@@ -207,7 +319,12 @@ test("incomplete planner output remains readable as revision-required but cannot
 
 test("revision requests invalidate approval and plan diff classifies material task changes", () => {
   withTempRepo((repoRoot) => {
-    const created = createTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planningRunId: "plan.test.revision" });
+    const created = createTaskPlan({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      planningRunId: "plan.test.revision",
+      plannerCandidate: missionPlannerCandidate(),
+    });
     const approved = approveTaskPlan({
       projectRef: repoRoot,
       cwd: repoRoot,
@@ -254,6 +371,7 @@ test("project policy can make semantic plan evaluation blocking", () => {
       projectRef: repoRoot,
       cwd: repoRoot,
       planningRunId: "plan.test.semantic-blocking",
+      plannerCandidate: missionPlannerCandidate(),
       semanticEvaluation: { status: "warn", warnings: ["Split the cross-component task."] },
     });
     assert.equal(created.planValidationReport.status, "pass");
@@ -285,7 +403,12 @@ test("medium plan revision proof preserves task identity across failed attempt, 
       reason: "Replace the incomplete candidate with independently verifiable work.",
       planningRunId: "plan.proof.revise",
     });
-    const revised = createTaskPlan({ projectRef: repoRoot, cwd: repoRoot, planningRunId: "plan.proof.v2" });
+    const revised = createTaskPlan({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      planningRunId: "plan.proof.v2",
+      plannerCandidate: missionPlannerCandidate("task.valid-v2"),
+    });
     assert.equal(revised.plan.plan_version, 2);
     assert.equal(revised.plan.plan_status, "proposed");
     assert.equal(revised.plan.plan_size, "medium");

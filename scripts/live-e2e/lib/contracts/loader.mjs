@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
-
 import { CONTRACT_FAMILY_INDEX } from "./contract-kernel.mjs";
 import { INTAKE_SOURCE_KIND_VALUES, LIVE_E2E_OBSERVATION_STATUS_VALUES } from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs";
-
+import { isPublicContractFamily, validatePublicContractDocument } from "./public-validation-bridge.mjs";
+import { validateQualificationCellReport } from "./qualification-cell-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -17,14 +17,7 @@ const LIVE_E2E_FEATURE_SIZE_VALUES = ["small", "medium", "large", "xlarge"];
 const LIVE_E2E_MISSION_CLASS_VALUES = ["flow-regression", "product-change"];
 const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
 const LIVE_E2E_RUN_HEALTH_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
-const LIVE_E2E_RUN_FAILURE_OWNER_VALUES = [
-  "aor",
-  "target_repository",
-  "provider",
-  "environment",
-  "operator",
-  "unknown",
-];
+const LIVE_E2E_RUN_FAILURE_OWNER_VALUES = ["aor", "target_repository", "provider", "environment", "operator", "unknown"];
 const LIVE_E2E_RUN_FAILURE_PHASE_VALUES = [
   "aor_install",
   "target_checkout",
@@ -166,6 +159,7 @@ export function getContractFamilyIndex() {
  * @returns {import("./index.d.ts").ContractValidationResult}
  */
 export function validateContractDocument({ family, document, source = "<in-memory>" }) {
+  if (isPublicContractFamily(family)) return validatePublicContractDocument({ family, document, source });
   const entry = CONTRACT_FAMILY_INDEX.find((candidate) => candidate.family === family);
   if (!entry) {
     return {
@@ -305,6 +299,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateLiveE2EQualityAssessmentReport(document, source));
   }
 
+  if (family === "live-e2e-qualification-cell-report") {
+    issues.push(...validateQualificationCellReport(document, source));
+  }
+
   if (family === "live-e2e-step-quality-assessment-request") {
     issues.push(...validateLiveE2EStepQualityAssessmentRequest(document, source));
   }
@@ -376,7 +374,6 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues,
   };
 }
-
 /**
  * @param {Record<string, unknown>} document
  * @param {string} source

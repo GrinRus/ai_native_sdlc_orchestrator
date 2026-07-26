@@ -32,14 +32,10 @@ import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mj
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { applyExecutableFailurePolicy } from "./failure-policy.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
-import { completeStepAttempt, reserveStepAttempt } from "./attempt-store.mjs";
+import { completeStepAttemptReservation, renewStepAttemptReservation, reserveStepAttempt } from "./attempt-store.mjs";
+import { buildStepExecutionIdentity } from "./execution-input-identity.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
-import {
-  captureCheckoutSnapshot,
-  compareCheckoutSnapshots,
-  prepareWorkspaceIsolation,
-  resumeWorkspaceIsolation,
-} from "./workspace-isolation.mjs";
+import { captureCheckoutSnapshot, compareCheckoutSnapshots, prepareWorkspaceIsolation, resumeWorkspaceIsolation, resumeWorkspaceSetIsolation } from "./workspace-isolation.mjs";
 import {
   evaluateRuntimePermissionRequest,
   normalizeRuntimeAgentAutoApprovalProfile,
@@ -1068,24 +1064,38 @@ function executeRoutedStepImplementation(options) {
       ? options.executionRoot
       : path.resolve(init.projectRoot, options.executionRoot)
     : init.projectRoot;
+  const executionIdentity = buildStepExecutionIdentity({
+    executionOptions: options, init, requestedStepClass, dryRun, requestedExecutionRoot: executionRoot,
+    sources: { project_profile: init.projectProfilePath, routes: routesRoot, wrappers: wrappersRoot, prompts: promptsRoot, context_bundles: contextBundlesRoot, context_docs: contextDocsRoot, context_rules: contextRulesRoot, context_skills: contextSkillsRoot, policies: policiesRoot, adapters: adaptersRoot, skills: skillsRoot },
+  });
+  let attemptReservation = reserveStepAttempt({
+    stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass,
+    requestKey: options.requestKey, executionIdentity, leaseMs: 14_400_000,
+  });
+  if (attemptReservation.replay) return attemptReservation.result;
   if (!dryRun) {
     const loadedProjectProfile = loadContractFile({ filePath: init.projectProfilePath, family: "project-profile" });
     if (!loadedProjectProfile.ok) throw new Error(`Project profile '${init.projectProfilePath}' failed contract validation.`);
     primaryCheckoutSnapshotBefore = captureCheckoutSnapshot(init.projectRoot);
-    workspaceIsolation = options.reuseDisposableWorkspace === true && options.executionRoot
-      ? resumeWorkspaceIsolation({
-          projectRoot: init.projectRoot,
+    workspaceIsolation = options.workspaceSetRef && options.executionRoot
+      ? resumeWorkspaceSetIsolation({
           projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
-          runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
           executionRoot: options.executionRoot,
         })
-      : prepareWorkspaceIsolation({
-          projectRoot: init.projectRoot,
-          runtimeRoot: init.runtimeRoot,
-          projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
-          runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
-          runId,
-        });
+      : options.reuseDisposableWorkspace === true && options.executionRoot
+        ? resumeWorkspaceIsolation({
+            projectRoot: init.projectRoot,
+            projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+            runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
+            executionRoot: options.executionRoot,
+          })
+        : prepareWorkspaceIsolation({
+            projectRoot: init.projectRoot,
+            runtimeRoot: init.runtimeRoot,
+            projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+            runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
+            runId,
+          });
     if (!workspaceIsolation.provisioned || !workspaceIsolation.executionRoot) {
       throw new Error(`Disposable workspace provisioning failed for mode '${workspaceIsolation.requestedMode}'.`);
     }
@@ -1093,14 +1103,6 @@ function executeRoutedStepImplementation(options) {
   }
   const changedPathStatusBefore = listChangedPaths(executionRoot);
   const executionCheckoutSnapshotBefore = captureCheckoutSnapshot(executionRoot);
-  const attemptReservation = reserveStepAttempt({
-    stateRoot: init.runtimeLayout.stateRoot,
-    runId,
-    stepId,
-    stepClass: requestedStepClass,
-    requestKey: options.requestKey,
-  });
-  if (attemptReservation.replay) return attemptReservation.result;
   const executionAttempt = attemptReservation.attempt;
   const stepResultId = derivePublicId(
     executionAttempt > 1
@@ -1554,6 +1556,9 @@ function executeRoutedStepImplementation(options) {
           : null,
       });
 
+      attemptReservation = renewStepAttemptReservation({
+        stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass, reservation: attemptReservation, leaseMs: 14_400_000,
+      });
       const invocation = invokeStepAdapterForStep({
         dryRun,
         requestedStepClass,
@@ -1957,15 +1962,11 @@ function executeRoutedStepImplementation(options) {
     stepResult,
     stepResultPath,
   };
-  completeStepAttempt({
-    stateRoot: init.runtimeLayout.stateRoot,
-    runId,
-    stepId,
-    stepClass: requestedStepClass,
-    requestKey: attemptReservation.request_key,
-    attempt: executionAttempt,
-    expectedRevision: attemptReservation.revision,
-    result,
+  attemptReservation = renewStepAttemptReservation({
+    stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass, reservation: attemptReservation, leaseMs: 14_400_000,
+  });
+  completeStepAttemptReservation({
+    stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass, reservation: attemptReservation, result,
   });
   return result;
 }

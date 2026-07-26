@@ -52,6 +52,10 @@ export function handleRunEventStream({ params, request, requestUrl, response, ru
       data: payload,
     });
   }
+  if (stream.cursor_terminal) {
+    response.end();
+    return;
+  }
 
   let unsubscribe = () => {};
   unsubscribe = stream.subscribe((event) => {
@@ -62,6 +66,9 @@ export function handleRunEventStream({ params, request, requestUrl, response, ru
       data: payload,
     });
     if (!writable) {
+      unsubscribe();
+      response.end();
+    } else if (event.event_type === "run.terminal") {
       unsubscribe();
       response.end();
     }

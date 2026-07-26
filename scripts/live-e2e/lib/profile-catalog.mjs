@@ -249,6 +249,23 @@ function assertLiveE2ePolicy(profile, source) {
     if (browserTaskProof.required !== true) {
       problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.required=true");
     }
+    if (browserTaskProof.schema_version !== 2) {
+      problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.schema_version=2");
+    }
+    if (asNonEmptyString(browserTaskProof.scenario_id) !== "installed-console-matrix") {
+      problems.push("browser-task-proof profiles must select the installed-console-matrix scenario");
+    }
+    const requiredBrowserMatrix = [
+      ["required_viewports", ["desktop", "tablet", "mobile", "zoom-200"]],
+      ["required_accessibility", ["keyboard-only", "dialog-focus", "focus-restoration", "semantic-tree", "contrast-aa", "touch-targets", "reduced-motion"]],
+      ["required_recovery", ["reload", "reconnect", "partial-read", "offline-read", "injected-error", "multi-item-attention", "project-switch", "terminal-read-only"]],
+    ];
+    for (const [field, expected] of requiredBrowserMatrix) {
+      const declared = new Set(asStringArray(browserTaskProof[field]));
+      for (const value of expected) {
+        if (!declared.has(value)) problems.push(`browser-task-proof profiles must include ${field} '${value}'`);
+      }
+    }
     if (flowLoopProof.enabled !== true) {
       problems.push("browser-task-proof profiles must declare guided_journey.flow_loop_proof.enabled=true");
     }

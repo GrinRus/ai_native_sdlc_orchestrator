@@ -6659,12 +6659,14 @@ function App() {
       const query = new URLSearchParams({ maxReplay: "0" });
       if (cursor) query.set("after_event_id", cursor);
       source = new EventSource(`${apiProjectBase}/runs/${encodeURIComponent(liveRunId)}/events?${query}`);
-      source.onmessage = (event) => {
+      const consumeDurableEvent = (event) => {
         if (event.lastEventId) cursor = event.lastEventId;
         refresh({ silent: true, selectionVersion: flowSelectionVersion.current }).catch((err) =>
           setError(err instanceof Error ? err.message : String(err)),
         );
       };
+      source.addEventListener("live-run-event", consumeDurableEvent);
+      source.addEventListener("message", consumeDurableEvent);
       source.onerror = () => {
         source?.close();
         if (!closed) window.setTimeout(connect, 1000);

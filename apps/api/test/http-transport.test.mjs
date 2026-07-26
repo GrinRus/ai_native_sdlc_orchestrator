@@ -1122,6 +1122,8 @@ test("HTTP shutdown bounds active SSE stream lifetime", async () => {
 
 test("flow plan API creates, reads, approves, reports progress, and invalidates approval on revision", async () => {
   await withTempRepo(async (repoRoot) => {
+    const requestFile = path.join(repoRoot, "structured-plan-api.request.json");
+    fs.writeFileSync(requestFile, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
     const transport = await createControlPlaneHttpServer({
       projectRef: repoRoot,
       cwd: repoRoot,
@@ -1139,6 +1141,7 @@ test("flow plan API creates, reads, approves, reports progress, and invalidates 
           dod: "The approved plan materializes execution units and progress.",
           allowed_path: "packages/orchestrator-core/**",
           delivery_mode: "patch-only",
+          request_file: requestFile,
         },
       });
       assert.equal(missionResponse.status, 200);
@@ -1185,6 +1188,48 @@ test("flow plan API creates, reads, approves, reports progress, and invalidates 
       assert.equal(progress.task_progress.tasks.length, shown.plan.local_tasks.length);
 
       const unit = progress.execution_plan.execution_units[0];
+      const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+      const workspaceRoot = path.join(init.runtimeLayout.projectRuntimeRoot, "workspace-sets", "run-http-structured-parent");
+      const executionRoot = path.join(workspaceRoot, "repos", "main");
+      const ownerMarker = path.join(workspaceRoot, ".aor-workspace-set-owner.json");
+      fs.mkdirSync(executionRoot, { recursive: true });
+      fs.writeFileSync(ownerMarker, `${JSON.stringify({
+        workspace_set_id: "workspace-set-run-http-structured-parent",
+        project_id: transport.projectId,
+        run_id: "run-http-structured-parent",
+        workspace_root: workspaceRoot,
+      })}\n`);
+      const workspaceSetFile = path.join(init.runtimeLayout.reportsRoot, "workspace-set.run-http-structured-parent.json");
+      fs.writeFileSync(workspaceSetFile, `${JSON.stringify({
+        schema_version: 2,
+        workspace_set_id: "workspace-set-run-http-structured-parent",
+        project_id: transport.projectId,
+        run_id: "run-http-structured-parent",
+        binding_ref: "binding://main",
+        status: "ready",
+        workspace_root: workspaceRoot,
+        owner_marker: ownerMarker,
+        repositories: [{
+          repo_id: "main",
+          mount_path: "repos/main",
+          base_ref: "main",
+          resolved_commit: "1".repeat(40),
+          execution_root: executionRoot,
+          provisioning: { strategy: "independent-clone", state: "ready" },
+        }],
+        conflicts: [],
+        cleanup: {
+          policy: { on_success: "delete", on_abort: "delete", on_failure: "retain" },
+          state: "pending",
+        },
+        evidence_refs: ["evidence://workspace-set.run-http-structured-parent.json"],
+      })}\n`);
+      const workspaceValidation = validateContractDocument({
+        family: "workspace-set",
+        document: JSON.parse(fs.readFileSync(workspaceSetFile, "utf8")),
+        source: workspaceSetFile,
+      });
+      assert.equal(workspaceValidation.ok, true, JSON.stringify(workspaceValidation.issues));
       const runStartResponse = await postJson(
         `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
         {
@@ -1192,12 +1237,14 @@ test("flow plan API creates, reads, approves, reports progress, and invalidates 
           run_id: "run.http.structured-plan-unit",
           execution_plan_ref: progress.task_progress.execution_plan_ref,
           execution_unit_id: unit.unit_id,
+          workspace_set_ref: `evidence://${path.relative(init.projectRoot, workspaceSetFile)}`,
         },
       );
-      assert.equal(runStartResponse.status, 200);
       const runStart = await runStartResponse.json();
+      assert.equal(runStartResponse.status, 200, JSON.stringify(runStart));
       assert.equal(runStart.run_control.state.execution_unit_id, unit.unit_id);
       assert.deepEqual(runStart.run_control.state.task_refs, unit.task_refs);
+      assert.equal(runStart.run_control.state.execution_root, executionRoot);
 
       const revisionResponse = await postJson(actionUrl, {
         action: "request_revision",

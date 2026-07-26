@@ -13,13 +13,13 @@ researchers. The repository remains docs-first and includes implemented CLI,
 API, web, and runtime baselines, but it is not a production-ready
 general-purpose orchestrator runtime.
 
-The July 2026 audit invalidated the previous self-hosted candidate verdict until
-W57-W59 repaired and independently requalified the affected surfaces. That
-remediation is now closed with bounded self-hosted release clearance for the
-supported Node 22 CLI/API runtime, literal-loopback local app, and explicit
-no-upstream-write delivery defaults. `pnpm production:ready --json` reports
-`status=pass`, `gate_execution_status=pass`,
-`release_disposition=cleared`, and `release_clearance=true`.
+W57-W59 closed the July 2026 audit findings for the bounded Node 22 CLI/API
+runtime, literal-loopback local app, and explicit no-upstream-write delivery
+defaults. The later W66 qualification intake invalidated that historical
+clearance until the retained runtime findings and fresh same-commit Codex and
+Claude matrix are complete. `pnpm production:ready --json` currently reports
+`status=blocked`, `gate_execution_status=pass`,
+`release_disposition=audit-hold`, and `release_clearance=false`.
 
 This is not a general hosted-production claim. Hosted SaaS, Windows
 certification, enterprise identity, credentialed provider certification, paid
@@ -345,7 +345,7 @@ claim.
 | Local installed-user UI | Implemented flow-centric baseline | `aor app` launches the packaged SPA with first-run wizard, project switcher, flow selector, active/completed flow views, and `New Flow`. |
 | Operator requests | Implemented flow-scoped baseline | `aor request create/run/status` routes bounded Ask AOR work through runtime evidence and `target_flow_id`. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
-| Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
+| Production-readiness gate | Implemented; W66 qualification hold active | `pnpm production:ready --json --expect-audit-hold`. |
 
 ## Readiness evidence
 
@@ -358,7 +358,7 @@ production runtime for arbitrary repositories.
 Run `pnpm check` first: it discovers every tracked `*.test.mjs` file through
 `scripts/test-manifest.json` and writes ignored execution evidence bound to the
 current HEAD. Readiness rejects a missing, stale, duplicated, or incomplete test
-report and currently returns the explicit July 2026 audit hold.
+report and currently returns the explicit W66 qualification hold.
 
 The current roadmap source of truth extends through W66 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path

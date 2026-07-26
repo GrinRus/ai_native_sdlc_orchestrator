@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  advanceParentForChildRun,
   completeChildRun,
   controlParentRun,
   retryParentUnit,
@@ -234,4 +235,67 @@ test("parent cancel propagates only to active children and budget exhaustion blo
     capacity: { provider_slots: 1, tool_slots: 2 },
   });
   assert.equal(scheduleParentRun({ parentFile: capacityRun.file }).started.length, 1);
+});
+
+test("failed child launch is reconciled without an active orphan or consumed budget", () => {
+  const projectRef = project();
+  const started = startParentRun({
+    projectRef,
+    cwd: projectRef,
+    parentRunId: "parent-run-launch-failure",
+    executionPlan: { ...executionPlan, execution_units: [executionPlan.execution_units[0]], integration_gates: [] },
+    executionPlanRef: "evidence://execution-plan.json",
+    workspaceSet: workspaceSet("parent-run-launch-failure"),
+    workspaceSetRef: "evidence://workspace-set.json",
+  });
+  const scheduled = scheduleParentRun({
+    parentFile: started.file,
+    startChild: () => {
+      throw Object.assign(new Error("injected spawn failure"), { code: "spawn-failed" });
+    },
+  });
+  assert.equal(scheduled.started.length, 0);
+  assert.equal(scheduled.launch_failures.length, 1);
+  assert.equal(scheduled.parent.units[0].status, "pending");
+  assert.equal(scheduled.parent.units[0].active_child_run_id, null);
+  assert.equal(scheduled.parent.consumed.child_starts, 0);
+  assert.ok(scheduled.parent.events.some((event) => event.event_type === "child.launch-failed"));
+});
+
+test("child completion advances dependencies and cancel becomes terminal after child acknowledgment", () => {
+  const projectRef = project();
+  const started = startParentRun({
+    projectRef,
+    cwd: projectRef,
+    parentRunId: "parent-run-auto-advance",
+    executionPlan: {
+      ...executionPlan,
+      execution_units: [executionPlan.execution_units[0], executionPlan.execution_units[2]],
+      integration_gates: [],
+    },
+    executionPlanRef: "evidence://execution-plan.json",
+    workspaceSet: workspaceSet("parent-run-auto-advance"),
+    workspaceSetRef: "evidence://workspace-set.json",
+  });
+  const first = scheduleParentRun({ parentFile: started.file });
+  const advanced = advanceParentForChildRun({
+    stateRoot: started.init.runtimeLayout.stateRoot,
+    childRunId: first.started[0].child_run_id,
+    status: "succeeded",
+  });
+  assert.deepEqual(advanced.started.map((entry) => entry.execution_unit_id), ["unit-c"]);
+
+  const canceled = controlParentRun({
+    parentFile: started.file,
+    expectedRevision: advanced.parent.revision,
+    action: "cancel",
+    commandId: "cancel-auto-advance",
+  });
+  assert.equal(canceled.status, "canceling");
+  const terminal = advanceParentForChildRun({
+    stateRoot: started.init.runtimeLayout.stateRoot,
+    childRunId: advanced.started[0].child_run_id,
+    status: "canceled",
+  });
+  assert.equal(terminal.parent.status, "canceled");
 });

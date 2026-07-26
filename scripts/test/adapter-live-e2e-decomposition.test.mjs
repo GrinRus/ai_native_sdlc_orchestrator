@@ -33,13 +33,19 @@ test("provider-neutral adapter boundaries remain focused and package-owned", () 
 });
 
 test("production and private live-E2E runtime modules have no executable cross-boundary imports", () => {
-  const tracked = execFileSync("git", ["ls-files", "packages/*/src/**/*.mjs", "apps/*/src/**/*.mjs", "scripts/live-e2e/lib/**/*.mjs"], {
+  const tracked = execFileSync("git", ["ls-files", "--", "packages", "apps", "scripts/live-e2e"], {
     cwd: root,
     encoding: "utf8",
-  }).trim().split("\n").filter(Boolean);
+  }).trim().split("\n").filter((relativeFile) =>
+    relativeFile.endsWith(".mjs")
+    && (
+      /^packages\/[^/]+\/src\//u.test(relativeFile)
+      || /^apps\/[^/]+\/(?:src|bin)\//u.test(relativeFile)
+      || /^scripts\/live-e2e\/(?:[^/]+\.mjs|lib\/)/u.test(relativeFile)
+    ));
   for (const relativeFile of tracked) {
     const text = source(relativeFile);
-    if (relativeFile.startsWith("scripts/live-e2e/lib/")) {
+    if (relativeFile.startsWith("scripts/live-e2e/")) {
       const imports = [...text.matchAll(/(?:from\s+|import\s*\()\s*["']([^"']+)["']/gu)].map((match) => match[1]);
       for (const specifier of imports.filter((entry) => entry.startsWith("."))) {
         const resolved = path.resolve(root, path.dirname(relativeFile), specifier);
@@ -47,7 +53,7 @@ test("production and private live-E2E runtime modules have no executable cross-b
         assert.equal(resolved.startsWith(path.join(root, "apps")), false, `${relativeFile} imports ${specifier}`);
       }
     } else {
-      assert.doesNotMatch(text, /scripts\/live-e2e/u, relativeFile);
+      assert.doesNotMatch(text, /scripts\/live-e2e|live[-_]e2e|target[-_]checkouts/u, relativeFile);
     }
   }
   assert.doesNotMatch(source("scripts/live-e2e/lib/contracts/contract-kernel.mjs"), /packages\/|apps\//u);

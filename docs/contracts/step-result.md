@@ -61,6 +61,15 @@ Runtime Harness controllers may add optional decision metadata:
 
 These fields describe AOR runtime control decisions. They do not replace review, eval, delivery, learning, or promotion artifacts.
 `external_runner` is a routed live-execution evidence summary copied from the adapter response when an external runtime was invoked. It should preserve the selected runtime-agent permission mode, permission mode source, command surface, execution root, exit metadata, raw evidence ref, request artifact refs, provider work packet refs, and context-budget status when available.
+Adapter output may additionally carry `execution_outcome` with
+`schema_version: 1`. Its `process`, `transport`, `provider`, and `verification`
+members are independent: process exit zero and completed transport do not imply
+provider or verification success. Consumers must fail closed on explicit
+`partial`, `incomplete`, `failed`, `blocked`, or `not_pass` provider outcomes.
+Unknown provider vocabulary remains `provider.status=unknown` and cannot be
+promoted to verified completion. Provider-specific stream parsing stays inside
+the adapter; shared surfaces receive only normalized, redacted progress and
+terminal metadata.
 Resolved live evidence also preserves `requested_model`, `effective_model`,
 `model_source`, ordered `route_attempts[]`, and `fallback_transitions[]`. The
 effective model must equal the adapter-owned argv/config value captured for the

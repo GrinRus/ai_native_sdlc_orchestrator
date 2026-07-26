@@ -12,5 +12,8 @@ event_ref: evidence://.aor/projects/aor-core/reports/live-run-events-run.canonic
 worker:
   identity: node-worker-42001
   pid: 42001
+  claim_token: 5bd1d9a4-4cb8-4abe-9bb0-20378a311a20
+  fencing_token: 3
+  lease_expires_at: "2026-07-15T00:00:11.000Z"
 terminal_at: null
 terminal_evidence_refs: []

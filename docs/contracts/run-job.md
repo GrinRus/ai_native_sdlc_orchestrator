@@ -16,7 +16,8 @@ completion.
 
 ## Worker and lifecycle fields
 
-- `worker` is null before ownership or contains a stable worker identity and PID;
+- `worker` is null before ownership or contains a stable worker identity, PID,
+  opaque claim token, monotonic fencing token, and renewable lease expiry;
 - `heartbeat_at` is refreshed while the worker supervises the provider process;
 - `started_at` records the first running transition;
 - terminal states require `terminal_at` and `terminal_evidence_refs[]`;
@@ -27,6 +28,13 @@ Updates use the project runtime lock and compare the expected revision before an
 atomic replace. Reusing one run/job identity with a different request digest is
 a typed conflict. Job state, run-control state, and live-event JSONL remain
 separate durable records joined by `run_id`.
+
+Ownership is claimed durably before process spawn. A worker may transition or
+finalize a job only while its fencing token still matches the durable record;
+an expired lease can be recovered with a higher fencing token. Spawn failure is
+persisted as a terminal failure instead of leaving a false running record.
+`waiting-input` is written before exit-zero success classification. One accepted
+interaction answer may requeue the same job/request boundary exactly once.
 
 ## Cursor semantics
 

@@ -928,6 +928,48 @@ test("live E2E product-change execution assessment includes result-quality dimen
   });
 });
 
+test("deterministic verification conflict overrides evaluator continue and forces non-pass dimensions", () => {
+  withTempRoot((reportsRoot) => {
+    const evidenceFile = path.join(reportsRoot, "execution-evidence.json");
+    const requestFile = path.join(reportsRoot, "execution-step-quality-request.json");
+    fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    fs.writeFileSync(requestFile, "{}\n", "utf8");
+    const built = writeStepQualityAssessmentReport({
+      runId: "controller-deterministic-conflict",
+      profile: {
+        profile_id: "live-e2e.test.deterministic-conflict",
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+      },
+      artifacts: {
+        target_catalog_id: "httpx",
+        feature_mission_id: "httpx-timeout-transport-regression",
+        feature_size: "medium",
+        mission_class: "product-change",
+        post_run_verify_status: "partial",
+        post_run_diagnostic_status: "timed_out",
+      },
+      entry: {
+        step_id: "execution",
+        step_instance_id: "execution#1",
+        sequence: 5,
+        agent_decision_request_ref: requestFile,
+        operator_decision_ref: evidenceFile,
+        inspected_evidence_refs: [evidenceFile],
+        decision: { action: "continue" },
+      },
+      outputDir: reportsRoot,
+      assessmentRequestFile: requestFile,
+      assessmentMethod: "external-skill-agent",
+    });
+    const report = JSON.parse(fs.readFileSync(built.reportFile, "utf8"));
+    assert.equal(report.status, "request_repair");
+    assert.equal(report.decision, "request-repair");
+    assert.equal(report.dimensions.verification_relevance.status, "fail");
+    assert.equal(report.dimensions.verification_relevance.evidence_strength, "weak");
+  });
+});
+
 test("live E2E product-change QA assessment includes QA-specific dimensions and cycle context", () => {
   withTempRoot((reportsRoot) => {
     const evidenceFile = path.join(reportsRoot, "qa-evidence.json");
@@ -2007,20 +2049,22 @@ test("live E2E step controller preserves repeated execution and review iteration
       },
     });
     assert.equal(reviewResult.action, "retry_public_step");
+    assert.equal(reviewResult.decision.next_step, "review");
+    assert.equal(reviewResult.decision.next_iteration, 2);
 
-    controller.planCommand({ label: "run-start", commandSurface: "aor run start", iteration: 2 });
-    writeSkillAgentDecision(reportsRoot, "controller-repair-loop", 3, "execution#2", {
+    controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 2 });
+    writeSkillAgentDecision(reportsRoot, "controller-repair-loop", 3, "review#2", {
       nextStep: "qa",
       inspectedEvidenceRefs: [executionTranscript],
     });
     controller.observeStage({
-      stage: "execution",
+      stage: "review",
       iteration: 2,
-      stageResult: { stage: "execution", status: "pass", evidence_refs: [executionTranscript], summary: "repaired" },
+      stageResult: { stage: "review", status: "pass", evidence_refs: [executionTranscript], summary: "repaired" },
       commandResults: [
         {
-          label: "run-start",
-          command_surface: "aor run start",
+          label: "review-run",
+          command_surface: "aor review run",
           status: "pass",
           transcript_file: executionTranscript,
           artifact_refs: [executionTranscript],
@@ -2035,7 +2079,7 @@ test("live E2E step controller preserves repeated execution and review iteration
       journal.map((entry) => [entry.step_id, entry.step_instance_id, entry.iteration]),
       [
         ["review", "review", 1],
-        ["execution", "execution#2", 2],
+        ["review", "review#2", 2],
       ],
     );
     assert.equal(journal.every((entry) => fs.existsSync(entry.plan_ref)), true);
@@ -2049,7 +2093,7 @@ test("live E2E step controller preserves repeated execution and review iteration
       mode: "auto",
     });
     assert.equal(resumed.shouldUseCachedCommand("review-run", 1), true);
-    assert.equal(resumed.shouldUseCachedCommand("run-start", 2), true);
+    assert.equal(resumed.shouldUseCachedCommand("review-run", 2), true);
   });
 });
 
@@ -3311,7 +3355,8 @@ test("live E2E step controller does not skip unresolved persisted decisions on r
       },
     );
     const state = JSON.parse(fs.readFileSync(second.stateFile, "utf8"));
-    assert.deepEqual(state.completed_steps, ["spec"]);
+    assert.deepEqual(state.observed_steps, ["spec"]);
+    assert.deepEqual(state.completed_steps, []);
     assert.equal(state.current_step, "spec");
     assert.equal(state.pending_decision.action, "answer");
   });
@@ -3440,7 +3485,8 @@ test("live E2E step controller stops on diagnose decisions", () => {
       },
     );
     const state = JSON.parse(fs.readFileSync(controller.stateFile, "utf8"));
-    assert.deepEqual(state.completed_steps, ["spec"]);
+    assert.deepEqual(state.observed_steps, ["spec"]);
+    assert.deepEqual(state.completed_steps, []);
     assert.equal(state.current_step, "spec");
     assert.equal(state.pending_decision.action, "diagnose");
   });

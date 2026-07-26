@@ -38,6 +38,7 @@ import {
   collectReviewFindingDetails,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
+  computeSourceTreeDigest,
   buildAcceptanceRepairDrillFinding,
   evaluateBaselineVerifyGate,
   evaluateRepairProofExpectations,
@@ -53,6 +54,7 @@ import {
   runtimeHarnessReportHasMissionRelevantChanges,
   resolveActiveAcceptanceRepairDrill,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
+  sourceInstallCacheMatches,
 } from "../lib/flows.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
@@ -183,6 +185,11 @@ function writeProfile(tempRoot, liveOverrides, options = {}) {
             "    enabled: true",
             "  browser_task_proof:",
             "    required: true",
+            "    schema_version: 2",
+            "    scenario_id: installed-console-matrix",
+            "    required_viewports: [desktop, tablet, mobile, zoom-200]",
+            "    required_accessibility: [keyboard-only, dialog-focus, focus-restoration, semantic-tree, contrast-aa, touch-targets, reduced-motion]",
+            "    required_recovery: [reload, reconnect, partial-read, offline-read, injected-error, multi-item-attention, project-switch, terminal-read-only]",
           ]
         : []),
       "",
@@ -4940,6 +4947,8 @@ test("proof runner reuses valid installation proof for manual resume", () => {
         {
           status: "pass",
           install_mode: "isolated",
+          source_commit_sha: spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).stdout.trim(),
+          source_tree_digest: computeSourceTreeDigest(repoRoot),
           launcher_ref: launcher,
           command_transcripts: [path.join(reportsRoot, "01-help.json")],
         },
@@ -4966,6 +4975,40 @@ test("proof runner reuses valid installation proof for manual resume", () => {
     assert.equal(result.launch.command, launcher);
     assert.equal(result.setupEntry.public_surface, "cached pnpm source install");
     assert.equal(result.setupEntry.evidence_refs.includes(result.proof.cached_launcher_smoke_file), true);
+  });
+});
+
+test("source install cache identity changes for tracked and untracked source edits", () => {
+  withTempRoot((tempRoot) => {
+    spawnSync("git", ["init", "-q"], { cwd: tempRoot });
+    fs.writeFileSync(path.join(tempRoot, "tracked.mjs"), "export const value = 1;\n");
+    spawnSync("git", ["add", "tracked.mjs"], { cwd: tempRoot });
+    spawnSync("git", ["-c", "user.name=AOR", "-c", "user.email=aor@example.invalid", "commit", "-qm", "baseline"], {
+      cwd: tempRoot,
+    });
+    const sourceCommit = spawnSync("git", ["rev-parse", "HEAD"], { cwd: tempRoot, encoding: "utf8" }).stdout.trim();
+    const baselineDigest = computeSourceTreeDigest(tempRoot);
+    assert.equal(sourceInstallCacheMatches({
+      effectivePolicy: "source-install-required",
+      currentSourceCommit: sourceCommit,
+      cachedSourceCommit: sourceCommit,
+      currentSourceTreeDigest: baselineDigest,
+      cachedSourceTreeDigest: baselineDigest,
+    }), true);
+
+    fs.writeFileSync(path.join(tempRoot, "tracked.mjs"), "export const value = 2;\n");
+    const trackedDigest = computeSourceTreeDigest(tempRoot);
+    assert.notEqual(trackedDigest, baselineDigest);
+    assert.equal(sourceInstallCacheMatches({
+      effectivePolicy: "source-install-required",
+      currentSourceCommit: sourceCommit,
+      cachedSourceCommit: sourceCommit,
+      currentSourceTreeDigest: trackedDigest,
+      cachedSourceTreeDigest: baselineDigest,
+    }), false);
+
+    fs.writeFileSync(path.join(tempRoot, "untracked.mjs"), "export const extra = true;\n");
+    assert.notEqual(computeSourceTreeDigest(tempRoot), trackedDigest);
   });
 });
 

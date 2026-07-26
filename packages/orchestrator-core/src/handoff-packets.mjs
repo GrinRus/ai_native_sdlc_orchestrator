@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
-import { initializeProjectRuntime } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
-import { revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
+import { initializeProjectRuntime } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs"; import { resolveMissionSpecificPlannerCandidate, revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
+
 /**
  * @param {string[]} values
  * @returns {string[]}
@@ -462,9 +462,9 @@ function derivePlanningContent(options) {
     ? options.sourceRef
     : "packet://approved-intake";
   const criteriaCatalog = buildCriteriaCatalog({ goals, kpis, definitionOfDone, acceptanceCriteria, sourceRef });
-  const taskPlanCandidate = Object.keys(asRecord(options.plannerCandidate)).length > 0
-    ? asRecord(options.plannerCandidate)
-    : asRecord(requestDocument.task_plan);
+  const taskPlanCandidate = resolveMissionSpecificPlannerCandidate(
+    { plannerCandidate: options.plannerCandidate, missionCandidate: requestDocument.task_plan, featureSize: planSize },
+  );
   const candidateTasks = asRecordArray(taskPlanCandidate.local_tasks);
   const normalizedExpectedEvidence = unique(["verify-summary", "review-report", ...expectedEvidence]);
   const localTasks = buildStructuredTasks({

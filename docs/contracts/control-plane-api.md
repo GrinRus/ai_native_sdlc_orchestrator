@@ -319,13 +319,13 @@ remain out of the event payload.
 
 ## External run-health projection (W35-S06)
 
-When a project is opened from an external runner target checkout, the
-controller may write public observation and run-health artifacts in the parent
-external runner project runtime rather than inside the target checkout `.aor`
-tree. The control-plane read surface exposes a compact, query-safe
-`run_health` projection so the web console and CLI/API consumers do not show
-completed provider execution as delivery-ready while the declared external
-flow is blocked.
+An external controller materializes the generic
+`external-run-projection` contract in the selected project's canonical reports
+directory. The control-plane does not infer an external controller from private
+filenames, a parent runtime, or a checkout layout. It exposes the contract as a
+compact, query-safe `run_health` projection so web, CLI, and API consumers do
+not show completed provider execution as delivery-ready while the declared
+external flow is blocked.
 
 `run_health` is additive on:
 - `GET /api/projects/:projectId/state` as the latest external run-health
@@ -354,7 +354,8 @@ plus copyable refs. This summary must stay query-safe: it may expose evidence
 refs and operator-facing rubric labels, but not raw provider prompts, command
 args, file contents, secrets, auth material, or private operator identity.
 
-This projection is a read model over public runner artifacts only. It must not
+This projection is a read model over the public generic ingress contract only.
+It must not
 read private process state, raw provider prompts, command args, file contents,
 environment variables, bearer tokens, auth tokens, or provider secrets. It does
 not judge product outcome quality; final code, artifact, accessibility, UI, or

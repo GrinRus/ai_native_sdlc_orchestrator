@@ -21,7 +21,7 @@ function locations(stateRoot, identity) {
 export function reserveStepAttempt(options) {
   const identity = { run_id: options.runId, step_id: options.stepId, step_class: options.stepClass };
   const requestKey = options.requestKey ?? `attempt-${crypto.randomUUID()}`;
-  const requestDigest = digest({ identity, request_key: requestKey });
+  const requestDigest = digest({ identity, request_key: requestKey, execution_identity: options.executionIdentity ?? null });
   const { ledgerFile, lockDirectory } = locations(options.stateRoot, identity);
   return withFileLock(lockDirectory, () => {
     const ledger = readLedger(ledgerFile);
@@ -40,6 +40,8 @@ export function reserveStepAttempt(options) {
       }
       existing.lease_expires_at = new Date(Date.now() + (options.leaseMs ?? 300_000)).toISOString();
       existing.revision += 1;
+      existing.fencing_token = (Number(existing.fencing_token) || 0) + 1;
+      existing.owner_token = crypto.randomUUID();
       writeJsonAtomic(ledgerFile, ledger);
       return { ...existing, replay: false, recovered: true };
     }
@@ -51,11 +53,51 @@ export function reserveStepAttempt(options) {
       attempt,
       status: "reserved",
       revision: 0,
+      fencing_token: 1,
+      owner_token: crypto.randomUUID(),
       reserved_at: new Date().toISOString(),
       lease_expires_at: new Date(Date.now() + (options.leaseMs ?? 300_000)).toISOString(),
     };
     writeJsonAtomic(ledgerFile, ledger);
     return { ...ledger.requests[requestKey], replay: false };
+  });
+}
+
+export function renewStepAttemptLease(options) {
+  const identity = { run_id: options.runId, step_id: options.stepId, step_class: options.stepClass };
+  const { ledgerFile, lockDirectory } = locations(options.stateRoot, identity);
+  return withFileLock(lockDirectory, () => {
+    const ledger = readLedger(ledgerFile);
+    const reservation = ledger.requests[options.requestKey];
+    if (
+      !reservation ||
+      reservation.attempt !== options.attempt ||
+      reservation.owner_token !== options.ownerToken ||
+      reservation.fencing_token !== options.fencingToken ||
+      reservation.status !== "reserved"
+    ) {
+      const error = new Error(`Attempt ${options.attempt} lease is no longer owned by '${options.requestKey}'.`);
+      error.code = "step-attempt-fencing-conflict";
+      throw error;
+    }
+    reservation.lease_expires_at = new Date(Date.now() + (options.leaseMs ?? 300_000)).toISOString();
+    reservation.revision += 1;
+    writeJsonAtomic(ledgerFile, ledger);
+    return { ...reservation };
+  });
+}
+
+export function renewStepAttemptReservation(options) {
+  return renewStepAttemptLease({
+    stateRoot: options.stateRoot,
+    runId: options.runId,
+    stepId: options.stepId,
+    stepClass: options.stepClass,
+    requestKey: options.reservation.request_key,
+    attempt: options.reservation.attempt,
+    ownerToken: options.reservation.owner_token,
+    fencingToken: options.reservation.fencing_token,
+    leaseMs: options.leaseMs,
   });
 }
 
@@ -70,6 +112,11 @@ export function completeStepAttempt(options) {
       error.code = "step-attempt-reservation-conflict";
       throw error;
     }
+    if (reservation.owner_token !== options.ownerToken || reservation.fencing_token !== options.fencingToken) {
+      const error = new Error(`Attempt ${options.attempt} fencing ownership changed.`);
+      error.code = "step-attempt-fencing-conflict";
+      throw error;
+    }
     if (reservation.status === "completed") return reservation.result;
     if (reservation.revision !== options.expectedRevision) {
       const error = new Error(`Attempt ${options.attempt} revision conflict.`);
@@ -82,5 +129,20 @@ export function completeStepAttempt(options) {
     reservation.result = options.result;
     writeJsonAtomic(ledgerFile, ledger);
     return reservation.result;
+  });
+}
+
+export function completeStepAttemptReservation(options) {
+  return completeStepAttempt({
+    stateRoot: options.stateRoot,
+    runId: options.runId,
+    stepId: options.stepId,
+    stepClass: options.stepClass,
+    requestKey: options.reservation.request_key,
+    attempt: options.reservation.attempt,
+    expectedRevision: options.reservation.revision,
+    ownerToken: options.reservation.owner_token,
+    fencingToken: options.reservation.fencing_token,
+    result: options.result,
   });
 }

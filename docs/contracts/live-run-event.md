@@ -18,6 +18,9 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
 ## Event types
 `event_type` must be one of:
 - `run.started`
+- `parent.started`
+- `parent.updated`
+- `parent.terminal`
 - `step.updated`
 - `provider.heartbeat`
 - `evidence.linked`
@@ -35,6 +38,11 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
   bearer tokens, auth tokens, or provider secrets.
 - W18 interactive continuation events should use existing query-safe event types such as `step.updated`, `warning.raised`, and `evidence.linked` unless the contract family is intentionally expanded. Payloads should point to `requested_interaction` and answer audit evidence refs rather than embedding sensitive answer text.
 - W20 production hardening requires event emitters and stream presenters to apply the configured redaction policy before JSONL append or SSE replay. Configured bearer tokens and explicit redaction values must not appear in live-event logs or stream payloads.
+- Parent lifecycle events use `payload.parent_event_version: 1`. `parent.started`
+  records the durable parent identity and launch transaction, `parent.updated`
+  records a query-safe action or child transition, and `parent.terminal` records
+  the final aggregate status. A parent event must be appended only after the
+  corresponding parent state revision is durable.
 
 ## Interactive continuation payload convention
 Runner-requested questions are represented as run events about a persisted `step-result.requested_interaction`, not as UI-local state.
@@ -72,9 +80,15 @@ emitter is not authoritative and is not required for cross-worker delivery.
 clients are disconnected with their last event id as the recovery cursor.
 
 Event append is a transactional identity operation. Writers serialize through a
-per-log cross-process lease and advance a sidecar cursor, so the steady-state
-append path does not scan the journal. `event_id` is derived from the validated
-`run_id` and the reserved monotonic sequence. Callers may supply a canonical
-request key: replaying the same key and payload returns the original event,
-while reusing it with different content is a typed conflict. Recovery may leave
-a sequence gap after a crash, but must never reuse an identity.
+per-log cross-process lease and persist a recoverable append transaction before
+the journal, cursor, and request-key sidecar are committed. The journal owns the
+sequence; startup reconciliation completes an interrupted transaction without
+losing, duplicating, or skipping its event. `event_id` is derived from the
+validated `run_id` and monotonic journal sequence. Callers may supply a
+canonical request key: replaying the same key and payload returns the original
+event, while reusing it with different content is a typed conflict.
+
+SSE startup reads only a bounded journal tail, emits named
+`live-run-event` records, and closes a late follow after an already durable
+terminal event. Browser clients subscribe to that named event and reconnect
+with the last event id.

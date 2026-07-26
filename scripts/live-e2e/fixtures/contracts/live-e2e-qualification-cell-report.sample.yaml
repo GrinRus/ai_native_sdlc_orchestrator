@@ -1,0 +1,43 @@
+schema_version: 1
+report_id: live-e2e.sample.openai-primary.medium.qualification-cell.v1
+cell_id: openai-primary.medium
+run_id: live-e2e.sample.openai-medium
+provider_variant_id: openai-primary
+feature_size: medium
+commit_sha: 0123456789abcdef0123456789abcdef01234567
+generated_at: "2026-07-26T16:00:00.000Z"
+status: pass
+dimensions:
+  public_lifecycle:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/observation]
+  run_health:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/run-health]
+  diagnostic_verification:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/diagnostic]
+  final_assessment:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/final-assessment]
+  changed_paths:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/delivery-manifest]
+  checkout_integrity:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/checkout-integrity]
+  delivery_safety:
+    status: pass
+    evidence_refs: [evidence://live-e2e/sample/no-upstream-write]
+observations: []
+positive_evidence:
+  - summary: All independent acceptance dimensions passed.
+warnings: []
+blocking_findings: []
+evidence:
+  - kind: final-assessment
+    ref: evidence://live-e2e/sample/final-assessment
+    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    owner: evaluator
+    generated_at: "2026-07-26T15:59:00.000Z"
+    run_id: live-e2e.sample.openai-medium

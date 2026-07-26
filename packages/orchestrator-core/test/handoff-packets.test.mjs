@@ -32,8 +32,19 @@ function withTempRepo(callback) {
   }
 }
 
+function materializeSmallIntake(repoRoot) {
+  const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+  const requestFile = path.join(repoRoot, "small-planning.request.json");
+  fs.writeFileSync(requestFile, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
+  materializeIntakeArtifactPacket({
+    projectId: init.projectId, projectRoot: init.projectRoot, projectProfileRef: init.projectProfileRef,
+    runtimeLayout: init.runtimeLayout, command: "aor intake create", requestFile,
+  });
+}
+
 test("prepareHandoffArtifacts materializes wave-ticket and pending handoff packet", () => {
   withTempRepo((repoRoot) => {
+    materializeSmallIntake(repoRoot);
     const result = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.equal(result.waveTicket.project_id, "aor-core");
     assert.equal(result.handoffPacket.project_id, "aor-core");
@@ -109,6 +120,7 @@ test("prepareHandoffArtifacts preserves mission planning content and narrow path
             diagnostic_commands: ["npm test"],
             diagnostic_failure_mode: "warn",
           },
+          feature_size: "small",
         },
         null,
         2,
@@ -187,6 +199,7 @@ test("prepareHandoffArtifacts preserves mission planning content and narrow path
 
 test("approveHandoffArtifacts marks handoff packet as approved and gate passes", () => {
   withTempRepo((repoRoot) => {
+    materializeSmallIntake(repoRoot);
     const prepared = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     const approved = approveHandoffArtifacts({
       projectRef: repoRoot,
@@ -212,6 +225,7 @@ test("approveHandoffArtifacts marks handoff packet as approved and gate passes",
 
 test("validateApprovedHandoffGate fails when handoff packet is missing", () => {
   withTempRepo((repoRoot) => {
+    materializeSmallIntake(repoRoot);
     const prepared = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     fs.rmSync(prepared.handoffPacketFile, { force: true });
 

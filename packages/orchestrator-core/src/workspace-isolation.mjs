@@ -384,3 +384,53 @@ export function resumeWorkspaceIsolation(options) {
     },
   };
 }
+
+export function resumeWorkspaceSetIsolation(options) {
+  const projectRuntimeRoot = canonicalDirectory(options.projectRuntimeRoot, "Project runtime root");
+  const workspaceSetsRoot = path.join(projectRuntimeRoot, "workspace-sets");
+  const executionRoot = canonicalDirectory(options.executionRoot, "Workspace-set execution root");
+  if (!fs.existsSync(workspaceSetsRoot) || !isPathInsideRoot(executionRoot, canonicalDirectory(workspaceSetsRoot, "Workspace sets root"))) {
+    throw new Error("Only an owned workspace-set repository can be reused.");
+  }
+  const relative = path.relative(workspaceSetsRoot, executionRoot);
+  const [workspaceDirectory] = relative.split(path.sep);
+  if (!workspaceDirectory) throw new Error("Workspace-set execution root has no owning workspace.");
+  const workspaceRoot = canonicalDirectory(path.join(workspaceSetsRoot, workspaceDirectory), "Workspace-set root");
+  const ownerMarker = path.join(workspaceRoot, ".aor-workspace-set-owner.json");
+  const marker = JSON.parse(fs.readFileSync(ownerMarker, "utf8"));
+  if (path.resolve(marker.workspace_root) !== workspaceRoot || !marker.workspace_set_id || !marker.project_id || !marker.run_id) {
+    throw new Error("Workspace-set owner marker does not match the requested execution root.");
+  }
+  if (!isPathInsideRoot(executionRoot, workspaceRoot) || executionRoot === workspaceRoot) {
+    throw new Error("Workspace-set repository execution root is outside its owned workspace.");
+  }
+  const executionGit = inspectGitCheckout(executionRoot);
+  if (!executionGit) throw new Error("Workspace-set execution root is not an independently usable Git checkout.");
+  const cleanupPolicy = { on_success: "retain", on_abort: "retain", on_failure: "retain" };
+  const cleanupResult = {
+    outcome: null,
+    action: "retain",
+    status: "retained-by-workspace-set",
+    performed: false,
+    exists_after: true,
+    error: null,
+  };
+  return {
+    requestedMode: "workspace-set",
+    mode: "workspace-set",
+    sourceRoot: null,
+    executionRoot,
+    checkout: {
+      strategy: "workspace-set",
+      ref: executionGit.head ?? "unborn",
+      source_git_dir: null,
+      execution_git_dir: executionGit.git_dir,
+    },
+    provisioning: "reused-owned-workspace-set",
+    provisioned: true,
+    cleanupPolicy,
+    ownerMarker,
+    cleanup: () => cleanupResult,
+    finalize: (outcome) => ({ ...cleanupResult, outcome }),
+  };
+}

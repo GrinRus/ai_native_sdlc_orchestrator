@@ -915,3 +915,11 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
     assert.equal(payload.runtime_root, path.join(fs.realpathSync.native(projectRoot), ".aor"));
   });
 });
+
+test("operator console subscribes to named durable live-run events", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  assert.match(source, /addEventListener\("live-run-event"/u);
+  assert.match(source, /addEventListener\("message"/u);
+  assert.doesNotMatch(source, /source\.onmessage\s*=/u);
+  assert.match(source, /after_event_id/u);
+});

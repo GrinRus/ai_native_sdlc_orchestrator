@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import {
   CliUsageError,
   InteractionAnswerError,
@@ -173,7 +175,10 @@ export function handleRunControlCommand(context) {
       }
       const reportRef = toEvidenceRef(current.init.projectRoot, path.resolve(cwd, reportFile));
       outputState.parentRun = applyIntegrationToParent({
-        parentFile: current.file, expectedRevision, report, integrationReportRef: reportRef,
+        parentFile: current.file,
+        expectedRevision,
+        reportFile: path.resolve(cwd, reportFile),
+        integrationReportRef: reportRef,
       });
       outputState.integrationReport = report;
     } else if (action === "hold") {
@@ -183,12 +188,10 @@ export function handleRunControlCommand(context) {
     } else if (action === "repair") {
       const repairRef = resolveOptionalStringFlag("quality-repair-ref", flags["quality-repair-ref"]);
       if (!repairRef) throw new CliUsageError("Integration repair requires '--quality-repair-ref'.");
-      const report = { ...current.parent, repair_refs: uniqueStrings([...(current.parent.repair_refs ?? []), repairRef]) };
       outputState.parentRun = applyIntegrationToParent({
         parentFile: current.file,
         expectedRevision,
-        report: { aggregate_gates: report.integration_gates ?? [], stale_units: report.stale_units ?? [], repair_refs: report.repair_refs, status: "repair-required" },
-        integrationReportRef: report.integration_report_ref ?? repairRef,
+        repairRef,
       });
     } else {
       throw new CliUsageError(`Unsupported integration action '${action}'.`);
@@ -222,9 +225,14 @@ export function handleRunControlCommand(context) {
       projectRef,
       runtimeRoot,
       runId: parentRunId,
-      eventType: "parent.unit.retry-requested",
+      eventType: "parent.updated",
       requestKey: commandId,
-      payload: { execution_unit_id: executionUnitId, revision: parent.revision },
+      payload: {
+        parent_event_version: 1,
+        action: "unit.retry-requested",
+        execution_unit_id: executionUnitId,
+        revision: parent.revision,
+      },
     });
     outputState.primaryEventId = retryEvent.event.event_id;
     outputState.streamLogFile = retryEvent.logFile;
@@ -293,7 +301,7 @@ export function handleRunControlCommand(context) {
     if (runAction !== "start" && (maxConcurrency !== undefined || maxChildStarts !== undefined)) {
       throw new CliUsageError("Flags '--max-concurrency' and '--max-child-starts' are only valid for 'aor run start'.");
     }
-    const childStart = runAction === "start" && Boolean(executionPlanRef && executionUnitId && !workspaceSetRef);
+    const childStart = runAction === "start" && Boolean(executionPlanRef && executionUnitId && workspaceSetRef);
     const parentStart = runAction === "start" && Boolean(executionPlanRef && workspaceSetRef && !executionUnitId);
     if (
       runAction === "start" &&
@@ -302,7 +310,7 @@ export function handleRunControlCommand(context) {
       !parentStart
     ) {
       throw new CliUsageError(
-        "Use '--execution-plan-ref' with either '--execution-unit-id' for one child run or '--workspace-set-ref' for one parent run.",
+        "Use '--execution-plan-ref' with '--workspace-set-ref' and either omit '--execution-unit-id' for a parent run or provide it for one workspace-bound child run.",
       );
     }
     if (runAction !== "start" && promotionEvidenceRefs.length > 0) {
@@ -324,7 +332,14 @@ export function handleRunControlCommand(context) {
           runtimeRoot,
           executionPlanRef,
           executionUnitId,
+          workspaceSetRef,
         });
+        if (
+          executionRoot
+          && path.resolve(cwd, executionRoot) !== path.resolve(executionContext.executionRoot)
+        ) {
+          throw new Error("Explicit execution root does not match the workspace-set repository binding.");
+        }
       } catch (error) {
         throw new CliUsageError(errorMessage(error));
       }
@@ -365,9 +380,14 @@ export function handleRunControlCommand(context) {
           projectRef,
           runtimeRoot,
           runId,
-          eventType: `parent.${runAction}`,
+          eventType: parent.status === "canceled" ? "parent.terminal" : "parent.updated",
           requestKey: commandId,
-          payload: { status: parent.status, revision: parent.revision },
+          payload: {
+            parent_event_version: 1,
+            action: runAction,
+            status: parent.status,
+            revision: parent.revision,
+          },
         });
         outputState.primaryEventId = parentEvent.event.event_id;
         outputState.streamLogFile = parentEvent.logFile;
@@ -509,6 +529,8 @@ export function handleRunControlCommand(context) {
             executionPlanRef,
             "--execution-unit-id",
             child.execution_unit_id,
+            "--workspace-set-ref",
+            workspaceSetRef,
             "--require-validation-pass",
             "false",
             ...(runtimeRoot ? ["--runtime-root", runtimeRoot] : []),
@@ -542,6 +564,7 @@ export function handleRunControlCommand(context) {
         eventType: "parent.started",
         requestKey: commandId ?? `parent-start-${scheduled.parent.request_digest}`,
         payload: {
+          parent_event_version: 1,
           revision: scheduled.parent.revision,
           execution_plan_ref: executionPlanRef,
           workspace_set_ref: workspaceSetRef,
@@ -573,6 +596,8 @@ export function handleRunControlCommand(context) {
       executionPlanRef: executionContext?.executionPlanRef,
       executionUnitId: executionContext?.executionUnitId,
       taskRefs: executionContext?.taskRefs,
+      workspaceSetRef: executionContext?.workspaceSetRef,
+      executionRoot: executionContext?.executionRoot,
     });
 
     populateRunControlOutputState(outputState, controlResult);
@@ -591,8 +616,9 @@ export function handleRunControlCommand(context) {
           stepId: `run.start.${targetStep ?? "implement"}`,
           requireDiscoveryCompleteness: true,
           approvedHandoffRef: approvedHandoffRef ?? undefined,
-          executionRoot: executionRoot ?? undefined,
-          reuseDisposableWorkspace: Boolean(executionRoot),
+          executionRoot: executionContext?.executionRoot ?? executionRoot ?? undefined,
+          reuseDisposableWorkspace: Boolean(executionContext?.executionRoot ?? executionRoot),
+          workspaceSetRef: executionContext?.workspaceSetRef ?? undefined,
           promotionEvidenceRefs,
           routeOverrides,
           policyOverrides,

@@ -13,6 +13,12 @@ Expected create output includes `planning_run_ref`, `plan_ref`,
 not approvable. Legacy `wave create` and `handoff prepare` only read this latest
 valid plan and return `structured-plan-required` when it is absent.
 
+The compact deterministic fallback is a compatibility path for `small`
+missions only. `medium`, `large`, and `xlarge` missions must provide a
+mission-specific `local_tasks[]` candidate. A missing or malformed candidate
+returns a typed structural blocker before semantic evaluation; an evaluator
+cannot turn absent decomposition into a valid plan.
+
 ## Request a revision
 
 ```bash
@@ -64,6 +70,8 @@ or upstream writes.
 ## Recovery
 
 - `plan-incomplete`: inspect the validation report and request revision.
+- `mission-specific-plan-required`: provide structured `local_tasks[]` for a
+  medium-or-larger mission; the compact fallback is intentionally unavailable.
 - `mission-split-required`: split an xlarge mission into smaller flows.
 - `plan-stale`: reload the current flow and approve its exact latest plan.
 - `plan-immutable`: do not edit an approved/superseded artifact; request a

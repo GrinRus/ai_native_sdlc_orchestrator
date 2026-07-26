@@ -49,6 +49,13 @@ semantics remain child-run concerns. Dependency order, conflict keys,
 `max_concurrency`, provider/tool capacity, and child-start budgets govern the
 ready queue. Parent completion additionally requires all integration gates;
 partial child success is never mission closure.
+Reservation, launch acknowledgment, launch failure, child completion, and
+control propagation are separate revisioned parent transactions. A launch
+failure releases the active reservation and budget debit while retaining its
+attempt evidence. Terminal child persistence advances the scheduler; a parent
+cancel remains `canceling` until every active child acknowledges a terminal
+state, then becomes `canceled`. Partial control propagation is retained as a
+parent blocker instead of being hidden by a failed parent write.
 
 Integration consumes only immutable child patch/commit evidence in dependency
 order inside a separate disposable workspace. Its report owns aggregate

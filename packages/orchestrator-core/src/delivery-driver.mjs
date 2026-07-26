@@ -12,6 +12,7 @@ import { classifyChangedPathsByRepo } from "./repo-scope.mjs";
 import { assertExactDeliveryDiff } from "./delivery-integrity.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
+import { collectRepositoryOutputRefs, executeIndependentRepositoryDeliveries, resolveIndependentRepositoryTargets } from "./multi-repo-delivery-execution.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
@@ -540,15 +541,15 @@ function executeDeliveryDriverTransaction(options = {}) {
     `delivery-transcript-${normalizeForId(mode)}-${normalizeForId(runId)}-${Date.now()}.json`,
   );
 
+  const { targets: independentRepoTargets, enabled: perRepositoryDelivery } =
+    resolveIndependentRepositoryTargets(coordinationRepos, executionRoot);
   const startedAt = new Date().toISOString();
-  const gitHeadBefore = readGitHead(executionRoot);
+  const gitHeadBefore = readGitHead(perRepositoryDelivery ? independentRepoTargets[0].repoRoot : executionRoot);
   const expectedMeaningfulChangedPaths = resolveExpectedMeaningfulChangedPaths(deliveryPlan, executionRoot);
   const authorizedChangedPaths = asStringArray(
     asRecord(asRecord(deliveryPlan.diff_authorization).changes).all_paths,
   );
-  /** @type {string[]} */
   const commands = [];
-  /** @type {string[]} */
   let changedPaths = [];
   let diffStats = {
     files: [],
@@ -558,48 +559,76 @@ function executeDeliveryDriverTransaction(options = {}) {
       deleted: 0,
     },
   };
-  /** @type {Record<string, unknown>} */
   let outputs = {};
-  /** @type {"success" | "failed"} */
   let status = "success";
-  /** @type {string | null} */
   let errorMessage = null;
-  /** @type {string[] | null} */
   let recoverySteps = null;
-  /** @type {string[]} */
   let missingExpectedChangedPaths = [];
+  let repositoryExecutionResults = new Map();
 
   try {
     if (rerunPreflightIssues.length > 0) {
       throw new Error(rerunPreflightIssues.join(" "));
     }
 
-    if (mode !== "no-write") {
-      assertExactDeliveryDiff(executionRoot, asRecord(deliveryPlan.diff_authorization));
+    if (perRepositoryDelivery) {
+      const repositoryRun = executeIndependentRepositoryDeliveries({
+        targets: independentRepoTargets,
+        authorizations: asRecord(deliveryPlan.repository_diff_authorizations),
+        mode,
+        runId,
+        branchName: options.branchName,
+        readHead: readGitHead,
+        assertDiff: assertExactDeliveryDiff,
+        runMode: runDeliveryMode,
+        modeOptions: {
+          artifactsRoot: init.runtimeLayout.artifactsRoot,
+          commitMessage: options.commitMessage,
+          forkOwner: options.forkOwner,
+          forkRemoteUrl: options.forkRemoteUrl,
+          baseRef: options.baseRef,
+          prTitle: options.prTitle,
+          prBody: options.prBody,
+          enableNetworkWrite: options.enableNetworkWrite,
+          githubToken: options.githubToken,
+          githubCliPath: options.githubCliPath,
+        },
+      });
+      repositoryExecutionResults = repositoryRun.results;
+      commands.push(...repositoryRun.commands);
+      changedPaths = repositoryRun.changedPaths;
+      diffStats = repositoryRun.diffStats;
+      outputs = repositoryRun.outputs;
+      status = repositoryRun.status;
+      errorMessage = repositoryRun.errorMessage;
+      recoverySteps = repositoryRun.recoverySteps;
+    } else {
+      if (mode !== "no-write") {
+        assertExactDeliveryDiff(executionRoot, asRecord(deliveryPlan.diff_authorization));
+      }
+      const modeResult = runDeliveryMode({
+        mode,
+        executionRoot,
+        artifactsRoot: init.runtimeLayout.artifactsRoot,
+        runId,
+        gitHeadBefore,
+        branchName: options.branchName,
+        commitMessage: options.commitMessage,
+        forkOwner: options.forkOwner,
+        forkRemoteUrl: options.forkRemoteUrl,
+        baseRef: options.baseRef,
+        prTitle: options.prTitle,
+        prBody: options.prBody,
+        enableNetworkWrite: options.enableNetworkWrite,
+        githubToken: options.githubToken,
+        githubCliPath: options.githubCliPath,
+        expectedChangedPaths: authorizedChangedPaths,
+      });
+      commands.push(...modeResult.commands);
+      changedPaths = modeResult.changedPaths;
+      diffStats = modeResult.diffStats;
+      outputs = modeResult.outputs;
     }
-
-    const modeResult = runDeliveryMode({
-      mode,
-      executionRoot,
-      artifactsRoot: init.runtimeLayout.artifactsRoot,
-      runId,
-      gitHeadBefore,
-      branchName: options.branchName,
-      commitMessage: options.commitMessage,
-      forkOwner: options.forkOwner,
-      forkRemoteUrl: options.forkRemoteUrl,
-      baseRef: options.baseRef,
-      prTitle: options.prTitle,
-      prBody: options.prBody,
-      enableNetworkWrite: options.enableNetworkWrite,
-      githubToken: options.githubToken,
-      githubCliPath: options.githubCliPath,
-      expectedChangedPaths: authorizedChangedPaths,
-    });
-    commands.push(...modeResult.commands);
-    changedPaths = modeResult.changedPaths;
-    diffStats = modeResult.diffStats;
-    outputs = modeResult.outputs;
     missingExpectedChangedPaths = findMissingExpectedChangedPaths({
       mode,
       expectedMeaningfulChangedPaths,
@@ -633,7 +662,7 @@ function executeDeliveryDriverTransaction(options = {}) {
   }
 
   const finishedAt = new Date().toISOString();
-  const gitHeadAfter = readGitHead(executionRoot);
+  const gitHeadAfter = readGitHead(perRepositoryDelivery ? independentRepoTargets[0].repoRoot : executionRoot);
 
   const transcript = {
     transcript_id: transcriptId,
@@ -687,19 +716,7 @@ function executeDeliveryDriverTransaction(options = {}) {
   if (typeof outputs.api_intent_file === "string") {
     deliveryOutputRefs.push(toEvidenceRef(init.projectRoot, outputs.api_intent_file));
   }
-
-  const writebackResult =
-    status === "success"
-      ? mode === "no-write"
-        ? "no-write-confirmed"
-        : mode === "patch-only"
-        ? "patch-materialized"
-        : mode === "local-branch"
-          ? "local-branch-committed"
-          : asString(outputs.network_mode) === "networked"
-            ? "fork-pr-draft-created"
-            : "fork-pr-planned"
-      : "failed";
+  deliveryOutputRefs.push(...collectRepositoryOutputRefs(outputs, init.projectRoot, toEvidenceRef));
 
   const deliveryRepos =
     coordinationRepos.length > 0
@@ -724,6 +741,22 @@ function executeDeliveryDriverTransaction(options = {}) {
           ? sourceRoot
           : path.resolve(executionRoot, sourceRoot);
     const repoChangedPaths = changedPathsByRepo.get(repo.repo_id) ?? [];
+    const repositoryResult = repositoryExecutionResults.get(repo.repo_id);
+    const repositoryOutputs = asRecord(repositoryResult?.outputs);
+    const repositorySucceeded = repositoryResult ? repositoryResult.status === "success" : status === "success";
+    const repositoryWritebackResult = repositorySucceeded
+      ? mode === "no-write"
+        ? "no-write-confirmed"
+        : mode === "patch-only"
+          ? "patch-materialized"
+          : mode === "local-branch"
+            ? "local-branch-committed"
+            : asString(repositoryOutputs.network_mode ?? outputs.network_mode) === "networked"
+              ? "fork-pr-draft-created"
+              : "fork-pr-planned"
+      : "failed";
+    const repositoryHeadBefore = repositoryResult?.headBefore ?? gitHeadBefore;
+    const repositoryHeadAfter = repositoryResult?.headAfter ?? gitHeadAfter;
     const repoDelivery = {
       repo_id: repo.repo_id,
       role: repo.role,
@@ -732,20 +765,24 @@ function executeDeliveryDriverTransaction(options = {}) {
       repo_root: repoRoot,
       repo_root_ref: toEvidenceRef(init.projectRoot, repoRoot),
       checkout_provenance: {
-        head_before: gitHeadBefore,
-        head_after: gitHeadAfter,
+        head_before: repositoryHeadBefore,
+        head_after: repositoryHeadAfter,
       },
-      base_ref: repo.default_branch ?? gitHeadBefore.branch,
-      head_ref: gitHeadAfter.branch,
-      branch_name: typeof outputs.branch_name === "string" ? outputs.branch_name : null,
+      base_ref: repo.default_branch ?? repositoryHeadBefore.branch,
+      head_ref: repositoryHeadAfter.branch,
+      branch_name: typeof repositoryOutputs.branch_name === "string"
+        ? repositoryOutputs.branch_name
+        : typeof outputs.branch_name === "string" ? outputs.branch_name : null,
       changed_paths: repoChangedPaths,
       diff_totals: summarizeDiffTotalsForPaths(diffStats, repoChangedPaths),
-      commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
-      writeback_result: writebackResult,
-      transaction_stage: status === "success" ? "complete" : "failed",
-      failed_step: status === "success" ? null : stepId,
+      commit_refs: typeof repositoryOutputs.commit_sha === "string"
+        ? [repositoryOutputs.commit_sha]
+        : typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
+      writeback_result: repositoryWritebackResult,
+      transaction_stage: repositorySucceeded ? "complete" : "failed",
+      failed_step: repositorySucceeded ? null : stepId,
       rollback_refs: [],
-      recovery_action: status === "success" ? null : "inspect-delivery-transcript",
+      recovery_action: repositorySucceeded ? null : "inspect-delivery-transcript",
       coordination: {
         required: coordinationMetadata.required,
         status: coordinationMetadata.status,

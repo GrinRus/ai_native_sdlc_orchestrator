@@ -2,12 +2,12 @@
 
 ## Status
 
-The July 2026 audit invalidated the historical self-hosted candidate verdict.
-W57-W59 have now completed remediation and independent requalification, yielding
-bounded self-hosted release clearance. The machine-readable gate returns
-`status=pass`, `gate_execution_status=pass`, and
-`release_disposition=cleared` only while the full ledger, closure reports, test
-manifest, package proof, and source-of-truth checks remain valid.
+W57-W59 completed remediation and independent requalification of the July 2026
+audit findings, but the later W66 qualification intake invalidated that
+historical bounded self-hosted release clearance. Until W66-S09 closes the
+fresh same-commit Codex/Claude matrix, the machine-readable gate returns
+`status=blocked`, `gate_execution_status=pass`,
+`release_disposition=audit-hold`, and `release_clearance=false`.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -26,8 +26,13 @@ Production readiness requires:
 - strict delivery gates that require current harness pass evidence and meaningful implementation changed paths;
 - real non-mock full-journey proof with code-changing evidence and no upstream writes;
 - a separate production-readiness gate (`pnpm production:ready`) that cannot pass without that proof.
+- fresh W66 medium/large Codex and Claude qualification cells against one AOR
+  commit and one pinned target commit.
 
 ## Clearance constraints
+
+The W57-W59 evidence below remains historical prerequisite evidence. It does
+not override the active W66 qualification hold.
 
 | Constraint | Evidence |
 |---|---|

@@ -30,6 +30,11 @@ import {
   buildProviderQualificationMatrix,
   extractQualificationFailureContext,
 } from "./lib/provider-qualification-matrix.mjs";
+import {
+  REQUIRED_QUALIFICATION_CELLS,
+  buildQualificationCellReport,
+  evaluateQualificationMatrix,
+} from "./lib/qualification-cell.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
@@ -37,7 +42,6 @@ const QUALIFYING_FEATURE_SIZES = new Set(["medium", "large"]);
 const REQUIRED_PROVIDER_COUNTS = Object.freeze({
   "openai-primary": 2,
   "anthropic-primary": 2,
-  "open-code-primary": 1,
 });
 
 /**
@@ -327,7 +331,7 @@ function buildAnalysis(options) {
 }
 
 /**
- * @param {{ qualificationSetFile: string, analysis: Record<string, unknown>, summary: Record<string, unknown> }}
+ * @param {{ qualificationSetFile: string, analysis: Record<string, unknown>, summary: Record<string, unknown>, cellReport: Record<string, unknown> }}
  */
 function updateQualificationSet(options) {
   const existing = options.qualificationSetFile && path.isAbsolute(options.qualificationSetFile) && fs.existsSync(options.qualificationSetFile)
@@ -348,6 +352,7 @@ function updateQualificationSet(options) {
     run_health_report_ref: asNonEmptyString(options.summary.live_e2e_run_health_report_file) || null,
     run_health_status: asNonEmptyString(options.analysis.run_health_status) || null,
     analysis_ref: asNonEmptyString(options.analysis.analysis_file) || null,
+    qualification_cell_report_ref: asNonEmptyString(options.analysis.qualification_cell_report_file) || null,
     failure_owner: asNonEmptyString(asRecord(options.analysis.failure_context).failure_owner) || null,
     failure_phase: asNonEmptyString(asRecord(options.analysis.failure_context).failure_phase) || null,
     failure_class: asNonEmptyString(asRecord(options.analysis.failure_context).failure_class) || null,
@@ -378,10 +383,20 @@ function updateQualificationSet(options) {
       required: count,
       actual: Number(provider_counts[provider]) || 0,
     }));
-  const qualification_status =
-    passing.length >= 5 && missing_provider_requirements.length === 0 ? "passed" : "incomplete";
+  const existingCellReports = Array.isArray(existing.qualification_cell_reports)
+    ? existing.qualification_cell_reports.map((entry) => asRecord(entry))
+    : [];
+  const cellId = asNonEmptyString(options.cellReport.cell_id);
+  const qualification_cell_reports = [
+    ...existingCellReports.filter((entry) => asNonEmptyString(entry.cell_id) !== cellId),
+    options.cellReport,
+  ];
+  const requiredQualificationMatrix = evaluateQualificationMatrix(qualification_cell_reports);
+  const qualification_status = requiredQualificationMatrix.status === "pass" ? "passed" : "incomplete";
   const document = {
-    qualification_report_id: "live-e2e.final-qualification.v1",
+    qualification_report_id: "live-e2e.final-qualification.v2",
+    schema_version: 2,
+    required_cells: REQUIRED_QUALIFICATION_CELLS,
     required_provider_counts: REQUIRED_PROVIDER_COUNTS,
     qualification_status,
     passing_run_count: passing.length,
@@ -394,6 +409,8 @@ function updateQualificationSet(options) {
       requiredProviderCounts: REQUIRED_PROVIDER_COUNTS,
       releaseBlockingProviderIds: [],
     }),
+    required_qualification_matrix: requiredQualificationMatrix,
+    qualification_cell_reports,
     attempts,
     updated_at: nowIso(),
   };
@@ -405,6 +422,7 @@ function updateQualificationSet(options) {
  * @param {{
  *   summaryFile: string,
  *   observationFile: string | null,
+ *   assessmentFile: string | null,
  *   qualificationSetFile: string | null,
  *   recordedExistingRun: boolean,
  *   expectedIdentity: Record<string, string>,
@@ -432,7 +450,27 @@ function recordQualificationResult(options) {
       `Qualification loop requires recorded summary feature_size medium or large; xlarge is manual-only. Received '${featureSize || "unknown"}'.`,
     );
   }
-  const status = classifyQualification(summary, observationReport, runHealthReport);
+  const qualificationCell = buildQualificationCellReport({
+    summaryFile,
+    observationFile,
+    runHealthFile,
+    assessmentFile: options.assessmentFile,
+  });
+  if (!qualificationCell.validation.ok) {
+    throw new UsageError(
+      `Qualification cell report is invalid: ${qualificationCell.validation.issues.map((entry) => entry.message).join(" ")}`,
+    );
+  }
+  const cellReportFile = path.join(
+    path.dirname(summaryFile),
+    `live-e2e-qualification-cell-${normalizeId(asNonEmptyString(summary.run_id) || "run")}.json`,
+  );
+  writeJson(cellReportFile, qualificationCell.report);
+  const status =
+    classifyQualification(summary, observationReport, runHealthReport) === "passed" &&
+    qualificationCell.report.status === "pass"
+      ? "passed"
+      : "blocked";
   const analysis = buildAnalysis({
     summary,
     observationReport,
@@ -444,11 +482,13 @@ function recordQualificationResult(options) {
     `live-e2e-qualification-analysis-${normalizeId(asNonEmptyString(summary.run_id) || "run")}.json`,
   );
   analysis.analysis_file = analysisFile;
+  analysis.qualification_cell_report_file = cellReportFile;
   writeJson(analysisFile, analysis);
   const qualificationSet = options.qualificationSetFile
     ? updateQualificationSet({
         qualificationSetFile: path.resolve(options.qualificationSetFile),
         analysis,
+        cellReport: qualificationCell.report,
         summary: {
           ...summary,
           summary_ref: summaryFile,
@@ -465,6 +505,7 @@ function recordQualificationResult(options) {
         run_id: asNonEmptyString(summary.run_id) || null,
         recorded_existing_run: options.recordedExistingRun,
         qualification_analysis_file: analysisFile,
+        qualification_cell_report_file: cellReportFile,
         qualification_set_file: options.qualificationSetFile ? path.resolve(options.qualificationSetFile) : null,
         qualification_set_status: asNonEmptyString(asRecord(qualificationSet).qualification_status) || null,
         live_e2e_run_summary_file: summaryFile,
@@ -488,7 +529,7 @@ function runCli(rawArgs) {
     process.stdout.write(
       [
         "Usage: node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> [--qualification-set-file <path>] [run-profile flags...]",
-        "       node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> --record-run-summary-file <path> [--record-observation-report-file <path>] [--qualification-set-file <path>]",
+        "       node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> --record-run-summary-file <path> --final-assessment-report-file <path> [--record-observation-report-file <path>] [--qualification-set-file <path>]",
         "",
         "Runs one medium or large live E2E profile and writes a qualification analysis for the launching agent.",
       ].join("\n"),
@@ -502,10 +543,17 @@ function runCli(rawArgs) {
     flags["record-observation-report-file"],
     "record-observation-report-file",
   );
+  const finalAssessmentReportFile = resolveOptionalStringFlag(
+    flags["final-assessment-report-file"],
+    "final-assessment-report-file",
+  );
   let runProfileArgs = qualificationSetFile ? removeStringFlag(rawArgs, "qualification-set-file") : rawArgs;
   runProfileArgs = recordRunSummaryFile ? removeStringFlag(runProfileArgs, "record-run-summary-file") : runProfileArgs;
   runProfileArgs = recordObservationReportFile
     ? removeStringFlag(runProfileArgs, "record-observation-report-file")
+    : runProfileArgs;
+  runProfileArgs = finalAssessmentReportFile
+    ? removeStringFlag(runProfileArgs, "final-assessment-report-file")
     : runProfileArgs;
   const hostRoot = requireDirectory(
     resolveOptionalStringFlag(flags["project-ref"], "project-ref") ??
@@ -548,6 +596,7 @@ function runCli(rawArgs) {
     return recordQualificationResult({
       summaryFile: recordRunSummaryFile,
       observationFile: recordObservationReportFile,
+      assessmentFile: finalAssessmentReportFile,
       qualificationSetFile: qualificationSetFile ? path.resolve(qualificationSetFile) : null,
       recordedExistingRun: true,
       expectedIdentity: buildExpectedSummaryIdentity({
@@ -575,7 +624,23 @@ function runCli(rawArgs) {
   const summary = summaryFile ? asRecord(readJson(summaryFile)) : {};
   const observationReport = observationFile ? asRecord(readJson(observationFile)) : {};
   const runHealthReport = runHealthFile ? asRecord(readJson(runHealthFile)) : {};
-  const status = classifyQualification(summary, observationReport, runHealthReport);
+  const qualificationCell = buildQualificationCellReport({
+    summaryFile,
+    observationFile,
+    runHealthFile,
+    assessmentFile: finalAssessmentReportFile,
+  });
+  const cellReportFile = path.join(
+    path.dirname(summaryFile || process.cwd()),
+    `live-e2e-qualification-cell-${normalizeId(asNonEmptyString(summary.run_id) || "run")}.json`,
+  );
+  writeJson(cellReportFile, qualificationCell.report);
+  const status =
+    classifyQualification(summary, observationReport, runHealthReport) === "passed" &&
+    qualificationCell.validation.ok &&
+    qualificationCell.report.status === "pass"
+      ? "passed"
+      : "blocked";
   const analysis = buildAnalysis({
     summary,
     observationReport,
@@ -587,11 +652,13 @@ function runCli(rawArgs) {
     `live-e2e-qualification-analysis-${normalizeId(asNonEmptyString(summary.run_id) || "run")}.json`,
   );
   analysis.analysis_file = analysisFile;
+  analysis.qualification_cell_report_file = cellReportFile;
   writeJson(analysisFile, analysis);
   const qualificationSet = qualificationSetFile
     ? updateQualificationSet({
         qualificationSetFile: path.resolve(qualificationSetFile),
         analysis,
+        cellReport: qualificationCell.report,
         summary: {
           ...summary,
           summary_ref: summaryFile,
@@ -605,6 +672,7 @@ function runCli(rawArgs) {
         status,
         run_id: asNonEmptyString(summary.run_id) || asNonEmptyString(output.run_id) || null,
         qualification_analysis_file: analysisFile,
+        qualification_cell_report_file: cellReportFile,
         qualification_set_file: qualificationSetFile ? path.resolve(qualificationSetFile) : null,
         qualification_set_status: asNonEmptyString(asRecord(qualificationSet).qualification_status) || null,
         live_e2e_run_summary_file: summaryFile || null,

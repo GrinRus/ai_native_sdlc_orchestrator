@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { loadContractFile } from "../../contracts/src/index.mjs";
 import { materializeDeliveryPlan } from "../src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../src/delivery-driver.mjs";
+import { captureDeliveryDiff } from "../src/delivery-integrity.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -166,7 +168,25 @@ function createReadyPlan(options) {
       updated_at: new Date().toISOString(),
     };
     fs.writeFileSync(integrationPath, `${JSON.stringify(integration, null, 2)}\n`);
-    integrationReport = { required: true, status: "passed", ref: integrationPath, parentRunId: options.runId };
+    const integrationBytes = fs.readFileSync(integrationPath);
+    fs.writeFileSync(`${integrationPath}.authority.json`, `${JSON.stringify({
+      schema_version: 1,
+      authority_kind: "aor-integration-materialization",
+      project_id: options.init.projectId,
+      parent_run_id: options.runId,
+      report_file: integrationPath,
+      report_digest: createHash("sha256").update(integrationBytes).digest("hex"),
+      workspace_owner_digest: "fixture",
+      source_output_digests: [],
+      created_at: new Date().toISOString(),
+    }, null, 2)}\n`);
+    integrationReport = {
+      required: true,
+      status: "passed",
+      ref: integrationPath,
+      filePath: integrationPath,
+      parentRunId: options.runId,
+    };
   }
   const plan = materializeDeliveryPlan({
     runtimeLayout: options.init.runtimeLayout,
@@ -871,6 +891,66 @@ test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo
     assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.cross_repo_validation_refs, [
       "validation://integration/backend-frontend/api-contract",
     ]);
+  });
+});
+
+test("runDeliveryDriver executes independent repositories separately and retains partial effects", () => {
+  withTempRepo((repoRoot) => {
+    const workspaceRoot = path.join(repoRoot, "independent-repos");
+    const apiRoot = path.join(workspaceRoot, "api");
+    const webRoot = path.join(workspaceRoot, "web");
+    for (const target of [apiRoot, webRoot]) {
+      fs.mkdirSync(target, { recursive: true });
+      runGitChecked({ cwd: target, args: ["init"] });
+      runGitChecked({ cwd: target, args: ["config", "user.email", "aor@example.com"] });
+      runGitChecked({ cwd: target, args: ["config", "user.name", "AOR Test"] });
+      fs.writeFileSync(path.join(target, "version.txt"), "v1\n");
+      runGitChecked({ cwd: target, args: ["add", "version.txt"] });
+      runGitChecked({ cwd: target, args: ["commit", "-m", "initial"] });
+      fs.writeFileSync(path.join(target, "version.txt"), "v2\n");
+    }
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.delivery.independent-partial.v1";
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId,
+      mode: "patch-only",
+      coordinationRepos: [
+        { repo_id: "api", role: "backend", default_branch: "main", source_root: "api", source_kind: "git" },
+        { repo_id: "web", role: "frontend", default_branch: "main", source_root: "web", source_kind: "git" },
+      ],
+      coordinationEvidenceRefs: ["evidence://coordination/independent"],
+      coordinationLockEvidenceRefs: ["evidence://coordination/independent-lock"],
+      crossRepoValidationRefs: ["validation://integration/api-web"],
+    });
+    const plan = JSON.parse(fs.readFileSync(deliveryPlanFile, "utf8"));
+    plan.repository_diff_authorizations = {
+      api: captureDeliveryDiff(apiRoot),
+      // Missing web authorization deliberately proves partial-effect lineage.
+    };
+    fs.writeFileSync(deliveryPlanFile, `${JSON.stringify(plan, null, 2)}\n`);
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      executionRoot: workspaceRoot,
+      runId,
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(
+      result.deliveryManifest.coordination_transaction.status,
+      "partial",
+      JSON.stringify({ transcript: result.transcript, deliveries: result.deliveryManifest.repo_deliveries }, null, 2),
+    );
+    assert.deepEqual(result.deliveryManifest.coordination_transaction.completed_repo_ids, ["api"]);
+    assert.deepEqual(result.deliveryManifest.coordination_transaction.failed_repo_ids, ["web"]);
+    const apiDelivery = result.deliveryManifest.repo_deliveries.find((entry) => entry.repo_id === "api");
+    assert.equal(apiDelivery.writeback_result, "patch-materialized");
+    assert.equal(fs.existsSync(result.outputs.repository_outputs.api.patch_file), true);
   });
 });
 

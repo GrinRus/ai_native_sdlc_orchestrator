@@ -376,6 +376,8 @@ function resolveNextActions(action, state) {
  *   executionPlanRef?: string,
  *   executionUnitId?: string,
  *   taskRefs?: string[],
+ *   workspaceSetRef?: string,
+ *   executionRoot?: string,
  *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
  *   commandId?: string,
@@ -405,6 +407,8 @@ function applyRunControlActionUnlocked(options) {
   const executionPlanRef = asString(options.executionPlanRef);
   const executionUnitId = asString(options.executionUnitId);
   const taskRefs = asStringArray(options.taskRefs);
+  const workspaceSetRef = asString(options.workspaceSetRef);
+  const executionRoot = asString(options.executionRoot);
   const init = options.initializedRuntime ?? initializeProjectRuntime({
     cwd,
     projectRef: options.projectRef,
@@ -467,6 +471,8 @@ function applyRunControlActionUnlocked(options) {
       execution_plan_ref: executionPlanRef,
       execution_unit_id: executionUnitId,
       task_refs: taskRefs,
+      workspace_set_ref: workspaceSetRef,
+      execution_root: executionRoot,
     },
     transition: {
       from_status: normalizeStatus(asString(stateBefore?.status)),
@@ -542,6 +548,8 @@ function applyRunControlActionUnlocked(options) {
       execution_plan_ref: executionPlanRef ?? asString(stateBefore?.execution_plan_ref),
       execution_unit_id: executionUnitId ?? asString(stateBefore?.execution_unit_id),
       task_refs: taskRefs.length > 0 ? taskRefs : asStringArray(stateBefore?.task_refs),
+      workspace_set_ref: workspaceSetRef ?? asString(stateBefore?.workspace_set_ref),
+      execution_root: executionRoot ?? asString(stateBefore?.execution_root),
       evidence_root: init.runtimeLayout.reportsRoot,
     };
 
@@ -572,12 +580,17 @@ function applyRunControlActionUnlocked(options) {
 
 export function applyRunControlAction(options) {
   const cwd = options.cwd ?? process.cwd();
-  const init = initializeProjectRuntime({
-    cwd,
-    projectRef: options.projectRef,
-    projectProfile: options.projectProfile,
-    runtimeRoot: options.runtimeRoot,
-  });
+  const projectRootHint = path.resolve(options.projectRef ?? cwd);
+  const runtimeRootHint = options.runtimeRoot
+    ? path.resolve(projectRootHint, options.runtimeRoot)
+    : path.join(projectRootHint, ".aor");
+  return withFileLock(`${runtimeRootHint}.run-control-operation.lock`, () => {
+    const init = initializeProjectRuntime({
+      cwd,
+      projectRef: options.projectRef,
+      projectProfile: options.projectProfile,
+      runtimeRoot: options.runtimeRoot,
+    });
   const runId = asString(options.runId) ?? (options.action === "start" ? `run-control-${Date.now()}` : null);
   if (!runId) throw new Error(`Run-control action '${options.action}' requires 'runId'.`);
   requirePublicId("run_id", runId);
@@ -589,7 +602,7 @@ export function applyRunControlAction(options) {
     throw error;
   }
   const lockDirectory = path.join(init.runtimeLayout.stateRoot, `run-control-${normalizeId(runId)}.lock`);
-  return withFileLock(lockDirectory, () => {
+    return withFileLock(lockDirectory, () => {
     const commandDirectory = path.join(init.runtimeLayout.stateRoot, "run-control-commands", normalizeId(runId));
     const commandFile = path.join(commandDirectory, `${normalizeId(commandId)}.json`);
     const requestDigest = crypto.createHash("sha256").update(JSON.stringify({
@@ -597,6 +610,14 @@ export function applyRunControlAction(options) {
       target_step: options.targetStep ?? null,
       reason: options.reason ?? null,
       approval_ref: options.approvalRef ?? null,
+      execution_plan_ref: options.executionPlanRef ?? null,
+      execution_unit_id: options.executionUnitId ?? null,
+      task_refs: options.taskRefs ?? [],
+      workspace_set_ref: options.workspaceSetRef ?? null,
+      execution_root: options.executionRoot ?? null,
+      preflight_block: options.preflightBlock ?? null,
+      project_profile: options.projectProfile ?? null,
+      runtime_root: options.runtimeRoot ?? null,
       expected_revision: options.expectedRevision ?? null,
     })).digest("hex");
     if (fs.existsSync(commandFile)) {
@@ -617,6 +638,7 @@ export function applyRunControlAction(options) {
     });
     writeJsonAtomic(commandFile, { command_id: commandId, request_digest: requestDigest, result });
     return result;
+    });
   });
 }
 

@@ -53,7 +53,7 @@ installed-console gates are trustworthy.
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-7
-- **State:** active
+- **State:** done
 - **Outcome:** The original W66 catalog, bootstrap, public repair, disposable
   workspace, intake, delivery-identity, and learning-lineage remediations are
   covered by deterministic regression evidence without claiming live
@@ -102,8 +102,9 @@ installed-console gates are trustworthy.
 5. **Backlog split and deterministic acceptance**
    - Purpose: Remove unrelated qualification, concurrency, delivery, and browser
      outcomes from the original oversized slice.
-   - Changes: Register W66-S02 through W66-S09 in every backlog source of truth
-     and retain live qualification only in W66-S09.
+   - Changes: Register W66-S02 through W66-S09 in every backlog source of truth,
+     retain live qualification only in W66-S09, and keep production readiness on
+     an explicit audit hold until that qualification closes.
    - Validation: Backlog integrity, focused W66 regressions, and
      `pnpm slice:gate -- W66-S01` pass on a clean source checkout.
 
@@ -117,12 +118,15 @@ installed-console gates are trustworthy.
 6. Long run IDs and content-addressed intake packets remain discoverable and valid.
 7. W66-S02 through W66-S09 are registered in dependency order.
 8. Focused tests and the slice gate pass without provider calls.
+9. Production readiness returns a valid W66 `audit-hold` with
+   `release_clearance=false`, and write-capable live execution is held by default.
 
 ### Done evidence
 
 - Focused catalog, bootstrap, lifecycle-lineage, workspace, intake, and delivery-ID regressions.
 - Backlog integrity and current tracked-test execution manifest.
 - W66-S01 slice gate output.
+- Production-readiness and runtime release-hold regressions.
 
 ### Out of scope
 
@@ -133,7 +137,7 @@ installed-console gates are trustworthy.
 ## W66-S02 — Private/product boundary and contract parity
 
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** Product runtime and the private live-E2E harness share only
   versioned public data and installed CLI subprocesses, with no executable-logic
   copy, reverse private vocabulary, or stale source-install reuse.
@@ -202,7 +206,7 @@ installed-console gates are trustworthy.
 ## W66-S03 — Qualification verdict and evidence truth
 
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** A qualification cell passes only when terminal public lifecycle,
   run health, diagnostics, final outcome quality, exact changed paths, and
   no-upstream-write evidence all agree.
@@ -267,7 +271,7 @@ installed-console gates are trustworthy.
 ## W66-S04 — Planner, controller, and provider outcome semantics
 
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** Medium and large planning fails closed without mission-specific
   structure, provider semantic outcomes remain distinct from process exit, and
   the private controller preserves truthful retry, block, completion, and resume state.
@@ -334,7 +338,7 @@ installed-console gates are trustworthy.
 ## W66-S05 — Atomic jobs, attempts, run control, and live events
 
 - **Epic:** EPIC-2, EPIC-3, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** Run jobs, attempts, run-control commands, event journals, SSE
   replay, and browser live refresh remain single-owner, crash-recoverable, and
   idempotent under concurrency.
@@ -401,7 +405,7 @@ installed-console gates are trustworthy.
 ## W66-S06 — Parent/child integration and coordinated delivery correctness
 
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** Parent/child scheduling, workspace provisioning, integration, and
   coordinated multirepo delivery execute real repository-specific work and
   retain truthful partial/recovery evidence.
@@ -470,7 +474,7 @@ installed-console gates are trustworthy.
 ## W66-S07 — Installed browser proof and design acceptance integrity
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** Installed Quiet Cockpit proof demonstrates authoritative lifecycle
   behavior, responsive accessibility, reload/reconnect recovery, and durable
   action outcomes rather than static loading or marker presence.
@@ -533,7 +537,7 @@ installed-console gates are trustworthy.
 ## W66-S08 — Deterministic remediation closure
 
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** done
 - **Outcome:** Every retained-analysis finding owned by W66 has a reproducible
   deterministic disposition, all repository/package/browser gates pass, and the
   exact source commit is ready for paid live qualification.
@@ -590,7 +594,7 @@ installed-console gates are trustworthy.
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** active
 - **Outcome:** One clean merged AOR commit completes the requested medium/large
   Codex and Claude matrix against one pinned target commit, with validated final
   quality and no primary-checkout or upstream mutation.

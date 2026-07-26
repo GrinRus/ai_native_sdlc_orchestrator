@@ -4,8 +4,9 @@
 
 `pnpm production:ready` is the release-disposition gate. It is intentionally
 separate from `pnpm check`: the latter remains the repository-integrity baseline.
-The current expected result is bounded self-hosted release clearance, not a
-hosted or universal production claim.
+The current expected result is a valid W66 qualification audit hold. Historical
+bounded self-hosted release clearance remains prerequisite evidence, not the
+current release disposition.
 
 The gate is review-oriented and fails closed. It must not create runtime state, target checkouts, upstream writes, or `.aor/` artifacts.
 
@@ -21,14 +22,15 @@ Machine-readable output:
 pnpm production:ready --json
 ```
 
-CI uses the normal cleared-state exit contract:
+CI verifies the expected hold without treating it as gate corruption:
 
 ```bash
-pnpm production:ready --json
+pnpm production:ready --json --expect-audit-hold
 ```
 
-It exits successfully only for `status=pass`. Invalid evidence returns
-`status=fail`; a future open release blocker returns `status=blocked`.
+Without `--expect-audit-hold`, the command exits successfully only for
+`status=pass`. Invalid evidence returns `status=fail`; the active W66 release
+blocker returns `status=blocked`.
 
 Executable local-console acceptance runs separately as
 `pnpm test:web:browser`. It launches the built SPA through the public loopback
@@ -71,11 +73,13 @@ The gate verifies:
 - W59 closure integrity: all 55 findings are resolved exactly once, every
   original S1 has an independent passing regression review, and the exact audit
   baseline-to-remediation commit range is pinned;
+- active W66 qualification disposition: release clearance stays suspended until
+  deterministic remediation and all four same-commit Codex/Claude cells close;
 
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
 - story honesty: all 116 stories remain machine-counted, OPS-12 cites the executable W63-S08 installed golden-path proof, other proof-covered rows retain their exact evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
-- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on current bounded self-hosted clearance and excluded surfaces;
+- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on the current W66 qualification hold and excluded surfaces;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;
 - W24 harness evidence: run-level Runtime Harness report fields, strict-delivery example evidence, and controller tests exist.
 - W30 alpha hardening: ADR index and accepted alpha-boundary ADRs exist, the OpenAPI 3.1 route contract matches the implemented HTTP/SSE router, self-hosted ops runbooks exist, W30 backlog source-of-truth docs are present, unsupported Docker/GHCR/SaaS/SSO/default-write-back claims remain out of scope, and OpenCode stories remain blocked without real certification proof.
@@ -90,7 +94,8 @@ Top-level meanings:
   invariant is still open;
 - `status=fail`, `gate_execution_status=fail`,
   `release_disposition=unknown`: the gate itself or its evidence is invalid;
-- `status=pass`, `release_clearance=true`: no release-blocking invariant remains.
+- `status=pass`, `release_clearance=true`: no release-blocking invariant remains;
+  this state is unavailable until W66-S09 closes.
 
 | Failed check | Meaning | Operator action |
 |---|---|---|

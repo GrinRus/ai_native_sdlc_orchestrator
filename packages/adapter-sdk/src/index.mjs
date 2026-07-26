@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
 import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
+import { buildExternalExecutionOutcome, classifyProviderSemanticFailure } from "./provider-outcome.mjs";
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 import { PROCESS_TREE_SUPERVISION_SOURCE } from "./process-tree-supervision.mjs";
@@ -216,7 +217,8 @@ function safeLabel(value, fallback) {
 function outputModeFromArgs(args) {
   if (!Array.isArray(args)) return null;
   const index = args.findIndex((entry) => entry === "--output-format");
-  return index >= 0 ? asString(args[index + 1]) : null;
+  if (index >= 0) return asString(args[index + 1]);
+  return args.includes("--json") ? "jsonl" : null;
 }
 
 function summarizeProgressEvent(record, observedAt) {
@@ -323,7 +325,7 @@ function latestProviderProgressPatch() {
 }
 
 function processStdoutProgressChunk(chunk) {
-  if (outputMode !== "stream-json") return;
+  if (!["stream-json", "jsonl"].includes(outputMode)) return;
   stdoutLineBuffer += chunk;
   const lines = stdoutLineBuffer.split(/\r?\n/);
   stdoutLineBuffer = lines.pop() || "";
@@ -337,7 +339,7 @@ function processStdoutProgressChunk(chunk) {
 }
 
 function flushStdoutProgressBuffer() {
-  if (outputMode !== "stream-json") return;
+  if (!["stream-json", "jsonl"].includes(outputMode)) return;
   const trimmed = stdoutLineBuffer.trim();
   stdoutLineBuffer = "";
   if (!trimmed) return;
@@ -875,7 +877,8 @@ function stableJsonText(value) {
  */
 function resolveOutputModeFromArgs(args) {
   const index = args.findIndex((entry) => entry === "--output-format");
-  return index >= 0 ? asOptionalString(args[index + 1]) : null;
+  if (index >= 0) return asOptionalString(args[index + 1]);
+  return args.includes("--json") ? "jsonl" : null;
 }
 
 /**
@@ -1159,6 +1162,8 @@ export function classifyExternalRunnerFailure(options) {
  */
 function classifyStructuredRunnerFailure(options) {
   const runnerPayload = asRecord(options.runnerPayload);
+  const semanticFailure = classifyProviderSemanticFailure(runnerPayload);
+  if (semanticFailure) return semanticFailure;
   if (hasNonEmptyPermissionDenials(runnerPayload) || hasNonEmptyPermissionDenials(options.runnerToolTraces)) {
     return "permission-mode-blocked";
   }
@@ -1268,9 +1273,11 @@ function parseExternalRunnerStdout(stdout, options = {}) {
 
   if (allJsonLines) {
     if (options.sanitizeJsonlEvents) {
+      const terminal = asRecord(jsonlRecords.at(-1));
       return {
         runnerPayload: {
           jsonl_event_count: jsonlRecords.length,
+          terminal_outcome: { type: asOptionalString(terminal.type), status: asOptionalString(terminal.status) || asOptionalString(terminal.subtype), model: asOptionalString(terminal.model), reasoning: asOptionalString(terminal.reasoning) || asOptionalString(terminal.reasoning_effort), verification_status: asOptionalString(terminal.verification_status) },
           provider_progress_events: Array.isArray(options.providerProgressEvents)
             ? options.providerProgressEvents.map((event) => ({
                 observed_at: asOptionalString(asRecord(event).observed_at),
@@ -3250,7 +3257,7 @@ export function createLiveAdapter(options) {
       const { rawEvidenceRef } = writeRawEvidence(rawEvidenceRecord);
 
       const { runnerPayload, runnerEvidenceRefs, runnerToolTraces } = parseExternalRunnerStdout(stdout, {
-        sanitizeJsonlEvents: runnerFamily === "qwen" && outputMode === "stream-json",
+        sanitizeJsonlEvents: ["stream-json", "jsonl"].includes(outputMode),
         providerProgressEvents,
       });
 
@@ -3303,6 +3310,9 @@ export function createLiveAdapter(options) {
           compaction_report: contextBudgetReports.compaction_report,
         },
         runner_output: runnerPayload,
+        execution_outcome: buildExternalExecutionOutcome(
+          { exitCode: invocation.status, signal: invocation.signal, timedOut: invocationTimedOut, interrupted: invocationInterrupted, invocationFailed, runnerPayload },
+        ),
       };
 
       const evidenceRefs = [

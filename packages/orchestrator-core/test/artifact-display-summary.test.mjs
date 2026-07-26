@@ -152,7 +152,7 @@ test("control-plane read surfaces expose artifact display summaries for packet a
   });
 });
 
-test("project state ignores runner-specific sidecars and exposes generic nested provider heartbeat", () => {
+test("project state ignores runner-specific sidecars and joins generic external health with provider heartbeat", () => {
   withCleanRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
     const requestFile = path.join(init.runtimeLayout.reportsRoot, "rehearsal-agent-decision-request-ui-proof-02-spec.json");
@@ -204,17 +204,22 @@ test("project state ignores runner-specific sidecars and exposes generic nested 
       status: "ready",
       created_at: "2026-06-02T00:05:00.000Z",
     });
-    const nestedStateFile = path.join(
-      init.runtimeLayout.projectRuntimeRoot,
-      "target-checkouts",
-      "demo",
-      ".aor",
-      "projects",
-      "target.run.ui-proof",
-      "state",
-      "run-control-state-ui-proof.json",
-    );
-    writeJson(nestedStateFile, {
+    writeJson(path.join(init.runtimeLayout.reportsRoot, "external-run-projection-ui-proof.json"), {
+      schema_version: 1,
+      projection_id: "external-run.ui-proof.v1",
+      run_id: "ui-proof",
+      status: "in_progress",
+      generated_at: "2026-06-02T00:01:04.000Z",
+      current_step: "spec",
+      pending_steps: ["spec"],
+      completed_steps: [],
+      missing_operator_decision_steps: [],
+      missing_evidence_refs: [],
+      blockers: [],
+      artifact_display_summaries: [],
+      evidence_refs: [],
+    });
+    writeJson(path.join(init.runtimeLayout.stateRoot, "run-control-state-ui-proof.json"), {
       run_id: "ui-proof",
       status: "running",
       provider_step_status: {

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { requestRunJobCancel, startRunJob } from "../../../packages/orchestrator-core/src/run-job.mjs";
+import { classifyRunJobTerminalStatus } from "../../../packages/orchestrator-core/src/run-job-status.mjs";
 import { applyRunControlAction, readRunControlState } from "../src/index.mjs";
 import { appendRunEvent, openRunEventStream, readRunEvents } from "../src/live-event-stream.mjs";
 
@@ -181,6 +182,20 @@ test("CLI run status follow waits for a later terminal event", async () => {
   });
 });
 
+test("CLI late follow exits after an already durable terminal event", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.cli.follow.late.terminal.v1";
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.started", payload: { status: "running" } });
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.terminal", payload: { status: "succeeded" } });
+    const result = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "run", "status", "--project-ref", repoRoot, "--run-id", runId, "--follow", "true", "--max-replay", "0",
+    ], { cwd: workspaceRoot, encoding: "utf8", timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).follow_mode.enabled, true);
+  });
+});
+
 test("CLI run status follow releases its subscription on SIGINT", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.cli.follow.sigint.v1";
@@ -220,6 +235,49 @@ test("run job cancellation terminates its supervised process group", async () =>
   });
 });
 
+test("concurrent identical run starts claim one fenced worker", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.job.concurrent.claim.v1";
+    const moduleUrl = new URL("../../../packages/orchestrator-core/src/run-job.mjs", import.meta.url).href;
+    const source = `
+      const { startRunJob } = await import(process.argv[1]);
+      const result = startRunJob({
+        projectRef: process.argv[2], cwd: process.argv[2], runId: process.argv[3],
+        args: ["doctor", "--project-ref", process.argv[2]],
+      });
+      process.stdout.write(JSON.stringify({ idempotent: result.idempotent, file: result.file }));
+    `;
+    const starts = await Promise.all(Array.from({ length: 8 }, () => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--input-type=module", "--eval", source, moduleUrl, repoRoot, runId], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      child.on("error", reject);
+      child.on("exit", (code) => code === 0 ? resolve(JSON.parse(stdout)) : reject(new Error(stderr)));
+    })));
+    assert.equal(starts.filter((entry) => entry.idempotent === false).length, 1);
+    const terminal = await waitForJob(starts[0].file, ["succeeded", "failed"]);
+    assert.equal(terminal.status, "succeeded", JSON.stringify(terminal.worker_result));
+    assert.equal(terminal.worker.fencing_token, 1);
+    assert.ok(terminal.worker.pid > 0);
+  });
+});
+
+test("exit-zero structured interaction is waiting-input before success classification", () => {
+  assert.equal(classifyRunJobTerminalStatus({
+    currentStatus: "running",
+    signal: null,
+    exitCode: 0,
+    commandOutput: { output: { requested_interaction: { requested: true, status: "requested" } } },
+  }), "waiting-input");
+  assert.equal(classifyRunJobTerminalStatus({
+    currentStatus: "running", signal: null, exitCode: 0, commandOutput: { status: "pass" },
+  }), "succeeded");
+});
+
 test("run-control API emits deterministic control events and durable audit evidence", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.control.api.v1";
@@ -251,6 +309,15 @@ test("run-control API emits deterministic control events and durable audit evide
     });
     assert.equal(retriedStart.revision, 1);
     assert.equal(readRunEvents({ projectRef: repoRoot, cwd: repoRoot, runId }).length, 2);
+    assert.throws(() => applyRunControlAction({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      action: "start",
+      commandId: "command.start.retry",
+      expectedRevision: 0,
+      executionPlanRef: "evidence://plans/different.json",
+    }), { code: "run-control-command-conflict" });
     assert.throws(() => applyRunControlAction({
       projectRef: repoRoot,
       cwd: repoRoot,
@@ -311,5 +378,47 @@ test("run-control API emits deterministic control events and durable audit evide
       events.map((event) => event.payload.sequence),
       [1, 2, 3, 4, 5, 6],
     );
+  });
+});
+
+test("concurrent run-control CAS accepts one command without overwriting it", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.control.concurrent.cas.v1";
+    applyRunControlAction({
+      projectRef: repoRoot, cwd: repoRoot, runId, action: "start",
+      commandId: "command.concurrent.start", expectedRevision: 0,
+    });
+    const moduleUrl = new URL("../src/index.mjs", import.meta.url).href;
+    const source = `
+      const { applyRunControlAction } = await import(process.argv[1]);
+      try {
+        const result = applyRunControlAction({
+          projectRef: process.argv[2], cwd: process.argv[2], runId: process.argv[3],
+          action: process.argv[4], commandId: \`command.concurrent.\${process.argv[4]}\`,
+          expectedRevision: 1, approvalRef: process.argv[4] === "cancel" ? "approval://CAS-1" : undefined,
+        });
+        process.stdout.write(JSON.stringify({ applied: result.applied, revision: result.revision }));
+      } catch (error) {
+        process.stderr.write(\`\${String(error.code)}\\n\${String(error.stack)}\`);
+        process.exit(2);
+      }
+    `;
+    const runCommand = (action) => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--input-type=module", "--eval", source, moduleUrl, repoRoot, runId, action], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      child.on("error", reject);
+      child.on("exit", (code) => resolve({ code, stdout, stderr }));
+    });
+    const results = await Promise.all([runCommand("pause"), runCommand("cancel")]);
+    assert.equal(results.filter((result) => result.code === 0).length, 1, JSON.stringify(results));
+    assert.equal(results.filter((result) => result.stderr.includes("run-control-revision-conflict")).length, 1, JSON.stringify(results));
+    const state = readRunControlState({ projectRef: repoRoot, cwd: repoRoot, runId }).state;
+    assert.equal(state.action_sequence, 2);
+    assert.ok(["paused", "canceled"].includes(state.status));
   });
 });

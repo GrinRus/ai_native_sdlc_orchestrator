@@ -16,16 +16,68 @@ function sha256(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 }
 
-export function inspectContractKernelParity() {
-  const snapshot = JSON.parse(fs.readFileSync(snapshotFile, "utf8"));
+function discoverKernelFiles(sourceRoot) {
+  return fs.readdirSync(sourceRoot, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.(?:mjs|d\.ts)$/u.test(entry.name))
+    .map((entry) => path.relative(sourceRoot, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"))
+    .sort();
+}
+
+function serializePublicRules() {
+  return publicRules.map((entry) => ({
+    regex_source: entry.regex.source,
+    regex_flags: entry.regex.flags,
+    family: entry.family,
+  }));
+}
+
+export function buildContractKernelSnapshot(previous = {}) {
+  const source = previous.source ?? "packages/contracts/src";
+  const sourceRoot = path.join(root, source);
+  const files = Object.fromEntries(discoverKernelFiles(sourceRoot).map((relativeFile) => [
+    relativeFile,
+    sha256(path.join(sourceRoot, relativeFile)),
+  ]));
+  return {
+    schema_version: 3,
+    kernel_version: Math.max(11, Number(previous.kernel_version) || 0),
+    source,
+    generation: {
+      generator: "scripts/contract-kernel-parity.mjs",
+      source_file_count: Object.keys(files).length,
+      source_manifest_sha256: crypto.createHash("sha256").update(JSON.stringify(files)).digest("hex"),
+    },
+    files,
+    contract_families: publicFamilies,
+    example_family_resolution_rules: serializePublicRules(),
+  };
+}
+
+export function inspectContractKernelParity(options = {}) {
+  const effectiveSnapshotFile = options.snapshotFile ?? snapshotFile;
+  const snapshot = JSON.parse(fs.readFileSync(effectiveSnapshotFile, "utf8"));
   const errors = [];
-  if (snapshot.schema_version !== 2 || !Number.isInteger(snapshot.kernel_version)) {
-    errors.push("contract kernel snapshot must declare schema_version=2 and an integer kernel_version");
+  if (snapshot.schema_version !== 3 || !Number.isInteger(snapshot.kernel_version)) {
+    errors.push("contract kernel snapshot must declare schema_version=3 and an integer kernel_version");
+  }
+  const sourceRoot = path.join(root, snapshot.source);
+  const discoveredFiles = discoverKernelFiles(sourceRoot);
+  const pinnedFiles = Object.keys(snapshot.files ?? {}).sort();
+  if (JSON.stringify(pinnedFiles) !== JSON.stringify(discoveredFiles)) {
+    errors.push("public kernel source set drift requires snapshot regeneration");
   }
   for (const [relativeFile, expectedHash] of Object.entries(snapshot.files ?? {})) {
-    const sourceFile = path.join(root, snapshot.source, relativeFile);
+    const sourceFile = path.join(sourceRoot, relativeFile);
     if (!fs.existsSync(sourceFile)) errors.push(`missing public kernel source: ${relativeFile}`);
     else if (sha256(sourceFile) !== expectedHash) errors.push(`public kernel drift requires snapshot regeneration: ${relativeFile}`);
+  }
+  const expectedManifestHash = crypto.createHash("sha256").update(JSON.stringify(snapshot.files ?? {})).digest("hex");
+  if (
+    snapshot.generation?.generator !== "scripts/contract-kernel-parity.mjs"
+    || snapshot.generation?.source_file_count !== discoveredFiles.length
+    || snapshot.generation?.source_manifest_sha256 !== expectedManifestHash
+  ) {
+    errors.push("contract kernel generation metadata is missing or stale");
   }
   const pinnedByFamily = new Map((snapshot.contract_families ?? []).map((entry) => [entry.family, entry]));
   for (const entry of publicFamilies) {
@@ -34,11 +86,7 @@ export function inspectContractKernelParity() {
     }
   }
   const pinnedRules = snapshot.example_family_resolution_rules ?? [];
-  const effectivePublicRules = publicRules.map((entry) => ({
-    regex_source: entry.regex.source,
-    regex_flags: entry.regex.flags,
-    family: entry.family,
-  }));
+  const effectivePublicRules = serializePublicRules();
   if (JSON.stringify(pinnedRules) !== JSON.stringify(effectivePublicRules)) {
     errors.push("public example resolution metadata snapshot drift requires regeneration");
   }
@@ -52,6 +100,10 @@ export function inspectContractKernelParity() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv.includes("--write")) {
+    const previous = fs.existsSync(snapshotFile) ? JSON.parse(fs.readFileSync(snapshotFile, "utf8")) : {};
+    fs.writeFileSync(snapshotFile, `${JSON.stringify(buildContractKernelSnapshot(previous), null, 2)}\n`);
+  }
   const result = inspectContractKernelParity();
   if (!result.ok) {
     process.stderr.write(`${result.errors.join("\n")}\n`);
