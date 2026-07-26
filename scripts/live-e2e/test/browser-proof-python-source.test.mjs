@@ -18,6 +18,11 @@ test("guided browser collector injects and recovers a real public resource failu
   assert.match(source, /name="Refresh setup", exact=True/u);
   assert.match(source, /error_feedback_observed/u);
   assert.match(source, /"recovered": error_recovered/u);
+  assert.ok(
+    source.indexOf("page.wait_for_timeout(1500)") <
+      source.indexOf('get_by_role("button", name="Refresh setup", exact=True)'),
+    "the post-reconnect DOM must settle before the refresh control is resolved",
+  );
 });
 
 test("guided browser collector separates handled optional 404 noise from unexpected console errors", () => {

@@ -314,19 +314,19 @@ def main():
             injected_error_observed["value"] = True
             route.abort()
         resource_url = f"{payload['control_plane']}/api/projects/{payload['project_id']}/execution-profile"
-        injection_active["value"] = True
-        page.route(resource_url, abort_resource, times=1)
+        page.wait_for_timeout(1500)
+        refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
         try:
-            refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
             if refresh_button.count() == 1 and refresh_button.is_enabled():
+                injection_active["value"] = True
+                page.route(resource_url, abort_resource, times=1)
                 refresh_button.click()
-            else:
-                page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
-            page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="visible", timeout=3000)
+                page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="visible", timeout=3000)
         except Exception:
             pass
         error_feedback = page.get_by_text("Some live resources are unavailable.", exact=True).count() > 0
-        page.unroute(resource_url)
+        if injection_active["value"]:
+            page.unroute(resource_url)
         injection_active["value"] = False
         try:
             refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
