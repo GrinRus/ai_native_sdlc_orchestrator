@@ -588,6 +588,12 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - proof-runner bootstrap asset overrides are not supported.
 
 Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the first product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, create a follow-up mission with `--follow-up-source-handoff-ref`, refresh `next` for the second flow, and create a flow-targeted `request create --target-flow-id`. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, flow-loop fields, browser-task AOR operator UI evidence refs, and no-upstream-write assertions must be materialized.
+
+Warn-only diagnostic verification may be deferred until browser proof only for a
+clean implementation cycle. Once review or QA has opened a quality-repair
+request, the diagnostic suite runs before public `repair close`; this supplies
+the refreshed verification coverage required to reconcile and close the repair
+before delivery.
 Run guided profiles through the manual live E2E loop when browser-task proof or
 operator decisions are required. A plain `run-profile.mjs` invocation is allowed
 to fail closed at the first missing decision request; that is not a completed

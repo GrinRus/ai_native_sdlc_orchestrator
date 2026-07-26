@@ -56,6 +56,7 @@ import {
   resolveAuditHoldOverrideArgs,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
   sourceInstallCacheMatches,
+  shouldDeferGuidedWarnDiagnostic,
 } from "../lib/flows.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
@@ -4070,6 +4071,18 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
   assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
   assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 600/u);
+  assert.equal(shouldDeferGuidedWarnDiagnostic({
+    guidedJourneyEnabled: true,
+    diagnosticFailureMode: "warn",
+    diagnosticCommands: ["npm test"],
+    repairDecisionFiles: [],
+  }), true);
+  assert.equal(shouldDeferGuidedWarnDiagnostic({
+    guidedJourneyEnabled: true,
+    diagnosticFailureMode: "warn",
+    diagnosticCommands: ["npm test"],
+    repairDecisionFiles: ["evidence://review-decision-request-repair.json"],
+  }), false);
 });
 
 test("flow-health regress profiles report policy-excluded QA as passing evidence", () => {

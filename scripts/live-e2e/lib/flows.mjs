@@ -3547,6 +3547,23 @@ function resolvePostRunQualityPolicy(mission, catalogVerification) {
 }
 
 /**
+ * @param {{
+ *   guidedJourneyEnabled: boolean,
+ *   diagnosticFailureMode: string,
+ *   diagnosticCommands: string[],
+ *   repairDecisionFiles: string[],
+ * }} options
+ */
+export function shouldDeferGuidedWarnDiagnostic(options) {
+  return (
+    options.guidedJourneyEnabled &&
+    options.diagnosticFailureMode === "warn" &&
+    options.diagnosticCommands.length > 0 &&
+    options.repairDecisionFiles.length === 0
+  );
+}
+
+/**
  * @param {Record<string, unknown>} profile
  * @returns {"readme-smoke" | "bounded-live" | "full-journey-observation" | "acceptance" | "production-proof"}
  */
@@ -6314,10 +6331,12 @@ function executeFullJourneyFlowImplementation(options) {
           qaEvaluationStatus = "skipped";
         }
 
-        const deferGuidedWarnDiagnostic =
-          guidedJourneyEnabled &&
-          postRunQualityPolicy.diagnosticFailureMode === "warn" &&
-          postRunQualityPolicy.diagnosticCommands.length > 0;
+        const deferGuidedWarnDiagnostic = shouldDeferGuidedWarnDiagnostic({
+          guidedJourneyEnabled,
+          diagnosticFailureMode: postRunQualityPolicy.diagnosticFailureMode,
+          diagnosticCommands: postRunQualityPolicy.diagnosticCommands,
+          repairDecisionFiles: asStringArray(artifacts.review_repair_decision_files),
+        });
         if (postRunQualityPolicy.diagnosticCommands.length > 0 && !deferGuidedWarnDiagnostic) {
           const postRunDiagnosticVerify = runPostRunDiagnosticVerify({ iteration });
           qaDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "fail";

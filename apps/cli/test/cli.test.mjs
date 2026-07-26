@@ -12,10 +12,34 @@ import { appendRunEvent, applyRunControlAction, listQualityArtifacts } from "../
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { buildCliOutput } from "../src/cli-output.mjs";
 import { invokeCli } from "../src/index.mjs";
+import { resolveRepairClosureStatusBlocker } from "../../../packages/orchestrator-core/src/operator-cli/command-handlers/quality.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const fixturesDir = path.join(path.dirname(currentFilePath), "fixtures");
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../../..");
+
+test("repair closure reconciles requested external-runner attempts only through distinct refreshed lineage", () => {
+  assert.equal(resolveRepairClosureStatusBlocker({
+    currentStatus: "requested",
+    runId: "run-1",
+    closureRunId: "run-1",
+  }), "A requested quality repair requires a distinct '--closure-run-id' with refreshed repair evidence.");
+  assert.equal(resolveRepairClosureStatusBlocker({
+    currentStatus: "requested",
+    runId: "run-1",
+    closureRunId: "run-1.repair-2",
+  }), null);
+  assert.match(resolveRepairClosureStatusBlocker({
+    currentStatus: "in-progress",
+    runId: "run-1",
+    closureRunId: "run-1.repair-2",
+  }), /cannot be closed/u);
+  assert.match(resolveRepairClosureStatusBlocker({
+    currentStatus: "budget-exhausted",
+    runId: "run-1",
+    closureRunId: "run-1.repair-2",
+  }), /cannot be closed/u);
+});
 
 /**
  * @param {(projectRoot: string) => void} callback

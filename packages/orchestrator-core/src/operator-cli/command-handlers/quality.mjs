@@ -97,6 +97,20 @@ export const QUALITY_COMMAND_GROUP = Object.freeze({
 });
 
 /**
+ * @param {{ currentStatus: string, runId: string, closureRunId: string }} options
+ * @returns {string | null}
+ */
+export function resolveRepairClosureStatusBlocker(options) {
+  if (["in-progress", "budget-exhausted"].includes(options.currentStatus)) {
+    return `Quality repair request in '${options.currentStatus}' cannot be closed.`;
+  }
+  if (options.currentStatus === "requested" && options.closureRunId === options.runId) {
+    return "A requested quality repair requires a distinct '--closure-run-id' with refreshed repair evidence.";
+  }
+  return null;
+}
+
+/**
  * @param {Record<string, unknown>} outputState
  * @param {unknown} compilerRevisionStatus
  */
@@ -545,8 +559,13 @@ export function handleQualityCommand(context) {
       throw new CliUsageError("Quality repair request project/run ownership does not match the requested closure.");
     }
     const currentStatus = typeof matchingRequest.document.status === "string" ? matchingRequest.document.status : "unknown";
-    if (["requested", "in-progress", "budget-exhausted"].includes(currentStatus)) {
-      throw new CliUsageError(`Quality repair request in '${currentStatus}' cannot be closed.`);
+    const statusBlocker = resolveRepairClosureStatusBlocker({
+      currentStatus,
+      runId,
+      closureRunId,
+    });
+    if (statusBlocker) {
+      throw new CliUsageError(statusBlocker);
     }
     const evidenceRefs = resolveOptionalStringListFlag("evidence-ref", flags["evidence-ref"]);
     const qaEvidenceRefs = resolveOptionalStringListFlag("qa-evidence-ref", flags["qa-evidence-ref"]);
