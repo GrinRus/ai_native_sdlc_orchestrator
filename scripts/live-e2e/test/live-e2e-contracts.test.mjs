@@ -130,6 +130,29 @@ test("medium and larger catalog missions require explicit structured local tasks
   });
 });
 
+test("W66 medium and large task plans cover intake-prefixed mission goals", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+    family: "live-e2e-target-catalog",
+  });
+  assert.equal(loaded.ok, true);
+
+  for (const [missionId, requiredGoalRef] of [
+    ["ky-fetch-options-regression", "goal.2"],
+    ["ky-retry-hooks-governance", "goal.3"],
+  ]) {
+    const mission = loaded.document.feature_missions.find((entry) => entry.mission_id === missionId);
+    const coveredCriteria = new Set(
+      mission.task_plan.local_tasks.flatMap((task) => task.criteria_refs),
+    );
+    assert.equal(
+      coveredCriteria.has(requiredGoalRef),
+      true,
+      `${missionId} must cover ${requiredGoalRef} after the full-journey intake adds its aggregate goal`,
+    );
+  }
+});
+
 test("live e2e private report fixtures validate from the private fixture root", () => {
   const fixtureRoot = path.join(workspaceRoot, "scripts/live-e2e/fixtures/contracts");
   const fixtureFamilies = [

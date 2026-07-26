@@ -371,6 +371,7 @@ feature_missions:
             - Confirm review traceability and patch-only delivery without upstream write-back.
           criteria_refs:
             - goal.1
+            - goal.2
             - kpi.ky-fetch-options-bounded-green
             - dod.1
             - dod.2
@@ -742,6 +743,7 @@ feature_missions:
             - Produce no-upstream-write delivery, audit, and learning closure.
           criteria_refs:
             - goal.2
+            - goal.3
             - kpi.ky-governance-lineage
             - dod.2
             - acceptance.2
