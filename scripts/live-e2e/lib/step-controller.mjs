@@ -160,7 +160,8 @@ export function isLiveE2eControllerStopInProgress(controllerStop, includedSteps)
   const state = asRecord(stop.state);
   const completedSteps = new Set(asStringArray(state.completed_steps));
   const allIncludedStepsCompleted =
-    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+    includedSteps.length > 0 &&
+    includedSteps.every((step) => [...completedSteps].some((entry) => entry === step || entry.startsWith(`${step}#`)));
   const terminalManualContinue =
     asNonEmptyString(decision.action) === "continue" &&
     !asNonEmptyString(decision.next_step) &&
@@ -782,22 +783,19 @@ export function createLiveE2eStepController(options) {
     if (!step) continue;
     entryByStep[asNonEmptyString(entry.step_instance_id) || buildStepInstanceId(step, iteration)] = entry;
   }
-  const resolveCurrentStep = () =>
-    includedSteps.find(
-      (step) =>
-        Object.values(entryByStep).some(
-          (entry) =>
-            asNonEmptyString(entry.step_id) === step &&
-            asNonEmptyString(asRecord(entry.decision).action) !== "continue",
-        ),
-    ) ??
-    includedSteps.find(
-      (step) =>
-        !Object.values(entryByStep).some(
-          (entry) => asNonEmptyString(entry.step_id) === step && (Number(entry.iteration) || 1) === 1,
-        ),
-    ) ??
-    null;
+  const resolveCurrentStep = () => {
+    const latestByStep = new Map();
+    for (const entry of Object.values(entryByStep).sort(
+      (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
+    )) {
+      const step = asNonEmptyString(entry.step_id);
+      if (step) latestByStep.set(step, entry);
+    }
+    return includedSteps.find((step) => {
+      const latestEntry = latestByStep.get(step);
+      return latestEntry && asNonEmptyString(asRecord(latestEntry.decision).action) !== "continue";
+    }) ?? includedSteps.find((step) => !latestByStep.has(step)) ?? null;
+  };
   const resolveLatestEntry = () => {
     const entries = Object.values(entryByStep).sort(
       (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),

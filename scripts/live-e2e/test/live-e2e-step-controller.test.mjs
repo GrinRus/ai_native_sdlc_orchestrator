@@ -2094,6 +2094,18 @@ test("live E2E step controller preserves repeated execution and review iteration
     });
     assert.equal(resumed.shouldUseCachedCommand("review-run", 1), true);
     assert.equal(resumed.shouldUseCachedCommand("review-run", 2), true);
+    const resumedState = JSON.parse(fs.readFileSync(resumed.stateFile, "utf8"));
+    assert.equal(resumedState.completed_steps.includes("review#2"), true);
+    assert.equal(
+      isLiveE2eControllerStopInProgress(
+        {
+          decision: { action: "continue", next_step: null },
+          state: { current_step: null, completed_steps: ["review#2"] },
+        },
+        ["review"],
+      ),
+      false,
+    );
   });
 });
 
