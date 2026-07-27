@@ -153,6 +153,19 @@ test("W66 medium and large task plans cover intake-prefixed mission goals", () =
   }
 });
 
+test("W66 medium primary verification exercises the allowed fetch test surface", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+    family: "live-e2e-target-catalog",
+  });
+  assert.equal(loaded.ok, true);
+
+  const mission = loaded.document.feature_missions.find(
+    (entry) => entry.mission_id === "ky-fetch-options-regression",
+  );
+  assert.ok(mission.post_run_quality.primary_commands.includes("npx ava test/fetch.ts"));
+});
+
 test("live e2e private report fixtures validate from the private fixture root", () => {
   const fixtureRoot = path.join(workspaceRoot, "scripts/live-e2e/fixtures/contracts");
   const fixtureFamilies = [
