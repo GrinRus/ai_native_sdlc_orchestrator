@@ -37,6 +37,12 @@ Manifest materialization should happen only after a `delivery-plan` artifact is 
 Delivery-capable runs should include execution isolation metadata (mode, checkout root, and cleanup policy/outcome) so write-back provenance is replayable.
 `repo_deliveries[].changed_paths` is the canonical file-level delta list for the delivery run.
 For bounded multirepo delivery, `repo_deliveries[]` should contain one entry per coordinated repo from the delivery plan. Each entry should preserve `repo_id`, repo role/source metadata when available, repo-local changed-path classification, write-back result, and coordination evidence refs.
+When coordinated repositories are independent Git roots, delivery requires an
+exact `repository_diff_authorizations[repo_id]` entry and executes the selected
+delivery mode separately in every root. Per-repository commands, HEAD
+provenance, outputs, failures, and recovery state are retained. Successful
+repository artifacts remain addressable when a later repository fails, while
+the aggregate transaction is `partial` and release stays blocked.
 For strict code-changing missions, an empty patch or empty non-bootstrap changed-path set is a machine-readable quality failure even when the manifest is structurally valid for audit lineage.
 Strict delivery/release preparation must also fail before manifest materialization when the run has no Runtime Harness routed step decisions or the selected Runtime Harness report is not `pass`.
 `approval_context` should preserve handoff, promotion, and Runtime Harness gate evidence references that justified write-back eligibility.

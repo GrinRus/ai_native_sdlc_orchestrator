@@ -1,0 +1,51 @@
+export const QUALIFICATION_CELL_CONTRACT_FAMILIES = Object.freeze([
+  {
+    family: "live-e2e-qualification-cell-report",
+    familyGroup: "execution-and-quality",
+    sourceContract: "scripts/live-e2e/docs/contracts/live-e2e-qualification-cell-report.md",
+    exampleGlob: "scripts/live-e2e/fixtures/contracts/live-e2e-qualification-cell-report*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "schema_version",
+      "report_id",
+      "cell_id",
+      "run_id",
+      "provider_variant_id",
+      "feature_size",
+      "commit_sha",
+      "generated_at",
+      "status",
+      "dimensions",
+      "observations",
+      "positive_evidence",
+      "warnings",
+      "blocking_findings",
+      "evidence",
+    ],
+    fieldTypes: {
+      schema_version: "number",
+      report_id: "string",
+      cell_id: "string",
+      run_id: "string",
+      provider_variant_id: "string",
+      feature_size: "string",
+      commit_sha: "string",
+      generated_at: "string",
+      status: "string",
+      dimensions: "object",
+      observations: "array",
+      positive_evidence: "array",
+      warnings: "array",
+      blocking_findings: "array",
+      evidence: "array",
+    },
+    enumChecks: [{ field: "status", allowedValues: ["pass", "warn", "blocked", "fail"] }],
+  },
+]);
+
+export const QUALIFICATION_CELL_EXAMPLE_RULES = Object.freeze([
+  {
+    regex: /^scripts\/live-e2e\/fixtures\/contracts\/live-e2e-qualification-cell-report[^/]*\.ya?ml$/,
+    family: "live-e2e-qualification-cell-report",
+  },
+]);

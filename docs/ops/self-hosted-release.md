@@ -2,9 +2,11 @@
 
 ## Supported mode
 
-AOR has **bounded self-hosted release clearance** after the W57-W59 audit
-remediation and independent requalification. This clearance is limited to the
-declared Node 22 CLI/API, loopback local app, and no-upstream-write defaults.
+AOR retains the W57-W59 **bounded self-hosted release clearance** as historical
+prerequisite evidence for the declared Node 22 CLI/API, loopback local app, and
+no-upstream-write defaults. W66 has placed current release disposition on
+`audit-hold` until deterministic remediation and fresh same-commit Codex and
+Claude qualification close.
 
 - CLI and API/control-plane runtime are supported operator surfaces.
 - The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
@@ -44,14 +46,19 @@ pnpm production:ready
 The production gate validates its internal checks and the audit ledger. While a
 release-blocking invariant is open it exits nonzero with `status=blocked` and
 `gate_execution_status=pass`. An internal check failure instead returns
-`status=fail` and `release_disposition=unknown`. The cleared repository returns
-`status=pass` and `release_disposition=cleared`. Use JSON output for review packets:
+`status=fail` and `release_disposition=unknown`. Only a repository with no active
+release blocker returns `status=pass` and `release_disposition=cleared`; W66 can
+reach that state only through the committed qualification closure. Use JSON
+output for review packets:
 
 ```bash
 pnpm production:ready --json
 ```
 
 The default production proof fixture is the sanitized fixture configured by `pnpm production:ready`.
+CI validates both the pending and closed lifecycle with
+`pnpm production:ready --json --allow-audit-hold`; the flag accepts only a
+well-formed audited hold and cannot turn failed evidence into clearance.
 
 ## Operator setup
 
@@ -64,10 +71,10 @@ The default production proof fixture is the sanitized fixture configured by `pnp
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 8. For installed-user UI validation, launch `aor app --project-ref <repo> --runtime-root <repo>/.aor` on loopback.
 9. For operator-initiated runtime work, use `aor request create/run/status` or the local UI Ask AOR drawer; keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
-10. Keep credentialed provider qualification and real network delivery outside
-    the cleared matrix unless a separate reviewed profile explicitly authorizes
-    them. The compatibility flag `--unsafe-development-override` remains
-    accepted but is not required when the release disposition is cleared.
+10. Keep credentialed provider qualification and real network delivery inside
+    the explicitly reviewed W66 profile only. The compatibility flag
+    `--unsafe-development-override` is for maintainer development probes and
+    does not grant release clearance.
 
 The production-hardened auth model is documented in `docs/ops/control-plane-production-hardening.md`.
 Environment, secrets, backup/restore, and incident procedures are documented in:

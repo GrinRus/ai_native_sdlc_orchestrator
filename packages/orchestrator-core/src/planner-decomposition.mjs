@@ -30,6 +30,70 @@ export function selectPlannerCandidate({ explicitCandidate, adapterOutput }) {
   return { candidate: {}, source: "mission-derived-fallback" };
 }
 
+export function validateMissionSpecificPlannerCandidate({ candidate, featureSize, source }) {
+  const normalizedSize = ["small", "medium", "large", "xlarge"].includes(String(featureSize))
+    ? String(featureSize)
+    : "medium";
+  const structured = asRecord(candidate);
+  const tasks = Array.isArray(structured.local_tasks)
+    ? structured.local_tasks.filter((entry) => Object.keys(asRecord(entry)).length > 0)
+    : [];
+  if (normalizedSize === "small" && tasks.length === 0) {
+    return { ok: true, fallback_allowed: true, blocker: null };
+  }
+  if (tasks.length === 0) {
+    return {
+      ok: false,
+      fallback_allowed: false,
+      blocker: {
+        code: "mission-specific-plan-required",
+        feature_size: normalizedSize,
+        candidate_source: String(source || "missing"),
+        message: `Feature size '${normalizedSize}' requires mission-specific structured local_tasks; compact fallback is small-only.`,
+      },
+    };
+  }
+  const malformedTaskIndexes = tasks.flatMap((task, index) => {
+    const record = asRecord(task);
+    const missing = ["task_id", "title", "objective"].filter(
+      (field) => typeof record[field] !== "string" || record[field].trim().length === 0,
+    );
+    return missing.length > 0 ? [{ index, missing_fields: missing }] : [];
+  });
+  return malformedTaskIndexes.length === 0
+    ? { ok: true, fallback_allowed: false, blocker: null }
+    : {
+        ok: false,
+        fallback_allowed: false,
+        blocker: {
+          code: "mission-specific-plan-malformed",
+          feature_size: normalizedSize,
+          candidate_source: String(source || "unknown"),
+          malformed_tasks: malformedTaskIndexes,
+          message: "Mission-specific structured tasks must declare stable task_id, title, and objective fields.",
+        },
+      };
+}
+
+export function resolveMissionSpecificPlannerCandidate({ plannerCandidate, missionCandidate, featureSize }) {
+  const explicit = asRecord(plannerCandidate);
+  const mission = asRecord(missionCandidate);
+  const candidate = Object.keys(explicit).length > 0 ? explicit : mission;
+  const source = Object.keys(explicit).length > 0
+    ? "planner-candidate"
+    : Object.keys(mission).length > 0
+      ? "mission-request"
+      : "missing";
+  const validation = validateMissionSpecificPlannerCandidate({ candidate, featureSize, source });
+  if (!validation.ok) {
+    const error = new Error(validation.blocker.message);
+    error.code = validation.blocker.code;
+    error.blocker = validation.blocker;
+    throw error;
+  }
+  return candidate;
+}
+
 export function revisionAdviceForValidationIssue(issue) {
   const field = String(issue?.field ?? "plan");
   if (String(issue?.message ?? "").includes("mission-split-required")) {

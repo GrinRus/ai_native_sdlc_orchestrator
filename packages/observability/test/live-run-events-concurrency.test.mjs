@@ -75,3 +75,31 @@ test("request keys are idempotent and stale owner-less locks are recovered", () 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("event append reconciles every injected crash boundary exactly once", () => {
+  for (const boundary of ["after-transaction", "after-journal", "after-cursor", "after-request"]) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), `aor-event-crash-${boundary}-`));
+    try {
+      const logFile = path.join(root, "events.ndjson");
+      const input = {
+        logFile,
+        runId: "run.crash.recovery",
+        eventType: "step.updated",
+        requestKey: "request.crash.recovery",
+        payload: { boundary },
+      };
+      assert.throws(() => appendLiveRunEvent({ ...input, faultInjectionBoundary: boundary }), {
+        code: "event-append-fault-injected",
+      });
+      const recovered = appendLiveRunEvent(input);
+      const events = listLiveRunEvents({ logFile, runId: input.runId });
+      assert.equal(events.length, 1, boundary);
+      assert.equal(events[0].event_id, recovered.event_id, boundary);
+      assert.equal(events[0].payload.sequence, 1, boundary);
+      assert.equal(fs.existsSync(`${logFile}.append-transaction.json`), false, boundary);
+      assert.equal(JSON.parse(fs.readFileSync(`${logFile}.cursor.json`, "utf8")).sequence, 1, boundary);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+});

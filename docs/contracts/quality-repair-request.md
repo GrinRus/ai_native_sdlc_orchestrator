@@ -94,10 +94,15 @@ the request-owning run and `--closure-run-id` identifies that attempt. Both
 runs stay in the same project and the closure artifacts are appended to the
 original request evidence; this does not transfer request ownership.
 
-The transition is idempotent for an already closed matching request. Requests
-in `requested`, `in-progress`, or `budget-exhausted` cannot be closed. Internal
-rehearsal tooling must call this public mutation rather than updating the
-artifact or importing observability helpers directly.
+The transition is idempotent for an already closed matching request. A
+`requested` request may be reconciled directly to `closed` only when the public
+command receives a distinct `--closure-run-id` and independently
+re-materializes passing review and Runtime Harness evidence for that repair
+attempt. This supports external-runner repair loops whose intermediate status
+projection was interrupted without weakening closure evidence. Requests in
+`in-progress` or `budget-exhausted` cannot be closed. Internal rehearsal
+tooling must call this public mutation rather than updating the artifact or
+importing observability helpers directly.
 
 ## Status history
 `status_history[]` may record status transitions with `status`, `changed_at`,

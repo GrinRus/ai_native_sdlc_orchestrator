@@ -1,16 +1,7 @@
+import { QUALIFICATION_CELL_CONTRACT_FAMILIES, QUALIFICATION_CELL_EXAMPLE_RULES } from "./qualification-cell-contract-family.mjs";
+
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
-const ROUTE_STEP_VALUES = [
-  "discovery",
-  "research",
-  "spec",
-  "planning",
-  "implement",
-  "review",
-  "qa",
-  "repair",
-  "eval",
-  "harness",
-];
+const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
@@ -107,6 +98,9 @@ const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary",
 export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
   "run.started",
+  "parent.started",
+  "parent.updated",
+  "parent.terminal",
   "step.updated",
   "provider.heartbeat",
   "evidence.linked",
@@ -989,6 +983,7 @@ export const PRIVATE_CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
     enumChecks: [{ field: "overall_status", allowedValues: LIVE_E2E_QUALITY_ASSESSMENT_STATUS_VALUES }],
   },
+  ...QUALIFICATION_CELL_CONTRACT_FAMILIES,
   {
     family: "live-e2e-step-quality-assessment-request",
     familyGroup: "execution-and-quality",
@@ -1869,6 +1864,7 @@ export const PRIVATE_EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
     regex: /^scripts\/live-e2e\/fixtures\/contracts\/live-e2e-quality-assessment-report[^/]*\.ya?ml$/,
     family: "live-e2e-quality-assessment-report",
   },
+  ...QUALIFICATION_CELL_EXAMPLE_RULES,
   {
     regex: /^scripts\/live-e2e\/fixtures\/contracts\/live-e2e-step-quality-assessment-request[^/]*\.ya?ml$/,
     family: "live-e2e-step-quality-assessment-request",

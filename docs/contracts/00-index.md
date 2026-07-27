@@ -42,6 +42,7 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `task-progress-report.md`
 - `workspace-set.md`
 - `execution-readiness-report.md`
+- `external-run-projection.md`
 
 Compiled-context and external-runner contracts include context-budget evidence for routed steps. Runtime Harness reports consume those facts as deterministic run-quality signals, while product quality remains owned by validation, review, evaluation, delivery, and learning-loop artifacts.
 

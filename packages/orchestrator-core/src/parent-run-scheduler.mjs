@@ -7,7 +7,7 @@ import { withFileLock, writeJsonAtomic } from "../../observability/src/file-tran
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 
 const TERMINAL = new Set(["succeeded", "failed", "canceled", "blocked"]);
-const ACTIVE = new Set(["queued", "running", "paused", "canceling"]);
+const ACTIVE = new Set(["launching", "queued", "running", "paused", "canceling"]);
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
@@ -35,12 +35,25 @@ function unitProjection(unit) {
     task_refs: unit.task_refs,
     depends_on: unit.depends_on,
     conflict_keys: unit.conflict_keys ?? [],
+    repository_scope: unit.repository_scope ?? unit.scope?.repo_ids ?? [],
     status: "pending",
     attempt_count: 0,
     active_child_run_id: null,
     child_runs: [],
     blocker_codes: [],
   };
+}
+
+function appendParentEvent(parent, type, payload = {}) {
+  parent.event_cursor = (parent.event_cursor ?? 0) + 1;
+  parent.events ??= [];
+  parent.events.push({
+    parent_event_version: 1,
+    sequence: parent.event_cursor,
+    event_type: type,
+    payload,
+    recorded_at: new Date().toISOString(),
+  });
 }
 
 function readyUnits(parent) {
@@ -54,7 +67,10 @@ function readyUnits(parent) {
 }
 
 function aggregateStatus(parent) {
-  if (parent.status === "paused" || parent.status === "canceling" || parent.status === "canceled") return parent.status;
+  if (parent.status === "paused" || parent.status === "canceled") return parent.status;
+  if (parent.status === "canceling") {
+    return parent.units.some((unit) => ACTIVE.has(unit.status)) ? "canceling" : "canceled";
+  }
   if (parent.blocker) return "blocked";
   if (parent.units.some((unit) => unit.status === "failed")) return "blocked";
   if (parent.units.every((unit) => unit.status === "succeeded" || unit.status === "non-run")) {
@@ -152,10 +168,15 @@ export function startParentRun(options) {
       integration_gates: (options.executionPlan.integration_gates ?? []).map((gate) => ({ ...gate, status: "pending", evidence_refs: [] })),
       command_ids: [],
       event_cursor: 0,
+      events: [],
       created_at: now,
       updated_at: now,
       terminal_at: null,
     };
+    appendParentEvent(created, "parent.created", {
+      execution_plan_ref: created.execution_plan_ref,
+      workspace_set_ref: created.workspace_set_ref,
+    });
     writeJsonAtomic(file, created);
     return created;
   });
@@ -163,8 +184,8 @@ export function startParentRun(options) {
 }
 
 export function scheduleParentRun(options) {
-  const started = [];
-  const parent = updateParent(options.parentFile, options.expectedRevision, (current) => {
+  const reservations = [];
+  let parent = updateParent(options.parentFile, options.expectedRevision, (current) => {
     if (TERMINAL.has(current.status) || current.status === "paused") return null;
     const concurrencyCeiling = Math.min(
       current.max_concurrency,
@@ -184,15 +205,23 @@ export function scheduleParentRun(options) {
     for (const unit of selected) {
       unit.attempt_count += 1;
       unit.active_child_run_id = derivePublicId([current.parent_run_id, unit.execution_unit_id, `attempt-${unit.attempt_count}`], "child-run");
-      unit.status = "queued";
+      unit.status = "launching";
       unit.child_runs.push({
         child_run_id: unit.active_child_run_id,
         attempt: unit.attempt_count,
-        status: "queued",
+        status: "launching",
         evidence_refs: [],
       });
       current.consumed.child_starts += 1;
-      started.push({ parent_run_id: current.parent_run_id, execution_unit_id: unit.execution_unit_id, child_run_id: unit.active_child_run_id, attempt: unit.attempt_count });
+      const reservation = {
+        parent_run_id: current.parent_run_id,
+        execution_unit_id: unit.execution_unit_id,
+        child_run_id: unit.active_child_run_id,
+        attempt: unit.attempt_count,
+        repository_scope: unit.repository_scope,
+      };
+      reservations.push(reservation);
+      appendParentEvent(current, "child.launch-reserved", reservation);
     }
     if (capacity > 0 && budget === 0 && readyUnits(current).length > 0) {
       current.status = "blocked";
@@ -200,8 +229,51 @@ export function scheduleParentRun(options) {
     }
     return selected.length > 0 || current.blocker ? current : null;
   });
-  const launched = started.map((child) => options.startChild?.(child) ?? child);
-  return { parent, started: launched };
+  const started = [];
+  const launchFailures = [];
+  for (const reservation of reservations) {
+    try {
+      const launched = options.startChild?.(reservation) ?? reservation;
+      parent = updateParent(options.parentFile, undefined, (current) => {
+        const unit = current.units.find((candidate) => candidate.execution_unit_id === reservation.execution_unit_id);
+        if (!unit || unit.active_child_run_id !== reservation.child_run_id || unit.status !== "launching") {
+          const error = new Error("Child launch result no longer owns its parent reservation.");
+          error.code = "parent-child-identity-conflict";
+          throw error;
+        }
+        unit.status = "queued";
+        const child = unit.child_runs.find((candidate) => candidate.child_run_id === reservation.child_run_id);
+        child.status = "queued";
+        child.launch = launched;
+        appendParentEvent(current, "child.launched", {
+          execution_unit_id: reservation.execution_unit_id,
+          child_run_id: reservation.child_run_id,
+        });
+        return current;
+      });
+      started.push(launched);
+    } catch (cause) {
+      const failure = {
+        ...reservation,
+        code: cause?.code ?? "child-launch-failed",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      };
+      launchFailures.push(failure);
+      parent = updateParent(options.parentFile, undefined, (current) => {
+        const unit = current.units.find((candidate) => candidate.execution_unit_id === reservation.execution_unit_id);
+        if (!unit || unit.active_child_run_id !== reservation.child_run_id) return null;
+        const child = unit.child_runs.find((candidate) => candidate.child_run_id === reservation.child_run_id);
+        child.status = "launch-failed";
+        child.failure = { code: failure.code, detail: failure.detail };
+        unit.status = "pending";
+        unit.active_child_run_id = null;
+        current.consumed.child_starts = Math.max(0, current.consumed.child_starts - 1);
+        appendParentEvent(current, "child.launch-failed", failure);
+        return current;
+      });
+    }
+  }
+  return { parent, started, launch_failures: launchFailures };
 }
 
 export function completeChildRun(options) {
@@ -217,12 +289,19 @@ export function completeChildRun(options) {
     child.evidence_refs = options.evidenceRefs ?? [];
     unit.status = options.status;
     unit.active_child_run_id = null;
+    appendParentEvent(current, "child.completed", {
+      execution_unit_id: options.executionUnitId,
+      child_run_id: options.childRunId,
+      status: options.status,
+      evidence_refs: child.evidence_refs,
+    });
     return current;
   });
 }
 
 export function controlParentRun(options) {
-  return updateParent(options.parentFile, options.expectedRevision, (current) => {
+  const childCommands = [];
+  let parent = updateParent(options.parentFile, options.expectedRevision, (current) => {
     if (current.command_ids.includes(options.commandId)) return null;
     current.command_ids.push(options.commandId);
     if (options.action === "pause") current.status = "paused";
@@ -238,14 +317,49 @@ export function controlParentRun(options) {
       throw error;
     }
     for (const unit of current.units.filter((candidate) => ACTIVE.has(candidate.status))) {
-      options.controlChild?.({
+      childCommands.push({
         action: options.action,
         childRunId: unit.active_child_run_id,
         executionUnitId: unit.execution_unit_id,
       });
     }
+    appendParentEvent(current, "parent.control-requested", {
+      action: options.action,
+      command_id: options.commandId,
+      child_run_ids: childCommands.map((command) => command.childRunId),
+    });
     return current;
   });
+  const failures = [];
+  for (const command of childCommands) {
+    try {
+      options.controlChild?.(command);
+    } catch (cause) {
+      failures.push({
+        child_run_id: command.childRunId,
+        code: cause?.code ?? "child-control-failed",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+  }
+  if (childCommands.length > 0) {
+    parent = updateParent(options.parentFile, undefined, (current) => {
+      appendParentEvent(current, "parent.control-propagated", {
+        action: options.action,
+        command_id: options.commandId,
+        child_run_ids: childCommands.map((command) => command.childRunId),
+        failures,
+      });
+      if (failures.length > 0) {
+        current.blocker = {
+          code: "parent-child-control-partial-failure",
+          detail: failures.map((failure) => `${failure.child_run_id}: ${failure.code}`).join("; "),
+        };
+      }
+      return current;
+    });
+  }
+  return parent;
 }
 
 export function retryParentUnit(options) {
@@ -260,6 +374,10 @@ export function retryParentUnit(options) {
     current.command_ids.push(options.commandId);
     unit.status = "pending";
     unit.blocker_codes = [];
+    appendParentEvent(current, "child.retry-requested", {
+      execution_unit_id: options.executionUnitId,
+      command_id: options.commandId,
+    });
     return current;
   });
 }
@@ -268,4 +386,39 @@ export function readParentRun(options) {
   const init = previewProjectRuntime(options);
   const file = parentFile(init.runtimeLayout, options.parentRunId);
   return { init, file, parent: fs.existsSync(file) ? readJson(file) : null };
+}
+
+export function advanceParentForChildRun(options) {
+  const parentRunsRoot = path.join(options.stateRoot, "parent-runs");
+  if (!fs.existsSync(parentRunsRoot)) return null;
+  const matches = fs.readdirSync(parentRunsRoot)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => path.join(parentRunsRoot, entry))
+    .filter((file) => {
+      const parent = readJson(file);
+      return parent.units.some((unit) => unit.active_child_run_id === options.childRunId);
+    });
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    const error = new Error(`Child run '${options.childRunId}' is owned by more than one parent.`);
+    error.code = "parent-child-ownership-conflict";
+    throw error;
+  }
+  const parentFilePath = matches[0];
+  const current = readJson(parentFilePath);
+  const unit = current.units.find((candidate) => candidate.active_child_run_id === options.childRunId);
+  const completed = completeChildRun({
+    parentFile: parentFilePath,
+    expectedRevision: current.revision,
+    executionUnitId: unit.execution_unit_id,
+    childRunId: options.childRunId,
+    status: options.status,
+    evidenceRefs: options.evidenceRefs,
+  });
+  const scheduled = scheduleParentRun({
+    parentFile: parentFilePath,
+    expectedRevision: completed.revision,
+    startChild: options.startChild,
+  });
+  return { parentFile: parentFilePath, completed, ...scheduled };
 }

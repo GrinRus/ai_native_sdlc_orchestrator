@@ -39,6 +39,7 @@ function fixture() {
     },
     parent: {
       parent_run_id: "parent-run-1",
+      project_id: "aor-core",
       units: [
         { execution_unit_id: "unit-a", depends_on: [] },
         { execution_unit_id: "unit-b", depends_on: ["unit-a"] },
@@ -96,9 +97,38 @@ test("integration applies immutable outputs in dependency order and gates parent
   const parentFile = path.join(fx.runtimeLayout.stateRoot, "parent-runs", "parent-run-parent-run-1.json");
   fs.mkdirSync(path.dirname(parentFile), { recursive: true });
   fs.writeFileSync(parentFile, `${JSON.stringify({ ...fx.parent, revision: 0, status: "integration-pending" })}\n`);
-  const parent = applyIntegrationToParent({ parentFile, expectedRevision: 0, report: result.report, integrationReportRef: "evidence://integration-report.json" });
+  const parent = applyIntegrationToParent({
+    parentFile,
+    expectedRevision: 0,
+    reportFile: result.reportFile,
+    integrationReportRef: "evidence://integration-report.json",
+  });
   assert.equal(parent.status, "succeeded");
   assert.equal(parent.revision, 1);
+  assert.equal(parent.integration_report_digest, result.authority.report_digest);
+});
+
+test("parent rejects a client-authored integration report outside authoritative materialization", () => {
+  const fx = fixture();
+  const parentFile = path.join(fx.runtimeLayout.stateRoot, "parent-runs", "parent-run-parent-run-1.json");
+  fs.mkdirSync(path.dirname(parentFile), { recursive: true });
+  fs.writeFileSync(parentFile, `${JSON.stringify({ ...fx.parent, revision: 0, status: "integration-pending" })}\n`);
+  const forged = path.join(fx.root, "forged-integration-report.json");
+  fs.writeFileSync(forged, `${JSON.stringify({
+    project_id: "aor-core",
+    parent_run_id: "parent-run-1",
+    status: "passed",
+    aggregate_gates: [],
+  })}\n`);
+  assert.throws(
+    () => applyIntegrationToParent({
+      parentFile,
+      expectedRevision: 0,
+      reportFile: forged,
+      integrationReportRef: "evidence://forged-integration-report.json",
+    }),
+    (error) => error.code === "integration-report-not-authoritative",
+  );
 });
 
 test("integration retains deterministic conflict and missing-output evidence", () => {

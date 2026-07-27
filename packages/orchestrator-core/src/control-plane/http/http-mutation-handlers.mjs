@@ -72,8 +72,12 @@ export async function handleRunControlAction({ request, response, runtimeOptions
 
   const executionPlanRef = asString(payload.execution_plan_ref);
   const executionUnitId = asString(payload.execution_unit_id);
-  if (Boolean(executionPlanRef) !== Boolean(executionUnitId) || (action !== "start" && (executionPlanRef || executionUnitId))) {
-    sendError(response, 400, "invalid_execution_unit_context", "execution_plan_ref and execution_unit_id are a paired input valid only for run start.");
+  const workspaceSetRef = asString(payload.workspace_set_ref);
+  if (
+    new Set([Boolean(executionPlanRef), Boolean(executionUnitId), Boolean(workspaceSetRef)]).size > 1
+    || (action !== "start" && (executionPlanRef || executionUnitId || workspaceSetRef))
+  ) {
+    sendError(response, 400, "invalid_execution_unit_context", "execution_plan_ref, execution_unit_id, and workspace_set_ref are a workspace-bound input valid only for run start.");
     return;
   }
   if (payload.expected_revision !== undefined && (!Number.isInteger(payload.expected_revision) || payload.expected_revision < 0)) {
@@ -81,9 +85,9 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     return;
   }
   let executionContext = null;
-  if (executionPlanRef && executionUnitId) {
+  if (executionPlanRef && executionUnitId && workspaceSetRef) {
     try {
-      executionContext = resolveExecutionUnitContext({ ...runtimeOptions, executionPlanRef, executionUnitId });
+      executionContext = resolveExecutionUnitContext({ ...runtimeOptions, executionPlanRef, executionUnitId, workspaceSetRef });
     } catch (error) {
       sendError(response, 409, typeof error?.code === "string" ? error.code : "execution-unit-invalid", error instanceof Error ? error.message : "Execution unit context is invalid.");
       return;
@@ -100,6 +104,8 @@ export async function handleRunControlAction({ request, response, runtimeOptions
     executionPlanRef: executionContext?.executionPlanRef,
     executionUnitId: executionContext?.executionUnitId,
     taskRefs: executionContext?.taskRefs,
+    workspaceSetRef: executionContext?.workspaceSetRef,
+    executionRoot: executionContext?.executionRoot,
     commandId: asString(payload.command_id) ?? undefined,
     expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
   });

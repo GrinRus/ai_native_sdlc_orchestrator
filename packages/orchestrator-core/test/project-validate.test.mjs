@@ -6,7 +6,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { analyzeProjectRuntime } from "../src/project-analysis.mjs";
+import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { approveHandoffArtifacts, prepareHandoffArtifacts } from "../src/handoff-packets.mjs";
+import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { validateProjectRuntime } from "../src/project-validate.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -26,6 +28,16 @@ function withTempRepo(callback) {
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
+}
+
+function materializeSmallIntake(repoRoot) {
+  const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+  const requestFile = path.join(repoRoot, "small-planning.request.json");
+  fs.writeFileSync(requestFile, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
+  materializeIntakeArtifactPacket({
+    projectId: init.projectId, projectRoot: init.projectRoot, projectProfileRef: init.projectProfileRef,
+    runtimeLayout: init.runtimeLayout, command: "aor intake create", requestFile,
+  });
 }
 
 test("validateProjectRuntime emits pass status when safety checks and analysis report are present", () => {
@@ -154,6 +166,7 @@ test("validateProjectRuntime emits fail status for unsafe writeback policy", () 
 
 test("validateProjectRuntime fails when approved handoff is required but packet is unapproved", () => {
   withTempRepo((repoRoot) => {
+    materializeSmallIntake(repoRoot);
     const prepared = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     const result = validateProjectRuntime({
       projectRef: repoRoot,
@@ -176,6 +189,7 @@ test("validateProjectRuntime fails when approved handoff is required but packet 
 
 test("validateProjectRuntime passes handoff approval gate after explicit approval", () => {
   withTempRepo((repoRoot) => {
+    materializeSmallIntake(repoRoot);
     const prepared = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     approveHandoffArtifacts({
       projectRef: repoRoot,

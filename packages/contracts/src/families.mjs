@@ -1,6 +1,7 @@
 import { TOPOLOGY_CONTRACT_FAMILIES, TOPOLOGY_EXAMPLE_RULES } from "./topology-contract-families.mjs";
 import { EXECUTION_READINESS_CONTRACT_FAMILIES, EXECUTION_READINESS_EXAMPLE_RULES } from "./execution-readiness-contract-families.mjs";
 import { INTEGRATION_CONTRACT_FAMILIES, INTEGRATION_EXAMPLE_RULES } from "./integration-contract-family.mjs";
+import { EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES, EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES } from "./external-run-projection-contract-family.mjs";
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
 const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
@@ -56,7 +57,7 @@ const OPERATOR_REQUEST_INTENT_VALUES = [
 const OPERATOR_REQUEST_STATUS_VALUES = ["created", "running", "completed", "failed", "blocked"];
 export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
-  "run.started",
+  "run.started", "parent.started", "parent.updated", "parent.terminal",
   "step.updated",
   "provider.heartbeat",
   "evidence.linked",
@@ -75,7 +76,6 @@ export const EXTERNAL_REFERENCE_PREFIXES = [
   "retry.",
   "repair.",
 ];
-
 /** @type {ReadonlyArray<import("./index.d.ts").ContractFamilyIndexEntry>} */
 export const CONTRACT_FAMILY_INDEX = Object.freeze([
   {
@@ -130,7 +130,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "asset_mode", allowedValues: ASSET_MODE_VALUES }],
   },
   ...TOPOLOGY_CONTRACT_FAMILIES,
-  ...EXECUTION_READINESS_CONTRACT_FAMILIES,
+  ...EXECUTION_READINESS_CONTRACT_FAMILIES, ...EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES,
   {
     family: "onboarding-report",
     familyGroup: "core-packets-and-profiles",
@@ -1560,7 +1560,6 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
   },
 ]);
-
 export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/adapters\/[^/]+\.ya?ml$/, family: "adapter-capability-profile" },
   { regex: /^examples\/context\/bundles\/[^/]+\.ya?ml$/, family: "context-bundle" },
@@ -1609,6 +1608,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/project[^/]*\.aor\.ya?ml$/, family: "project-profile" },
   ...TOPOLOGY_EXAMPLE_RULES,
   ...EXECUTION_READINESS_EXAMPLE_RULES,
+  ...EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES,
   ...INTEGRATION_EXAMPLE_RULES,
   { regex: /^examples\/prompts\/[^/]+\.ya?ml$/, family: "prompt-bundle" },
   { regex: /^examples\/routes\/[^/]+\.ya?ml$/, family: "provider-route-profile" },

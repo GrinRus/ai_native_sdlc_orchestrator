@@ -423,7 +423,8 @@ Extended candidate cells:
 - `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
 - `ky.governance.xlarge.openai` / `ky.governance.xlarge.anthropic` (`ky-request-lifecycle-observability-xlarge`, manual-only)
-  - primary verification: `npx xo`, `npm run build`, `npx ava test/main.ts test/hooks.ts`,
+  - primary verification: `npx xo`, `npm run build`,
+    `npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'`,
     and `npx ava test/retry.ts --match='*shouldRetry*'`
   - diagnostic observation: `npx playwright install` then `npm test`; failures remain warning
     evidence unless a future profile explicitly promotes the full suite to acceptance

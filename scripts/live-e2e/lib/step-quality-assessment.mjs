@@ -94,9 +94,10 @@ function requiredStepQualityDimensions(stepId, productQualityRequired) {
  */
 function buildStepQualityDimensions(options) {
   const refs = options.inspectedEvidenceRefs;
+  const deterministicConflict = options.deterministicConflict === true;
   const dimension = {
-    status: "pass",
-    evidence_strength: refs.length > 0 ? "strong" : "medium",
+    status: deterministicConflict ? "fail" : "pass",
+    evidence_strength: deterministicConflict ? "weak" : refs.length > 0 ? "strong" : "medium",
     inspected_evidence_refs: refs,
   };
   const findingSuffix = options.productQualityRequired
@@ -186,6 +187,19 @@ function buildStepQualityDimensions(options) {
 	  }
 	  return dimensions;
 	}
+
+function hasDeterministicStepQualityConflict(entry, artifacts) {
+  const statuses = [
+    asNonEmptyString(entry.deterministic_status),
+    asNonEmptyString(artifacts.post_run_verify_status),
+    asNonEmptyString(artifacts.post_run_diagnostic_status),
+    asNonEmptyString(artifacts.evaluation_status),
+    asNonEmptyString(asRecord(artifacts.target_verification_status_detail).status),
+  ].filter(Boolean);
+  return statuses.some((status) =>
+    ["fail", "failed", "blocked", "not_pass", "partial", "timeout", "timed_out"].includes(status),
+  );
+}
 
 /**
  * @param {Record<string, unknown>} artifacts
@@ -409,14 +423,19 @@ export function buildStepQualityAssessment(options) {
   const stepId = asNonEmptyString(entry.step_id) || "step";
   const stepInstanceId = asNonEmptyString(entry.step_instance_id) || stepId;
   const candidateDecision = asRecord(entry.step_quality_candidate_decision);
-  const action =
+  const requestedAction =
     asNonEmptyString(options.assessmentDecision) ||
     asNonEmptyString(candidateDecision.action) ||
     asNonEmptyString(asRecord(entry.decision).action) ||
     "continue";
+  const productQualityRequired = requiresAcceptedProductStepQuality(context);
+  const deterministicConflict =
+    productQualityRequired && hasDeterministicStepQualityConflict(entry, asRecord(options.artifacts));
+  const action = deterministicConflict && normalizeStepQualityDecision(requestedAction) === "continue"
+    ? "request-repair"
+    : requestedAction;
   const decision = normalizeStepQualityDecision(action);
   const inspectedEvidenceRefs = asStringArray(entry.inspected_evidence_refs);
-  const productQualityRequired = requiresAcceptedProductStepQuality(context);
   const files = resolveStepQualityFiles(options);
   const assessmentRequest = asRecord(options.assessmentRequest);
   const evaluatorInputRefs = uniqueStrings([
@@ -482,7 +501,12 @@ export function buildStepQualityAssessment(options) {
       sourceAssessmentRequestFile,
     status: statusFromStepQualityDecision(decision),
     decision,
-    dimensions: buildStepQualityDimensions({ stepId, inspectedEvidenceRefs, productQualityRequired }),
+    dimensions: buildStepQualityDimensions({
+      stepId,
+      inspectedEvidenceRefs,
+      productQualityRequired,
+      deterministicConflict,
+    }),
     findings: topLevelFindings,
     repair_instructions:
       decision === "request-repair"

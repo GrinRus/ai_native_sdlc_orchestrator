@@ -15,6 +15,10 @@ verification:
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: patch-only
+qualification_policy:
+  explicit_task_plan_mission_ids:
+    - ky-fetch-options-regression
+    - ky-retry-hooks-governance
 required_matrix_cells:
   - cell_id: ky.regress.small.openai
     scenario_family: regress
@@ -257,6 +261,7 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
+        - npx ava test/fetch.ts
         - npx ava test/hooks.ts
         - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
@@ -282,6 +287,111 @@ feature_missions:
       max_added_lines: 2200
     quality_evidence: *a2
     mission_class: product-change
+    task_plan:
+      local_tasks:
+        - task_id: task.fetch-options-source
+          title: Implement the bounded fetch-options behavior
+          type: implementation
+          objective: Repair the approved fetch-options or retry behavior inside the Ky source surface.
+          rationale: The runtime behavior must be corrected before tests and public typings can prove coherence.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [source/**]
+            forbidden_paths: []
+          depends_on: []
+          work_items:
+            - Locate the narrow options-handling or retry seam covered by the approved mission.
+            - Implement the smallest compatible runtime change within source.
+          criteria_refs:
+            - goal.1
+            - kpi.ky-fetch-options-bounded-green
+            - dod.1
+            - acceptance.1
+          verification:
+            command_group_refs: []
+            validators: [repo-scope]
+            manual_checks: []
+            success_conditions:
+              - Runtime behavior changes only inside the approved source boundary.
+          expected_evidence: [routed-step-result, review-report]
+          risks:
+            - Existing fetch option precedence may rely on the current behavior.
+          stop_conditions:
+            - The fix requires a repository surface outside the approved mission.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: false
+        - task_id: task.fetch-options-tests
+          title: Add focused fetch-options regression coverage
+          type: verification
+          objective: Prove the runtime change through the mission-focused hooks and retry tests.
+          rationale: The regression must fail before the fix and protect the changed behavior afterward.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [test/**]
+            forbidden_paths: []
+          depends_on: [task.fetch-options-source]
+          work_items:
+            - Add or refine focused regression coverage in the existing AVA style.
+            - Run the bounded lint, build, hooks, and retry verification commands.
+          criteria_refs:
+            - kpi.ky-fetch-options-bounded-green
+            - dod.2
+            - acceptance.2
+          verification:
+            command_group_refs: []
+            validators: [evidence-complete]
+            manual_checks: []
+            success_conditions:
+              - Focused primary verification passes and diagnostic evidence remains linked.
+          expected_evidence: [verify-summary]
+          risks:
+            - Timing-sensitive full-suite behavior can obscure the focused regression signal.
+          stop_conditions:
+            - The focused test cannot distinguish the repaired behavior from the baseline.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: false
+        - task_id: task.fetch-options-types-delivery
+          title: Align public typings and close delivery evidence
+          type: integration
+          objective: Keep the public type surface coherent and bind review and patch-only delivery to the verified change.
+          rationale: The medium mission explicitly crosses the runtime, test, and public type boundaries.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [index.d.ts]
+            forbidden_paths: []
+          depends_on: [task.fetch-options-source, task.fetch-options-tests]
+          work_items:
+            - Adjust the public typing only when required by the approved behavior.
+            - Confirm review traceability and patch-only delivery without upstream write-back.
+          criteria_refs:
+            - goal.1
+            - goal.2
+            - kpi.ky-fetch-options-bounded-green
+            - dod.1
+            - dod.2
+            - acceptance.3
+          verification:
+            command_group_refs: []
+            validators: [contract-shape, evidence-complete]
+            manual_checks: []
+            success_conditions:
+              - Runtime, tests, typings, and delivery evidence describe one coherent bounded change.
+          expected_evidence: [delivery-manifest, review-report]
+          risks:
+            - An unnecessary typing change would widen the patch without improving compatibility.
+          stop_conditions:
+            - Public typing compatibility cannot be preserved inside index.d.ts.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: false
     agent_visible_request:
       user_problem: Adjust one multi-file options-handling or retry-surface regression with matching tests
         and the smallest typing touch needed to keep the public API coherent.
@@ -492,7 +602,7 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
-        - npx ava test/main.ts test/hooks.ts
+        - "npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'"
         - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
@@ -516,6 +626,144 @@ feature_missions:
       max_added_lines: 4500
     quality_evidence: *a4
     mission_class: product-change
+    task_plan:
+      local_tasks:
+        - task_id: task.retry-lifecycle-source
+          title: Implement the governed retry lifecycle change
+          type: implementation
+          objective: Apply the approved retry or hook lifecycle behavior inside the Ky source surface.
+          rationale: The large mission needs one explicit runtime owner before cross-surface verification and governance closure.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [source/**]
+            forbidden_paths: []
+          depends_on: []
+          work_items:
+            - Map the approved lifecycle behavior to the smallest compatible runtime seams.
+            - Preserve request, retry, and hook ordering outside the mission.
+          criteria_refs:
+            - goal.1
+            - kpi.ky-governance-lineage
+            - dod.1
+            - acceptance.1
+          verification:
+            command_group_refs: []
+            validators: [repo-scope]
+            manual_checks: []
+            success_conditions:
+              - The runtime lifecycle change stays inside the approved source boundary.
+          expected_evidence: [routed-step-result, review-report]
+          risks:
+            - Retry and hook ordering changes can affect multiple request lifecycle phases.
+          stop_conditions:
+            - The implementation requires unrelated control-plane or repository changes.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: false
+        - task_id: task.retry-hooks-tests
+          title: Add lifecycle and hooks regression coverage
+          type: verification
+          objective: Prove retry, hooks, and request lifecycle behavior with the required focused and broad Ky tests.
+          rationale: Large qualification needs direct regression signals across the touched lifecycle seams.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [test/**]
+            forbidden_paths: []
+          depends_on: [task.retry-lifecycle-source]
+          work_items:
+            - Add focused regression cases using existing AVA conventions.
+            - Run lint, build, main, hooks, focused retry, and split diagnostic commands.
+          criteria_refs:
+            - goal.1
+            - kpi.ky-governance-lineage
+            - dod.1
+            - acceptance.1
+          verification:
+            command_group_refs: []
+            validators: [evidence-complete]
+            manual_checks: []
+            success_conditions:
+              - Primary and diagnostic verification preserve a clear lifecycle regression signal.
+          expected_evidence: [verify-summary]
+          risks:
+            - Timing-sensitive retry tests may require the catalog's isolated diagnostic command.
+          stop_conditions:
+            - Required verification is unavailable or introduces a new blocking failure.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: false
+        - task_id: task.retry-public-types
+          title: Preserve the public retry and hook type surface
+          type: integration
+          objective: Align public typings with the approved lifecycle behavior without widening the API.
+          rationale: The governance mission includes public compatibility as a separate reviewable boundary.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [index.d.ts]
+            forbidden_paths: []
+          depends_on: [task.retry-lifecycle-source]
+          work_items:
+            - Inspect whether the runtime change requires a public typing adjustment.
+            - Preserve compatibility and avoid speculative type-surface churn.
+          criteria_refs:
+            - goal.1
+            - dod.1
+          verification:
+            command_group_refs: []
+            validators: [contract-shape, repo-scope]
+            manual_checks: []
+            success_conditions:
+              - The public type surface remains coherent with the implemented lifecycle behavior.
+          expected_evidence: [review-report]
+          risks:
+            - Speculative typing changes can widen the release surface.
+          stop_conditions:
+            - Compatibility requires a public API expansion outside the approved mission.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: true
+        - task_id: task.retry-governance-closure
+          title: Close governance, audit, delivery, and learning lineage
+          type: delivery
+          objective: Bind verified target changes to review, patch-only delivery, audit, and learning evidence.
+          rationale: The large cell counts only when governance artifacts preserve one target and mission lineage without upstream writes.
+          scope:
+            repo_ids: [ky]
+            component_ids: []
+            allowed_paths: [source/**, test/**, index.d.ts]
+            forbidden_paths: []
+          depends_on: [task.retry-lifecycle-source, task.retry-hooks-tests, task.retry-public-types]
+          work_items:
+            - Confirm review and verification evidence covers every changed surface.
+            - Produce no-upstream-write delivery, audit, and learning closure.
+          criteria_refs:
+            - goal.2
+            - goal.3
+            - kpi.ky-governance-lineage
+            - dod.2
+            - acceptance.2
+            - acceptance.3
+          verification:
+            command_group_refs: []
+            validators: [evidence-complete, repo-scope]
+            manual_checks: []
+            success_conditions:
+              - Review, delivery, audit, and learning evidence preserve the same mission and target checkout lineage.
+          expected_evidence: [delivery-manifest, learning-loop-handoff, verify-summary]
+          risks:
+            - A detached governance artifact can falsely imply closure without target lineage.
+          stop_conditions:
+            - Any upstream write is attempted or required evidence loses target-checkout lineage.
+          execution_hints:
+            group_key: null
+            group_reason: null
+            parallel_candidate: false
     agent_visible_request:
       user_problem: Touch one broader request lifecycle surface with bounded regression coverage, stricter
         audit expectations, and no control-plane leakage.
@@ -557,7 +805,7 @@ feature_missions:
         - learning-loop-handoff
         - "Primary verification command: npx xo"
         - "Primary verification command: npm run build"
-        - "Primary verification command: npx ava test/main.ts test/hooks.ts"
+        - "Primary verification command: npx ava test/main.ts test/hooks.ts with the timing-sensitive totalTimeout case excluded"
         - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
         - "Diagnostic evidence command: npx playwright install"
         - "Diagnostic evidence command: npm test with the timing-sensitive totalTimeout case excluded"
@@ -623,7 +871,7 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
-        - npx ava test/main.ts test/hooks.ts
+        - "npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'"
         - npx ava test/retry.ts --match='*shouldRetry*'
       diagnostic_commands:
         - npx playwright install
@@ -695,7 +943,7 @@ feature_missions:
         - learning-loop-handoff
         - "Primary verification command: npx xo"
         - "Primary verification command: npm run build"
-        - "Primary verification command: npx ava test/main.ts test/hooks.ts"
+        - "Primary verification command: npx ava test/main.ts test/hooks.ts with the timing-sensitive totalTimeout case excluded"
         - "Primary verification command: npx ava test/retry.ts --match='*shouldRetry*'"
         - "Diagnostic evidence command: npx playwright install"
         - "Diagnostic evidence command: npm test with the timing-sensitive totalTimeout case excluded"

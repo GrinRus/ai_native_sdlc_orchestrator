@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "w66-live-qualification-evidence-index",
+  "status": "pending",
+  "qualification_commit": null,
+  "target_repository": "https://github.com/sindresorhus/ky.git",
+  "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
+  "path_policy": "path-neutral-content-addressed",
+  "installed_baseline": {
+    "run_id": null,
+    "commit_sha": null,
+    "status": "not-run",
+    "ui_ux_status": "not-run",
+    "accessibility_status": "not-run",
+    "no_source_write": false,
+    "artifact_digests": {}
+  },
+  "cells": [
+    {
+      "cell_id": "openai-primary.medium",
+      "profile_ref": "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
+      "profile_sha256": "4c0c509f6af5211baab5744247301e7895484c1ffcfb3365b409247e26ee18dc",
+      "run_id": null,
+      "status": "not-run",
+      "run_health_status": "not-run",
+      "production_proof_status": "not-run",
+      "final_assessment_status": "not-run",
+      "no_upstream_write_status": "not-run",
+      "artifact_digests": {}
+    },
+    {
+      "cell_id": "openai-primary.large",
+      "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
+      "profile_sha256": "09de0d97beab4a67b10b17741e1a1352dcd7d3ee8b5abc1507756cdc54ae246e",
+      "run_id": null,
+      "status": "not-run",
+      "run_health_status": "not-run",
+      "production_proof_status": "not-run",
+      "final_assessment_status": "not-run",
+      "no_upstream_write_status": "not-run",
+      "artifact_digests": {}
+    },
+    {
+      "cell_id": "anthropic-primary.medium",
+      "profile_ref": "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
+      "profile_sha256": "2cbb39df912c26e6fb90267648f71c05ed09351e817a7550d6efd2000ac9ca6d",
+      "run_id": null,
+      "status": "not-run",
+      "run_health_status": "not-run",
+      "production_proof_status": "not-run",
+      "final_assessment_status": "not-run",
+      "no_upstream_write_status": "not-run",
+      "artifact_digests": {}
+    },
+    {
+      "cell_id": "anthropic-primary.large",
+      "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-anthropic.yaml",
+      "profile_sha256": "7bade07c69eeba9fdf74208e36bc688086dd80b8eb69796bebc564c27d42c31d",
+      "run_id": null,
+      "status": "not-run",
+      "run_health_status": "not-run",
+      "production_proof_status": "not-run",
+      "final_assessment_status": "not-run",
+      "no_upstream_write_status": "not-run",
+      "artifact_digests": {}
+    }
+  ]
+}

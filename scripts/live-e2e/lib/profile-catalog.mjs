@@ -195,6 +195,7 @@ function assertLiveE2ePolicy(profile, source) {
   const agentDecisionPolicy = asNonEmptyString(policy.agent_decision_policy);
   const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
   const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
+  const auditHoldPolicy = asNonEmptyString(policy.audit_hold_policy) || "enforce";
   const implementationLoop = asRecord(profile.implementation_loop);
   const guidedJourney = asRecord(profile.guided_journey);
   const proofRequirements = asStringArray(guidedJourney.proof_requirements);
@@ -234,6 +235,17 @@ function assertLiveE2ePolicy(profile, source) {
   if (targetWritePolicy !== "aor-runtime-only-before-execution") {
     problems.push("live_e2e.target_write_policy must be aor-runtime-only-before-execution");
   }
+  if (!["enforce", "maintainer-qualification-override"].includes(auditHoldPolicy)) {
+    problems.push("live_e2e.audit_hold_policy must be enforce or maintainer-qualification-override");
+  }
+  if (
+    auditHoldPolicy === "maintainer-qualification-override" &&
+    (safetyPolicy !== "no-upstream-write" || asRecord(profile.output_policy).write_back_to_remote !== false)
+  ) {
+    problems.push(
+      "live_e2e.audit_hold_policy=maintainer-qualification-override requires no-upstream-write and output_policy.write_back_to_remote=false",
+    );
+  }
   if (acceptanceLike) {
     if (implementationLoop.enabled !== true) {
       problems.push("acceptance/production-proof profiles must enable implementation_loop.enabled=true");
@@ -248,6 +260,23 @@ function assertLiveE2ePolicy(profile, source) {
     }
     if (browserTaskProof.required !== true) {
       problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.required=true");
+    }
+    if (browserTaskProof.schema_version !== 2) {
+      problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.schema_version=2");
+    }
+    if (asNonEmptyString(browserTaskProof.scenario_id) !== "installed-console-matrix") {
+      problems.push("browser-task-proof profiles must select the installed-console-matrix scenario");
+    }
+    const requiredBrowserMatrix = [
+      ["required_viewports", ["desktop", "tablet", "mobile", "zoom-200"]],
+      ["required_accessibility", ["keyboard-only", "dialog-focus", "focus-restoration", "semantic-tree", "contrast-aa", "touch-targets", "reduced-motion"]],
+      ["required_recovery", ["reload", "reconnect", "partial-read", "offline-read", "injected-error", "multi-item-attention", "project-switch", "terminal-read-only"]],
+    ];
+    for (const [field, expected] of requiredBrowserMatrix) {
+      const declared = new Set(asStringArray(browserTaskProof[field]));
+      for (const value of expected) {
+        if (!declared.has(value)) problems.push(`browser-task-proof profiles must include ${field} '${value}'`);
+      }
     }
     if (flowLoopProof.enabled !== true) {
       problems.push("browser-task-proof profiles must declare guided_journey.flow_loop_proof.enabled=true");

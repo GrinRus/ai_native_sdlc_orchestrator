@@ -12,10 +12,34 @@ import { appendRunEvent, applyRunControlAction, listQualityArtifacts } from "../
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { buildCliOutput } from "../src/cli-output.mjs";
 import { invokeCli } from "../src/index.mjs";
+import { resolveRepairClosureStatusBlocker } from "../../../packages/orchestrator-core/src/operator-cli/command-handlers/quality.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const fixturesDir = path.join(path.dirname(currentFilePath), "fixtures");
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../../..");
+
+test("repair closure reconciles requested external-runner attempts only through distinct refreshed lineage", () => {
+  assert.equal(resolveRepairClosureStatusBlocker({
+    currentStatus: "requested",
+    runId: "run-1",
+    closureRunId: "run-1",
+  }), "A requested quality repair requires a distinct '--closure-run-id' with refreshed repair evidence.");
+  assert.equal(resolveRepairClosureStatusBlocker({
+    currentStatus: "requested",
+    runId: "run-1",
+    closureRunId: "run-1.repair-2",
+  }), null);
+  assert.match(resolveRepairClosureStatusBlocker({
+    currentStatus: "in-progress",
+    runId: "run-1",
+    closureRunId: "run-1.repair-2",
+  }), /cannot be closed/u);
+  assert.match(resolveRepairClosureStatusBlocker({
+    currentStatus: "budget-exhausted",
+    runId: "run-1",
+    closureRunId: "run-1.repair-2",
+  }), /cannot be closed/u);
+});
 
 /**
  * @param {(projectRoot: string) => void} callback
@@ -82,6 +106,19 @@ function materializeSoftNoWriteIntake(options) {
   ]);
   assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
   return JSON.parse(intakeResult.stdout);
+}
+
+/**
+ * @param {{ projectRoot: string, runtimeRoot?: string }} options
+ */
+function materializeSmallPlanningIntake(options) {
+  const requestFile = path.join(options.projectRoot, "small-planning.request.json");
+  fs.writeFileSync(requestFile, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
+  const args = ["intake", "create", "--project-ref", options.projectRoot, "--request-file", requestFile];
+  if (options.runtimeRoot) args.push("--runtime-root", options.runtimeRoot);
+  const result = invokeCli(args);
+  assert.equal(result.exitCode, 0, result.stderr);
+  return JSON.parse(result.stdout);
 }
 
 /**
@@ -1464,7 +1501,9 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     );
     fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
 
-    const intakeResult = invokeCli(["intake", "create", "--project-ref", projectRoot]);
+    const planningRequest = path.join(projectRoot, "small-planning.request.json");
+    fs.writeFileSync(planningRequest, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
+    const intakeResult = invokeCli(["intake", "create", "--project-ref", projectRoot, "--request-file", planningRequest]);
     assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
     const intakePayload = JSON.parse(intakeResult.stdout);
     assert.equal(intakePayload.command, "intake create");
@@ -1475,14 +1514,10 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
       "kpis",
       "definition_of_done",
     ]);
-    assert.deepEqual(intakePayload.product_intake_source_refs, [
-      {
-        source_id: "manual-request",
-        source_kind: "local-note",
-        title: "Catalog-backed feature mission request",
-        ref: "runtime://manual-request",
-      },
-    ]);
+    assert.equal(intakePayload.product_intake_source_refs.length, 1);
+    assert.equal(intakePayload.product_intake_source_refs[0].source_kind, "local-note");
+    assert.equal(intakePayload.product_intake_source_refs[0].title, "Catalog-backed feature mission request");
+    assert.equal(intakePayload.product_intake_source_refs[0].ref, planningRequest);
 
     const discoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
     assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
@@ -1521,6 +1556,7 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(specStepResult.routed_execution.discovery_research_gate.status, "incomplete");
     assert.equal(specStepResult.routed_execution.architecture_traceability.selected_step.step_class, "spec");
 
+    materializeSmallPlanningIntake({ projectRoot });
     const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
     assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
@@ -3626,6 +3662,7 @@ test("operator commands inspect runs, packets, and evidence through shared contr
     assert.equal(compactRunStatusPayload.run_event_history.total_events, 2);
     assert.equal(Object.prototype.hasOwnProperty.call(compactRunStatusPayload, "validation_report_id"), false);
 
+    materializeSmallPlanningIntake({ projectRoot });
     const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
     assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
@@ -5904,6 +5941,7 @@ test("handoff prepare reuses the latest validated structured plan", () => {
     assert.equal(missingPlan.exitCode, 1);
     assert.match(missingPlan.stderr, /aor plan create/u);
 
+    materializeSmallPlanningIntake({ projectRoot });
     const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
     assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const result = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
@@ -5929,6 +5967,7 @@ test("project validate enforces approved handoff gate when required", () => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
 
+    materializeSmallPlanningIntake({ projectRoot });
     const planCreateResult = invokeCli(["plan", "create", "--project-ref", projectRoot]);
     assert.equal(planCreateResult.exitCode, 0, planCreateResult.stderr);
     const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
@@ -5993,6 +6032,7 @@ test("handoff approve preserves an explicitly selected project profile", () => {
       defaultProfile.replace("project_id: aor-core", "project_id: qualification-target"),
       "utf8",
     );
+    const intake = materializeSmallPlanningIntake({ projectRoot, runtimeRoot: ".aor-live" });
 
     const planResult = invokeCli([
       "plan",
@@ -6003,6 +6043,8 @@ test("handoff approve preserves an explicitly selected project profile", () => {
       profilePath,
       "--runtime-root",
       ".aor-live",
+      "--approved-artifact",
+      intake.artifact_packet_file,
     ]);
     assert.equal(planResult.exitCode, 0, planResult.stderr);
     const plan = JSON.parse(planResult.stdout);

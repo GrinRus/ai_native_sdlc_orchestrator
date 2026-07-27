@@ -684,6 +684,88 @@ test("live adapter executes external runner path for supported codex-cli request
   }
 });
 
+test("exit zero preserves transport completion but rejects explicit partial provider outcome", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-provider-outcome-"));
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify({output:{semantic_outcome:'partial',verification_status:'partial'}}));"],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute({
+      request_id: "req-partial-outcome",
+      run_id: "run-partial-outcome",
+      step_id: "step-partial-outcome",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      context: { compiled_context_ref: "compiled-context://partial" },
+    });
+    assert.equal(response.output.execution_outcome.process.exit_code, 0);
+    assert.equal(response.output.execution_outcome.transport.status, "completed");
+    assert.equal(response.output.execution_outcome.provider.status, "partial");
+    assert.equal(response.output.execution_outcome.verification.status, "partial");
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "provider-partial-outcome");
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("Codex JSON mode publishes normalized progress before the terminal outcome", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-codex-json-progress-"));
+  try {
+    const runnerFile = path.join(evidenceRoot, "runner.mjs");
+    fs.writeFileSync(
+      runnerFile,
+      [
+        "process.stdout.write(JSON.stringify({type:'assistant',message:'working'})+'\\n');",
+        "process.stdout.write(JSON.stringify({type:'result',status:'completed',verification_status:'pass',model:'gpt-test',reasoning_effort:'high'})+'\\n');",
+      ].join("\n"),
+    );
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [runnerFile, "--json"],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute({
+      request_id: "req-codex-progress",
+      run_id: "run-codex-progress",
+      step_id: "step-codex-progress",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      context: { compiled_context_ref: "compiled-context://codex-progress" },
+    });
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.output_mode, "jsonl");
+    assert.equal(response.output.external_runner.provider_progress_events.length, 2);
+    assert.equal(response.output.external_runner.provider_progress_events.at(-1).kind, "result");
+    assert.equal(response.output.runner_output.provider_progress_events.length, 2);
+    assert.equal(response.output.runner_output.terminal_outcome.model, "gpt-test");
+    assert.equal(response.output.runner_output.terminal_outcome.reasoning, "high");
+    assert.equal(response.output.execution_outcome.provider.status, "completed");
+    assert.equal(response.output.execution_outcome.verification.status, "pass");
+    assert.equal(response.output.execution_outcome.schema_version, 1);
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter can invoke external runners through a short execution root alias", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-short-root-"));
   const longSegment = "installed-user-guided-journey-qwen-final-ui-1780348266";
@@ -2073,6 +2155,39 @@ test("live adapter accepts Codex JSONL agent summaries that mention target Permi
   assert.equal(response.status, "success");
   assert.equal(response.output.failure_kind, undefined);
   assert.equal(response.output.runner_output.jsonl_events.length, 2);
+});
+
+test("live adapter does not treat target listen EPERM diagnostics as runner permission denial", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({type:'thread.started',thread_id:'t1'})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'command_execution',command:'npm test',aggregated_output:'Error: listen EPERM: operation not permitted 0.0.0.0',exit_code:1,status:'failed'}})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Implemented source/utils/merge.ts and test/headers.ts. The target test was environment-blocked by a local listen permission denial; controller-owned verification remains authoritative.'}})+'\\n');",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-codex-jsonl-target-listen-eperm",
+    run_id: "run-codex-jsonl-target-listen-eperm",
+    step_id: "step-codex-jsonl-target-listen-eperm",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.failure_kind, undefined);
+  assert.equal(response.output.runner_output.jsonl_events.length, 3);
 });
 
 test("live adapter ignores successful Codex plugin warm auth noise", () => {

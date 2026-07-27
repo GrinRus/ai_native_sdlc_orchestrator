@@ -40,7 +40,15 @@ import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.m
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
 import { runGuidedBrowserTaskCollector } from "./browser-proof-collector.mjs";
+import { guidedBrowserTaskCollectorPythonSource } from "./browser-proof-python-source.mjs";
 import { collectTypedEvidenceRefs } from "./evidence-ref-collector.mjs";
+import { computeSourceTreeDigest, sourceInstallCacheMatches } from "./source-tree-identity.mjs";
+import {
+  materializeBrowserEvidenceIndex,
+  validateInstalledBrowserProof,
+} from "./installed-browser-proof.mjs";
+
+export { computeSourceTreeDigest, sourceInstallCacheMatches } from "./source-tree-identity.mjs";
 
 const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
 const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
@@ -688,14 +696,23 @@ export function prepareAorInstallationProof(options) {
   const installRoot = path.join(options.reportsRoot, `live-e2e-aor-install-${normalizedRunId}`);
   const proofFile = path.join(options.reportsRoot, `live-e2e-aor-installation-proof-${normalizedRunId}.json`);
   const currentSourceCommit = gitHeadOrNull(options.hostRoot);
+  const currentSourceTreeDigest =
+    effectivePolicy === "source-install-required" ? computeSourceTreeDigest(options.hostRoot) : null;
   if (fileExists(proofFile)) {
     const cachedProof = asRecord(readJson(proofFile));
     const launcherRef = asNonEmptyString(cachedProof.launcher_ref);
     const cachedSourceCommit = asNonEmptyString(cachedProof.source_commit_sha);
+    const cachedSourceTreeDigest = asNonEmptyString(cachedProof.source_tree_digest);
     const cachedInstallMode = asNonEmptyString(cachedProof.install_mode);
-    const sourceCommitMatches = !currentSourceCommit || !cachedSourceCommit || currentSourceCommit === cachedSourceCommit;
+    const sourceIdentityMatches = sourceInstallCacheMatches({
+      effectivePolicy,
+      currentSourceCommit,
+      currentSourceTreeDigest,
+      cachedSourceCommit,
+      cachedSourceTreeDigest,
+    });
     const cacheLooksReusable =
-      asNonEmptyString(cachedProof.status) === "pass" && sourceCommitMatches && launcherRef && fileExists(launcherRef);
+      asNonEmptyString(cachedProof.status) === "pass" && sourceIdentityMatches && launcherRef && fileExists(launcherRef);
     const cachedLauncherSmoke = cacheLooksReusable ? verifyCachedAorLauncher({ launcherRef, installRoot }) : null;
     if (cacheLooksReusable && cachedLauncherSmoke?.status === "pass") {
       const cachedProofWithReuse = {
@@ -815,6 +832,7 @@ export function prepareAorInstallationProof(options) {
     runtime_root: options.runtimeRoot ?? null,
     original_source_root: options.hostRoot,
     source_commit_sha: currentSourceCommit,
+    source_tree_digest: currentSourceTreeDigest,
     installed_source_root: effectivePolicy === "source-install-required" ? installCwd : null,
     launcher_ref: launcherRef,
     command_transcripts: commandTranscripts,
@@ -1301,6 +1319,20 @@ function resolveImplementationLoopPolicy(profile) {
     proofExpectations: asRecord(loop.proof_expectations),
     acceptanceRepairDrill: resolveAcceptanceRepairDrill(asRecord(loop.proof_expectations)),
   };
+}
+
+/**
+ * Resolve the explicit private-profile exception used for reviewed
+ * qualification while the product release hold remains active.
+ *
+ * @param {Record<string, unknown>} profile
+ * @returns {string[]}
+ */
+export function resolveAuditHoldOverrideArgs(profile) {
+  return asNonEmptyString(asRecord(profile.live_e2e).audit_hold_policy) ===
+    "maintainer-qualification-override"
+    ? ["--unsafe-development-override", "true"]
+    : [];
 }
 
 /**
@@ -1799,278 +1831,6 @@ function resolvePlaywrightPythonBin(env = process.env) {
 /**
  * @returns {string}
  */
-function guidedBrowserTaskCollectorPythonSource() {
-  return String.raw`import json
-import sys
-from pathlib import Path
-
-from playwright.sync_api import sync_playwright
-
-
-def write_json(path, document):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-
-
-def main():
-    payload = json.loads(sys.argv[1])
-    timeout_ms = int(payload.get("timeout_ms") or 30000)
-    app_url = payload["app_url"]
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
-        page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
-        page.wait_for_timeout(1500)
-        html = page.content()
-        Path(payload["rendered_html_file"]).write_text(html, encoding="utf-8")
-        screenshot_file = payload["screenshot_file"]
-        page.screenshot(path=screenshot_file, full_page=True)
-        dom_snapshot = page.evaluate("""() => {
-          const selectorFor = (el) => {
-            if (!el) return null;
-            if (el.id) return '#' + CSS.escape(el.id);
-            const rawClass = typeof el.className === 'string' ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 3) : [];
-            const classSuffix = rawClass.length > 0 ? '.' + rawClass.map((part) => CSS.escape(part)).join('.') : '';
-            const parent = el.parentElement;
-            const siblings = parent ? Array.from(parent.children).filter((item) => item.tagName === el.tagName) : [];
-            const nth = siblings.length > 1 ? ':nth-of-type(' + (siblings.indexOf(el) + 1) + ')' : '';
-            return el.tagName.toLowerCase() + classSuffix + nth;
-          };
-          const visible = (el) => {
-            const style = window.getComputedStyle(el);
-            const rect = el.getBoundingClientRect();
-            return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
-          };
-          const labelFor = (el) => (
-            el.getAttribute('aria-label') ||
-            el.getAttribute('title') ||
-            el.innerText ||
-            el.textContent ||
-            el.getAttribute('name') ||
-            el.id ||
-            ''
-          ).trim().replace(/\s+/g, ' ').slice(0, 160);
-          const roleFor = (el) => el.getAttribute('role') || (
-            el.tagName.toLowerCase() === 'a' ? 'link' :
-            el.tagName.toLowerCase() === 'button' ? 'button' :
-            el.tagName.toLowerCase() === 'select' ? 'combobox' :
-            el.tagName.toLowerCase() === 'input' ? 'textbox' :
-            null
-          );
-          const focusableSelector = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"]),[role="button"],[role="link"],[role="menuitem"],[role="tab"]';
-          const focusableControls = Array.from(document.querySelectorAll(focusableSelector))
-            .filter((el) => visible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true')
-            .slice(0, 80)
-            .map((el, index) => ({
-              index: index + 1,
-              tag_name: el.tagName.toLowerCase(),
-              role: roleFor(el),
-              label: labelFor(el),
-              selector: selectorFor(el),
-              tab_index: el.tabIndex
-            }));
-          const semantic = {
-            title: document.title || null,
-            h1_count: document.querySelectorAll('h1').length,
-            heading_count: document.querySelectorAll('h1,h2,h3,h4,h5,h6,[role="heading"]').length,
-            main_count: document.querySelectorAll('main,[role="main"]').length,
-            button_count: document.querySelectorAll('button,[role="button"]').length,
-            form_control_count: document.querySelectorAll('button,input,select,textarea').length,
-            status_region_count: document.querySelectorAll('[role="status"],[role="alert"],[aria-live]').length
-          };
-          const parseRgb = (value) => {
-            const match = String(value).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
-            if (!match) return null;
-            const alpha = match[4] === undefined ? 1 : Number(match[4]);
-            return { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]), a: alpha };
-          };
-          const relativeLuminance = (rgb) => {
-            const channel = (value) => {
-              const srgb = value / 255;
-              return srgb <= 0.03928 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4);
-            };
-            return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
-          };
-          const contrastRatio = (left, right) => {
-            const l1 = relativeLuminance(left);
-            const l2 = relativeLuminance(right);
-            return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-          };
-          const backgroundFor = (el) => {
-            let current = el;
-            while (current) {
-              const style = window.getComputedStyle(current);
-              const backgroundColor = parseRgb(style.backgroundColor);
-              if (backgroundColor && backgroundColor.a >= 0.98) return backgroundColor;
-              const backgroundImage = parseRgb(style.backgroundImage);
-              if (backgroundImage && backgroundImage.a >= 0.98) return backgroundImage;
-              current = current.parentElement;
-            }
-            return { r: 255, g: 255, b: 255, a: 1 };
-          };
-          const contrastSamples = focusableControls.slice(0, 30).map((control) => {
-            const el = document.querySelector(control.selector);
-            if (!el) return null;
-            const style = window.getComputedStyle(el);
-            const color = parseRgb(style.color);
-            const background = backgroundFor(el);
-            return color ? {
-              selector: control.selector,
-              label: control.label,
-              ratio: Number(contrastRatio(color, background).toFixed(2))
-            } : null;
-          }).filter(Boolean);
-          return {
-            url: window.location.href,
-            title: document.title || null,
-            body_text_sample: (document.body?.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 5000),
-            focusable_controls: focusableControls,
-            semantic,
-            contrast_samples: contrastSamples
-          };
-        }""")
-        try:
-            page.locator("body").click(position={"x": 1, "y": 1}, timeout=3000)
-        except Exception:
-            pass
-        focus_sequence = []
-        for index in range(1, 21):
-            page.keyboard.press("Tab")
-            active = page.evaluate("""(index) => {
-              const el = document.activeElement;
-              if (!el || el === document.body) return null;
-              const selectorFor = (node) => {
-                if (node.id) return '#' + CSS.escape(node.id);
-                const rawClass = typeof node.className === 'string' ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 3) : [];
-                const classSuffix = rawClass.length > 0 ? '.' + rawClass.map((part) => CSS.escape(part)).join('.') : '';
-                const parent = node.parentElement;
-                const siblings = parent ? Array.from(parent.children).filter((item) => item.tagName === node.tagName) : [];
-                const nth = siblings.length > 1 ? ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')' : '';
-                return node.tagName.toLowerCase() + classSuffix + nth;
-              };
-              const label = (
-                el.getAttribute('aria-label') ||
-                el.getAttribute('title') ||
-                el.innerText ||
-                el.textContent ||
-                el.getAttribute('name') ||
-                el.id ||
-                ''
-              ).trim().replace(/\s+/g, ' ').slice(0, 160);
-              const tag = el.tagName.toLowerCase();
-              const role = el.getAttribute('role') || (tag === 'a' ? 'link' : tag === 'button' ? 'button' : tag === 'select' ? 'combobox' : tag === 'input' ? 'textbox' : null);
-              return { index, role, label, selector: selectorFor(el), tag_name: tag };
-            }""", index)
-            if active:
-                focus_sequence.append(active)
-        browser.close()
-
-    distinct_targets = {entry.get("selector") or entry.get("label") for entry in focus_sequence if entry.get("selector") or entry.get("label")}
-    focusable_controls = dom_snapshot.get("focusable_controls") or []
-    unlabeled_controls = [entry for entry in focusable_controls[:30] if not entry.get("label")]
-    semantic = dom_snapshot.get("semantic") or {}
-    contrast_samples = dom_snapshot.get("contrast_samples") or []
-    low_contrast = [entry for entry in contrast_samples if float(entry.get("ratio") or 0) < 3.0]
-    evidence_refs = [
-        payload["browser_task_proof_file"],
-        payload["rendered_html_file"],
-        payload["dom_snapshot_file"],
-        payload["accessibility_summary_file"],
-        payload["visual_guardrail_file"],
-        screenshot_file,
-    ]
-    accessibility_checks = [
-        {
-            "check_id": "keyboard_navigation",
-            "status": "pass" if len(distinct_targets) >= 2 else "not_pass",
-            "evidence_refs": evidence_refs,
-            "findings": [] if len(distinct_targets) >= 2 else ["Keyboard Tab probe did not reach at least two distinct controls."]
-        },
-        {
-            "check_id": "focus_order",
-            "status": "pass" if len(focus_sequence) >= 2 and len(focusable_controls) >= 2 else "not_pass",
-            "evidence_refs": evidence_refs,
-            "findings": [] if len(focus_sequence) >= 2 and len(focusable_controls) >= 2 else ["Focusable DOM order could not be compared with Tab traversal."]
-        },
-        {
-            "check_id": "contrast_and_readability",
-            "status": "pass" if not low_contrast else "not_pass",
-            "evidence_refs": evidence_refs,
-            "findings": [] if not low_contrast else [f"{len(low_contrast)} sampled controls had contrast ratio below 3.0."]
-        },
-        {
-            "check_id": "semantic_structure",
-            "status": "pass" if semantic.get("heading_count", 0) >= 1 and semantic.get("form_control_count", 0) >= 2 else "not_pass",
-            "evidence_refs": evidence_refs,
-            "findings": [] if semantic.get("heading_count", 0) >= 1 and semantic.get("form_control_count", 0) >= 2 else ["Operator UI semantic structure did not expose headings and controls."]
-        },
-        {
-            "check_id": "screen_reader_labels",
-            "status": "pass" if not unlabeled_controls else "not_pass",
-            "evidence_refs": evidence_refs,
-            "findings": [] if not unlabeled_controls else [f"{len(unlabeled_controls)} sampled focusable controls lacked accessible labels."]
-        },
-        {
-            "check_id": "accessible_error_feedback",
-            "status": "pass",
-            "evidence_refs": evidence_refs,
-            "findings": ["No active blocking error state was present during the guided browser probe; status and state-feedback text were inspected."]
-        },
-    ]
-    write_json(payload["dom_snapshot_file"], {
-        "kind": "guided-browser-task-dom-snapshot",
-        "status": "pass",
-        **dom_snapshot,
-    })
-    write_json(payload["accessibility_summary_file"], {
-        "kind": "guided-browser-task-accessibility-summary",
-        "status": "pass" if all(entry["status"] == "pass" for entry in accessibility_checks) else "not_pass",
-        "keyboard_focus_sequence": focus_sequence,
-        "focusable_control_count": len(focusable_controls),
-        "accessibility_checks": accessibility_checks,
-        "findings": [finding for entry in accessibility_checks for finding in entry.get("findings", [])],
-    })
-    proof_status = "pass" if all(entry["status"] == "pass" for entry in accessibility_checks) else "not_pass"
-    proof = {
-        "schema_version": 1,
-        "proof_id": f"{payload['run_id']}.guided-browser-task-proof.v1",
-        "run_id": payload["run_id"],
-        "status": proof_status,
-        "proof_source": "playwright-python-guided-browser-task-collector",
-        "browser_task_proof_request_file": payload["browser_task_proof_request_file"],
-        "rendered_html_file": payload["rendered_html_file"],
-        "dom_snapshot_file": payload["dom_snapshot_file"],
-        "accessibility_summary_file": payload["accessibility_summary_file"],
-        "visual_guardrail_file": payload["visual_guardrail_file"],
-        "screenshot_files": [screenshot_file],
-        "screenshot_refs": [screenshot_file],
-        "keyboard_navigation": {
-            "status": "pass" if len(distinct_targets) >= 2 else "not_pass",
-            "focus_sequence": focus_sequence,
-        },
-        "keyboard_focus_sequence": focus_sequence,
-        "accessibility_checks": accessibility_checks,
-        "task_outcome": {
-            "status": proof_status,
-            "checked_tasks": [
-                "AOR operator app loaded in a real browser",
-                "keyboard Tab traversal captured",
-                "focusable controls inspected",
-                "DOM and accessibility summaries materialized",
-                "visual screenshot captured"
-            ],
-            "findings": [] if proof_status == "pass" else [finding for entry in accessibility_checks for finding in entry.get("findings", [])],
-        },
-        "ux_findings": ["Guided browser task proof was collected from the installed-user AOR operator console."],
-    }
-    write_json(payload["browser_task_proof_file"], proof)
-    print(json.dumps({"status": proof_status, "proof_file": payload["browser_task_proof_file"], "screenshot_file": screenshot_file}))
-
-
-if __name__ == "__main__":
-    main()
-`;
-}
 
 /**
  * @param {{
@@ -2079,6 +1839,8 @@ if __name__ == "__main__":
  *   reportsRoot: string,
  *   env: Record<string, string | undefined>,
  *   appUrl: string | null,
+ *   controlPlane?: string | null,
+ *   projectId?: string | null,
  *   browserTaskProofRequestFile: string,
  *   browserTaskProofFile: string,
  *   outputHtml: string,
@@ -2138,7 +1900,10 @@ export function collectGuidedBrowserTaskProof(options) {
   fs.writeFileSync(collectorScriptFile, guidedBrowserTaskCollectorPythonSource(), "utf8");
   const payload = {
     run_id: options.runId,
+    scenario_id: "installed-console-matrix",
     app_url: options.appUrl,
+    control_plane: options.controlPlane,
+    project_id: options.projectId,
     browser_task_proof_request_file: options.browserTaskProofRequestFile,
     browser_task_proof_file: options.browserTaskProofFile,
     rendered_html_file: options.outputHtml,
@@ -2159,7 +1924,7 @@ export function collectGuidedBrowserTaskProof(options) {
   } catch {
     parsedStdout = {};
   }
-  const collectorResult =
+  let collectorResult =
     result.status === 0 && fileExists(options.browserTaskProofFile)
       ? {
           status: asNonEmptyString(parsedStdout.status) || "pass",
@@ -2183,6 +1948,78 @@ export function collectGuidedBrowserTaskProof(options) {
           blocker_class: "browser_task_proof_collector_failed",
           attempts,
         };
+  if (
+    collectorResult.status === "pass"
+    && fileExists(options.browserTaskProofRequestFile)
+    && fileExists(options.browserTaskProofFile)
+  ) {
+    const request = asRecord(readJson(options.browserTaskProofRequestFile));
+    const proof = asRecord(readJson(options.browserTaskProofFile));
+    if (request.schema_version === 2 && proof.schema_version === 2) {
+      const scenarioReportFile = path.join(
+        options.reportsRoot,
+        `installed-browser-scenario-report-${normalizeId(options.runId)}.json`,
+      );
+      const findingLedgerFile = path.join(
+        options.reportsRoot,
+        `installed-browser-finding-ledger-${normalizeId(options.runId)}.json`,
+      );
+      const appSmokeFile = path.join(
+        options.reportsRoot,
+        `installed-browser-app-smoke-${normalizeId(options.runId)}.json`,
+      );
+      writeJson(appSmokeFile, {
+        kind: "installed-app-smoke",
+        run_id: options.runId,
+        scenario_id: request.scenario_id,
+        app_url: options.appUrl,
+        control_plane: options.controlPlane,
+        status: proof.status,
+      });
+      writeJson(scenarioReportFile, {
+        kind: "installed-scenario-report",
+        run_id: options.runId,
+        scenario_id: request.scenario_id,
+        scenarios: proof.scenarios,
+        actions: proof.actions,
+      });
+      writeJson(findingLedgerFile, {
+        kind: "finding-ledger",
+        run_id: options.runId,
+        scenario_id: request.scenario_id,
+        findings: proof.findings ?? [],
+      });
+      const indexed = materializeBrowserEvidenceIndex({
+        reportsRoot: options.reportsRoot,
+        runId: options.runId,
+        scenarioId: request.scenario_id,
+        createdAt: request.created_at,
+        artifacts: [
+          { kind: "installed-app-smoke", file: appSmokeFile },
+          { kind: "installed-scenario-report", file: scenarioReportFile },
+          { kind: "browser-task-proof", file: options.browserTaskProofFile },
+          { kind: "dom-snapshot", file: options.domSnapshotFile },
+          { kind: "accessibility-summary", file: options.accessibilitySummaryFile },
+          { kind: "finding-ledger", file: findingLedgerFile },
+        ],
+      });
+      const validation = validateInstalledBrowserProof({
+        proof,
+        request,
+        index: indexed.index,
+        reportsRoot: options.reportsRoot,
+        runId: options.runId,
+        scenarioId: request.scenario_id,
+      });
+      collectorResult = {
+        ...collectorResult,
+        status: validation.ok ? "pass" : "not_pass",
+        evidence_index_file: indexed.indexFile,
+        evidence_index_digest: indexed.digest,
+        validation,
+      };
+    }
+  }
   writeJson(outputFile, collectorResult);
   return collectorResult;
 }
@@ -2278,8 +2115,11 @@ export function runGuidedWebSmoke(options) {
   const browserTaskAppUrl = asNonEmptyString(browserTaskAppSurface.app_url) || null;
   const browserTaskControlPlane = asNonEmptyString(browserTaskAppSurface.control_plane) || null;
   writeJson(browserTaskProofRequestFile, {
-    request_id: `${options.runId}.guided-browser-task-proof-request.v1`,
+    schema_version: 2,
+    kind: "installed-browser-proof-request",
+    request_id: `${options.runId}.installed-browser-proof-request.v2`,
     run_id: options.runId,
+    scenario_id: "installed-console-matrix",
     expected_browser_task_proof_file: browserTaskProofFile,
     expected_rendered_html_file: outputHtml,
     expected_dom_snapshot_file: domSnapshotFile,
@@ -2305,6 +2145,26 @@ export function runGuidedWebSmoke(options) {
       "browser-task proof ref",
     ],
     required_accessibility_checks: AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS,
+    required_viewports: ["desktop", "tablet", "mobile", "zoom-200"],
+    required_accessibility_matrix: [
+      "keyboard-only",
+      "dialog-focus",
+      "focus-restoration",
+      "semantic-tree",
+      "contrast-aa",
+      "touch-targets",
+      "reduced-motion",
+    ],
+    required_recovery_matrix: [
+      "reload",
+      "reconnect",
+      "partial-read",
+      "offline-read",
+      "injected-error",
+      "multi-item-attention",
+      "project-switch",
+      "terminal-read-only",
+    ],
     assessment_scope:
       "AOR operator and installed-user UI/UX only; checked-repository frontend behavior belongs to implementation and verification evidence.",
     instructions: [
@@ -2386,6 +2246,8 @@ export function runGuidedWebSmoke(options) {
     reportsRoot: options.reportsRoot,
     env: options.env,
     appUrl: browserTaskAppUrl,
+    controlPlane: browserTaskControlPlane,
+    projectId: asNonEmptyString(summary.project_id) || null,
     browserTaskProofRequestFile,
     browserTaskProofFile,
     outputHtml,
@@ -2415,6 +2277,13 @@ export function runGuidedWebSmoke(options) {
     Object.keys(browserTaskProof).length > 0 &&
     taskPassed &&
     (browserTaskStatus === "pass" || browserTaskStatus === "warn") &&
+    (
+      browserTaskProof.schema_version !== 2
+      || (
+        browserTaskProofCollector.status === "pass"
+        && asRecord(browserTaskProofCollector.validation).ok === true
+      )
+    ) &&
     (browserTaskScreenshotFiles.length > 0 || asNonEmptyString(browserTaskProof.visual_guardrail_file));
   const browserTaskAppServerCleanup =
     options.keepBrowserTaskAppSurface === false
@@ -2442,6 +2311,10 @@ export function runGuidedWebSmoke(options) {
   summary.browser_task_proof_file = Object.keys(browserTaskProof).length > 0 ? browserTaskProofFile : null;
   summary.browser_task_proof_collector = browserTaskProofCollector;
   summary.browser_task_proof_collector_file = asNonEmptyString(browserTaskProofCollector.output_file) || null;
+  summary.browser_evidence_index_file =
+    asNonEmptyString(browserTaskProofCollector.evidence_index_file) || null;
+  summary.browser_evidence_index_digest =
+    asNonEmptyString(browserTaskProofCollector.evidence_index_digest) || null;
   summary.browser_task_app_url = browserTaskAppUrl;
   summary.browser_task_control_plane = browserTaskControlPlane;
   summary.browser_task_app_server_status = asNonEmptyString(browserTaskAppSurface.status) || "unknown";
@@ -3671,6 +3544,23 @@ function resolvePostRunQualityPolicy(mission, catalogVerification) {
     diagnosticCommands,
     diagnosticFailureMode,
   };
+}
+
+/**
+ * @param {{
+ *   guidedJourneyEnabled: boolean,
+ *   diagnosticFailureMode: string,
+ *   diagnosticCommands: string[],
+ *   repairDecisionFiles: string[],
+ * }} options
+ */
+export function shouldDeferGuidedWarnDiagnostic(options) {
+  return (
+    options.guidedJourneyEnabled &&
+    options.diagnosticFailureMode === "warn" &&
+    options.diagnosticCommands.length > 0 &&
+    options.repairDecisionFiles.length === 0
+  );
 }
 
 /**
@@ -6157,6 +6047,7 @@ function executeFullJourneyFlowImplementation(options) {
           : []),
         ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
         ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
+        ...resolveAuditHoldOverrideArgs(options.profile),
       ], { iteration });
       artifacts.routed_step_result_file = getStringField(runStart.payload, "routed_step_result_file");
       artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
@@ -6440,10 +6331,12 @@ function executeFullJourneyFlowImplementation(options) {
           qaEvaluationStatus = "skipped";
         }
 
-        const deferGuidedWarnDiagnostic =
-          guidedJourneyEnabled &&
-          postRunQualityPolicy.diagnosticFailureMode === "warn" &&
-          postRunQualityPolicy.diagnosticCommands.length > 0;
+        const deferGuidedWarnDiagnostic = shouldDeferGuidedWarnDiagnostic({
+          guidedJourneyEnabled,
+          diagnosticFailureMode: postRunQualityPolicy.diagnosticFailureMode,
+          diagnosticCommands: postRunQualityPolicy.diagnosticCommands,
+          repairDecisionFiles: asStringArray(artifacts.review_repair_decision_files),
+        });
         if (postRunQualityPolicy.diagnosticCommands.length > 0 && !deferGuidedWarnDiagnostic) {
           const postRunDiagnosticVerify = runPostRunDiagnosticVerify({ iteration });
           qaDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "fail";

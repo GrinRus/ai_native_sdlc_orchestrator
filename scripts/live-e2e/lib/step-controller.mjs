@@ -160,7 +160,8 @@ export function isLiveE2eControllerStopInProgress(controllerStop, includedSteps)
   const state = asRecord(stop.state);
   const completedSteps = new Set(asStringArray(state.completed_steps));
   const allIncludedStepsCompleted =
-    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+    includedSteps.length > 0 &&
+    includedSteps.every((step) => [...completedSteps].some((entry) => entry === step || entry.startsWith(`${step}#`)));
   const terminalManualContinue =
     asNonEmptyString(decision.action) === "continue" &&
     !asNonEmptyString(decision.next_step) &&
@@ -724,7 +725,7 @@ export function createLiveE2eStepController(options) {
     flow_range_policy: policy,
     included_steps: includedSteps,
     current_step: includedSteps[0] ?? null,
-    completed_steps: [],
+    observed_steps: [], accepted_steps: [], completed_steps: [],
     pending_decision: null,
     operator_context: operatorContext,
     retry_counters: retryCounters,
@@ -782,29 +783,26 @@ export function createLiveE2eStepController(options) {
     if (!step) continue;
     entryByStep[asNonEmptyString(entry.step_instance_id) || buildStepInstanceId(step, iteration)] = entry;
   }
-  const resolveCurrentStep = () =>
-    includedSteps.find(
-      (step) =>
-        Object.values(entryByStep).some(
-          (entry) =>
-            asNonEmptyString(entry.step_id) === step &&
-            !["continue", "retry_public_step"].includes(asNonEmptyString(asRecord(entry.decision).action)),
-        ),
-    ) ??
-    includedSteps.find(
-      (step) =>
-        !Object.values(entryByStep).some(
-          (entry) => asNonEmptyString(entry.step_id) === step && (Number(entry.iteration) || 1) === 1,
-        ),
-    ) ??
-    null;
+  const resolveCurrentStep = () => {
+    const latestByStep = new Map();
+    for (const entry of Object.values(entryByStep).sort(
+      (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
+    )) {
+      const step = asNonEmptyString(entry.step_id);
+      if (step) latestByStep.set(step, entry);
+    }
+    return includedSteps.find((step) => {
+      const latestEntry = latestByStep.get(step);
+      return latestEntry && asNonEmptyString(asRecord(latestEntry.decision).action) !== "continue";
+    }) ?? includedSteps.find((step) => !latestByStep.has(step)) ?? null;
+  };
   const resolveLatestEntry = () => {
     const entries = Object.values(entryByStep).sort(
       (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
     );
     return entries[entries.length - 1] ?? null;
   };
-  state.completed_steps = Object.values(entryByStep)
+  state.observed_steps = Object.values(entryByStep)
     .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
     .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
     .filter(Boolean);
@@ -838,8 +836,16 @@ export function createLiveE2eStepController(options) {
     const orderedEntries = Object.values(entryByStep).sort(
       (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
     );
+    const entryId = (entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id);
+    state.observed_steps = orderedEntries.map(entryId).filter(Boolean);
+    state.accepted_steps = orderedEntries.filter((entry) => asNonEmptyString(entry.operator_decision_status) === "accepted").map(entryId).filter(Boolean);
     state.completed_steps = orderedEntries
-      .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
+      .filter((entry) => {
+        if (asNonEmptyString(asRecord(entry.decision).action) !== "continue") return false;
+        const qualityStatus = asNonEmptyString(entry.step_quality_assessment_status);
+        return qualityStatus !== "awaiting-assessment" && qualityStatus !== "request_repair" && qualityStatus !== "blocked";
+      })
+      .map(entryId)
       .filter(Boolean);
     state.current_step = resolveCurrentStep();
     state.pending_decision = asRecord(resolveLatestEntry()?.decision) ?? null;
@@ -1611,6 +1617,13 @@ export function createLiveE2eStepController(options) {
     }
 
     applyStepQualityGate(entry, input.artifacts);
+    if (asNonEmptyString(asRecord(entry.decision).action) === "retry_public_step") {
+      const nextIteration = iteration + 1;
+      entry.decision = { ...asRecord(entry.decision), next_step: step, next_iteration: nextIteration };
+      retryCounters[step] = Math.max(Number(retryCounters[step]) || 0, nextIteration);
+      state.retry_counters = retryCounters;
+      state.current_step = step;
+    }
 
     recordPhase(step, "plan", []);
     recordPhase(step, "execute", uniqueStrings([asNonEmptyString(entry.transcript_ref)]));
@@ -1679,7 +1692,8 @@ export function createLiveE2eStepController(options) {
     Object.values(entryByStep)
       .filter((entry) => {
         const action = asNonEmptyString(asRecord(entry.decision).action);
-        return action === "continue" || (mode === "auto" && action === "retry_public_step");
+        const qualityStatus = asNonEmptyString(entry.step_quality_assessment_status);
+        return action === "continue" && qualityStatus !== "awaiting-assessment";
       })
       .map((entry) => asNonEmptyString(entry.step_instance_id) || buildStepInstanceId(asNonEmptyString(entry.step_id), Number(entry.iteration) || 1))
       .filter(Boolean);
@@ -1834,6 +1848,12 @@ export function createLiveE2eStepController(options) {
         return findCachedCommandResult(label, normalizedIteration) !== null;
       }
       if (mode === "evaluator" && observedStepInstances().includes(stepInstanceId)) {
+        return findCachedCommandResult(label, normalizedIteration) !== null;
+      }
+      if (
+        mode === "auto" &&
+        asNonEmptyString(asRecord(asRecord(entryByStep[stepInstanceId]).decision).action) === "retry_public_step"
+      ) {
         return findCachedCommandResult(label, normalizedIteration) !== null;
       }
       if (completedControllerStepInstances().includes(stepInstanceId)) {

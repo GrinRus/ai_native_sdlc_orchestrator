@@ -9,6 +9,7 @@ import {
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
+import { validateInstalledBrowserProof } from "./installed-browser-proof.mjs";
 
 export const REQUIRED_GUIDED_COMMAND_LABELS = Object.freeze([
   "guided-doctor",
@@ -193,7 +194,35 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
     ...asStringArray(proof.screenshot_refs),
   ]);
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
-  const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
+  let immutableProofPasses = true;
+  if (proof.schema_version === 2) {
+    const requestFile =
+      asNonEmptyString(artifacts.guided_browser_task_proof_request_file)
+      || asNonEmptyString(webSmoke.browser_task_proof_request_file);
+    const indexFile =
+      asNonEmptyString(artifacts.guided_browser_evidence_index_file)
+      || asNonEmptyString(webSmoke.browser_evidence_index_file);
+    const request = readJsonIfPresent(requestFile);
+    const index = readJsonIfPresent(indexFile);
+    const reportsRoot = indexFile
+      ? path.dirname(path.dirname(path.dirname(indexFile)))
+      : "";
+    immutableProofPasses = Boolean(
+      indexFile
+      && validateInstalledBrowserProof({
+        proof,
+        request,
+        index,
+        reportsRoot,
+        runId: asNonEmptyString(proof.run_id),
+        scenarioId: asNonEmptyString(proof.scenario_id),
+      }).ok,
+    );
+  }
+  const proofPasses =
+    (proofStatus === "pass" || proofStatus === "warn")
+    && proofHasVisualEvidence
+    && immutableProofPasses;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
   const keyboardNavigation = asRecord(proof.keyboard_navigation);
   const keyboardFocusSequence = normalizeKeyboardFocusSequence(

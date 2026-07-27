@@ -59,6 +59,21 @@ intent for a release-quality live E2E run:
 - `kpis`
 - `definition_of_done`
 - `post_run_quality.primary_commands`
+- `task_plan.local_tasks` with at least three mission-specific structured tasks
+  when the catalog lists the mission under
+  `qualification_policy.explicit_task_plan_mission_ids`
+
+Each mission task must declare at least `task_id`, `title`, and `objective`.
+The catalog should normally provide the complete structured-task shape because
+the task plan is copied into the public feature request and consumed by
+`aor plan create`. Medium+ qualification must fail before provider execution
+when this explicit decomposition is absent; the compact generated fallback is
+small-only.
+
+`qualification_policy.explicit_task_plan_mission_ids` is an optional private
+qualification constraint. It lets a release set require explicit plans for its
+selected cells without silently changing historical diagnostic catalog
+missions.
 
 `agent_visible_request` is the user-facing request given to AOR. It must include
 `user_problem`, `desired_outcome`, `constraints[]`, and `non_goals[]`.

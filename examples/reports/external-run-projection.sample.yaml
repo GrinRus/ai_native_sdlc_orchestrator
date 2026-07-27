@@ -1,0 +1,44 @@
+schema_version: 1
+projection_id: external-run.sample-run.v1
+run_id: sample-run
+profile_id: sample-profile
+status: blocked
+report_status: in_progress
+generated_at: "2026-07-26T12:00:00.000Z"
+current_step: delivery
+blocked_step_id: delivery
+pending_steps:
+  - delivery
+completed_steps:
+  - execution
+  - review
+missing_operator_decision_steps:
+  - delivery
+missing_evidence_refs: []
+failure_summary:
+  owner: operator
+  phase: controller_decision
+  class: controller_incomplete
+  summary: Delivery requires an accepted operator decision.
+pending_decision:
+  action: diagnose
+  reason: Inspect public delivery evidence before continuing.
+controller_health:
+  status: blocked
+resume_interaction_health:
+  status: blocked
+  pending_interaction_count: 0
+  pending_decision_count: 1
+blockers:
+  - code: run_health.delivery.pending_diagnose
+    severity: warning
+    summary: Delivery requires an operator decision.
+artifact_display_summaries:
+  - artifact_ref: evidence://external-runs/sample-run/health
+    type: run-health
+    stage: delivery
+    label: Run health
+    description: Delivery is blocked.
+    status: blocked
+evidence_refs:
+  - evidence://external-runs/sample-run/health

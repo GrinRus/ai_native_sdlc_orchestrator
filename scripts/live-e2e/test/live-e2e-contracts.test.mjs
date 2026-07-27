@@ -105,6 +105,85 @@ test("live e2e private catalog documents validate through the private loader", (
   );
 });
 
+test("medium and larger catalog missions require explicit structured local tasks", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "scripts/live-e2e/catalog/targets/ky.yaml", (document) => {
+      const mission = document.feature_missions.find(
+        (entry) => entry.mission_id === "ky-fetch-options-regression",
+      );
+      delete mission.task_plan;
+    });
+
+    const loaded = loadContractFile({
+      filePath: path.join(tempRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+      family: "live-e2e-target-catalog",
+    });
+    assert.equal(loaded.ok, false);
+    assert.ok(
+      loaded.validation.issues.some(
+        (candidate) =>
+          candidate.code === "required_field_missing" &&
+          candidate.field.endsWith(".task_plan.local_tasks"),
+      ),
+      "expected missing medium task plan to fail closed",
+    );
+  });
+});
+
+test("W66 medium and large task plans cover intake-prefixed mission goals", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+    family: "live-e2e-target-catalog",
+  });
+  assert.equal(loaded.ok, true);
+
+  for (const [missionId, requiredGoalRef] of [
+    ["ky-fetch-options-regression", "goal.2"],
+    ["ky-retry-hooks-governance", "goal.3"],
+  ]) {
+    const mission = loaded.document.feature_missions.find((entry) => entry.mission_id === missionId);
+    const coveredCriteria = new Set(
+      mission.task_plan.local_tasks.flatMap((task) => task.criteria_refs),
+    );
+    assert.equal(
+      coveredCriteria.has(requiredGoalRef),
+      true,
+      `${missionId} must cover ${requiredGoalRef} after the full-journey intake adds its aggregate goal`,
+    );
+  }
+});
+
+test("W66 medium primary verification exercises the allowed fetch test surface", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+    family: "live-e2e-target-catalog",
+  });
+  assert.equal(loaded.ok, true);
+
+  const mission = loaded.document.feature_missions.find(
+    (entry) => entry.mission_id === "ky-fetch-options-regression",
+  );
+  assert.ok(mission.post_run_quality.primary_commands.includes("npx ava test/fetch.ts"));
+});
+
+test("W66 required qualification profiles produce fail-closed delivery proof", () => {
+  for (const profileRef of [
+    "full-journey-regress-ky-medium-codex.yaml",
+    "full-journey-governance-ky-large-codex.yaml",
+    "full-journey-regress-ky-medium-anthropic.yaml",
+    "full-journey-governance-ky-large-anthropic.yaml",
+  ]) {
+    const profile = parseYaml(
+      fs.readFileSync(path.join(workspaceRoot, "scripts/live-e2e/profiles", profileRef), "utf8"),
+    );
+    assert.equal(profile.verification.baseline_gate.mode, "blocking", profileRef);
+    assert.equal(profile.production_proof.enabled, true, profileRef);
+    assert.equal(profile.production_proof.real_code_change_proof_required, true, profileRef);
+    assert.equal(profile.production_proof.no_upstream_write_required, true, profileRef);
+    assert.equal(profile.production_proof.required_failure_mode, "fail-closed", profileRef);
+  }
+});
+
 test("live e2e private report fixtures validate from the private fixture root", () => {
   const fixtureRoot = path.join(workspaceRoot, "scripts/live-e2e/fixtures/contracts");
   const fixtureFamilies = [

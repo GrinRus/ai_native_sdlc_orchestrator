@@ -40,7 +40,14 @@ function writeCurrentPassingTestReport() {
   return reportPath;
 }
 
-test("production readiness gate clears the bounded self-hosted scope only with complete W59 closure", () => {
+function currentW66ClosurePassed() {
+  const closure = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/25-w66-qualification-closure.json"), "utf8"),
+  );
+  return closure.status === "passed";
+}
+
+test("production readiness gate derives the W66 disposition from closure evidence", () => {
   const ledger = JSON.parse(
     fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
   );
@@ -50,10 +57,11 @@ test("production readiness gate clears the bounded self-hosted scope only with c
   assert.equal(auditIds.length, 55);
   assert.ok(auditIds.includes("AUD-055"));
   const result = runProductionReadinessGate({ rootDir: root, testReportPath: writeCurrentPassingTestReport() });
-  assert.equal(result.status, "pass");
+  const qualified = currentW66ClosurePassed();
+  assert.equal(result.status, qualified ? "pass" : "blocked");
   assert.equal(result.gate_execution_status, "pass");
-  assert.equal(result.release_disposition, "cleared");
-  assert.equal(result.release_clearance, true);
+  assert.equal(result.release_disposition, qualified ? "cleared" : "audit-hold");
+  assert.equal(result.release_clearance, qualified);
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-006"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-018"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-009"));
@@ -61,7 +69,10 @@ test("production readiness gate clears the bounded self-hosted scope only with c
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-046"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-039"));
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-043"));
-  assert.deepEqual(result.blocking_invariants, []);
+  assert.deepEqual(
+    result.blocking_invariants.map((entry) => entry.finding_id),
+    qualified ? [] : ["W66-QUALIFICATION"],
+  );
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
     "pass",
@@ -80,6 +91,8 @@ test("production readiness gate clears the bounded self-hosted scope only with c
   );
   assert.equal(result.remediation_closure_reports.W58, "docs/research/09-w58-runtime-quality-closure.json");
   assert.equal(result.remediation_closure_reports.W59, "docs/research/10-w59-audit-closure.json");
+  assert.equal(result.remediation_closure_reports.W66, "docs/research/25-w66-qualification-closure.json");
+  assert.equal(result.checks.find((check) => check.id === "w66-qualification-closure")?.status, "pass");
 });
 
 test("W58 runtime-quality profile proves clean read, explicit mutation, durable run parity, evaluation, and fail-closed transport", () => {
@@ -170,7 +183,7 @@ test("W59 closure report maps all audit findings exactly once and requires indep
   assert.match(closureCheck?.findings?.join("\n") ?? "", /missing 'AUD-049'/u);
 });
 
-test("production readiness gate clears only a valid ledger with evidence-backed closed blockers", () => {
+test("a valid ledger with closed historical blockers defers to the W66 qualification disposition", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-audit-ledger-"));
   const tempLedger = path.join(tempDir, "audit-ledger.json");
   const ledger = JSON.parse(
@@ -185,10 +198,15 @@ test("production readiness gate clears only a valid ledger with evidence-backed 
   fs.writeFileSync(tempLedger, `${JSON.stringify(ledger, null, 2)}\n`);
 
   const result = runProductionReadinessGate({ rootDir: root, auditLedgerPath: tempLedger, testReportPath: writeCurrentPassingTestReport() });
-  assert.equal(result.status, "pass");
+  const qualified = currentW66ClosurePassed();
+  assert.equal(result.status, qualified ? "pass" : "blocked");
   assert.equal(result.gate_execution_status, "pass");
-  assert.equal(result.release_disposition, "cleared");
-  assert.equal(result.release_clearance, true);
+  assert.equal(result.release_disposition, qualified ? "cleared" : "audit-hold");
+  assert.equal(result.release_clearance, qualified);
+  assert.deepEqual(
+    result.blocking_invariants.map((entry) => entry.finding_id),
+    qualified ? [] : ["W66-QUALIFICATION"],
+  );
 });
 
 test("production readiness gate returns audit-hold for a valid newly opened release blocker", () => {
@@ -210,7 +228,10 @@ test("production readiness gate returns audit-hold for a valid newly opened rele
   assert.equal(result.status, "blocked");
   assert.equal(result.gate_execution_status, "pass");
   assert.equal(result.release_disposition, "audit-hold");
-  assert.deepEqual(result.blocking_invariants.map((entry) => entry.finding_id), ["AUD-049"]);
+  assert.deepEqual(
+    result.blocking_invariants.map((entry) => entry.finding_id),
+    currentW66ClosurePassed() ? ["AUD-049"] : ["AUD-049", "W66-QUALIFICATION"],
+  );
 });
 
 test("production readiness gate distinguishes an invalid ledger from an expected hold", () => {
@@ -224,10 +245,39 @@ test("production readiness gate distinguishes an invalid ledger from an expected
   assert.equal(result.release_clearance, false);
 });
 
-test("CI workflow requires the normal cleared readiness contract", () => {
+test("W66 closure fails closed on a partial or path-bearing qualification claim", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w66-closure-"));
+  const closurePath = path.join(tempDir, "closure.json");
+  const indexPath = path.join(tempDir, "index.json");
+  const closure = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/25-w66-qualification-closure.json"), "utf8"),
+  );
+  const index = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/24-w66-live-qualification-evidence-index.json"), "utf8"),
+  );
+  closure.status = "passed";
+  closure.release_disposition = "cleared";
+  closure.release_clearance = true;
+  index.status = "passed";
+  index.cells[0].run_id = "/tmp/private-run";
+  fs.writeFileSync(closurePath, `${JSON.stringify(closure, null, 2)}\n`);
+  fs.writeFileSync(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+
+  const result = runProductionReadinessGate({
+    rootDir: root,
+    w66ClosurePath: closurePath,
+    w66EvidenceIndexPath: indexPath,
+    testReportPath: writeCurrentPassingTestReport(),
+  });
+  assert.equal(result.status, "fail");
+  const closureCheck = result.checks.find((check) => check.id === "w66-qualification-closure");
+  assert.equal(closureCheck?.status, "fail");
+  assert.match(closureCheck?.findings?.join("\n") ?? "", /runtime-local path|complete matrix|qualification commit/u);
+});
+
+test("CI workflow accepts a valid pending hold and a completed W66 clearance", () => {
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
-  assert.match(workflow, /run: pnpm production:ready --json\s*$/mu);
-  assert.doesNotMatch(workflow, /--expect-audit-hold/u);
+  assert.match(workflow, /run: pnpm production:ready --json --allow-audit-hold\s*$/mu);
 });
 
 test("test discovery maps every tracked candidate exactly once", () => {
@@ -291,7 +341,7 @@ test("readiness test evidence rejects stale head and accepts complete current ex
   assert.match(stale.errors.join("\n"), /current Git HEAD/u);
 });
 
-test("audit release hold applies only when the current disposition is audit-hold", () => {
+test("audit release hold defaults to the active W66 disposition", () => {
   const externalRuntime = { command: "provider" };
   assert.equal(
     evaluateAuditReleaseHold({ dryRun: true, externalRuntime, deliveryMode: "patch-only" }).allowed,
@@ -301,14 +351,14 @@ test("audit release hold applies only when the current disposition is audit-hold
     evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "no-write" }).allowed,
     true,
   );
-  const cleared = evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "patch-only" });
-  assert.equal(cleared.allowed, true);
-  const blocked = evaluateAuditReleaseHold({
+  const cleared = evaluateAuditReleaseHold({
     dryRun: false,
     externalRuntime,
     deliveryMode: "patch-only",
-    releaseDisposition: "audit-hold",
+    releaseDisposition: "cleared",
   });
+  assert.equal(cleared.allowed, true);
+  const blocked = evaluateAuditReleaseHold({ dryRun: false, externalRuntime, deliveryMode: "patch-only" });
   assert.equal(blocked.allowed, false);
   assert.equal(blocked.code, "audit_release_hold");
   const overridden = evaluateAuditReleaseHold({

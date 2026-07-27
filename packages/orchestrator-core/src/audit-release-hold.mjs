@@ -1,5 +1,5 @@
 export const AUDIT_RELEASE_HOLD_CODE = "audit_release_hold";
-export const CURRENT_RELEASE_DISPOSITION = "cleared";
+export const CURRENT_RELEASE_DISPOSITION = "audit-hold";
 
 /**
  * Decide from resolved capabilities rather than provider names or credentials.

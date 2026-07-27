@@ -35,5 +35,11 @@ repository. It records HEAD, NUL-safe status entries (including both rename
 paths), tracked/untracked changed paths, and ignored runner scratch paths.
 Consumers must use `workspace_set_ref` and the manifest repository map;
 launcher `cwd` and primary-checkout fallback are forbidden after provisioning.
+A structured child run must resolve its execution unit to exactly one
+`repository_scope` entry and use that repository's `execution_root`. The
+runtime verifies that the root exists below `workspace_root` and that
+`owner_marker` matches the workspace-set, project, and canonical workspace
+root. A caller-provided execution root that differs from this binding is a
+typed conflict; it is never treated as a fallback.
 
 See `examples/workspace-sets/aor-core.no-write.yaml`.

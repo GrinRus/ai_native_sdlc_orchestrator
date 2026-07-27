@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import path from "node:path";
+import { withFileLock } from "../../../observability/src/index.mjs";
 import { applyRunControlAction as applyRunControlActionCore, readRunControlState as readRunControlStateCore } from "../run-control.mjs";
 
 import { appendRunEvent } from "./live-event-stream.mjs";
@@ -115,13 +117,15 @@ function buildPrimaryPayload(result) {
  *   executionPlanRef?: string,
  *   executionUnitId?: string,
  *   taskRefs?: string[],
+ *   workspaceSetRef?: string,
+ *   executionRoot?: string,
  *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
  *   commandId?: string,
  *   expectedRevision?: number,
  * }} options
  */
-export function applyRunControlAction(options) {
+function applyRunControlActionWithEvents(options) {
   const result = applyRunControlActionCore(options);
   const eventRequestPrefix = `event-command-${crypto.createHash("sha256").update(result.commandId).digest("hex").slice(0, 24)}`;
   const primaryEventType = resolveLiveEventType(result.action, result.blocked);
@@ -165,6 +169,14 @@ export function applyRunControlAction(options) {
     evidenceEvent: evidenceEvent.event,
     streamLogFile: evidenceEvent.logFile,
   };
+}
+
+export function applyRunControlAction(options) {
+  const projectRootHint = path.resolve(options.projectRef ?? options.cwd ?? process.cwd());
+  const runtimeRootHint = options.runtimeRoot
+    ? path.resolve(projectRootHint, options.runtimeRoot)
+    : path.join(projectRootHint, ".aor");
+  return withFileLock(`${runtimeRootHint}.run-control-events.lock`, () => applyRunControlActionWithEvents(options));
 }
 
 /**

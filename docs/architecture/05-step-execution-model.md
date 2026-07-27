@@ -107,6 +107,13 @@ the same fail-closed predicate rule. Adapter-owned model arguments and semantic
 provider events keep argv/config evidence provider-specific at the boundary
 while route decisions remain runner-neutral.
 
+Before workspace or provider side effects, the engine reserves one fenced
+attempt using a versioned digest of mode, workspace, route/model/capability
+sources, policy, evidence, plan, task, and project-profile inputs. A repeated
+request with changed execution inputs is a typed conflict. Active execution
+renews the lease, and only the current owner/fencing token may publish the
+result; dry-run evidence can therefore never replay as a live attempt.
+
 The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with:
 - selected route/asset/policy/adapter metadata;
 - compiled-context diagnostics and refs;

@@ -11,6 +11,10 @@ function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+function integrationAuthorityFile(reportFile) {
+  return `${reportFile}.authority.json`;
+}
+
 function unique(values) {
   return [...new Set(values.filter(Boolean))].sort();
 }
@@ -191,7 +195,21 @@ export function integrateParentRun(options) {
   const reportFile = path.join(options.runtimeLayout.reportsRoot, `integration-report-${options.parentRunId}.json`);
   fs.mkdirSync(path.dirname(reportFile), { recursive: true });
   writeJsonAtomic(reportFile, report);
-  return { report, reportFile, workspaceRoot: workspace.root };
+  const reportBytes = fs.readFileSync(reportFile);
+  const authority = {
+    schema_version: 1,
+    authority_kind: "aor-integration-materialization",
+    project_id: options.projectId,
+    parent_run_id: options.parentRunId,
+    report_file: reportFile,
+    report_digest: sha256(reportBytes),
+    workspace_owner_digest: sha256(fs.readFileSync(path.join(workspace.root, ".aor-integration-owner.json"))),
+    source_output_digests: unique(sourceAttempts.map((attempt) => attempt.output_digest)),
+    created_at: options.now ?? new Date().toISOString(),
+  };
+  const authorityFile = integrationAuthorityFile(reportFile);
+  writeJsonAtomic(authorityFile, authority);
+  return { report, reportFile, authority, authorityFile, workspaceRoot: workspace.root };
 }
 
 export function applyIntegrationToParent(options) {
@@ -200,12 +218,53 @@ export function applyIntegrationToParent(options) {
     if (options.expectedRevision !== undefined && parent.revision !== options.expectedRevision) {
       throw Object.assign(new Error("Parent integration revision conflict."), { code: "parent-run-revision-conflict" });
     }
+    if (typeof options.repairRef === "string" && options.repairRef.length > 0) {
+      parent.repair_refs = unique([...(parent.repair_refs ?? []), options.repairRef]);
+      parent.blocker = { code: "parent-integration-repair-required", detail: options.repairRef };
+      parent.status = "blocked";
+      parent.revision += 1;
+      parent.updated_at = options.now ?? new Date().toISOString();
+      writeJsonAtomic(options.parentFile, parent);
+      return parent;
+    }
+    const projectRuntimeRoot = path.dirname(path.dirname(path.dirname(options.parentFile)));
+    const expectedReportFile = path.join(projectRuntimeRoot, "reports", `integration-report-${parent.parent_run_id}.json`);
+    const reportFile = path.resolve(options.reportFile ?? "");
+    if (reportFile !== path.resolve(expectedReportFile) || !fs.existsSync(reportFile)) {
+      throw Object.assign(new Error("Parent integration requires its canonical materialized report."), {
+        code: "integration-report-not-authoritative",
+      });
+    }
+    const authorityFile = integrationAuthorityFile(reportFile);
+    if (!fs.existsSync(authorityFile)) {
+      throw Object.assign(new Error("Integration materialization authority is missing."), {
+        code: "integration-report-not-authoritative",
+      });
+    }
+    const reportBytes = fs.readFileSync(reportFile);
+    const report = JSON.parse(reportBytes);
+    const authority = JSON.parse(fs.readFileSync(authorityFile, "utf8"));
+    if (
+      authority.authority_kind !== "aor-integration-materialization"
+      || authority.parent_run_id !== parent.parent_run_id
+      || authority.project_id !== parent.project_id
+      || authority.report_file !== reportFile
+      || authority.report_digest !== sha256(reportBytes)
+      || report.parent_run_id !== parent.parent_run_id
+      || report.project_id !== parent.project_id
+    ) {
+      throw Object.assign(new Error("Integration report does not match its authoritative materialization."), {
+        code: "integration-report-not-authoritative",
+      });
+    }
     parent.integration_report_ref = options.integrationReportRef;
-    parent.integration_gates = options.report.aggregate_gates;
-    parent.stale_units = options.report.stale_units;
-    parent.repair_refs = options.report.repair_refs;
-    parent.blocker = options.report.status === "passed" ? null : { code: "parent-integration-not-passed", detail: options.report.status };
-    parent.status = options.report.status === "passed" ? "succeeded" : "blocked";
+    parent.integration_report_digest = authority.report_digest;
+    parent.integration_authority_ref = options.integrationAuthorityRef ?? `${options.integrationReportRef}.authority.json`;
+    parent.integration_gates = report.aggregate_gates;
+    parent.stale_units = report.stale_units;
+    parent.repair_refs = report.repair_refs;
+    parent.blocker = report.status === "passed" ? null : { code: "parent-integration-not-passed", detail: report.status };
+    parent.status = report.status === "passed" ? "succeeded" : "blocked";
     parent.revision += 1;
     parent.updated_at = options.now ?? new Date().toISOString();
     writeJsonAtomic(options.parentFile, parent);

@@ -361,6 +361,7 @@ export function handleDeliveryCommand(context) {
         parentRunId: loadedIntegration.document.parent_run_id,
         executionPlanRef: loadedIntegration.document.execution_plan_ref,
         workspaceSetRef: loadedIntegration.document.workspace_set_ref,
+        filePath: integrationReportFile,
       };
     }
     const rerunOfRunId = resolveOptionalStringFlag("rerun-of-run-id", flags["rerun-of-run-id"]);

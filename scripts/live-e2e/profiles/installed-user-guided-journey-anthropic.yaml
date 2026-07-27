@@ -75,6 +75,30 @@ guided_journey:
   browser_task_proof:
     required: true
     auto_collect: true
+    schema_version: 2
+    scenario_id: installed-console-matrix
+    required_viewports:
+      - desktop
+      - tablet
+      - mobile
+      - zoom-200
+    required_accessibility:
+      - keyboard-only
+      - dialog-focus
+      - focus-restoration
+      - semantic-tree
+      - contrast-aa
+      - touch-targets
+      - reduced-motion
+    required_recovery:
+      - reload
+      - reconnect
+      - partial-read
+      - offline-read
+      - injected-error
+      - multi-item-attention
+      - project-switch
+      - terminal-read-only
     required_evidence:
       - rendered-html
       - dom-snapshot

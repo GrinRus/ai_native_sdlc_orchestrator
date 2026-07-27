@@ -1,5 +1,46 @@
 # Live E2E provider qualification matrix
 
+## W66 release qualification
+
+W66 release qualification uses the versioned
+`live-e2e-qualification-cell-report.v1` on top of the provider-path matrix.
+The release set is exactly:
+
+- `openai-primary.medium`
+- `openai-primary.large`
+- `anthropic-primary.medium`
+- `anthropic-primary.large`
+
+All four cells must pass on one commit. OpenCode and Qwen remain useful
+diagnostic/extended provider paths, but do not participate in W66 closure.
+Each cell keeps public lifecycle, run health, diagnostic verification, final
+assessment, changed paths, checkout integrity, and delivery safety as separate
+dimensions. A missing or non-all-pass final assessment always blocks the cell.
+
+Installed browser evidence used by the baseline or a provider cell must satisfy
+`installed-browser-proof.v2`. The content-addressed evidence index binds
+artifact kind, digest, byte length, run/scenario ownership, and freshness.
+Qualification rejects fixed-delay readiness, response-only action claims,
+assumed error handling, missing responsive/accessibility/recovery cells, and
+any proof whose indexed bytes were replaced. See
+`scripts/live-e2e/docs/contracts/installed-browser-proof.md`.
+
+Record a completed run only after the SWE-authored assessment passes its own
+all-pass gate:
+
+```bash
+node ./scripts/live-e2e/qualification-loop.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml \
+  --record-run-summary-file <live-e2e-run-summary-file> \
+  --final-assessment-report-file <live-e2e-quality-assessment-report> \
+  --qualification-set-file /tmp/aor-w66-qualification-set.json
+```
+
+The resulting set uses schema version 2 and embeds the four versioned cell
+reports plus the single-commit closure verdict. Any code change after the first
+cell invalidates that set for release clearance.
+
 ## Purpose
 
 The provider qualification matrix records what AOR knows about each live E2E
@@ -112,7 +153,8 @@ node ./scripts/live-e2e/qualification-loop.mjs \
   --record-run-summary-file <live-e2e-run-summary-file>
 ```
 
-The generated qualification set includes `provider_qualification_matrix`.
+The generated qualification set includes `provider_qualification_matrix` and
+the W66 `required_qualification_matrix`.
 Short/small diagnostic runs may be cited as blocker or candidate evidence, but
 they do not replace medium-or-larger qualification-loop evidence.
 

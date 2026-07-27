@@ -38,6 +38,7 @@ import {
   collectReviewFindingDetails,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
+  computeSourceTreeDigest,
   buildAcceptanceRepairDrillFinding,
   evaluateBaselineVerifyGate,
   evaluateRepairProofExpectations,
@@ -52,7 +53,10 @@ import {
   runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
   resolveActiveAcceptanceRepairDrill,
+  resolveAuditHoldOverrideArgs,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
+  sourceInstallCacheMatches,
+  shouldDeferGuidedWarnDiagnostic,
 } from "../lib/flows.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
@@ -69,6 +73,7 @@ import {
 } from "../step-evaluator.mjs";
 import {
   buildArtifactReadinessProof,
+  isLiveE2eControllerStateInProgress,
   resolveRunHealthFailure,
   writeProofRunnerArtifacts,
 } from "../run-profile.mjs";
@@ -183,6 +188,11 @@ function writeProfile(tempRoot, liveOverrides, options = {}) {
             "    enabled: true",
             "  browser_task_proof:",
             "    required: true",
+            "    schema_version: 2",
+            "    scenario_id: installed-console-matrix",
+            "    required_viewports: [desktop, tablet, mobile, zoom-200]",
+            "    required_accessibility: [keyboard-only, dialog-focus, focus-restoration, semantic-tree, contrast-aa, touch-targets, reduced-motion]",
+            "    required_recovery: [reload, reconnect, partial-read, offline-read, injected-error, multi-item-attention, project-switch, terminal-read-only]",
           ]
         : []),
       "",
@@ -466,6 +476,20 @@ test("step evaluator keeps resuming when an included current step is still pendi
         included_steps: ["discovery", "qa", "delivery"],
         completed_steps: ["discovery", "qa", "delivery"],
       },
+    ),
+    false,
+  );
+});
+
+test("terminal controller state treats a successful repair instance as completing its base step", () => {
+  assert.equal(
+    isLiveE2eControllerStateInProgress(
+      {
+        completed_steps: ["execution", "review#2", "qa#2"],
+        current_step: null,
+        pending_decision: { action: "continue", next_step: null },
+      },
+      ["execution", "review", "qa"],
     ),
     false,
   );
@@ -1195,6 +1219,15 @@ test("catalog feature request materialization preserves required path prefixes",
           diagnostic_commands: ["npm test"],
           diagnostic_failure_mode: "warn",
         },
+        task_plan: {
+          local_tasks: [
+            {
+              task_id: "task.header-regression",
+              title: "Implement header regression",
+              objective: "Preserve bounded header behavior.",
+            },
+          ],
+        },
       },
     });
 
@@ -1203,9 +1236,11 @@ test("catalog feature request materialization preserves required path prefixes",
     assert.deepEqual(result.requestDocument.definition_of_done, ["Targeted header verification passes."]);
     assert.deepEqual(result.requestDocument.change_evidence.required_path_prefixes, ["source/", "test/"]);
     assert.deepEqual(result.requestDocument.post_run_quality.primary_commands, ["npx ava test/headers.ts"]);
+    assert.equal(result.requestDocument.task_plan.local_tasks[0].task_id, "task.header-regression");
     const persisted = JSON.parse(fs.readFileSync(result.requestFile, "utf8"));
     assert.deepEqual(persisted.change_evidence.required_path_prefixes, ["source/", "test/"]);
     assert.deepEqual(persisted.post_run_quality.primary_commands, ["npx ava test/headers.ts"]);
+    assert.equal(persisted.task_plan.local_tasks[0].task_id, "task.header-regression");
   });
 });
 
@@ -1606,7 +1641,69 @@ test("W66 Ky medium qualification profiles budget the required full diagnostic s
   ]) {
     const { profile } = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
     assert.equal(profile.live_e2e.target_command_timeout_sec, 1800);
+    assert.deepEqual(resolveAuditHoldOverrideArgs(profile), [
+      "--unsafe-development-override",
+      "true",
+    ]);
   }
+});
+
+test("audit hold override is explicit, fail-closed, and constrained to no-write profiles", () => {
+  assert.deepEqual(resolveAuditHoldOverrideArgs({
+    live_e2e: { audit_hold_policy: "enforce" },
+  }), []);
+  assert.deepEqual(resolveAuditHoldOverrideArgs({
+    live_e2e: { audit_hold_policy: "maintainer-qualification-override" },
+  }), ["--unsafe-development-override", "true"]);
+
+  withTempRoot((tempRoot) => {
+    const profileFile = path.join(tempRoot, "unsafe-profile.yaml");
+    fs.writeFileSync(profileFile, [
+      "profile_id: unsafe-profile",
+      "journey_mode: full-journey",
+      "live_e2e:",
+      "  flow_range_policy: full_lifecycle",
+      "  installation_policy: source-install-required",
+      "  interaction_capability: public-control-plane",
+      "  frontend_capability: none",
+      "  safety_policy: no-upstream-write",
+      "  operator_mode: skill-agent",
+      "  agent_decision_policy: required",
+      "  interaction_answer_policy: agent-required",
+      "  target_write_policy: aor-runtime-only-before-execution",
+      "  audit_hold_policy: maintainer-qualification-override",
+      "implementation_loop:",
+      "  enabled: true",
+      "  max_iterations: 1",
+      "output_policy:",
+      "  write_back_to_remote: true",
+      "",
+    ].join("\n"));
+    assert.throws(
+      () => loadProofRunnerProfile({ hostRoot: tempRoot, profileRef: profileFile }),
+      /requires no-upstream-write and output_policy\.write_back_to_remote=false/u,
+    );
+  });
+});
+
+test("every frozen W66 baseline and qualification profile explicitly enables the reviewed hold override", () => {
+  for (const profileRef of [
+    "scripts/live-e2e/profiles/installed-user-guided-journey.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
+    "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
+    "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
+    "scripts/live-e2e/profiles/full-journey-governance-ky-large-anthropic.yaml",
+  ]) {
+    const { profile } = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    assert.deepEqual(resolveAuditHoldOverrideArgs(profile), [
+      "--unsafe-development-override",
+      "true",
+    ]);
+    assert.equal(profile.live_e2e.safety_policy, "no-upstream-write");
+    assert.equal(profile.output_policy.write_back_to_remote, false);
+  }
+  const source = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
+  assert.match(source, /\.\.\.resolveAuditHoldOverrideArgs\(options\.profile\)/u);
 });
 
 test("generated ky large Anthropic profile uses bounded governance verification", () => {
@@ -1646,7 +1743,7 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
-      "CI=1 npx ava test/main.ts test/hooks.ts",
+      "CI=1 npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'",
       "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
@@ -1693,7 +1790,7 @@ test("generated ky xlarge manual profile includes focused retry primary verifica
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
-      "CI=1 npx ava test/main.ts test/hooks.ts",
+      "CI=1 npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'",
       "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
@@ -4000,6 +4097,18 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
   assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
   assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 600/u);
+  assert.equal(shouldDeferGuidedWarnDiagnostic({
+    guidedJourneyEnabled: true,
+    diagnosticFailureMode: "warn",
+    diagnosticCommands: ["npm test"],
+    repairDecisionFiles: [],
+  }), true);
+  assert.equal(shouldDeferGuidedWarnDiagnostic({
+    guidedJourneyEnabled: true,
+    diagnosticFailureMode: "warn",
+    diagnosticCommands: ["npm test"],
+    repairDecisionFiles: ["evidence://review-decision-request-repair.json"],
+  }), false);
 });
 
 test("flow-health regress profiles report policy-excluded QA as passing evidence", () => {
@@ -4940,6 +5049,8 @@ test("proof runner reuses valid installation proof for manual resume", () => {
         {
           status: "pass",
           install_mode: "isolated",
+          source_commit_sha: spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).stdout.trim(),
+          source_tree_digest: computeSourceTreeDigest(repoRoot),
           launcher_ref: launcher,
           command_transcripts: [path.join(reportsRoot, "01-help.json")],
         },
@@ -4966,6 +5077,40 @@ test("proof runner reuses valid installation proof for manual resume", () => {
     assert.equal(result.launch.command, launcher);
     assert.equal(result.setupEntry.public_surface, "cached pnpm source install");
     assert.equal(result.setupEntry.evidence_refs.includes(result.proof.cached_launcher_smoke_file), true);
+  });
+});
+
+test("source install cache identity changes for tracked and untracked source edits", () => {
+  withTempRoot((tempRoot) => {
+    spawnSync("git", ["init", "-q"], { cwd: tempRoot });
+    fs.writeFileSync(path.join(tempRoot, "tracked.mjs"), "export const value = 1;\n");
+    spawnSync("git", ["add", "tracked.mjs"], { cwd: tempRoot });
+    spawnSync("git", ["-c", "user.name=AOR", "-c", "user.email=aor@example.invalid", "commit", "-qm", "baseline"], {
+      cwd: tempRoot,
+    });
+    const sourceCommit = spawnSync("git", ["rev-parse", "HEAD"], { cwd: tempRoot, encoding: "utf8" }).stdout.trim();
+    const baselineDigest = computeSourceTreeDigest(tempRoot);
+    assert.equal(sourceInstallCacheMatches({
+      effectivePolicy: "source-install-required",
+      currentSourceCommit: sourceCommit,
+      cachedSourceCommit: sourceCommit,
+      currentSourceTreeDigest: baselineDigest,
+      cachedSourceTreeDigest: baselineDigest,
+    }), true);
+
+    fs.writeFileSync(path.join(tempRoot, "tracked.mjs"), "export const value = 2;\n");
+    const trackedDigest = computeSourceTreeDigest(tempRoot);
+    assert.notEqual(trackedDigest, baselineDigest);
+    assert.equal(sourceInstallCacheMatches({
+      effectivePolicy: "source-install-required",
+      currentSourceCommit: sourceCommit,
+      cachedSourceCommit: sourceCommit,
+      currentSourceTreeDigest: trackedDigest,
+      cachedSourceTreeDigest: baselineDigest,
+    }), false);
+
+    fs.writeFileSync(path.join(tempRoot, "untracked.mjs"), "export const extra = true;\n");
+    assert.notEqual(computeSourceTreeDigest(tempRoot), trackedDigest);
   });
 });
 

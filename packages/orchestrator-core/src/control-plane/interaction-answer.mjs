@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { redactSensitiveValue } from "../../../observability/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
+import { resumeRunJobAfterInput } from "../run-job.mjs";
 
 import { appendRunEvent } from "./live-event-stream.mjs";
 import { listStepResults, toEvidenceRef } from "./read-artifact-readers.mjs";
@@ -486,6 +487,14 @@ export function submitInteractionAnswer(options) {
         },
       })
     : null;
+  const resumedJob = canResume
+    ? resumeRunJobAfterInput({
+        cwd: options.cwd,
+        projectRef: options.projectRef,
+        runtimeRoot: options.runtimeRoot,
+        runId: options.runId,
+      })
+    : null;
 
   return {
     projectRoot: init.projectRoot,
@@ -509,6 +518,7 @@ export function submitInteractionAnswer(options) {
           answer_audit_ref: answerAuditRef,
         }
       : null,
+    resumedJob: resumedJob?.job ?? null,
     blocked: !canResume,
     blockedReason,
     evidenceEvent: evidenceEvent.event,

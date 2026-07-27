@@ -8,6 +8,9 @@ import { withFileLock, writeJsonAtomic } from "./file-transaction.mjs";
 
 const LIVE_RUN_EVENT_TYPES = new Set([
   "run.started",
+  "parent.started",
+  "parent.updated",
+  "parent.terminal",
   "step.updated",
   "provider.heartbeat",
   "evidence.linked",
@@ -53,12 +56,13 @@ function buildEventId(runId, sequence) {
 }
 
 function readCursor(cursorFile, logFile, runId) {
+  const events = readEventLog(logFile).filter((event) => event.run_id === runId);
+  const journalSequence = events.length === 0 ? 0 : getEventSequence(events.at(-1));
   try {
     const cursor = JSON.parse(fs.readFileSync(cursorFile, "utf8"));
-    if (cursor.run_id === runId && Number.isInteger(cursor.sequence) && cursor.sequence >= 0) return cursor.sequence;
+    if (cursor.run_id === runId && Number.isInteger(cursor.sequence) && cursor.sequence === journalSequence) return cursor.sequence;
   } catch {}
-  const events = readEventLog(logFile).filter((event) => event.run_id === runId);
-  return events.length === 0 ? 0 : getEventSequence(events.at(-1));
+  return journalSequence;
 }
 
 /**
@@ -88,6 +92,71 @@ function readEventLog(logFile) {
   return events.sort((left, right) => getEventSequence(left) - getEventSequence(right));
 }
 
+function readEventLogTail(logFile, maxRecords) {
+  if (!fs.existsSync(logFile) || maxRecords <= 0) return [];
+  const descriptor = fs.openSync(logFile, "r");
+  try {
+    let position = fs.fstatSync(descriptor).size;
+    let text = "";
+    while (position > 0 && text.split("\n").filter(Boolean).length <= maxRecords) {
+      const length = Math.min(64 * 1024, position);
+      position -= length;
+      const buffer = Buffer.alloc(length);
+      fs.readSync(descriptor, buffer, 0, length, position);
+      text = `${buffer.toString("utf8")}${text}`;
+    }
+    return text
+      .split("\n")
+      .filter(Boolean)
+      .slice(-maxRecords)
+      .flatMap((line) => {
+        try {
+          const event = JSON.parse(line);
+          return typeof event === "object" && event !== null ? [event] : [];
+        } catch {
+          return [];
+        }
+      })
+      .sort((left, right) => getEventSequence(left) - getEventSequence(right));
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function appendLineDurable(logFile, line) {
+  const descriptor = fs.openSync(logFile, "a");
+  try {
+    fs.writeSync(descriptor, line, null, "utf8");
+    fs.fsyncSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function runFaultHook(options, boundary) {
+  if (options.faultInjectionBoundary === boundary) {
+    const error = new Error(`Injected live-run-event crash at '${boundary}'.`);
+    error.code = "event-append-fault-injected";
+    throw error;
+  }
+}
+
+function reconcileAppendTransaction(transactionFile, logFile, cursorFile) {
+  if (!fs.existsSync(transactionFile)) return null;
+  const transaction = JSON.parse(fs.readFileSync(transactionFile, "utf8"));
+  const event = transaction.event;
+  const alreadyAppended = readEventLog(logFile).some((entry) => entry.event_id === event.event_id);
+  if (!alreadyAppended) appendLineDurable(logFile, `${JSON.stringify(event)}\n`);
+  writeJsonAtomic(cursorFile, {
+    run_id: event.run_id,
+    sequence: getEventSequence(event),
+    updated_at: new Date().toISOString(),
+  });
+  if (transaction.request_file) writeJsonAtomic(transaction.request_file, transaction.request_record);
+  fs.rmSync(transactionFile, { force: true });
+  return event;
+}
+
 /**
  * @param {{
  *   logFile: string,
@@ -97,6 +166,7 @@ function readEventLog(logFile) {
  *   timestamp?: string,
  *   redactionPolicy?: unknown,
  *   requestKey?: string,
+ *   faultInjectionBoundary?: "after-transaction" | "after-journal" | "after-cursor" | "after-request",
  * }} options
  */
 export function appendLiveRunEvent(options) {
@@ -124,11 +194,13 @@ export function appendLiveRunEvent(options) {
   );
   const cursorFile = `${options.logFile}.cursor.json`;
   const lockDirectory = `${options.logFile}.append.lock`;
+  const transactionFile = `${options.logFile}.append-transaction.json`;
   const requestDigest = crypto
     .createHash("sha256")
     .update(JSON.stringify({ event_type: options.eventType, payload: redactedPayload, timestamp: options.timestamp ?? null }))
     .digest("hex");
   const event = withFileLock(lockDirectory, () => {
+    reconcileAppendTransaction(transactionFile, options.logFile, cursorFile);
     const requestFile = options.requestKey
       ? `${options.logFile}.requests/${crypto.createHash("sha256").update(options.requestKey).digest("hex")}.json`
       : null;
@@ -148,6 +220,7 @@ export function appendLiveRunEvent(options) {
       timestamp: options.timestamp ?? new Date().toISOString(),
       event_type: options.eventType,
       payload: { sequence: nextSequence, ...redactedPayload },
+      ...(options.requestKey ? { request_key: options.requestKey, request_digest: requestDigest } : {}),
     };
     const validation = validateContractDocument({
       family: "live-run-event",
@@ -158,11 +231,18 @@ export function appendLiveRunEvent(options) {
       const issues = validation.issues.map((issue) => issue.message).join("; ");
       throw new Error(`Generated live-run event failed contract validation: ${issues}`);
     }
+    const requestRecord = requestFile
+      ? { request_key: options.requestKey, request_digest: requestDigest, event: nextEvent }
+      : null;
+    writeJsonAtomic(transactionFile, { event: nextEvent, request_file: requestFile, request_record: requestRecord });
+    runFaultHook(options, "after-transaction");
+    appendLineDurable(options.logFile, `${JSON.stringify(nextEvent)}\n`);
+    runFaultHook(options, "after-journal");
     writeJsonAtomic(cursorFile, { run_id: options.runId, sequence: nextSequence, updated_at: new Date().toISOString() });
-    fs.appendFileSync(options.logFile, `${JSON.stringify(nextEvent)}\n`, "utf8");
-    if (requestFile) {
-      writeJsonAtomic(requestFile, { request_key: options.requestKey, request_digest: requestDigest, event: nextEvent });
-    }
+    runFaultHook(options, "after-cursor");
+    if (requestFile) writeJsonAtomic(requestFile, requestRecord);
+    runFaultHook(options, "after-request");
+    fs.rmSync(transactionFile, { force: true });
     return nextEvent;
   });
   return event;
@@ -229,10 +309,8 @@ export function openLiveRunEventStream(options) {
     : DEFAULT_MAX_REPLAY;
   const maxReplay = Math.min(requestedReplay, SERVER_MAX_REPLAY);
   const initialJournalSize = fs.existsSync(options.logFile) ? fs.statSync(options.logFile).size : 0;
-  const runEvents = listLiveRunEvents({
-    logFile: options.logFile,
-    runId: options.runId,
-  });
+  const runEvents = readEventLogTail(options.logFile, Math.max(maxReplay + 1, 1))
+    .filter((event) => event.run_id === options.runId);
   const replayWindow = resolveReplayWindow(runEvents, options.afterEventId, maxReplay);
   let lastSequence = replayWindow.afterSequence;
   if (replayWindow.replayEvents.length > 0) {

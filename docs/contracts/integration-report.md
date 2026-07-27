@@ -26,6 +26,14 @@ A parent run cannot pass or become deliverable until every required gate
 passes. Stale units record changed input fingerprints and the transitive rerun
 boundary while historical attempts remain immutable.
 
+The integration service writes the canonical report below the project runtime
+reports root together with an `aor-integration-materialization` authority
+sidecar. The sidecar binds project/parent identity, report bytes, integration
+workspace ownership, and immutable child output digests. Parent closure loads
+that canonical file and verifies the sidecar; a client-supplied report object,
+an external file, a missing sidecar, or changed report bytes cannot assert a
+passing integration status.
+
 Integration findings reuse `quality-repair-request`. Its existing
 `source_stage=review|qa` remains authoritative. Optional `origin_context`
 identifies the parent run, execution unit or integration gate, and input

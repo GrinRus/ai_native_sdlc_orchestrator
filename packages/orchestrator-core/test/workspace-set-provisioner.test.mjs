@@ -11,6 +11,7 @@ import {
   projectWorkspaceSetProvenance,
   provisionWorkspaceSet,
 } from "../src/workspace-set-provisioner.mjs";
+import { resumeWorkspaceSetIsolation } from "../src/workspace-isolation.mjs";
 
 function git(cwd, ...args) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -61,6 +62,13 @@ test("workspace set provisions mixed isolated repositories and records per-repos
   const provenance = projectWorkspaceSetProvenance(manifest);
   assert.equal(provenance.workspace_set_ref, manifest.workspace_set_ref);
   assert.equal(provenance.repository_map.main.execution_root, manifest.repositories[0].execution_root);
+  const reused = resumeWorkspaceSetIsolation({
+    projectRuntimeRoot,
+    executionRoot: manifest.repositories[0].execution_root,
+  });
+  assert.equal(reused.mode, "workspace-set");
+  assert.equal(reused.finalize("success").status, "retained-by-workspace-set");
+  assert.equal(fs.existsSync(manifest.repositories[0].execution_root), true);
   assert.equal(git(first, "status", "--porcelain"), firstBefore);
   assert.equal(finalizeWorkspaceSet(manifest, "success").cleanup.state, "deleted");
   assert.equal(finalizeWorkspaceSet(manifest, "success").cleanup.state, "deleted");

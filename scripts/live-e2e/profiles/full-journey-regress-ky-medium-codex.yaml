@@ -13,6 +13,7 @@ live_e2e:
   agent_decision_policy: required
   interaction_answer_policy: agent-required
   target_write_policy: aor-runtime-only-before-execution
+  audit_hold_policy: maintainer-qualification-override
   target_command_timeout_sec: 1800
 implementation_loop:
   enabled: true
@@ -51,6 +52,8 @@ stages:
   - delivery
   - learning
 verification:
+  baseline_gate:
+    mode: blocking
   build: true
   lint: true
   tests: project-default
@@ -70,6 +73,19 @@ output_policy:
   materialize_release_packet: false
   write_back_to_remote: false
   preferred_delivery_mode: patch-only
+production_proof:
+  enabled: true
+  profile_status: candidate
+  proof_scope: full_code_changing_runtime_candidate
+  external_runner_mode: real-external-process
+  real_code_change_proof_required: true
+  real_code_change_proof_complete: false
+  mock_runner_allowed: false
+  no_upstream_write_required: true
+  require_runner_auth: true
+  require_permission_readiness: true
+  require_blocking_target_verification: true
+  required_failure_mode: fail-closed
 learning_loop:
   backlog_refs:
     - docs/backlog/mvp-implementation-backlog.md

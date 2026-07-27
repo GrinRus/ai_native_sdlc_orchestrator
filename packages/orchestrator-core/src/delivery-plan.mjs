@@ -33,6 +33,31 @@ function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function verifyIntegrationMaterialization(integrationReport, options) {
+  const reportFileValue = asString(integrationReport.filePath);
+  const parentRunId = asString(integrationReport.parentRunId);
+  if (!reportFileValue || !parentRunId) return false;
+  const reportFile = path.resolve(reportFileValue);
+  const canonical = path.join(options.runtimeLayout.reportsRoot, `integration-report-${parentRunId}.json`);
+  const authorityFile = `${reportFile}.authority.json`;
+  if (reportFile !== path.resolve(canonical) || !fs.existsSync(reportFile) || !fs.existsSync(authorityFile)) return false;
+  try {
+    const reportBytes = fs.readFileSync(reportFile);
+    const report = JSON.parse(reportBytes);
+    const authority = JSON.parse(fs.readFileSync(authorityFile, "utf8"));
+    return authority.authority_kind === "aor-integration-materialization"
+      && authority.project_id === options.projectId
+      && authority.parent_run_id === parentRunId
+      && authority.report_file === reportFile
+      && authority.report_digest === createHash("sha256").update(reportBytes).digest("hex")
+      && report.project_id === options.projectId
+      && report.parent_run_id === parentRunId
+      && report.status === "passed";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {unknown} value
  * @returns {number | null}
@@ -262,7 +287,12 @@ function executeDeliveryPlanTransaction(options) {
   const integrationReport = asRecord(options.integrationReport ?? {});
   const integrationRequired = nonReadOnlyMode && (multiRepoRequired || integrationReport.required === true);
   const integrationRef = asString(integrationReport.ref);
-  const integrationStatus = integrationRequired ? asString(integrationReport.status) ?? "missing" : "not-required";
+  const integrationAuthoritative = integrationRequired
+    ? verifyIntegrationMaterialization(integrationReport, options)
+    : true;
+  const integrationStatus = integrationRequired
+    ? integrationAuthoritative ? "passed" : "unverified"
+    : "not-required";
 
   const rerunOfRunRef = asString(options.rerunOfRunRef);
   const rerunFailedStepRef = asString(options.rerunFailedStepRef);
@@ -390,6 +420,7 @@ function executeDeliveryPlanTransaction(options) {
         parent_run_id: asString(integrationReport.parentRunId),
         execution_plan_ref: asString(integrationReport.executionPlanRef),
         workspace_set_ref: asString(integrationReport.workspaceSetRef),
+        authority_verified: integrationAuthoritative,
       },
     },
     governance,
