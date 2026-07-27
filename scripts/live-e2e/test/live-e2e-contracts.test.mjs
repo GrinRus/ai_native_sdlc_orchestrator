@@ -166,6 +166,24 @@ test("W66 medium primary verification exercises the allowed fetch test surface",
   assert.ok(mission.post_run_quality.primary_commands.includes("npx ava test/fetch.ts"));
 });
 
+test("W66 required qualification profiles produce fail-closed delivery proof", () => {
+  for (const profileRef of [
+    "full-journey-regress-ky-medium-codex.yaml",
+    "full-journey-governance-ky-large-codex.yaml",
+    "full-journey-regress-ky-medium-anthropic.yaml",
+    "full-journey-governance-ky-large-anthropic.yaml",
+  ]) {
+    const profile = parseYaml(
+      fs.readFileSync(path.join(workspaceRoot, "scripts/live-e2e/profiles", profileRef), "utf8"),
+    );
+    assert.equal(profile.verification.baseline_gate.mode, "blocking", profileRef);
+    assert.equal(profile.production_proof.enabled, true, profileRef);
+    assert.equal(profile.production_proof.real_code_change_proof_required, true, profileRef);
+    assert.equal(profile.production_proof.no_upstream_write_required, true, profileRef);
+    assert.equal(profile.production_proof.required_failure_mode, "fail-closed", profileRef);
+  }
+});
+
 test("live e2e private report fixtures validate from the private fixture root", () => {
   const fixtureRoot = path.join(workspaceRoot, "scripts/live-e2e/fixtures/contracts");
   const fixtureFamilies = [
