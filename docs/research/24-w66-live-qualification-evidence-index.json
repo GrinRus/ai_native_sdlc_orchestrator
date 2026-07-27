@@ -31,7 +31,7 @@
     {
       "cell_id": "openai-primary.large",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
-      "profile_sha256": "4dc36645106d601a7be7cf3ccad036b0f8edb754e0257dbbaaedb1f3b820021c",
+      "profile_sha256": "09de0d97beab4a67b10b17741e1a1352dcd7d3ee8b5abc1507756cdc54ae246e",
       "run_id": null,
       "status": "not-run",
       "run_health_status": "not-run",
@@ -55,7 +55,7 @@
     {
       "cell_id": "anthropic-primary.large",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-anthropic.yaml",
-      "profile_sha256": "c2b2c033bd89cfbb0434b8e3a676ad5dc6336da5479fce5088099ad8e5589e0a",
+      "profile_sha256": "7bade07c69eeba9fdf74208e36bc688086dd80b8eb69796bebc564c27d42c31d",
       "run_id": null,
       "status": "not-run",
       "run_health_status": "not-run",

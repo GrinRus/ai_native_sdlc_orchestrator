@@ -1743,7 +1743,7 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
-      "CI=1 npx ava test/main.ts test/hooks.ts",
+      "CI=1 npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'",
       "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
@@ -1790,7 +1790,7 @@ test("generated ky xlarge manual profile includes focused retry primary verifica
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
-      "CI=1 npx ava test/main.ts test/hooks.ts",
+      "CI=1 npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'",
       "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
