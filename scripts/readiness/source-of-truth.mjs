@@ -55,7 +55,7 @@ export function checkReadinessSourceOfTruth(rootDir) {
   }
   for (const [file, text] of documents) {
     for (const required of ["W66", "audit-hold"]) {
-      if (!text.includes(required)) findings.push(`${file} must mention the active ${required} qualification disposition.`);
+      if (!text.includes(required)) findings.push(`${file} must preserve the ${required} qualification history.`);
     }
   }
 
@@ -71,7 +71,7 @@ export function checkReadinessSourceOfTruth(rootDir) {
   return {
     id: "source-of-truth-alignment",
     status: "pass",
-    summary: "README, readiness source-of-truth, production gate, and release runbook align on the W66 qualification hold.",
+    summary: "README, readiness source-of-truth, production gate, and release runbook align on the W66 qualification disposition.",
     evidence: EVIDENCE,
   };
 }

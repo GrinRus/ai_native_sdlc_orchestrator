@@ -22,15 +22,17 @@ Machine-readable output:
 pnpm production:ready --json
 ```
 
-CI verifies the expected hold without treating it as gate corruption:
+CI accepts either a valid pending hold or completed clearance while still
+rejecting malformed evidence:
 
 ```bash
-pnpm production:ready --json --expect-audit-hold
+pnpm production:ready --json --allow-audit-hold
 ```
 
-Without `--expect-audit-hold`, the command exits successfully only for
-`status=pass`. Invalid evidence returns `status=fail`; the active W66 release
-blocker returns `status=blocked`.
+Without `--allow-audit-hold`, the command exits successfully only for
+`status=pass`. Invalid evidence returns `status=fail`; a pending W66 release
+blocker returns `status=blocked`. `--expect-audit-hold` remains available for a
+test that specifically requires the pending state.
 
 Executable local-console acceptance runs separately as
 `pnpm test:web:browser`. It launches the built SPA through the public loopback
@@ -73,13 +75,14 @@ The gate verifies:
 - W59 closure integrity: all 55 findings are resolved exactly once, every
   original S1 has an independent passing regression review, and the exact audit
   baseline-to-remediation commit range is pinned;
-- active W66 qualification disposition: release clearance stays suspended until
-  deterministic remediation and all four same-commit Codex/Claude cells close;
+- W66 qualification disposition: the path-neutral closure report keeps release
+  clearance suspended until the installed baseline and all four same-commit
+  Codex/Claude cells close, then removes only that evidence-backed invariant;
 
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
 - story honesty: all 116 stories remain machine-counted, OPS-12 cites the executable W63-S08 installed golden-path proof, other proof-covered rows retain their exact evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
-- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on the current W66 qualification hold and excluded surfaces;
+- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on the current W66 qualification disposition and excluded surfaces;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;
 - W24 harness evidence: run-level Runtime Harness report fields, strict-delivery example evidence, and controller tests exist.
 - W30 alpha hardening: ADR index and accepted alpha-boundary ADRs exist, the OpenAPI 3.1 route contract matches the implemented HTTP/SSE router, self-hosted ops runbooks exist, W30 backlog source-of-truth docs are present, unsupported Docker/GHCR/SaaS/SSO/default-write-back claims remain out of scope, and OpenCode stories remain blocked without real certification proof.
@@ -95,7 +98,7 @@ Top-level meanings:
 - `status=fail`, `gate_execution_status=fail`,
   `release_disposition=unknown`: the gate itself or its evidence is invalid;
 - `status=pass`, `release_clearance=true`: no release-blocking invariant remains;
-  this state is unavailable until W66-S09 closes.
+  this state is available only after W66-S09 closure validates.
 
 | Failed check | Meaning | Operator action |
 |---|---|---|
@@ -103,6 +106,7 @@ Top-level meanings:
 | `w57-remediation-closure` | The W57 finding set is missing, duplicated, regressed, or points at missing evidence. | Restore the closure report and its referenced deterministic suites; keep the audit hold. |
 | `w58-remediation-closure` | The W58 runtime-quality set, integration profile, remaining W59 map, or evidence paths drifted. | Restore the W58 closure report and rerun `pnpm w58:proof`; do not claim release clearance. |
 | `w59-audit-closure` | The final 55-finding map, independent S1 review, commit range, or direct evidence drifted. | Restore W59 closure evidence and keep readiness failed or blocked. |
+| `w66-qualification-closure` | The pending/closed disposition, same-commit matrix, content digests, or post-qualification path allowlist drifted. | Restore the W66 closure/index pair; repeat qualification after any product or profile change. |
 | `complete-test-execution` | The discovered-test report is missing, stale, incomplete, duplicated, or belongs to another HEAD/policy digest. | Run `pnpm test` or `pnpm check`, then rerun readiness without changing HEAD. |
 | `baseline-boundary` | `pnpm check` or `pnpm production:ready` no longer has the expected meaning. | Restore the script boundary before making any production claim. |
 | `w25-real-proof-fixture` | The proof fixture is missing, unsafe, mock-backed, non-passing, or no longer proves code-changing no-upstream-write execution. | Re-run or re-sanitize W25 proof evidence; do not replace it with mock output. |

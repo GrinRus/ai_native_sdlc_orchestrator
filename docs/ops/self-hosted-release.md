@@ -47,17 +47,18 @@ The production gate validates its internal checks and the audit ledger. While a
 release-blocking invariant is open it exits nonzero with `status=blocked` and
 `gate_execution_status=pass`. An internal check failure instead returns
 `status=fail` and `release_disposition=unknown`. Only a repository with no active
-release blocker returns `status=pass` and `release_disposition=cleared`; that
-state is unavailable during W66. Use JSON output for review packets:
+release blocker returns `status=pass` and `release_disposition=cleared`; W66 can
+reach that state only through the committed qualification closure. Use JSON
+output for review packets:
 
 ```bash
 pnpm production:ready --json
 ```
 
 The default production proof fixture is the sanitized fixture configured by `pnpm production:ready`.
-CI may validate the expected W66 hold with
-`pnpm production:ready --json --expect-audit-hold`; release automation must not
-use that compatibility flag to bypass clearance.
+CI validates both the pending and closed lifecycle with
+`pnpm production:ready --json --allow-audit-hold`; the flag accepts only a
+well-formed audited hold and cannot turn failed evidence into clearance.
 
 ## Operator setup
 

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "kind": "w66-qualification-closure",
+  "wave": "W66",
+  "status": "pending",
+  "qualification_commit": null,
+  "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
+  "evidence_index": "docs/research/24-w66-live-qualification-evidence-index.json",
+  "required_cell_count": 4,
+  "passing_cell_count": 0,
+  "same_commit_matrix": false,
+  "installed_baseline_status": "not-run",
+  "final_assessment_policy": "all-pass",
+  "no_upstream_write": false,
+  "release_disposition": "audit-hold",
+  "release_clearance": false,
+  "clearance_scope": "bounded-self-hosted-node22-loopback-and-hardened-headless",
+  "residual_limitations": [
+    "Hosted SaaS, enterprise identity, managed multi-tenant operations, and upstream publication remain out of scope.",
+    "OpenCode and Qwen remain extended, non-required provider coverage."
+  ]
+}

@@ -345,7 +345,7 @@ claim.
 | Local installed-user UI | Implemented flow-centric baseline | `aor app` launches the packaged SPA with first-run wizard, project switcher, flow selector, active/completed flow views, and `New Flow`. |
 | Operator requests | Implemented flow-scoped baseline | `aor request create/run/status` routes bounded Ask AOR work through runtime evidence and `target_flow_id`. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
-| Production-readiness gate | Implemented; W66 qualification hold active | `pnpm production:ready --json --expect-audit-hold`. |
+| Production-readiness gate | Implemented; W66 disposition is evidence-derived | `pnpm production:ready --json`; CI uses `--allow-audit-hold` while closure is pending. |
 
 ## Readiness evidence
 
@@ -358,7 +358,9 @@ production runtime for arbitrary repositories.
 Run `pnpm check` first: it discovers every tracked `*.test.mjs` file through
 `scripts/test-manifest.json` and writes ignored execution evidence bound to the
 current HEAD. Readiness rejects a missing, stale, duplicated, or incomplete test
-report and currently returns the explicit W66 qualification hold.
+report. It returns the explicit W66 `audit-hold` while closure evidence is
+pending and may return clearance only after the committed path-neutral
+four-cell closure validates.
 
 The current roadmap source of truth extends through W66 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path

@@ -7,6 +7,7 @@ import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/contro
 import { validateTestExecutionReport } from "./test-discovery.mjs";
 import { checkW59ClosureReport } from "./readiness/w59-closure.mjs";
 import { checkReadinessSourceOfTruth } from "./readiness/source-of-truth.mjs";
+import { checkW66QualificationClosure } from "./readiness/w66-closure.mjs";
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = path.posix.join(
   "scripts",
@@ -20,6 +21,8 @@ const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledg
 const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure.json";
 const defaultW58ClosurePath = "docs/research/09-w58-runtime-quality-closure.json";
 const defaultW59ClosurePath = "docs/research/10-w59-audit-closure.json", defaultW59IndependentReviewPath = "docs/research/11-w59-independent-s1-review.json";
+const defaultW66EvidenceIndexPath = "docs/research/24-w66-live-qualification-evidence-index.json";
+const defaultW66ClosurePath = "docs/research/25-w66-qualification-closure.json";
 const ACTIVE_QUALIFICATION_HOLD = {
   finding_id: "W66-QUALIFICATION",
   state: "in-progress",
@@ -925,12 +928,20 @@ export function runProductionReadinessGate(options = {}) {
   const w57ClosurePath = options.w57ClosurePath ?? defaultW57ClosurePath;
   const w58ClosurePath = options.w58ClosurePath ?? defaultW58ClosurePath;
   const w59ClosurePath = options.w59ClosurePath ?? defaultW59ClosurePath, w59IndependentReviewPath = options.w59IndependentReviewPath ?? defaultW59IndependentReviewPath;
+  const w66EvidenceIndexPath = options.w66EvidenceIndexPath ?? defaultW66EvidenceIndexPath;
+  const w66ClosurePath = options.w66ClosurePath ?? defaultW66ClosurePath;
   const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
+  const w66ClosureCheck = checkW66QualificationClosure({
+    rootDir,
+    closureReportPath: w66ClosurePath,
+    evidenceIndexPath: w66EvidenceIndexPath,
+  });
   const checks = [
     auditLedgerCheck,
     checkW57ClosureReport(rootDir, auditLedgerPath, w57ClosurePath),
     checkW58ClosureReport(rootDir, auditLedgerPath, w58ClosurePath),
     checkW59ClosureReport({ rootDir, auditLedgerPath, closureReportPath: w59ClosurePath, independentReviewPath: w59IndependentReviewPath }),
+    w66ClosureCheck,
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
     checkStoryHonesty(rootDir, storyMatrixPath),
@@ -946,7 +957,7 @@ export function runProductionReadinessGate(options = {}) {
   const gateExecutionStatus = checks.every((check) => check.status === "pass") ? "pass" : "fail";
   const blockingInvariants = [
     ...(auditLedgerCheck.blocking_invariants ?? []),
-    ACTIVE_QUALIFICATION_HOLD,
+    ...(w66ClosureCheck.qualified ? [] : [ACTIVE_QUALIFICATION_HOLD]),
   ];
   const releaseDisposition = gateExecutionStatus === "fail" ? "unknown" : blockingInvariants.length > 0 ? "audit-hold" : "cleared";
   const status = gateExecutionStatus === "fail" ? "fail" : releaseDisposition === "audit-hold" ? "blocked" : "pass";
@@ -960,7 +971,12 @@ export function runProductionReadinessGate(options = {}) {
     proof_fixture_path: proofFixturePath,
     openapi_path: openApiPath,
     remediation_ledger_path: auditLedgerPath,
-    remediation_closure_reports: { W57: w57ClosurePath, W58: w58ClosurePath, W59: w59ClosurePath },
+    remediation_closure_reports: {
+      W57: w57ClosurePath,
+      W58: w58ClosurePath,
+      W59: w59ClosurePath,
+      W66: w66ClosurePath,
+    },
     checks,
   };
 }
@@ -972,6 +988,7 @@ function parseArgs(argv) {
     openApiPath: defaultOpenApiPath,
     auditLedgerPath: defaultAuditLedgerPath,
     expectAuditHold: false,
+    allowAuditHold: false,
     requireTestEvidence: true,
     json: false,
   };
@@ -993,6 +1010,8 @@ function parseArgs(argv) {
       args.json = true;
     } else if (arg === "--expect-audit-hold") {
       args.expectAuditHold = true;
+    } else if (arg === "--allow-audit-hold") {
+      args.allowAuditHold = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -1025,7 +1044,8 @@ if (invokedAsMain) {
       printTextReport(result);
     }
     const expectedAuditHold = args.expectAuditHold && result.status === "blocked" && result.gate_execution_status === "pass";
-    if (result.status !== "pass" && !expectedAuditHold) process.exit(1);
+    const allowedAuditHold = args.allowAuditHold && result.status === "blocked" && result.gate_execution_status === "pass";
+    if (result.status !== "pass" && !expectedAuditHold && !allowedAuditHold) process.exit(1);
   } catch (error) {
     console.error(error.message);
     process.exit(1);
