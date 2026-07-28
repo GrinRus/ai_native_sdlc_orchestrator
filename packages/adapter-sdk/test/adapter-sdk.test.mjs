@@ -487,6 +487,42 @@ test("external runner failure classifier ignores successful authentication confi
   );
 });
 
+test("external runner failure classifier ignores successful stream auth telemetry fields", () => {
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: [
+        JSON.stringify({
+          type: "system",
+          subtype: "init",
+          apiKeySource: "none",
+          model: "host-authenticated-model",
+        }),
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "Minimal non-interactive invocation completed.",
+        }),
+      ].join("\n"),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "none",
+  );
+
+  for (const authFailure of ["API key missing", "api_key invalid", "api-key expired"]) {
+    assert.equal(
+      classifyExternalRunnerFailure({
+        stdout: "",
+        stderr: authFailure,
+        errorMessage: null,
+        defaultFailureKind: "external-runner-failed",
+      }),
+      "auth-failed",
+    );
+  }
+});
+
 test("external runner failure classifier ignores nested target Permission denied logs", () => {
   const targetOutput = [
     "Running npm test",

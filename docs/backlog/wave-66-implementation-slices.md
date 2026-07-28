@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -803,6 +803,55 @@ installed-console gates are trustworthy.
 - Provider policy changes, target repair, large provider execution, four-cell
   closure, or production clearance.
 
+## W66-S13 — Stream auth telemetry classification
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Successful streaming provider initialization metadata cannot be
+  misclassified as an authentication failure merely because it names the
+  provider's API-key source field.
+- **Delivery priority:** P0
+- **Estimated effort:** XS
+- **Primary modules:** adapter failure classifier, live-adapter preflight,
+  streaming auth regression tests
+- **Hard dependencies:** W66-S12
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Boundary-aware auth matching**
+   - Purpose: Distinguish real API-key errors from successful stream telemetry.
+   - Changes: Require a complete `api key`, `api_key`, or `api-key` token rather
+     than matching arbitrary identifiers such as `apiKeySource`.
+   - Validation: Successful Claude init/result JSONL passes preflight while
+     explicit missing, invalid, and expired key errors remain `auth-failed`.
+2. **Qualification reset**
+   - Purpose: Keep the W66 qualification set attributable to one behavior commit.
+   - Changes: Preserve the failed Anthropic preflight and every earlier S12 run
+     as diagnostic evidence, close S13 through deterministic gates, then freeze
+     and rerun the installed baseline and both medium cells.
+   - Validation: No pre-S13 result can enter the final qualification matrix.
+
+### Acceptance criteria
+
+1. Stream metadata containing `apiKeySource` cannot create a false auth failure.
+2. Real API-key error messages retain provider-owned `auth-failed`
+   classification.
+3. Adapter and live-E2E focused tests plus `pnpm slice:gate -- W66-S13` pass
+   without a paid provider call.
+4. W66-S09 returns to active only after the S13 behavior commit.
+
+### Done evidence
+
+- Boundary-aware failure-classification tests.
+- Deterministic gate results and W66-S13 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Provider credentials, target repair, large provider execution, four-cell
+  closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -814,7 +863,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S12
+- **Hard dependencies:** W66-S13
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

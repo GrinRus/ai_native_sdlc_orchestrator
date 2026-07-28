@@ -1024,7 +1024,7 @@ export function classifyExternalRunnerFailure(options) {
     /\b(?:failed|failure|required|error|invalid|expired|missing|denied|transient)\s+authentication\b/u.test(combined) ||
     combined.includes("missing bearer") ||
     combined.includes("api key") ||
-    combined.includes("apikey") ||
+    /\bapi[_-]?key\b/u.test(combined) ||
     combined.includes("setup-token") ||
     combined.includes("login required")
   )) {
