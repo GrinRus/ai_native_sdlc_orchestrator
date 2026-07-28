@@ -59,6 +59,7 @@ import {
   shouldDeferGuidedWarnDiagnostic,
 } from "../lib/flows.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
+import { materializeBrowserEvidenceIndex } from "../lib/installed-browser-proof.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
 import {
   REQUIRED_GUIDED_COMMAND_LABELS,
@@ -3926,6 +3927,34 @@ test("guided browser-task proof request points at a live app surface, not the sh
     assert.equal(result.summary.browser_task_app_url, "http://127.0.0.1:61002/");
     assert.equal(result.summary.browser_task_app_server_cleanup.status, "terminated");
     assert.equal(result.browserTaskAppServerCleanup.status, "terminated");
+
+    const immutableRequestBytes = fs.readFileSync(result.browserTaskProofRequestFile);
+    fs.writeFileSync(
+      request.expected_browser_task_proof_file,
+      `${JSON.stringify({
+        schema_version: 2,
+        kind: "installed-browser-proof",
+        run_id: "guided-live-surface",
+        scenario_id: "installed-console-matrix",
+      }, null, 2)}\n`,
+    );
+    runGuidedWebSmoke({
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [fakeAor],
+        binaryRef: fakeAor,
+      },
+      targetCheckoutRoot,
+      runId: "guided-live-surface",
+      reportsRoot,
+      env: process.env,
+      keepBrowserTaskAppSurface: false,
+    });
+    assert.equal(
+      fs.readFileSync(result.browserTaskProofRequestFile).equals(immutableRequestBytes),
+      true,
+      "terminal resume must not refresh the request timestamp for an immutable schema-v2 proof",
+    );
   });
 });
 
@@ -4078,6 +4107,127 @@ test("guided browser-task collector retries one transient environment failure", 
       { attempt: 2, status: 0, signal: null, proof_materialized: true },
     ]);
     assert.equal(fs.readFileSync(counterFile, "utf8"), "2");
+  });
+});
+
+test("guided browser-task collector revalidates immutable evidence on terminal resume", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "guided-collector-resume";
+    const scenarioId = "installed-console-matrix";
+    const createdAt = new Date().toISOString();
+    const browserTaskProofRequestFile = path.join(reportsRoot, `browser-request-${runId}.json`);
+    const browserTaskProofFile = path.join(reportsRoot, `browser-proof-${runId}.json`);
+    const passEntries = (ids) => ids.map((id) => ({ id, status: "pass" }));
+    const proof = {
+      schema_version: 2,
+      kind: "installed-browser-proof",
+      run_id: runId,
+      scenario_id: scenarioId,
+      status: "pass",
+      scenarios: [{
+        id: "completed-read-only",
+        status: "pass",
+        observed_state: "completed",
+        expected_state: "completed",
+        durable_precondition_ref: "evidence://state.json",
+      }],
+      actions: [{
+        id: "create-no-write-request",
+        status: "pass",
+        visible_label: "Ask AOR",
+        canonical_mutation: { method: "POST", route: "/api/projects/aor-core/operator-requests" },
+        response_id: "request-1",
+        evidence_refs: ["evidence://request-1.json"],
+        reload_verified: true,
+        durable_readback: { status: "pass", ref: "evidence://request-1.json" },
+      }],
+      viewport_matrix: passEntries(["desktop", "tablet", "mobile", "zoom-200"]),
+      accessibility_matrix: passEntries([
+        "keyboard-only",
+        "dialog-focus",
+        "focus-restoration",
+        "semantic-tree",
+        "contrast-aa",
+        "touch-targets",
+        "reduced-motion",
+      ]),
+      recovery_matrix: passEntries([
+        "reload",
+        "reconnect",
+        "partial-read",
+        "offline-read",
+        "injected-error",
+        "multi-item-attention",
+        "project-switch",
+        "terminal-read-only",
+      ]).map((entry) => entry.id === "injected-error" ? { ...entry, injected: true } : entry),
+      screenshot_files: ["evidence://desktop.png"],
+      findings: [],
+      console_errors: [],
+      external_requests: [],
+    };
+    fs.writeFileSync(
+      browserTaskProofRequestFile,
+      `${JSON.stringify({ schema_version: 2, run_id: runId, scenario_id: scenarioId, created_at: createdAt }, null, 2)}\n`,
+    );
+    fs.writeFileSync(browserTaskProofFile, `${JSON.stringify(proof, null, 2)}\n`);
+    const evidenceArtifacts = [
+      ["installed-app-smoke", path.join(reportsRoot, "app-smoke.json")],
+      ["installed-scenario-report", path.join(reportsRoot, "scenario-report.json")],
+      ["browser-task-proof", browserTaskProofFile],
+      ["dom-snapshot", path.join(reportsRoot, "dom.json")],
+      ["accessibility-summary", path.join(reportsRoot, "accessibility.json")],
+      ["finding-ledger", path.join(reportsRoot, "findings.json")],
+    ].map(([kind, file]) => {
+      if (!fs.existsSync(file)) fs.writeFileSync(file, `${JSON.stringify({ kind, run_id: runId })}\n`);
+      return { kind, file };
+    });
+    const indexed = materializeBrowserEvidenceIndex({
+      reportsRoot,
+      runId,
+      scenarioId,
+      createdAt,
+      artifacts: evidenceArtifacts,
+    });
+    const collectorFile = path.join(
+      reportsRoot,
+      `installed-user-guided-browser-task-proof-collector-${runId}.json`,
+    );
+    fs.writeFileSync(
+      collectorFile,
+      `${JSON.stringify({
+        status: "pass",
+        output_file: collectorFile,
+        evidence_index_file: indexed.indexFile,
+        evidence_index_digest: indexed.digest,
+        validation: { ok: true, issues: [] },
+      }, null, 2)}\n`,
+    );
+    const options = {
+      enabled: false,
+      runId,
+      reportsRoot,
+      env: process.env,
+      appUrl: "http://127.0.0.1:61002/",
+      browserTaskProofRequestFile,
+      browserTaskProofFile,
+      outputHtml: path.join(reportsRoot, "smoke.html"),
+      domSnapshotFile: path.join(reportsRoot, "dom.json"),
+      accessibilitySummaryFile: path.join(reportsRoot, "accessibility.json"),
+      visualSnapshotFile: path.join(reportsRoot, "visual.json"),
+    };
+
+    const resumed = collectGuidedBrowserTaskProof(options);
+    assert.equal(resumed.status, "pass");
+    assert.equal(resumed.reused_existing_evidence, true);
+    assert.equal(resumed.evidence_index_file, indexed.indexFile);
+
+    fs.appendFileSync(indexed.indexFile, "\n");
+    const tampered = collectGuidedBrowserTaskProof(options);
+    assert.equal(tampered.status, "not_pass");
+    assert.match(tampered.validation.issues.join("\n"), /digest or content-addressed filename/u);
   });
 });
 

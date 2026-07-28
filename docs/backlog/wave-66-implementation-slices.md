@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -744,6 +744,65 @@ installed-console gates are trustworthy.
 - Changing provider authentication, lowering Claude effort, target-source
   repair, large provider execution, four-cell closure, or production clearance.
 
+## W66-S12 — Resumable immutable browser-evidence reconciliation
+
+- **Epic:** EPIC-0, EPIC-1, EPIC-7
+- **State:** done
+- **Outcome:** Re-entering a terminal guided flow reuses only a freshly
+  revalidated content-addressed browser evidence index, so an already passing
+  installed proof cannot be lost or silently trusted during resume.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** private guided browser collector, immutable browser proof
+  validation, live-E2E resume regressions
+- **Hard dependencies:** W66-S11
+- **Primary user story surfaces:** PBO-09, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Resume-safe collector reconciliation**
+   - Purpose: Preserve immutable browser proof identity when the terminal
+     controller rebuilds guided stage results.
+   - Changes: Reload the prior collector record only when its request, proof,
+     content-addressed index, and referenced objects can all be revalidated.
+   - Validation: A terminal resume retains the exact index and passing proof
+     without rerunning the browser collector.
+2. **Fail-closed tamper handling**
+   - Purpose: Prevent a stale collector status from authorizing changed evidence.
+   - Changes: Recompute the index digest, require the digest-derived filename,
+     and return `not_pass` when index or object validation fails.
+   - Validation: Digest, filename, object, run, scenario, and freshness
+     mismatches remain non-passing.
+3. **Qualification reset**
+   - Purpose: Keep the W66 matrix attributable to one behavior commit.
+   - Changes: Close W66-S12 after deterministic gates, invalidate the attempted
+     W66-S11 guided baseline, and freeze a new manifest before any provider call.
+   - Validation: W66-S09 returns to active only after the S12 commit; installed
+     baseline and both medium cells restart on that immutable commit.
+
+### Acceptance criteria
+
+1. Existing schema-version-2 browser proof is never accepted from a cached
+   collector status alone.
+2. Valid immutable evidence survives repeated terminal controller evaluation
+   with the original content-addressed index.
+3. Mutated or missing evidence fails closed and does not produce a guided
+   journey proof.
+4. Focused live-E2E tests, repository gates, and
+   `pnpm slice:gate -- W66-S12` pass before qualification restarts.
+5. The attempted guided run on `fec5e8d5` remains diagnostic only.
+
+### Done evidence
+
+- Resume and tamper regression tests.
+- Deterministic gate results and W66-S12 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Provider policy changes, target repair, large provider execution, four-cell
+  closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -755,7 +814,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S11
+- **Hard dependencies:** W66-S12
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

@@ -605,7 +605,8 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S08 | Deterministic remediation closure | EPIC-0, EPIC-4, EPIC-7 | done | root/package/browser gates, W66 finding ledger, deterministic fixture matrices, readiness docs | W66-S07 |
 | W66-S10 | Non-repair review warning approval compatibility | EPIC-0, EPIC-4, EPIC-5 | done | review-decision contract/runtime, public approval regressions, guided lifecycle compatibility | W66-S08 |
 | W66-S11 | Bounded external-provider session convergence | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | done | adapter session-budget contract, external-process supervisor, Claude streaming profile, run-health regressions | W66-S10 |
-| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S11 |
+| W66-S12 | Resumable immutable browser-evidence reconciliation | EPIC-0, EPIC-1, EPIC-7 | done | private browser collector, immutable evidence reconciliation, guided resume regressions | W66-S11 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S12 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New

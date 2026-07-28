@@ -1863,6 +1863,73 @@ export function collectGuidedBrowserTaskProof(options) {
     `installed-user-guided-browser-task-proof-collector-${normalizeId(options.runId)}.json`,
   );
   if (options.enabled !== true) {
+    if (
+      fileExists(outputFile)
+      && fileExists(options.browserTaskProofRequestFile)
+      && fileExists(options.browserTaskProofFile)
+    ) {
+      try {
+        const previous = asRecord(readJson(outputFile));
+        const evidenceIndexFile = asNonEmptyString(previous.evidence_index_file);
+        const resolvedIndexFile = evidenceIndexFile ? path.resolve(evidenceIndexFile) : "";
+        const relativeIndexFile = resolvedIndexFile
+          ? path.relative(path.resolve(options.reportsRoot), resolvedIndexFile)
+          : "";
+        if (
+          evidenceIndexFile
+          && relativeIndexFile
+          && !relativeIndexFile.startsWith("..")
+          && !path.isAbsolute(relativeIndexFile)
+          && fileExists(resolvedIndexFile)
+        ) {
+          const indexBytes = fs.readFileSync(resolvedIndexFile);
+          const evidenceIndexDigest = createHash("sha256").update(indexBytes).digest("hex");
+          const expectedDigest = asNonEmptyString(previous.evidence_index_digest);
+          const proof = asRecord(readJson(options.browserTaskProofFile));
+          const request = asRecord(readJson(options.browserTaskProofRequestFile));
+          const index = asRecord(JSON.parse(indexBytes.toString("utf8")));
+          const validation = validateInstalledBrowserProof({
+            proof,
+            request,
+            index,
+            reportsRoot: options.reportsRoot,
+            runId: options.runId,
+            scenarioId: asNonEmptyString(request.scenario_id),
+          });
+          if (
+            expectedDigest !== evidenceIndexDigest
+            || path.basename(resolvedIndexFile) !== `${evidenceIndexDigest}.json`
+          ) {
+            validation.ok = false;
+            validation.issues.push("browser evidence index digest or content-addressed filename is invalid");
+          }
+          return {
+            ...previous,
+            status: validation.ok ? "pass" : "not_pass",
+            evidence_index_file: resolvedIndexFile,
+            evidence_index_digest: evidenceIndexDigest,
+            validation,
+            reused_existing_evidence: true,
+          };
+        }
+        return {
+          ...previous,
+          status: "not_pass",
+          validation: { ok: false, issues: ["browser evidence index is missing or outside the reports root"] },
+          reused_existing_evidence: true,
+        };
+      } catch (error) {
+        return {
+          status: "not_pass",
+          output_file: outputFile,
+          validation: {
+            ok: false,
+            issues: [`browser evidence resume validation failed: ${error instanceof Error ? error.message : String(error)}`],
+          },
+          reused_existing_evidence: true,
+        };
+      }
+    }
     return { status: "not_requested", output_file: outputFile };
   }
   if (!asNonEmptyString(options.appUrl)) {
@@ -2118,10 +2185,10 @@ export function runGuidedWebSmoke(options) {
         kind: "guided-browser-task-app-surface",
         status: "not_started",
         reason: "Guided web smoke did not pass; browser-task proof surface was not started.",
-      };
+  };
   const browserTaskAppUrl = asNonEmptyString(browserTaskAppSurface.app_url) || null;
   const browserTaskControlPlane = asNonEmptyString(browserTaskAppSurface.control_plane) || null;
-  writeJson(browserTaskProofRequestFile, {
+  const browserTaskProofRequest = {
     schema_version: 2,
     kind: "installed-browser-proof-request",
     request_id: `${options.runId}.installed-browser-proof-request.v2`,
@@ -2191,7 +2258,16 @@ export function runGuidedWebSmoke(options) {
     app_server_launch_summary: browserTaskAppSurface,
     project_id: asNonEmptyString(summary.project_id) || null,
     created_at: nowIso(),
-  });
+  };
+  const existingBrowserTaskProof = fileExists(browserTaskProofFile)
+    ? asRecord(readJson(browserTaskProofFile))
+    : {};
+  const preserveImmutableBrowserTaskRequest =
+    existingBrowserTaskProof.schema_version === 2
+    && fileExists(browserTaskProofRequestFile);
+  if (!preserveImmutableBrowserTaskRequest) {
+    writeJson(browserTaskProofRequestFile, browserTaskProofRequest);
+  }
   fs.writeFileSync(
     outputHtml,
     [
