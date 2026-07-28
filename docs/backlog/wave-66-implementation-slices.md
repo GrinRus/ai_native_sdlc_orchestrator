@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -591,6 +591,71 @@ installed-console gates are trustworthy.
 
 - Security scanning, real provider execution, upstream writes, and publication.
 
+## W66-S10 — Non-repair review warning approval compatibility
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-5
+- **State:** done
+- **Outcome:** Public review decisions permit an operator to approve a bounded
+  review warning that recommends proceeding, while repair, human-review, failed
+  finding, and failed Runtime Harness outcomes remain fail-closed.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** `docs/contracts/review-decision.md`,
+  `packages/observability/**`, public review-decision CLI regressions, guided
+  live-E2E compatibility tests
+- **Hard dependencies:** W66-S08
+- **Primary user story surfaces:** DEV-05, DTX-01, OPS-06
+
+### Local tasks
+
+1. **Approval compatibility contract**
+   - Purpose: Align the public review-decision gate with the documented
+     non-repair warning semantics already used by the live lifecycle.
+   - Changes: Define delivery-compatible review evidence as `pass`, or `warn`
+     plus `proceed` with no failed review finding; preserve the original review
+     verdict in the decision basis.
+   - Validation: Contract documentation and generated decisions agree without a
+     schema or wire-format change.
+2. **Fail-closed decision implementation**
+   - Purpose: Permit bounded operator acknowledgement without weakening repair
+     and Runtime Harness gates.
+   - Changes: Evaluate review status, recommendation, failed findings, and
+     Runtime Harness outcome together before materializing `approve`.
+   - Validation: `repair`, `required-human-review`, failed findings, unknown
+     states, and non-passing Runtime Harness outcomes remain blocked.
+3. **Guided lifecycle regression and qualification restart**
+   - Purpose: Close the exact delivery blocker discovered by the installed
+     guided W66-S09 baseline.
+   - Changes: Add focused positive and negative regressions, run repository
+     gates, and invalidate the pre-fix qualification manifest and run evidence.
+   - Validation: The public approve path accepts the retained non-repair warning
+     shape, the slice gate passes, and W66-S09 restarts on the fix commit.
+
+### Acceptance criteria
+
+1. A `warn` review with `review_recommendation=proceed`, no failed finding, and
+   a passing Runtime Harness may materialize an `approve` decision.
+2. The decision basis retains `review_overall_status=warn`; no consumer
+   misrepresents the review as `pass`.
+3. Repair, required-human-review, failed finding, unknown, and failed Runtime
+   Harness inputs cannot produce approval.
+4. Public contracts and wire formats remain backward-compatible.
+5. Focused tests, `pnpm check`, and `pnpm slice:gate -- W66-S10` pass without a
+   provider call.
+6. All pre-fix W66-S09 evidence is diagnostic only and qualification restarts
+   from deterministic baseline on the new commit.
+
+### Done evidence
+
+- Review-decision contract clarification and focused positive/negative tests.
+- Public lifecycle compatibility regression.
+- W66-S10 slice gate and new qualification commit.
+
+### Out of scope
+
+- Weakening review findings, auto-approving warnings, target-source repair,
+  provider/profile changes, large provider execution, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -602,7 +667,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S08
+- **Hard dependencies:** W66-S10
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

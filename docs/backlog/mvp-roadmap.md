@@ -78,7 +78,7 @@ The authoritative planning model for implementation lives in:
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
 | W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, and same-commit Codex/Claude closure. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 
-The current roadmap contains **341 slices across 67 waves**.
+The current roadmap contains **342 slices across 67 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -307,6 +307,7 @@ The current roadmap contains **341 slices across 67 waves**.
 | W66-S06 | parent/integration/multirepo delivery correctness target: EMP-03, DEV-05, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, OPS-01, OPS-04, OPS-10 |
 | W66-S07 | installed browser-proof and design-acceptance target: PBO-09, OPS-01, OPS-04, OPS-06, OPS-07, OPS-11, OPS-12 |
 | W66-S08 | deterministic remediation closure target: OPS-06, OPS-07, FIN-03 |
+| W66-S10 | non-repair review warning approval compatibility target: DEV-05, DTX-01, OPS-06 |
 | W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation

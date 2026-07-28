@@ -156,6 +156,7 @@ function writeJson(filePath, document) {
  */
 function evaluateDecisionGate(options) {
   const reviewStatus = asString(options.reviewReport.overall_status) ?? "unknown";
+  const reviewRecommendation = asString(options.reviewReport.review_recommendation) ?? "unknown";
   const runtimeDecision = asString(options.runtimeHarnessReport.overall_decision) ?? "unknown";
 
   if (options.decision === "hold") {
@@ -175,8 +176,17 @@ function evaluateDecisionGate(options) {
   }
 
   const findings = [];
-  if (reviewStatus !== "pass") {
-    findings.push(`Cannot approve because review-report overall_status is '${reviewStatus}'.`);
+  const hasFailedReviewFinding = asRecordArray(options.reviewReport.findings).some(
+    (finding) => asString(finding.severity) === "fail",
+  );
+  const reviewAllowsApproval =
+    reviewStatus === "pass" ||
+    (reviewStatus === "warn" && reviewRecommendation === "proceed" && !hasFailedReviewFinding);
+  if (!reviewAllowsApproval) {
+    findings.push(
+      `Cannot approve because review-report overall_status is '${reviewStatus}', ` +
+        `review_recommendation is '${reviewRecommendation}', or a failed review finding remains.`,
+    );
   }
   if (runtimeDecision !== "pass") {
     findings.push(`Cannot approve because Runtime Harness overall_decision is '${runtimeDecision}'.`);
@@ -447,7 +457,7 @@ export function materializeReviewDecision(options) {
   const repairContext = normalizeRepairContext({
     decision: options.decision,
     context: options.repairContext,
-    defaultVerificationStatus: runtimeDecision === "pass" && reviewStatus === "pass" ? "pass" : "not_pass",
+    defaultVerificationStatus: gate.status === "pass" ? "pass" : "not_pass",
     fallbackFindingDetails: buildFallbackRepairFindingDetails({
       findings: [...reviewFindings, ...runtimeFindings],
       fallbackEvidenceRefs: evidenceRefs,
@@ -490,7 +500,7 @@ export function materializeReviewDecision(options) {
     reason:
       options.reason ??
       (options.decision === "approve"
-        ? "Linked review and Runtime Harness evidence are passing."
+        ? "Linked review and Runtime Harness evidence allow delivery."
         : `Operator selected '${options.decision}' for the linked review evidence.`),
     review_report_ref: reviewReportRef,
     runtime_harness_report_ref: runtimeHarnessReportRef,

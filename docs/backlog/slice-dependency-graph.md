@@ -344,6 +344,7 @@ graph TD
   W66S06[W66-S06 Parent/child integration and coordinated delivery correctness]
   W66S07[W66-S07 Installed browser proof and design acceptance integrity]
   W66S08[W66-S08 Deterministic remediation closure]
+  W66S10[W66-S10 Non-repair review warning approval compatibility]
   W66S09[W66-S09 Fresh four-cell live qualification closure]
 
   W0S01 --> W0S02
@@ -849,7 +850,8 @@ graph TD
   W66S05 --> W66S06
   W66S06 --> W66S07
   W66S07 --> W66S08
-  W66S08 --> W66S09
+  W66S08 --> W66S10
+  W66S10 --> W66S09
 ```
 
 ## W0 hard dependencies
@@ -1463,7 +1465,8 @@ own the stricter terminal control proof evidence for this lane.
 | W66-S06 | W66-S05 |
 | W66-S07 | W66-S06 |
 | W66-S08 | W66-S07 |
-| W66-S09 | W66-S08 |
+| W66-S10 | W66-S08 |
+| W66-S09 | W66-S10 |
 
 ## Topological order
 1. W0-S01
@@ -1806,7 +1809,8 @@ own the stricter terminal control proof evidence for this lane.
 338. W66-S06
 339. W66-S07
 340. W66-S08
-341. W66-S09
+341. W66-S10
+342. W66-S09
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

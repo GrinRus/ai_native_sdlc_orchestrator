@@ -26,7 +26,7 @@ const defaultW66ClosurePath = "docs/research/25-w66-qualification-closure.json";
 const ACTIVE_QUALIFICATION_HOLD = {
   finding_id: "W66-QUALIFICATION",
   state: "in-progress",
-  owner_slices: ["W66-S01", "W66-S02", "W66-S03", "W66-S04", "W66-S05", "W66-S06", "W66-S07", "W66-S08", "W66-S09"],
+  owner_slices: ["W66-S01", "W66-S02", "W66-S03", "W66-S04", "W66-S05", "W66-S06", "W66-S07", "W66-S08", "W66-S10", "W66-S09"],
   summary: "Fresh same-commit Codex and Claude qualification is incomplete; bounded release clearance remains suspended.",
 };
 const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
