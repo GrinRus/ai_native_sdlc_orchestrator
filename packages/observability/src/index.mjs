@@ -17,4 +17,8 @@ export {
   materializeQualityRepairRequest,
   updateQualityRepairRequest,
 } from "./quality-repair-request.mjs";
-export { listReviewDecisions, materializeReviewDecision } from "./review-decision.mjs";
+export {
+  listReviewDecisions,
+  materializeReviewDecision,
+  reviewReportAllowsApproval,
+} from "./review-decision.mjs";

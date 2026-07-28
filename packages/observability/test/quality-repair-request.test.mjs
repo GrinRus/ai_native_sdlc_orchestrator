@@ -11,6 +11,7 @@ import {
   listQualityRepairRequests,
   materializeQualityRepairRequest,
   materializeReviewDecision,
+  reviewReportAllowsApproval,
   updateQualityRepairRequest,
 } from "../src/index.mjs";
 
@@ -110,6 +111,38 @@ test("review approval accepts a bounded warning that recommends proceed", () => 
       source: "fixture://review-decision-approve-warning",
     }).ok,
     true,
+  );
+});
+
+test("repair closure reuses the same bounded warning eligibility as review approval", () => {
+  assert.equal(
+    reviewReportAllowsApproval({
+      overall_status: "warn",
+      review_recommendation: "proceed",
+      findings: [
+        {
+          finding_id: "review.finding.bounded-warning",
+          severity: "warn",
+        },
+      ],
+    }),
+    true,
+  );
+  assert.equal(
+    reviewReportAllowsApproval({
+      overall_status: "warn",
+      review_recommendation: "required-human-review",
+      findings: [],
+    }),
+    false,
+  );
+  assert.equal(
+    reviewReportAllowsApproval({
+      overall_status: "warn",
+      review_recommendation: "proceed",
+      findings: [{ finding_id: "review.finding.blocking", severity: "fail" }],
+    }),
+    false,
   );
 });
 

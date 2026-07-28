@@ -607,7 +607,8 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S11 | Bounded external-provider session convergence | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | done | adapter session-budget contract, external-process supervisor, Claude streaming profile, run-health regressions | W66-S10 |
 | W66-S12 | Resumable immutable browser-evidence reconciliation | EPIC-0, EPIC-1, EPIC-7 | done | private browser collector, immutable evidence reconciliation, guided resume regressions | W66-S11 |
 | W66-S13 | Stream auth telemetry classification | EPIC-0, EPIC-4, EPIC-7 | done | adapter failure classifier, live-adapter preflight, streaming auth regressions | W66-S12 |
-| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S13 |
+| W66-S14 | Repair closure warning approval parity | EPIC-0, EPIC-4, EPIC-7 | done | review decision eligibility, public repair closure, observability and guided lifecycle regressions | W66-S13 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S14 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New

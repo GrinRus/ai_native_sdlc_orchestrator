@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -852,6 +852,57 @@ installed-console gates are trustworthy.
 - Provider credentials, target repair, large provider execution, four-cell
   closure, or production clearance.
 
+## W66-S14 — Repair closure warning approval parity
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Public repair closure applies the same reviewed warning
+  eligibility as review approval, so a refreshed non-blocking warning cannot
+  strand an otherwise passing repair lifecycle before delivery.
+- **Delivery priority:** P0
+- **Estimated effort:** XS
+- **Primary modules:** review decision eligibility, public repair closure,
+  observability and guided lifecycle regressions
+- **Hard dependencies:** W66-S13
+- **Primary user story surfaces:** DEV-05, DTX-01, OPS-06
+
+### Local tasks
+
+1. **Single warning-approval predicate**
+   - Purpose: Remove semantic drift between review approval and repair closure.
+   - Changes: Reuse one predicate for `pass` reviews and bounded `warn` reviews
+     that recommend `proceed` and contain no failed finding.
+   - Validation: Repair closure accepts the same warning report that an approve
+     decision accepts, while repair/human-review/failed-finding outcomes remain
+     blocked.
+2. **Qualification reset**
+   - Purpose: Keep the W66 matrix attributable to one behavior commit.
+   - Changes: Preserve the failed S13 guided delivery as diagnostic evidence,
+     close S14 through deterministic gates, then freeze and rerun the installed
+     baseline and both medium cells.
+   - Validation: No pre-S14 result enters the final qualification matrix.
+
+### Acceptance criteria
+
+1. Review approval and repair closure cannot disagree on bounded warning
+   eligibility.
+2. A warning with `repair`, `required-human-review`, or a failed finding remains
+   blocked.
+3. Focused observability/CLI/live-E2E tests and
+   `pnpm slice:gate -- W66-S14` pass without a paid provider call.
+4. W66-S09 returns to active only after the S14 behavior commit.
+
+### Done evidence
+
+- Shared warning-eligibility regression tests.
+- Deterministic gate results and W66-S14 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Target repair policy, provider credentials, large provider execution,
+  four-cell closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -863,7 +914,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S13
+- **Hard dependencies:** W66-S14
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

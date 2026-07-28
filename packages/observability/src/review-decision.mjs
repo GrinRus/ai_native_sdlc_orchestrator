@@ -176,12 +176,7 @@ function evaluateDecisionGate(options) {
   }
 
   const findings = [];
-  const hasFailedReviewFinding = asRecordArray(options.reviewReport.findings).some(
-    (finding) => asString(finding.severity) === "fail",
-  );
-  const reviewAllowsApproval =
-    reviewStatus === "pass" ||
-    (reviewStatus === "warn" && reviewRecommendation === "proceed" && !hasFailedReviewFinding);
+  const reviewAllowsApproval = reviewReportAllowsApproval(options.reviewReport);
   if (!reviewAllowsApproval) {
     findings.push(
       `Cannot approve because review-report overall_status is '${reviewStatus}', ` +
@@ -197,6 +192,22 @@ function evaluateDecisionGate(options) {
     blocksDownstream: findings.length > 0,
     findings,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} reviewReport
+ * @returns {boolean}
+ */
+export function reviewReportAllowsApproval(reviewReport) {
+  const reviewStatus = asString(reviewReport.overall_status) ?? "unknown";
+  const reviewRecommendation = asString(reviewReport.review_recommendation) ?? "unknown";
+  const hasFailedReviewFinding = asRecordArray(reviewReport.findings).some(
+    (finding) => asString(finding.severity) === "fail",
+  );
+  return (
+    reviewStatus === "pass" ||
+    (reviewStatus === "warn" && reviewRecommendation === "proceed" && !hasFailedReviewFinding)
+  );
 }
 
 /**
