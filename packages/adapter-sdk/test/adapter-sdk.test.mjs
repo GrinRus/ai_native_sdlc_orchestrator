@@ -510,6 +510,54 @@ test("external runner failure classifier ignores successful stream auth telemetr
     "none",
   );
 
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: [
+        JSON.stringify({
+          type: "system",
+          subtype: "init",
+          apiKeySource: "none",
+          model: "host-authenticated-model",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: "The API key and HTTP 401 notes are documentation only; host OAuth is active.",
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "Minimal non-interactive invocation completed.",
+        }),
+      ].join("\n"),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "none",
+  );
+
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: JSON.stringify({
+        type: "result",
+        subtype: "error",
+        result: "API key missing",
+      }),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "external-runner-failed",
+    }),
+    "auth-failed",
+  );
+
   for (const authFailure of ["API key missing", "api_key invalid", "api-key expired"]) {
     assert.equal(
       classifyExternalRunnerFailure({

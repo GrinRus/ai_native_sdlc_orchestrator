@@ -349,6 +349,7 @@ graph TD
   W66S12[W66-S12 Resumable immutable browser-evidence reconciliation]
   W66S13[W66-S13 Stream auth telemetry classification]
   W66S14[W66-S14 Repair closure warning approval parity]
+  W66S15[W66-S15 Structured stream failure-signal classification]
   W66S09[W66-S09 Fresh four-cell live qualification closure]
 
   W0S01 --> W0S02
@@ -859,7 +860,8 @@ graph TD
   W66S11 --> W66S12
   W66S12 --> W66S13
   W66S13 --> W66S14
-  W66S14 --> W66S09
+  W66S14 --> W66S15
+  W66S15 --> W66S09
 ```
 
 ## W0 hard dependencies
@@ -1478,7 +1480,8 @@ own the stricter terminal control proof evidence for this lane.
 | W66-S12 | W66-S11 |
 | W66-S13 | W66-S12 |
 | W66-S14 | W66-S13 |
-| W66-S09 | W66-S14 |
+| W66-S15 | W66-S14 |
+| W66-S09 | W66-S15 |
 
 ## Topological order
 1. W0-S01
@@ -1826,7 +1829,8 @@ own the stricter terminal control proof evidence for this lane.
 343. W66-S12
 344. W66-S13
 345. W66-S14
-346. W66-S09
+346. W66-S15
+347. W66-S09
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

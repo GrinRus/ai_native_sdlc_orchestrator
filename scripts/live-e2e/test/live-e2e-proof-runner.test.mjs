@@ -2454,6 +2454,78 @@ test("live adapter preflight applies env_from aliases without leaking values", (
   });
 });
 
+test("live adapter preflight ignores auth vocabulary in successful stream events", () => {
+  withTempRoot((tempRoot) => {
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    const reportsRoot = path.join(tempRoot, "reports");
+    const adapterProfileRoot = path.join(tempRoot, "adapters");
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(adapterProfileRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(adapterProfileRoot, "claude-code.yaml"),
+      [
+        "adapter_id: claude-code",
+        "runner_family: claude",
+        "version: 1",
+        "launch_modes:",
+        "  - non-interactive",
+        "capabilities:",
+        "  repo_read: true",
+        "  repo_write: true",
+        "  shell_commands: true",
+        "  structured_output: true",
+        "constraints:",
+        "  requires_local_runtime: true",
+        "execution:",
+        "  runtime_mode: external-process",
+        "  live_baseline: true",
+        "  handler: claude-code-external-runner",
+        "  evidence_namespace: evidence://adapter-live/claude-code",
+        "  external_runtime:",
+        `    command: ${process.execPath}`,
+        "    request_transport: stdin-json",
+        "    stdin_json_scope: test-only",
+        "    preflight_timeout_ms: 30000",
+        "    timeout_ms: 30000",
+        "    permission_policy:",
+        "      default_mode: full-bypass",
+        "      modes:",
+        "        full-bypass:",
+        "          args:",
+        "            - -e",
+        "            - process.stdout.write([JSON.stringify({type:'system',subtype:'init',apiKeySource:'none'}),JSON.stringify({type:'assistant',message:{role:'assistant',content:[{type:'text',text:'API key and HTTP 401 notes are documentation; host OAuth is active.'}]}}),JSON.stringify({type:'result',subtype:'success',result:'preflight ok'})].join('\\n'));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runLiveAdapterPreflight({
+      targetCheckoutRoot,
+      adapterProfileRoot,
+      providerVariant: {
+        provider: "anthropic",
+        primary_adapter: "claude-code",
+        coverage_tier: "extended",
+      },
+      providerVariantId: "anthropic-primary",
+      coverageTier: "extended",
+      env: process.env,
+      runnerAuthMode: "host",
+      runnerAuthSource: "host",
+      runtimeAgentPermissionMode: "full-bypass",
+      runtimeAgentInteractionPolicy: "fail-closed",
+      runtimeAgentAutoApprovalProfile: "none",
+      authProbeRequired: true,
+      runId: "claude-stream-auth-vocabulary",
+      reportsRoot,
+    });
+
+    assert.equal(result.status, "pass", JSON.stringify(result.report));
+    assert.equal(result.report.auth_probe.status, "pass");
+  });
+});
+
 test("live adapter preflight uses a preflight-specific request-artifact prompt and marker edit", () => {
   withTempRoot((tempRoot) => {
     const targetCheckoutRoot = path.join(tempRoot, "target");

@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -903,6 +903,59 @@ installed-console gates are trustworthy.
 - Target repair policy, provider credentials, large provider execution,
   four-cell closure, or production clearance.
 
+## W66-S15 — Structured stream failure-signal classification
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Successful structured provider streams cannot be misclassified
+  from auth-like vocabulary in ordinary assistant output, while stderr and
+  explicit structured failure events retain precise failure classification.
+- **Delivery priority:** P0
+- **Estimated effort:** XS
+- **Primary modules:** adapter failure classification, live-adapter preflight,
+  structured-stream regressions
+- **Hard dependencies:** W66-S14
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Failure-relevant stream projection**
+   - Purpose: Prevent normal provider output from becoming a false auth signal.
+   - Changes: When stdout is a structured JSONL stream, classify only explicit
+     error/failure events; continue to classify stderr and process errors.
+   - Validation: Successful system, assistant, and result events may mention
+     auth documentation without changing the successful preflight verdict.
+2. **Compatibility and qualification reset**
+   - Purpose: Preserve existing behavior outside structured provider streams
+     and keep qualification attributable to one behavior commit.
+   - Changes: Retain plain/buffered output classification and explicit
+     structured error classification; invalidate all S14 qualification evidence
+     and restart the installed baseline and medium cells after S15 closes.
+   - Validation: Focused adapter and live-preflight regressions pass before any
+     paid provider call, and no pre-S15 result enters the qualification matrix.
+
+### Acceptance criteria
+
+1. Auth-like text in a successful structured stream does not produce
+   `auth-failed`.
+2. Explicit structured failure events, stderr, timeout, cancel, and session
+   budget failures retain their existing classifications.
+3. Buffered JSON and plain-text adapters retain compatibility.
+4. Focused adapter/live-E2E tests and `pnpm slice:gate -- W66-S15` pass without
+   a paid provider call.
+5. W66-S09 returns to active only after the S15 behavior commit.
+
+### Done evidence
+
+- Structured success/failure classification regressions.
+- Deterministic gate results and W66-S15 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Provider prompt policy, target repair policy, large provider execution,
+  four-cell closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -914,7 +967,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S14
+- **Hard dependencies:** W66-S15
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

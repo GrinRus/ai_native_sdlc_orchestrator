@@ -305,11 +305,46 @@ export function resolveExternalRuntimePermissionPolicy(options) {
 }
 
 /**
+ * @param {string} stdout
+ * @returns {string}
+ */
+function collectFailureRelevantStdout(stdout) {
+  const lines = stdout.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return "";
+  /** @type {Record<string, unknown>[]} */
+  const events = [];
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return stdout;
+      events.push(parsed);
+    } catch {
+      return stdout;
+    }
+  }
+  return events
+    .filter((event) => {
+      const type = typeof event.type === "string" ? event.type.toLowerCase() : "";
+      const subtype = typeof event.subtype === "string" ? event.subtype.toLowerCase() : "";
+      const status = typeof event.status === "string" ? event.status.toLowerCase() : "";
+      return (
+        event.is_error === true ||
+        Object.prototype.hasOwnProperty.call(event, "error") ||
+        ["error", "failed", "failure"].includes(type) ||
+        ["error", "failed", "failure"].includes(subtype) ||
+        ["error", "failed", "failure"].includes(status)
+      );
+    })
+    .map((event) => JSON.stringify(event))
+    .join("\n");
+}
+
+/**
  * @param {{ stdout?: string, stderr?: string, errorMessage?: string | null, defaultFailureKind: string, ignoreAuthFailure?: boolean }} options
  * @returns {string}
  */
 export function classifyExternalRunnerFailure(options) {
-  const combined = `${options.stdout ?? ""}\n${options.stderr ?? ""}\n${options.errorMessage ?? ""}`.toLowerCase();
+  const combined = `${collectFailureRelevantStdout(options.stdout ?? "")}\n${options.stderr ?? ""}\n${options.errorMessage ?? ""}`.toLowerCase();
   if (
     combined.includes("prompt is too long") ||
     combined.includes("context window") ||
