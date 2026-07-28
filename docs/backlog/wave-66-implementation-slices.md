@@ -707,6 +707,55 @@ installed-console gates are trustworthy.
    - Validation: All four cells pass, the ledger-derived readiness verdict matches
      evidence, and `slice:complete`/`slice:sync-ready` close W66 consistently.
 
+### Medium-only qualification checkpoint — 2026-07-28
+
+- Qualification commit:
+  `088c806b0c081863828d7f6b3ac7c12ea4de9b6f`.
+- Pinned `ky` target commit:
+  `3419113b48e034fdcf8fa6bd3be3da7b3d0d758f`.
+- Installed guided baseline:
+  `w66-s09-guided-088c806b-20260728`, status `pass`, UI/UX `pass`,
+  accessibility `pass`, and no-write checks `pass`.
+  - Run summary SHA-256:
+    `4222beb3ceb9805d9f01a352950b9a3cf5781d05975a6f65fba597480856ad90`.
+  - Observation report SHA-256:
+    `7b8c6e067b1cc55d9d7c36dd304d239211a8ae62410e3f4f7cce41ec6990b7fd`.
+  - Run-health report SHA-256:
+    `421ab0af14c407e3f93b02debaa1c33ede8f0d49c54355a9945e4cb5cd8c6070`.
+  - Browser-task proof SHA-256:
+    `2717f0980f033b3fc713ef8eef3dceac8ae7431af8c3fd92956522f4323c05f3`.
+- `openai-primary.medium`:
+  `w66-s09-openai-medium-088c806b-20260728`, status `passed`,
+  `run_health=pass`, production proof `pass`, final assessment `pass`, and
+  no-upstream-write checks `pass`.
+  - Run summary SHA-256:
+    `cc61e9ff919c6afeffd8e9b13c9e0b6f9118b241c3953d7dd92c5fcdf4ff6ff9`.
+  - Observation report SHA-256:
+    `1df83d072e7c6ad4e1fd29a05b9892ea7bec8d3f2245beafcbe0c036d42b87c8`.
+  - Run-health report SHA-256:
+    `a271d0ad82ae9e5922b1a3d120ab033ca9f54a8ca5c9735ec8bef493a910afbc`.
+  - Final assessment SHA-256:
+    `5294fce158b4d2db2375f215d8087089922cffc7037fbb8de75218665908644b`.
+  - Qualification-cell report SHA-256:
+    `8328e58f0c63b588e781efb888026b7d40625c730c03c46a2a10048be704bc03`.
+- `anthropic-primary.medium`: `blocked` by a provider-owned
+  `provider_context_window_exceeded` result after two fresh isolated attempts;
+  target readiness and command health passed in both attempts, and neither
+  attempt is recorded as a passing qualification cell.
+  - Attempt `w66-s09-anthropic-medium-088c806b-20260728`: run summary SHA-256
+    `1cdef5046706bf600d2aecacb9f4f179a75e3de76187ea0a53d5906c114e548c`;
+    run-health SHA-256
+    `74e39d6ccef2dcb2c4424a668779bce890eab6a456300f2c9926ba1403b08057`.
+  - Attempt `w66-s09-anthropic-medium-088c806b-20260728-r2`: run summary
+    SHA-256
+    `6e50d511d3566208a758972031e736216792f03f17e4c1cb716b15f0be6ac947`;
+    run-health SHA-256
+    `822f1063cd9c1b8c68dbbcecc1fb31f20a7a662b51b6538f71cbe219144e5b40`.
+- `openai-primary.large` and `anthropic-primary.large` were not run.
+- This checkpoint does not update the committed pending closure index, does not
+  close W66-S09, and does not grant release clearance. The release disposition
+  remains `audit-hold` with `release_clearance=false`.
+
 ### Acceptance criteria
 
 1. All four cells use one AOR commit and one pinned target commit.
