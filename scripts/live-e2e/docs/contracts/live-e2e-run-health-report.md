@@ -79,6 +79,18 @@ the measured provider work-packet status, while
 `adapter_raw_evidence_ref`; do not collapse this into a generic provider
 blocker or the pre-spawn `compiled_context_budget_exceeded` class.
 
+For an AOR-supervised post-spawn session-budget stop, run-health preserves the
+versioned `provider_health.session_budget` report and uses:
+- `failure_summary.owner: provider`
+- `failure_summary.phase: provider_execution`
+- `failure_summary.class: provider_session_budget_exceeded`
+
+This class means the external provider did not converge within the declared
+assistant-turn or tool-call bound. It is not a product-quality verdict and must
+block final outcome assessment. A `session_budget.status=warn` is non-terminal
+when the provider subsequently returns a valid terminal result below every hard
+limit.
+
 Malformed provider API/tool-call schema failures after invocation, including
 OpenAI `invalid_request_error` and `property_name_above_max_length`, remain
 provider execution failures. Run-health must keep

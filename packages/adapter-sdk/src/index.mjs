@@ -9,6 +9,8 @@ import { buildExternalExecutionOutcome, classifyProviderSemanticFailure } from "
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 import { PROCESS_TREE_SUPERVISION_SOURCE } from "./process-tree-supervision.mjs";
+import { PROVIDER_STEP_STATUS_SUPERVISION_SOURCE } from "./provider-step-status-supervision.mjs";
+import { SESSION_BUDGET_SUPERVISION_SOURCE } from "./session-budget-supervision.mjs";
 import { runSupervisedProcessSync } from "./supervisor.mjs";
 
 export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
@@ -55,152 +57,11 @@ function asNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function isCanceledStatus(value) {
-  const status = asString(value);
-  return status === "canceled" || status === "cancelled" || status === "interrupted";
+function asPositiveInteger(value) {
+  return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function parseIsoMs(value) {
-  const stringValue = asString(value);
-  if (!stringValue) return null;
-  const parsed = Date.parse(stringValue);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function writeProviderStepStatus(patch = {}) {
-  const providerConfig = asObject(options.provider_step_status);
-  const stateFile = asString(providerConfig.state_file);
-  if (!stateFile) return;
-
-  const now = new Date();
-  const nowIso = now.toISOString();
-  let state = {};
-  try {
-    state = asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
-  } catch {
-    state = {};
-  }
-  const previous = asObject(state.provider_step_status);
-  const startedAt = asString(previous.started_at) || asString(providerConfig.started_at) || nowIso;
-  const startedMs = parseIsoMs(startedAt) || now.getTime();
-  const timeoutBudgetMs = asNumber(previous.timeout_budget_ms) || asNumber(providerConfig.timeout_budget_ms) || timeoutMs;
-  const elapsedMs = Math.max(0, Math.floor(now.getTime() - startedMs));
-  const remainingBudgetMs = Math.max(0, Math.floor(timeoutBudgetMs - elapsedMs));
-  const lastOutputAt = asString(patch.last_output_at) || asString(previous.last_output_at) || null;
-  const lastArtifactUpdateAt =
-    asString(patch.last_artifact_update_at) || asString(previous.last_artifact_update_at) || null;
-  const lastProgressAt = asString(patch.last_progress_at) || asString(previous.last_progress_at) || null;
-  const progressEventCount =
-    asNumber(patch.progress_event_count) !== null
-      ? Math.max(0, Math.floor(asNumber(patch.progress_event_count)))
-      : asNumber(previous.progress_event_count) !== null
-        ? Math.max(0, Math.floor(asNumber(previous.progress_event_count)))
-        : null;
-  const lastActivityMs = Math.max(parseIsoMs(lastOutputAt) || startedMs, parseIsoMs(lastArtifactUpdateAt) || startedMs);
-  const lastObservedActivityMs = Math.max(lastActivityMs, parseIsoMs(lastProgressAt) || startedMs);
-  const silentMs = Math.max(0, Math.floor(now.getTime() - lastObservedActivityMs));
-  const timeoutRiskThreshold = Math.min(60000, Math.max(5000, Math.floor(timeoutBudgetMs * 0.1)));
-  const terminalStatus = patch.status === "completed" || patch.status === "failed" || patch.status === "interrupted";
-  let status = asString(patch.status) || asString(previous.status) || "running";
-  if (!terminalStatus) {
-    if (remainingBudgetMs <= timeoutRiskThreshold) {
-      status = "timeout-risk";
-    } else if (silentMs >= 60000) {
-      status = "silent-running";
-    } else {
-      status = "running";
-    }
-  }
-
-  const nextProviderStepStatus = {
-    provider: asString(providerConfig.provider) || asString(previous.provider),
-    adapter: asString(providerConfig.adapter) || asString(previous.adapter),
-    route_id: asString(providerConfig.route_id) || asString(previous.route_id),
-    step_id: asString(providerConfig.step_id) || asString(previous.step_id),
-    status,
-    elapsed_ms: elapsedMs,
-    timeout_budget_ms: timeoutBudgetMs,
-    remaining_budget_ms: remainingBudgetMs,
-    last_output_at: lastOutputAt,
-    last_artifact_update_at: lastArtifactUpdateAt,
-    last_progress_at: lastProgressAt,
-    last_progress_kind: asString(patch.last_progress_kind) || asString(previous.last_progress_kind) || null,
-    last_progress_label: asString(patch.last_progress_label) || asString(previous.last_progress_label) || null,
-    progress_event_count: progressEventCount,
-    output_mode: asString(patch.output_mode) || asString(previous.output_mode) || null,
-    interruption_owner: asString(patch.interruption_owner) || asString(previous.interruption_owner) || null,
-    interruption_reason: asString(patch.interruption_reason) || asString(previous.interruption_reason) || null,
-    interruption_status: asString(patch.interruption_status) || asString(previous.interruption_status) || null,
-    current_command_label:
-      asString(providerConfig.current_command_label) || asString(previous.current_command_label) || "external-provider-runner",
-    recommended_action:
-      asString(patch.recommended_action) ||
-      (status === "timeout-risk"
-        ? "Check provider progress or stop before budget is exhausted."
-        : status === "silent-running"
-          ? "No output yet; provider is still running."
-          : lastProgressAt
-            ? "Provider stream progress observed; keep monitoring until the step completes."
-          : status === "failed"
-            ? "Inspect provider evidence and failure summary."
-            : status === "completed"
-              ? "Continue with post-run verification."
-              : "Provider is still running."),
-    started_at: startedAt,
-    updated_at: nowIso,
-    finished_at: asString(patch.finished_at) || asString(previous.finished_at) || null,
-  };
-  state.provider_step_status = nextProviderStepStatus;
-  state.updated_at = nowIso;
-  try {
-    const latestState = asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
-    const latestProviderStatus = asString(asObject(latestState.provider_step_status).status);
-    const nextStatus = asString(nextProviderStepStatus.status);
-    if (isCanceledStatus(latestState.status)) {
-      state = { ...latestState, provider_step_status: nextProviderStepStatus, updated_at: nowIso };
-    }
-    if (latestProviderStatus === "interrupted" && nextStatus !== "interrupted") {
-      const latestProviderStepStatus = asObject(latestState.provider_step_status);
-      state.provider_step_status = {
-        ...nextProviderStepStatus,
-        status: "interrupted",
-        interruption_owner:
-          asString(latestProviderStepStatus.interruption_owner) || nextProviderStepStatus.interruption_owner,
-        interruption_reason:
-          asString(latestProviderStepStatus.interruption_reason) || nextProviderStepStatus.interruption_reason,
-        interruption_status:
-          asString(latestProviderStepStatus.interruption_status) || nextProviderStepStatus.interruption_status,
-        recommended_action:
-          asString(latestProviderStepStatus.recommended_action) ||
-          "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
-      };
-    }
-    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n", "utf8");
-  } catch {}
-}
-
-function readProviderStepState() {
-  const providerConfig = asObject(options.provider_step_status);
-  const stateFile = asString(providerConfig.state_file);
-  if (!stateFile) return {};
-  try {
-    return asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
-  } catch {
-    return {};
-  }
-}
-
-function providerCancellationRequested() {
-  const state = readProviderStepState();
-  const stateStatus = asString(state.status);
-  const providerStatus = asString(asObject(state.provider_step_status).status);
-  return (
-    stateStatus === "canceled" ||
-    stateStatus === "cancelled" ||
-    stateStatus === "interrupted" ||
-    providerStatus === "interrupted"
-  );
-}
+${PROVIDER_STEP_STATUS_SUPERVISION_SOURCE}
 
 function appendBounded(current, chunk, maxBuffer) {
   const next = current + chunk;
@@ -285,18 +146,24 @@ let interrupted = false;
 let emitted = false;
 let heartbeatTimer = null;
 let interruptKillTimer = null;
+let timeoutTimer = null;
 let stdoutLineBuffer = "";
 let providerProgressEventCount = 0;
 const providerProgressEvents = [];
 const heartbeatIntervalMs = Math.max(25, asNumber(asObject(options.provider_step_status).heartbeat_interval_ms) || 5000);
 const heartbeatStatusWriteIntervalMs = Math.max(1000, heartbeatIntervalMs);
 let lastHeartbeatStatusWriteMs = Date.now();
+${SESSION_BUDGET_SUPERVISION_SOURCE}
 
 function recordProviderProgress(record) {
   const nowIso = new Date().toISOString();
   const event = summarizeProgressEvent(record, nowIso);
   if (!event) return;
   providerProgressEventCount += 1;
+  if (event.kind === "assistant") {
+    observedAssistantTurns += 1;
+  }
+  observedToolCalls += countToolCalls(record, event);
   providerProgressEvents.push(event);
   if (providerProgressEvents.length > 100) {
     providerProgressEvents.shift();
@@ -308,8 +175,17 @@ function recordProviderProgress(record) {
     last_progress_label: event.label,
     progress_event_count: providerProgressEventCount,
     output_mode: outputMode,
-    recommended_action: "Provider stream progress observed; keep monitoring until the step completes.",
+    session_budget: buildSessionBudgetReport(),
+    recommended_action:
+      sessionBudgetConfig && observedAssistantTurns >= sessionBudgetConfig.warn_after_assistant_turns
+        ? "Provider session budget warning reached; the provider must stop new exploration and finalize."
+        : "Provider stream progress observed; keep monitoring until the step completes.",
   });
+  if (sessionBudgetConfig && observedAssistantTurns > sessionBudgetConfig.max_assistant_turns) {
+    triggerSessionBudgetExceeded("assistant_turns");
+  } else if (sessionBudgetConfig && observedToolCalls > sessionBudgetConfig.max_tool_calls) {
+    triggerSessionBudgetExceeded("tool_calls");
+  }
 }
 
 function latestProviderProgressPatch() {
@@ -321,6 +197,7 @@ function latestProviderProgressPatch() {
     last_progress_label: latestProgress.label,
     progress_event_count: providerProgressEventCount,
     output_mode: outputMode,
+    session_budget: buildSessionBudgetReport(),
   };
 }
 
@@ -361,7 +238,15 @@ function finish(result) {
     clearTimeout(interruptKillTimer);
     interruptKillTimer = null;
   }
-  emit({ ...result, provider_progress_events: providerProgressEvents });
+  if (sessionBudgetKillTimer) {
+    clearTimeout(sessionBudgetKillTimer);
+    sessionBudgetKillTimer = null;
+  }
+  emit({
+    ...result,
+    provider_progress_events: providerProgressEvents,
+    session_budget: buildSessionBudgetReport(),
+  });
 }
 
 function writeHeartbeatStatusIfDue() {
@@ -423,7 +308,8 @@ heartbeatTimer = setInterval(() => {
   writeHeartbeatStatusIfDue();
 }, heartbeatIntervalMs);
 
-const timer = setTimeout(() => {
+timeoutTimer = setTimeout(() => {
+  if (sessionBudgetExceeded || interrupted) return;
   timedOut = true;
   writeProviderStepStatus({
     status: "timeout-risk",
@@ -444,7 +330,7 @@ child.stderr.on("data", (chunk) => {
   writeProviderStepStatus({ status: "running", last_output_at: new Date().toISOString() });
 });
 child.on("error", (error) => {
-  clearTimeout(timer);
+  if (timeoutTimer) clearTimeout(timeoutTimer);
   writeProviderStepStatus({
     status: "failed",
     recommended_action: "Inspect provider process error evidence.",
@@ -455,13 +341,21 @@ child.on("error", (error) => {
     signal: null,
     stdout,
     stderr,
-    error_code: error && typeof error.code === "string" ? error.code : "EXTERNAL_RUNTIME_SPAWN_FAILED",
-    error_message: error instanceof Error ? error.message : String(error),
+    error_code: sessionBudgetExceeded
+      ? "ESESSIONBUDGET"
+      : error && typeof error.code === "string"
+        ? error.code
+        : "EXTERNAL_RUNTIME_SPAWN_FAILED",
+    error_message: sessionBudgetExceeded
+      ? "External runtime exceeded its configured provider session budget."
+      : error instanceof Error
+        ? error.message
+        : String(error),
     timed_out: timedOut,
   });
 });
 child.on("close", (status, signal) => {
-  clearTimeout(timer);
+  if (timeoutTimer) clearTimeout(timeoutTimer);
   flushStdoutProgressBuffer();
   if (!interrupted && providerCancellationRequested()) {
     interrupted = true;
@@ -472,26 +366,37 @@ child.on("close", (status, signal) => {
   }
   writeProviderStepStatus({
     ...latestProviderProgressPatch(),
-    status: interrupted ? "interrupted" : status === 0 && !timedOut ? "completed" : "failed",
+    status: interrupted ? "interrupted" : status === 0 && !timedOut && !sessionBudgetExceeded ? "completed" : "failed",
     interruption_owner: interrupted ? "operator" : null,
     interruption_reason: interrupted ? "External runtime was interrupted by public run-control cancel." : null,
     interruption_status: interrupted ? "operator-stopped" : null,
     recommended_action:
       interrupted
         ? "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step."
+        : sessionBudgetExceeded
+          ? "Provider session budget was exceeded; preserve partial evidence and retry only with a fresh isolated run."
         : status === 0 && !timedOut
           ? "Continue with post-run verification."
           : "Inspect provider evidence and failure summary.",
     finished_at: new Date().toISOString(),
+    session_budget: buildSessionBudgetReport(),
   });
   finish({
     status,
     signal,
     stdout,
     stderr,
-    error_code: interrupted ? "EINTERRUPTED" : timedOut ? "ETIMEDOUT" : null,
+    error_code: interrupted
+      ? "EINTERRUPTED"
+      : sessionBudgetExceeded
+        ? "ESESSIONBUDGET"
+        : timedOut
+          ? "ETIMEDOUT"
+          : null,
     error_message: interrupted
       ? "External runtime was interrupted by public run-control cancel."
+      : sessionBudgetExceeded
+        ? "External runtime exceeded its configured provider session budget."
       : timedOut
         ? "External runtime timed out after " + timeoutMs + "ms."
         : null,
@@ -772,6 +677,7 @@ export function resolveExternalRuntimeExecutionRoot(options) {
  *   timeout: number,
  *   maxBuffer: number,
  *   providerStepStatus?: Record<string, unknown> | null,
+ *   sessionBudget?: Record<string, unknown> | null,
  * }} options
  * @returns {{
  *   status: number | null,
@@ -780,6 +686,7 @@ export function resolveExternalRuntimeExecutionRoot(options) {
  *   stderr: string,
  *   error: Error | null,
  *   providerProgressEvents?: Array<Record<string, unknown>>,
+ *   sessionBudget?: Record<string, unknown> | null,
  * }}
  */
 export function runExternalRuntimeProcessSync(options) {
@@ -3162,6 +3069,7 @@ export function createLiveAdapter(options) {
         timeout: requestTimeoutMs,
         maxBuffer: 10 * 1024 * 1024,
         providerStepStatus: asRecord(envelope.provider_step_status),
+        sessionBudget: asRecord(externalRuntime.session_budget),
       });
       const finishedAt = new Date().toISOString();
 
@@ -3172,8 +3080,15 @@ export function createLiveAdapter(options) {
       if (invocationInterrupted) {
         markProviderRunControlInterrupted(asRecord(envelope.provider_step_status));
       }
+      const sessionBudgetReport =
+        invocation.sessionBudget && Object.keys(asRecord(invocation.sessionBudget)).length > 0
+          ? asRecord(invocation.sessionBudget)
+          : null;
+      const invocationSessionBudgetExceeded =
+        invocationError?.code === "ESESSIONBUDGET" || asOptionalString(sessionBudgetReport?.status) === "exceeded";
       const invocationTimedOut =
         !invocationInterrupted &&
+        !invocationSessionBudgetExceeded &&
         (invocationError?.code === "ETIMEDOUT" ||
           ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null));
       const invocationFailed = invocationError !== null || invocation.status !== 0;
@@ -3250,6 +3165,7 @@ export function createLiveAdapter(options) {
           compaction_report: contextBudgetReports.compaction_report,
           top_context_size_sources: contextBudgetReports.top_context_size_sources,
         },
+        session_budget: sessionBudgetReport,
         provider_progress_events: providerProgressEvents,
       };
 
@@ -3300,6 +3216,7 @@ export function createLiveAdapter(options) {
                 : null,
           top_context_size_sources: contextBudgetReports.top_context_size_sources,
           raw_provider_error_summary: rawProviderErrorSummary,
+          ...(sessionBudgetReport ? { session_budget: sessionBudgetReport } : {}),
           output_mode: outputMode,
           provider_progress_events: providerProgressEvents,
           raw_evidence_ref: rawEvidenceRef,
@@ -3375,6 +3292,22 @@ export function createLiveAdapter(options) {
         });
       }
 
+      if (invocationSessionBudgetExceeded) {
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `External runner command '${runtimeCommand}' exceeded its configured provider session budget for adapter '${adapterId}'.`,
+          output: {
+            ...baseOutput,
+            blocked: true,
+            failure_kind: "provider_session_budget_exceeded",
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: toolTraces,
+        });
+      }
+
       if (invocationError) {
         const missingCommand = invocationError.code === "ENOENT";
         const failureKind = missingCommand
@@ -3391,6 +3324,7 @@ export function createLiveAdapter(options) {
           failureKind === "permission-mode-blocked" ||
           failureKind === "edit-denied" ||
           failureKind === "compiled_context_budget_exceeded" ||
+          failureKind === "provider_session_budget_exceeded" ||
           failureKind === "provider_context_window_exceeded";
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
@@ -3424,6 +3358,7 @@ export function createLiveAdapter(options) {
           "permission-mode-blocked",
           "edit-denied",
           "compiled_context_budget_exceeded",
+          "provider_session_budget_exceeded",
           "provider_context_window_exceeded",
         ].includes(failureKind);
         return createAdapterResponseEnvelope({
@@ -3461,6 +3396,7 @@ export function createLiveAdapter(options) {
           "edit-denied",
           "interactive-question-requested",
           "compiled_context_budget_exceeded",
+          "provider_session_budget_exceeded",
           "provider_context_window_exceeded",
         ].includes(semanticFailureKind);
         return createAdapterResponseEnvelope({

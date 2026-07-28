@@ -984,6 +984,11 @@ of implementation and verification evidence when the mission requires it.
   deterministic budget, but the external runtime exhausted its own conversation
   context while executing. Preserve the raw provider summary and treat the run
   as blocked before outcome quality assessment.
+- `provider_session_budget_exceeded` is the fail-early post-spawn convergence
+  class. It means AOR stopped a streaming external runtime after it exceeded a
+  declared assistant-turn or tool-call hard bound. Preserve the versioned
+  session-budget report, classify the blocker as provider-owned, and do not
+  prepare outcome quality assessment from the partial disposable workspace.
 - Step quality follow-up comes from `live-e2e-step-quality-assessment-report`, and final outcome quality comes from `live-e2e-quality-assessment-report`, not from the runner summary.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.

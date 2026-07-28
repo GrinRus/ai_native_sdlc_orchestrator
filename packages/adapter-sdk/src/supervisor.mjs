@@ -24,6 +24,7 @@ export function runSupervisedProcessSync(options) {
     timeout_ms: timeoutMs,
     max_buffer: maxBuffer,
     provider_step_status: options.providerStepStatus ?? null,
+    session_budget: options.sessionBudget ?? null,
   };
   const supervisor = spawnSync(process.execPath, ["-e", options.supervisorSource], {
     cwd: options.cwd,
@@ -42,6 +43,7 @@ export function runSupervisedProcessSync(options) {
       stderr: typeof supervisor.stderr === "string" ? supervisor.stderr : "",
       error: supervisor.error,
       providerProgressEvents: [],
+      sessionBudget: null,
     };
   }
   const stdout = typeof supervisor.stdout === "string" ? supervisor.stdout.trim() : "";
@@ -60,6 +62,9 @@ export function runSupervisedProcessSync(options) {
       providerProgressEvents: Array.isArray(parsed.provider_progress_events)
         ? parsed.provider_progress_events.map((event) => asRecord(event))
         : [],
+      sessionBudget: Object.keys(asRecord(parsed.session_budget)).length > 0
+        ? asRecord(parsed.session_budget)
+        : null,
     };
   } catch (cause) {
     const error = cause instanceof Error ? cause : new Error(String(cause));
@@ -71,6 +76,7 @@ export function runSupervisedProcessSync(options) {
       stderr: [typeof supervisor.stderr === "string" ? supervisor.stderr : "", stdout].filter(Boolean).join("\n"),
       error,
       providerProgressEvents: [],
+      sessionBudget: null,
     };
   }
 }

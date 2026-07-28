@@ -1,10 +1,9 @@
-import fs from "node:fs"; import path from "node:path";
-import { parse as parseYaml } from "yaml";
+import fs from "node:fs"; import path from "node:path"; import { parse as parseYaml } from "yaml";
 import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES } from "./families.mjs";
 import { validateCanonicalContractValues } from "./canonical-values.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
-import { validateStructuredTaskPlan } from "./structured-task-plan.mjs";
+import { validateStructuredTaskPlan } from "./structured-task-plan.mjs"; import { validateExternalRunnerSessionBudget, validateExternalRuntimeSessionBudget } from "./session-budget-validation.mjs";
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
 import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs"; import { validateOperatorControl } from "./operator-control-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
@@ -1227,7 +1226,7 @@ function validateAdapterCapabilityProfile(document, source) {
     validateNestedStringField({ record: modelArgument, source, field: "execution.external_runtime.model_argument.flag", issues, required: true });
     validateNestedArrayField({ record: modelArgument, source, field: "execution.external_runtime.model_argument.prefix_args", issues, required: false });
   }
-
+  issues.push(...validateExternalRuntimeSessionBudget(externalRuntime.session_budget, source, "execution.external_runtime.session_budget"));
   const requestTransport =
     typeof externalRuntime.request_transport === "string" && externalRuntime.request_transport.length > 0
       ? externalRuntime.request_transport
@@ -1725,6 +1724,7 @@ function validateStepResult(document, source) {
         issues,
       );
     }
+    if ("session_budget" in externalRunner) issues.push(...validateExternalRunnerSessionBudget(externalRunner.session_budget, source, "external_runner.session_budget"));
     validateNestedNumberField({
       record: externalRunner,
       source,

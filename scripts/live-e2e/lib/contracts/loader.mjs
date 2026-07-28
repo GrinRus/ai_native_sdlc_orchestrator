@@ -1,12 +1,11 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from "node:fs"; import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { CONTRACT_FAMILY_INDEX } from "./contract-kernel.mjs";
 import { INTAKE_SOURCE_KIND_VALUES, LIVE_E2E_OBSERVATION_STATUS_VALUES } from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs";
-import { isPublicContractFamily, validatePublicContractDocument } from "./public-validation-bridge.mjs";
+import { isPublicContractFamily, validatePublicContractDocument, validatePublicExternalRunnerSessionBudget } from "./public-validation-bridge.mjs";
 import { validateQualificationCellReport } from "./qualification-cell-validation.mjs";
 import { explicitCatalogTaskPlanMissionIds, validateExplicitCatalogTaskPlan } from "./catalog-task-plan-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
@@ -1205,6 +1204,7 @@ function validateStepResult(document, source) {
         issues,
       );
     }
+    if ("session_budget" in externalRunner) issues.push(...validatePublicExternalRunnerSessionBudget(externalRunner.session_budget, source, "external_runner.session_budget"));
     validateNestedNumberField({
       record: externalRunner,
       source,
@@ -4343,7 +4343,7 @@ function validateLiveE2ERunHealthReport(document, source) {
       issues,
     );
   }
-
+  if ("session_budget" in providerHealth) issues.push(...validatePublicExternalRunnerSessionBudget(providerHealth.session_budget, source, "provider_health.session_budget"));
   validateLiveE2EDiagnosticHealth(document.diagnostic_health, source, issues);
 
   const failureSummary = isPlainObject(document.failure_summary) ? document.failure_summary : {};

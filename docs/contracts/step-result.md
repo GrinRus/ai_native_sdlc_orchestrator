@@ -61,6 +61,16 @@ Runtime Harness controllers may add optional decision metadata:
 
 These fields describe AOR runtime control decisions. They do not replace review, eval, delivery, learning, or promotion artifacts.
 `external_runner` is a routed live-execution evidence summary copied from the adapter response when an external runtime was invoked. It should preserve the selected runtime-agent permission mode, permission mode source, command surface, execution root, exit metadata, raw evidence ref, request artifact refs, provider work packet refs, and context-budget status when available.
+When the adapter declares a post-spawn session budget, `external_runner` may
+add `session_budget` with `schema_version: 1`, configured limits, observed
+assistant-turn and tool-call counters, `status` in
+`pass|warn|exceeded|not_configured`, an optional exhausted dimension, and
+termination evidence. These fields are query-safe and must not embed prompts,
+tool arguments, tool results, provider transcripts, credentials, or local
+runner-home paths. `provider_session_budget_exceeded` is a provider-execution
+blocker and remains distinct from timeout, cancellation,
+`compiled_context_budget_exceeded`, and
+`provider_context_window_exceeded`.
 Adapter output may additionally carry `execution_outcome` with
 `schema_version: 1`. Its `process`, `transport`, `provider`, and `verification`
 members are independent: process exit zero and completed transport do not imply
@@ -112,6 +122,10 @@ The shared contract loader validates nested step-result fields that carry runtim
 - `project verify` command evidence is optional for backward compatibility, but when present `exit_code` is numeric or `null`, `signal` and `error_code` are strings or `null`, `output_excerpt` must stay a bounded summary rather than a full transcript, and `output_quality_findings[]` entries must carry string `rule_id`, `source`, `severity`, `summary`, and optional bounded `excerpt`. Baseline-accepted warning findings may add string `baseline_status` and `baseline_evidence_refs[]` pointing to the prior verify summaries that prove the warning class was pre-existing. Baseline-accepted command failures may add `baseline_failure_status=pre_existing` and `baseline_failure_evidence_refs[]`; they must only be emitted when the current command failure matches an explicit baseline verify failure.
 - `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|resume_failed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
 - `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref`, `request_artifact_ref`, `provider_work_packet_ref`, `context_budget_status`, `context_budget_failure_class`, and `raw_provider_error_summary` are validated as strings when available; `top_context_size_sources[]` entries must be objects with source labels and numeric size estimates; and `exit_code` is numeric when available or `null` for missing-command preflight failures.
+- `external_runner.session_budget`, when present, must use `schema_version: 1`,
+  positive integer configured limits, non-negative observed counters, a supported status,
+  and a supported exhausted dimension. The warning threshold must be lower than
+  the hard assistant-turn threshold.
 - `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.
 - `quality_repair_lineage`, when present, must include `request_ref`,
   `cycle_id`, `source_stage`, and `status`; `source_stage` must be `review|qa`.

@@ -98,6 +98,35 @@ fields and `provider_progress_events[]` raw evidence, but those summaries must
 remain sanitized and must not read private runner homes such as `~/.qwen/**` as
 normal product input.
 
+`execution.external_runtime.session_budget` is an optional versioned hard bound
+for multi-turn external runtimes whose context can grow after the initial
+provider work packet has passed deterministic context-budget validation.
+Version `1` supports:
+- `schema_version: 1`;
+- `warn_after_assistant_turns`, a positive soft threshold;
+- `max_assistant_turns`, a positive hard threshold greater than the warning
+  threshold;
+- `max_tool_calls`, a positive hard tool-call threshold;
+- `termination_grace_ms`, a positive grace period between process-tree
+  `SIGTERM` and `SIGKILL`.
+
+Session budgets require a streaming output mode that AOR can normalize without
+retaining prompts, tool arguments, tool results, or credentials. Profiles that
+omit `session_budget` retain the existing timeout-only behavior. The initial
+`context_budget.max_input_tokens` and the post-spawn session budget are
+independent: the former blocks an oversized static packet before spawn, while
+the latter stops a non-converging provider execution before it exhausts the
+provider's own conversation window.
+
+When configured, `external_runner.session_budget` carries a versioned,
+query-safe report with configured limits, observed assistant/tool counters,
+`status` in `pass|warn|exceeded|not_configured`, an optional
+`exhausted_dimension`, and termination evidence. Exceeding a hard session bound
+returns `failure_kind=provider_session_budget_exceeded`; this is a
+provider-owned execution blocker, not a target-product verdict, timeout,
+operator interruption, pre-spawn compiled-context failure, or provider-reported
+context-window overflow.
+
 External-process adapters must enforce `execution.external_runtime.timeout_ms` and preflight probe timeouts as hard local subprocess bounds. A policy `resolved_bounds.budget.timeout_sec` may shorten a single request timeout, but it must not extend execution beyond the adapter profile's hard bound. A runner that exceeds the bound, including one that ignores graceful termination or launches a long-lived child process, must have its local process group terminated and return fail-closed timeout evidence with `failure_kind=external-runner-timeout` and `timed_out=true`; it must not leave the public lifecycle waiting indefinitely.
 
 Adapters may declare `model_aliases`, `supported_models`, and `default_model`.

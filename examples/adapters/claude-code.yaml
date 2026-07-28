@@ -35,6 +35,12 @@ execution:
     command: claude
     model_argument:
       flag: --model
+    session_budget:
+      schema_version: 1
+      warn_after_assistant_turns: 24
+      max_assistant_turns: 32
+      max_tool_calls: 96
+      termination_grace_ms: 1000
     permission_policy:
       default_mode: restricted
       modes:
@@ -42,10 +48,16 @@ execution:
           args:
             - --print
             - --output-format
-            - json
+            - stream-json
+            - --verbose
             - --no-session-persistence
+            - --no-chrome
+            - --disable-slash-commands
+            - --strict-mcp-config
+            - --tools
+            - Bash,Edit,Read,Write,Glob,Grep
             - --append-system-prompt
-            - Keep this AOR run bounded. Read the provider work packet first, use referenced local files instead of asking for pasted context, and if the prompt or working context exceeds Claude's limit return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+            - Keep this AOR run bounded to one directed implementation pass. Read the provider work packet first and only its required local refs. Use targeted searches, never emit broad repository dumps, do not reread unchanged files, and run only required profile verification commands. Before 24 assistant turns stop new exploration and finalize the implementation report; never exceed 32 assistant turns or 96 tool calls. If the provider context itself overflows, return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
             - --effort
             - high
             - --dangerously-skip-permissions
@@ -53,10 +65,16 @@ execution:
           args:
             - --print
             - --output-format
-            - json
+            - stream-json
+            - --verbose
             - --no-session-persistence
+            - --no-chrome
+            - --disable-slash-commands
+            - --strict-mcp-config
+            - --tools
+            - Bash,Edit,Read,Write,Glob,Grep
             - --append-system-prompt
-            - Keep this AOR run bounded. Read the provider work packet first, use referenced local files instead of asking for pasted context, and if the prompt or working context exceeds Claude's limit return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+            - Keep this AOR run bounded to one directed implementation pass. Read the provider work packet first and only its required local refs. Use targeted searches, never emit broad repository dumps, do not reread unchanged files, and run only required profile verification commands. Before 24 assistant turns stop new exploration and finalize the implementation report; never exceed 32 assistant turns or 96 tool calls. If the provider context itself overflows, return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
             - --effort
             - high
             - --permission-mode
@@ -65,7 +83,7 @@ execution:
     request_transport: request-artifact
     request_file:
       mode: pointer-prompt
-      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout; evidence inputs are read-only and must never be treated as execution roots. Read that file first, then open every required resolved_local_refs[].local_path instead of asking the operator to paste more context. Keep the implementation bounded to execution_contract.expected_meaningful_change.allowed_target_paths and the mission request. Make direct edits only in the disposable execution root when required, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet. If Claude reports that the prompt or context exceeds the provider limit, return a blocked report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout; evidence inputs are read-only and must never be treated as execution roots. Read that file first, then open each required resolved_local_refs[].local_path once instead of asking the operator to paste more context. Perform one directed implementation pass bounded to execution_contract.expected_meaningful_change.allowed_target_paths and the mission request. Use targeted searches and bounded command output; do not reread unchanged files, dump broad repository content, or run diagnostic commands not listed as required. Make direct edits only in the disposable execution root when required, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Stop new exploration before 24 assistant turns and finalize before 32 assistant turns or 96 tool calls. Do not stop after summarizing the packet. If Claude reports that the prompt or context exceeds the provider limit, return a blocked report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
     preflight_timeout_ms: 120000
     timeout_ms: 3600000
 sandbox_mode: local-or-container

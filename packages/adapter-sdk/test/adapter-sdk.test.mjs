@@ -55,6 +55,7 @@ function withTempRepo(callback) {
  *   envFrom?: Record<string, string>,
  *   nativeTimeoutArg?: Record<string, unknown>,
  *   contextBudget?: Record<string, unknown>,
+ *   sessionBudget?: Record<string, unknown>,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -98,6 +99,9 @@ function buildExternalRunnerProfile(options) {
   }
   if (options.contextBudget) {
     execution.external_runtime.context_budget = options.contextBudget;
+  }
+  if (options.sessionBudget) {
+    execution.external_runtime.session_budget = options.sessionBudget;
   }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
@@ -160,13 +164,30 @@ test("Claude live adapter args keep host auth and compact context guardrails", (
     const externalRuntime = claude.profile.execution.external_runtime;
     const modes = externalRuntime.permission_policy.modes;
     assert.equal(externalRuntime.env_from?.ANTHROPIC_API_KEY, undefined);
+    assert.deepEqual(externalRuntime.session_budget, {
+      schema_version: 1,
+      warn_after_assistant_turns: 24,
+      max_assistant_turns: 32,
+      max_tool_calls: 96,
+      termination_grace_ms: 1000,
+    });
     for (const mode of ["full-bypass", "restricted"]) {
       const args = modes[mode].args;
       assert.equal(args.includes("--bare"), false, `${mode} args must preserve host Claude auth`);
       assert.ok(args.includes("--print"), `${mode} args must use non-interactive print mode`);
+      assert.equal(args[args.indexOf("--output-format") + 1], "stream-json", `${mode} must expose progress`);
+      assert.ok(args.includes("--verbose"), `${mode} must emit complete stream events`);
+      assert.ok(args.includes("--no-chrome"), `${mode} must disable optional Chrome integration`);
+      assert.ok(args.includes("--disable-slash-commands"), `${mode} must disable optional slash commands`);
+      assert.ok(args.includes("--strict-mcp-config"), `${mode} must ignore unrelated MCP configuration`);
+      assert.equal(args[args.indexOf("--tools") + 1], "Bash,Edit,Read,Write,Glob,Grep");
       assert.ok(args.includes("--append-system-prompt"), `${mode} args must include compact guardrail prompt`);
       assert.ok(args.includes("--effort"), `${mode} args must declare supported effort bound`);
+      assert.equal(args[args.indexOf("--effort") + 1], "high");
       assert.match(args.join(" "), /provider_context_window_exceeded/u, mode);
+      assert.match(args.join(" "), /24 assistant turns/u, mode);
+      assert.match(args.join(" "), /32 assistant turns/u, mode);
+      assert.match(args.join(" "), /96 tool calls/u, mode);
     }
     assert.match(externalRuntime.request_file.message, /provider_context_window_exceeded/u);
     assert.match(externalRuntime.request_file.message, /resolved_local_refs\[\]\.local_path/u);
@@ -2441,6 +2462,149 @@ test("live adapter turns Qwen stream-json events into sanitized provider progres
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
+});
+
+test("live adapter records passing and warning session budgets without changing terminal success", () => {
+  for (const scenario of [
+    { assistantTurns: 1, warnAfter: 2, maxTurns: 3, expectedStatus: "pass" },
+    { assistantTurns: 2, warnAfter: 2, maxTurns: 3, expectedStatus: "warn" },
+    { assistantTurns: 2, warnAfter: 1, maxTurns: 2, expectedStatus: "warn" },
+  ]) {
+    const events = [
+      ...Array.from({ length: scenario.assistantTurns }, () => ({
+        type: "assistant",
+        message: { content: [{ type: "text", text: "bounded private provider output" }] },
+      })),
+      { type: "result", subtype: "success" },
+    ];
+    const script = `for (const event of ${JSON.stringify(events)}) process.stdout.write(JSON.stringify(event) + '\\n');`;
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", script, "--", "--output-format", "stream-json"],
+        handler: null,
+        sessionBudget: {
+          schema_version: 1,
+          warn_after_assistant_turns: scenario.warnAfter,
+          max_assistant_turns: scenario.maxTurns,
+          max_tool_calls: 4,
+          termination_grace_ms: 50,
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: `req-session-${scenario.expectedStatus}`,
+      run_id: `run-session-${scenario.expectedStatus}`,
+      step_id: `step-session-${scenario.expectedStatus}`,
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: {},
+      policy_bundle: {},
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.session_budget.status, scenario.expectedStatus);
+    assert.equal(
+      response.output.external_runner.session_budget.observed.assistant_turns,
+      scenario.assistantTurns,
+    );
+    assert.equal(response.output.external_runner.session_budget.exhausted_dimension, null);
+  }
+});
+
+test("live adapter stops and classifies assistant-turn session budget exhaustion", () => {
+  const script = [
+    "process.on('SIGTERM', () => {});",
+    "for (let index = 0; index < 3; index += 1) {",
+    "  process.stdout.write(JSON.stringify({type:'assistant',message:{content:[{type:'text',text:'secret turn payload'}]}}) + '\\n');",
+    "}",
+    "setInterval(() => {}, 1000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", script, "--", "--output-format", "stream-json"],
+      timeoutMs: 5000,
+      handler: null,
+      sessionBudget: {
+        schema_version: 1,
+        warn_after_assistant_turns: 1,
+        max_assistant_turns: 2,
+        max_tool_calls: 8,
+        termination_grace_ms: 50,
+      },
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-session-assistant-exhausted",
+    run_id: "run-session-assistant-exhausted",
+    step_id: "step-session-assistant-exhausted",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: {},
+    policy_bundle: {},
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "provider_session_budget_exceeded");
+  assert.equal(response.output.external_runner.timed_out, false);
+  assert.equal(response.output.external_runner.session_budget.status, "exceeded");
+  assert.equal(response.output.external_runner.session_budget.exhausted_dimension, "assistant_turns");
+  assert.equal(response.output.external_runner.session_budget.termination.graceful_signal, "SIGTERM");
+  assert.equal(response.output.external_runner.session_budget.termination.forced_signal, "SIGKILL");
+  assert.doesNotMatch(JSON.stringify(response.output.external_runner.provider_progress_events), /secret turn payload/u);
+});
+
+test("live adapter stops and classifies tool-call session budget exhaustion", () => {
+  const script = [
+    "process.stdout.write(JSON.stringify({",
+    "  type:'assistant',",
+    "  message:{content:[",
+    "    {type:'tool_use',name:'Read',input:{file_path:'/private/one'}},",
+    "    {type:'tool_use',name:'Read',input:{file_path:'/private/two'}}",
+    "  ]}",
+    "}) + '\\n');",
+    "setInterval(() => {}, 1000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", script, "--", "--output-format", "stream-json"],
+      timeoutMs: 5000,
+      handler: null,
+      sessionBudget: {
+        schema_version: 1,
+        warn_after_assistant_turns: 2,
+        max_assistant_turns: 4,
+        max_tool_calls: 1,
+        termination_grace_ms: 50,
+      },
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-session-tools-exhausted",
+    run_id: "run-session-tools-exhausted",
+    step_id: "step-session-tools-exhausted",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: {},
+    policy_bundle: {},
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "provider_session_budget_exceeded");
+  assert.equal(response.output.external_runner.session_budget.exhausted_dimension, "tool_calls");
+  assert.equal(response.output.external_runner.session_budget.observed.tool_calls, 2);
+  assert.doesNotMatch(JSON.stringify(response.output.external_runner.provider_progress_events), /private\/one/u);
 });
 
 test("live adapter keeps malformed Qwen stream JSONL out of public runner output", () => {

@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -656,6 +656,94 @@ installed-console gates are trustworthy.
 - Weakening review findings, auto-approving warnings, target-source repair,
   provider/profile changes, large provider execution, or production clearance.
 
+## W66-S11 — Bounded external-provider session convergence
+
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Streaming external providers have a versioned, runner-agnostic
+  post-spawn session budget that stops non-converging execution before provider
+  context overflow while preserving truthful provider-owned failure evidence.
+- **Delivery priority:** P0
+- **Estimated effort:** M
+- **Primary modules:** adapter capability and step-result contracts,
+  `packages/adapter-sdk/**`, Claude adapter profile, private live-E2E run-health
+  contracts/tests
+- **Hard dependencies:** W66-S10
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Versioned session-budget contract**
+   - Purpose: Separate initial work-packet size from post-spawn provider
+     convergence without changing adapters that omit the new policy.
+   - Changes: Define the optional version-1 assistant-turn/tool-call budget,
+     positive-bound validation, versioned external-runner report, and
+     `provider_session_budget_exceeded` failure semantics.
+   - Validation: Positive, negative, omitted-policy, and unknown-future-field
+     fixtures prove backward compatibility and fail-closed validation.
+2. **Runner-agnostic stream supervision**
+   - Purpose: Stop a non-converging external process before its provider context
+     window is exhausted.
+   - Changes: Count sanitized assistant and tool events, persist warning status,
+     terminate the complete process tree at a hard bound, and preserve bounded
+     partial evidence without provider payloads.
+   - Validation: Fake streams cover pass, warn, assistant/tool exhaustion,
+     terminal-boundary completion, graceful and forced termination, timeout,
+     cancellation, malformed JSONL, and secret redaction.
+3. **Claude convergence profile**
+   - Purpose: Give AOR observable Claude progress and a concrete convergence
+     envelope without weakening model effort or host authentication.
+   - Changes: Use verbose stream JSON, bounded built-in tools, disabled optional
+     interactive integrations, numeric turn/tool guardrails, and one directed
+     implementation pass while retaining `--effort high`.
+   - Validation: Adapter profile tests prove host-auth compatibility, exact
+     stream mode, bounded tool surface, session limits, and no `--bare`.
+4. **Run-health and assessment fail-closed behavior**
+   - Purpose: Keep early AOR supervision distinct from timeout, cancellation,
+     compiled packet overflow, provider context overflow, and product quality.
+   - Changes: Project the session report through step result and private
+     run-health, classify hard exhaustion as provider-owned, and block final
+     assessment for partial execution.
+   - Validation: Focused controller, run-health, and quality-assessment
+     regressions preserve owner/phase/class and compatibility.
+5. **Deterministic closure and qualification reset**
+   - Purpose: Land the behavior change before any new paid proof and restart W66
+     qualification from a clean commit.
+   - Changes: Run repository/package/browser/install gates, close W66-S11,
+     invalidate earlier W66-S09 evidence, and freeze a new manifest only after
+     the slice commit.
+   - Validation: `pnpm slice:gate -- W66-S11` passes, W66-S09 becomes active
+     again, and no live provider call occurs before the behavior commit.
+
+### Acceptance criteria
+
+1. Profiles without `session_budget` retain their existing behavior.
+2. Configured streaming providers expose sanitized warning and terminal budget
+   evidence with no prompt, tool payload, transcript, credential, or runner-home
+   leakage.
+3. Exceeding an assistant-turn or tool-call hard limit stops the entire process
+   tree and returns `provider_session_budget_exceeded`.
+4. Timeout, operator cancellation, compiled-context overflow, and
+   provider-reported context overflow keep their existing distinct classes.
+5. Claude uses verbose stream JSON, host auth, high effort, bounded built-in
+   tools, and the declared 24/32/96 convergence envelope.
+6. Focused tests, `pnpm quality:ratchet`, `pnpm check`, browser/package/install
+   gates, and `pnpm slice:gate -- W66-S11` pass without a paid provider call.
+7. All qualification evidence from before the W66-S11 behavior commit is
+   diagnostic only.
+
+### Done evidence
+
+- Versioned adapter/step-result/run-health contract and validation fixtures.
+- External supervisor and Claude profile regressions.
+- Deterministic repository/package/browser/install gate results.
+- W66-S11 slice gate and the new qualification behavior commit.
+
+### Out of scope
+
+- Changing provider authentication, lowering Claude effort, target-source
+  repair, large provider execution, four-cell closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -667,7 +755,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S10
+- **Hard dependencies:** W66-S11
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
@@ -708,6 +796,10 @@ installed-console gates are trustworthy.
      evidence, and `slice:complete`/`slice:sync-ready` close W66 consistently.
 
 ### Medium-only qualification checkpoint — 2026-07-28
+
+All evidence in this checkpoint predates W66-S11 and is diagnostic only. It
+cannot count toward the final qualification matrix after the provider-session
+behavior changes.
 
 - Qualification commit:
   `088c806b0c081863828d7f6b3ac7c12ea4de9b6f`.

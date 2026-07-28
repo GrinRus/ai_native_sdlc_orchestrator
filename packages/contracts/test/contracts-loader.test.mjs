@@ -681,6 +681,59 @@ test("step result validates generic command group outcomes", () => {
   );
 });
 
+test("step result validates versioned external-runner session-budget evidence", () => {
+  const source = path.join(workspaceRoot, "examples/reports/step-result.verify-missing-tool.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "step-result" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.external_runner = {
+    runtime_mode: "external-process",
+    command: "claude",
+    session_budget: {
+      schema_version: 1,
+      configured: {
+        warn_after_assistant_turns: 24,
+        max_assistant_turns: 32,
+        max_tool_calls: 96,
+        termination_grace_ms: 1000,
+      },
+      observed: {
+        assistant_turns: 24,
+        tool_calls: 70,
+        progress_events: 100,
+      },
+      status: "warn",
+      exhausted_dimension: null,
+      termination: {
+        requested: false,
+        graceful_signal: null,
+        forced_signal: null,
+      },
+      future_optional_field: "ignored",
+    },
+  };
+  assert.equal(
+    validateContractDocument({
+      family: "step-result",
+      document: candidate,
+      source: "test://step-result-session-budget",
+    }).ok,
+    true,
+  );
+
+  candidate.external_runner.session_budget.status = "soft-fail";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: candidate,
+      source: "test://step-result-session-budget-status",
+    }),
+    "enum_value_invalid",
+    "external_runner.session_budget.status",
+  );
+});
+
 test("provider-route-profile rejects legacy wrapper ownership field", () => {
   const source = path.join(workspaceRoot, "examples/routes/implement-default.yaml");
   const loaded = loadContractFile({ filePath: source, family: "provider-route-profile" });
@@ -859,6 +912,71 @@ test("adapter capability profile validates default invocation args", () => {
     invalidValidation,
     "field_type_mismatch",
     "execution.external_runtime.default_args[1]",
+  );
+});
+
+test("adapter capability profile validates optional versioned session budgets", () => {
+  const validProfile = {
+    adapter_id: "test-live-session-budget",
+    version: 1,
+    capabilities: {},
+    constraints: {},
+    execution: {
+      external_runtime: {
+        session_budget: {
+          schema_version: 1,
+          warn_after_assistant_turns: 24,
+          max_assistant_turns: 32,
+          max_tool_calls: 96,
+          termination_grace_ms: 1000,
+          future_optional_field: "ignored",
+        },
+      },
+    },
+  };
+  const validValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: validProfile,
+    source: "test://adapter-session-budget",
+  });
+  assert.equal(validValidation.ok, true);
+
+  const omittedValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: {
+      ...validProfile,
+      execution: { external_runtime: {} },
+    },
+    source: "test://adapter-session-budget-omitted",
+  });
+  assert.equal(omittedValidation.ok, true);
+
+  for (const [field, value] of [
+    ["schema_version", 2],
+    ["max_assistant_turns", 0],
+    ["max_tool_calls", -1],
+    ["termination_grace_ms", "1000"],
+  ]) {
+    const invalidProfile = structuredClone(validProfile);
+    invalidProfile.execution.external_runtime.session_budget[field] = value;
+    const invalidValidation = validateContractDocument({
+      family: "adapter-capability-profile",
+      document: invalidProfile,
+      source: `test://adapter-session-budget-${field}`,
+    });
+    assert.equal(invalidValidation.ok, false, `${field} should fail validation`);
+  }
+
+  const invalidOrder = structuredClone(validProfile);
+  invalidOrder.execution.external_runtime.session_budget.warn_after_assistant_turns = 32;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "adapter-capability-profile",
+      document: invalidOrder,
+      source: "test://adapter-session-budget-order",
+    }),
+    "field_value_invalid",
+    "execution.external_runtime.session_budget.warn_after_assistant_turns",
   );
 });
 

@@ -478,6 +478,13 @@ function classifyProviderExecutionFailure(stepResult, adapterOutput) {
       class: "provider_context_window_exceeded",
     };
   }
+  if (failureClass === "provider_session_budget_exceeded") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: "provider_session_budget_exceeded",
+    };
+  }
   if (failureClass === "provider_work_packet_not_executed") {
     return {
       owner: "provider",
@@ -4597,6 +4604,7 @@ export function executeInstalledUserFlow(options) {
     artifacts.provider_work_packet_ref = asNonEmptyString(externalRunner.provider_work_packet_ref) || null;
     artifacts.context_budget_status = asNonEmptyString(externalRunner.context_budget_status) || null;
     artifacts.context_budget_failure_class = asNonEmptyString(externalRunner.context_budget_failure_class) || null;
+    artifacts.session_budget = asRecord(externalRunner.session_budget);
     artifacts.raw_provider_error_summary = asNonEmptyString(externalRunner.raw_provider_error_summary) || null;
     artifacts.top_context_size_sources = Array.isArray(externalRunner.top_context_size_sources)
       ? externalRunner.top_context_size_sources
@@ -6079,6 +6087,7 @@ function executeFullJourneyFlowImplementation(options) {
         artifacts.provider_work_packet_ref = asNonEmptyString(externalRunner.provider_work_packet_ref) || null;
         artifacts.context_budget_status = asNonEmptyString(externalRunner.context_budget_status) || null;
         artifacts.context_budget_failure_class = asNonEmptyString(externalRunner.context_budget_failure_class) || null;
+        artifacts.session_budget = asRecord(externalRunner.session_budget);
         artifacts.raw_provider_error_summary = asNonEmptyString(externalRunner.raw_provider_error_summary) || null;
         artifacts.top_context_size_sources = Array.isArray(externalRunner.top_context_size_sources)
           ? externalRunner.top_context_size_sources

@@ -1485,6 +1485,55 @@ test("run-health keeps failed project bootstrap ahead of controller-incomplete f
   });
 });
 
+test("run-health preserves provider-owned session-budget exhaustion", () => {
+  const sessionBudget = {
+    schema_version: 1,
+    configured: {
+      warn_after_assistant_turns: 24,
+      max_assistant_turns: 32,
+      max_tool_calls: 96,
+      termination_grace_ms: 1000,
+    },
+    observed: {
+      assistant_turns: 33,
+      tool_calls: 80,
+      progress_events: 120,
+    },
+    status: "exceeded",
+    exhausted_dimension: "assistant_turns",
+    termination: {
+      requested: true,
+      graceful_signal: "SIGTERM",
+      forced_signal: null,
+    },
+  };
+  const failure = resolveRunHealthFailure({
+    observationReport: { report_status: "final" },
+    commandHealth: { status: "pass", failed_commands: [] },
+    controllerHealth: { status: "blocked" },
+    providerHealth: { status: "blocked", session_budget: sessionBudget },
+    targetReadiness: { status: "pass" },
+    targetEnvironmentHealth: { status: "pass" },
+    diagnosticHealth: { status: "pass" },
+    evidenceHealth: { status: "pass", weak_evidence_refs: [] },
+    resumeInteractionHealth: { status: "pass" },
+    lifecycleCompletion: { continuation_status: "blocked" },
+    artifacts: {
+      failure_owner: "provider",
+      failure_phase: "provider_execution",
+      failure_class: "provider_session_budget_exceeded",
+      session_budget: sessionBudget,
+    },
+  });
+
+  assert.deepEqual(failure, {
+    owner: "provider",
+    phase: "provider_execution",
+    class: "provider_session_budget_exceeded",
+    summary: "External runtime did not converge within its configured provider session budget.",
+  });
+});
+
 test("full journey materializes the structured plan before handoff approval", () => {
   const source = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   assert.match(source, /runCommand\("plan-create", \[\s*"plan",\s*"create"/u);

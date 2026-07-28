@@ -4,8 +4,8 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 20,
-    "source_manifest_sha256": "ea78222acb19ee0043d825f1f046cbacc84de5a9c790e5c0f0fe14e26dc5eccb"
+    "source_file_count": 21,
+    "source_manifest_sha256": "5b476e58a1306b14927e86aa0207ab202745ed916908c4e0fd39ad374f7a5dc6"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -19,11 +19,12 @@
     "index.d.ts": "0f60bb578e3190fd5f02bbeb77d1325db3baf87566784b5bab7be8b833aa1a6b",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
-    "loader.mjs": "747c55c23f74fcd366590263f71ee5ad7e6279991c9a4a467ddd4408bb24fa1e",
+    "loader.mjs": "46ce03f248b44ac38b17d37af52e87351784e8177e517f43be3681c255706fe8",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
     "reference-registry.mjs": "90e94fad7a8cc231ad14714cd885a3961ad3e8625a77e0aafc31538c3fa965b5",
     "runtime-harness-validation.mjs": "75cd2ee07e4f72ebb36261160e97eeb16e99b0d4d3a8075d0136bd65e44189df",
+    "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",

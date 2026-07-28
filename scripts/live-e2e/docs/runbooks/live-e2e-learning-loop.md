@@ -24,6 +24,8 @@ Read `live_e2e_run_health_report_file` first. Classify follow-up for:
 - provider execution issues;
 - context-budget blockers, including `compiled_context_budget_exceeded` and
   `provider_context_window_exceeded`;
+- provider convergence blockers such as
+  `provider_session_budget_exceeded`;
 - target setup or verification environment issues;
 - missing factual evidence refs;
 - resume or interaction failures.
