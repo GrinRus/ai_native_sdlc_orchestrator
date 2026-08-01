@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -956,6 +956,86 @@ installed-console gates are trustworthy.
 - Provider prompt policy, target repair policy, large provider execution,
   four-cell closure, or production clearance.
 
+## W66-S16 — Provider work-packet command-role separation
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Provider work packets distinguish commands the provider may run
+  from the mission verification it must run, while controller-owned readiness
+  and diagnostics cannot be promoted into provider repair obligations.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** provider work-packet contract and materialization,
+  generated project profiles, handoff command policy, repair regressions
+- **Hard dependencies:** W66-S15
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Versioned provider work-packet contract**
+   - Purpose: Make provider command roles explicit and spawn-safe.
+   - Changes: Emit work-packet v2 with separate `allowed_commands` and
+     `required_commands`, require the required set to be a subset of the
+     allowlist, retain v1 replay compatibility, and keep diagnostics
+     controller-owned.
+   - Validation: Invalid command-role packets fail before provider spawn as an
+     AOR-owned construction error; v1 evidence remains readable.
+2. **Generated command-role materialization**
+   - Purpose: Prevent readiness setup from reappearing as mission lint or repair
+     work.
+   - Changes: Keep setup only in the generic readiness command group; expose
+     ordered primary lint/build/test commands through repo and handoff surfaces;
+     reuse completed preflight setup in repair workspaces.
+   - Validation: Generated packets never list package installation as required
+     verification and preserve primary command order and CI environment.
+3. **Bounded repair guardrails**
+   - Purpose: Converge repair without parallel setup, verification, or sandbox
+     workarounds.
+   - Changes: Instruct every adapter to perform one focused repair pass, execute
+     only required commands sequentially, and return bounded environment-limited
+     evidence after `EPERM` or `EACCES` instead of retrying or installing.
+   - Validation: Codex, Claude, OpenCode, and Qwen receive equivalent semantics;
+     timeout, cancel, session-budget, and context-overflow classifications remain
+     unchanged.
+4. **Deterministic closure and qualification reset**
+   - Purpose: Establish a clean behavior commit before any paid provider call.
+   - Changes: Run focused, repository, browser, package, and neutral-install
+     gates; close S16; invalidate all qualification evidence on `b324a231`; then
+     freeze a new manifest.
+   - Validation: `pnpm slice:gate -- W66-S16` passes, S16 is complete, and S09
+     returns to active only on the new behavior commit.
+
+### Acceptance criteria
+
+1. Runtime-created provider work packets use version 2 and v1 packets remain
+   replay-readable.
+2. `required_commands` contains ordered mission-primary verification only and is
+   a subset of `allowed_commands`; invalid packets block before spawn.
+3. Readiness setup and diagnostics remain controller-owned and package install
+   is absent from generated repo lint and repair-required commands.
+4. Repair starts with failed focused verification, runs commands sequentially,
+   and records sandbox denial without retry, install, or target workaround.
+5. Provider adapters retain packet parity and Codex remains in
+   `workspace-write` sandbox.
+6. Focused tests, `pnpm quality:ratchet`, `pnpm check`, browser/package/install
+   gates, and `pnpm slice:gate -- W66-S16` pass without a paid provider call.
+7. The guided blocker `w66-s15-guided-b324a231-r3-20260729` remains diagnostic
+   only, and every qualification result on `b324a231` is invalid for the new
+   matrix.
+
+### Done evidence
+
+- Provider work-packet v2 contract and v1 replay compatibility tests.
+- Generated profile, handoff, repair, sandbox-limitation, and adapter-parity
+  regressions.
+- Deterministic gate results, closed W66-S16 slice, and new frozen behavior
+  manifest.
+
+### Out of scope
+
+- Provider timeout increases, session-budget changes, guided diagnostic timeout
+  changes, large provider execution, four-cell closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -967,7 +1047,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S15
+- **Hard dependencies:** W66-S16
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

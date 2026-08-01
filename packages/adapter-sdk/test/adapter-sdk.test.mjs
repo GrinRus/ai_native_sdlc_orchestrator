@@ -19,6 +19,7 @@ import {
   resolveExternalRuntimePermissionPolicy,
   summarizeProviderMalformedToolCallError,
 } from "../src/index.mjs";
+import { materializeProviderInputSnapshot } from "../src/packet-transport.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -134,6 +135,10 @@ test("request-artifact adapter launcher prompts mention output quality policy", 
       const message = adapter?.profile?.execution?.external_runtime?.request_file?.message;
       assert.equal(typeof message, "string", `${adapterId} request_file.message must be present`);
       assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
+      assert.match(message, /execution_contract\.required_commands/u, adapterId);
+      assert.match(message, /sequentially and in order/u, adapterId);
+      assert.match(message, /never repeat readiness setup or package installation/u, adapterId);
+      assert.match(message, /EPERM or EACCES/u, adapterId);
       assert.doesNotMatch(message, /warning-producing stdout\/stderr/u, adapterId);
     }
   });
@@ -1614,9 +1619,16 @@ test("live adapter request-artifact transport sends bounded provider work packet
     const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
     const executionRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "workspaces", "disposable");
     const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
+    const handoffPacketFile = path.join(evidenceRoot, "handoff.json");
     fs.mkdirSync(evidenceRoot, { recursive: true });
     fs.mkdirSync(path.join(executionRoot, "source"), { recursive: true });
     fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
+    fs.writeFileSync(handoffPacketFile, JSON.stringify({
+      verification_expectations: {
+        primary_commands: ["CI=1 npx xo", "CI=1 npm run build"],
+        diagnostic_commands: ["CI=1 npm test"],
+      },
+    }, null, 2), "utf8");
     const adapter = createLiveAdapter({
       adapterId: "claude-code",
       projectRoot: repoRoot,
@@ -1635,7 +1647,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'request artifact ok',",
-            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),resolved_local_paths:packet.resolved_local_refs.map(ref=>ref.local_path),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content,cwd:process.cwd(),packet_path:filePath},",
+            "output:{packet_kind:packet.packet_kind,packet_version:packet.version,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),resolved_local_paths:packet.resolved_local_refs.map(ref=>ref.local_path),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content,cwd:process.cwd(),packet_path:filePath},",
             "evidence_refs:['evidence://adapter-live/claude-code/request-artifact']",
             "}));",
           ].join(""),
@@ -1657,7 +1669,18 @@ test("live adapter request-artifact transport sends bounded provider work packet
       step_class: "implement",
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
-      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      policy_bundle: {
+        policy: { policy_id: "policy.step.runner.default" },
+        resolved_bounds: {
+          command_constraints: {
+            allowed_commands: [
+              "CI=1 npm install --prefer-offline --no-audit --no-fund",
+              "CI=1 npx xo",
+              "CI=1 npm run build",
+            ],
+          },
+        },
+      },
       feature_traceability: {
         required_path_prefixes: ["source/", "test/", "index.d.ts"],
       },
@@ -1678,6 +1701,15 @@ test("live adapter request-artifact transport sends bounded provider work packet
         }],
         instruction_set: { objective: "Implement the bounded request-artifact test." },
         packet_refs: ["packet://handoff"],
+        required_inputs_resolved: {
+          packets: {
+            required: [{
+              packet: "handoff_packet",
+              required: true,
+              resolved_ref: "evidence://.aor/projects/adapter-test/reports/handoff.json",
+            }],
+          },
+        },
         execution_permissions: {
           execution_allowed: true,
           writeback_allowed: true,
@@ -1695,6 +1727,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.match(response.output.external_runner.provider_work_packet_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-work-packet-/u);
     assert.equal(response.output.external_runner.context_budget_status, "pass");
     assert.equal(response.output.runner_output.packet_kind, "aor-provider-work-packet");
+    assert.equal(response.output.runner_output.packet_version, 2);
     assert.equal(response.output.runner_output.has_full_request_ref, true);
     assert.equal(response.output.runner_output.has_context_budget, false);
     assert.match(response.output.runner_output.safety_rule, /bounded and evidence-first/u);
@@ -1724,6 +1757,17 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);
+    assert.deepEqual(response.output.runner_output.execution_contract.allowed_commands, [
+      "CI=1 npm install --prefer-offline --no-audit --no-fund",
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+    ]);
+    assert.deepEqual(response.output.runner_output.execution_contract.required_commands, [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+    ]);
+    assert.equal(response.output.runner_output.execution_contract.command_execution_policy.mode, "sequential");
+    assert.equal(response.output.runner_output.execution_contract.command_execution_policy.readiness_setup_owner, "controller");
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.warning_clean_required, true);
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.exit_zero_warning_output_is_failure, true);
     assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.applies_to, [
@@ -1772,6 +1816,87 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.target_write_allowed, false);
     assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.writeback_allowed, false);
     assert.equal(readOnlyResponse.output.runner_output.execution_contract.final_report.require_diff_or_patch_evidence, false);
+    assert.deepEqual(readOnlyResponse.output.runner_output.execution_contract.required_commands, []);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.repair_closure_policy, undefined);
+  });
+});
+
+test("provider input snapshot keeps v1 work packets replay-readable", () => {
+  withTempRepo((repoRoot) => {
+    const executionRoot = path.join(repoRoot, "replay-workspace");
+    const canonicalPacketFile = path.join(repoRoot, ".aor", "replay", "provider-work-packet.json");
+    fs.mkdirSync(executionRoot, { recursive: true });
+    fs.mkdirSync(path.dirname(canonicalPacketFile), { recursive: true });
+    const result = materializeProviderInputSnapshot({
+      providerWorkPacket: {
+        packet_kind: "aor-provider-work-packet",
+        version: 1,
+        resolved_local_refs: [],
+        execution_contract: { required_commands: ["npm test"] },
+      },
+      canonicalPacketFile,
+      executionRoot,
+      projectRoot: repoRoot,
+    });
+    assert.equal(result.packet.version, 1);
+    assert.deepEqual(result.packet.execution_contract.required_commands, ["npm test"]);
+  });
+});
+
+test("provider work packet blocks an unlisted required command before spawn", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const executionRoot = path.join(repoRoot, "disposable");
+    const handoffPacketFile = path.join(evidenceRoot, "handoff-invalid.json");
+    const spawnedMarker = path.join(repoRoot, "runner-spawned.txt");
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.mkdirSync(executionRoot, { recursive: true });
+    fs.writeFileSync(handoffPacketFile, JSON.stringify({
+      verification_expectations: { primary_commands: ["npm test"] },
+    }), "utf8");
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(spawnedMarker)},'spawned')`],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: { message: "Open {provider_work_packet_path}.", argument: "--work-packet" },
+      }),
+    });
+    assert.throws(
+      () => adapter.execute({
+        request_id: "req-invalid-required-command",
+        run_id: "run-invalid-required-command",
+        step_id: "step-invalid-required-command",
+        step_class: "implement",
+        route: { resolved_route_id: "route.implement.default" },
+        asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+        policy_bundle: {
+          policy: { policy_id: "policy.step.runner.default" },
+          resolved_bounds: { command_constraints: { allowed_commands: ["npm run build"] } },
+        },
+        dry_run: false,
+        context: {
+          execution_permissions: { target_write_allowed: true, meaningful_change_required: true },
+          required_inputs_resolved: {
+            packets: {
+              required: [{
+                packet: "handoff_packet",
+                required: true,
+                resolved_ref: "evidence://.aor/projects/adapter-test/reports/handoff-invalid.json",
+              }],
+            },
+          },
+        },
+      }),
+      /provider_work_packet_construction_failed.*subset of allowed_commands/u,
+    );
+    assert.equal(fs.existsSync(spawnedMarker), false);
   });
 });
 
@@ -1860,7 +1985,7 @@ test("live adapter repair request-artifact packet includes repair closure policy
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'repair packet ok',",
-            "output:{roles:packet.resolved_local_refs.map(ref=>ref.role),repair_context:packet.repair_context,repair_policy:packet.execution_contract.repair_closure_policy},",
+            "output:{roles:packet.resolved_local_refs.map(ref=>ref.role),repair_context:packet.repair_context,repair_policy:packet.execution_contract.repair_closure_policy,execution_contract:packet.execution_contract},",
             "evidence_refs:['evidence://adapter-live/claude-code/repair-packet']",
             "}));",
           ].join(""),
@@ -1882,11 +2007,24 @@ test("live adapter repair request-artifact packet includes repair closure policy
       step_class: "implement",
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
-      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      policy_bundle: {
+        policy: { policy_id: "policy.step.runner.default" },
+        resolved_bounds: {
+          command_constraints: { allowed_commands: ["npx ava test/headers.ts"] },
+        },
+      },
       dry_run: false,
       context: {
         compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
         compiled_context_file: compiledContextFile,
+        execution_permissions: {
+          execution_allowed: true,
+          writeback_allowed: false,
+          target_write_allowed: true,
+          direct_edits_allowed: true,
+          meaningful_change_required: true,
+          delivery_mode: "patch-only",
+        },
         runtime_evidence_refs: [
           "evidence://.aor/projects/adapter-test/reports/review-decision-request-repair.json",
         ],
@@ -1902,6 +2040,8 @@ test("live adapter repair request-artifact packet includes repair closure policy
       "npx ava test/headers.ts",
     );
     assert.equal(response.output.runner_output.repair_policy.required, true);
+    assert.deepEqual(response.output.runner_output.execution_contract.required_commands, ["npx ava test/headers.ts"]);
+    assert.equal(response.output.runner_output.execution_contract.command_execution_policy.retries_after_sandbox_denial, 0);
     assert.equal(response.output.runner_output.repair_policy.must_address_each_unresolved_finding, true);
     assert.equal(
       response.output.runner_output.repair_policy.unresolved_finding_details[0].finding_id,

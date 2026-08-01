@@ -64,6 +64,11 @@ For structured implementation work, the packet carries the same planning-grade c
 - `goals[]`, `definition_of_done[]`, `local_tasks[]`, `acceptance_criteria[]`, `expected_evidence[]`, and `kpis[]` from the approved intake/spec when present.
 - `verification_expectations` copied from the wave ticket so review and operator checks can inspect the mission verification contract directly.
 - `verification_plan.command_groups[]` populated with generic AOR command groups for setup, baseline, post-change, and diagnostic checks. Legacy `verification_plan.commands[]` may remain as a compatibility read model for older packets, but new packets should treat command groups as the executable verification contract.
+- `allowed_commands[]` may include mission-primary repo commands but must not
+  promote controller-owned readiness setup or diagnostic commands into provider
+  obligations. Provider work-packet v2 derives `required_commands[]` only from
+  ordered `verification_expectations.primary_commands[]` and verifies the
+  required set is a subset of this allowlist before spawn.
 - Command groups may carry W54 authoring metadata (`repo_id`, `working_dir`,
   `depends_on[]`, `detected_from[]`, `package_manager`,
   `tool_requirements[]`, and `skip_policy`) as long as generated handoffs do not

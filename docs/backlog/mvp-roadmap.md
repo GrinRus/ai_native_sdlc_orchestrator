@@ -313,6 +313,7 @@ The current roadmap contains **342 slices across 67 waves**.
 | W66-S13 | stream auth telemetry classification target: DEV-04, AIP-12, OPS-06 |
 | W66-S14 | repair closure warning approval parity target: DEV-05, DTX-01, OPS-06 |
 | W66-S15 | structured stream failure-signal classification target: DEV-04, AIP-12, OPS-06 |
+| W66-S16 | provider work-packet command-role separation target: DEV-04, AIP-12, OPS-06 |
 | W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation

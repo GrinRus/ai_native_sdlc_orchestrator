@@ -1331,7 +1331,7 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.ok(loaded.document.allowed_providers.includes(current.provider));
       assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
       assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
-      assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
+      assert.deepEqual(loaded.document.repos[0].lint_commands, []);
       assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
     }
   });
@@ -1450,12 +1450,19 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
     assert.equal(loaded.document.repos[0].name, "sindresorhus/ky");
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
-    assert.deepEqual(loaded.document.repos[0].lint_commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(loaded.document.repos[0].lint_commands, [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+      "CI=1 npx ava test/headers.ts",
+    ]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
       "CI=1 npx ava test/headers.ts",
     ]);
+    const readinessGroup = loaded.document.verification.command_groups.find((group) => group.phase === "readiness");
+    assert.deepEqual(readinessGroup.commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.equal(loaded.document.repos[0].lint_commands.some((command) => command.includes("npm install")), false);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
   });
 });
@@ -1789,7 +1796,12 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     assert.equal(loaded.ok, true);
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
-    assert.deepEqual(loaded.document.repos[0].lint_commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(loaded.document.repos[0].lint_commands, [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+      "CI=1 npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'",
+      "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
+    ]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
@@ -1893,14 +1905,13 @@ test("generated Vitest large profile isolates verification and checks hard-targe
       loaded.document.repos[0].lint_commands.some((command) =>
         command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
       ),
-      true,
+      false,
     );
-    assert.equal(
-      loaded.document.repos[0].lint_commands.some((command) =>
-        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm build"),
-      ),
-      true,
-    );
+    const readinessGroup = loaded.document.verification.command_groups.find((group) => group.phase === "readiness");
+    assert.ok(readinessGroup.commands.some((command) =>
+      command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
+    ));
+    assert.deepEqual(loaded.document.repos[0].lint_commands, loaded.document.repos[0].test_commands);
     assert.equal(
       loaded.document.repos[0].test_commands.some((command) =>
         command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm test"),

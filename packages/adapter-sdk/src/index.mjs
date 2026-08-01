@@ -8,6 +8,7 @@ import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
 import { buildExternalExecutionOutcome, classifyProviderSemanticFailure } from "./provider-outcome.mjs";
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
+import { resolveProviderCommandRoles } from "./provider-work-packet.mjs";
 import { PROCESS_TREE_SUPERVISION_SOURCE } from "./process-tree-supervision.mjs";
 import { PROVIDER_STEP_STATUS_SUPERVISION_SOURCE } from "./provider-step-status-supervision.mjs";
 import { SESSION_BUDGET_SUPERVISION_SOURCE } from "./session-budget-supervision.mjs";
@@ -1723,7 +1724,7 @@ function buildResolvedLocalRefs(envelope, options) {
 
 /**
  * @param {Record<string, unknown>} envelope
- * @param {{ projectRoot?: string | null }} [options]
+ * @param {{ projectRoot?: string | null, resolvedLocalRefs?: Array<Record<string, unknown>> }} [options]
  * @returns {Record<string, unknown>}
  */
 function buildExecutionContract(envelope, options = {}) {
@@ -1734,9 +1735,17 @@ function buildExecutionContract(envelope, options = {}) {
   const commandConstraints = asRecord(resolvedBounds.command_constraints);
   const allowedCommands = asStringArray(commandConstraints.allowed_commands);
   const repairWorkContext = resolveRepairWorkContext(envelope, options);
+  const resolvedLocalRefs = Array.isArray(options.resolvedLocalRefs) ? options.resolvedLocalRefs : [];
   const executionPermissions = asRecord(asRecord(envelope.context).execution_permissions);
   const targetWriteAllowed = executionPermissions.target_write_allowed === true;
   const meaningfulChangeRequired = targetWriteAllowed && executionPermissions.meaningful_change_required === true;
+  const { requiredCommands } = resolveProviderCommandRoles({
+    envelope,
+    resolvedLocalRefs,
+    repairWorkContext,
+    allowedCommands,
+    targetWriteAllowed,
+  });
   const contract = {
     mode: targetWriteAllowed ? "execute-implementation" : "read-only-inspection",
     must_open_required_local_refs: true,
@@ -1753,7 +1762,18 @@ function buildExecutionContract(envelope, options = {}) {
       upstream_write_allowed: false,
       delivery_materialization_downstream: true,
     },
-    required_commands: allowedCommands,
+    allowed_commands: allowedCommands,
+    required_commands: requiredCommands,
+    command_execution_policy: {
+      mode: "sequential",
+      provider_may_run_only_required_commands: true,
+      readiness_setup_owner: "controller",
+      diagnostics_owner: "controller",
+      completed_readiness_setup_is_reusable: true,
+      sandbox_denial_behavior: "record-environment-limitation-and-return",
+      sandbox_denial_codes: ["EPERM", "EACCES"],
+      retries_after_sandbox_denial: 0,
+    },
     output_quality_policy: {
       warning_clean_required: true,
       applies_to: [
@@ -1765,7 +1785,7 @@ function buildExecutionContract(envelope, options = {}) {
       exit_zero_warning_output_is_failure: true,
       baseline_exception_requires_same_command_unchanged_baseline: true,
       required_runner_action:
-        "Run and inspect required and primary verification only. Do not run diagnostic commands unless they are also required_commands; the controller owns diagnostic verification after provider execution. Fix warning-producing code or tests before final reporting.",
+        "Run only execution_contract.required_commands, in order and one at a time. Do not repeat readiness setup or package installation; the controller owns diagnostic verification. If a required check returns EPERM or EACCES because of the provider sandbox, record bounded environment-limited evidence and finish the report without retrying the command or changing the target to bypass the sandbox. Fix warning-producing code or tests before final reporting.",
     },
     final_report: {
       required_sections: ["summary", "changed-files", "commands-run", "verification", "risks"],
@@ -1791,7 +1811,7 @@ function buildExecutionContract(envelope, options = {}) {
         : [],
       required_final_report_section: "repair-closure",
       required_runner_action:
-        "Open the source review decision and review report, address every unresolved finding, and do not report repair success without explicit closure evidence for each finding.",
+        "Open the source review decision and review report, perform one directed repair pass for every unresolved finding, then run only required_commands sequentially. Do not repeat readiness or package installation, and do not start new investigation after the fix. Return explicit closure evidence for every finding or a bounded environment-limited report after sandbox EPERM/EACCES.",
     };
   }
   return contract;
@@ -1822,10 +1842,15 @@ function buildProviderWorkPacket(envelope, options) {
     ...asStringArray(context.runtime_evidence_refs),
   ].filter(Boolean);
   const repairWorkContext = resolveRepairWorkContext(envelope, options);
+  const resolvedLocalRefs = buildResolvedLocalRefs(envelope, options);
+  const executionContract = buildExecutionContract(envelope, {
+    ...options,
+    resolvedLocalRefs,
+  });
 
   return {
     packet_kind: "aor-provider-work-packet",
-    version: 1,
+    version: 2,
     request_id: envelope.request_id,
     run_id: envelope.run_id,
     step_id: envelope.step_id,
@@ -1851,8 +1876,8 @@ function buildProviderWorkPacket(envelope, options) {
       },
     },
     input_packet_refs: asStringArray(envelope.input_packet_refs),
-    resolved_local_refs: buildResolvedLocalRefs(envelope, options),
-    execution_contract: buildExecutionContract(envelope, options),
+    resolved_local_refs: resolvedLocalRefs,
+    execution_contract: executionContract,
     repair_context: repairWorkContext
       ? {
           source_review_decision_ref: asOptionalString(repairWorkContext.source_review_decision_ref),
@@ -2924,7 +2949,7 @@ export function createLiveAdapter(options) {
       const executionContract = asRecord(executionProviderWorkPacket.execution_contract);
       const checkoutWritePolicy = asRecord(executionContract.target_checkout_write_policy);
       const defaultRequestArtifactMessage = checkoutWritePolicy.direct_edits_allowed === true
-        ? "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout. Evidence inputs are read-only and must never be treated as execution roots. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits only in the disposable execution root when execution_contract.expected_meaningful_change.required is true, follow all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final implementation report with changed-files, commands-run, verification, and risks."
+        ? "Execute one directed AOR implementation pass using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout. Evidence inputs are read-only and must never be treated as execution roots. Read that JSON first, open every required resolved_local_refs[].local_path, and make direct edits only in the disposable execution root when execution_contract.expected_meaningful_change.required is true. Run only execution_contract.required_commands, sequentially and in order. Never repeat readiness setup or package installation and never run controller-owned diagnostics. On sandbox EPERM or EACCES, record bounded environment-limited evidence and finish without retry or workaround. Do not write upstream. Return a final implementation report with changed-files, commands-run, verification, and risks."
         : "Perform the approved read-only AOR inspection using the provider work packet at {provider_work_packet_path}. Read that JSON first, open required resolved_local_refs[].local_path files, do not edit the target checkout, index, HEAD, or untracked files, do not write upstream, run only permitted read-only checks, and return an inspection report with findings, commands-run, verification, and risks.";
       const requestMessage = renderRequestArtifactMessage(
         asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
