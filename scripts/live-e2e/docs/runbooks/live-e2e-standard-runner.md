@@ -584,7 +584,11 @@ Full-journey layer:
   `all-pass` unless they match unchanged-baseline evidence. Sandbox
   `EPERM`/`EACCES` produces bounded environment-limited evidence without retry,
   install, or target workaround; host/controller verification remains
-  authoritative.
+  authoritative. Command-role subset validation compares mission command
+  identity after removing only leading shell environment assignments. The
+  emitted `required_commands` retain the exact allowlisted form, including
+  prefixes such as `CI=1`; arbitrary wrappers or shell prefixes are not
+  equivalent and still fail packet construction before provider spawn.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;

@@ -20,6 +20,7 @@ import {
   summarizeProviderMalformedToolCallError,
 } from "../src/index.mjs";
 import { materializeProviderInputSnapshot } from "../src/packet-transport.mjs";
+import { resolveProviderCommandRoles } from "../src/provider-work-packet.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -1898,6 +1899,45 @@ test("provider work packet blocks an unlisted required command before spawn", ()
     );
     assert.equal(fs.existsSync(spawnedMarker), false);
   });
+});
+
+test("provider work packet resolves mission commands to exact environment-qualified allowlist entries", () => {
+  const result = resolveProviderCommandRoles({
+    envelope: {
+      verification_expectations: {
+        primary_commands: ["npx xo", "npm run build", "npx ava test/headers.ts"],
+      },
+    },
+    resolvedLocalRefs: [],
+    repairWorkContext: null,
+    allowedCommands: [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+      "CI=1 npx ava test/headers.ts",
+    ],
+    targetWriteAllowed: true,
+  });
+
+  assert.deepEqual(result.requiredCommands, [
+    "CI=1 npx xo",
+    "CI=1 npm run build",
+    "CI=1 npx ava test/headers.ts",
+  ]);
+});
+
+test("provider work packet does not treat arbitrary command wrappers as environment qualification", () => {
+  assert.throws(
+    () => resolveProviderCommandRoles({
+      envelope: {
+        verification_expectations: { primary_commands: ["npx xo"] },
+      },
+      resolvedLocalRefs: [],
+      repairWorkContext: null,
+      allowedCommands: ["echo npx xo"],
+      targetWriteAllowed: true,
+    }),
+    /provider_work_packet_construction_failed.*unlisted commands: npx xo/u,
+  );
 });
 
 test("live adapter repair request-artifact packet includes repair closure policy", () => {

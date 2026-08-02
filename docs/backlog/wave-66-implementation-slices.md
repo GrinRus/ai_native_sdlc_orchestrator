@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S17 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -1036,6 +1036,77 @@ installed-console gates are trustworthy.
 - Provider timeout increases, session-budget changes, guided diagnostic timeout
   changes, large provider execution, four-cell closure, or production clearance.
 
+## W66-S17 — Environment-qualified provider command identity
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Mission-primary verification commands resolve to their exact
+  allowlisted environment-qualified form before provider work-packet subset
+  validation, so real generated profiles can spawn without weakening the v2
+  command boundary.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** provider work-packet command-role resolution, adapter
+  contract tests, live-E2E generated command parity
+- **Hard dependencies:** W66-S16
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Command identity contract clarification**
+   - Purpose: Preserve exact v2 subset enforcement while allowing the
+     controller to add reviewed environment assignments to mission commands.
+   - Changes: Define command identity as the command after leading shell
+     environment assignments only, and require emitted commands to use the
+     exact matching allowlist entry.
+   - Validation: `npx xo` resolves to `CI=1 npx xo`; arbitrary wrappers such as
+     `echo npx xo` remain non-equivalent and block before spawn.
+2. **Provider packet materialization repair**
+   - Purpose: Align real generated Ky profiles with mission-primary command
+     requirements.
+   - Changes: Resolve primary and focused repair commands against the ordered
+     policy allowlist before constructing `required_commands`; keep readiness,
+     diagnostics, command order, and provider-neutral behavior unchanged.
+   - Validation: The guided command set produces an exact
+     `required_commands subset allowed_commands` packet with its `CI=1`
+     environment preserved.
+3. **Deterministic closure and qualification reset**
+   - Purpose: Replace the failed frozen behavior commit before another paid
+     provider attempt.
+   - Changes: Record
+     `w66-s16-guided-e8d8e270-r1-20260802` as diagnostic AOR-owned evidence,
+     run focused/root/browser/package/install gates, close S17, and freeze a
+     new manifest.
+   - Validation: `pnpm slice:gate -- W66-S17` passes and W66-S09 returns to
+     active only on the new behavior commit.
+
+### Acceptance criteria
+
+1. Environment-qualified allowlist entries satisfy equivalent mission-primary
+   commands without changing the work-packet v2 schema.
+2. `required_commands` contains only exact strings present in
+   `allowed_commands`, in mission order, with controller-provided environment
+   assignments preserved.
+3. Non-environment wrappers, setup commands, diagnostics, and unlisted commands
+   cannot enter `required_commands`.
+4. Codex, Claude, OpenCode, and Qwen retain identical packet semantics.
+5. Focused tests and `pnpm slice:gate -- W66-S17` pass without another paid
+   provider call.
+6. Qualification evidence on `e8d8e270` is diagnostic only and the next guided
+   baseline starts from a fresh frozen commit and workspace.
+
+### Done evidence
+
+- Environment-qualified command identity and negative wrapper regressions.
+- Deterministic gate results, closed W66-S17 slice, and replacement frozen
+  qualification manifest.
+
+### Out of scope
+
+- Provider/session/diagnostic timeout changes, sandbox relaxation, large
+  provider execution, four-cell closure, or production clearance. If guided
+  diagnostic timeout alignment is later required, it becomes W66-S18.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -1047,7 +1118,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S16
+- **Hard dependencies:** W66-S17
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
