@@ -89,6 +89,7 @@ export {
   materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
   materializeReviewDecision,
+  reviewReportAllowsApproval,
 } from "../../../observability/src/index.mjs";
 export { resolveStepPolicyForStep } from "../policy-resolution.mjs";
 export { analyzeProjectRuntime } from "../project-analysis.mjs";

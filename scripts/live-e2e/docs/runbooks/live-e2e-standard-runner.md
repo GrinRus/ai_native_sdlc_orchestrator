@@ -35,7 +35,10 @@ pre-product-execution blocker classification.
 Installed-user guided profiles may set
 `live_e2e.guided_warn_diagnostic_timeout_sec` for non-blocking post-guided-proof
 diagnostics; this timeout only applies when the mission diagnostic failure mode
-is `warn`.
+is `warn`. The Ky installed qualification profile uses `1800` seconds because
+its complete diagnostic suite can validly exceed ten minutes; the timeout is
+still capped by `target_command_timeout_sec`, preserves the per-command hard
+bound, and retains process-group cleanup on exhaustion.
 
 Live E2E provider parity is required across Codex, Claude, OpenCode, and Qwen.
 Provider-specific behavior belongs only at the adapter boundary: command shape,
@@ -534,7 +537,10 @@ Legacy bounded rehearsal summaries:
 
 Full-journey layer:
 - resolves `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id` from the curated internal catalog;
-- uses public `aor project init` with a host-side generated project profile plus repo command overrides derived from the curated catalog;
+- uses public `aor project init` with a host-side generated project profile plus
+  mission-primary repo command overrides derived from the curated catalog;
+  readiness setup remains only in the generic `phase=readiness` command group
+  and is not mapped into legacy repo lint commands;
 - preflights the selected provider adapter before execution so missing live runtime metadata, missing commands, auth failures, edit-readiness failures, and permission-mode blocks fail before `run start`;
 - keeps adapter preflight self-contained: the provider invocation used for
   readiness must not recursively launch provider CLIs such as `codex`,
@@ -554,6 +560,8 @@ Full-journey layer:
   until after guided browser proof materializes and use
   `live_e2e.guided_warn_diagnostic_timeout_sec` (default `120`) so target-side
   timing-sensitive tests cannot prevent UI/accessibility evidence collection;
+  the installed Ky qualification profile explicitly raises this aggregate
+  diagnostic allowance to `1800` seconds without changing the default;
 - has the runner prepare one structured feature request input under AOR run state;
 - requires small catalog missions to use `mission_class=flow-regression`; requires medium, large, and xlarge catalog missions to use `mission_class=product-change` with `agent_visible_request`, evaluator/final-code rubrics, widened budgets, goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands; xlarge remains manual observation evidence and cannot close required acceptance;
 - materializes provider-pinned route and policy overrides in host-side AOR run
@@ -573,11 +581,30 @@ Full-journey layer:
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required.
 - requires post-run diagnostic evidence to be `pass` under the strict quality-assessment `all-pass` policy. Non-blocking diagnostic warnings remain valid factual run evidence, but they must be fixed, scoped out, or explicitly kept outside all-pass closure.
 - passes an explicit output-quality policy to external runtime agents in the
-  provider work packet. The agent must inspect primary and diagnostic
-  verification stdout/stderr and fix warning-producing target code or tests
-  before final reporting; exit-0 warnings such as Python `ResourceWarning` are
-  outcome-quality failures for `all-pass` unless they match unchanged-baseline
-  evidence.
+  provider work packet. The agent runs only ordered mission-primary
+  `required_commands`, sequentially; readiness setup and diagnostics remain
+  controller-owned. The agent must inspect required verification stdout/stderr
+  and fix warning-producing target code or tests before final reporting; exit-0
+  warnings such as Python `ResourceWarning` are outcome-quality failures for
+  `all-pass` unless they match unchanged-baseline evidence. Sandbox
+  `EPERM`/`EACCES` produces bounded environment-limited evidence without retry,
+  install, or target workaround; host/controller verification remains
+  authoritative. Command-role subset validation compares mission command
+  identity after removing only leading shell environment assignments. The
+  emitted `required_commands` retain the exact allowlisted form, including
+  prefixes such as `CI=1`; arbitrary wrappers or shell prefixes are not
+  equivalent and still fail packet construction before provider spawn. Every
+  changed test file must be exercised by one of those ordered
+  `required_commands`; when the mission cannot be completed inside that test
+  surface, the provider returns a bounded verification-scope mismatch instead
+  of editing unverified tests or invoking controller-owned diagnostics.
+
+Private delivery eligibility is no broader than the public review-decision
+contract. A warning may continue only when the review recommendation is
+`proceed` and no failed finding remains. `required-human-review` stops before
+the public approve command; a primary-pass changed-test mapping warning is
+classified as provider-owned `verification_mapping_gap`, not as an AOR command
+failure.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
@@ -984,6 +1011,11 @@ of implementation and verification evidence when the mission requires it.
   deterministic budget, but the external runtime exhausted its own conversation
   context while executing. Preserve the raw provider summary and treat the run
   as blocked before outcome quality assessment.
+- `provider_session_budget_exceeded` is the fail-early post-spawn convergence
+  class. It means AOR stopped a streaming external runtime after it exceeded a
+  declared assistant-turn or tool-call hard bound. Preserve the versioned
+  session-budget report, classify the blocker as provider-owned, and do not
+  prepare outcome quality assessment from the partial disposable workspace.
 - Step quality follow-up comes from `live-e2e-step-quality-assessment-report`, and final outcome quality comes from `live-e2e-quality-assessment-report`, not from the runner summary.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.

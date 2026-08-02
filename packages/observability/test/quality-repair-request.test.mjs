@@ -11,6 +11,7 @@ import {
   listQualityRepairRequests,
   materializeQualityRepairRequest,
   materializeReviewDecision,
+  reviewReportAllowsApproval,
   updateQualityRepairRequest,
 } from "../src/index.mjs";
 
@@ -52,6 +53,132 @@ function withRuntime(callback) {
     fs.rmSync(root, { recursive: true, force: true });
   }
 }
+
+function materializeApproval(options = {}) {
+  let result;
+  withRuntime((projectRoot, runtimeLayout) => {
+    result = materializeReviewDecision({
+      projectId: "aor-core",
+      projectRoot,
+      runtimeLayout,
+      runId: options.runId ?? "run.review-approval",
+      decision: "approve",
+      reviewReport: {
+        review_report_id: "run.review-approval.review-report.v1",
+        project_id: "aor-core",
+        run_id: options.runId ?? "run.review-approval",
+        overall_status: options.reviewStatus ?? "warn",
+        review_recommendation: options.reviewRecommendation ?? "proceed",
+        findings: options.reviewFindings ?? [
+          {
+            finding_id: "review.finding.bounded-warning",
+            category: "verification",
+            severity: "warn",
+            summary: "Primary verification is passing but narrower than the changed-path set.",
+            evidence_refs: ["evidence://reports/review-report-run-review-approval.json"],
+          },
+        ],
+        evidence_refs: ["evidence://reports/review-report-run-review-approval.json"],
+      },
+      reviewReportRef: "evidence://reports/review-report-run-review-approval.json",
+      runtimeHarnessReport: {
+        report_id: "run.review-approval.runtime-harness-report.v1",
+        project_id: "aor-core",
+        run_id: options.runId ?? "run.review-approval",
+        overall_decision: options.runtimeDecision ?? "pass",
+        run_findings: [],
+        evidence_refs: ["evidence://reports/runtime-harness-report-run-review-approval.json"],
+      },
+      runtimeHarnessReportRef: "evidence://reports/runtime-harness-report-run-review-approval.json",
+      timestamp: "2026-07-28T12:00:00.000Z",
+    });
+  });
+  return result;
+}
+
+test("review approval accepts a bounded warning that recommends proceed", () => {
+  const result = materializeApproval();
+
+  assert.equal(result.decision.delivery_gate.status, "pass");
+  assert.equal(result.decision.delivery_gate.blocks_downstream, false);
+  assert.equal(result.decision.decision_basis.review_overall_status, "warn");
+  assert.equal(result.decision.decision_basis.review_recommendation, "proceed");
+  assert.deepEqual(result.decision.decision_basis.blocking_findings, []);
+  assert.equal(
+    validateContractDocument({
+      family: "review-decision",
+      document: result.decision,
+      source: "fixture://review-decision-approve-warning",
+    }).ok,
+    true,
+  );
+});
+
+test("repair closure reuses the same bounded warning eligibility as review approval", () => {
+  assert.equal(
+    reviewReportAllowsApproval({
+      overall_status: "warn",
+      review_recommendation: "proceed",
+      findings: [
+        {
+          finding_id: "review.finding.bounded-warning",
+          severity: "warn",
+        },
+      ],
+    }),
+    true,
+  );
+  assert.equal(
+    reviewReportAllowsApproval({
+      overall_status: "warn",
+      review_recommendation: "required-human-review",
+      findings: [],
+    }),
+    false,
+  );
+  assert.equal(
+    reviewReportAllowsApproval({
+      overall_status: "warn",
+      review_recommendation: "proceed",
+      findings: [{ finding_id: "review.finding.blocking", severity: "fail" }],
+    }),
+    false,
+  );
+});
+
+test("review approval keeps repair, human-review, failed-finding, and harness outcomes blocked", () => {
+  assert.throws(
+    () => materializeApproval({ reviewRecommendation: "repair" }),
+    /Cannot approve because review-report/u,
+  );
+  assert.throws(
+    () => materializeApproval({ reviewRecommendation: "required-human-review" }),
+    /Cannot approve because review-report/u,
+  );
+  assert.throws(
+    () => materializeApproval({ reviewStatus: "unknown" }),
+    /Cannot approve because review-report/u,
+  );
+  assert.throws(
+    () =>
+      materializeApproval({
+        reviewFindings: [
+          {
+            finding_id: "review.finding.blocking",
+            category: "correctness",
+            severity: "fail",
+            summary: "A correctness defect remains.",
+            evidence_refs: ["evidence://reports/review-report-run-review-approval.json"],
+          },
+        ],
+      }),
+    /Cannot approve because review-report/u,
+  );
+  assert.throws(
+    () => materializeApproval({ runtimeDecision: "repair" }),
+    /Runtime Harness overall_decision is 'repair'/u,
+  );
+});
 
 test("quality repair request helpers create, read, update, and close bounded requests", () => {
   withRuntime((projectRoot, runtimeLayout) => {

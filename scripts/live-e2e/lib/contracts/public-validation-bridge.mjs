@@ -9,6 +9,9 @@ const PUBLIC_CONTRACT_FAMILIES = new Set(
 const PUBLIC_VALIDATOR = fileURLToPath(
   new URL("../../../../packages/contracts/bin/validate-document.mjs", import.meta.url),
 );
+const PUBLIC_SESSION_BUDGET_VALIDATOR = fileURLToPath(
+  new URL("../../../../packages/contracts/bin/validate-session-budget.mjs", import.meta.url),
+);
 
 export function isPublicContractFamily(family) {
   return PUBLIC_CONTRACT_FAMILIES.has(family);
@@ -35,4 +38,24 @@ export function validatePublicContractDocument({ family, document, source }) {
     };
   }
   return JSON.parse(child.stdout);
+}
+
+export function validatePublicExternalRunnerSessionBudget(value, source, field) {
+  const child = spawnSync(process.execPath, [PUBLIC_SESSION_BUDGET_VALIDATOR], {
+    input: JSON.stringify({ value, source, field }),
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  });
+  if (child.status !== 0) {
+    return [{
+      code: "public_contract_validator_failed",
+      source,
+      field,
+      expected: "installed public session-budget validator",
+      actual: child.error?.message ?? child.stderr.trim() ?? `exit ${child.status}`,
+      message: "Public session-budget validation failed at the product/private subprocess boundary.",
+    }];
+  }
+  const parsed = JSON.parse(child.stdout);
+  return Array.isArray(parsed.issues) ? parsed.issues : [];
 }

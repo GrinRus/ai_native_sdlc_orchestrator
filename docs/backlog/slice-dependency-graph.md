@@ -344,6 +344,16 @@ graph TD
   W66S06[W66-S06 Parent/child integration and coordinated delivery correctness]
   W66S07[W66-S07 Installed browser proof and design acceptance integrity]
   W66S08[W66-S08 Deterministic remediation closure]
+  W66S10[W66-S10 Non-repair review warning approval compatibility]
+  W66S11[W66-S11 Bounded external-provider session convergence]
+  W66S12[W66-S12 Resumable immutable browser-evidence reconciliation]
+  W66S13[W66-S13 Stream auth telemetry classification]
+  W66S14[W66-S14 Repair closure warning approval parity]
+  W66S15[W66-S15 Structured stream failure-signal classification]
+  W66S16[W66-S16 Provider work-packet command-role separation]
+  W66S17[W66-S17 Environment-qualified provider command identity]
+  W66S18[W66-S18 Guided diagnostic timeout alignment]
+  W66S19[W66-S19 Provider verification-scope convergence]
   W66S09[W66-S09 Fresh four-cell live qualification closure]
 
   W0S01 --> W0S02
@@ -849,7 +859,17 @@ graph TD
   W66S05 --> W66S06
   W66S06 --> W66S07
   W66S07 --> W66S08
-  W66S08 --> W66S09
+  W66S08 --> W66S10
+  W66S10 --> W66S11
+  W66S11 --> W66S12
+  W66S12 --> W66S13
+  W66S13 --> W66S14
+  W66S14 --> W66S15
+  W66S15 --> W66S16
+  W66S16 --> W66S17
+  W66S17 --> W66S18
+  W66S18 --> W66S19
+  W66S19 --> W66S09
 ```
 
 ## W0 hard dependencies
@@ -1463,7 +1483,17 @@ own the stricter terminal control proof evidence for this lane.
 | W66-S06 | W66-S05 |
 | W66-S07 | W66-S06 |
 | W66-S08 | W66-S07 |
-| W66-S09 | W66-S08 |
+| W66-S10 | W66-S08 |
+| W66-S11 | W66-S10 |
+| W66-S12 | W66-S11 |
+| W66-S13 | W66-S12 |
+| W66-S14 | W66-S13 |
+| W66-S15 | W66-S14 |
+| W66-S16 | W66-S15 |
+| W66-S17 | W66-S16 |
+| W66-S18 | W66-S17 |
+| W66-S19 | W66-S18 |
+| W66-S09 | W66-S19 |
 
 ## Topological order
 1. W0-S01
@@ -1806,7 +1836,17 @@ own the stricter terminal control proof evidence for this lane.
 338. W66-S06
 339. W66-S07
 340. W66-S08
-341. W66-S09
+341. W66-S10
+342. W66-S11
+343. W66-S12
+344. W66-S13
+345. W66-S14
+346. W66-S15
+347. W66-S16
+348. W66-S17
+349. W66-S18
+350. W66-S19
+351. W66-S09
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

@@ -33,6 +33,7 @@ import {
   applyIncidentRecertification,
   materializeLearningLoopArtifacts,
   materializeReviewDecision,
+  reviewReportAllowsApproval,
   closeQualityRepairRequest,
   listQualityRepairRequests,
   resolveNextAction,
@@ -596,8 +597,10 @@ export function handleQualityCommand(context) {
         runId: /** @type {string} */ (closureRunId),
         executionRoot,
       });
-      if (reviewResult.reviewReport.overall_status !== "pass") {
-        throw new CliUsageError("Quality repair closure requires a refreshed passing review report.");
+      if (!reviewReportAllowsApproval(reviewResult.reviewReport)) {
+        throw new CliUsageError(
+          "Quality repair closure requires a refreshed review report that is eligible for approval.",
+        );
       }
       if (runtimeHarness.report.overall_decision !== "pass") {
         throw new CliUsageError("Quality repair closure requires a refreshed passing Runtime Harness report.");

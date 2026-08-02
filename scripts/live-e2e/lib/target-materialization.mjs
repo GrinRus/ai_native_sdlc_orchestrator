@@ -369,13 +369,12 @@ function materializeSelectedAdapterLiveE2eDefaults(options) {
  * @param {Record<string, unknown>} verification
  */
 function hydrateRepoVerificationCommands(repoRecord, verification) {
-  const setupCommands = applyTargetExecutionEnvironmentToCommands(verification, asStringArray(verification.setup_commands));
   const verificationCommands = applyTargetExecutionEnvironmentToCommands(verification, asStringArray(verification.commands));
   const buildEnabled = verification.build === true;
   const testsEnabled = verification.tests !== false;
 
   repoRecord.build_commands = buildEnabled ? verificationCommands : [];
-  repoRecord.lint_commands = setupCommands;
+  repoRecord.lint_commands = verificationCommands;
   repoRecord.test_commands = testsEnabled ? verificationCommands : [];
 }
 

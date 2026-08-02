@@ -603,7 +603,17 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S06 | Parent/child integration and coordinated delivery correctness | EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | done | parent scheduler, workspace provisioner, integration service, delivery driver, tests | W66-S05 |
 | W66-S07 | Installed browser proof and design acceptance integrity | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | done | private browser collector, W63/W65 scenarios, `apps/web/**`, installed-package tests | W66-S06 |
 | W66-S08 | Deterministic remediation closure | EPIC-0, EPIC-4, EPIC-7 | done | root/package/browser gates, W66 finding ledger, deterministic fixture matrices, readiness docs | W66-S07 |
-| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S08 |
+| W66-S10 | Non-repair review warning approval compatibility | EPIC-0, EPIC-4, EPIC-5 | done | review-decision contract/runtime, public approval regressions, guided lifecycle compatibility | W66-S08 |
+| W66-S11 | Bounded external-provider session convergence | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | done | adapter session-budget contract, external-process supervisor, Claude streaming profile, run-health regressions | W66-S10 |
+| W66-S12 | Resumable immutable browser-evidence reconciliation | EPIC-0, EPIC-1, EPIC-7 | done | private browser collector, immutable evidence reconciliation, guided resume regressions | W66-S11 |
+| W66-S13 | Stream auth telemetry classification | EPIC-0, EPIC-4, EPIC-7 | done | adapter failure classifier, live-adapter preflight, streaming auth regressions | W66-S12 |
+| W66-S14 | Repair closure warning approval parity | EPIC-0, EPIC-4, EPIC-7 | done | review decision eligibility, public repair closure, observability and guided lifecycle regressions | W66-S13 |
+| W66-S15 | Structured stream failure-signal classification | EPIC-0, EPIC-4, EPIC-7 | done | adapter failure classifier, live-adapter preflight, structured-stream regressions | W66-S14 |
+| W66-S16 | Provider work-packet command-role separation | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet v2, generated command roles, repair convergence regressions | W66-S15 |
+| W66-S17 | Environment-qualified provider command identity | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet command identity, environment-qualified allowlist parity, adapter regressions | W66-S16 |
+| W66-S18 | Guided diagnostic timeout alignment | EPIC-0, EPIC-4, EPIC-7 | done | private guided profile timeout policy, diagnostic timeout and cleanup regressions | W66-S17 |
+| W66-S19 | Provider verification-scope convergence | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet scope guardrail, review-owner fidelity, guided regressions | W66-S18 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S19 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New

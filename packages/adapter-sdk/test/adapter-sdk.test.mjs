@@ -19,6 +19,8 @@ import {
   resolveExternalRuntimePermissionPolicy,
   summarizeProviderMalformedToolCallError,
 } from "../src/index.mjs";
+import { materializeProviderInputSnapshot } from "../src/packet-transport.mjs";
+import { resolveProviderCommandRoles } from "../src/provider-work-packet.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -55,6 +57,7 @@ function withTempRepo(callback) {
  *   envFrom?: Record<string, string>,
  *   nativeTimeoutArg?: Record<string, unknown>,
  *   contextBudget?: Record<string, unknown>,
+ *   sessionBudget?: Record<string, unknown>,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -99,6 +102,9 @@ function buildExternalRunnerProfile(options) {
   if (options.contextBudget) {
     execution.external_runtime.context_budget = options.contextBudget;
   }
+  if (options.sessionBudget) {
+    execution.external_runtime.session_budget = options.sessionBudget;
+  }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
   }
@@ -130,6 +136,11 @@ test("request-artifact adapter launcher prompts mention output quality policy", 
       const message = adapter?.profile?.execution?.external_runtime?.request_file?.message;
       assert.equal(typeof message, "string", `${adapterId} request_file.message must be present`);
       assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
+      assert.match(message, /execution_contract\.required_commands/u, adapterId);
+      assert.match(message, /sequentially and in order/u, adapterId);
+      assert.match(message, /Every changed test file must be exercised by a required command/u, adapterId);
+      assert.match(message, /Never repeat readiness setup or package installation/u, adapterId);
+      assert.match(message, /EPERM or EACCES/u, adapterId);
       assert.doesNotMatch(message, /warning-producing stdout\/stderr/u, adapterId);
     }
   });
@@ -160,13 +171,30 @@ test("Claude live adapter args keep host auth and compact context guardrails", (
     const externalRuntime = claude.profile.execution.external_runtime;
     const modes = externalRuntime.permission_policy.modes;
     assert.equal(externalRuntime.env_from?.ANTHROPIC_API_KEY, undefined);
+    assert.deepEqual(externalRuntime.session_budget, {
+      schema_version: 1,
+      warn_after_assistant_turns: 24,
+      max_assistant_turns: 32,
+      max_tool_calls: 96,
+      termination_grace_ms: 1000,
+    });
     for (const mode of ["full-bypass", "restricted"]) {
       const args = modes[mode].args;
       assert.equal(args.includes("--bare"), false, `${mode} args must preserve host Claude auth`);
       assert.ok(args.includes("--print"), `${mode} args must use non-interactive print mode`);
+      assert.equal(args[args.indexOf("--output-format") + 1], "stream-json", `${mode} must expose progress`);
+      assert.ok(args.includes("--verbose"), `${mode} must emit complete stream events`);
+      assert.ok(args.includes("--no-chrome"), `${mode} must disable optional Chrome integration`);
+      assert.ok(args.includes("--disable-slash-commands"), `${mode} must disable optional slash commands`);
+      assert.ok(args.includes("--strict-mcp-config"), `${mode} must ignore unrelated MCP configuration`);
+      assert.equal(args[args.indexOf("--tools") + 1], "Bash,Edit,Read,Write,Glob,Grep");
       assert.ok(args.includes("--append-system-prompt"), `${mode} args must include compact guardrail prompt`);
       assert.ok(args.includes("--effort"), `${mode} args must declare supported effort bound`);
+      assert.equal(args[args.indexOf("--effort") + 1], "high");
       assert.match(args.join(" "), /provider_context_window_exceeded/u, mode);
+      assert.match(args.join(" "), /24 assistant turns/u, mode);
+      assert.match(args.join(" "), /32 assistant turns/u, mode);
+      assert.match(args.join(" "), /96 tool calls/u, mode);
     }
     assert.match(externalRuntime.request_file.message, /provider_context_window_exceeded/u);
     assert.match(externalRuntime.request_file.message, /resolved_local_refs\[\]\.local_path/u);
@@ -464,6 +492,90 @@ test("external runner failure classifier ignores successful authentication confi
     }),
     "auth-failed",
   );
+});
+
+test("external runner failure classifier ignores successful stream auth telemetry fields", () => {
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: [
+        JSON.stringify({
+          type: "system",
+          subtype: "init",
+          apiKeySource: "none",
+          model: "host-authenticated-model",
+        }),
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "Minimal non-interactive invocation completed.",
+        }),
+      ].join("\n"),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "none",
+  );
+
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: [
+        JSON.stringify({
+          type: "system",
+          subtype: "init",
+          apiKeySource: "none",
+          model: "host-authenticated-model",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: "The API key and HTTP 401 notes are documentation only; host OAuth is active.",
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          result: "Minimal non-interactive invocation completed.",
+        }),
+      ].join("\n"),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "none",
+  );
+
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: JSON.stringify({
+        type: "result",
+        subtype: "error",
+        result: "API key missing",
+      }),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "external-runner-failed",
+    }),
+    "auth-failed",
+  );
+
+  for (const authFailure of ["API key missing", "api_key invalid", "api-key expired"]) {
+    assert.equal(
+      classifyExternalRunnerFailure({
+        stdout: "",
+        stderr: authFailure,
+        errorMessage: null,
+        defaultFailureKind: "external-runner-failed",
+      }),
+      "auth-failed",
+    );
+  }
 });
 
 test("external runner failure classifier ignores nested target Permission denied logs", () => {
@@ -1509,9 +1621,16 @@ test("live adapter request-artifact transport sends bounded provider work packet
     const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
     const executionRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "workspaces", "disposable");
     const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
+    const handoffPacketFile = path.join(evidenceRoot, "handoff.json");
     fs.mkdirSync(evidenceRoot, { recursive: true });
     fs.mkdirSync(path.join(executionRoot, "source"), { recursive: true });
     fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
+    fs.writeFileSync(handoffPacketFile, JSON.stringify({
+      verification_expectations: {
+        primary_commands: ["CI=1 npx xo", "CI=1 npm run build"],
+        diagnostic_commands: ["CI=1 npm test"],
+      },
+    }, null, 2), "utf8");
     const adapter = createLiveAdapter({
       adapterId: "claude-code",
       projectRoot: repoRoot,
@@ -1530,7 +1649,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'request artifact ok',",
-            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),resolved_local_paths:packet.resolved_local_refs.map(ref=>ref.local_path),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content,cwd:process.cwd(),packet_path:filePath},",
+            "output:{packet_kind:packet.packet_kind,packet_version:packet.version,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),resolved_local_paths:packet.resolved_local_refs.map(ref=>ref.local_path),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content,cwd:process.cwd(),packet_path:filePath},",
             "evidence_refs:['evidence://adapter-live/claude-code/request-artifact']",
             "}));",
           ].join(""),
@@ -1552,7 +1671,18 @@ test("live adapter request-artifact transport sends bounded provider work packet
       step_class: "implement",
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
-      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      policy_bundle: {
+        policy: { policy_id: "policy.step.runner.default" },
+        resolved_bounds: {
+          command_constraints: {
+            allowed_commands: [
+              "CI=1 npm install --prefer-offline --no-audit --no-fund",
+              "CI=1 npx xo",
+              "CI=1 npm run build",
+            ],
+          },
+        },
+      },
       feature_traceability: {
         required_path_prefixes: ["source/", "test/", "index.d.ts"],
       },
@@ -1573,6 +1703,15 @@ test("live adapter request-artifact transport sends bounded provider work packet
         }],
         instruction_set: { objective: "Implement the bounded request-artifact test." },
         packet_refs: ["packet://handoff"],
+        required_inputs_resolved: {
+          packets: {
+            required: [{
+              packet: "handoff_packet",
+              required: true,
+              resolved_ref: "evidence://.aor/projects/adapter-test/reports/handoff.json",
+            }],
+          },
+        },
         execution_permissions: {
           execution_allowed: true,
           writeback_allowed: true,
@@ -1590,6 +1729,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.match(response.output.external_runner.provider_work_packet_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-work-packet-/u);
     assert.equal(response.output.external_runner.context_budget_status, "pass");
     assert.equal(response.output.runner_output.packet_kind, "aor-provider-work-packet");
+    assert.equal(response.output.runner_output.packet_version, 2);
     assert.equal(response.output.runner_output.has_full_request_ref, true);
     assert.equal(response.output.runner_output.has_context_budget, false);
     assert.match(response.output.runner_output.safety_rule, /bounded and evidence-first/u);
@@ -1619,8 +1759,23 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);
+    assert.deepEqual(response.output.runner_output.execution_contract.allowed_commands, [
+      "CI=1 npm install --prefer-offline --no-audit --no-fund",
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+    ]);
+    assert.deepEqual(response.output.runner_output.execution_contract.required_commands, [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+    ]);
+    assert.equal(response.output.runner_output.execution_contract.command_execution_policy.mode, "sequential");
+    assert.equal(response.output.runner_output.execution_contract.command_execution_policy.readiness_setup_owner, "controller");
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.warning_clean_required, true);
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.exit_zero_warning_output_is_failure, true);
+    assert.match(
+      response.output.runner_output.execution_contract.output_quality_policy.required_runner_action,
+      /Every changed test file must be exercised by a required command/u,
+    );
     assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.applies_to, [
       "required_commands",
       "verification_expectations.primary_commands",
@@ -1667,7 +1822,127 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.target_write_allowed, false);
     assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.writeback_allowed, false);
     assert.equal(readOnlyResponse.output.runner_output.execution_contract.final_report.require_diff_or_patch_evidence, false);
+    assert.deepEqual(readOnlyResponse.output.runner_output.execution_contract.required_commands, []);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.repair_closure_policy, undefined);
   });
+});
+
+test("provider input snapshot keeps v1 work packets replay-readable", () => {
+  withTempRepo((repoRoot) => {
+    const executionRoot = path.join(repoRoot, "replay-workspace");
+    const canonicalPacketFile = path.join(repoRoot, ".aor", "replay", "provider-work-packet.json");
+    fs.mkdirSync(executionRoot, { recursive: true });
+    fs.mkdirSync(path.dirname(canonicalPacketFile), { recursive: true });
+    const result = materializeProviderInputSnapshot({
+      providerWorkPacket: {
+        packet_kind: "aor-provider-work-packet",
+        version: 1,
+        resolved_local_refs: [],
+        execution_contract: { required_commands: ["npm test"] },
+      },
+      canonicalPacketFile,
+      executionRoot,
+      projectRoot: repoRoot,
+    });
+    assert.equal(result.packet.version, 1);
+    assert.deepEqual(result.packet.execution_contract.required_commands, ["npm test"]);
+  });
+});
+
+test("provider work packet blocks an unlisted required command before spawn", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const executionRoot = path.join(repoRoot, "disposable");
+    const handoffPacketFile = path.join(evidenceRoot, "handoff-invalid.json");
+    const spawnedMarker = path.join(repoRoot, "runner-spawned.txt");
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.mkdirSync(executionRoot, { recursive: true });
+    fs.writeFileSync(handoffPacketFile, JSON.stringify({
+      verification_expectations: { primary_commands: ["npm test"] },
+    }), "utf8");
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(spawnedMarker)},'spawned')`],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: { message: "Open {provider_work_packet_path}.", argument: "--work-packet" },
+      }),
+    });
+    assert.throws(
+      () => adapter.execute({
+        request_id: "req-invalid-required-command",
+        run_id: "run-invalid-required-command",
+        step_id: "step-invalid-required-command",
+        step_class: "implement",
+        route: { resolved_route_id: "route.implement.default" },
+        asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+        policy_bundle: {
+          policy: { policy_id: "policy.step.runner.default" },
+          resolved_bounds: { command_constraints: { allowed_commands: ["npm run build"] } },
+        },
+        dry_run: false,
+        context: {
+          execution_permissions: { target_write_allowed: true, meaningful_change_required: true },
+          required_inputs_resolved: {
+            packets: {
+              required: [{
+                packet: "handoff_packet",
+                required: true,
+                resolved_ref: "evidence://.aor/projects/adapter-test/reports/handoff-invalid.json",
+              }],
+            },
+          },
+        },
+      }),
+      /provider_work_packet_construction_failed.*subset of allowed_commands/u,
+    );
+    assert.equal(fs.existsSync(spawnedMarker), false);
+  });
+});
+
+test("provider work packet resolves mission commands to exact environment-qualified allowlist entries", () => {
+  const result = resolveProviderCommandRoles({
+    envelope: {
+      verification_expectations: {
+        primary_commands: ["npx xo", "npm run build", "npx ava test/headers.ts"],
+      },
+    },
+    resolvedLocalRefs: [],
+    repairWorkContext: null,
+    allowedCommands: [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+      "CI=1 npx ava test/headers.ts",
+    ],
+    targetWriteAllowed: true,
+  });
+
+  assert.deepEqual(result.requiredCommands, [
+    "CI=1 npx xo",
+    "CI=1 npm run build",
+    "CI=1 npx ava test/headers.ts",
+  ]);
+});
+
+test("provider work packet does not treat arbitrary command wrappers as environment qualification", () => {
+  assert.throws(
+    () => resolveProviderCommandRoles({
+      envelope: {
+        verification_expectations: { primary_commands: ["npx xo"] },
+      },
+      resolvedLocalRefs: [],
+      repairWorkContext: null,
+      allowedCommands: ["echo npx xo"],
+      targetWriteAllowed: true,
+    }),
+    /provider_work_packet_construction_failed.*unlisted commands: npx xo/u,
+  );
 });
 
 test("live adapter repair request-artifact packet includes repair closure policy", () => {
@@ -1755,7 +2030,7 @@ test("live adapter repair request-artifact packet includes repair closure policy
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'repair packet ok',",
-            "output:{roles:packet.resolved_local_refs.map(ref=>ref.role),repair_context:packet.repair_context,repair_policy:packet.execution_contract.repair_closure_policy},",
+            "output:{roles:packet.resolved_local_refs.map(ref=>ref.role),repair_context:packet.repair_context,repair_policy:packet.execution_contract.repair_closure_policy,execution_contract:packet.execution_contract},",
             "evidence_refs:['evidence://adapter-live/claude-code/repair-packet']",
             "}));",
           ].join(""),
@@ -1777,11 +2052,24 @@ test("live adapter repair request-artifact packet includes repair closure policy
       step_class: "implement",
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
-      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      policy_bundle: {
+        policy: { policy_id: "policy.step.runner.default" },
+        resolved_bounds: {
+          command_constraints: { allowed_commands: ["npx ava test/headers.ts"] },
+        },
+      },
       dry_run: false,
       context: {
         compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
         compiled_context_file: compiledContextFile,
+        execution_permissions: {
+          execution_allowed: true,
+          writeback_allowed: false,
+          target_write_allowed: true,
+          direct_edits_allowed: true,
+          meaningful_change_required: true,
+          delivery_mode: "patch-only",
+        },
         runtime_evidence_refs: [
           "evidence://.aor/projects/adapter-test/reports/review-decision-request-repair.json",
         ],
@@ -1797,6 +2085,8 @@ test("live adapter repair request-artifact packet includes repair closure policy
       "npx ava test/headers.ts",
     );
     assert.equal(response.output.runner_output.repair_policy.required, true);
+    assert.deepEqual(response.output.runner_output.execution_contract.required_commands, ["npx ava test/headers.ts"]);
+    assert.equal(response.output.runner_output.execution_contract.command_execution_policy.retries_after_sandbox_denial, 0);
     assert.equal(response.output.runner_output.repair_policy.must_address_each_unresolved_finding, true);
     assert.equal(
       response.output.runner_output.repair_policy.unresolved_finding_details[0].finding_id,
@@ -2441,6 +2731,149 @@ test("live adapter turns Qwen stream-json events into sanitized provider progres
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
+});
+
+test("live adapter records passing and warning session budgets without changing terminal success", () => {
+  for (const scenario of [
+    { assistantTurns: 1, warnAfter: 2, maxTurns: 3, expectedStatus: "pass" },
+    { assistantTurns: 2, warnAfter: 2, maxTurns: 3, expectedStatus: "warn" },
+    { assistantTurns: 2, warnAfter: 1, maxTurns: 2, expectedStatus: "warn" },
+  ]) {
+    const events = [
+      ...Array.from({ length: scenario.assistantTurns }, () => ({
+        type: "assistant",
+        message: { content: [{ type: "text", text: "bounded private provider output" }] },
+      })),
+      { type: "result", subtype: "success" },
+    ];
+    const script = `for (const event of ${JSON.stringify(events)}) process.stdout.write(JSON.stringify(event) + '\\n');`;
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", script, "--", "--output-format", "stream-json"],
+        handler: null,
+        sessionBudget: {
+          schema_version: 1,
+          warn_after_assistant_turns: scenario.warnAfter,
+          max_assistant_turns: scenario.maxTurns,
+          max_tool_calls: 4,
+          termination_grace_ms: 50,
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: `req-session-${scenario.expectedStatus}`,
+      run_id: `run-session-${scenario.expectedStatus}`,
+      step_id: `step-session-${scenario.expectedStatus}`,
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: {},
+      policy_bundle: {},
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.session_budget.status, scenario.expectedStatus);
+    assert.equal(
+      response.output.external_runner.session_budget.observed.assistant_turns,
+      scenario.assistantTurns,
+    );
+    assert.equal(response.output.external_runner.session_budget.exhausted_dimension, null);
+  }
+});
+
+test("live adapter stops and classifies assistant-turn session budget exhaustion", () => {
+  const script = [
+    "process.on('SIGTERM', () => {});",
+    "for (let index = 0; index < 3; index += 1) {",
+    "  process.stdout.write(JSON.stringify({type:'assistant',message:{content:[{type:'text',text:'secret turn payload'}]}}) + '\\n');",
+    "}",
+    "setInterval(() => {}, 1000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", script, "--", "--output-format", "stream-json"],
+      timeoutMs: 5000,
+      handler: null,
+      sessionBudget: {
+        schema_version: 1,
+        warn_after_assistant_turns: 1,
+        max_assistant_turns: 2,
+        max_tool_calls: 8,
+        termination_grace_ms: 50,
+      },
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-session-assistant-exhausted",
+    run_id: "run-session-assistant-exhausted",
+    step_id: "step-session-assistant-exhausted",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: {},
+    policy_bundle: {},
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "provider_session_budget_exceeded");
+  assert.equal(response.output.external_runner.timed_out, false);
+  assert.equal(response.output.external_runner.session_budget.status, "exceeded");
+  assert.equal(response.output.external_runner.session_budget.exhausted_dimension, "assistant_turns");
+  assert.equal(response.output.external_runner.session_budget.termination.graceful_signal, "SIGTERM");
+  assert.equal(response.output.external_runner.session_budget.termination.forced_signal, "SIGKILL");
+  assert.doesNotMatch(JSON.stringify(response.output.external_runner.provider_progress_events), /secret turn payload/u);
+});
+
+test("live adapter stops and classifies tool-call session budget exhaustion", () => {
+  const script = [
+    "process.stdout.write(JSON.stringify({",
+    "  type:'assistant',",
+    "  message:{content:[",
+    "    {type:'tool_use',name:'Read',input:{file_path:'/private/one'}},",
+    "    {type:'tool_use',name:'Read',input:{file_path:'/private/two'}}",
+    "  ]}",
+    "}) + '\\n');",
+    "setInterval(() => {}, 1000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", script, "--", "--output-format", "stream-json"],
+      timeoutMs: 5000,
+      handler: null,
+      sessionBudget: {
+        schema_version: 1,
+        warn_after_assistant_turns: 2,
+        max_assistant_turns: 4,
+        max_tool_calls: 1,
+        termination_grace_ms: 50,
+      },
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-session-tools-exhausted",
+    run_id: "run-session-tools-exhausted",
+    step_id: "step-session-tools-exhausted",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: {},
+    policy_bundle: {},
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "provider_session_budget_exceeded");
+  assert.equal(response.output.external_runner.session_budget.exhausted_dimension, "tool_calls");
+  assert.equal(response.output.external_runner.session_budget.observed.tool_calls, 2);
+  assert.doesNotMatch(JSON.stringify(response.output.external_runner.provider_progress_events), /private\/one/u);
 });
 
 test("live adapter keeps malformed Qwen stream JSONL out of public runner output", () => {

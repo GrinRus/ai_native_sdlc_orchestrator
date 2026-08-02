@@ -773,6 +773,9 @@ function resolveAssessmentReadiness(runSummary, observationReport, runHealthRepo
   if (failureClass === "compiled_context_budget_exceeded") {
     issues.push("flow stopped at context-budget guardrail before outcome artifacts were produced");
   }
+  if (failureClass === "provider_session_budget_exceeded") {
+    issues.push("flow stopped at provider session-budget guardrail before outcome artifacts were produced");
+  }
   return {
     ok: issues.length === 0,
     runHealthStatus,

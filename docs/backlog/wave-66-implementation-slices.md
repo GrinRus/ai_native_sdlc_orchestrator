@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S17 -> W66-S18 -> W66-S19 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -591,6 +591,673 @@ installed-console gates are trustworthy.
 
 - Security scanning, real provider execution, upstream writes, and publication.
 
+## W66-S10 — Non-repair review warning approval compatibility
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-5
+- **State:** done
+- **Outcome:** Public review decisions permit an operator to approve a bounded
+  review warning that recommends proceeding, while repair, human-review, failed
+  finding, and failed Runtime Harness outcomes remain fail-closed.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** `docs/contracts/review-decision.md`,
+  `packages/observability/**`, public review-decision CLI regressions, guided
+  live-E2E compatibility tests
+- **Hard dependencies:** W66-S08
+- **Primary user story surfaces:** DEV-05, DTX-01, OPS-06
+
+### Local tasks
+
+1. **Approval compatibility contract**
+   - Purpose: Align the public review-decision gate with the documented
+     non-repair warning semantics already used by the live lifecycle.
+   - Changes: Define delivery-compatible review evidence as `pass`, or `warn`
+     plus `proceed` with no failed review finding; preserve the original review
+     verdict in the decision basis.
+   - Validation: Contract documentation and generated decisions agree without a
+     schema or wire-format change.
+2. **Fail-closed decision implementation**
+   - Purpose: Permit bounded operator acknowledgement without weakening repair
+     and Runtime Harness gates.
+   - Changes: Evaluate review status, recommendation, failed findings, and
+     Runtime Harness outcome together before materializing `approve`.
+   - Validation: `repair`, `required-human-review`, failed findings, unknown
+     states, and non-passing Runtime Harness outcomes remain blocked.
+3. **Guided lifecycle regression and qualification restart**
+   - Purpose: Close the exact delivery blocker discovered by the installed
+     guided W66-S09 baseline.
+   - Changes: Add focused positive and negative regressions, run repository
+     gates, and invalidate the pre-fix qualification manifest and run evidence.
+   - Validation: The public approve path accepts the retained non-repair warning
+     shape, the slice gate passes, and W66-S09 restarts on the fix commit.
+
+### Acceptance criteria
+
+1. A `warn` review with `review_recommendation=proceed`, no failed finding, and
+   a passing Runtime Harness may materialize an `approve` decision.
+2. The decision basis retains `review_overall_status=warn`; no consumer
+   misrepresents the review as `pass`.
+3. Repair, required-human-review, failed finding, unknown, and failed Runtime
+   Harness inputs cannot produce approval.
+4. Public contracts and wire formats remain backward-compatible.
+5. Focused tests, `pnpm check`, and `pnpm slice:gate -- W66-S10` pass without a
+   provider call.
+6. All pre-fix W66-S09 evidence is diagnostic only and qualification restarts
+   from deterministic baseline on the new commit.
+
+### Done evidence
+
+- Review-decision contract clarification and focused positive/negative tests.
+- Public lifecycle compatibility regression.
+- W66-S10 slice gate and new qualification commit.
+
+### Out of scope
+
+- Weakening review findings, auto-approving warnings, target-source repair,
+  provider/profile changes, large provider execution, or production clearance.
+
+## W66-S11 — Bounded external-provider session convergence
+
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Streaming external providers have a versioned, runner-agnostic
+  post-spawn session budget that stops non-converging execution before provider
+  context overflow while preserving truthful provider-owned failure evidence.
+- **Delivery priority:** P0
+- **Estimated effort:** M
+- **Primary modules:** adapter capability and step-result contracts,
+  `packages/adapter-sdk/**`, Claude adapter profile, private live-E2E run-health
+  contracts/tests
+- **Hard dependencies:** W66-S10
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Versioned session-budget contract**
+   - Purpose: Separate initial work-packet size from post-spawn provider
+     convergence without changing adapters that omit the new policy.
+   - Changes: Define the optional version-1 assistant-turn/tool-call budget,
+     positive-bound validation, versioned external-runner report, and
+     `provider_session_budget_exceeded` failure semantics.
+   - Validation: Positive, negative, omitted-policy, and unknown-future-field
+     fixtures prove backward compatibility and fail-closed validation.
+2. **Runner-agnostic stream supervision**
+   - Purpose: Stop a non-converging external process before its provider context
+     window is exhausted.
+   - Changes: Count sanitized assistant and tool events, persist warning status,
+     terminate the complete process tree at a hard bound, and preserve bounded
+     partial evidence without provider payloads.
+   - Validation: Fake streams cover pass, warn, assistant/tool exhaustion,
+     terminal-boundary completion, graceful and forced termination, timeout,
+     cancellation, malformed JSONL, and secret redaction.
+3. **Claude convergence profile**
+   - Purpose: Give AOR observable Claude progress and a concrete convergence
+     envelope without weakening model effort or host authentication.
+   - Changes: Use verbose stream JSON, bounded built-in tools, disabled optional
+     interactive integrations, numeric turn/tool guardrails, and one directed
+     implementation pass while retaining `--effort high`.
+   - Validation: Adapter profile tests prove host-auth compatibility, exact
+     stream mode, bounded tool surface, session limits, and no `--bare`.
+4. **Run-health and assessment fail-closed behavior**
+   - Purpose: Keep early AOR supervision distinct from timeout, cancellation,
+     compiled packet overflow, provider context overflow, and product quality.
+   - Changes: Project the session report through step result and private
+     run-health, classify hard exhaustion as provider-owned, and block final
+     assessment for partial execution.
+   - Validation: Focused controller, run-health, and quality-assessment
+     regressions preserve owner/phase/class and compatibility.
+5. **Deterministic closure and qualification reset**
+   - Purpose: Land the behavior change before any new paid proof and restart W66
+     qualification from a clean commit.
+   - Changes: Run repository/package/browser/install gates, close W66-S11,
+     invalidate earlier W66-S09 evidence, and freeze a new manifest only after
+     the slice commit.
+   - Validation: `pnpm slice:gate -- W66-S11` passes, W66-S09 becomes active
+     again, and no live provider call occurs before the behavior commit.
+
+### Acceptance criteria
+
+1. Profiles without `session_budget` retain their existing behavior.
+2. Configured streaming providers expose sanitized warning and terminal budget
+   evidence with no prompt, tool payload, transcript, credential, or runner-home
+   leakage.
+3. Exceeding an assistant-turn or tool-call hard limit stops the entire process
+   tree and returns `provider_session_budget_exceeded`.
+4. Timeout, operator cancellation, compiled-context overflow, and
+   provider-reported context overflow keep their existing distinct classes.
+5. Claude uses verbose stream JSON, host auth, high effort, bounded built-in
+   tools, and the declared 24/32/96 convergence envelope.
+6. Focused tests, `pnpm quality:ratchet`, `pnpm check`, browser/package/install
+   gates, and `pnpm slice:gate -- W66-S11` pass without a paid provider call.
+7. All qualification evidence from before the W66-S11 behavior commit is
+   diagnostic only.
+
+### Done evidence
+
+- Versioned adapter/step-result/run-health contract and validation fixtures.
+- External supervisor and Claude profile regressions.
+- Deterministic repository/package/browser/install gate results.
+- W66-S11 slice gate and the new qualification behavior commit.
+
+### Out of scope
+
+- Changing provider authentication, lowering Claude effort, target-source
+  repair, large provider execution, four-cell closure, or production clearance.
+
+## W66-S12 — Resumable immutable browser-evidence reconciliation
+
+- **Epic:** EPIC-0, EPIC-1, EPIC-7
+- **State:** done
+- **Outcome:** Re-entering a terminal guided flow reuses only a freshly
+  revalidated content-addressed browser evidence index, so an already passing
+  installed proof cannot be lost or silently trusted during resume.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** private guided browser collector, immutable browser proof
+  validation, live-E2E resume regressions
+- **Hard dependencies:** W66-S11
+- **Primary user story surfaces:** PBO-09, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Resume-safe collector reconciliation**
+   - Purpose: Preserve immutable browser proof identity when the terminal
+     controller rebuilds guided stage results.
+   - Changes: Reload the prior collector record only when its request, proof,
+     content-addressed index, and referenced objects can all be revalidated.
+   - Validation: A terminal resume retains the exact index and passing proof
+     without rerunning the browser collector.
+2. **Fail-closed tamper handling**
+   - Purpose: Prevent a stale collector status from authorizing changed evidence.
+   - Changes: Recompute the index digest, require the digest-derived filename,
+     and return `not_pass` when index or object validation fails.
+   - Validation: Digest, filename, object, run, scenario, and freshness
+     mismatches remain non-passing.
+3. **Qualification reset**
+   - Purpose: Keep the W66 matrix attributable to one behavior commit.
+   - Changes: Close W66-S12 after deterministic gates, invalidate the attempted
+     W66-S11 guided baseline, and freeze a new manifest before any provider call.
+   - Validation: W66-S09 returns to active only after the S12 commit; installed
+     baseline and both medium cells restart on that immutable commit.
+
+### Acceptance criteria
+
+1. Existing schema-version-2 browser proof is never accepted from a cached
+   collector status alone.
+2. Valid immutable evidence survives repeated terminal controller evaluation
+   with the original content-addressed index.
+3. Mutated or missing evidence fails closed and does not produce a guided
+   journey proof.
+4. Focused live-E2E tests, repository gates, and
+   `pnpm slice:gate -- W66-S12` pass before qualification restarts.
+5. The attempted guided run on `fec5e8d5` remains diagnostic only.
+
+### Done evidence
+
+- Resume and tamper regression tests.
+- Deterministic gate results and W66-S12 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Provider policy changes, target repair, large provider execution, four-cell
+  closure, or production clearance.
+
+## W66-S13 — Stream auth telemetry classification
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Successful streaming provider initialization metadata cannot be
+  misclassified as an authentication failure merely because it names the
+  provider's API-key source field.
+- **Delivery priority:** P0
+- **Estimated effort:** XS
+- **Primary modules:** adapter failure classifier, live-adapter preflight,
+  streaming auth regression tests
+- **Hard dependencies:** W66-S12
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Boundary-aware auth matching**
+   - Purpose: Distinguish real API-key errors from successful stream telemetry.
+   - Changes: Require a complete `api key`, `api_key`, or `api-key` token rather
+     than matching arbitrary identifiers such as `apiKeySource`.
+   - Validation: Successful Claude init/result JSONL passes preflight while
+     explicit missing, invalid, and expired key errors remain `auth-failed`.
+2. **Qualification reset**
+   - Purpose: Keep the W66 qualification set attributable to one behavior commit.
+   - Changes: Preserve the failed Anthropic preflight and every earlier S12 run
+     as diagnostic evidence, close S13 through deterministic gates, then freeze
+     and rerun the installed baseline and both medium cells.
+   - Validation: No pre-S13 result can enter the final qualification matrix.
+
+### Acceptance criteria
+
+1. Stream metadata containing `apiKeySource` cannot create a false auth failure.
+2. Real API-key error messages retain provider-owned `auth-failed`
+   classification.
+3. Adapter and live-E2E focused tests plus `pnpm slice:gate -- W66-S13` pass
+   without a paid provider call.
+4. W66-S09 returns to active only after the S13 behavior commit.
+
+### Done evidence
+
+- Boundary-aware failure-classification tests.
+- Deterministic gate results and W66-S13 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Provider credentials, target repair, large provider execution, four-cell
+  closure, or production clearance.
+
+## W66-S14 — Repair closure warning approval parity
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Public repair closure applies the same reviewed warning
+  eligibility as review approval, so a refreshed non-blocking warning cannot
+  strand an otherwise passing repair lifecycle before delivery.
+- **Delivery priority:** P0
+- **Estimated effort:** XS
+- **Primary modules:** review decision eligibility, public repair closure,
+  observability and guided lifecycle regressions
+- **Hard dependencies:** W66-S13
+- **Primary user story surfaces:** DEV-05, DTX-01, OPS-06
+
+### Local tasks
+
+1. **Single warning-approval predicate**
+   - Purpose: Remove semantic drift between review approval and repair closure.
+   - Changes: Reuse one predicate for `pass` reviews and bounded `warn` reviews
+     that recommend `proceed` and contain no failed finding.
+   - Validation: Repair closure accepts the same warning report that an approve
+     decision accepts, while repair/human-review/failed-finding outcomes remain
+     blocked.
+2. **Qualification reset**
+   - Purpose: Keep the W66 matrix attributable to one behavior commit.
+   - Changes: Preserve the failed S13 guided delivery as diagnostic evidence,
+     close S14 through deterministic gates, then freeze and rerun the installed
+     baseline and both medium cells.
+   - Validation: No pre-S14 result enters the final qualification matrix.
+
+### Acceptance criteria
+
+1. Review approval and repair closure cannot disagree on bounded warning
+   eligibility.
+2. A warning with `repair`, `required-human-review`, or a failed finding remains
+   blocked.
+3. Focused observability/CLI/live-E2E tests and
+   `pnpm slice:gate -- W66-S14` pass without a paid provider call.
+4. W66-S09 returns to active only after the S14 behavior commit.
+
+### Done evidence
+
+- Shared warning-eligibility regression tests.
+- Deterministic gate results and W66-S14 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Target repair policy, provider credentials, large provider execution,
+  four-cell closure, or production clearance.
+
+## W66-S15 — Structured stream failure-signal classification
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Successful structured provider streams cannot be misclassified
+  from auth-like vocabulary in ordinary assistant output, while stderr and
+  explicit structured failure events retain precise failure classification.
+- **Delivery priority:** P0
+- **Estimated effort:** XS
+- **Primary modules:** adapter failure classification, live-adapter preflight,
+  structured-stream regressions
+- **Hard dependencies:** W66-S14
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Failure-relevant stream projection**
+   - Purpose: Prevent normal provider output from becoming a false auth signal.
+   - Changes: When stdout is a structured JSONL stream, classify only explicit
+     error/failure events; continue to classify stderr and process errors.
+   - Validation: Successful system, assistant, and result events may mention
+     auth documentation without changing the successful preflight verdict.
+2. **Compatibility and qualification reset**
+   - Purpose: Preserve existing behavior outside structured provider streams
+     and keep qualification attributable to one behavior commit.
+   - Changes: Retain plain/buffered output classification and explicit
+     structured error classification; invalidate all S14 qualification evidence
+     and restart the installed baseline and medium cells after S15 closes.
+   - Validation: Focused adapter and live-preflight regressions pass before any
+     paid provider call, and no pre-S15 result enters the qualification matrix.
+
+### Acceptance criteria
+
+1. Auth-like text in a successful structured stream does not produce
+   `auth-failed`.
+2. Explicit structured failure events, stderr, timeout, cancel, and session
+   budget failures retain their existing classifications.
+3. Buffered JSON and plain-text adapters retain compatibility.
+4. Focused adapter/live-E2E tests and `pnpm slice:gate -- W66-S15` pass without
+   a paid provider call.
+5. W66-S09 returns to active only after the S15 behavior commit.
+
+### Done evidence
+
+- Structured success/failure classification regressions.
+- Deterministic gate results and W66-S15 slice gate.
+- New qualification behavior commit and frozen manifest.
+
+### Out of scope
+
+- Provider prompt policy, target repair policy, large provider execution,
+  four-cell closure, or production clearance.
+
+## W66-S16 — Provider work-packet command-role separation
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Provider work packets distinguish commands the provider may run
+  from the mission verification it must run, while controller-owned readiness
+  and diagnostics cannot be promoted into provider repair obligations.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** provider work-packet contract and materialization,
+  generated project profiles, handoff command policy, repair regressions
+- **Hard dependencies:** W66-S15
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Versioned provider work-packet contract**
+   - Purpose: Make provider command roles explicit and spawn-safe.
+   - Changes: Emit work-packet v2 with separate `allowed_commands` and
+     `required_commands`, require the required set to be a subset of the
+     allowlist, retain v1 replay compatibility, and keep diagnostics
+     controller-owned.
+   - Validation: Invalid command-role packets fail before provider spawn as an
+     AOR-owned construction error; v1 evidence remains readable.
+2. **Generated command-role materialization**
+   - Purpose: Prevent readiness setup from reappearing as mission lint or repair
+     work.
+   - Changes: Keep setup only in the generic readiness command group; expose
+     ordered primary lint/build/test commands through repo and handoff surfaces;
+     reuse completed preflight setup in repair workspaces.
+   - Validation: Generated packets never list package installation as required
+     verification and preserve primary command order and CI environment.
+3. **Bounded repair guardrails**
+   - Purpose: Converge repair without parallel setup, verification, or sandbox
+     workarounds.
+   - Changes: Instruct every adapter to perform one focused repair pass, execute
+     only required commands sequentially, and return bounded environment-limited
+     evidence after `EPERM` or `EACCES` instead of retrying or installing.
+   - Validation: Codex, Claude, OpenCode, and Qwen receive equivalent semantics;
+     timeout, cancel, session-budget, and context-overflow classifications remain
+     unchanged.
+4. **Deterministic closure and qualification reset**
+   - Purpose: Establish a clean behavior commit before any paid provider call.
+   - Changes: Run focused, repository, browser, package, and neutral-install
+     gates; close S16; invalidate all qualification evidence on `b324a231`; then
+     freeze a new manifest.
+   - Validation: `pnpm slice:gate -- W66-S16` passes, S16 is complete, and S09
+     returns to active only on the new behavior commit.
+
+### Acceptance criteria
+
+1. Runtime-created provider work packets use version 2 and v1 packets remain
+   replay-readable.
+2. `required_commands` contains ordered mission-primary verification only and is
+   a subset of `allowed_commands`; invalid packets block before spawn.
+3. Readiness setup and diagnostics remain controller-owned and package install
+   is absent from generated repo lint and repair-required commands.
+4. Repair starts with failed focused verification, runs commands sequentially,
+   and records sandbox denial without retry, install, or target workaround.
+5. Provider adapters retain packet parity and Codex remains in
+   `workspace-write` sandbox.
+6. Focused tests, `pnpm quality:ratchet`, `pnpm check`, browser/package/install
+   gates, and `pnpm slice:gate -- W66-S16` pass without a paid provider call.
+7. The guided blocker `w66-s15-guided-b324a231-r3-20260729` remains diagnostic
+   only, and every qualification result on `b324a231` is invalid for the new
+   matrix.
+
+### Done evidence
+
+- Provider work-packet v2 contract and v1 replay compatibility tests.
+- Generated profile, handoff, repair, sandbox-limitation, and adapter-parity
+  regressions.
+- Deterministic gate results, closed W66-S16 slice, and new frozen behavior
+  manifest.
+
+### Out of scope
+
+- Provider timeout increases, session-budget changes, guided diagnostic timeout
+  changes, large provider execution, four-cell closure, or production clearance.
+
+## W66-S17 — Environment-qualified provider command identity
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** Mission-primary verification commands resolve to their exact
+  allowlisted environment-qualified form before provider work-packet subset
+  validation, so real generated profiles can spawn without weakening the v2
+  command boundary.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** provider work-packet command-role resolution, adapter
+  contract tests, live-E2E generated command parity
+- **Hard dependencies:** W66-S16
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06
+
+### Local tasks
+
+1. **Command identity contract clarification**
+   - Purpose: Preserve exact v2 subset enforcement while allowing the
+     controller to add reviewed environment assignments to mission commands.
+   - Changes: Define command identity as the command after leading shell
+     environment assignments only, and require emitted commands to use the
+     exact matching allowlist entry.
+   - Validation: `npx xo` resolves to `CI=1 npx xo`; arbitrary wrappers such as
+     `echo npx xo` remain non-equivalent and block before spawn.
+2. **Provider packet materialization repair**
+   - Purpose: Align real generated Ky profiles with mission-primary command
+     requirements.
+   - Changes: Resolve primary and focused repair commands against the ordered
+     policy allowlist before constructing `required_commands`; keep readiness,
+     diagnostics, command order, and provider-neutral behavior unchanged.
+   - Validation: The guided command set produces an exact
+     `required_commands subset allowed_commands` packet with its `CI=1`
+     environment preserved.
+3. **Deterministic closure and qualification reset**
+   - Purpose: Replace the failed frozen behavior commit before another paid
+     provider attempt.
+   - Changes: Record
+     `w66-s16-guided-e8d8e270-r1-20260802` as diagnostic AOR-owned evidence,
+     run focused/root/browser/package/install gates, close S17, and freeze a
+     new manifest.
+   - Validation: `pnpm slice:gate -- W66-S17` passes and W66-S09 returns to
+     active only on the new behavior commit.
+
+### Acceptance criteria
+
+1. Environment-qualified allowlist entries satisfy equivalent mission-primary
+   commands without changing the work-packet v2 schema.
+2. `required_commands` contains only exact strings present in
+   `allowed_commands`, in mission order, with controller-provided environment
+   assignments preserved.
+3. Non-environment wrappers, setup commands, diagnostics, and unlisted commands
+   cannot enter `required_commands`.
+4. Codex, Claude, OpenCode, and Qwen retain identical packet semantics.
+5. Focused tests and `pnpm slice:gate -- W66-S17` pass without another paid
+   provider call.
+6. Qualification evidence on `e8d8e270` is diagnostic only and the next guided
+   baseline starts from a fresh frozen commit and workspace.
+
+### Done evidence
+
+- Environment-qualified command identity and negative wrapper regressions.
+- Deterministic gate results, closed W66-S17 slice, and replacement frozen
+  qualification manifest.
+
+### Out of scope
+
+- Provider/session/diagnostic timeout changes, sandbox relaxation, large
+  provider execution, four-cell closure, or production clearance. If guided
+  diagnostic timeout alignment is later required, it becomes W66-S18.
+
+## W66-S18 — Guided diagnostic timeout alignment
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** The installed Ky guided qualification profile gives the complete
+  non-blocking diagnostic suite a realistic aggregate allowance without
+  weakening per-command bounds, cleanup, or product acceptance policy.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** private guided live-E2E profile, timeout resolver tests,
+  live-E2E operator runbook
+- **Hard dependencies:** W66-S17
+- **Primary user story surfaces:** DEV-04, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Diagnostic evidence disposition**
+   - Purpose: Preserve the successful provider and primary evidence while
+     preventing a timed-out diagnostic run from entering qualification.
+   - Changes: Record `w66-s17-guided-b762eb46-r1-20260802` as diagnostic-only
+     evidence with `run_health=warn`, owned by the target-repository diagnostic
+     phase, and invalidate all qualification evidence on `b762eb46`.
+   - Validation: Medium cells remain not run and W66-S09 stays blocked until a
+     new behavior commit is frozen.
+2. **Private aggregate timeout alignment**
+   - Purpose: Allow the complete Ky suite, already observed to exceed 600
+     seconds, to finish without changing provider execution policy.
+   - Changes: Raise only
+     `live_e2e.guided_warn_diagnostic_timeout_sec` from 600 to 1800 for the
+     installed guided profile; keep the per-command timeout, warning failure
+     mode, process-group cleanup, and default policy unchanged.
+   - Validation: A synthetic duration above 600 seconds is within the profile
+     allowance, while a lower target-command bound still caps the aggregate
+     timeout.
+3. **Deterministic closure and qualification reset**
+   - Purpose: Establish a clean behavior commit before another provider call.
+   - Changes: Run focused timeout/profile tests, root/browser/package/install
+     gates, close S18, sync readiness, and freeze a replacement manifest.
+   - Validation: `pnpm slice:gate -- W66-S18` passes without a paid provider
+     call and W66-S09 returns to active only after the new commit is frozen.
+
+### Acceptance criteria
+
+1. The installed guided Ky profile uses an 1800-second aggregate warning
+   diagnostic timeout while the repository default remains 120 seconds.
+2. Per-command timeout capping, hard-timeout classification, and descendant
+   process cleanup remain intact.
+3. A complete diagnostic suite taking more than 600 seconds can finish within
+   the explicit profile allowance.
+4. The previous guided run remains diagnostic only and no medium or large
+   provider cell runs before S18 closes.
+5. Focused tests and all deterministic slice gates pass.
+
+### Done evidence
+
+- Profile-specific timeout-resolution regression and existing hard-timeout,
+  run-health, and process-group cleanup regressions.
+- Deterministic gate results, closed W66-S18 slice, and replacement frozen
+  qualification manifest.
+
+### Out of scope
+
+- Provider/session-budget changes, sandbox relaxation, product API or wire
+  changes, large provider execution, four-cell closure, or production
+  clearance.
+
+## W66-S19 — Provider verification-scope convergence
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** External providers keep test changes inside the surface exercised
+  by mission-primary commands, while the private controller preserves public
+  review approval semantics and attributes verification-mapping blockers before
+  delivery.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** provider work-packet instructions, Ky small-canary
+  contract, private review gate and run-health classification, adapter/live-E2E
+  regressions
+- **Hard dependencies:** W66-S18
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Diagnostic evidence disposition**
+   - Purpose: Preserve the completed provider execution without accepting an
+     unverified broad target diff.
+   - Changes: Record `w66-s18-guided-5bee6927-r1-20260802` as diagnostic-only;
+     its provider, primary verification, Runtime Harness, and QA passed, but
+     delivery correctly blocked because four changed test files were outside
+     the mission-primary AVA command.
+   - Validation: No browser, medium, or large result from `5bee6927` counts
+     toward qualification and W66-S09 remains blocked during S19.
+2. **Verification-scope provider guardrail**
+   - Purpose: Prevent a provider from creating review-blocking test evidence it
+     is contractually forbidden to execute.
+   - Changes: Strengthen the runner-agnostic provider work-packet and all
+     adapter launcher instructions: every changed test file must be exercised
+     by `required_commands`; otherwise the provider must avoid that edit or
+     return a bounded scope-mismatch report. Clarify the Ky header canary to
+     keep test changes in `test/headers.ts`.
+   - Validation: Codex, Claude, OpenCode, and Qwen share the same instruction;
+     setup and diagnostics remain controller-owned and packet v2 stays
+     backward-compatible.
+3. **Review-owner fidelity**
+   - Purpose: Stop before an impossible public approve call and retain the
+     actual provider-quality owner.
+   - Changes: Align private delivery eligibility with the public review gate:
+     `warn` is delivery-compatible only with `review_recommendation=proceed`
+     and no failed finding. Map a primary-pass verification warning with
+     `required-human-review` to provider-owned `verification_mapping_gap`.
+   - Validation: The controller never calls public approve for human-review
+     evidence; genuine bounded `warn+proceed` remains compatible.
+4. **Deterministic closure and qualification reset**
+   - Purpose: Establish a new immutable behavior commit before another paid
+     run.
+   - Changes: Run focused adapter/catalog/controller tests, root/browser/
+     package/install gates, close S19, sync readiness, and freeze a replacement
+     W66 manifest.
+   - Validation: `pnpm slice:gate -- W66-S19` passes without provider calls and
+     W66-S09 returns to active only after the new commit is frozen.
+
+### Acceptance criteria
+
+1. Provider-facing instructions forbid changed test files not exercised by
+   ordered mission-primary `required_commands`.
+2. The Ky small header canary explicitly limits test edits to
+   `test/headers.ts`; source changes remain governed by lint and build.
+3. `warn+required-human-review` cannot reach public approve and preserves
+   provider/review/`verification_mapping_gap` classification.
+4. `warn+proceed`, no failed finding, and passing Runtime Harness retain the
+   W66-S10 approval compatibility.
+5. Packet version, session budget, timeout, sandbox, public review contract,
+   and large profiles are unchanged.
+6. Focused and deterministic slice gates pass before another paid provider
+   call.
+
+### Done evidence
+
+- Adapter parity and verification-scope instruction regressions.
+- Review eligibility and owner-classification regressions for proceed,
+  human-review, repair, and failed findings.
+- Deterministic gate results, closed W66-S19 slice, and replacement frozen
+  qualification manifest.
+
+### Out of scope
+
+- Auto-approving human-review evidence, dynamically executing provider-chosen
+  commands, target-source repair, provider timeout changes, large provider
+  execution, four-cell closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -602,7 +1269,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S08
+- **Hard dependencies:** W66-S19
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
@@ -641,6 +1308,111 @@ installed-console gates are trustworthy.
      dispositions, residual limitations, and readiness/backlog updates.
    - Validation: All four cells pass, the ledger-derived readiness verdict matches
      evidence, and `slice:complete`/`slice:sync-ready` close W66 consistently.
+
+### Medium-only qualification checkpoint — 2026-07-28
+
+All evidence in this checkpoint predates W66-S11 and is diagnostic only. It
+cannot count toward the final qualification matrix after the provider-session
+behavior changes.
+
+- Qualification commit:
+  `088c806b0c081863828d7f6b3ac7c12ea4de9b6f`.
+- Pinned `ky` target commit:
+  `3419113b48e034fdcf8fa6bd3be3da7b3d0d758f`.
+- Installed guided baseline:
+  `w66-s09-guided-088c806b-20260728`, status `pass`, UI/UX `pass`,
+  accessibility `pass`, and no-write checks `pass`.
+  - Run summary SHA-256:
+    `4222beb3ceb9805d9f01a352950b9a3cf5781d05975a6f65fba597480856ad90`.
+  - Observation report SHA-256:
+    `7b8c6e067b1cc55d9d7c36dd304d239211a8ae62410e3f4f7cce41ec6990b7fd`.
+  - Run-health report SHA-256:
+    `421ab0af14c407e3f93b02debaa1c33ede8f0d49c54355a9945e4cb5cd8c6070`.
+  - Browser-task proof SHA-256:
+    `2717f0980f033b3fc713ef8eef3dceac8ae7431af8c3fd92956522f4323c05f3`.
+- `openai-primary.medium`:
+  `w66-s09-openai-medium-088c806b-20260728`, status `passed`,
+  `run_health=pass`, production proof `pass`, final assessment `pass`, and
+  no-upstream-write checks `pass`.
+  - Run summary SHA-256:
+    `cc61e9ff919c6afeffd8e9b13c9e0b6f9118b241c3953d7dd92c5fcdf4ff6ff9`.
+  - Observation report SHA-256:
+    `1df83d072e7c6ad4e1fd29a05b9892ea7bec8d3f2245beafcbe0c036d42b87c8`.
+  - Run-health report SHA-256:
+    `a271d0ad82ae9e5922b1a3d120ab033ca9f54a8ca5c9735ec8bef493a910afbc`.
+  - Final assessment SHA-256:
+    `5294fce158b4d2db2375f215d8087089922cffc7037fbb8de75218665908644b`.
+  - Qualification-cell report SHA-256:
+    `8328e58f0c63b588e781efb888026b7d40625c730c03c46a2a10048be704bc03`.
+- `anthropic-primary.medium`: `blocked` by a provider-owned
+  `provider_context_window_exceeded` result after two fresh isolated attempts;
+  target readiness and command health passed in both attempts, and neither
+  attempt is recorded as a passing qualification cell.
+  - Attempt `w66-s09-anthropic-medium-088c806b-20260728`: run summary SHA-256
+    `1cdef5046706bf600d2aecacb9f4f179a75e3de76187ea0a53d5906c114e548c`;
+    run-health SHA-256
+    `74e39d6ccef2dcb2c4424a668779bce890eab6a456300f2c9926ba1403b08057`.
+  - Attempt `w66-s09-anthropic-medium-088c806b-20260728-r2`: run summary
+    SHA-256
+    `6e50d511d3566208a758972031e736216792f03f17e4c1cb716b15f0be6ac947`;
+    run-health SHA-256
+    `822f1063cd9c1b8c68dbbcecc1fb31f20a7a662b51b6538f71cbe219144e5b40`.
+- `openai-primary.large` and `anthropic-primary.large` were not run.
+- This checkpoint does not update the committed pending closure index, does not
+  close W66-S09, and does not grant release clearance. The release disposition
+  remains `audit-hold` with `release_clearance=false`.
+
+### Guided plus OpenAI-medium checkpoint — 2026-08-02
+
+This checkpoint records the user-bounded qualification scope after W66-S19.
+It is valid evidence for the frozen behavior commit, but it is not the complete
+four-cell W66 matrix because Anthropic medium and both large cells were not run.
+
+- Qualification commit:
+  `c933235e046ef476707c7222ec4761223b86d937`.
+- Pinned `ky` target commit:
+  `3419113b48e034fdcf8fa6bd3be3da7b3d0d758f`.
+- Frozen manifest SHA-256:
+  `faf4de5e95131235023fdfa01ca7ffe99cf8481ca426cc227fb063f88bb3141d`.
+- Installed guided baseline:
+  `w66-s19-guided-c933235e-r1-20260802`, status `pass`,
+  `run_health=pass`, primary verification `pass`, diagnostic verification
+  `pass`, UI/UX and accessibility `pass`, and no-upstream-write checks `pass`.
+  - Run summary SHA-256:
+    `462ba170357d290314de1f74d5008a5a435a20d00da453bbc286ebee94716f8f`.
+  - Observation report SHA-256:
+    `ccd5604be7a1ecb9cf413b2cbd2458e7596b9a4f03d57462289f9695444741cf`.
+  - Run-health report SHA-256:
+    `2ad008351e6fcd8e2b9f5eb6d95dcd6142182b0c3c2adf8b5fe46a6a0559db45`.
+  - Browser-task proof SHA-256:
+    `7b0f4ecd283d87bf2b3866976dbc4e5f967f8df6c648d7755ddafaa91c23b495`.
+- `openai-primary.medium`:
+  `w66-s19-openai-medium-c933235e-r1-20260802`, status `passed`,
+  `run_health=pass`, production proof `pass`, primary and diagnostic
+  verification `pass`, final assessment all-pass, and no-upstream-write checks
+  `pass`. The meaningful target diff is limited to `source/core/Ky.ts` and
+  `source/types/retry.ts` in the disposable workspace.
+  - Run summary SHA-256:
+    `6526d48b72a58d0ea723bb45e947e503fcd009dc0646c08a98755669ed6c62ed`.
+  - Observation report SHA-256:
+    `c0e5e52e75f2bc4a74f5c395cf4a4b666678254f8ef38076c329d965827da178`.
+  - Run-health report SHA-256:
+    `1fce53e4da0f5ce2f0407e26b9bc64799f9a8639ab9610a5a7cd5a1bb4ba4c1b`.
+  - Final assessment SHA-256:
+    `42ef9b97ee19a4e70362ba0bbfd02d3b8594ecc2eb7ddeee5bfe6b169f450ae4`.
+  - Qualification-cell report SHA-256:
+    `1bc06981105803c640620c9d922282354409cf74a0f29d9348ebd63d6c159176`.
+  - Qualification analysis SHA-256:
+    `bb8960eb6841fa3d8867837aa196f479b47b5e14d02296726165449159351b16`.
+- `anthropic-primary.medium`, `openai-primary.large`, and
+  `anthropic-primary.large` were not run. No result is inferred for them.
+- The local qualification set SHA-256 is
+  `7eb5a844bbdf056cdfc34fe30d0626e94cfa4d9cc33a82b084bd6960ab0acedd`;
+  its required matrix is blocked only by the three intentionally missing
+  cells.
+- The committed closure index remains pending, W66-S09 remains `active`, and
+  the release disposition remains `audit-hold` with
+  `release_clearance=false`.
 
 ### Acceptance criteria
 

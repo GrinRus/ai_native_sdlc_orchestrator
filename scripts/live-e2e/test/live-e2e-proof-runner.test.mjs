@@ -38,6 +38,7 @@ import {
   collectReviewFindingDetails,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
+  classifyNonRepairReviewBlocker,
   computeSourceTreeDigest,
   buildAcceptanceRepairDrillFinding,
   evaluateBaselineVerifyGate,
@@ -55,10 +56,12 @@ import {
   resolveActiveAcceptanceRepairDrill,
   resolveAuditHoldOverrideArgs,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
+  resolveGuidedWarnDiagnosticTimeoutMs,
   sourceInstallCacheMatches,
   shouldDeferGuidedWarnDiagnostic,
 } from "../lib/flows.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
+import { materializeBrowserEvidenceIndex } from "../lib/installed-browser-proof.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
 import {
   REQUIRED_GUIDED_COMMAND_LABELS,
@@ -120,6 +123,7 @@ const qualificationLoopScript = path.join(repoRoot, "scripts/live-e2e/qualificat
 test("private live E2E delivery preserves non-actionable review warnings without treating them as repair failures", () => {
   const verificationWarning = {
     overall_status: "warn",
+    review_recommendation: "proceed",
     findings: [
       {
         severity: "warn",
@@ -136,8 +140,29 @@ test("private live E2E delivery preserves non-actionable review warnings without
 
   assert.equal(reviewAllowsLiveE2eDelivery({}, "pass"), true);
   assert.equal(reviewAllowsLiveE2eDelivery(verificationWarning, "warn"), true);
+  assert.equal(
+    reviewAllowsLiveE2eDelivery({ ...verificationWarning, review_recommendation: "required-human-review" }, "warn"),
+    false,
+  );
   assert.equal(reviewAllowsLiveE2eDelivery(actionableWarning, "warn"), false);
   assert.equal(reviewAllowsLiveE2eDelivery({ overall_status: "fail" }, "fail"), false);
+  assert.equal(
+    classifyNonRepairReviewBlocker({
+      reviewReport: {
+        overall_status: "warn",
+        review_recommendation: "required-human-review",
+        findings: [
+          {
+            severity: "warn",
+            category: "artifact-quality",
+            summary: "Primary verification did not explicitly exercise changed test file(s): test/hooks.ts.",
+          },
+        ],
+      },
+      artifacts: { post_run_verify_status: "pass" },
+    }),
+    "verification_mapping_gap",
+  );
 });
 
 function withTempRoot(callback) {
@@ -1330,7 +1355,7 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.ok(loaded.document.allowed_providers.includes(current.provider));
       assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
       assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
-      assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
+      assert.deepEqual(loaded.document.repos[0].lint_commands, []);
       assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
     }
   });
@@ -1449,12 +1474,19 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
     assert.equal(loaded.document.repos[0].name, "sindresorhus/ky");
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "ephemeral");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
-    assert.deepEqual(loaded.document.repos[0].lint_commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(loaded.document.repos[0].lint_commands, [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+      "CI=1 npx ava test/headers.ts",
+    ]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
       "CI=1 npx ava test/headers.ts",
     ]);
+    const readinessGroup = loaded.document.verification.command_groups.find((group) => group.phase === "readiness");
+    assert.deepEqual(readinessGroup.commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.equal(loaded.document.repos[0].lint_commands.some((command) => command.includes("npm install")), false);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
   });
 });
@@ -1482,6 +1514,55 @@ test("run-health keeps failed project bootstrap ahead of controller-incomplete f
     phase: "project_bootstrap",
     class: "public_command_failed",
     summary: "Public project bootstrap failed before live E2E controller execution.",
+  });
+});
+
+test("run-health preserves provider-owned session-budget exhaustion", () => {
+  const sessionBudget = {
+    schema_version: 1,
+    configured: {
+      warn_after_assistant_turns: 24,
+      max_assistant_turns: 32,
+      max_tool_calls: 96,
+      termination_grace_ms: 1000,
+    },
+    observed: {
+      assistant_turns: 33,
+      tool_calls: 80,
+      progress_events: 120,
+    },
+    status: "exceeded",
+    exhausted_dimension: "assistant_turns",
+    termination: {
+      requested: true,
+      graceful_signal: "SIGTERM",
+      forced_signal: null,
+    },
+  };
+  const failure = resolveRunHealthFailure({
+    observationReport: { report_status: "final" },
+    commandHealth: { status: "pass", failed_commands: [] },
+    controllerHealth: { status: "blocked" },
+    providerHealth: { status: "blocked", session_budget: sessionBudget },
+    targetReadiness: { status: "pass" },
+    targetEnvironmentHealth: { status: "pass" },
+    diagnosticHealth: { status: "pass" },
+    evidenceHealth: { status: "pass", weak_evidence_refs: [] },
+    resumeInteractionHealth: { status: "pass" },
+    lifecycleCompletion: { continuation_status: "blocked" },
+    artifacts: {
+      failure_owner: "provider",
+      failure_phase: "provider_execution",
+      failure_class: "provider_session_budget_exceeded",
+      session_budget: sessionBudget,
+    },
+  });
+
+  assert.deepEqual(failure, {
+    owner: "provider",
+    phase: "provider_execution",
+    class: "provider_session_budget_exceeded",
+    summary: "External runtime did not converge within its configured provider session budget.",
   });
 });
 
@@ -1739,7 +1820,12 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     assert.equal(loaded.ok, true);
     assert.equal(loaded.document.runtime_defaults.workspace_mode, "workspace-clone");
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
-    assert.deepEqual(loaded.document.repos[0].lint_commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(loaded.document.repos[0].lint_commands, [
+      "CI=1 npx xo",
+      "CI=1 npm run build",
+      "CI=1 npx ava test/main.ts test/hooks.ts --match='!*totalTimeout bounds a never-ending successful response body*'",
+      "CI=1 npx ava test/retry.ts --match='*shouldRetry*'",
+    ]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "CI=1 npx xo",
       "CI=1 npm run build",
@@ -1843,14 +1929,13 @@ test("generated Vitest large profile isolates verification and checks hard-targe
       loaded.document.repos[0].lint_commands.some((command) =>
         command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
       ),
-      true,
+      false,
     );
-    assert.equal(
-      loaded.document.repos[0].lint_commands.some((command) =>
-        command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm build"),
-      ),
-      true,
-    );
+    const readinessGroup = loaded.document.verification.command_groups.find((group) => group.phase === "readiness");
+    assert.ok(readinessGroup.commands.some((command) =>
+      command.includes("Vitest proof requires Node ^22.12.0 || ^24.0.0 || >=26.0.0"),
+    ));
+    assert.deepEqual(loaded.document.repos[0].lint_commands, loaded.document.repos[0].test_commands);
     assert.equal(
       loaded.document.repos[0].test_commands.some((command) =>
         command.includes("AOR_LIVE_E2E_TARGET_NODE_BIN") && command.includes("pnpm test"),
@@ -2401,6 +2486,78 @@ test("live adapter preflight applies env_from aliases without leaking values", (
     ]);
     assert.deepEqual(result.report.external_runtime.native_timeout_args, ["--max-wall-time", "25s"]);
     assert.equal(JSON.stringify(result.report).includes("preflight-secret-from-source"), false);
+  });
+});
+
+test("live adapter preflight ignores auth vocabulary in successful stream events", () => {
+  withTempRoot((tempRoot) => {
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    const reportsRoot = path.join(tempRoot, "reports");
+    const adapterProfileRoot = path.join(tempRoot, "adapters");
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(adapterProfileRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(adapterProfileRoot, "claude-code.yaml"),
+      [
+        "adapter_id: claude-code",
+        "runner_family: claude",
+        "version: 1",
+        "launch_modes:",
+        "  - non-interactive",
+        "capabilities:",
+        "  repo_read: true",
+        "  repo_write: true",
+        "  shell_commands: true",
+        "  structured_output: true",
+        "constraints:",
+        "  requires_local_runtime: true",
+        "execution:",
+        "  runtime_mode: external-process",
+        "  live_baseline: true",
+        "  handler: claude-code-external-runner",
+        "  evidence_namespace: evidence://adapter-live/claude-code",
+        "  external_runtime:",
+        `    command: ${process.execPath}`,
+        "    request_transport: stdin-json",
+        "    stdin_json_scope: test-only",
+        "    preflight_timeout_ms: 30000",
+        "    timeout_ms: 30000",
+        "    permission_policy:",
+        "      default_mode: full-bypass",
+        "      modes:",
+        "        full-bypass:",
+        "          args:",
+        "            - -e",
+        "            - process.stdout.write([JSON.stringify({type:'system',subtype:'init',apiKeySource:'none'}),JSON.stringify({type:'assistant',message:{role:'assistant',content:[{type:'text',text:'API key and HTTP 401 notes are documentation; host OAuth is active.'}]}}),JSON.stringify({type:'result',subtype:'success',result:'preflight ok'})].join('\\n'));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runLiveAdapterPreflight({
+      targetCheckoutRoot,
+      adapterProfileRoot,
+      providerVariant: {
+        provider: "anthropic",
+        primary_adapter: "claude-code",
+        coverage_tier: "extended",
+      },
+      providerVariantId: "anthropic-primary",
+      coverageTier: "extended",
+      env: process.env,
+      runnerAuthMode: "host",
+      runnerAuthSource: "host",
+      runtimeAgentPermissionMode: "full-bypass",
+      runtimeAgentInteractionPolicy: "fail-closed",
+      runtimeAgentAutoApprovalProfile: "none",
+      authProbeRequired: true,
+      runId: "claude-stream-auth-vocabulary",
+      reportsRoot,
+    });
+
+    assert.equal(result.status, "pass", JSON.stringify(result.report));
+    assert.equal(result.report.auth_probe.status, "pass");
   });
 });
 
@@ -3877,6 +4034,34 @@ test("guided browser-task proof request points at a live app surface, not the sh
     assert.equal(result.summary.browser_task_app_url, "http://127.0.0.1:61002/");
     assert.equal(result.summary.browser_task_app_server_cleanup.status, "terminated");
     assert.equal(result.browserTaskAppServerCleanup.status, "terminated");
+
+    const immutableRequestBytes = fs.readFileSync(result.browserTaskProofRequestFile);
+    fs.writeFileSync(
+      request.expected_browser_task_proof_file,
+      `${JSON.stringify({
+        schema_version: 2,
+        kind: "installed-browser-proof",
+        run_id: "guided-live-surface",
+        scenario_id: "installed-console-matrix",
+      }, null, 2)}\n`,
+    );
+    runGuidedWebSmoke({
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [fakeAor],
+        binaryRef: fakeAor,
+      },
+      targetCheckoutRoot,
+      runId: "guided-live-surface",
+      reportsRoot,
+      env: process.env,
+      keepBrowserTaskAppSurface: false,
+    });
+    assert.equal(
+      fs.readFileSync(result.browserTaskProofRequestFile).equals(immutableRequestBytes),
+      true,
+      "terminal resume must not refresh the request timestamp for an immutable schema-v2 proof",
+    );
   });
 });
 
@@ -4032,6 +4217,127 @@ test("guided browser-task collector retries one transient environment failure", 
   });
 });
 
+test("guided browser-task collector revalidates immutable evidence on terminal resume", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "guided-collector-resume";
+    const scenarioId = "installed-console-matrix";
+    const createdAt = new Date().toISOString();
+    const browserTaskProofRequestFile = path.join(reportsRoot, `browser-request-${runId}.json`);
+    const browserTaskProofFile = path.join(reportsRoot, `browser-proof-${runId}.json`);
+    const passEntries = (ids) => ids.map((id) => ({ id, status: "pass" }));
+    const proof = {
+      schema_version: 2,
+      kind: "installed-browser-proof",
+      run_id: runId,
+      scenario_id: scenarioId,
+      status: "pass",
+      scenarios: [{
+        id: "completed-read-only",
+        status: "pass",
+        observed_state: "completed",
+        expected_state: "completed",
+        durable_precondition_ref: "evidence://state.json",
+      }],
+      actions: [{
+        id: "create-no-write-request",
+        status: "pass",
+        visible_label: "Ask AOR",
+        canonical_mutation: { method: "POST", route: "/api/projects/aor-core/operator-requests" },
+        response_id: "request-1",
+        evidence_refs: ["evidence://request-1.json"],
+        reload_verified: true,
+        durable_readback: { status: "pass", ref: "evidence://request-1.json" },
+      }],
+      viewport_matrix: passEntries(["desktop", "tablet", "mobile", "zoom-200"]),
+      accessibility_matrix: passEntries([
+        "keyboard-only",
+        "dialog-focus",
+        "focus-restoration",
+        "semantic-tree",
+        "contrast-aa",
+        "touch-targets",
+        "reduced-motion",
+      ]),
+      recovery_matrix: passEntries([
+        "reload",
+        "reconnect",
+        "partial-read",
+        "offline-read",
+        "injected-error",
+        "multi-item-attention",
+        "project-switch",
+        "terminal-read-only",
+      ]).map((entry) => entry.id === "injected-error" ? { ...entry, injected: true } : entry),
+      screenshot_files: ["evidence://desktop.png"],
+      findings: [],
+      console_errors: [],
+      external_requests: [],
+    };
+    fs.writeFileSync(
+      browserTaskProofRequestFile,
+      `${JSON.stringify({ schema_version: 2, run_id: runId, scenario_id: scenarioId, created_at: createdAt }, null, 2)}\n`,
+    );
+    fs.writeFileSync(browserTaskProofFile, `${JSON.stringify(proof, null, 2)}\n`);
+    const evidenceArtifacts = [
+      ["installed-app-smoke", path.join(reportsRoot, "app-smoke.json")],
+      ["installed-scenario-report", path.join(reportsRoot, "scenario-report.json")],
+      ["browser-task-proof", browserTaskProofFile],
+      ["dom-snapshot", path.join(reportsRoot, "dom.json")],
+      ["accessibility-summary", path.join(reportsRoot, "accessibility.json")],
+      ["finding-ledger", path.join(reportsRoot, "findings.json")],
+    ].map(([kind, file]) => {
+      if (!fs.existsSync(file)) fs.writeFileSync(file, `${JSON.stringify({ kind, run_id: runId })}\n`);
+      return { kind, file };
+    });
+    const indexed = materializeBrowserEvidenceIndex({
+      reportsRoot,
+      runId,
+      scenarioId,
+      createdAt,
+      artifacts: evidenceArtifacts,
+    });
+    const collectorFile = path.join(
+      reportsRoot,
+      `installed-user-guided-browser-task-proof-collector-${runId}.json`,
+    );
+    fs.writeFileSync(
+      collectorFile,
+      `${JSON.stringify({
+        status: "pass",
+        output_file: collectorFile,
+        evidence_index_file: indexed.indexFile,
+        evidence_index_digest: indexed.digest,
+        validation: { ok: true, issues: [] },
+      }, null, 2)}\n`,
+    );
+    const options = {
+      enabled: false,
+      runId,
+      reportsRoot,
+      env: process.env,
+      appUrl: "http://127.0.0.1:61002/",
+      browserTaskProofRequestFile,
+      browserTaskProofFile,
+      outputHtml: path.join(reportsRoot, "smoke.html"),
+      domSnapshotFile: path.join(reportsRoot, "dom.json"),
+      accessibilitySummaryFile: path.join(reportsRoot, "accessibility.json"),
+      visualSnapshotFile: path.join(reportsRoot, "visual.json"),
+    };
+
+    const resumed = collectGuidedBrowserTaskProof(options);
+    assert.equal(resumed.status, "pass");
+    assert.equal(resumed.reused_existing_evidence, true);
+    assert.equal(resumed.evidence_index_file, indexed.indexFile);
+
+    fs.appendFileSync(indexed.indexFile, "\n");
+    const tampered = collectGuidedBrowserTaskProof(options);
+    assert.equal(tampered.status, "not_pass");
+    assert.match(tampered.validation.issues.join("\n"), /digest or content-addressed filename/u);
+  });
+});
+
 test("guided flow loop prefers archived first-flow next-action evidence", () => {
   withTempRoot((tempRoot) => {
     const targetRoot = path.join(tempRoot, "target");
@@ -4096,7 +4402,33 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.ok(guidedWebSmokeIndex < deferredDiagnosticRunIndex);
   assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
   assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
-  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 600/u);
+  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 1800/u);
+  assert.equal(
+    resolveGuidedWarnDiagnosticTimeoutMs({
+      live_e2e: {
+        guided_warn_diagnostic_timeout_sec: 1800,
+        target_command_timeout_sec: 1800,
+      },
+    }),
+    1_800_000,
+  );
+  assert.ok(
+    resolveGuidedWarnDiagnosticTimeoutMs({
+      live_e2e: {
+        guided_warn_diagnostic_timeout_sec: 1800,
+        target_command_timeout_sec: 1800,
+      },
+    }) > 600_000,
+  );
+  assert.equal(
+    resolveGuidedWarnDiagnosticTimeoutMs({
+      live_e2e: {
+        guided_warn_diagnostic_timeout_sec: 1800,
+        target_command_timeout_sec: 900,
+      },
+    }),
+    900_000,
+  );
   assert.equal(shouldDeferGuidedWarnDiagnostic({
     guidedJourneyEnabled: true,
     diagnosticFailureMode: "warn",

@@ -60,7 +60,17 @@ For `request-artifact`, `execution.external_runtime.request_file` declares only 
 - the bounded `provider_work_packet_ref`, which is the only file the runtime agent is instructed to open initially;
 - a context budget report and compaction report before provider invocation.
 
-The bounded provider work packet must include `resolved_local_refs[]` for provider-visible local files. Required entries include the full request artifact, provider work packet, compiled context, required input packets such as handoff/spec when present, and repair evidence such as review-decision/review-report files when execution is a public repair iteration. Each entry carries `role`, `evidence_ref`, `local_path`, `required`, and `kind`. The packet must also include an `execution_contract` that independently states execution, target-write, direct-edit, and writeback permissions. A no-write contract uses `mode=read-only-inspection`, forbids target edits, and does not require a meaningful change or diff. Write-capable execution still occurs only in the disposable checkout; upstream writes remain forbidden. `execution_contract.output_quality_policy` records the provider-visible rule that stdout/stderr warning tokens from required and primary verification must be resolved before final reporting; exit-0 warning output is not all-pass evidence unless the same command reproduces the same warning on an unchanged baseline. Diagnostic verification is controller-owned: the provider must not execute `verification_expectations.diagnostic_commands` unless the same command is also present in `required_commands`, and the controller records diagnostic outcomes after provider execution. `execution_contract.expected_meaningful_change.allowed_target_paths[]` is derived from mission traceability, including `feature_traceability.required_path_prefixes[]` and any explicit allowed paths; prefix hints such as `source/` are rendered as provider-visible globs such as `source/**`.
+The bounded provider work packet must include `resolved_local_refs[]` for provider-visible local files. Required entries include the full request artifact, provider work packet, compiled context, required input packets such as handoff/spec when present, and repair evidence such as review-decision/review-report files when execution is a public repair iteration. Each entry carries `role`, `evidence_ref`, `local_path`, `required`, and `kind`.
+
+Runtime-created packets use `packet_kind=aor-provider-work-packet` and `version=2`. Version 1 packets remain readable immutable replay evidence, but are never emitted for new execution. Version 2 adds explicit command roles under `execution_contract`:
+
+- `allowed_commands` is the complete provider allowlist inherited from the approved handoff and policy;
+- `required_commands` contains only ordered mission-primary verification; during repair, failed focused verification is placed first;
+- every required command must exactly match an allowed command. A mismatch is an AOR-owned packet-construction failure and blocks external-process spawn;
+- `command_execution_policy.mode=sequential` forbids concurrent install, build, or test execution;
+- readiness setup and diagnostics are controller-owned. Successfully completed preflight setup is reusable and must not be repeated by a repair provider.
+
+The packet must also include an `execution_contract` that independently states execution, target-write, direct-edit, and writeback permissions. A no-write contract uses `mode=read-only-inspection`, forbids target edits, and does not require a meaningful change or diff. Write-capable execution still occurs only in the disposable checkout; upstream writes remain forbidden. `execution_contract.output_quality_policy` records the provider-visible rule that stdout/stderr warning tokens from required verification must be resolved before final reporting; exit-0 warning output is not all-pass evidence unless the same command reproduces the same warning on an unchanged baseline. Diagnostic verification is controller-owned and never becomes provider-required merely because it appears in a project profile. If a required sandbox-dependent check returns `EPERM` or `EACCES`, the provider records bounded environment-limited evidence and completes its report without retrying the command, running package installation, or changing the target to bypass the sandbox. The host/controller verification remains authoritative. `execution_contract.expected_meaningful_change.allowed_target_paths[]` is derived from mission traceability, including `feature_traceability.required_path_prefixes[]` and any explicit allowed paths; prefix hints such as `source/` are rendered as provider-visible globs such as `source/**`.
 
 Before a live external process starts, AOR copies the provider-visible packet and every required local input into a read-only snapshot under the disposable execution checkout. The executed packet rewrites `resolved_local_refs[].local_path` to those snapshot files, replaces absolute primary-checkout locations inside provider-visible copies with explicit `aor-evidence://primary-checkout/...` identifiers, and records `execution_contract.disposable_workspace_boundary`. Canonical packet and evidence refs remain in the project runtime for audit lineage, but their filesystem locations are not passed as writable checkout roots. The runtime agent must treat its process `cwd` and the declared `execution_root` as the only source tree; evidence paths must never be used to infer or select a different checkout.
 
@@ -97,6 +107,35 @@ AOR may summarize stream JSONL events into `provider_step_status` progress
 fields and `provider_progress_events[]` raw evidence, but those summaries must
 remain sanitized and must not read private runner homes such as `~/.qwen/**` as
 normal product input.
+
+`execution.external_runtime.session_budget` is an optional versioned hard bound
+for multi-turn external runtimes whose context can grow after the initial
+provider work packet has passed deterministic context-budget validation.
+Version `1` supports:
+- `schema_version: 1`;
+- `warn_after_assistant_turns`, a positive soft threshold;
+- `max_assistant_turns`, a positive hard threshold greater than the warning
+  threshold;
+- `max_tool_calls`, a positive hard tool-call threshold;
+- `termination_grace_ms`, a positive grace period between process-tree
+  `SIGTERM` and `SIGKILL`.
+
+Session budgets require a streaming output mode that AOR can normalize without
+retaining prompts, tool arguments, tool results, or credentials. Profiles that
+omit `session_budget` retain the existing timeout-only behavior. The initial
+`context_budget.max_input_tokens` and the post-spawn session budget are
+independent: the former blocks an oversized static packet before spawn, while
+the latter stops a non-converging provider execution before it exhausts the
+provider's own conversation window.
+
+When configured, `external_runner.session_budget` carries a versioned,
+query-safe report with configured limits, observed assistant/tool counters,
+`status` in `pass|warn|exceeded|not_configured`, an optional
+`exhausted_dimension`, and termination evidence. Exceeding a hard session bound
+returns `failure_kind=provider_session_budget_exceeded`; this is a
+provider-owned execution blocker, not a target-product verdict, timeout,
+operator interruption, pre-spawn compiled-context failure, or provider-reported
+context-window overflow.
 
 External-process adapters must enforce `execution.external_runtime.timeout_ms` and preflight probe timeouts as hard local subprocess bounds. A policy `resolved_bounds.budget.timeout_sec` may shorten a single request timeout, but it must not extend execution beyond the adapter profile's hard bound. A runner that exceeds the bound, including one that ignores graceful termination or launches a long-lived child process, must have its local process group terminated and return fail-closed timeout evidence with `failure_kind=external-runner-timeout` and `timed_out=true`; it must not leave the public lifecycle waiting indefinitely.
 

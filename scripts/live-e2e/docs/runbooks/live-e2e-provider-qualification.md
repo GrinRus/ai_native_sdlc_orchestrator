@@ -169,6 +169,14 @@ provider-side overflow blockers such as `provider_context_window_exceeded` are
 run-health issues in `phase=provider_execution`. They do not evaluate produced
 code or artifacts.
 
+An AOR-supervised `provider_session_budget_exceeded` result is also a
+provider-owned run-health blocker in `phase=provider_execution`. It means the
+streaming provider exceeded the declared post-spawn assistant-turn or tool-call
+bound before returning a terminal implementation result. Preserve the
+versioned session-budget report and discard the partial disposable target from
+qualification; do not reinterpret the stop as timeout, target failure, or
+outcome-quality evidence.
+
 For Claude xlarge observation cells, `provider_context_window_exceeded` remains
 provider-owned when AOR's compiled/provider work-packet budget passes and the
 runner reports prompt or context-window overflow after launch. Preserve the raw

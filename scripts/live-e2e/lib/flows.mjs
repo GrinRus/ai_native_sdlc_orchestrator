@@ -293,9 +293,12 @@ function reviewRequiresActionableRepair(reviewReport, reviewOverallStatus) {
 }
 
 export function reviewAllowsLiveE2eDelivery(reviewReport, reviewOverallStatus) {
-  // Preserve public warnings without treating non-actionable evidence as a repair failure.
+  // Stay exactly within the public review-decision approval boundary.
+  const recommendation = asNonEmptyString(reviewReport.review_recommendation);
   return reviewOverallStatus === "pass" ||
-    (reviewOverallStatus === "warn" && !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus));
+    (reviewOverallStatus === "warn" &&
+      recommendation === "proceed" &&
+      !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus));
 }
 
 /**
@@ -379,7 +382,7 @@ function reviewHasOnlyVerificationMappingFindings(reviewReport) {
  * @param {{ reviewReport: Record<string, unknown>, artifacts: Record<string, unknown> }} options
  * @returns {string}
  */
-function classifyNonRepairReviewBlocker(options) {
+export function classifyNonRepairReviewBlocker(options) {
   if (
     reviewHasOnlyVerificationMappingFindings(options.reviewReport) &&
     asNonEmptyString(options.artifacts.post_run_verify_status) === "pass"
@@ -476,6 +479,13 @@ function classifyProviderExecutionFailure(stepResult, adapterOutput) {
       owner: "provider",
       phase: "provider_execution",
       class: "provider_context_window_exceeded",
+    };
+  }
+  if (failureClass === "provider_session_budget_exceeded") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: "provider_session_budget_exceeded",
     };
   }
   if (failureClass === "provider_work_packet_not_executed") {
@@ -1856,6 +1866,73 @@ export function collectGuidedBrowserTaskProof(options) {
     `installed-user-guided-browser-task-proof-collector-${normalizeId(options.runId)}.json`,
   );
   if (options.enabled !== true) {
+    if (
+      fileExists(outputFile)
+      && fileExists(options.browserTaskProofRequestFile)
+      && fileExists(options.browserTaskProofFile)
+    ) {
+      try {
+        const previous = asRecord(readJson(outputFile));
+        const evidenceIndexFile = asNonEmptyString(previous.evidence_index_file);
+        const resolvedIndexFile = evidenceIndexFile ? path.resolve(evidenceIndexFile) : "";
+        const relativeIndexFile = resolvedIndexFile
+          ? path.relative(path.resolve(options.reportsRoot), resolvedIndexFile)
+          : "";
+        if (
+          evidenceIndexFile
+          && relativeIndexFile
+          && !relativeIndexFile.startsWith("..")
+          && !path.isAbsolute(relativeIndexFile)
+          && fileExists(resolvedIndexFile)
+        ) {
+          const indexBytes = fs.readFileSync(resolvedIndexFile);
+          const evidenceIndexDigest = createHash("sha256").update(indexBytes).digest("hex");
+          const expectedDigest = asNonEmptyString(previous.evidence_index_digest);
+          const proof = asRecord(readJson(options.browserTaskProofFile));
+          const request = asRecord(readJson(options.browserTaskProofRequestFile));
+          const index = asRecord(JSON.parse(indexBytes.toString("utf8")));
+          const validation = validateInstalledBrowserProof({
+            proof,
+            request,
+            index,
+            reportsRoot: options.reportsRoot,
+            runId: options.runId,
+            scenarioId: asNonEmptyString(request.scenario_id),
+          });
+          if (
+            expectedDigest !== evidenceIndexDigest
+            || path.basename(resolvedIndexFile) !== `${evidenceIndexDigest}.json`
+          ) {
+            validation.ok = false;
+            validation.issues.push("browser evidence index digest or content-addressed filename is invalid");
+          }
+          return {
+            ...previous,
+            status: validation.ok ? "pass" : "not_pass",
+            evidence_index_file: resolvedIndexFile,
+            evidence_index_digest: evidenceIndexDigest,
+            validation,
+            reused_existing_evidence: true,
+          };
+        }
+        return {
+          ...previous,
+          status: "not_pass",
+          validation: { ok: false, issues: ["browser evidence index is missing or outside the reports root"] },
+          reused_existing_evidence: true,
+        };
+      } catch (error) {
+        return {
+          status: "not_pass",
+          output_file: outputFile,
+          validation: {
+            ok: false,
+            issues: [`browser evidence resume validation failed: ${error instanceof Error ? error.message : String(error)}`],
+          },
+          reused_existing_evidence: true,
+        };
+      }
+    }
     return { status: "not_requested", output_file: outputFile };
   }
   if (!asNonEmptyString(options.appUrl)) {
@@ -2111,10 +2188,10 @@ export function runGuidedWebSmoke(options) {
         kind: "guided-browser-task-app-surface",
         status: "not_started",
         reason: "Guided web smoke did not pass; browser-task proof surface was not started.",
-      };
+  };
   const browserTaskAppUrl = asNonEmptyString(browserTaskAppSurface.app_url) || null;
   const browserTaskControlPlane = asNonEmptyString(browserTaskAppSurface.control_plane) || null;
-  writeJson(browserTaskProofRequestFile, {
+  const browserTaskProofRequest = {
     schema_version: 2,
     kind: "installed-browser-proof-request",
     request_id: `${options.runId}.installed-browser-proof-request.v2`,
@@ -2184,7 +2261,16 @@ export function runGuidedWebSmoke(options) {
     app_server_launch_summary: browserTaskAppSurface,
     project_id: asNonEmptyString(summary.project_id) || null,
     created_at: nowIso(),
-  });
+  };
+  const existingBrowserTaskProof = fileExists(browserTaskProofFile)
+    ? asRecord(readJson(browserTaskProofFile))
+    : {};
+  const preserveImmutableBrowserTaskRequest =
+    existingBrowserTaskProof.schema_version === 2
+    && fileExists(browserTaskProofRequestFile);
+  if (!preserveImmutableBrowserTaskRequest) {
+    writeJson(browserTaskProofRequestFile, browserTaskProofRequest);
+  }
   fs.writeFileSync(
     outputHtml,
     [
@@ -2875,7 +2961,7 @@ function resolveLiveE2eTargetCommandTimeoutMs(profile) {
  * @param {Record<string, unknown>} profile
  * @returns {number}
  */
-function resolveGuidedWarnDiagnosticTimeoutMs(profile) {
+export function resolveGuidedWarnDiagnosticTimeoutMs(profile) {
   const livePolicy = asRecord(profile.live_e2e);
   const explicitTimeoutSec =
     positiveIntegerOrNull(livePolicy.guided_warn_diagnostic_timeout_sec) ??
@@ -4597,6 +4683,7 @@ export function executeInstalledUserFlow(options) {
     artifacts.provider_work_packet_ref = asNonEmptyString(externalRunner.provider_work_packet_ref) || null;
     artifacts.context_budget_status = asNonEmptyString(externalRunner.context_budget_status) || null;
     artifacts.context_budget_failure_class = asNonEmptyString(externalRunner.context_budget_failure_class) || null;
+    artifacts.session_budget = asRecord(externalRunner.session_budget);
     artifacts.raw_provider_error_summary = asNonEmptyString(externalRunner.raw_provider_error_summary) || null;
     artifacts.top_context_size_sources = Array.isArray(externalRunner.top_context_size_sources)
       ? externalRunner.top_context_size_sources
@@ -6079,6 +6166,7 @@ function executeFullJourneyFlowImplementation(options) {
         artifacts.provider_work_packet_ref = asNonEmptyString(externalRunner.provider_work_packet_ref) || null;
         artifacts.context_budget_status = asNonEmptyString(externalRunner.context_budget_status) || null;
         artifacts.context_budget_failure_class = asNonEmptyString(externalRunner.context_budget_failure_class) || null;
+        artifacts.session_budget = asRecord(externalRunner.session_budget);
         artifacts.raw_provider_error_summary = asNonEmptyString(externalRunner.raw_provider_error_summary) || null;
         artifacts.top_context_size_sources = Array.isArray(externalRunner.top_context_size_sources)
           ? externalRunner.top_context_size_sources

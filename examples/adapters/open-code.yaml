@@ -53,7 +53,7 @@ execution:
     request_transport: request-artifact
     request_file:
       mode: native-file-argument
-      message: Execute the approved AOR implementation using the attached AOR provider work packet JSON. Open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when required, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet.
+      message: Execute one directed AOR implementation or repair pass using the attached provider work packet JSON. Open every required resolved_local_refs[].local_path and, for repair, the review decision/report. Make direct edits only in the ephemeral target checkout when required. Follow execution_contract.output_quality_policy. Run only execution_contract.required_commands, sequentially and in order. Every changed test file must be exercised by a required command; otherwise leave it unchanged and return a bounded verification-scope mismatch. Never repeat readiness setup or package installation and never run controller-owned diagnostics. On sandbox EPERM or EACCES, record bounded environment-limited evidence and finish without retry or target workaround. Do not write upstream. Return a final report with changed-files, commands-run, verification, repair-closure when applicable, and risks. Do not stop after summarizing the packet.
       argument: --file
     preflight_timeout_ms: 120000
     timeout_ms: 3600000

@@ -1997,6 +1997,7 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "provider_work_packet_ref",
     "context_budget_status",
     "context_budget_failure_class",
+    "session_budget",
     "raw_provider_error_summary",
     "top_context_size_sources",
     "provider_execution_status",
@@ -2571,19 +2572,23 @@ function buildProviderHealth(artifacts) {
   const providerStepStatus = asRecord(artifacts.provider_step_status);
   const contextBudgetStatus = asNonEmptyString(artifacts.context_budget_status);
   const contextBudgetFailureClass = asNonEmptyString(artifacts.context_budget_failure_class);
+  const sessionBudget = asRecord(artifacts.session_budget);
+  const sessionBudgetStatus = asNonEmptyString(sessionBudget.status);
   const hasContextBudgetBlock =
     ["compiled_context_budget_exceeded", "provider_context_window_exceeded"].includes(contextBudgetFailureClass) ||
     contextBudgetStatus === "fail";
+  const hasSessionBudgetBlock = sessionBudgetStatus === "exceeded";
   const providerExecutionStatus =
     asNonEmptyString(artifacts.provider_execution_status) ||
     asNonEmptyString(providerStepStatus.status) ||
-    (hasContextBudgetBlock ? "blocked" : null) ||
+    (hasContextBudgetBlock || hasSessionBudgetBlock ? "blocked" : null) ||
     "not_attempted";
   const hasProviderBlock = ["interrupted", "blocked", "provider_blocked", "permission-mode-blocked", "edit-denied"].includes(
     providerExecutionStatus,
   );
   const hasProviderPass = ["pass", "completed", "not_attempted"].includes(providerExecutionStatus);
-  const status = hasContextBudgetBlock || hasProviderBlock ? "blocked" : hasProviderPass ? "pass" : "fail";
+  const status =
+    hasContextBudgetBlock || hasSessionBudgetBlock || hasProviderBlock ? "blocked" : hasProviderPass ? "pass" : "fail";
   return {
     status,
     provider_execution_status: providerExecutionStatus,
@@ -2593,6 +2598,7 @@ function buildProviderHealth(artifacts) {
     provider_work_packet_ref: asNonEmptyString(artifacts.provider_work_packet_ref) || null,
     context_budget_status: contextBudgetStatus || null,
     context_budget_failure_class: contextBudgetFailureClass || null,
+    ...(Object.keys(sessionBudget).length > 0 ? { session_budget: sessionBudget } : {}),
     top_context_size_sources: Array.isArray(artifacts.top_context_size_sources)
       ? artifacts.top_context_size_sources
       : [],
@@ -3146,16 +3152,24 @@ export function resolveRunHealthFailure(options) {
   const declaredPhase = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_phase);
   const declaredClass = declaredClassIsNonFailure ? "" : rawDeclaredClass;
   if (declaredOwner || declaredPhase || declaredClass) {
-    if (["compiled_context_budget_exceeded", "provider_context_window_exceeded"].includes(declaredClass)) {
+    if (
+      [
+        "compiled_context_budget_exceeded",
+        "provider_context_window_exceeded",
+        "provider_session_budget_exceeded",
+      ].includes(declaredClass)
+    ) {
       return {
-        owner: declaredOwner || (declaredClass === "provider_context_window_exceeded" ? "provider" : "aor"),
+        owner: declaredOwner || (declaredClass === "compiled_context_budget_exceeded" ? "aor" : "provider"),
         phase: declaredPhase || "provider_execution",
         class: declaredClass,
         summary:
           asNonEmptyString(options.artifacts.raw_provider_error_summary) ||
           (declaredClass === "provider_context_window_exceeded"
             ? "External runtime exhausted its provider conversation context during execution."
-            : "Provider work packet exceeded the configured context budget before provider execution."),
+            : declaredClass === "provider_session_budget_exceeded"
+              ? "External runtime did not converge within its configured provider session budget."
+              : "Provider work packet exceeded the configured context budget before provider execution."),
       };
     }
     if (["provider_work_packet_not_executed", "no-op"].includes(declaredClass)) {
@@ -3865,6 +3879,10 @@ function writeProofRunnerArtifactsImplementation(options) {
         : null,
     context_budget_status: asNonEmptyString(options.flowResult.artifacts.context_budget_status) || null,
     context_budget_failure_class: asNonEmptyString(options.flowResult.artifacts.context_budget_failure_class) || null,
+    session_budget:
+      Object.keys(asRecord(options.flowResult.artifacts.session_budget)).length > 0
+        ? asRecord(options.flowResult.artifacts.session_budget)
+        : null,
     raw_provider_error_summary: asNonEmptyString(options.flowResult.artifacts.raw_provider_error_summary) || null,
     top_context_size_sources: Array.isArray(options.flowResult.artifacts.top_context_size_sources)
       ? options.flowResult.artifacts.top_context_size_sources

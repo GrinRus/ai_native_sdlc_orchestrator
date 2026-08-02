@@ -28,7 +28,20 @@ Durable approval decision for one reviewed run.
 - `hold`
 - `request-repair`
 
-`approve` is only valid when the linked `review-report.overall_status` is `pass` and the linked `runtime-harness-report.overall_decision` is `pass`.
+`approve` is only valid when the linked
+`runtime-harness-report.overall_decision` is `pass` and the linked review is
+delivery-compatible. A review is delivery-compatible when either:
+
+- `review-report.overall_status` is `pass`; or
+- `review-report.overall_status` is `warn`,
+  `review-report.review_recommendation` is `proceed`, and the review contains no
+  finding with `severity=fail`.
+
+Warnings that recommend `repair` or `required-human-review` remain blocking.
+Unknown review states and any failed Runtime Harness decision also remain
+blocking. This compatibility rule lets an operator acknowledge bounded,
+non-repair warnings without weakening deterministic verification or converting
+a repair finding into approval.
 
 `hold` preserves a human stop without claiming repair has started.
 
@@ -100,6 +113,9 @@ details remain valid.
 - `findings`
 
 Delivery and release commands that opt into the review-decision gate must require the latest run-linked `review-decision` to be `approve`; `hold` and `request-repair` must block.
+An approved non-repair warning records the original `warn` status and `proceed`
+recommendation in `decision_basis`; consumers must not rewrite it as a passing
+review.
 
 ## Boundary rules
 - `review-decision` must not replace deterministic validation, evaluation, Runtime Harness diagnosis, or delivery manifests.
