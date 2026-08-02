@@ -353,6 +353,7 @@ graph TD
   W66S16[W66-S16 Provider work-packet command-role separation]
   W66S17[W66-S17 Environment-qualified provider command identity]
   W66S18[W66-S18 Guided diagnostic timeout alignment]
+  W66S19[W66-S19 Provider verification-scope convergence]
   W66S09[W66-S09 Fresh four-cell live qualification closure]
 
   W0S01 --> W0S02
@@ -867,7 +868,8 @@ graph TD
   W66S15 --> W66S16
   W66S16 --> W66S17
   W66S17 --> W66S18
-  W66S18 --> W66S09
+  W66S18 --> W66S19
+  W66S19 --> W66S09
 ```
 
 ## W0 hard dependencies
@@ -1490,7 +1492,8 @@ own the stricter terminal control proof evidence for this lane.
 | W66-S16 | W66-S15 |
 | W66-S17 | W66-S16 |
 | W66-S18 | W66-S17 |
-| W66-S09 | W66-S18 |
+| W66-S19 | W66-S18 |
+| W66-S09 | W66-S19 |
 
 ## Topological order
 1. W0-S01
@@ -1842,7 +1845,8 @@ own the stricter terminal control proof evidence for this lane.
 347. W66-S16
 348. W66-S17
 349. W66-S18
-350. W66-S09
+350. W66-S19
+351. W66-S09
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

@@ -38,6 +38,7 @@ import {
   collectReviewFindingDetails,
   collectReviewChangedPaths,
   collectRuntimeHarnessChangedPaths,
+  classifyNonRepairReviewBlocker,
   computeSourceTreeDigest,
   buildAcceptanceRepairDrillFinding,
   evaluateBaselineVerifyGate,
@@ -122,6 +123,7 @@ const qualificationLoopScript = path.join(repoRoot, "scripts/live-e2e/qualificat
 test("private live E2E delivery preserves non-actionable review warnings without treating them as repair failures", () => {
   const verificationWarning = {
     overall_status: "warn",
+    review_recommendation: "proceed",
     findings: [
       {
         severity: "warn",
@@ -138,8 +140,29 @@ test("private live E2E delivery preserves non-actionable review warnings without
 
   assert.equal(reviewAllowsLiveE2eDelivery({}, "pass"), true);
   assert.equal(reviewAllowsLiveE2eDelivery(verificationWarning, "warn"), true);
+  assert.equal(
+    reviewAllowsLiveE2eDelivery({ ...verificationWarning, review_recommendation: "required-human-review" }, "warn"),
+    false,
+  );
   assert.equal(reviewAllowsLiveE2eDelivery(actionableWarning, "warn"), false);
   assert.equal(reviewAllowsLiveE2eDelivery({ overall_status: "fail" }, "fail"), false);
+  assert.equal(
+    classifyNonRepairReviewBlocker({
+      reviewReport: {
+        overall_status: "warn",
+        review_recommendation: "required-human-review",
+        findings: [
+          {
+            severity: "warn",
+            category: "artifact-quality",
+            summary: "Primary verification did not explicitly exercise changed test file(s): test/hooks.ts.",
+          },
+        ],
+      },
+      artifacts: { post_run_verify_status: "pass" },
+    }),
+    "verification_mapping_gap",
+  );
 });
 
 function withTempRoot(callback) {

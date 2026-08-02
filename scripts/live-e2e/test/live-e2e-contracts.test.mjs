@@ -166,6 +166,25 @@ test("W66 medium primary verification exercises the allowed fetch test surface",
   assert.ok(mission.post_run_quality.primary_commands.includes("npx ava test/fetch.ts"));
 });
 
+test("W66 guided header canary keeps changed tests inside primary verification scope", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "scripts/live-e2e/catalog/targets/ky.yaml"),
+    family: "live-e2e-target-catalog",
+  });
+  assert.equal(loaded.ok, true);
+
+  const mission = loaded.document.feature_missions.find(
+    (entry) => entry.mission_id === "ky-header-regression",
+  );
+  assert.ok(mission.post_run_quality.primary_commands.includes("npx ava test/headers.ts"));
+  assert.ok(
+    mission.agent_visible_request.constraints.some(
+      (constraint) => constraint.includes("Keep test changes in test/headers.ts") &&
+        constraint.includes("verification-scope mismatch"),
+    ),
+  );
+});
+
 test("W66 required qualification profiles produce fail-closed delivery proof", () => {
   for (const profileRef of [
     "full-journey-regress-ky-medium-codex.yaml",

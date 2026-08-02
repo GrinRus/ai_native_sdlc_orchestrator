@@ -316,6 +316,7 @@ The current roadmap contains **342 slices across 67 waves**.
 | W66-S16 | provider work-packet command-role separation target: DEV-04, AIP-12, OPS-06 |
 | W66-S17 | environment-qualified provider command identity target: DEV-04, AIP-12, OPS-06 |
 | W66-S18 | guided diagnostic timeout alignment target: DEV-04, OPS-06, OPS-07 |
+| W66-S19 | provider verification-scope convergence target: DEV-04, AIP-12, OPS-06, OPS-07 |
 | W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation

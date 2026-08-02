@@ -593,7 +593,18 @@ Full-journey layer:
   identity after removing only leading shell environment assignments. The
   emitted `required_commands` retain the exact allowlisted form, including
   prefixes such as `CI=1`; arbitrary wrappers or shell prefixes are not
-  equivalent and still fail packet construction before provider spawn.
+  equivalent and still fail packet construction before provider spawn. Every
+  changed test file must be exercised by one of those ordered
+  `required_commands`; when the mission cannot be completed inside that test
+  surface, the provider returns a bounded verification-scope mismatch instead
+  of editing unverified tests or invoking controller-owned diagnostics.
+
+Private delivery eligibility is no broader than the public review-decision
+contract. A warning may continue only when the review recommendation is
+`proceed` and no failed finding remains. `required-human-review` stops before
+the public approve command; a primary-pass changed-test mapping warning is
+classified as provider-owned `verification_mapping_gap`, not as an AOR command
+failure.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;

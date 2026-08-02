@@ -183,6 +183,9 @@ feature_missions:
       constraints:
         - Use this mission only as a live E2E canary that proves the public flow still works.
         - Use the target repository conventions and existing test style.
+        - Keep test changes in test/headers.ts because it is the only test file exercised by the
+          mission-primary AVA command; if another test file must change, leave it unchanged and
+          report a verification-scope mismatch.
         - Keep upstream writes disabled; materialize delivery evidence only through the configured
           no-write or patch/fork mode.
         - Do not mutate target files directly from the runner or evaluator outside the public AOR

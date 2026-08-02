@@ -103,6 +103,13 @@ Feature missions may add `post_run_quality`:
 - `diagnostic_commands` are additional evidence. A failing diagnostic command is reported with `diagnostic_failure_mode` (`warn` by default) and must not hide a passing primary gate.
 - If `post_run_quality` is omitted, `verification.commands` remain the primary post-run gate.
 
+Provider-created test changes must remain inside the test surface exercised by
+`primary_commands`. A provider that discovers it needs to change another test
+file must leave that file unchanged and return a bounded verification-scope
+mismatch instead of creating evidence it is forbidden to execute. This rule
+does not move diagnostics into provider ownership and does not authorize
+commands outside the reviewed allowlist.
+
 The catalog command shape is live E2E authoring sugar only. Generated target
 project profiles must translate it into AOR
 `verification.command_groups[]`: setup commands become `role=setup`,

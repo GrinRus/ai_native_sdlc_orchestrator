@@ -138,7 +138,8 @@ test("request-artifact adapter launcher prompts mention output quality policy", 
       assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
       assert.match(message, /execution_contract\.required_commands/u, adapterId);
       assert.match(message, /sequentially and in order/u, adapterId);
-      assert.match(message, /never repeat readiness setup or package installation/u, adapterId);
+      assert.match(message, /Every changed test file must be exercised by a required command/u, adapterId);
+      assert.match(message, /Never repeat readiness setup or package installation/u, adapterId);
       assert.match(message, /EPERM or EACCES/u, adapterId);
       assert.doesNotMatch(message, /warning-producing stdout\/stderr/u, adapterId);
     }
@@ -1771,6 +1772,10 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.execution_contract.command_execution_policy.readiness_setup_owner, "controller");
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.warning_clean_required, true);
     assert.equal(response.output.runner_output.execution_contract.output_quality_policy.exit_zero_warning_output_is_failure, true);
+    assert.match(
+      response.output.runner_output.execution_contract.output_quality_policy.required_runner_action,
+      /Every changed test file must be exercised by a required command/u,
+    );
     assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.applies_to, [
       "required_commands",
       "verification_expectations.primary_commands",

@@ -48,7 +48,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S17 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S17 -> W66-S18 -> W66-S19 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -1173,6 +1173,91 @@ installed-console gates are trustworthy.
   changes, large provider execution, four-cell closure, or production
   clearance.
 
+## W66-S19 — Provider verification-scope convergence
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** External providers keep test changes inside the surface exercised
+  by mission-primary commands, while the private controller preserves public
+  review approval semantics and attributes verification-mapping blockers before
+  delivery.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** provider work-packet instructions, Ky small-canary
+  contract, private review gate and run-health classification, adapter/live-E2E
+  regressions
+- **Hard dependencies:** W66-S18
+- **Primary user story surfaces:** DEV-04, AIP-12, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Diagnostic evidence disposition**
+   - Purpose: Preserve the completed provider execution without accepting an
+     unverified broad target diff.
+   - Changes: Record `w66-s18-guided-5bee6927-r1-20260802` as diagnostic-only;
+     its provider, primary verification, Runtime Harness, and QA passed, but
+     delivery correctly blocked because four changed test files were outside
+     the mission-primary AVA command.
+   - Validation: No browser, medium, or large result from `5bee6927` counts
+     toward qualification and W66-S09 remains blocked during S19.
+2. **Verification-scope provider guardrail**
+   - Purpose: Prevent a provider from creating review-blocking test evidence it
+     is contractually forbidden to execute.
+   - Changes: Strengthen the runner-agnostic provider work-packet and all
+     adapter launcher instructions: every changed test file must be exercised
+     by `required_commands`; otherwise the provider must avoid that edit or
+     return a bounded scope-mismatch report. Clarify the Ky header canary to
+     keep test changes in `test/headers.ts`.
+   - Validation: Codex, Claude, OpenCode, and Qwen share the same instruction;
+     setup and diagnostics remain controller-owned and packet v2 stays
+     backward-compatible.
+3. **Review-owner fidelity**
+   - Purpose: Stop before an impossible public approve call and retain the
+     actual provider-quality owner.
+   - Changes: Align private delivery eligibility with the public review gate:
+     `warn` is delivery-compatible only with `review_recommendation=proceed`
+     and no failed finding. Map a primary-pass verification warning with
+     `required-human-review` to provider-owned `verification_mapping_gap`.
+   - Validation: The controller never calls public approve for human-review
+     evidence; genuine bounded `warn+proceed` remains compatible.
+4. **Deterministic closure and qualification reset**
+   - Purpose: Establish a new immutable behavior commit before another paid
+     run.
+   - Changes: Run focused adapter/catalog/controller tests, root/browser/
+     package/install gates, close S19, sync readiness, and freeze a replacement
+     W66 manifest.
+   - Validation: `pnpm slice:gate -- W66-S19` passes without provider calls and
+     W66-S09 returns to active only after the new commit is frozen.
+
+### Acceptance criteria
+
+1. Provider-facing instructions forbid changed test files not exercised by
+   ordered mission-primary `required_commands`.
+2. The Ky small header canary explicitly limits test edits to
+   `test/headers.ts`; source changes remain governed by lint and build.
+3. `warn+required-human-review` cannot reach public approve and preserves
+   provider/review/`verification_mapping_gap` classification.
+4. `warn+proceed`, no failed finding, and passing Runtime Harness retain the
+   W66-S10 approval compatibility.
+5. Packet version, session budget, timeout, sandbox, public review contract,
+   and large profiles are unchanged.
+6. Focused and deterministic slice gates pass before another paid provider
+   call.
+
+### Done evidence
+
+- Adapter parity and verification-scope instruction regressions.
+- Review eligibility and owner-classification regressions for proceed,
+  human-review, repair, and failed findings.
+- Deterministic gate results, closed W66-S19 slice, and replacement frozen
+  qualification manifest.
+
+### Out of scope
+
+- Auto-approving human-review evidence, dynamically executing provider-chosen
+  commands, target-source repair, provider timeout changes, large provider
+  execution, four-cell closure, or production clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -1184,7 +1269,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S18
+- **Hard dependencies:** W66-S19
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

@@ -293,9 +293,12 @@ function reviewRequiresActionableRepair(reviewReport, reviewOverallStatus) {
 }
 
 export function reviewAllowsLiveE2eDelivery(reviewReport, reviewOverallStatus) {
-  // Preserve public warnings without treating non-actionable evidence as a repair failure.
+  // Stay exactly within the public review-decision approval boundary.
+  const recommendation = asNonEmptyString(reviewReport.review_recommendation);
   return reviewOverallStatus === "pass" ||
-    (reviewOverallStatus === "warn" && !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus));
+    (reviewOverallStatus === "warn" &&
+      recommendation === "proceed" &&
+      !reviewRequiresActionableRepair(reviewReport, reviewOverallStatus));
 }
 
 /**
@@ -379,7 +382,7 @@ function reviewHasOnlyVerificationMappingFindings(reviewReport) {
  * @param {{ reviewReport: Record<string, unknown>, artifacts: Record<string, unknown> }} options
  * @returns {string}
  */
-function classifyNonRepairReviewBlocker(options) {
+export function classifyNonRepairReviewBlocker(options) {
   if (
     reviewHasOnlyVerificationMappingFindings(options.reviewReport) &&
     asNonEmptyString(options.artifacts.post_run_verify_status) === "pass"
