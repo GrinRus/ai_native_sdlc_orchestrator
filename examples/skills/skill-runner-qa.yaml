@@ -9,6 +9,8 @@ workflow:
     instruction: map QA checks to acceptance criteria and policy gate requirements
   - id: execute-validation
     instruction: run deterministic tests first and classify failures with repro notes
+  - id: inspect-warning-output
+    instruction: inspect verification stdout/stderr for warning-producing behavior introduced by the change and report it as QA failure unless the same warning is reproduced by the same command on an unchanged baseline
   - id: package-evidence
     instruction: publish pass/fail summary with explicit evidence references
 required_inputs:

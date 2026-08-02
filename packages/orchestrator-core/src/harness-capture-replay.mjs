@@ -120,7 +120,7 @@ export function replayHarnessCapture(options) {
     dryRun: true,
   });
 
-  const compatibility = compareHarnessCompatibility({
+  let compatibility = compareHarnessCompatibility({
     capture,
     currentStepResult: currentStep.stepResult,
   });
@@ -162,12 +162,18 @@ export function replayHarnessCapture(options) {
         ? replayEval.evaluationReport.summary_metrics.aggregate_pass_rate
         : null;
 
+    compatibility = compareHarnessCompatibility({
+      capture,
+      currentStepResult: currentStep.stepResult,
+      currentEvaluationReport: replayEval.evaluationReport,
+    });
     comparable =
+      compatibility.compatible &&
       baselineStatus === replayEval.evaluationReport.status &&
       baselinePassRate !== null &&
       replayPassRate !== null &&
       baselinePassRate === replayPassRate;
-    replayStatus = comparable ? "pass" : "fail";
+    replayStatus = compatibility.compatible ? (comparable ? "pass" : "fail") : "incompatible";
   }
 
   const replayReport = {

@@ -6,9 +6,15 @@ import { fileURLToPath } from "node:url";
 
 import {
   getContractFamilyIndex,
+  classifyAllowedPaths,
+  derivePublicId,
   loadContractFile,
   loadExampleContracts,
+  matchesAllowedPath,
+  validateAllowedPathPattern,
   validateContractDocument,
+  validatePublicId,
+  validateReferenceBinding,
 } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -84,6 +90,181 @@ test("loads all examples through the shared contracts path", () => {
   assert.equal(loaded.ok, true, "batch example loading should pass");
 });
 
+test("canonical public identifiers reject traversal, separators, controls, Unicode, and lossy normalization", () => {
+  for (const value of ["a", "aor-core", "run.canonical_1", `a${"b".repeat(126)}c`]) {
+    assert.equal(validatePublicId(value).ok, true, value);
+  }
+  for (const [value, valueClass] of [
+    ["../run", "path-separator"],
+    ["run\\child", "path-separator"],
+    ["C:run", "drive-form"],
+    ["run..child", "dot-segment"],
+    ["run\r\nchild", "control-character"],
+    ["RÜN", "non-ascii-or-lossy-normalization"],
+    ["RUN", "grammar"],
+    ["run-", "grammar"],
+  ]) {
+    const validation = validatePublicId(value);
+    assert.equal(validation.ok, false, value);
+    assert.equal(validation.value_class, valueClass, value);
+  }
+  assert.notEqual("RÜN".toLowerCase().normalize("NFKD"), "RÜN");
+  assert.equal(derivePublicId(["run-1", "event", "000001"], "event"), "run-1.event.000001");
+  assert.match(derivePublicId([`run-${"r".repeat(124)}`, "event", "000001"], "event"), /^event-[a-f0-9]{32}$/u);
+  assert.throws(() => derivePublicId(["RUN-1", "event"], "event"), /Cannot derive/u);
+});
+
+test("allowed_paths distinguishes absent, deny-all, bounded, unrestricted, and malformed scopes", () => {
+  assert.equal(classifyAllowedPaths(undefined).state, "absent");
+  assert.equal(classifyAllowedPaths([]).state, "deny-all");
+  assert.equal(classifyAllowedPaths(["source/*.ts"]).state, "bounded");
+  assert.equal(classifyAllowedPaths(["**"]).state, "unrestricted");
+  assert.equal(classifyAllowedPaths(["**/*"]).state, "unrestricted");
+  for (const value of ["/tmp/**", "C:/tmp/**", "../source/**", "source\\**", "source/[ab].ts", "source/?.ts", "source/**.ts", "source//x"] ) {
+    assert.equal(validateAllowedPathPattern(value).ok, false, value);
+  }
+  assert.equal(matchesAllowedPath("source/*.ts", "source/index.ts"), true);
+  assert.equal(matchesAllowedPath("source/*.ts", "source/nested/index.ts"), false);
+  assert.equal(matchesAllowedPath("source/*.ts", "source/index.js"), false);
+  assert.equal(matchesAllowedPath("source/**", "source/nested/index.ts"), true);
+  assert.equal(matchesAllowedPath("source/**", "source-escape/index.ts"), false);
+});
+
+test("contract diagnostics identify rejected value class and a safe migration action", () => {
+  const invalidId = validateContractDocument({
+    family: "project-profile",
+    document: { project_id: "../AOR", project_kind: "monorepo", repo_topology: "monorepo", default_routes: {}, default_wrappers: {}, default_prompt_bundles: {}, default_context_bundles: {}, default_skills: {}, step_overrides: {}, policies: {}, verification: {} },
+    source: "test://invalid-id",
+  });
+  assertValidationIssue(invalidId, "identifier_format_invalid", "project_id");
+  assert.match(invalidId.issues.find((entry) => entry.code === "identifier_format_invalid").message, /path-separator|lowercase ASCII/u);
+
+  const loaded = loadContractFile({ filePath: path.join(workspaceRoot, "examples/packets/intake-request-body.complete.yaml"), family: "intake-request-body" });
+  const invalidScope = structuredClone(loaded.document);
+  invalidScope.mission_scope.allowed_paths = ["../source/**"];
+  const scopeValidation = validateContractDocument({ family: "intake-request-body", document: invalidScope, source: "test://invalid-scope" });
+  assertValidationIssue(scopeValidation, "path_scope_invalid", "mission_scope.allowed_paths[0]");
+  assert.match(scopeValidation.issues.find((entry) => entry.code === "path_scope_invalid").message, /Remove empty, '\.', and '\.\.'/u);
+
+  invalidScope.mission_scope.allowed_paths = "**";
+  const nonArrayScope = validateContractDocument({ family: "intake-request-body", document: invalidScope, source: "test://non-array-scope" });
+  assertValidationIssue(nonArrayScope, "path_scope_invalid", "mission_scope.allowed_paths");
+  assert.match(nonArrayScope.issues.find((entry) => entry.code === "path_scope_invalid").message, /use \[\] to deny all/u);
+});
+
+test("relative and evidence references require exactly one canonical base", () => {
+  assert.equal(validateReferenceBinding({ reference: "reports/result.json", base: "runtime-relative" }).ok, true);
+  assert.equal(validateReferenceBinding({ reference: "evidence://runs/run-1", base: "evidence-relative" }).ok, true);
+  assert.equal(validateReferenceBinding({ reference: "src/index.ts", base: "repository-bound" }).ok, true);
+  assert.equal(validateReferenceBinding({ reference: "src/index.ts", base: undefined }).value_class, "missing-or-unknown-base");
+  assert.equal(validateReferenceBinding({ reference: "../outside", base: "project-relative" }).ok, false);
+  assert.equal(validateReferenceBinding({ reference: "reports/result.json", base: "evidence-relative" }).ok, false);
+});
+
+test("structured task plans load while legacy compact plans remain compatible", () => {
+  for (const [fileName, family] of [
+    ["wave-ticket-bootstrap.yaml", "wave-ticket"],
+    ["wave-ticket-structured-medium.yaml", "wave-ticket"],
+    ["handoff-wave-004.yaml", "handoff-packet"],
+    ["handoff-structured-medium.yaml", "handoff-packet"],
+  ]) {
+    const loaded = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples/packets", fileName),
+      family,
+    });
+    assert.equal(loaded.ok, true, `${fileName} should remain contract-valid`);
+  }
+});
+
+test("structured task validation rejects dependency, scope, coverage, and verification gaps", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/packets/wave-ticket-structured-medium.yaml"),
+    family: "wave-ticket",
+  });
+  assert.equal(loaded.ok, true);
+
+  const invalidDependency = structuredClone(loaded.document);
+  invalidDependency.local_tasks[0].depends_on = ["task.unknown"];
+  assert.equal(validateContractDocument({ family: "wave-ticket", document: invalidDependency }).ok, false);
+
+  const duplicateId = structuredClone(loaded.document);
+  duplicateId.local_tasks[1].task_id = duplicateId.local_tasks[0].task_id;
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: duplicateId }).issues.some(
+    (problem) => problem.message.includes("Duplicate task id"),
+  ));
+
+  const dependencyCycle = structuredClone(loaded.document);
+  dependencyCycle.local_tasks[0].depends_on = [dependencyCycle.local_tasks.at(-1).task_id];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: dependencyCycle }).issues.some(
+    (problem) => problem.message.includes("contains a cycle"),
+  ));
+
+  const invalidScope = structuredClone(loaded.document);
+  invalidScope.local_tasks[0].scope.allowed_paths = ["packages/settlement/**"];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidScope }).issues.some(
+    (problem) => problem.message.includes("widens the approved plan scope"),
+  ));
+
+  const invalidRepoScope = structuredClone(loaded.document);
+  invalidRepoScope.local_tasks[0].scope.repo_ids = ["unknown-repo"];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidRepoScope }).issues.some(
+    (problem) => problem.message.includes("Task repository 'unknown-repo' widens the approved plan scope"),
+  ));
+
+  const invalidCoverage = structuredClone(loaded.document);
+  invalidCoverage.local_tasks.forEach((task) => {
+    task.criteria_refs = task.criteria_refs.filter((criterionId) => criterionId !== "goal.actionable-errors");
+  });
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidCoverage }).issues.some(
+    (problem) => problem.message.includes("is not owned by any task"),
+  ));
+
+  const invalidVerification = structuredClone(loaded.document);
+  invalidVerification.local_tasks[0].verification.command_group_refs = [];
+  invalidVerification.local_tasks[0].verification.validators = [];
+  invalidVerification.local_tasks[0].verification.manual_checks = [];
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidVerification }).issues.some(
+    (problem) => problem.message.includes("has no executable or reviewable verification"),
+  ));
+
+  const unownedEvidence = structuredClone(loaded.document);
+  unownedEvidence.expected_evidence.push("delivery-manifest");
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: unownedEvidence }).issues.some(
+    (problem) => problem.message.includes("is not owned by any task"),
+  ));
+
+  const invalidGrouping = structuredClone(loaded.document);
+  invalidGrouping.local_tasks[0].execution_hints.group_key = "solo-group";
+  invalidGrouping.local_tasks[0].execution_hints.group_reason = "Try to group one task.";
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidGrouping }).issues.some(
+    (problem) => problem.message.includes("has only one task"),
+  ));
+
+  const readableIncompleteMedium = structuredClone(loaded.document);
+  readableIncompleteMedium.plan_status = "revision-required";
+  readableIncompleteMedium.local_tasks = readableIncompleteMedium.local_tasks.slice(0, 1);
+  assert.equal(validateContractDocument({ family: "wave-ticket", document: readableIncompleteMedium }).ok, true);
+
+  const invalidMultirepoSmall = structuredClone(loaded.document);
+  invalidMultirepoSmall.plan_size = "small";
+  invalidMultirepoSmall.scope.repo_scopes.push("secondary");
+  invalidMultirepoSmall.local_tasks = invalidMultirepoSmall.local_tasks.slice(0, 2);
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: invalidMultirepoSmall }).issues.some(
+    (problem) => problem.message.includes("Bounded multirepo plans cannot"),
+  ));
+
+  const splitRequired = structuredClone(loaded.document);
+  splitRequired.plan_size = "xlarge";
+  splitRequired.local_tasks = Array.from({ length: 8 }, (_, index) => ({
+    ...structuredClone(loaded.document.local_tasks[0]),
+    task_id: `task.xlarge-${index + 1}`,
+    depends_on: [],
+  }));
+  assert.ok(validateContractDocument({ family: "wave-ticket", document: splitRequired }).issues.some(
+    (problem) => problem.message.includes("mission-split-required"),
+  ));
+});
+
 test("loads monorepo and bounded multirepo profiles through the same project-profile contract path", () => {
   for (const profileName of ["project.aor.yaml", "project.bounded-multirepo.aor.yaml"]) {
     const loaded = loadContractFile({
@@ -92,6 +273,117 @@ test("loads monorepo and bounded multirepo profiles through the same project-pro
     });
     assert.equal(loaded.ok, true, `${profileName} should load as project-profile`);
   }
+});
+
+test("W61 topology contracts preserve legacy defaults and fail closed on unsafe shared writes", () => {
+  const legacy = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.github.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(legacy.ok, true);
+
+  const project = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(project.ok, true);
+  assert.equal(project.document.components.length, 2);
+
+  const binding = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/bindings/aor-core.local.yaml"),
+    family: "project-binding",
+  });
+  assert.equal(binding.ok, true);
+
+  const workspaceSet = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/workspace-sets/aor-core.no-write.yaml"),
+    family: "workspace-set",
+  });
+  assert.equal(workspaceSet.ok, true);
+
+  const invalid = loadContractFile({
+    filePath: path.join(workspaceRoot, "packages/contracts/test/fixtures/workspace-set.invalid-overlap.yaml"),
+    family: "workspace-set",
+  });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.validation.issues.some((problem) => problem.message.includes("unsafe overlapping write scope")));
+});
+
+test("artifact workflow prompt bundles validate as artifact execution prompts", () => {
+  const expected = {
+    discovery: {
+      ref: "prompt-bundle://discovery-default@v1",
+      fileName: "discovery-default.yaml",
+      requiredPackets: ["step-input-context"],
+    },
+    research: {
+      ref: "prompt-bundle://research-default@v1",
+      fileName: "research-default.yaml",
+      requiredPackets: ["discovery"],
+    },
+    spec: {
+      ref: "prompt-bundle://spec-default@v1",
+      fileName: "spec-default.yaml",
+      requiredPackets: ["discovery", "research"],
+    },
+  };
+
+  const projectProfile = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(projectProfile.ok, true, "project profile should load as project-profile");
+  const defaultPromptBundles = /** @type {Record<string, string>} */ (projectProfile.document.default_prompt_bundles);
+  assert.equal(new Set(Object.values(expected).map((entry) => entry.ref)).size, 3);
+
+  for (const [step, metadata] of Object.entries(expected)) {
+    assert.equal(defaultPromptBundles[step], metadata.ref);
+    const prompt = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples/prompts", metadata.fileName),
+      family: "prompt-bundle",
+    });
+    assert.equal(prompt.ok, true, `${metadata.fileName} should load as prompt-bundle`);
+    assert.equal(prompt.document.step_class, "artifact");
+    const requiredInputs = /** @type {Record<string, unknown>} */ (prompt.document.required_inputs);
+    const packets = /** @type {Record<string, unknown>} */ (requiredInputs.packets);
+    assert.deepEqual(packets.required, metadata.requiredPackets);
+  }
+});
+
+test("verification archetype profile documents migration command-group examples", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.verification-archetypes.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(loaded.ok, true, "verification archetype profile should load as project-profile");
+
+  const verification = /** @type {Record<string, unknown>} */ (loaded.document.verification);
+  const groups = /** @type {Array<Record<string, unknown>>} */ (verification.command_groups);
+  const roles = new Set(groups.map((group) => group.role));
+  assert.ok(roles.has("setup"));
+  assert.ok(roles.has("build"));
+  assert.ok(roles.has("lint"));
+  assert.ok(roles.has("test"));
+  assert.ok(roles.has("e2e"));
+  assert.ok(roles.has("full-suite"));
+
+  const browserGroup = groups.find((group) => group.id === "browser-app-post-change-e2e");
+  assert.ok(browserGroup, "expected browser e2e command group");
+  assert.equal(browserGroup?.enforcement, "warn");
+  assert.equal(browserGroup?.timeout_class, "browser-e2e");
+  assert.equal(/** @type {Record<string, unknown>} */ (browserGroup?.skip_policy).outcome, "missing-tool");
+
+  const fullSuiteGroup = groups.find((group) => group.id === "workspace-post-change-full-suite");
+  assert.ok(fullSuiteGroup, "expected workspace full-suite command group");
+  assert.equal(fullSuiteGroup?.enforcement, "observe");
+
+  const baselineGroup = groups.find((group) => group.id === "legacy-service-baseline-test");
+  assert.ok(baselineGroup, "expected legacy-service baseline command group");
+  assert.equal(baselineGroup?.phase, "baseline");
+  assert.equal(/** @type {Record<string, unknown>} */ (baselineGroup?.skip_policy).outcome, "broken-baseline");
+
+  const outcomes = /** @type {Array<Record<string, unknown>>} */ (verification.discovery_outcomes);
+  assert.equal(outcomes.some((outcome) => outcome.outcome === "no-tests" && outcome.working_dir === "docs"), true);
 });
 
 test("returns actionable error when required field is missing", () => {
@@ -241,6 +533,154 @@ test("project profile requires default prompt and context bundle defaults", () =
   );
 });
 
+test("project profile validates verification command group enums", () => {
+  const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.verification.command_groups[0].role = "live-e2e-diagnostic";
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "project-profile",
+      document: candidate,
+      source: "test://invalid-verification-command-group-role",
+    }),
+    "enum_value_invalid",
+    "verification.command_groups[0].role",
+  );
+});
+
+test("project profile accepts optional artifact readiness soft policy", () => {
+  const source = path.join(workspaceRoot, "examples/project.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.artifact_readiness_policy = {
+    research: {
+      allow_incomplete_for_spec: true,
+      reason: "Explicit operator policy allows bounded spec drafting from incomplete research.",
+    },
+  };
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: candidate,
+    source: "test://artifact-readiness-policy",
+  });
+
+  assert.equal(validation.ok, true);
+});
+
+test("next action report validates artifact readiness statuses", () => {
+  const source = path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "next-action-report" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.artifact_readiness.stages.spec.status = "maybe-ready";
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "next-action-report",
+      document: candidate,
+      source: "test://invalid-artifact-readiness-status",
+    }),
+    "enum_value_invalid",
+    "artifact_readiness.stages.spec.status",
+  );
+});
+
+test("next action report validates additive structured operator controls", () => {
+  const source = path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "next-action-report" });
+  assert.equal(loaded.document.primary_action.operator_control.category, "mutation");
+  assert.equal(loaded.document.primary_action.operator_control.operation.command, "discovery run");
+  const invalid = structuredClone(loaded.document);
+  invalid.primary_action.operator_control.category = "shell";
+  const result = validateContractDocument({ document: invalid, family: "next-action-report", source });
+  assert.equal(result.ok, false);
+  assert.ok(result.issues.some((entry) => entry.field === "primary_action.operator_control.category"));
+});
+
+test("verification command groups accept W54 authoring metadata", () => {
+  const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.verification.command_groups[0] = {
+    ...candidate.verification.command_groups[0],
+    repo_id: "target",
+    working_dir: "packages/app",
+    depends_on: ["setup-readiness"],
+    detected_from: ["package.json#scripts.test"],
+    package_manager: "pnpm",
+    tool_requirements: [
+      {
+        tool: "node",
+        version_range: ">=22",
+        install_hint: "Use the project-pinned Node runtime.",
+      },
+    ],
+    skip_policy: {
+      outcome: "no-tests",
+      applies_when: "No test script is declared.",
+      reason: "No synthetic passing test command should be invented.",
+    },
+  };
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: candidate,
+    source: "test://w54-command-group-authoring-fields",
+  });
+
+  assert.equal(validation.ok, true);
+});
+
+test("verification command groups reject private proof-harness fields", () => {
+  const source = path.join(workspaceRoot, "examples/project.github.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.verification.command_groups[0].target_readiness = {
+    owner: "live-e2e",
+  };
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "project-profile",
+      document: candidate,
+      source: "test://private-proof-harness-command-group-field",
+    }),
+    "unsupported_field_present",
+    "verification.command_groups[0].target_readiness",
+  );
+});
+
+test("step result validates generic command group outcomes", () => {
+  const source = path.join(workspaceRoot, "examples/reports/step-result.verify-missing-tool.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "step-result" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.command_group_outcome = "live-e2e-blocked";
+
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: candidate,
+      source: "test://invalid-command-group-outcome",
+    }),
+    "enum_value_invalid",
+    "command_group_outcome",
+  );
+});
+
 test("provider-route-profile rejects legacy wrapper ownership field", () => {
   const source = path.join(workspaceRoot, "examples/routes/implement-default.yaml");
   const loaded = loadContractFile({ filePath: source, family: "provider-route-profile" });
@@ -294,27 +734,6 @@ test("wrapper-profile rejects legacy prompt and session bootstrap fields", () =>
   );
 });
 
-test("W14 live-e2e provider variant catalog documents validate", () => {
-  assertDirectoryContractsLoad(
-    path.join(workspaceRoot, "scripts/live-e2e/catalog/providers"),
-    "live-e2e-provider-variant",
-  );
-});
-
-test("W14 live-e2e scenario policy documents validate", () => {
-  assertDirectoryContractsLoad(
-    path.join(workspaceRoot, "scripts/live-e2e/catalog/scenarios"),
-    "live-e2e-scenario-policy",
-  );
-});
-
-test("W14 live-e2e target catalog documents validate", () => {
-  assertDirectoryContractsLoad(
-    path.join(workspaceRoot, "scripts/live-e2e/catalog/targets"),
-    "live-e2e-target-catalog",
-  );
-});
-
 test("new runtime context family examples load through the shared contract path", () => {
   const examples = [
     [path.join(workspaceRoot, "examples/context/docs/repo-map-core.yaml"), "context-doc"],
@@ -328,6 +747,119 @@ test("new runtime context family examples load through the shared contract path"
     const loaded = loadContractFile({ filePath, family });
     assert.equal(loaded.ok, true, `expected ${family} example to load`);
   }
+});
+
+test("compiled-context artifact requires budget and compaction reports", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/context/compiled/implement-runner-default.sample.yaml"),
+    family: "compiled-context-artifact",
+  });
+  assert.equal(loaded.ok, true, "expected compiled-context sample to load");
+
+  const missingBudget = structuredClone(loaded.document);
+  delete missingBudget.budget_report;
+
+  const missingBudgetValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: missingBudget,
+    source: "test://compiled-context-missing-budget",
+  });
+
+  assertValidationIssue(missingBudgetValidation, "required_field_missing", "budget_report");
+
+  const missingSkillRefs = structuredClone(loaded.document);
+  delete missingSkillRefs.skill_refs;
+
+  const missingSkillRefsValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: missingSkillRefs,
+    source: "test://compiled-context-missing-skill-refs",
+  });
+
+  assertValidationIssue(missingSkillRefsValidation, "required_field_missing", "skill_refs");
+
+  const invalidSourceBreakdown = structuredClone(loaded.document);
+  invalidSourceBreakdown.budget_report.source_breakdown = [{ source: "context" }];
+
+  const invalidBreakdownValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: invalidSourceBreakdown,
+    source: "test://compiled-context-invalid-breakdown",
+  });
+
+  assertValidationIssue(invalidBreakdownValidation, "required_field_missing", "budget_report.source_breakdown[0].bytes");
+});
+
+test("adapter capability profile rejects unrestricted stdin-json for external-process adapters", () => {
+  const invalidProfile = {
+    adapter_id: "test-live-adapter",
+    version: 1,
+    capabilities: {},
+    constraints: {},
+    execution: {
+      runtime_mode: "external-process",
+      external_runtime: {
+        command: "node",
+        request_transport: "stdin-json",
+      },
+    },
+  };
+
+  const invalidValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: invalidProfile,
+    source: "test://adapter-stdin-json-unscoped",
+  });
+
+  assertValidationIssue(
+    invalidValidation,
+    "required_field_missing",
+    "execution.external_runtime.stdin_json_scope",
+  );
+
+  const validProfile = structuredClone(invalidProfile);
+  validProfile.execution.external_runtime.stdin_json_scope = "test-only";
+
+  const validValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: validProfile,
+    source: "test://adapter-stdin-json-test-only",
+  });
+
+  assert.equal(validValidation.ok, true);
+});
+
+test("adapter capability profile validates default invocation args", () => {
+  const validProfile = {
+    adapter_id: "test-live-defaults",
+    version: 1,
+    capabilities: {},
+    constraints: {},
+    execution: {
+      external_runtime: {
+        default_args: ["--model", "gpt-5.5"],
+      },
+    },
+  };
+  const validValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: validProfile,
+    source: "test://adapter-default-args",
+  });
+  assert.equal(validValidation.ok, true);
+
+  const invalidProfile = structuredClone(validProfile);
+  invalidProfile.execution.external_runtime.default_args = ["--model", 5];
+  const invalidValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: invalidProfile,
+    source: "test://adapter-default-args-invalid",
+  });
+  assertValidationIssue(
+    invalidValidation,
+    "field_type_mismatch",
+    "execution.external_runtime.default_args[1]",
+  );
 });
 
 test("runtime harness report example loads through the shared contract path", () => {
@@ -379,6 +911,20 @@ test("review decision example preserves explicit approval vocabulary", () => {
   assert.equal(loaded.ok, true, "expected review-decision example to load");
   assert.equal(loaded.document.decision, "approve");
   assert.equal(loaded.document.delivery_gate.status, "pass");
+  assert.deepEqual(loaded.document.repair_context, {
+    source_phase: "none",
+    cycle_iteration: 0,
+    unresolved_findings: [],
+    unresolved_finding_details: [],
+    meaningful_changed_paths: [],
+	    verification_status: "pass",
+	    verification_refs: [],
+	    previous_repair_decision_refs: [],
+	    context_fingerprint: "none",
+	    new_context_since_previous: [],
+	    stop_reason: "none",
+	    requested_next_step: "none",
+	  });
 
   const invalid = structuredClone(loaded.document);
   invalid.decision = "proceed";
@@ -391,6 +937,269 @@ test("review decision example preserves explicit approval vocabulary", () => {
   assert.ok(
     validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "decision"),
     "expected invalid review decision value to be rejected",
+  );
+
+  const missingRepairContext = structuredClone(loaded.document);
+  delete missingRepairContext.repair_context;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-decision",
+      document: missingRepairContext,
+      source: "test://review-decision-missing-repair-context",
+    }),
+    "required_field_missing",
+    "repair_context",
+  );
+
+  const invalidRepair = structuredClone(loaded.document);
+  invalidRepair.decision = "request-repair";
+  invalidRepair.repair_context = {
+    source_phase: "none",
+    cycle_iteration: 0,
+    unresolved_findings: [],
+    unresolved_finding_details: [],
+    meaningful_changed_paths: [],
+    verification_status: "not_pass",
+    verification_refs: [],
+    previous_repair_decision_refs: [],
+    context_fingerprint: "",
+    new_context_since_previous: [],
+    stop_reason: "",
+    requested_next_step: "none",
+  };
+  const invalidRepairValidation = validateContractDocument({
+    family: "review-decision",
+    document: invalidRepair,
+    source: "test://review-decision-invalid-repair-context",
+  });
+  assert.equal(invalidRepairValidation.ok, false);
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "repair_context.source_phase",
+    ),
+    "expected request-repair decisions to require a supported repair source phase",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.unresolved_findings",
+    ),
+    "expected request-repair decisions to preserve unresolved findings",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.context_fingerprint",
+    ),
+    "expected request-repair decisions to preserve a context fingerprint",
+  );
+  assert.ok(
+    invalidRepairValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "repair_context.unresolved_finding_details",
+    ),
+    "expected request-repair decisions to preserve structured unresolved finding details",
+  );
+
+  const validRepair = structuredClone(loaded.document);
+  validRepair.decision = "request-repair";
+  validRepair.repair_context = {
+    source_phase: "qa",
+    cycle_iteration: 2,
+    unresolved_findings: ["QA evaluation found a regression that requires another implementation iteration."],
+    unresolved_finding_details: [
+      {
+        finding_id: "qa.evaluation-status",
+        category: "qa",
+        severity: "blocking",
+        summary: "QA evaluation found a regression that requires another implementation iteration.",
+        evidence_refs: [loaded.document.review_report_ref],
+        resolution_requirement: "Repair the regression or provide fresh evidence that the QA finding is stale.",
+        verification_failure_details: [
+          {
+            command: "npx ava test/retry.ts --match='*shouldRetry*'",
+            command_group_id: "post-change-test",
+            role: "test",
+            phase: "post-change",
+            enforcement: "required",
+            enforcement_result: "fail",
+            outcome: null,
+            exit_code: 1,
+            signal: null,
+            error_code: null,
+            timed_out: false,
+            timeout_class: "focused-test",
+            command_timeout_ms: 300000,
+            working_dir: ".",
+            repo_scope: "target",
+            stdout_excerpt: "shouldRetry hook failed",
+            stderr_excerpt: "",
+            failure_summary: "Post-change verification command failed with exit code 1.",
+            evidence_refs: [loaded.document.review_report_ref],
+          },
+        ],
+      },
+    ],
+    meaningful_changed_paths: ["src/client.py", "tests/test_client.py"],
+    verification_status: "fail",
+    verification_refs: [loaded.document.review_report_ref],
+    previous_repair_decision_refs: [],
+    context_fingerprint: "sha256:valid-qa-repair-context",
+    new_context_since_previous: ["first-repair-decision"],
+    stop_reason: "QA failed after a passing review.",
+    requested_next_step: "execution",
+  };
+  const validRepairValidation = validateContractDocument({
+    family: "review-decision",
+    document: validRepair,
+    source: "test://review-decision-valid-qa-repair-context",
+  });
+  assert.equal(validRepairValidation.ok, true, JSON.stringify(validRepairValidation.issues, null, 2));
+
+  const repeatedRepair = structuredClone(validRepair);
+  repeatedRepair.repair_context.previous_repair_decision_refs = ["evidence://reports/review-decision-1.json"];
+  repeatedRepair.repair_context.new_context_since_previous = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-decision",
+      document: repeatedRepair,
+      source: "test://review-decision-repeated-repair-without-new-context",
+    }),
+    "required_field_missing",
+    "repair_context.new_context_since_previous",
+  );
+});
+
+test("quality repair request examples share review and QA repair semantics", () => {
+  const examples = [
+    "quality-repair-request.review-origin.yaml",
+    "quality-repair-request.qa-origin.yaml",
+    "quality-repair-request.budget-exhausted.yaml",
+  ];
+
+  for (const example of examples) {
+    const loaded = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples/reports", example),
+      family: "quality-repair-request",
+    });
+    assert.equal(loaded.ok, true, `${example} should load as quality-repair-request`);
+  }
+
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/quality-repair-request.review-origin.yaml"),
+    family: "quality-repair-request",
+  });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+  assert.equal(loaded.document.source_stage, "review");
+  assert.equal(loaded.document.status, "requested");
+  assert.equal(loaded.document.attempt_budget.policy_ref, "project-profile://aor-core#quality_repair_policy");
+
+  const invalidSource = structuredClone(loaded.document);
+  invalidSource.source_stage = "post-run";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "quality-repair-request",
+      document: invalidSource,
+      source: "test://quality-repair-request-invalid-source-stage",
+    }),
+    "enum_value_invalid",
+    "source_stage",
+  );
+
+  const invalidStatus = structuredClone(loaded.document);
+  invalidStatus.status = "waiting";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "quality-repair-request",
+      document: invalidStatus,
+      source: "test://quality-repair-request-invalid-status",
+    }),
+    "enum_value_invalid",
+    "status",
+  );
+
+  const missingPolicy = structuredClone(loaded.document);
+  delete missingPolicy.attempt_budget.policy_ref;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "quality-repair-request",
+      document: missingPolicy,
+      source: "test://quality-repair-request-missing-policy-ref",
+    }),
+    "required_field_missing",
+    "attempt_budget.policy_ref",
+  );
+});
+
+test("W45 repair lineage is additive across downstream reports", () => {
+  const fixtures = [
+    [path.join(workspaceRoot, "examples/reports/review-report.canonical.yaml"), "review-report"],
+    [path.join(workspaceRoot, "examples/reports/review-decision.approve.yaml"), "review-decision"],
+    [path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"), "step-result"],
+    [path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"), "runtime-harness-report"],
+    [path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml"), "next-action-report"],
+  ];
+  const lineage = {
+    request_ref: "evidence://.aor/projects/aor-core/reports/quality-repair-request-review-origin.json",
+    cycle_id: "quality-cycle.review-origin.001",
+    source_stage: "review",
+    status: "review-required",
+    attempt_index: 1,
+    evidence_refs: ["evidence://.aor/projects/aor-core/reports/review-decision-run-review-origin.json"],
+  };
+
+  for (const [filePath, family] of fixtures) {
+    const loaded = loadContractFile({ filePath, family });
+    assert.equal(loaded.ok, true, `${family} fixture should load without quality repair lineage`);
+    assert.equal(Object.hasOwn(loaded.document, "quality_repair_lineage"), false);
+
+    const withLineage = structuredClone(loaded.document);
+    withLineage.quality_repair_lineage = lineage;
+    if (family === "review-decision") {
+      withLineage.quality_repair_request_ref = lineage.request_ref;
+    }
+    const validation = validateContractDocument({
+      family,
+      document: withLineage,
+      source: `test://${family}-with-quality-repair-lineage`,
+    });
+    assert.equal(validation.ok, true, JSON.stringify(validation.issues, null, 2));
+  }
+
+  const invalid = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"),
+    family: "step-result",
+  });
+  assert.equal(invalid.ok, true);
+  const invalidLineage = structuredClone(invalid.document);
+  invalidLineage.quality_repair_lineage = { ...lineage, source_stage: "release" };
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidLineage,
+      source: "test://step-result-invalid-quality-repair-lineage",
+    }),
+    "enum_value_invalid",
+    "quality_repair_lineage.source_stage",
+  );
+});
+
+test("project profile carries policy-driven quality repair defaults", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/project.aor.yaml"),
+    family: "project-profile",
+  });
+  assert.equal(loaded.ok, true, "project profile should load with quality repair policy");
+  assert.equal(loaded.document.quality_repair_policy.max_attempts_per_cycle, 2);
+  assert.equal(loaded.document.quality_repair_policy.blocks_delivery_while_open, true);
+
+  const invalid = structuredClone(loaded.document);
+  invalid.quality_repair_policy.max_attempts_per_cycle = "two";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "project-profile",
+      document: invalid,
+      source: "test://project-profile-invalid-quality-repair-policy",
+    }),
+    "field_type_mismatch",
+    "quality_repair_policy.max_attempts_per_cycle",
   );
 });
 
@@ -618,6 +1427,11 @@ test("control-plane API baseline documents interactive continuation target metad
     ),
     "expected lifecycle command subset to include guided mission create",
   );
+  assert.equal(loaded.document.structured_plan_operations?.status, "implemented");
+  assert.ok(
+    loaded.document.read_operations?.some((operation) => operation.operation_id === "read.flow-plan-progress"),
+    "expected structured plan progress read operation",
+  );
   assert.ok(
     loaded.document.deferred_transport?.implemented_mappings?.includes(
       "GET /api/projects/:projectId/next-action-report",
@@ -649,6 +1463,48 @@ test("control-plane API baseline documents production hardening metadata", () =>
   );
 });
 
+test("control-plane API baseline documents W34 flow projection examples", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  const contract = loaded.document.flow_projection_contract;
+  assert.equal(contract?.owning_slice, "W34-S02");
+  assert.equal(contract?.status, "implemented-read-baseline");
+  assert.ok(contract?.projection_fields?.includes("flow_id"), "expected stable flow id field");
+  assert.ok(contract?.projection_fields?.includes("follow_up_source_handoff_ref"), "expected follow-up lineage field");
+  assert.ok(contract?.projection_fields?.includes("closure_state"), "expected closure projection field");
+  assert.ok(contract?.projection_fields?.includes("mission_settings"), "expected duplicate mission settings field");
+  assert.ok(
+    contract?.read_models?.some((entry) => entry.route === "GET /api/projects/:projectId/flows"),
+    "expected implemented flow list route",
+  );
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.creates_fresh_intake, true);
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.archives_mission_next_action_report, true);
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.mutates_completed_source_flow, false);
+  assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.source_flow_read_only, true);
+  assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.duplicate_settings_create_fresh_intake, true);
+
+  const examples = contract?.example_payloads ?? {};
+  assert.equal(examples.active_flow?.status, "active");
+  assert.equal(examples.completed_flow?.completed_read_only, true);
+  assert.equal(examples.completed_flow?.closure_state?.follow_up_eligible, true);
+  assert.ok(
+    examples.follow_up_flow?.follow_up_source_handoff_ref,
+    "expected follow-up flow example to cite source handoff",
+  );
+  assert.equal(examples.flow_targeted_operator_request_summary?.target_flow_id, examples.active_flow?.flow_id);
+  assert.equal(examples.completed_flow_mutation_block?.error_code, "operator_request.completed_flow_read_only");
+});
+
+test("operator-request examples may target a W34 flow projection", () => {
+  const source = path.join(workspaceRoot, "examples/reports/operator-request.flow-target.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "operator-request" });
+  assert.equal(loaded.ok, true, "expected flow-targeted operator-request example to load");
+  assert.equal(loaded.document.target_flow_id, "flow.aor-core.checkout-risk");
+  assert.equal(loaded.document.delivery_mode, "no-write");
+});
+
 test("control-plane API contract rejects invalid binding mode", () => {
   const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
   const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
@@ -668,257 +1524,6 @@ test("control-plane API contract rejects invalid binding mode", () => {
     (problem) => problem.code === "enum_value_invalid" && problem.field === "binding_mode",
   );
   assert.ok(enumIssue, "expected enum_value_invalid for binding_mode");
-});
-
-test("live E2E observation report loads and enforces status scale", () => {
-  const source = path.join(workspaceRoot, "examples/reports/live-e2e-observation-report.sample.yaml");
-  const loaded = loadContractFile({ filePath: source, family: "live-e2e-observation-report" });
-  assert.equal(loaded.ok, true, "expected live-e2e-observation-report sample to load");
-
-  const candidate = structuredClone(loaded.document);
-  candidate.overall_status = "fail";
-
-  const validation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: candidate,
-    source: "test://live-e2e-observation-invalid-status",
-  });
-
-  assert.equal(validation.ok, false);
-  const enumIssue = validation.issues.find(
-    (problem) => problem.code === "enum_value_invalid" && problem.field === "overall_status",
-  );
-  assert.ok(enumIssue, "expected enum_value_invalid for overall_status");
-
-  const invalidFlowRangePolicyCandidate = structuredClone(loaded.document);
-  invalidFlowRangePolicyCandidate.flow_range_policy = "report_first";
-
-  const invalidFlowRangePolicyValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: invalidFlowRangePolicyCandidate,
-    source: "test://live-e2e-observation-invalid-flow-range-policy",
-  });
-
-  assert.equal(invalidFlowRangePolicyValidation.ok, false);
-  assert.ok(
-    invalidFlowRangePolicyValidation.issues.some(
-      (problem) => problem.code === "enum_value_invalid" && problem.field === "flow_range_policy",
-    ),
-    "expected flow_range_policy to use the supported live E2E policy set",
-  );
-
-  const nestedCandidate = structuredClone(loaded.document);
-  nestedCandidate.step_journal[0].final_step_verdict = "fail";
-  nestedCandidate.step_journal[0].deterministic_analysis.status = "fail";
-  nestedCandidate.step_journal[0].semantic_analysis.status = "fail";
-  nestedCandidate.final_analysis.status = "fail";
-
-  const nestedValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: nestedCandidate,
-    source: "test://live-e2e-observation-invalid-nested-status",
-  });
-
-  assert.equal(nestedValidation.ok, false);
-  for (const field of [
-    "step_journal[0].final_step_verdict",
-    "step_journal[0].deterministic_analysis.status",
-    "step_journal[0].semantic_analysis.status",
-    "final_analysis.status",
-  ]) {
-    assert.ok(
-      nestedValidation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === field),
-      `expected enum_value_invalid for ${field}`,
-    );
-  }
-
-  const missingPlanCandidate = structuredClone(loaded.document);
-  delete missingPlanCandidate.step_journal[0].plan;
-
-  const missingPlanValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: missingPlanCandidate,
-    source: "test://live-e2e-observation-missing-plan",
-  });
-
-  assert.equal(missingPlanValidation.ok, false);
-  assert.ok(
-    missingPlanValidation.issues.some(
-      (problem) => problem.code === "required_field_missing" && problem.field === "step_journal[0].plan",
-    ),
-    "expected step_journal entries without plan to be rejected",
-  );
-
-  const missingOperatorCandidate = structuredClone(loaded.document);
-  delete missingOperatorCandidate.operator_context;
-
-  const missingOperatorValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: missingOperatorCandidate,
-    source: "test://live-e2e-observation-missing-operator-context",
-  });
-
-  assert.equal(missingOperatorValidation.ok, false);
-  assert.ok(
-    missingOperatorValidation.issues.some(
-      (problem) => problem.code === "required_field_missing" && problem.field === "operator_context.operator_kind",
-    ),
-    "expected live E2E reports without operator context to be rejected",
-  );
-
-  const skillAgentDecisionCandidate = structuredClone(loaded.document);
-  skillAgentDecisionCandidate.operator_context = {
-    operator_kind: "skill-agent",
-    operator_ref: "skill://live-e2e-runner",
-    decision_policy: "required",
-    answer_policy: "agent-public-control-plane",
-    target_write_policy: "aor-runtime-only-before-execution",
-  };
-  skillAgentDecisionCandidate.step_journal[0].operator_decision_status = "missing";
-  skillAgentDecisionCandidate.step_journal[0].semantic_analysis.judge_source = "deterministic-runner";
-
-  const skillAgentDecisionValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: skillAgentDecisionCandidate,
-    source: "test://live-e2e-observation-missing-skill-agent-decision",
-  });
-
-  assert.equal(skillAgentDecisionValidation.ok, false);
-  assert.ok(
-    skillAgentDecisionValidation.issues.some(
-      (problem) =>
-        problem.code === "enum_value_invalid" &&
-        problem.field === "step_journal[0].operator_decision_status",
-    ),
-    "expected acceptance reports without accepted skill-agent decisions to be rejected",
-  );
-  assert.ok(
-    skillAgentDecisionValidation.issues.some(
-      (problem) =>
-        problem.code === "enum_value_invalid" &&
-        problem.field === "step_journal[0].semantic_analysis.judge_source",
-    ),
-    "expected deterministic semantic analysis to be rejected for skill-agent reports",
-  );
-
-  const inProgressSkillAgentCandidate = structuredClone(skillAgentDecisionCandidate);
-  inProgressSkillAgentCandidate.report_status = "in_progress";
-
-  const inProgressSkillAgentValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: inProgressSkillAgentCandidate,
-    source: "test://live-e2e-observation-in-progress-skill-agent-decision",
-  });
-
-  assert.equal(inProgressSkillAgentValidation.ok, true);
-
-  const missingInstallCandidate = structuredClone(loaded.document);
-  delete missingInstallCandidate.aor_installation_proof_file;
-
-  const missingInstallValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: missingInstallCandidate,
-    source: "test://live-e2e-observation-missing-install-proof",
-  });
-
-  assert.equal(missingInstallValidation.ok, false);
-  assert.ok(
-    missingInstallValidation.issues.some(
-      (problem) => problem.code === "required_field_missing" && problem.field === "aor_installation_proof_file",
-    ),
-    "expected live E2E reports without installation proof to be rejected",
-  );
-
-  const missingSetupCandidate = structuredClone(loaded.document);
-  missingSetupCandidate.setup_journal = [];
-
-  const missingSetupValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: missingSetupCandidate,
-    source: "test://live-e2e-observation-missing-setup-journal",
-  });
-
-  assert.equal(missingSetupValidation.ok, false);
-  assert.ok(
-    missingSetupValidation.issues.some(
-      (problem) => problem.code === "required_field_missing" && problem.field === "setup_journal",
-    ),
-    "expected live E2E reports without setup evidence to be rejected",
-  );
-
-  const invalidPreludeCandidate = structuredClone(loaded.document);
-  invalidPreludeCandidate.flow_range.prelude_steps = invalidPreludeCandidate.flow_range.prelude_steps.filter(
-    (step) => step !== "install",
-  );
-
-  const invalidPreludeValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: invalidPreludeCandidate,
-    source: "test://live-e2e-observation-invalid-prelude-steps",
-  });
-
-  assert.equal(invalidPreludeValidation.ok, false);
-  assert.ok(
-    invalidPreludeValidation.issues.some(
-      (problem) => problem.code === "enum_value_invalid" && problem.field === "flow_range.prelude_steps[0]",
-    ),
-    "expected flow_range.prelude_steps to start with install",
-  );
-
-  const reorderedSetupCandidate = structuredClone(loaded.document);
-  reorderedSetupCandidate.setup_journal = reorderedSetupCandidate.setup_journal.filter(
-    (entry) => entry.step_id !== "install",
-  );
-
-  const reorderedSetupValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: reorderedSetupCandidate,
-    source: "test://live-e2e-observation-reordered-setup-journal",
-  });
-
-  assert.equal(reorderedSetupValidation.ok, false);
-  assert.ok(
-    reorderedSetupValidation.issues.some(
-      (problem) => problem.code === "enum_value_invalid" && problem.field === "setup_journal[0].step_id",
-    ),
-    "expected live E2E setup evidence to require the install prelude first",
-  );
-
-  const malformedSetupEvidenceCandidate = structuredClone(loaded.document);
-  malformedSetupEvidenceCandidate.setup_journal[0].evidence_refs = [123];
-
-  const malformedSetupEvidenceValidation = validateContractDocument({
-    family: "live-e2e-observation-report",
-    document: malformedSetupEvidenceCandidate,
-    source: "test://live-e2e-observation-malformed-setup-evidence",
-  });
-
-  assert.equal(malformedSetupEvidenceValidation.ok, false);
-  assert.ok(
-    malformedSetupEvidenceValidation.issues.some(
-      (problem) => problem.code === "field_type_mismatch" && problem.field === "setup_journal[0].evidence_refs[0]",
-    ),
-    "expected setup evidence refs to contain strings only",
-  );
-
-  for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {
-    const legacyCandidate = structuredClone(loaded.document);
-    legacyCandidate[legacyField] = [];
-
-    const legacyValidation = validateContractDocument({
-      family: "live-e2e-observation-report",
-      document: legacyCandidate,
-      source: `test://live-e2e-observation-legacy-${legacyField}`,
-    });
-
-    assert.equal(legacyValidation.ok, false);
-    assert.ok(
-      legacyValidation.issues.some(
-        (problem) => problem.code === "unsupported_field_present" && problem.field === legacyField,
-      ),
-      `expected legacy ${legacyField} to be rejected`,
-    );
-  }
 });
 
 test("W23 nested canonical contract examples load through the shared contract path", () => {
@@ -1029,6 +1634,74 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     "field_type_mismatch",
     "findings[0].evidence_refs",
   );
+  const reviewReportWithVerificationDetails = structuredClone(reviewReport.document);
+  reviewReportWithVerificationDetails.findings[0].verification_failure_details = [
+    {
+      command: "npx xo",
+      command_group_id: "post-change-lint",
+      role: "lint",
+      phase: "post-change",
+      enforcement: "required",
+      enforcement_result: "fail",
+      outcome: null,
+      exit_code: 1,
+      signal: null,
+      error_code: null,
+      timed_out: false,
+      timeout_class: "focused-test",
+      command_timeout_ms: 300000,
+      working_dir: ".",
+      repo_scope: "target",
+      stdout_excerpt: "",
+      stderr_excerpt: "test/retry.ts: Type string | null is not assignable to type string.",
+      failure_summary: "Post-change verification command 'npx xo' failed with exit code 1.",
+      evidence_refs: [
+        "evidence://.aor/projects/aor-core/reports/step-result-post-run-primary-1.json",
+        "evidence://.aor/projects/aor-core/reports/transcript-post-run-primary-1.txt",
+      ],
+    },
+  ];
+  assert.equal(
+    validateContractDocument({
+      family: "review-report",
+      document: reviewReportWithVerificationDetails,
+      source: "test://w55-review-report-verification-failure-details",
+    }).ok,
+    true,
+  );
+  const invalidVerificationDetails = structuredClone(reviewReportWithVerificationDetails);
+  invalidVerificationDetails.findings[0].verification_failure_details[0].evidence_refs = [];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: invalidVerificationDetails,
+      source: "test://w55-review-report-invalid-verification-failure-details",
+    }),
+    "required_field_missing",
+    "findings[0].verification_failure_details[0].evidence_refs",
+  );
+  const missingVerificationCoverageReport = structuredClone(reviewReport.document);
+  delete missingVerificationCoverageReport.artifact_quality.verification_coverage;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: missingVerificationCoverageReport,
+      source: "test://w50-review-report-missing-verification-coverage",
+    }),
+    "required_field_missing",
+    "artifact_quality.verification_coverage",
+  );
+  const invalidReviewTraceability = structuredClone(reviewReport.document);
+  invalidReviewTraceability.feature_traceability.required_path_prefixes = ["source/", 42];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: invalidReviewTraceability,
+      source: "test://w35-review-report-invalid-required-path-prefix",
+    }),
+    "field_type_mismatch",
+    "feature_traceability.required_path_prefixes[1]",
+  );
 
   const liveRunEvent = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/live-run-event.canonical.yaml"),
@@ -1130,4 +1803,22 @@ test("contract index mapping covers every docs/contracts/00-index entry", () => 
   assert.ok(controlPlaneEntry, "expected control-plane-api in family index");
   assert.equal(controlPlaneEntry.status, "implemented");
   assert.equal(controlPlaneEntry.exampleGlob, "examples/control-plane-api/*.yaml");
+});
+
+test("execution readiness contracts reject secret-bearing top-level fields", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/execution/execution-readiness-report.ready.yaml"),
+    family: "execution-readiness-report",
+  });
+  assert.equal(loaded.ok, true);
+  const invalid = { ...loaded.document, token: "secret-canary" };
+  assertValidationIssue(
+    validateContractDocument({
+      family: "execution-readiness-report",
+      document: invalid,
+      source: "test://execution-readiness-secret",
+    }),
+    "unsupported_field_present",
+    "token",
+  );
 });

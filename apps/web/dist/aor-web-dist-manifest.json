@@ -1,0 +1,51 @@
+{
+  "manifest_version": 2,
+  "source_hash": "6e193d141ae670aea36f71985a252e87aee8ce4c64d6dc18e0e111f25abe279b",
+  "source_files": [
+    "apps/web/index.html",
+    "apps/web/package.json",
+    "apps/web/src/console-experience.js",
+    "apps/web/src/control-plane-client.js",
+    "apps/web/src/dialog.jsx",
+    "apps/web/src/execution-orchestration-model.js",
+    "apps/web/src/execution-orchestration.css",
+    "apps/web/src/execution-orchestration.jsx",
+    "apps/web/src/execution-setup.css",
+    "apps/web/src/execution-setup.jsx",
+    "apps/web/src/mission-builder.css",
+    "apps/web/src/mission-builder.jsx",
+    "apps/web/src/mission-model.js",
+    "apps/web/src/operator-control.js",
+    "apps/web/src/operator-error-card.jsx",
+    "apps/web/src/operator-operations.js",
+    "apps/web/src/plan-workbench-views.jsx",
+    "apps/web/src/plan-workbench.jsx",
+    "apps/web/src/project-snapshot.js",
+    "apps/web/src/project-structure-model.js",
+    "apps/web/src/project-structure.css",
+    "apps/web/src/project-structure.jsx",
+    "apps/web/src/quiet-modes-model.js",
+    "apps/web/src/quiet-modes.css",
+    "apps/web/src/quiet-modes.jsx",
+    "apps/web/src/quiet-presentation.js",
+    "apps/web/src/quiet-shell.css",
+    "apps/web/src/quiet-shell.jsx",
+    "apps/web/src/spa.css",
+    "apps/web/src/spa.jsx",
+    "apps/web/src/ui/components.css",
+    "apps/web/src/ui/components.jsx",
+    "apps/web/src/ui/semantics.js",
+    "apps/web/src/ui/tokens.css",
+    "apps/web/vite.config.mjs"
+  ],
+  "dist_files": [
+    "apps/web/dist/assets/index-QhX_toRP.js",
+    "apps/web/dist/assets/index-WxKKYvh4.css",
+    "apps/web/dist/index.html"
+  ],
+  "dist_hashes": {
+    "apps/web/dist/assets/index-QhX_toRP.js": "0d783687d945757180d2b54d66e54544d96d894b6a2a1372bf530a67e715ac82",
+    "apps/web/dist/assets/index-WxKKYvh4.css": "b8569258cc063a9570c33753b9748bd4de62ffb38c5ab626f127e7ebf3a1b8d0",
+    "apps/web/dist/index.html": "ae7319a7045ae379f8340392e5b62e1622f2f65f8033446ec83f30b2d7898261"
+  }
+}

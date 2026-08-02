@@ -1,6 +1,16 @@
 adapter_id: claude-code
 runner_family: claude
 version: 1
+default_model: claude-opus-4-6
+supported_models:
+  - claude-opus-4-6
+model_aliases:
+  coding-primary: claude-opus-4-6
+  coding-fallback: claude-opus-4-6
+  planning-primary: claude-opus-4-6
+  planning-fallback: claude-opus-4-6
+  judge-primary: claude-opus-4-6
+  judge-fallback: claude-opus-4-6
 launch_modes:
   - interactive
   - non-interactive
@@ -23,8 +33,10 @@ execution:
   evidence_namespace: evidence://adapter-live/claude-code
   external_runtime:
     command: claude
+    model_argument:
+      flag: --model
     permission_policy:
-      default_mode: full-bypass
+      default_mode: restricted
       modes:
         full-bypass:
           args:
@@ -32,6 +44,10 @@ execution:
             - --output-format
             - json
             - --no-session-persistence
+            - --append-system-prompt
+            - Keep this AOR run bounded. Read the provider work packet first, use referenced local files instead of asking for pasted context, and if the prompt or working context exceeds Claude's limit return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+            - --effort
+            - high
             - --dangerously-skip-permissions
         restricted:
           args:
@@ -39,15 +55,29 @@ execution:
             - --output-format
             - json
             - --no-session-persistence
+            - --append-system-prompt
+            - Keep this AOR run bounded. Read the provider work packet first, use referenced local files instead of asking for pasted context, and if the prompt or working context exceeds Claude's limit return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+            - --effort
+            - high
             - --permission-mode
             - auto
-    request_via_stdin: true
+    request_via_stdin: false
+    request_transport: request-artifact
+    request_file:
+      mode: pointer-prompt
+      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout; evidence inputs are read-only and must never be treated as execution roots. Read that file first, then open every required resolved_local_refs[].local_path instead of asking the operator to paste more context. Keep the implementation bounded to execution_contract.expected_meaningful_change.allowed_target_paths and the mission request. Make direct edits only in the disposable execution root when required, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet. If Claude reports that the prompt or context exceeds the provider limit, return a blocked report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
     preflight_timeout_ms: 120000
-    timeout_ms: 600000
+    timeout_ms: 3600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
   supports_pause_resume: true
+  continuation_strategy: reinvoke
+  approval_grant_scope: tool-call-scoped
+  approval_resume_mode: restricted
+  permission_request_detection:
+    - structured-output
+    - stdout-stderr-patterns
 log_features:
   stdout: true
   stderr: true

@@ -7,7 +7,7 @@ API is the control-plane surface for commands, queries, approvals, and live even
 - run lifecycle commands
 - approval endpoints
 - delivery and incident endpoints
-- live E2E start/status/report endpoints
+- run status and report endpoints
 - query endpoints and SSE streams
 
 ## Rules

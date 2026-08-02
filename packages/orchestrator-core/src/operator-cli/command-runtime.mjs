@@ -9,6 +9,7 @@ export {
   listDeliveryManifests,
   listCompilerRevisionStatuses,
   listMultirepoCoordinationStatuses,
+  listOperatorRequests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -47,6 +48,26 @@ export {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
 } from "../handoff-packets.mjs";
+export {
+  approveTaskPlan,
+  approveTaskPlanFromHandoff,
+  createTaskPlan,
+  diffTaskPlanRefs,
+  getTaskPlanStatus,
+  materializeTaskProgress,
+  requestTaskPlanRevision,
+  resolveExecutionUnitContext,
+  showTaskPlan,
+} from "../task-plan-service.mjs";
+export {
+  readParentRun,
+  retryParentUnit,
+  scheduleParentRun,
+  startParentRun,
+  controlParentRun,
+} from "../parent-run-scheduler.mjs";
+export { applyIntegrationToParent } from "../integration-service.mjs";
+export { requestRunJobCancel, startRunJob } from "../run-job.mjs";
 export { certifyAssetPromotion } from "../certification-decision.mjs";
 export {
   materializeCompilerRevisionStatus,
@@ -62,7 +83,9 @@ export { runEvaluationSuite } from "../eval-runner.mjs";
 export { replayHarnessCapture } from "../harness-capture-replay.mjs";
 export {
   applyIncidentRecertification,
+  closeQualityRepairRequest,
   listReviewDecisions,
+  listQualityRepairRequests,
   materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
   materializeReviewDecision,
@@ -71,8 +94,15 @@ export { resolveStepPolicyForStep } from "../policy-resolution.mjs";
 export { analyzeProjectRuntime } from "../project-analysis.mjs";
 export { initializeProjectRuntime } from "../project-init.mjs";
 export { resolveNextAction } from "../next-action.mjs";
+export {
+  OperatorRequestError,
+  createOperatorRequest,
+  getOperatorRequestStatus,
+  listOperatorRequests as listOperatorRequestRecords,
+  runOperatorRequest,
+} from "../operator-request.mjs";
 export { validateProjectRuntime } from "../project-validate.mjs";
-export { verifyProjectRuntime } from "../project-verify.mjs";
+export { planProjectVerification, verifyProjectRuntime } from "../project-verify.mjs";
 export { materializeIntakeArtifactPacket } from "../artifact-store.mjs";
 export { materializeReviewReport } from "../review-run.mjs";
 export { materializeRuntimeHarnessReport } from "../runtime-harness-report.mjs";
@@ -82,6 +112,13 @@ export {
   executeRuntimeHarnessControlledStep,
 } from "../step-execution-engine.mjs";
 export { RUNTIME_ROOT_DIRNAME };
+export { createLocalProjectRegistry, summarizeProjectContext } from "../control-plane/local-project-registry.mjs";
+export { applyTopologyAction, readProjectTopology, TopologyManagementError } from "../control-plane/topology-management.mjs";
+export {
+  applyExecutionProfileAction,
+  readExecutionProfile,
+  ExecutionProfileError,
+} from "../control-plane/execution-profile.mjs";
 
 export class CliUsageError extends Error {
   /**
@@ -380,7 +417,7 @@ export function resolveOptionalRefOrPathFlag(options) {
 export const DEFAULT_LEARNING_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
-  "docs/ops/live-e2e-standard-runner.md",
+  "docs/ops/run-control-lifecycle.md",
 ]);
 
 /**
@@ -582,7 +619,13 @@ export function findLatestRuntimeHarnessReportForRun(options) {
  * @returns {Record<string, unknown>}
  */
 export function finalizeRunControlState(options) {
-  const terminalStatus = options.stepStatus === "passed" ? "completed" : "failed";
+  const stateFileSnapshot = fs.existsSync(options.stateFile) ? readJson(options.stateFile) : {};
+  const providerStepStatus = asPlainObject(stateFileSnapshot.provider_step_status);
+  const stateStatus = typeof stateFileSnapshot.status === "string" ? stateFileSnapshot.status : null;
+  const providerStatus = typeof providerStepStatus.status === "string" ? providerStepStatus.status : null;
+  const interrupted =
+    providerStatus === "interrupted" || stateStatus === "canceled" || stateStatus === "cancelled" || stateStatus === "interrupted";
+  const terminalStatus = interrupted ? "canceled" : options.stepStatus === "passed" ? "completed" : "failed";
   const previousAuditRefs = asStringArray(options.previousState?.audit_refs);
   const previousEvidenceRefs = asStringArray(options.previousState?.step_result_refs);
   const stepResultRef = toEvidenceRef(options.projectRoot, options.stepResultFile);
@@ -592,7 +635,7 @@ export function finalizeRunControlState(options) {
     run_id: typeof options.previousState?.run_id === "string" ? options.previousState.run_id : null,
     status: terminalStatus,
     current_step: options.targetStep,
-    last_action: "start",
+    last_action: interrupted && typeof stateFileSnapshot.last_action === "string" ? stateFileSnapshot.last_action : "start",
     started_at:
       typeof options.previousState?.started_at === "string"
         ? options.previousState.started_at
@@ -607,6 +650,50 @@ export function finalizeRunControlState(options) {
     step_result_refs: nextStepResultRefs,
     evidence_root:
       typeof options.previousState?.evidence_root === "string" ? options.previousState.evidence_root : path.dirname(options.stateFile),
+    ...(Object.keys(providerStepStatus).length > 0 ? { provider_step_status: providerStepStatus } : {}),
+  };
+  writeJson(options.stateFile, nextState);
+  return nextState;
+}
+
+/**
+ * @param {{
+ *   stateFile: string,
+ *   previousState: Record<string, unknown> | null,
+ *   targetStep: string,
+ *   failureCode: string,
+ *   failureSummary: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+export function finalizeRunControlFailure(options) {
+  const stateFileSnapshot = fs.existsSync(options.stateFile) ? readJson(options.stateFile) : {};
+  const providerStepStatus = asPlainObject(stateFileSnapshot.provider_step_status);
+  const nextState = {
+    schema_version: 1,
+    run_id: typeof options.previousState?.run_id === "string" ? options.previousState.run_id : null,
+    status: "failed",
+    current_step: options.targetStep,
+    last_action: "start",
+    started_at:
+      typeof options.previousState?.started_at === "string"
+        ? options.previousState.started_at
+        : new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    action_sequence:
+      typeof options.previousState?.action_sequence === "number" && Number.isFinite(options.previousState.action_sequence)
+        ? options.previousState.action_sequence
+        : 1,
+    approval_refs: asStringArray(options.previousState?.approval_refs),
+    audit_refs: asStringArray(options.previousState?.audit_refs),
+    step_result_refs: asStringArray(options.previousState?.step_result_refs),
+    failure: {
+      code: options.failureCode,
+      summary: options.failureSummary,
+    },
+    evidence_root:
+      typeof options.previousState?.evidence_root === "string" ? options.previousState.evidence_root : path.dirname(options.stateFile),
+    ...(Object.keys(providerStepStatus).length > 0 ? { provider_step_status: providerStepStatus } : {}),
   };
   writeJson(options.stateFile, nextState);
   return nextState;

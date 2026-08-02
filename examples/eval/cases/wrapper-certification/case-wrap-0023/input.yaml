@@ -1,0 +1,8 @@
+family: evaluation-case-input
+case_id: case-wrap-0023
+version: 1
+subject_type: wrapper
+content:
+  scenario: wrapper-certification
+  required_evidence: wrapper-profile
+

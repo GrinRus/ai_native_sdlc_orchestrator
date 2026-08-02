@@ -12,7 +12,11 @@ workflow:
   - id: apply-change
     instruction: implement bounded changes and keep route, policy, and evidence alignment explicit
   - id: verify
-    instruction: run required checks and capture outputs for delivery/harness reuse
+    instruction: run required checks against the final edited working tree, without stashing or hiding implementation changes, and capture outputs for delivery/harness reuse
+  - id: inspect-verification-output
+    instruction: review verification stdout/stderr for warnings introduced by the change, especially resource leaks or deprecations in new tests, and fix them before reporting completion
+  - id: block-warning-output
+    instruction: treat primary verification stderr warnings as blocking even when the command exits 0; only classify a warning as pre-existing after rerunning the same command on an unchanged baseline and seeing the same warning
 required_inputs:
   packets:
     - handoff

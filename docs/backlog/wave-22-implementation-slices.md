@@ -4,7 +4,7 @@
 Repair source-of-truth claims so the repository distinguishes baseline readiness from production readiness and treats OpenCode as extended candidate coverage until real certification exists.
 
 ## Wave exit criteria
-- Story coverage uses evidence-strength statuses across all 112 stories.
+- Story coverage uses evidence-strength statuses across the original 112 stories.
 - Production readiness docs state that the W22 baseline is not yet production-ready and name the W23-W26 release criteria.
 - OpenCode is downgraded to extended candidate coverage until real certification exists.
 
@@ -21,17 +21,17 @@ Repair source-of-truth claims so the repository distinguishes baseline readiness
 - **Outcome:** Replace blanket story coverage with an evidence-strength status model that distinguishes baseline implementation from production proof.
 - **Primary modules:** `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs`
 - **Hard dependencies:** none
-- **Primary user-story surfaces:** all 112 story IDs, especially production-proof and OpenCode rows
+- **Primary user-story surfaces:** the original 112 story IDs, especially production-proof and OpenCode rows
 
 ### Local tasks
 1. Replace the story matrix status vocabulary with `baseline-covered`, `proof-covered`, `partial`, and `blocked`.
-2. Reclassify the 112-story registry into baseline-covered, partial, and blocked rows using executable evidence rather than docs-only claims.
+2. Reclassify the original 112-story registry into baseline-covered, partial, and blocked rows using executable evidence rather than docs-only claims.
 3. Keep partial and blocked stories pointed at non-done gap slices that own the missing executable proof.
 4. Update the matrix checker so old `covered` and `gap` statuses fail fast.
 5. Record the current counts and make future proof upgrades explicit.
 
 ### Acceptance criteria
-1. The story matrix still machine-checks exactly 112 story rows across the supported role clusters.
+1. The story matrix still machine-checks exactly the story rows defined at W22 across the supported role clusters.
 2. No row claims production proof unless an executable proof path exists and the row uses `proof-covered`.
 3. Partial and blocked rows reference only not-yet-done gap slices.
 4. The checker rejects the old blanket `covered` vocabulary.

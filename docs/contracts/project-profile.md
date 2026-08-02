@@ -27,11 +27,28 @@ Persistent configuration for one target project, including repos, allowed provid
 ## Notes
 Use the project profile as the durable source of truth for runtime default selection.
 
+`project_id` follows the canonical lowercase public-ID grammar in
+`canonical-identifiers-and-paths.md`. Invalid or collision-equivalent values are
+rejected rather than normalized. Project-relative registry roots resolve from
+the canonical project root; bundled absolute registry roots are explicit
+installed-asset inputs and must never be inferred from launcher `cwd`.
+
 `asset_mode` is optional for backward compatibility and should be present on new or materialized profiles:
 - `bundled` resolves AOR-provided registry roots from the installed AOR asset bundle without copying example registries into the target repository;
 - `materialized` resolves registry roots from target-repo committed assets after the user explicitly materializes or ejects them.
 
 For bounded multirepo flows, one project profile owns all participating `repos[]` entries and any `repo_graph` dependency edges. This supports separate backend, mobile, frontend, documentation, or shared-library repositories inside one AOR flow; it is not the same as coordinating multiple independent AOR `project_id` profiles.
+
+W61 topology is additive. `repos[].workspace_mount` is the portable stable mount
+for a future workspace set. When it is absent, loaders derive the same in-memory
+value from legacy `repos[].source.root`. `components[]` identifies apps,
+packages, and services inside a declared repository through `component_id`,
+`repo_id`, repository-relative `root`, `role`, and optional
+`command_group_refs[]`. `component_graph[]` records component dependencies and
+optional validation refs. Legacy profiles load with empty component arrays.
+
+Absolute checkout paths and credential readiness do not belong in this profile;
+they are owned by `project-binding`.
 
 Bounded multirepo profiles should keep each repo entry explicit:
 - `repo_id`, `role`, `default_branch`, and `source.kind`;
@@ -70,17 +87,118 @@ W21 guided onboarding preserves both modes:
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.
 These fields declare deterministic defaults only. Actual context selection, expansion, and prompt/context assembly begin in `W8-S08`.
 
+Workflow-step keys and execution classes are intentionally separate. The
+`discovery`, `research`, and `spec` prompt defaults may point at distinct prompt
+bundle refs, but those prompt bundles remain compatible with
+`step_class: artifact`, `default_wrapper_profiles.artifact`,
+`default_step_policies.artifact`, and `default_skill_profiles.artifact`.
+Bundled examples select `prompt-bundle://discovery-default@v1`,
+`prompt-bundle://research-default@v1`, and `prompt-bundle://spec-default@v1`.
+Profiles that still point all three keys at `prompt-bundle://artifact-default@v1`
+remain valid.
+
+`artifact_readiness_policy` is optional. When omitted, `aor next` uses strict
+artifact readiness: research must be `adr-ready` before spec can become ready,
+and stale discovery/research/spec evidence blocks downstream planning. A profile
+may set
+`artifact_readiness_policy.research.allow_incomplete_for_spec: true` with a
+human-readable `reason` to allow bounded spec drafting from incomplete research.
+That soft decision must remain visible in `next-action-report.artifact_readiness`
+and does not make stale evidence current.
+
+`quality_repair_policy` is optional. When omitted, W45 repair-cycle behavior
+must resolve its attempt limits and downstream gate behavior from the selected
+runtime policy rather than hardcoding a default in reports. New profiles may
+declare:
+- `policy_ref`, a stable profile-local policy reference;
+- `max_attempts_per_cycle`, copied into
+  `quality-repair-request.attempt_budget.max_attempts`;
+- `requires_review_after_repair`, which should be `true` for public repair
+  loops;
+- `requires_qa_after_passing_review`, which applies when QA is in scope;
+- `budget_exhausted_requires_operator_approval`, which blocks delivery/release
+  until explicit approval exists;
+- `blocks_delivery_while_open`, which blocks delivery/release while a required
+  request is not `closed`;
+- `qa_in_scope_stages[]`, the stages whose repair closure must return through
+  QA after a passing review.
+
+`structured_plan_policy` is optional. Its
+`semantic_evaluator_blocking` boolean defaults to `false`. Deterministic
+structured-plan validation always blocks incomplete plans; this profile switch
+only decides whether post-structural semantic `evaluation-report` warnings or
+failures also require a planner revision before approval.
+
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 
-`runtime_defaults.workspace_mode` controls execution isolation:
-- `ephemeral` — run inside the primary checkout;
-- `workspace-clone` — run in an isolated filesystem clone;
-- `worktree` — run in an isolated worktree-style root.
+`runtime_defaults.workspace_mode` controls disposable execution isolation:
+- `ephemeral` — prefer a detached Git worktree and use an independent clone or
+  independent snapshot repository as fallback;
+- `workspace-clone` — prefer an independent local clone;
+- `worktree` — use the detached-worktree-first strategy.
+
+No supported mode runs provider or project verification commands in the
+primary checkout. Source and execution checkout roots and Git directories must
+be distinct. Primary-checkout integrity compares semantic Git state: HEAD,
+symbolic ref, staged object/stage/path entries and meaningful index flags,
+tracked and untracked content, and porcelain status. Git's binary index format
+and stat-cache bytes are not mutation evidence by themselves because read-only
+Git operations may rewrite them without changing repository state.
 
 Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
 
-`project verify` target commands are bounded per command. `runtime_defaults.verification_command_timeout_sec` may set an explicit per-command timeout for lint, test, build, and setup-derived verification commands. If it is omitted, `budget_policy.verification_command_timeout_sec` may provide the same bound. If both are omitted, AOR derives a bounded default from `budget_policy.default_timeout_sec` capped by the implementation default. The timeout is per target command, not a whole-lifecycle or provider-run budget.
+`verification.command_groups[]` is the generic AOR verification contract for
+target projects. Each group must carry:
+- `id`
+- `role`: `setup`, `build`, `lint`, `test`, `typecheck`, `e2e`, `full-suite`, or `custom`
+- `phase`: `readiness`, `baseline`, `post-change`, or `diagnostic`
+- `enforcement`: `required`, `warn`, or `observe`
+- `timeout_class`: `install`, `build`, `focused-test`, `full-suite`, `browser-e2e`, or `quick`
+- `commands[]`
+
+Groups may also carry authoring metadata used by W54 discovery and profile
+generation:
+- `repo_id` to bind the group to one `repos[].repo_id`;
+- `working_dir` as the repo-relative execution directory;
+- `depends_on[]` with prerequisite command-group ids;
+- `detected_from[]` with manifest, script, or operator source refs;
+- `package_manager` for the detected ecosystem driver;
+- `tool_requirements[]` entries with `tool`, optional `version_range`, and
+  optional `install_hint`;
+- `skip_policy` with optional `outcome`, `applies_when`, and `reason`.
+
+Generic command-group outcomes are `no-tests`, `missing-tool`,
+`not-applicable`, and `broken-baseline`. They are AOR verification evidence and
+must not use private proof-harness fields such as target-matrix, run-health, or
+step-quality metadata.
+`broken-baseline` may describe a baseline-phase command that fails before the
+change or a post-change command failure that matches explicit baseline failure
+evidence supplied to `project verify --output-quality-baseline`.
+
+`project init` materializes discovery-backed command groups for detected stacks
+and may record `verification.discovery_outcomes[]` and
+`verification.discovery_suggestions[]` when no runnable verification command is
+detected. These records are evidence for operator review, not invented passing
+commands.
+
+Legacy per-repo `build_commands`, `lint_commands`, and `test_commands` remain
+loadable and are normalized into required command groups by `project verify`
+when `verification.command_groups[]` is absent.
+
+For migration guidance, see
+`docs/ops/verification-command-groups-migration.md`. New profiles should author
+command groups directly, keep legacy command lists only as compatibility read
+models, and treat `warn` and `observe` groups as non-acceptance evidence.
+
+`project verify` target commands are bounded per command.
+`runtime_defaults.verification_command_timeout_sec` may set an explicit
+per-command timeout for every command group. If it is omitted,
+`budget_policy.verification_command_timeout_sec` may provide the same bound. If
+both are omitted, AOR uses the command group's `timeout_class` default before
+falling back to the implementation default. The timeout is per target command,
+not a whole-lifecycle or provider-run budget. Long-running timeout budgets are
+separate from hang cleanup evidence.
 
 `writeback_policy.default_delivery_mode` should resolve to one of the delivery-plan modes:
 - `no-write`
@@ -91,4 +209,6 @@ Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort
 Non-canonical aliases are rejected instead of normalized.
 
 ## Example
-See `examples/project.aor.yaml`, `examples/project.github.aor.yaml`, and `examples/project.bounded-multirepo.aor.yaml`.
+See `examples/project.aor.yaml`, `examples/project.github.aor.yaml`,
+`examples/project.bounded-multirepo.aor.yaml`, and
+`examples/project.verification-archetypes.aor.yaml`.

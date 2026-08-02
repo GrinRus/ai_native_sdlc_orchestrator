@@ -1,0 +1,83 @@
+assessment_id: live-e2e.sample.discovery.step-quality.v1
+run_id: live-e2e.sample.run
+profile_id: live-e2e.full-journey.regress.httpx.medium.openai
+generated_at: "2026-06-22T00:00:00.000Z"
+evaluator:
+  kind: skill-agent
+  ref: skill://live-e2e-runner
+  mode: product-step-quality
+  responsibility: Assess product-change step quality from public artifacts before continuation.
+target_catalog_id: httpx
+feature_mission_id: httpx-timeout-transport-regression
+feature_size: medium
+mission_class: product-change
+step_id: discovery
+step_name: discovery
+step_iteration: 1
+source_agent_decision_request_file: runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-discovery.json
+source_operator_decision_file: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-discovery.json
+source_assessment_request_file: runtime://reports/live-e2e-step-quality-assessment-request-live-e2e.sample.run-01-discovery.json
+assessment_method: external-skill-agent
+rubric_version: live-e2e-step-quality.v1
+evaluator_input_refs:
+  - runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-discovery.json
+  - runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-discovery.json
+  - runtime://reports/discovery-research-report-live-e2e.sample.run.yaml
+evaluator_output_ref: runtime://reports/live-e2e-step-quality-assessment-report-live-e2e.sample.run-01-discovery.json
+status: accepted
+decision: continue
+dimensions:
+  traceability:
+    status: pass
+    evidence_strength: strong
+    summary: Discovery evidence traces the user request through public AOR discovery artifacts.
+    inspected_evidence_refs:
+      - runtime://reports/discovery-research-report-live-e2e.sample.run.yaml
+      - runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-discovery.json
+    findings:
+      - Discovery artifacts cite the agent-visible request and target repository evidence.
+  completeness:
+    status: pass
+    evidence_strength: medium
+    summary: Required discovery outputs are present for the next public step.
+    inspected_evidence_refs:
+      - runtime://reports/discovery-research-report-live-e2e.sample.run.yaml
+    findings:
+      - Discovery produced a concrete report for evaluator inspection.
+  actionability:
+    status: pass
+    evidence_strength: medium
+    summary: The operator decision records a concrete continuation action.
+    inspected_evidence_refs:
+      - runtime://reports/next-action-report-live-e2e.sample.run.json
+    findings:
+      - The public next action is explicit and can be followed by the runner.
+  evidence_strength:
+    status: pass
+    evidence_strength: strong
+    summary: The assessment cites durable public reports instead of private runtime state.
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json
+    findings:
+      - Public observation evidence is materialized for this step.
+  black_box_boundary:
+    status: pass
+    evidence_strength: strong
+    summary: The evaluator relies on runner-visible artifacts and does not mutate the target checkout.
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+    findings:
+      - The assessment uses public live E2E artifacts only.
+findings:
+  - Step quality accepted from public discovery, operator decision, and observation evidence.
+repair_instructions: []
+inspected_evidence_refs:
+  - runtime://reports/discovery-research-report-live-e2e.sample.run.yaml
+  - runtime://reports/next-action-report-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json
+evidence_refs:
+  - runtime://reports/live-e2e-step-quality-assessment-request-live-e2e.sample.run-01-discovery.json
+  - runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-discovery.json
+  - runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-discovery.json
+  - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json

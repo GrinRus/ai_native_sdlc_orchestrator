@@ -151,7 +151,7 @@ Replace legacy live E2E post-run matrices with an online black-box step-controll
 
 ### Local tasks
 1. Delete or rewrite fixtures that assert the old report shape.
-2. Replace `verdict_matrix` outputs with `quality_judgement` where matrix naming only described quality evidence.
+2. Remove `verdict_matrix` and `quality_judgement` outputs instead of renaming or compatibility-shimming legacy quality evidence.
 3. Remove test assertions for legacy verdict matrices and delivery downgrade semantics.
 4. Align roadmap, master backlog, epic map, and dependency graph with W27.
 

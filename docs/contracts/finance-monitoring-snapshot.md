@@ -60,7 +60,7 @@ Missing telemetry must stay explicit:
 - `offline_certification`
 - `rehearsal`
 
-Production monitoring requires explicit event scope such as `production`, `production-monitoring`, or `production_monitoring`. Offline certification evidence may include `promotion-decision`, `evaluation-report`, and `runtime-harness-report` artifacts. Rehearsal evidence may include live E2E, proof-runner, or explicitly rehearsal-scoped events.
+Production monitoring requires explicit event scope such as `production`, `production-monitoring`, or `production_monitoring`. Offline certification evidence may include `promotion-decision`, `evaluation-report`, and `runtime-harness-report` artifacts. Rehearsal evidence may include explicitly rehearsal-scoped events.
 
 Production monitoring evidence must not be inferred from offline certification or rehearsal artifacts.
 

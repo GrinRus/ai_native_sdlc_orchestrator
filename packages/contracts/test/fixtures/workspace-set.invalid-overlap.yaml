@@ -1,0 +1,27 @@
+workspace_set_id: workspace-set.invalid-overlap
+project_id: invalid-overlap
+binding_ref: binding://binding.shared@r1
+status: blocked
+repositories:
+  - repo_id: first
+    mount_path: repos/first
+    binding_ref: binding://binding.shared#first
+    base_ref: main
+    resolved_commit: 1111111111111111111111111111111111111111
+    resolved_identity: github.com/example/shared
+    access_mode: read-write
+    write_scope:
+      - src/**
+  - repo_id: second
+    mount_path: repos/second
+    binding_ref: binding://binding.shared#second
+    base_ref: main
+    resolved_commit: 1111111111111111111111111111111111111111
+    resolved_identity: github.com/example/shared
+    access_mode: read-write
+    write_scope:
+      - src/**
+conflicts:
+  - code: shared-repository-write-scope-overlap
+    repository_identity: github.com/example/shared
+    blocking: true

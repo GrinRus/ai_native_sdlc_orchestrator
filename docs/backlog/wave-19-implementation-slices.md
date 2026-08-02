@@ -18,13 +18,13 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 ## W19-S01 — User-story registry and coverage evidence matrix
 - **Epic:** EPIC-0 Repository development system
 - **State:** done
-- **Outcome:** Promote the supported user-story inventory into a machine-checkable 112-story coverage matrix with stable IDs, tiers, evidence pointers, coverage status, and backlog gap references.
+- **Outcome:** Promote the supported user-story inventory into the original machine-checkable 112-story coverage matrix with stable IDs, tiers, evidence pointers, coverage status, and backlog gap references.
 - **Primary modules:** `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs`
 - **Hard dependencies:** W17-S01
 - **Primary user-story surfaces:** all role clusters
 
 ### Local tasks
-1. Add a flat product story coverage matrix for the current 112-story working set.
+1. Add a flat product story coverage matrix for the original 112-story working set.
 2. Link partially covered and uncovered story outcomes to explicit W19/W20/W21 gap slices.
 3. Add repository checks for story count, unique IDs, valid tiers, valid coverage statuses, and valid gap slice references.
 4. Update roadmap and README references so the current backlog horizon is W21.

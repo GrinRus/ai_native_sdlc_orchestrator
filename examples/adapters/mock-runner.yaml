@@ -20,6 +20,10 @@ permission_policy: not_applicable
 approval_features:
   supports_human_approval: false
   supports_pause_resume: false
+  continuation_strategy: none
+  approval_grant_scope: step-coarse
+  approval_resume_mode: null
+  permission_request_detection: []
 log_features:
   stdout: true
   stderr: true

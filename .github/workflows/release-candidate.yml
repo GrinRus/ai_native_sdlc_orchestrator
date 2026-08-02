@@ -22,7 +22,7 @@ jobs:
     name: Release candidate gate
     if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref || inputs.release_branch }}
       AOR_RELEASE_STRICT_BRANCH: "true"

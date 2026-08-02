@@ -12,7 +12,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 ## Parallel start and sequencing notes
 - `W10-S01`, `W10-S02`, and `W10-S03` can start in parallel because they close separate production-facing gaps on top of completed baselines.
 - `W10-S04` starts after `W10-S03` so auth and permission work hardens an already-defined mutation surface rather than a hypothetical one.
-- `W10-S05` closed after `W11-S05` landed with replacement target-backed evidence in `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`; this is a historical closure dependency, not normal forward implementation order.
+- `W10-S05` closed after `W11-S05` landed with replacement target-backed evidence. That old short-profile evidence was removed after the skill-agent-only migration, so this is historical planning context rather than current acceptance evidence.
 
 ---
 
@@ -161,9 +161,9 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 4. Wave-level closure can be reviewed without relying on AOR-workspace artifacts or narrative-only claims.
 
 ### Done evidence
-- W11 proof-bundle references for `regress-short` and `release-short`: `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`
-- updated runbooks and dependency matrix entries linked to the replacement target-backed evidence
-- backlog state change showing `W10-S05` moved from `blocked` to `done` only after W11 closure evidence landed
+- historical W11 short-profile proof bundles were removed after the live E2E skill-agent-only migration
+- updated runbooks and dependency matrix entries now point current proof claims at catalog-backed full journeys, `installed-user-guided-journey`, and the W25 production-proof fixture
+- backlog state change showing `W10-S05` moved from `blocked` to `done` remains historical context, not current acceptance evidence
 
 ### Out of scope
 - broad target-catalog expansion

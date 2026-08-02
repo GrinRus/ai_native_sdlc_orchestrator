@@ -9,6 +9,7 @@ import {
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
+import { validateInstalledBrowserProof } from "./installed-browser-proof.mjs";
 
 export const REQUIRED_GUIDED_COMMAND_LABELS = Object.freeze([
   "guided-doctor",
@@ -27,6 +28,9 @@ export const REQUIRED_GUIDED_COMMAND_LABELS = Object.freeze([
   "release-prepare",
   "learning-handoff",
   "guided-next-after-learning",
+  "follow-up-mission-create",
+  "guided-next-after-follow-up",
+  "flow-targeted-request-create",
 ]);
 
 const REQUIRED_DURABLE_ARTIFACT_FIELDS = Object.freeze([
@@ -44,6 +48,21 @@ const REQUIRED_DURABLE_ARTIFACT_FIELDS = Object.freeze([
   "learning_loop_handoff_file",
   "web_smoke_summary_file",
   "web_smoke_html_file",
+  "web_dom_snapshot_file",
+  "web_accessibility_summary_file",
+  "web_screenshot_file",
+  "new_flow_mission_artifact_packet_file",
+  "new_flow_mission_artifact_packet_body_file",
+  "new_flow_next_action_report_file",
+  "flow_targeted_operator_request_file",
+]);
+const AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
 ]);
 
 /**
@@ -74,6 +93,188 @@ function resolveEvidencePath(targetRoot, ref) {
 }
 
 /**
+ * @param {string | null} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readJsonIfPresent(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  if (!resolved || !fs.existsSync(resolved)) return {};
+  return asRecord(JSON.parse(fs.readFileSync(resolved, "utf8")));
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {string}
+ */
+function resolveBrowserTaskProofFile(artifacts, webSmoke) {
+  const directProofFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file);
+  if (directProofFile && fs.existsSync(directProofFile)) return directProofFile;
+  const requestFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const request = readJsonIfPresent(requestFile);
+  const expectedProofFile = asNonEmptyString(request.expected_browser_task_proof_file);
+  return expectedProofFile && fs.existsSync(expectedProofFile) ? expectedProofFile : directProofFile;
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const rawEntries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return rawEntries
+    .map((entry) => ({
+      check_id: asNonEmptyString(entry.check_id) || asNonEmptyString(entry.id) || asNonEmptyString(entry.key),
+      status: asNonEmptyString(entry.status) || "not_pass",
+      evidence_refs: uniqueStrings([...asStringArray(entry.evidence_refs), asNonEmptyString(entry.evidence_ref)]),
+      findings: asStringArray(entry.findings),
+    }))
+    .filter((entry) => AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.includes(entry.check_id))
+    .map((entry) => ({
+      ...entry,
+      evidence_refs: entry.evidence_refs.length > 0 ? entry.evidence_refs : uniqueStrings(fallbackEvidenceRefs),
+    }));
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} fallbackEvidenceRefs
+ * @returns {Array<{ check_id: string, status: string, evidence_refs: string[], findings: string[] }>}
+ */
+function buildAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs = []) {
+  const byId = new Map(normalizeAorOperatorAccessibilityChecks(value, fallbackEvidenceRefs).map((entry) => [entry.check_id, entry]));
+  return AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS.map((checkId) => {
+    const existing = byId.get(checkId);
+    if (existing) return existing;
+    return {
+      check_id: checkId,
+      status: "not_pass",
+      evidence_refs: [],
+      findings: [`AOR operator accessibility check '${checkId}' was not materialized in browser-task proof.`],
+    };
+  });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<{ index: number, role: string | null, label: string | null, selector: string | null, tag_name: string | null }>}
+ */
+function normalizeKeyboardFocusSequence(value) {
+  const entries = Array.isArray(value) ? value.map((entry) => asRecord(entry)) : [];
+  return entries
+    .map((entry, index) => ({
+      index: Number.isFinite(Number(entry.index)) ? Number(entry.index) : index + 1,
+      role: asNonEmptyString(entry.role) || null,
+      label: asNonEmptyString(entry.label) || asNonEmptyString(entry.accessible_name) || asNonEmptyString(entry.text) || null,
+      selector: asNonEmptyString(entry.selector) || null,
+      tag_name: asNonEmptyString(entry.tag_name) || asNonEmptyString(entry.tagName) || null,
+    }))
+    .filter((entry) => entry.role || entry.label || entry.selector || entry.tag_name);
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {Record<string, unknown>}
+ */
+function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
+  const browserTaskProofFile = resolveBrowserTaskProofFile(artifacts, webSmoke);
+  if (!browserTaskProofFile || !fs.existsSync(browserTaskProofFile)) return webSmoke;
+  const proof = readJsonIfPresent(browserTaskProofFile);
+  const proofOutcome = asRecord(proof.task_outcome);
+  const proofStatus = asNonEmptyString(proofOutcome.status) || asNonEmptyString(proof.status);
+  const screenshotFiles = uniqueStrings([
+    ...asStringArray(webSmoke.screenshot_files),
+    ...asStringArray(proof.screenshot_files),
+    ...asStringArray(proof.screenshot_refs),
+  ]);
+  const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
+  let immutableProofPasses = true;
+  if (proof.schema_version === 2) {
+    const requestFile =
+      asNonEmptyString(artifacts.guided_browser_task_proof_request_file)
+      || asNonEmptyString(webSmoke.browser_task_proof_request_file);
+    const indexFile =
+      asNonEmptyString(artifacts.guided_browser_evidence_index_file)
+      || asNonEmptyString(webSmoke.browser_evidence_index_file);
+    const request = readJsonIfPresent(requestFile);
+    const index = readJsonIfPresent(indexFile);
+    const reportsRoot = indexFile
+      ? path.dirname(path.dirname(path.dirname(indexFile)))
+      : "";
+    immutableProofPasses = Boolean(
+      indexFile
+      && validateInstalledBrowserProof({
+        proof,
+        request,
+        index,
+        reportsRoot,
+        runId: asNonEmptyString(proof.run_id),
+        scenarioId: asNonEmptyString(proof.scenario_id),
+      }).ok,
+    );
+  }
+  const proofPasses =
+    (proofStatus === "pass" || proofStatus === "warn")
+    && proofHasVisualEvidence
+    && immutableProofPasses;
+  if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const keyboardNavigation = asRecord(proof.keyboard_navigation);
+  const keyboardFocusSequence = normalizeKeyboardFocusSequence(
+    Array.isArray(proof.keyboard_focus_sequence) ? proof.keyboard_focus_sequence : keyboardNavigation.focus_sequence,
+  );
+  const proofEvidenceRefs = uniqueStrings([
+    browserTaskProofFile,
+    asNonEmptyString(proof.accessibility_summary_file),
+    asNonEmptyString(proof.accessibility_summary_ref),
+    asNonEmptyString(webSmoke.accessibility_summary_file),
+    ...screenshotFiles,
+  ]);
+  const retainedWebSmokeUxFindings = asStringArray(webSmoke.ux_findings).filter(
+    (finding) => !/browser-task-proof requires skill-agent browser evidence/iu.test(finding),
+  );
+  return {
+    ...webSmoke,
+    rendered_html_file:
+      asNonEmptyString(proof.rendered_html_file) ||
+      asNonEmptyString(proof.html_ref) ||
+      asNonEmptyString(webSmoke.rendered_html_file),
+    dom_snapshot_file:
+      asNonEmptyString(proof.dom_snapshot_file) ||
+      asNonEmptyString(proof.dom_snapshot_ref) ||
+      asNonEmptyString(webSmoke.dom_snapshot_file),
+    accessibility_summary_file:
+      asNonEmptyString(proof.accessibility_summary_file) ||
+      asNonEmptyString(proof.accessibility_summary_ref) ||
+      asNonEmptyString(webSmoke.accessibility_summary_file),
+    visual_guardrail_file:
+      asNonEmptyString(proof.visual_guardrail_file) ||
+      asNonEmptyString(webSmoke.visual_guardrail_file),
+    browser_task_proof_file: browserTaskProofFile,
+    screenshot_files: screenshotFiles,
+    keyboard_focus_sequence: keyboardFocusSequence,
+    accessibility_checks: buildAorOperatorAccessibilityChecks(proof.accessibility_checks, proofEvidenceRefs),
+    task_outcome: {
+      status: "pass",
+      checked_tasks: uniqueStrings([
+        ...asStringArray(asRecord(webSmoke.task_outcome).checked_tasks),
+        ...asStringArray(proofOutcome.checked_tasks),
+      ]),
+      findings: asStringArray(proofOutcome.findings),
+    },
+    ux_findings: uniqueStrings([...retainedWebSmokeUxFindings, ...asStringArray(proof.ux_findings)]),
+    operator_decision_ref:
+      asNonEmptyString(proof.operator_decision_ref) ||
+      asNonEmptyString(webSmoke.operator_decision_ref),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @returns {string | null}
  */
@@ -95,6 +296,41 @@ function findCommand(commandResults, label) {
 }
 
 /**
+ * Recover required guided commands from their durable private transcripts after
+ * a manual controller resume. The transcript is evidence of an already-run
+ * installed CLI command; this never replays product behavior.
+ *
+ * @param {{ runId: string, reportsRoot: string, commandResults: Array<Record<string, unknown>> }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function hydrateGuidedCommandResults(options) {
+  const results = [...options.commandResults];
+  const observedLabels = new Set(results.map((entry) => asNonEmptyString(entry.label)).filter(Boolean));
+  const transcriptRoot = path.join(
+    options.reportsRoot,
+    `live-e2e-command-traces-${normalizeId(options.runId)}`,
+  );
+  if (!fs.existsSync(transcriptRoot)) return results;
+
+  for (const name of fs.readdirSync(transcriptRoot).filter((entry) => entry.endsWith(".json")).sort()) {
+    const transcriptFile = path.join(transcriptRoot, name);
+    const transcript = readJsonIfPresent(transcriptFile);
+    const label = asNonEmptyString(transcript.label);
+    if (!REQUIRED_GUIDED_COMMAND_LABELS.includes(label) || observedLabels.has(label)) continue;
+    if (transcript.timed_out === true || Number(transcript.exit_code) !== 0) continue;
+    results.push({
+      label,
+      status: "pass",
+      exit_code: 0,
+      transcript_file: transcriptFile,
+      parsed_payload: asRecord(transcript.parsed_json),
+    });
+    observedLabels.add(label);
+  }
+  return results;
+}
+
+/**
  * @param {Array<Record<string, unknown>>} commandResults
  * @returns {Record<string, string>}
  */
@@ -105,7 +341,7 @@ function collectRequiredArtifactFiles(commandResults, artifacts) {
     asRecord(findCommand(commandResults, "guided-next-after-learning").parsed_payload) ||
     asRecord(findCommand(commandResults, "guided-next-after-delivery").parsed_payload);
   const reviewDecide = asRecord(findCommand(commandResults, "review-decide-approve").parsed_payload);
-  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
 
   return {
     onboarding_report_file:
@@ -138,6 +374,64 @@ function collectRequiredArtifactFiles(commandResults, artifacts) {
     web_smoke_html_file:
       asNonEmptyString(webSmoke.rendered_html_file) ||
       asNonEmptyString(artifacts.guided_web_smoke_html_file),
+    web_dom_snapshot_file:
+      asNonEmptyString(webSmoke.dom_snapshot_file) ||
+      asNonEmptyString(artifacts.guided_web_dom_snapshot_file),
+    web_accessibility_summary_file:
+      asNonEmptyString(webSmoke.accessibility_summary_file) ||
+      asNonEmptyString(artifacts.guided_web_accessibility_summary_file),
+    web_screenshot_file:
+      asStringArray(webSmoke.screenshot_files)[0] ||
+      asStringArray(artifacts.guided_web_screenshot_files)[0] ||
+      asNonEmptyString(artifacts.guided_web_visual_guardrail_file),
+    new_flow_mission_artifact_packet_file:
+      asNonEmptyString(artifacts.new_flow_mission_artifact_packet_file),
+    new_flow_mission_artifact_packet_body_file:
+      asNonEmptyString(artifacts.new_flow_mission_artifact_packet_body_file),
+    new_flow_next_action_report_file:
+      asNonEmptyString(artifacts.new_flow_next_action_report_file),
+    flow_targeted_operator_request_file:
+      asNonEmptyString(artifacts.flow_targeted_operator_request_file),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Record<string, unknown>}
+ */
+function buildFlowLoopProof(artifacts) {
+  const requestDocument = asRecord(artifacts.flow_targeted_operator_request);
+  return {
+    first_flow_id: asNonEmptyString(artifacts.first_flow_id) || null,
+    first_flow_status: asNonEmptyString(artifacts.first_flow_status) || null,
+    completed_flow_read_only: artifacts.completed_flow_read_only === true,
+    completed_flow_next_action_report_file: asNonEmptyString(artifacts.completed_flow_next_action_report_file) || null,
+    second_flow_id: asNonEmptyString(artifacts.second_flow_id) || null,
+    follow_up_source_handoff_ref: asNonEmptyString(artifacts.follow_up_source_handoff_ref) || null,
+    new_flow_mission_artifact_packet_file: asNonEmptyString(artifacts.new_flow_mission_artifact_packet_file) || null,
+    new_flow_mission_artifact_packet_body_file:
+      asNonEmptyString(artifacts.new_flow_mission_artifact_packet_body_file) || null,
+    new_flow_next_action_report_file: asNonEmptyString(artifacts.new_flow_next_action_report_file) || null,
+    operator_request: {
+      operator_request_file: asNonEmptyString(artifacts.flow_targeted_operator_request_file) || null,
+      operator_request_ref: asNonEmptyString(artifacts.flow_targeted_operator_request_ref) || null,
+      operator_request_id: asNonEmptyString(artifacts.flow_targeted_operator_request_id) || null,
+      target_flow_id:
+        asNonEmptyString(requestDocument.target_flow_id) ||
+        asNonEmptyString(artifacts.flow_targeted_operator_request_target_flow_id) ||
+        null,
+      target_stage: asNonEmptyString(requestDocument.target_stage) || null,
+      intent_type: asNonEmptyString(requestDocument.intent_type) || null,
+      delivery_mode: asNonEmptyString(requestDocument.delivery_mode) || null,
+    },
+    evidence_refs: uniqueStrings([
+      asNonEmptyString(artifacts.intake_artifact_packet_file),
+      asNonEmptyString(artifacts.completed_flow_next_action_report_file),
+      asNonEmptyString(artifacts.learning_loop_handoff_file),
+      asNonEmptyString(artifacts.new_flow_mission_artifact_packet_file),
+      asNonEmptyString(artifacts.new_flow_next_action_report_file),
+      asNonEmptyString(artifacts.flow_targeted_operator_request_file),
+    ]),
   };
 }
 
@@ -155,14 +449,15 @@ function collectRequiredArtifactFiles(commandResults, artifacts) {
  * }} options
  */
 export function buildGuidedJourneyProof(options) {
-  const commandLabels = options.commandResults.map((entry) => asNonEmptyString(entry.label)).filter(Boolean);
-  const transcriptFiles = options.commandResults
+  const commandResults = hydrateGuidedCommandResults(options);
+  const commandLabels = commandResults.map((entry) => asNonEmptyString(entry.label)).filter(Boolean);
+  const transcriptFiles = commandResults
     .filter((entry) => REQUIRED_GUIDED_COMMAND_LABELS.includes(asNonEmptyString(entry.label)))
     .map((entry) => asNonEmptyString(entry.transcript_file))
     .filter(Boolean);
   const outputPolicy = asRecord(options.profile.output_policy);
-  const requiredArtifactFiles = collectRequiredArtifactFiles(options.commandResults, options.artifacts);
-  const webSmoke = asRecord(options.artifacts.guided_web_smoke);
+  const requiredArtifactFiles = collectRequiredArtifactFiles(commandResults, options.artifacts);
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
 
   return {
     proof_id: `${options.runId}.installed-user-guided-journey.v1`,
@@ -176,10 +471,29 @@ export function buildGuidedJourneyProof(options) {
     web_smoke: {
       summary_file: asNonEmptyString(webSmoke.summary_file) || null,
       rendered_html_file: asNonEmptyString(webSmoke.rendered_html_file) || null,
+      dom_snapshot_file: asNonEmptyString(webSmoke.dom_snapshot_file) || null,
+      accessibility_summary_file: asNonEmptyString(webSmoke.accessibility_summary_file) || null,
+      screenshot_files: asStringArray(webSmoke.screenshot_files),
+      visual_guardrail_file:
+        asNonEmptyString(webSmoke.visual_guardrail_file) ||
+        asNonEmptyString(options.artifacts.guided_web_visual_guardrail_file) ||
+        null,
+      browser_task_proof_request_file: asNonEmptyString(webSmoke.browser_task_proof_request_file) || null,
+      browser_task_proof_file: asNonEmptyString(webSmoke.browser_task_proof_file) || null,
+      keyboard_focus_sequence: normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence),
+      accessibility_checks: buildAorOperatorAccessibilityChecks(webSmoke.accessibility_checks, [
+        asNonEmptyString(webSmoke.accessibility_summary_file),
+        asNonEmptyString(webSmoke.browser_task_proof_file),
+        ...asStringArray(webSmoke.screenshot_files),
+      ]),
+      task_outcome: asRecord(webSmoke.task_outcome),
+      ux_findings: asStringArray(webSmoke.ux_findings),
+      operator_decision_ref: asNonEmptyString(webSmoke.operator_decision_ref) || null,
       guided_lifecycle_state: asNonEmptyString(webSmoke.guided_lifecycle_state) || null,
       guided_current_stage_id: asNonEmptyString(webSmoke.guided_current_stage_id) || null,
       detached: webSmoke.detached === true,
     },
+    flow_loop: buildFlowLoopProof(options.artifacts),
     no_write_assertions: {
       output_policy_write_back_to_remote: outputPolicy.write_back_to_remote === false,
       preferred_delivery_mode: asNonEmptyString(outputPolicy.preferred_delivery_mode) || null,
@@ -246,6 +560,109 @@ export function validateGuidedJourneyProof(proof, options) {
   }
   if (!asNonEmptyString(webSmoke.guided_lifecycle_state)) {
     issues.push("web smoke did not report a guided lifecycle state");
+  }
+  if (!asNonEmptyString(webSmoke.dom_snapshot_file)) {
+    issues.push("web smoke did not materialize a DOM snapshot");
+  }
+  if (!asNonEmptyString(webSmoke.accessibility_summary_file)) {
+    issues.push("web smoke did not materialize an accessibility summary");
+  }
+  const accessibilityChecks = Array.isArray(webSmoke.accessibility_checks)
+    ? webSmoke.accessibility_checks.map((entry) => asRecord(entry))
+    : [];
+  for (const checkId of AOR_OPERATOR_ACCESSIBILITY_CHECK_IDS) {
+    const check = accessibilityChecks.find((entry) => asNonEmptyString(entry.check_id) === checkId);
+    if (!check) {
+      issues.push(`web smoke did not materialize AOR accessibility check '${checkId}'`);
+      continue;
+    }
+    if (asStringArray(check.evidence_refs).length === 0) {
+      issues.push(`AOR accessibility check '${checkId}' has no evidence refs`);
+    }
+    if (asNonEmptyString(check.status) !== "pass") {
+      issues.push(`AOR accessibility check '${checkId}' did not pass`);
+    }
+  }
+  const keyboardFocusSequence = normalizeKeyboardFocusSequence(webSmoke.keyboard_focus_sequence);
+  const distinctFocusTargets = new Set(
+    keyboardFocusSequence.map((entry) => entry.selector || entry.label || `${entry.role ?? ""}:${entry.tag_name ?? ""}`),
+  );
+  if (keyboardFocusSequence.length < 2 || distinctFocusTargets.size < 2) {
+    issues.push("AOR keyboard navigation proof did not record focus movement across at least two controls");
+  }
+  if (asStringArray(webSmoke.screenshot_files).length === 0) {
+    const visualGuardrailFile = asNonEmptyString(webSmoke.visual_guardrail_file);
+    const resolvedVisualGuardrailFile = visualGuardrailFile
+      ? resolveEvidencePath(options.targetCheckoutRoot, visualGuardrailFile)
+      : null;
+    if (!resolvedVisualGuardrailFile || !fs.existsSync(resolvedVisualGuardrailFile)) {
+      issues.push("web smoke did not materialize a screenshot or visual guardrail");
+    }
+  }
+  if (asNonEmptyString(asRecord(webSmoke.task_outcome).status) !== "pass") {
+    issues.push("web smoke task outcome did not pass");
+  }
+  if (asStringArray(webSmoke.ux_findings).length === 0) {
+    issues.push("web smoke did not record UX findings");
+  }
+  const browserTaskProofFile = asNonEmptyString(webSmoke.browser_task_proof_file);
+  const resolvedBrowserTaskProofFile = browserTaskProofFile
+    ? resolveEvidencePath(options.targetCheckoutRoot, browserTaskProofFile)
+    : null;
+  if (!resolvedBrowserTaskProofFile || !fs.existsSync(resolvedBrowserTaskProofFile)) {
+    issues.push("web smoke did not materialize browser-task proof evidence");
+  }
+
+  const flowLoop = asRecord(proof.flow_loop);
+  const operatorRequest = asRecord(flowLoop.operator_request);
+  const firstFlowId = asNonEmptyString(flowLoop.first_flow_id);
+  const secondFlowId = asNonEmptyString(flowLoop.second_flow_id);
+  if (!firstFlowId) {
+    issues.push("flow loop proof is missing first_flow_id");
+  }
+  if (asNonEmptyString(flowLoop.first_flow_status) !== "completed") {
+    issues.push("flow loop proof must record first_flow_status=completed");
+  }
+  if (flowLoop.completed_flow_read_only !== true) {
+    issues.push("flow loop proof must record completed_flow_read_only=true");
+  }
+  if (!secondFlowId) {
+    issues.push("flow loop proof is missing second_flow_id");
+  }
+  if (firstFlowId && secondFlowId && firstFlowId === secondFlowId) {
+    issues.push("flow loop proof must create a second flow distinct from the first flow");
+  }
+  if (!asNonEmptyString(flowLoop.follow_up_source_handoff_ref)) {
+    issues.push("flow loop proof is missing follow_up_source_handoff_ref");
+  }
+  for (const field of [
+    "new_flow_mission_artifact_packet_file",
+    "new_flow_mission_artifact_packet_body_file",
+    "new_flow_next_action_report_file",
+  ]) {
+    const artifactRef = asNonEmptyString(flowLoop[field]);
+    if (!artifactRef) {
+      issues.push(`flow loop proof is missing ${field}`);
+      continue;
+    }
+    const resolved = resolveEvidencePath(options.targetCheckoutRoot, artifactRef);
+    if (!resolved || !fs.existsSync(resolved)) {
+      issues.push(`flow loop artifact '${field}' is not materialized: ${artifactRef}`);
+    }
+  }
+  const operatorRequestFile = asNonEmptyString(operatorRequest.operator_request_file);
+  if (!operatorRequestFile) {
+    issues.push("flow loop proof is missing operator_request.operator_request_file");
+  } else {
+    const resolvedOperatorRequestFile = resolveEvidencePath(options.targetCheckoutRoot, operatorRequestFile);
+    if (!resolvedOperatorRequestFile || !fs.existsSync(resolvedOperatorRequestFile)) {
+      issues.push(`flow loop operator request is not materialized: ${operatorRequestFile}`);
+    }
+  }
+  if (!asNonEmptyString(operatorRequest.target_flow_id)) {
+    issues.push("flow loop proof is missing operator_request.target_flow_id");
+  } else if (secondFlowId && asNonEmptyString(operatorRequest.target_flow_id) !== secondFlowId) {
+    issues.push("flow loop operator_request.target_flow_id must target the second flow");
   }
 
   const noWrite = asRecord(proof.no_write_assertions);

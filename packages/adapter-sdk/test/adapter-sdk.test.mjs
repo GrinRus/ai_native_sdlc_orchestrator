@@ -15,7 +15,9 @@ import {
   createMockAdapter,
   resolveAdapterForRoute,
   resolveAdapterMatrix,
+  resolveExternalRuntimeNativeTimeoutArgs,
   resolveExternalRuntimePermissionPolicy,
+  summarizeProviderMalformedToolCallError,
 } from "../src/index.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
@@ -48,6 +50,11 @@ function withTempRepo(callback) {
  *   requestTransport?: string,
  *   requestFile?: Record<string, unknown>,
  *   requestViaStdin?: boolean,
+ *   executionRootMode?: string,
+ *   env?: Record<string, string>,
+ *   envFrom?: Record<string, string>,
+ *   nativeTimeoutArg?: Record<string, unknown>,
+ *   contextBudget?: Record<string, unknown>,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -77,6 +84,21 @@ function buildExternalRunnerProfile(options) {
   if (options.requestFile) {
     execution.external_runtime.request_file = options.requestFile;
   }
+  if (options.executionRootMode) {
+    execution.external_runtime.execution_root_mode = options.executionRootMode;
+  }
+  if (options.env) {
+    execution.external_runtime.env = options.env;
+  }
+  if (options.envFrom) {
+    execution.external_runtime.env_from = options.envFrom;
+  }
+  if (options.nativeTimeoutArg) {
+    execution.external_runtime.native_timeout_arg = options.nativeTimeoutArg;
+  }
+  if (options.contextBudget) {
+    execution.external_runtime.context_budget = options.contextBudget;
+  }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
   }
@@ -97,6 +119,60 @@ test("buildAdapterRegistry loads adapter capability profiles through shared cont
   });
 });
 
+test("request-artifact adapter launcher prompts mention output quality policy", () => {
+  withTempRepo((repoRoot) => {
+    const registry = buildAdapterRegistry({
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+
+    for (const adapterId of ["claude-code", "codex-cli", "open-code", "qwen-code"]) {
+      const adapter = registry.get(adapterId);
+      const message = adapter?.profile?.execution?.external_runtime?.request_file?.message;
+      assert.equal(typeof message, "string", `${adapterId} request_file.message must be present`);
+      assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
+      assert.doesNotMatch(message, /warning-producing stdout\/stderr/u, adapterId);
+    }
+  });
+});
+
+test("Codex live adapter args use clean config and rules while preserving host auth", () => {
+  withTempRepo((repoRoot) => {
+    const registry = buildAdapterRegistry({
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+    const codex = registry.get("codex-cli");
+    const modes = codex.profile.execution.external_runtime.permission_policy.modes;
+    for (const mode of ["full-bypass", "restricted"]) {
+      const args = modes[mode].args;
+      const execIndex = args.indexOf("exec");
+      assert.notEqual(execIndex, -1, `${mode} args must use codex exec`);
+      assert.deepEqual(args.slice(execIndex + 1, execIndex + 3), ["--ignore-user-config", "--ignore-rules"]);
+    }
+  });
+});
+
+test("Claude live adapter args keep host auth and compact context guardrails", () => {
+  withTempRepo((repoRoot) => {
+    const registry = buildAdapterRegistry({
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+    const claude = registry.get("claude-code");
+    const externalRuntime = claude.profile.execution.external_runtime;
+    const modes = externalRuntime.permission_policy.modes;
+    assert.equal(externalRuntime.env_from?.ANTHROPIC_API_KEY, undefined);
+    for (const mode of ["full-bypass", "restricted"]) {
+      const args = modes[mode].args;
+      assert.equal(args.includes("--bare"), false, `${mode} args must preserve host Claude auth`);
+      assert.ok(args.includes("--print"), `${mode} args must use non-interactive print mode`);
+      assert.ok(args.includes("--append-system-prompt"), `${mode} args must include compact guardrail prompt`);
+      assert.ok(args.includes("--effort"), `${mode} args must declare supported effort bound`);
+      assert.match(args.join(" "), /provider_context_window_exceeded/u, mode);
+    }
+    assert.match(externalRuntime.request_file.message, /provider_context_window_exceeded/u);
+    assert.match(externalRuntime.request_file.message, /resolved_local_refs\[\]\.local_path/u);
+  });
+});
+
 test("resolveAdapterForRoute passes when required capabilities are declared by selected adapter", () => {
   withTempRepo((repoRoot) => {
     const routeResolution = resolveRouteForStep({
@@ -114,6 +190,35 @@ test("resolveAdapterForRoute passes when required capabilities are declared by s
     assert.equal(resolved.adapter.resolution_source.kind, "route-primary");
     assert.equal(resolved.capability_check.status, "pass");
     assert.deepEqual(resolved.capability_check.missing, []);
+    assert.equal(resolved.requested_model, "coding-primary");
+    assert.equal(resolved.effective_model, "gpt-5.5");
+    assert.equal(resolved.model_source, "policy-approved-alias");
+    assert.equal(resolved.execution_candidates.length, 2);
+    assert.equal(resolved.execution_candidates[1].adapter_id, "claude-code");
+    assert.equal(resolved.execution_candidates[1].effective_model, "claude-opus-4-6");
+  });
+});
+
+test("resolveAdapterForRoute blocks unsupported models before invocation", () => {
+  withTempRepo((repoRoot) => {
+    const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");
+    fs.writeFileSync(
+      routePath,
+      fs.readFileSync(routePath, "utf8").replace("model: coding-primary", "model: unsupported-model"),
+      "utf8",
+    );
+    const routeResolution = resolveRouteForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      stepClass: "implement",
+    });
+    assert.throws(
+      () => resolveAdapterForRoute({
+        routeResolution,
+        adaptersRoot: path.join(repoRoot, "examples/adapters"),
+      }),
+      /unsupported-model.*not a supported concrete model or declared alias/u,
+    );
   });
 });
 
@@ -174,6 +279,14 @@ test("adapter request and response envelopes enforce stable required fields", ()
     policy_bundle: { policy_id: "policy.step.runner.default" },
     input_packet_refs: ["packet://handoff"],
     dry_run: true,
+    provider_step_status: {
+      provider: "codex",
+      adapter: "codex-cli",
+      route_id: "route.implement.default",
+      step_id: "run.start.implement",
+      status: "running",
+      current_command_label: "external-provider-runner",
+    },
     context: {
       compiled_context_ref: "compiled-context://compiled-context.aor-core.implement.runner-default",
       packet_refs: ["packet://handoff"],
@@ -184,6 +297,7 @@ test("adapter request and response envelopes enforce stable required fields", ()
   assert.equal(request.dry_run, true);
   assert.deepEqual(request.input_packet_refs, ["packet://handoff"]);
   assert.equal(request.context.compiled_context_ref, "compiled-context://compiled-context.aor-core.implement.runner-default");
+  assert.equal(request.provider_step_status.current_command_label, "external-provider-runner");
 
   const response = createAdapterResponseEnvelope({
     request_id: "req-1",
@@ -195,6 +309,13 @@ test("adapter request and response envelopes enforce stable required fields", ()
 
   assert.equal(response.status, "success");
   assert.deepEqual(response.evidence_refs, ["evidence://mock-adapter/req-1"]);
+
+  for (const invalidId of ["../run", "C:\\temp", "run\nretry: 1", "RUN-1", "rún-1", `run-${"x".repeat(128)}`]) {
+    assert.throws(
+      () => createAdapterRequestEnvelope({ ...request, request_id: invalidId }),
+      /Invalid request_id/u,
+    );
+  }
 
   assert.throws(
     () =>
@@ -272,6 +393,22 @@ test("external runtime permission policy resolves env-selected mode args before 
   assert.equal(invalid.failureKind, "permission-policy-invalid");
 });
 
+test("external runtime native timeout args are derived from the resolved request timeout", () => {
+  assert.deepEqual(
+    resolveExternalRuntimeNativeTimeoutArgs({
+      externalRuntime: {
+        native_timeout_arg: {
+          flag: "--max-wall-time",
+          format: "duration-seconds",
+          reserve_ms: 5000,
+        },
+      },
+      timeoutMs: 300000,
+    }),
+    ["--max-wall-time", "295s"],
+  );
+});
+
 test("external runner failure classifier ignores benign permission words on successful output", () => {
   for (const stdout of [
     "Confirmed. Bounded non-interactive edits are allowed under the current workspace-write permissions.",
@@ -279,6 +416,7 @@ test("external runner failure classifier ignores benign permission words on succ
     JSON.stringify({ status: "success", summary: "workspace-write permissions and sandbox are configured" }),
     "Confirmed. Bounded non-interactive edits are allowed with no questions or interactive prompts.",
     "Preflight passed. Do not ask questions instruction was followed.",
+    "Confirmed. I can perform bounded, non-interactive edits and avoid interactive prompts.",
   ]) {
     assert.equal(
       classifyExternalRunnerFailure({
@@ -546,6 +684,148 @@ test("live adapter executes external runner path for supported codex-cli request
   }
 });
 
+test("exit zero preserves transport completion but rejects explicit partial provider outcome", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-provider-outcome-"));
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify({output:{semantic_outcome:'partial',verification_status:'partial'}}));"],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute({
+      request_id: "req-partial-outcome",
+      run_id: "run-partial-outcome",
+      step_id: "step-partial-outcome",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      context: { compiled_context_ref: "compiled-context://partial" },
+    });
+    assert.equal(response.output.execution_outcome.process.exit_code, 0);
+    assert.equal(response.output.execution_outcome.transport.status, "completed");
+    assert.equal(response.output.execution_outcome.provider.status, "partial");
+    assert.equal(response.output.execution_outcome.verification.status, "partial");
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "provider-partial-outcome");
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("Codex JSON mode publishes normalized progress before the terminal outcome", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-codex-json-progress-"));
+  try {
+    const runnerFile = path.join(evidenceRoot, "runner.mjs");
+    fs.writeFileSync(
+      runnerFile,
+      [
+        "process.stdout.write(JSON.stringify({type:'assistant',message:'working'})+'\\n');",
+        "process.stdout.write(JSON.stringify({type:'result',status:'completed',verification_status:'pass',model:'gpt-test',reasoning_effort:'high'})+'\\n');",
+      ].join("\n"),
+    );
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [runnerFile, "--json"],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute({
+      request_id: "req-codex-progress",
+      run_id: "run-codex-progress",
+      step_id: "step-codex-progress",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      context: { compiled_context_ref: "compiled-context://codex-progress" },
+    });
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.output_mode, "jsonl");
+    assert.equal(response.output.external_runner.provider_progress_events.length, 2);
+    assert.equal(response.output.external_runner.provider_progress_events.at(-1).kind, "result");
+    assert.equal(response.output.runner_output.provider_progress_events.length, 2);
+    assert.equal(response.output.runner_output.terminal_outcome.model, "gpt-test");
+    assert.equal(response.output.runner_output.terminal_outcome.reasoning, "high");
+    assert.equal(response.output.execution_outcome.provider.status, "completed");
+    assert.equal(response.output.execution_outcome.verification.status, "pass");
+    assert.equal(response.output.execution_outcome.schema_version, 1);
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter can invoke external runners through a short execution root alias", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-short-root-"));
+  const longSegment = "installed-user-guided-journey-qwen-final-ui-1780348266";
+  const executionRoot = path.join(tempRoot, longSegment, "runtime", "projects", "aor-core", "target-checkouts", `ky-${longSegment}`);
+  const evidenceRoot = path.join(tempRoot, "reports");
+  fs.mkdirSync(executionRoot, { recursive: true });
+  fs.mkdirSync(evidenceRoot, { recursive: true });
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "qwen-code",
+      adapterProfile: {
+        runner_family: "qwen",
+        ...buildExternalRunnerProfile({
+          command: process.execPath,
+          executionRootMode: "short-symlink",
+          args: [
+            "-e",
+            [
+              "const fs=require('node:fs');",
+              "process.stdout.write(JSON.stringify({",
+              "status:'success',",
+              "output:{cwd:process.cwd(),real_cwd:fs.realpathSync(process.cwd())}",
+              "}));",
+            ].join(""),
+          ],
+          handler: null,
+        }),
+      },
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: executionRoot,
+      executionRoot,
+    });
+
+    const response = adapter.execute({
+      request_id: "req-short-execution-root",
+      run_id: "run-short-execution-root",
+      step_id: "step-short-execution-root",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.execution_root_mode, "short-symlink");
+    assert.notEqual(response.output.external_runner.execution_root, executionRoot);
+    assert.ok(
+      response.output.external_runner.execution_root.length < executionRoot.length,
+      "expected the external runner cwd to be shorter than the canonical checkout root",
+    );
+    assert.equal(fs.realpathSync(response.output.external_runner.execution_root), fs.realpathSync(executionRoot));
+    assert.equal(fs.realpathSync(response.output.runner_output.cwd), fs.realpathSync(executionRoot));
+    assert.equal(fs.realpathSync(response.output.runner_output.real_cwd), fs.realpathSync(executionRoot));
+    assert.equal(response.output.external_runner.canonical_execution_root, fs.realpathSync(executionRoot));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter keeps raw evidence filenames bounded for long live run ids", () => {
   const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-long-evidence-"));
   const executionRoot = path.join(evidenceRoot, "execution-root");
@@ -562,12 +842,11 @@ test("live adapter keeps raw evidence filenames bounded for long live run ids", 
       executionRoot,
     });
 
-    const edgePadding = "-".repeat(1024);
-    const longRunId = `${edgePadding}live-e2e.${"very-long-segment.".repeat(18)}repair-2${edgePadding}`;
+    const longRunId = `run-${"r".repeat(124)}`;
     const response = adapter.execute({
-      request_id: `${longRunId}.run-start-implement.${"request.".repeat(8)}`,
+      request_id: `request-${"q".repeat(120)}`,
       run_id: longRunId,
-      step_id: `${longRunId}.step.implement`,
+      step_id: `step-${"s".repeat(123)}`,
       step_class: "implement",
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
@@ -669,6 +948,71 @@ test("live adapter reports failed when external runner exits non-zero", () => {
   assert.match(response.summary, /exited with code 17/i);
 });
 
+test("live adapter surfaces malformed Codex/OpenAI tool-call schema failures as provider raw summary", () => {
+  const rawError = JSON.stringify({
+    error: {
+      message: "Invalid property name in input[3].arguments",
+      type: "invalid_request_error",
+      code: "property_name_above_max_length",
+      param: "input[3].arguments",
+    },
+  });
+  const summary = summarizeProviderMalformedToolCallError("", rawError, null);
+  assert.match(summary, /Malformed Codex\/OpenAI tool-call schema failure/i);
+  assert.match(summary, /property_name_above_max_length/i);
+  assert.match(
+    summarizeProviderMalformedToolCallError("", "property_name_above_max_length", null),
+    /Malformed Codex\/OpenAI tool-call schema failure/i,
+  );
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-malformed-schema-"));
+  const stateFile = path.join(tempRoot, "provider-state.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify({ status: "running", provider_step_status: { status: "running" } }, null, 2)}\n`,
+    "utf8",
+  );
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      runtimeEvidenceRoot: path.join(tempRoot, "reports"),
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", `process.stderr.write(${JSON.stringify(rawError)} + "\\n"); process.exit(1);`],
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-live-malformed-schema",
+      run_id: "run-live-malformed-schema",
+      step_id: "step-live-malformed-schema",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "openai",
+        adapter: "codex-cli",
+        route_id: "route.implement.default",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 10000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "external-runner-failed");
+    assert.equal(response.output.external_runner.context_budget_failure_class, null);
+    assert.match(response.output.external_runner.raw_provider_error_summary, /property_name_above_max_length/i);
+    assert.match(state.provider_step_status.recommended_action, /Malformed Codex\/OpenAI tool-call schema failure/i);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter reports timeout distinctly from launch failures", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",
@@ -724,7 +1068,7 @@ test("live adapter hard-kills external runners that ignore SIGTERM on timeout", 
   assert.equal(response.output.external_runner.signal, "SIGKILL");
 });
 
-test("live adapter kills external runner process groups on timeout", () => {
+test("live adapter kills detached descendant process groups on timeout", () => {
   const markerFile = path.join(os.tmpdir(), `aor-adapter-orphan-${process.pid}-${Date.now()}.txt`);
   const orphanScript = [
     "const fs = require('node:fs');",
@@ -733,7 +1077,7 @@ test("live adapter kills external runner process groups on timeout", () => {
   ].join("");
   const runnerScript = [
     "const { spawn } = require('node:child_process');",
-    `spawn(process.execPath, ['-e', ${JSON.stringify(orphanScript)}], { stdio: 'ignore' });`,
+    `spawn(process.execPath, ['-e', ${JSON.stringify(orphanScript)}], { detached: true, stdio: 'ignore' }).unref();`,
     "setTimeout(() => {}, 1000);",
   ].join("");
   const adapter = createLiveAdapter({
@@ -768,12 +1112,157 @@ test("live adapter kills external runner process groups on timeout", () => {
   }
 });
 
+test("live adapter interrupts external runner when public run-control cancel is recorded", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-adapter-interrupt-"));
+  const stateFile = path.join(repoRoot, "run-control-state-interrupted.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-live-interrupted",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const cancelScript = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "function recordCancel() {",
+    "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "  state.status = 'canceled';",
+    "  state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
+    "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "}",
+    "setTimeout(() => {",
+    "  recordCancel();",
+    "  setInterval(recordCancel, 10);",
+    "}, 75);",
+    "setTimeout(() => {}, 5000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", cancelScript],
+      timeoutMs: 10000,
+      handler: null,
+    }),
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-live-interrupted",
+      run_id: "run-live-interrupted",
+      step_id: "step-live-interrupted",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 10000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "external-runner-interrupted");
+    assert.equal(response.output.external_runner.timed_out, false);
+    assert.equal(state.provider_step_status.status, "interrupted");
+    assert.equal(state.provider_step_status.interruption_owner, "operator");
+    assert.equal(state.provider_step_status.interruption_status, "operator-stopped");
+    assert.match(state.provider_step_status.interruption_reason, /public run-control cancel/i);
+    assert.match(state.provider_step_status.recommended_action, /stopped by the operator/i);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter treats canceled run-control state on runner close as an interruption", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-adapter-close-interrupt-"));
+  const stateFile = path.join(repoRoot, "run-control-state-close-interrupt.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-live-close-interrupted",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const cancelAndExitScript = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "state.status = 'canceled';",
+    "state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
+    "fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "process.exit(1);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", cancelAndExitScript],
+      timeoutMs: 2000,
+      handler: null,
+    }),
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-live-close-interrupted",
+      run_id: "run-live-close-interrupted",
+      step_id: "step-live-close-interrupted",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 2000,
+        heartbeat_interval_ms: 1000,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "external-runner-interrupted");
+    assert.equal(state.provider_step_status.status, "interrupted");
+    assert.equal(state.provider_step_status.interruption_owner, "operator");
+    assert.equal(state.provider_step_status.interruption_status, "operator-stopped");
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter applies resolved route timeout when it is shorter than the adapter timeout", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
-      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 10);"],
+      args: ["-e", "process.stdout.write(JSON.stringify({status:'success'}));"],
       timeoutMs: 3000,
       handler: null,
     }),
@@ -790,7 +1279,7 @@ test("live adapter applies resolved route timeout when it is shorter than the ad
       policy_id: "policy.step.runner.default",
       resolved_bounds: {
         budget: {
-          timeout_sec: 1,
+          timeout_sec: 2,
         },
       },
     },
@@ -798,7 +1287,7 @@ test("live adapter applies resolved route timeout when it is shorter than the ad
   });
 
   assert.equal(response.status, "success");
-  assert.equal(response.output.external_runner.timeout_ms, 1000);
+  assert.equal(response.output.external_runner.timeout_ms, 2000);
   assert.equal(response.output.external_runner.timed_out, false);
 });
 
@@ -866,6 +1355,101 @@ test("live adapter baseline accepts non-codex adapter ids when an external runne
   assert.equal(response.tool_traces[0].kind, "open-code-external-runner");
 });
 
+test("live adapter applies env_from aliases without exposing secret values in evidence", () => {
+  const previousSource = process.env.AOR_TEST_SOURCE_SECRET;
+  const previousTarget = process.env.AOR_TEST_TARGET_SECRET;
+  process.env.AOR_TEST_SOURCE_SECRET = "secret-from-env-from";
+  delete process.env.AOR_TEST_TARGET_SECRET;
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "qwen-code",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "fs.readFileSync(0,'utf8');",
+            "if(!process.env.AOR_TEST_TARGET_SECRET||process.env.AOR_TEST_TARGET_SECRET!==process.env.AOR_TEST_SOURCE_SECRET){process.stderr.write('missing env alias');process.exit(1);}",
+            "process.stdout.write(JSON.stringify({status:'success',summary:'env alias ok',output:{target_present:true}}));",
+          ].join(""),
+        ],
+        handler: null,
+        envFrom: {
+          AOR_TEST_TARGET_SECRET: "AOR_TEST_SOURCE_SECRET",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-qwen-env-from",
+      run_id: "run-qwen-env-from",
+      step_id: "step-qwen-env-from",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.deepEqual(response.output.external_runner.env_from_applied, [
+      { target: "AOR_TEST_TARGET_SECRET", source: "AOR_TEST_SOURCE_SECRET" },
+    ]);
+    assert.equal(JSON.stringify(response).includes("secret-from-env-from"), false);
+  } finally {
+    if (previousSource === undefined) {
+      delete process.env.AOR_TEST_SOURCE_SECRET;
+    } else {
+      process.env.AOR_TEST_SOURCE_SECRET = previousSource;
+    }
+    if (previousTarget === undefined) {
+      delete process.env.AOR_TEST_TARGET_SECRET;
+    } else {
+      process.env.AOR_TEST_TARGET_SECRET = previousTarget;
+    }
+  }
+});
+
+test("live adapter appends native timeout args before invoking an external runner", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const timeoutIndex=process.argv.indexOf('--max-wall-time');",
+          "if(timeoutIndex<0||process.argv[timeoutIndex+1]!=='25s'){process.stderr.write('missing native timeout');process.exit(1);}",
+          "process.stdout.write(JSON.stringify({status:'success',summary:'native timeout ok'}));",
+        ].join(""),
+        "--",
+      ],
+      handler: null,
+      timeoutMs: 30000,
+      nativeTimeoutArg: {
+        flag: "--max-wall-time",
+        format: "duration-seconds",
+        reserve_ms: 5000,
+      },
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-qwen-native-timeout",
+    run_id: "run-qwen-native-timeout",
+    step_id: "step-qwen-native-timeout",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.deepEqual(response.output.external_runner.args.slice(-2), ["--max-wall-time", "25s"]);
+});
+
 test("live adapter supports file-attached request transport for argv prompt runners", () => {
   withTempRepo((repoRoot) => {
     const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
@@ -917,6 +1501,459 @@ test("live adapter supports file-attached request transport for argv prompt runn
     assert.match(response.output.external_runner.request_file_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
     assert.equal(response.output.runner_output.message_seen, true);
     assert.equal(response.output.runner_output.request_id, "req-open-code-file");
+  });
+});
+
+test("live adapter request-artifact transport sends bounded provider work packet", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const executionRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "workspaces", "disposable");
+    const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.mkdirSync(path.join(executionRoot, "source"), { recursive: true });
+    fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--work-packet');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "fs.writeFileSync('source/provider-edit.txt','workspace only\\n');",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'request artifact ok',",
+            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),resolved_local_paths:packet.resolved_local_refs.map(ref=>ref.local_path),execution_contract:packet.execution_contract,safety_rule:packet.context.effective_assets.find(asset=>asset.family==='context-rule')?.content,cwd:process.cwd(),packet_path:filePath},",
+            "evidence_refs:['evidence://adapter-live/claude-code/request-artifact']",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+          argument: "--work-packet",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-request-artifact",
+      run_id: "run-request-artifact",
+      step_id: "step-request-artifact",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      feature_traceability: {
+        required_path_prefixes: ["source/", "test/", "index.d.ts"],
+      },
+      input_packet_refs: ["packet://handoff"],
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        compiled_context_file: compiledContextFile,
+        compiler_revision: "runtime-context-compiler@v2",
+        effective_assets: [{
+          canonical_id: "context.rule.public-repo-safety",
+          reference: "context-rule://context.rule.public-repo-safety@v1",
+          family: "context-rule",
+          digest: "sha256:test-safety-rule",
+          order: 0,
+          delivery_mode: "inline",
+          content: "Treat public repository execution as bounded and evidence-first.",
+        }],
+        instruction_set: { objective: "Implement the bounded request-artifact test." },
+        packet_refs: ["packet://handoff"],
+        execution_permissions: {
+          execution_allowed: true,
+          writeback_allowed: true,
+          target_write_allowed: true,
+          direct_edits_allowed: true,
+          meaningful_change_required: true,
+          delivery_mode: "patch-only",
+        },
+      },
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.request_transport, "request-artifact");
+    assert.match(response.output.external_runner.request_artifact_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
+    assert.match(response.output.external_runner.provider_work_packet_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-work-packet-/u);
+    assert.equal(response.output.external_runner.context_budget_status, "pass");
+    assert.equal(response.output.runner_output.packet_kind, "aor-provider-work-packet");
+    assert.equal(response.output.runner_output.has_full_request_ref, true);
+    assert.equal(response.output.runner_output.has_context_budget, false);
+    assert.match(response.output.runner_output.safety_rule, /bounded and evidence-first/u);
+    assert.ok(response.output.runner_output.resolved_ref_roles.includes("full_request_artifact"));
+    assert.ok(response.output.runner_output.resolved_ref_roles.includes("provider_work_packet"));
+    assert.ok(response.output.runner_output.resolved_ref_roles.includes("compiled_context"));
+    assert.ok(
+      response.output.runner_output.resolved_local_paths.every((filePath) => {
+        const relative = path.relative(fs.realpathSync(executionRoot), filePath);
+        return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+      }),
+      JSON.stringify(response.output.runner_output.resolved_local_paths),
+    );
+    assert.equal(fs.realpathSync(response.output.runner_output.cwd), fs.realpathSync(executionRoot));
+    assert.ok(response.output.runner_output.packet_path.startsWith(path.join(fs.realpathSync(executionRoot), ".aor", "provider-inputs")));
+    assert.equal(fs.existsSync(path.join(executionRoot, "source", "provider-edit.txt")), true);
+    assert.equal(fs.existsSync(path.join(repoRoot, "source", "provider-edit.txt")), false);
+    assert.equal(response.output.runner_output.execution_contract.mode, "execute-implementation");
+    assert.equal(response.output.runner_output.execution_contract.disposable_workspace_boundary.source_edits_must_remain_within_execution_root, true);
+    assert.equal(response.output.runner_output.execution_contract.must_open_required_local_refs, true);
+    assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.required, true);
+    assert.deepEqual(response.output.runner_output.execution_contract.expected_meaningful_change.allowed_target_paths, [
+      "source/**",
+      "test/**",
+      "index.d.ts",
+    ]);
+    assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, true);
+    assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, true);
+    assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);
+    assert.equal(response.output.runner_output.execution_contract.output_quality_policy.warning_clean_required, true);
+    assert.equal(response.output.runner_output.execution_contract.output_quality_policy.exit_zero_warning_output_is_failure, true);
+    assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.applies_to, [
+      "required_commands",
+      "verification_expectations.primary_commands",
+    ]);
+    assert.deepEqual(response.output.runner_output.execution_contract.output_quality_policy.controller_owned_diagnostics, [
+      "verification_expectations.diagnostic_commands",
+    ]);
+    assert.match(
+      response.output.runner_output.execution_contract.output_quality_policy.required_runner_action,
+      /controller owns diagnostic verification/u,
+    );
+    assert.ok(response.output.runner_output.execution_contract.output_quality_policy.stderr_warning_tokens.includes("ResourceWarning"));
+
+    const readOnlyResponse = adapter.execute({
+      request_id: "req-request-artifact-read-only",
+      run_id: "run-request-artifact-read-only",
+      step_id: "step-request-artifact-read-only",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      input_packet_refs: ["packet://handoff"],
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.read-only",
+        compiled_context_file: compiledContextFile,
+        instruction_set: { objective: "Inspect without changing the checkout." },
+        execution_permissions: {
+          execution_allowed: true,
+          writeback_allowed: false,
+          target_write_allowed: false,
+          direct_edits_allowed: false,
+          meaningful_change_required: false,
+          delivery_mode: "no-write",
+        },
+      },
+    });
+
+    assert.equal(readOnlyResponse.status, "success");
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.mode, "read-only-inspection");
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.expected_meaningful_change.required, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.target_write_allowed, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.target_checkout_write_policy.writeback_allowed, false);
+    assert.equal(readOnlyResponse.output.runner_output.execution_contract.final_report.require_diff_or_patch_evidence, false);
+  });
+});
+
+test("live adapter repair request-artifact packet includes repair closure policy", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
+    const reviewReportFile = path.join(evidenceRoot, "review-report-repair.json");
+    const reviewDecisionFile = path.join(evidenceRoot, "review-decision-request-repair.json");
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
+    fs.writeFileSync(reviewReportFile, JSON.stringify({ overall_status: "fail" }, null, 2), "utf8");
+    fs.writeFileSync(
+      reviewDecisionFile,
+      JSON.stringify(
+        {
+          decision: "request-repair",
+          review_report_ref: "evidence://.aor/projects/adapter-test/reports/review-report-repair.json",
+          repair_context: {
+            source_phase: "review",
+            cycle_iteration: 1,
+            unresolved_findings: ["test/headers.ts coverage was weakened."],
+            unresolved_finding_details: [
+              {
+                finding_id: "code-quality.headers-coverage",
+                category: "code-quality",
+                severity: "blocking",
+                summary: "test/headers.ts coverage was weakened.",
+                evidence_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
+                resolution_requirement: "Restore the weakened assertion coverage or provide equivalent stronger coverage.",
+                verification_failure_details: [
+                  {
+                    command: "npx ava test/headers.ts",
+                    command_group_id: "post-change-test",
+                    role: "test",
+                    phase: "post-change",
+                    enforcement: "required",
+                    enforcement_result: "fail",
+                    outcome: null,
+                    exit_code: 1,
+                    signal: null,
+                    error_code: null,
+                    timed_out: false,
+                    timeout_class: "focused-test",
+                    command_timeout_ms: 300000,
+                    working_dir: ".",
+                    repo_scope: "target",
+                    stdout_excerpt: "headers coverage failed",
+                    stderr_excerpt: "",
+                    failure_summary: "Post-change verification command 'npx ava test/headers.ts' failed with exit code 1.",
+                    evidence_refs: ["evidence://.aor/projects/adapter-test/reports/step-result-post-run-primary-1.json"],
+                  },
+                ],
+              },
+            ],
+            meaningful_changed_paths: ["test/headers.ts"],
+            verification_status: "pass",
+            verification_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
+            previous_repair_decision_refs: [],
+            context_fingerprint: "sha256:adapter-repair-context",
+            new_context_since_previous: ["first-repair-decision"],
+            stop_reason: "Review requested repair.",
+            requested_next_step: "execution",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--work-packet');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'repair packet ok',",
+            "output:{roles:packet.resolved_local_refs.map(ref=>ref.role),repair_context:packet.repair_context,repair_policy:packet.execution_contract.repair_closure_policy},",
+            "evidence_refs:['evidence://adapter-live/claude-code/repair-packet']",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+          argument: "--work-packet",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-repair-packet",
+      run_id: "run-repair-packet",
+      step_id: "step-repair-packet",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        compiled_context_file: compiledContextFile,
+        runtime_evidence_refs: [
+          "evidence://.aor/projects/adapter-test/reports/review-decision-request-repair.json",
+        ],
+      },
+    });
+
+    assert.equal(response.status, "success");
+    assert.ok(response.output.runner_output.roles.includes("review_decision"));
+    assert.ok(response.output.runner_output.roles.includes("review_report"));
+    assert.equal(response.output.runner_output.repair_context.context.source_phase, "review");
+    assert.equal(
+      response.output.runner_output.repair_context.context.unresolved_finding_details[0].verification_failure_details[0].command,
+      "npx ava test/headers.ts",
+    );
+    assert.equal(response.output.runner_output.repair_policy.required, true);
+    assert.equal(response.output.runner_output.repair_policy.must_address_each_unresolved_finding, true);
+    assert.equal(
+      response.output.runner_output.repair_policy.unresolved_finding_details[0].finding_id,
+      "code-quality.headers-coverage",
+    );
+    assert.equal(
+      response.output.runner_output.repair_policy.unresolved_finding_details[0].verification_failure_details[0].command,
+      "npx ava test/headers.ts",
+    );
+  });
+});
+
+test("live adapter classifies provider work-packet echo as non-executed", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--work-packet');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "packet_identity:{packet_kind:packet.packet_kind,request_id:packet.request_id,step_id:packet.step_id},",
+            "route_and_policy:{route:packet.route,policy:packet.policy},",
+            "linked_refs_resolved:packet.resolved_local_refs",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+          argument: "--work-packet",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-work-packet-echo",
+      run_id: "run-work-packet-echo",
+      step_id: "step-work-packet-echo",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      input_packet_refs: ["packet://handoff"],
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        instruction_set: { objective: "Implement the work-packet echo test." },
+      },
+    });
+
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "provider_work_packet_not_executed");
+    assert.equal(response.output.external_runner.exit_code, 0);
+    assert.equal(response.output.external_runner.provider_work_packet_ref.startsWith("evidence://"), true);
+  });
+});
+
+test("live adapter blocks oversized provider work packet before spawning runtime", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify({status:'success',summary:'should not spawn'}));"],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+        },
+        contextBudget: {
+          max_input_tokens: 1,
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-oversized",
+      run_id: "run-oversized",
+      step_id: "step-oversized",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        instruction_set: { objective: "x".repeat(200) },
+      },
+    });
+
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "compiled_context_budget_exceeded");
+    assert.equal(response.output.external_runner.exit_code, null);
+    assert.equal(response.output.external_runner.context_budget_status, "fail");
+    assert.equal(response.output.runner_output, undefined);
+    assert.ok(response.output.external_runner.top_context_size_sources.length > 0);
+  });
+});
+
+test("live adapter maps provider prompt overflow to provider context-window failure", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stderr.write('Prompt is too long: input tokens exceed context window'); process.exit(1);"],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-provider-overflow",
+      run_id: "run-provider-overflow",
+      step_id: "step-provider-overflow",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: {},
+      policy_bundle: {},
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+      },
+    });
+
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "provider_context_window_exceeded");
+    assert.equal(response.output.external_runner.context_budget_status, "pass");
+    assert.equal(response.output.external_runner.context_budget_failure_class, "provider_context_window_exceeded");
+    assert.match(response.output.external_runner.raw_provider_error_summary, /Prompt is too long/i);
+    assert.ok(response.output.external_runner.raw_evidence_ref.startsWith("evidence://"));
+    assert.ok(response.output.external_runner.top_context_size_sources.length > 0);
   });
 });
 
@@ -1052,6 +2089,9 @@ test("live adapter classifies external runner permission blocks", () => {
 
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
+  assert.equal(response.output.runtime_permission_request.interaction_type, "permission_request");
+  assert.equal(response.output.runtime_permission_request.adapter_id, "claude-code");
+  assert.equal(response.output.runtime_permission_request.operation_type, "file_write");
 });
 
 test("live adapter accepts successful runner output with target Permission denied logs", () => {
@@ -1115,6 +2155,39 @@ test("live adapter accepts Codex JSONL agent summaries that mention target Permi
   assert.equal(response.status, "success");
   assert.equal(response.output.failure_kind, undefined);
   assert.equal(response.output.runner_output.jsonl_events.length, 2);
+});
+
+test("live adapter does not treat target listen EPERM diagnostics as runner permission denial", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({type:'thread.started',thread_id:'t1'})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'command_execution',command:'npm test',aggregated_output:'Error: listen EPERM: operation not permitted 0.0.0.0',exit_code:1,status:'failed'}})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Implemented source/utils/merge.ts and test/headers.ts. The target test was environment-blocked by a local listen permission denial; controller-owned verification remains authoritative.'}})+'\\n');",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-codex-jsonl-target-listen-eperm",
+    run_id: "run-codex-jsonl-target-listen-eperm",
+    step_id: "step-codex-jsonl-target-listen-eperm",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.failure_kind, undefined);
+  assert.equal(response.output.runner_output.jsonl_events.length, 3);
 });
 
 test("live adapter ignores successful Codex plugin warm auth noise", () => {
@@ -1183,6 +2256,9 @@ test("live adapter blocks successful Claude JSON results that include permission
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
   assert.equal(response.output.runner_output.permission_denials.length, 1);
+  assert.equal(response.output.runtime_permission_request.operation_type, "file_read");
+  assert.equal(response.output.runtime_permission_request.tool_name, "Read");
+  assert.equal(response.output.runtime_permission_request.target, ".aor/projects/run/artifacts/handoff.json");
 });
 
 test("live adapter blocks nested runner_output permission denials without relying on raw text", () => {
@@ -1218,6 +2294,350 @@ test("live adapter blocks nested runner_output permission denials without relyin
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
   assert.equal(response.output.runner_output.runner_output.permission_denials.length, 1);
+});
+
+test("live adapter parses Qwen JSON array output and detects permission denials", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "process.stdout.write(JSON.stringify([",
+            "{type:'system',subtype:'session_start',session_id:'qwen-test'},",
+            "{type:'result',subtype:'success',permission_denials:[{tool_name:'Bash',tool_input:{command:'git status --short'}}]}",
+            "]));",
+          ].join(""),
+        ],
+        handler: null,
+      }),
+    },
+  });
+
+  const response = adapter.execute({
+    request_id: "req-qwen-json-array-permission",
+    run_id: "run-qwen-json-array-permission",
+    step_id: "step-qwen-json-array-permission",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "permission-mode-blocked");
+  assert.equal(response.output.runner_output.json_events.length, 2);
+  assert.equal(response.output.runtime_permission_request.runner_family, "qwen");
+  assert.deepEqual(response.output.semantic_events, [
+    { event_type: "permission-denial", status: "blocked", failure_kind: "permission-mode-blocked" },
+  ]);
+  assert.equal(response.output.runtime_permission_request.operation_type, "shell_command");
+  assert.equal(response.output.runtime_permission_request.command, "git status --short");
+});
+
+test("live adapter turns Qwen stream-json events into sanitized provider progress", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-qwen-stream-progress-"));
+  const evidenceRoot = path.join(repoRoot, "reports");
+  const stateFile = path.join(repoRoot, "run-control-state-qwen-stream.json");
+  fs.mkdirSync(evidenceRoot, { recursive: true });
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-qwen-stream",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  const script = [
+    "const events = [",
+    "  {type:'system',subtype:'init'},",
+    "  {type:'assistant',message:{content:[{type:'text',text:'secret sk-live-progress should not be public'}]}},",
+    "  {type:'tool_call',name:'read_file',input:{file_path:'/private/secret.txt'}},",
+    "  {type:'stream_event',event:{type:'content_block_start',content_block:{type:'tool_use',name:'read_file',input:{file_path:'/private/secret.txt'}}}},",
+    "  {type:'result',subtype:'success'}",
+    "];",
+    "let delay = 0;",
+    "for (const event of events) {",
+    "  setTimeout(() => process.stdout.write(JSON.stringify(event) + '\\n'), delay);",
+    "  delay += 20;",
+    "}",
+    "setTimeout(() => process.exit(0), delay + 20);",
+  ].join("");
+
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "qwen-code",
+      adapterProfile: {
+        runner_family: "qwen",
+        ...buildExternalRunnerProfile({
+          command: process.execPath,
+          args: ["-e", script, "--", "--output-format", "stream-json"],
+          timeoutMs: 2000,
+          handler: null,
+        }),
+      },
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: repoRoot,
+      executionRoot: repoRoot,
+    });
+
+    const response = adapter.execute({
+      request_id: "req-qwen-stream",
+      run_id: "run-qwen-stream",
+      step_id: "step-qwen-stream",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 2000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    const rawRef = response.evidence_refs.find((ref) => ref.includes("adapter-live-raw-qwen-code"));
+    assert.ok(rawRef);
+    const rawPath = rawRef.startsWith("evidence://")
+      ? path.isAbsolute(rawRef.slice("evidence://".length))
+        ? rawRef.slice("evidence://".length)
+        : path.join(repoRoot, rawRef.slice("evidence://".length))
+      : rawRef;
+    const rawEvidence = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+
+    assert.equal(response.status, "success");
+    assert.equal(state.provider_step_status.status, "completed");
+    assert.equal(state.provider_step_status.output_mode, "stream-json");
+    assert.equal(state.provider_step_status.progress_event_count, 5);
+    assert.equal(state.provider_step_status.last_progress_kind, "result");
+    assert.equal(response.output.runner_output.jsonl_event_count, 5);
+    assert.equal(response.output.runner_output.jsonl_events, undefined);
+    assert.equal(response.output.external_runner.provider_progress_events.length, 5);
+    assert.equal(rawEvidence.provider_progress_events.length, 5);
+    assert.ok(
+      response.output.external_runner.provider_progress_events.some(
+        (event) => event.kind === "tool_call" && event.label === "read_file",
+      ),
+    );
+    assert.doesNotMatch(JSON.stringify(response.output.runner_output), /sk-live-progress|secret\\.txt/u);
+    assert.doesNotMatch(JSON.stringify(rawEvidence.provider_progress_events), /sk-live-progress|secret\\.txt/u);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter keeps malformed Qwen stream JSONL out of public runner output", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "process.stdout.write(JSON.stringify({type:'tool_call',name:'read_file'}) + '\\n');",
+            "process.stdout.write('not-json {secret}\\n');",
+          ].join(""),
+          "--",
+          "--output-format",
+          "stream-json",
+        ],
+        handler: null,
+      }),
+    },
+  });
+
+  const response = adapter.execute({
+    request_id: "req-qwen-malformed-stream",
+    run_id: "run-qwen-malformed-stream",
+    step_id: "step-qwen-malformed-stream",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default.qwen-primary" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.runner_output.malformed_jsonl, true);
+  assert.equal(response.output.runner_output.raw_stdout, undefined);
+  assert.equal(response.output.runner_output.provider_progress_events.length, 1);
+});
+
+test("live adapter keeps buffered Qwen json silent until final stdout", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-qwen-buffered-json-silent-"));
+  const stateFile = path.join(repoRoot, "run-control-state-qwen-buffered-json.json");
+  const staleStartedAt = new Date(Date.now() - 120000).toISOString();
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-qwen-buffered-json",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+          started_at: staleStartedAt,
+          timeout_budget_ms: 300000,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const script = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 120);",
+    "const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "const provider = state.provider_step_status || {};",
+    "process.stdout.write(JSON.stringify({",
+    "  status: 'success',",
+    "  summary: 'buffered json completed',",
+    "  output: {",
+    "    observed_status_before_stdout: provider.status || null,",
+    "    observed_progress_event_count: provider.progress_event_count ?? null",
+    "  }",
+    "}));",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", script, "--", "--output-format", "json"],
+        timeoutMs: 10000,
+        handler: null,
+      }),
+    },
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-qwen-buffered-json",
+      run_id: "run-qwen-buffered-json",
+      step_id: "step-qwen-buffered-json",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 300000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.output_mode, "json");
+    assert.equal(response.output.runner_output.observed_status_before_stdout, "silent-running");
+    assert.equal(response.output.runner_output.observed_progress_event_count, null);
+    assert.equal(response.output.external_runner.provider_progress_events.length, 0);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter preserves Qwen stream progress when run-control interrupts provider", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-qwen-stream-interrupt-"));
+  const stateFile = path.join(repoRoot, "run-control-state-qwen-stream-interrupt.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-qwen-stream-interrupt",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const interruptScript = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "function recordCancel() {",
+    "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "  state.status = 'canceled';",
+    "  state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
+    "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "}",
+    "process.stdout.write(JSON.stringify({type:'tool_call',name:'read_file'}) + '\\n');",
+    "recordCancel();",
+    "setInterval(recordCancel, 10);",
+    "setTimeout(() => {}, 5000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", interruptScript, "--", "--output-format", "stream-json"],
+        timeoutMs: 10000,
+        handler: null,
+      }),
+    },
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-qwen-stream-interrupt",
+      run_id: "run-qwen-stream-interrupt",
+      step_id: "step-qwen-stream-interrupt",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 10000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "external-runner-interrupted");
+    assert.equal(response.output.external_runner.provider_progress_events.length, 1);
+    assert.equal(state.provider_step_status.status, "interrupted");
+    assert.equal(state.provider_step_status.interruption_owner, "operator");
+    assert.equal(state.provider_step_status.interruption_status, "operator-stopped");
+    assert.equal(state.provider_step_status.last_progress_kind, "tool_call");
+    assert.equal(state.provider_step_status.progress_event_count, 1);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
 });
 
 test("live adapter blocks successful runner exits that still emit tool denial evidence", () => {

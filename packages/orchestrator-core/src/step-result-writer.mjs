@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 
 /**
  * @param {{
@@ -22,7 +23,16 @@ export function writeStepResult(options) {
   }
 
   const stepResultPath = path.join(options.runtimeLayout.reportsRoot, options.stepResultFileName);
-  fs.writeFileSync(stepResultPath, `${JSON.stringify(options.stepResult, null, 2)}\n`, "utf8");
+  const serialized = `${JSON.stringify(options.stepResult, null, 2)}\n`;
+  try {
+    fs.writeFileSync(stepResultPath, serialized, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if (error?.code !== "EEXIST" || fs.readFileSync(stepResultPath, "utf8") !== serialized) {
+      const conflict = new Error(`Step result '${stepResultPath}' already exists with different content.`);
+      conflict.code = "step-result-create-conflict";
+      throw conflict;
+    }
+  }
   return stepResultPath;
 }
 
@@ -31,12 +41,26 @@ export function writeStepResult(options) {
  *   runtimeLayout: { reportsRoot: string },
  *   stepResultPath: string,
  *   stepResult: Record<string, unknown>,
+ *   expectedRevision?: number,
  * }} options
  */
 export function rewriteStepResult(options) {
-  return writeStepResult({
-    runtimeLayout: options.runtimeLayout,
-    stepResultFileName: path.basename(options.stepResultPath),
-    stepResult: options.stepResult,
+  const revisionFile = `${options.stepResultPath}.revision.json`;
+  return withFileLock(`${options.stepResultPath}.lock`, () => {
+    const revision = fs.existsSync(revisionFile) ? JSON.parse(fs.readFileSync(revisionFile, "utf8")).revision : 0;
+    if (options.expectedRevision !== undefined && options.expectedRevision !== revision) {
+      const conflict = new Error(`Step result revision conflict: expected ${options.expectedRevision}, current ${revision}.`);
+      conflict.code = "step-result-revision-conflict";
+      throw conflict;
+    }
+    const validation = validateContractDocument({
+      family: "step-result",
+      document: options.stepResult,
+      source: "runtime://step-result",
+    });
+    if (!validation.ok) throw new Error(`Routed step-result failed contract validation: ${validation.issues.map((issue) => issue.message).join("; ")}`);
+    writeJsonAtomic(options.stepResultPath, options.stepResult);
+    writeJsonAtomic(revisionFile, { revision: revision + 1, updated_at: new Date().toISOString() });
+    return options.stepResultPath;
   });
 }

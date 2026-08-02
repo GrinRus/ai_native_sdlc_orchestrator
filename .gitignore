@@ -2,6 +2,8 @@ node_modules
 .pnpm-store
 .next
 dist
+!apps/web/dist/
+!apps/web/dist/**
 coverage
 .env
 .env.*

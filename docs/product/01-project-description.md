@@ -101,9 +101,31 @@ AOR must work for:
 
 A bounded multirepo graph belongs to one AOR project profile and may include separate repositories for backend services, mobile apps, frontend apps, documentation, or shared libraries. This is distinct from coordinating multiple independent AOR `project_id` profiles in one portfolio-level flow.
 
+The local installed-user app may show several explicitly added local AOR
+projects in one loopback session. That is a UI workspace convenience for
+switching between independent `project_id` contexts; it does not merge those
+projects into one planning, execution, delivery, or release flow.
+
+The Local Workspace is operator-local state, not a target repository. Portable
+AOR Project profiles describe repositories and components, while Project
+Bindings contain machine-local checkout paths and redacted readiness. A
+Workspace Set is a later run-scoped snapshot of those bindings rather than a
+second project definition.
+
 AOR does **not** target unbounded organization-wide orchestration in MVP.
 
 The MVP proof path for bounded multirepo support is intentionally narrow: one profile, explicit `repos[]`, explicit `repo_graph[]`, deterministic per-repo and integration validation refs, coordination evidence before non-`no-write` delivery, and repo-level changed-path lineage in the delivery manifest and release packet.
+
+W60-W62 plan the post-audit maturity boundary. W60 makes planning tasks structured,
+versioned, acceptance-traceable, and evidence-derived. W61 separates portable
+project/repository/component topology from machine-local repository bindings and
+adds explicit installed-user management. W62 provisions run-scoped workspace
+sets and coordinates task DAG execution, integration, repair, and per-repository
+delivery under one parent mission. These waves do not add portfolio
+orchestration across independent AOR project IDs.
+
+The operator experience for this boundary is defined in
+`docs/product/04-project-topology-and-task-planning-ux.md`.
 
 ## Product intake source model
 AOR intake preserves product acceptance evidence as a durable `intake-request-body` attached to the `intake-request` artifact packet.
@@ -128,14 +150,14 @@ The research report has two deterministic states:
 
 `spec build` carries this research gate into its routed `step-result`. The gate does not perform autonomous web research and does not block all specification work by itself, but it makes missing ADR evidence explicit before handoff.
 
-## Live E2E posture
-AOR ships with four standard rehearsal classes:
+## Installed-User Rehearsal Posture
+AOR maintainers keep four standard internal rehearsal classes:
 - regress short
 - regress long
 - release short
 - release long
 
-These profiles are designed to run on real public repositories through `no-write`, `patch-only`, or `fork-first-pr` delivery defaults.
+These internal profiles are designed to run on real public repositories through `no-write`, `patch-only`, or `fork-first-pr` delivery defaults.
 
 The W13 full-journey layer adds:
 - curated repository selection instead of arbitrary live targets;

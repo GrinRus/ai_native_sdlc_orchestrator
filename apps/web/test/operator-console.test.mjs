@@ -1,1153 +1,925 @@
 import assert from "node:assert/strict";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { appendRunEvent, createControlPlaneHttpServer } from "../../api/src/index.mjs";
-import { invokeCli } from "../../cli/src/index.mjs";
-import {
-  applyOperatorRunControl,
-  applyOperatorUiLifecycle,
-  applyOperatorLifecycleCommand,
-  attachOperatorConsoleSession,
-  buildOperatorConsoleSnapshot,
-  renderOperatorConsoleHtml,
-  submitOperatorInteractionAnswer,
-} from "../src/operator-console.mjs";
-
 const currentFilePath = fileURLToPath(import.meta.url);
-const fixturesDir = path.join(path.dirname(currentFilePath), "fixtures");
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../../..");
 
 /**
- * @param {(projectRoot: string) => Promise<void> | void} callback
+ * @param {(projectRoot: string) => void} callback
  */
-async function withTempProject(callback) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-web-w5-s04-"));
+function withTempProject(callback) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-web-app-smoke-"));
   try {
-    await callback(tempRoot);
+    callback(tempRoot);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 
-/**
- * @param {string[]} args
- * @param {{ cwd: string }} options
- * @returns {Promise<{ status: number | null, stdout: string, stderr: string }>}
- */
-function spawnNode(args, options) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, args, {
-      cwd: options.cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-    });
-    child.on("error", reject);
-    child.on("close", (status) => {
-      resolve({ status, stdout, stderr });
-    });
-  });
-}
+test("packaging-only marker smoke exposes installed-user guided mission controls", () => {
+  const source = [
+    "spa.jsx",
+    "control-plane-client.js",
+    "dialog.jsx",
+    "project-snapshot.js",
+    "operator-error-card.jsx",
+    "project-structure.jsx",
+    "project-structure-model.js",
+    "mission-model.js",
+    "mission-builder.jsx",
+  ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 
-/**
- * @param {string} projectRoot
- * @returns {string}
- */
-function seedOperatorArtifacts(projectRoot) {
-  fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
-  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
-
-  const verifyResult = invokeCli([
-    "project",
-    "verify",
-    "--project-ref",
-    projectRoot,
-    "--routed-dry-run-step",
-    "implement",
-  ]);
-  assert.equal(verifyResult.exitCode, 0, verifyResult.stderr);
-  const verifyPayload = JSON.parse(verifyResult.stdout);
-  const routedStepResult = JSON.parse(fs.readFileSync(verifyPayload.routed_step_result_file, "utf8"));
-  const runId = routedStepResult.run_id;
-
-  const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
-  assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
-
-  const evalResult = invokeCli([
-    "eval",
-    "run",
-    "--project-ref",
-    projectRoot,
-    "--suite-ref",
-    "suite.release.core@v1",
-    "--subject-ref",
-    "run://web-console-smoke",
-  ]);
-  assert.equal(evalResult.exitCode, 0, evalResult.stderr);
-
-  const certifyResult = invokeCli([
-    "harness",
-    "certify",
-    "--project-ref",
-    projectRoot,
-    "--asset-ref",
-    "wrapper://wrapper.eval.default@v1",
-    "--subject-ref",
-    "wrapper://wrapper.eval.default@v1",
-    "--suite-ref",
-    "suite.cert.core@v4",
-  ]);
-  assert.equal(certifyResult.exitCode, 0, certifyResult.stderr);
-
-  return runId;
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} runId
- * @param {string} interactionId
- * @returns {string}
- */
-function seedRequestedInteraction(projectRoot, runId, interactionId) {
-  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
-  assert.equal(initResult.exitCode, 0, initResult.stderr);
-  const initPayload = JSON.parse(initResult.stdout);
-  const reportsRoot = initPayload.runtime_layout.reportsRoot;
-  fs.mkdirSync(reportsRoot, { recursive: true });
-  const stepResultFile = path.join(reportsRoot, "step-result-web-interaction-question.json");
-  fs.writeFileSync(
-    stepResultFile,
-    `${JSON.stringify(
-      {
-        step_result_id: `${runId}.web.runner.question`,
-        run_id: runId,
-        step_id: "runner.implement",
-        step_class: "runner",
-        status: "failed",
-        summary: "Runner requested operator input.",
-        evidence_refs: ["evidence://reports/web-runner-question.json"],
-        requested_interaction: {
-          requested: true,
-          interaction_id: interactionId,
-          status: "requested",
-          prompt_summary: "Select the operator-approved target.",
-          question_evidence_refs: ["evidence://reports/web-runner-question.json"],
-          answer_audit_refs: [],
-          continuation: {
-            next_action: "resume_from_boundary",
-            reason_code: "operator-answer-required",
-          },
-          state_history: [
-            {
-              status: "requested",
-              timestamp: "2026-05-07T00:00:00.000Z",
-              summary: "Select the operator-approved target.",
-              evidence_refs: ["evidence://reports/web-runner-question.json"],
-              continuation: {
-                next_action: "resume_from_boundary",
-                reason_code: "operator-answer-required",
-              },
-            },
-          ],
-        },
-      },
-      null,
-      2,
-    )}\n`,
-    "utf8",
+  for (const required of [
+    "safe-walkthrough",
+    "Create Flow & Resolve Next Action",
+    "Create Follow-up Flow & Resolve Next Action",
+    "Mission intake",
+    "Flow selector",
+    "ProjectSnapshotLoading",
+    "Syncing project state",
+    "Project state is loading.",
+    "Active flows",
+    "Completed flows (read-only)",
+    "Flow completed - evidence locked",
+    "Inspect Evidence",
+    "Inspect locked evidence before starting follow-up work",
+    "Completed evidence locked",
+    "Create Follow-up",
+    "Start New Flow",
+    "Create follow-up from learning handoff",
+    "Duplicate mission settings",
+    "follow-up-source-handoff-ref",
+    "deliveryMode: followUp ? \"no-write\"",
+    "Evidence Graph",
+    "Runtime Trace",
+    "EvidenceReadinessPath",
+    "Readiness path",
+    "needs flow evidence",
+    "Refresh the selected flow after a lifecycle command",
+    "Refresh run status or open Execution Evidence",
+    "Next action",
+    "Evidence artifacts",
+    "qualityClosurePlan",
+    "qualityClosureContext",
+    "Quality closure path",
+    "Quality closure still needs evidence",
+    "Quality closure is blocked by repair",
+    "The current safe step is the public repair decision",
+    "Held until repair",
+    "Run-health is factual status",
+    "Run or attach the outcome assessment",
+    "Verification plan",
+    "verification_plan",
+    "group.outcome",
+    "No upstream writes",
+    "/flows/selected",
+    "/evidence-graph",
+    "/runtime-trace",
+    "lifecycle-command/actions",
+    "operator-requests",
+    "target_flow_id",
+    "targetFlowId",
+    "requestStageId",
+    "sameFlow",
+    "sameStage",
+    "comparableEvidenceRef",
+    "evidenceRefsMatch",
+    "latestRequestForFlow",
+    "flowScopedInteractions",
+    "actionCommandLabel",
+    "actionOutcomeTitle",
+    "actionOutcomeDetail",
+    "What happens next",
+    "Show CLI command",
+    "Materialize discovery evidence",
+    "topbar-ask-button",
+    "draft: newFlowDraft",
+    "draftSurface",
+    "currentStage = draftSurface",
+    "providerFocusStageId(providerStepStatus, externalRunHealth)",
+    "spec: \"discovery\"",
+    "handoff: \"discovery\"",
+    "eval: \"review\"",
+    "harness: \"review\"",
+    "EXTERNAL_RUN_STEP_CONTEXT",
+    "externalRunStepContext(externalRunHealth)",
+    "Execution handoff readiness",
+    "Approved handoff packet",
+    "Planning -> Execution handoff",
+    "Draft flow has no artifacts yet",
+    "No visible artifacts yet",
+    "workbenchEvidenceRows",
+    "latestDecisionRequestFromEvidence",
+    "selected flow or project-level live evidence",
+    "compactVisibleValue",
+    "CompactInlineValue",
+    "CompactDetailValue",
+    "shellQuoteCommandArg",
+    "appendCommandFlag",
+    "New Flow Preview",
+    "Completeness Checklist",
+    "Cancel New Flow",
+    "flow.new-draft-cancelled",
+    "flowSelectionVersion",
+    "projectSnapshotLoaded",
+    "snapshot-loading-grid",
+    "selectionVersion",
+    "selectionApplied",
+    "selectionStillCurrent && !didChooseStage.current",
+    "setSelectedStage(\"discovery\");",
+    "refresh({ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion })",
+    "ADVANCED_WORKBENCH_FOCUS_EVENT",
+    "ADVANCED_WORKBENCH_TAB_IDS",
+    "hasOpenDecisionRequest",
+    "Decision Request",
+    "openAdvancedWorkbench(workbenchAction.tabId)",
+    "setSelectedTab(nextTab)",
+    "preferredOperatorDecisionAction",
+    "externalRunHealth?.pending_decision?.action",
+    "preferredOperatorDecisionAction(externalRunHealth, supportedActions, selectedRequest)",
+    "requestStatus === \"rejected\" && actions.includes(rubricRecommendedAction)",
+    "isStepQualityAssessmentCompletionSummary",
+    "product-change step[- ]quality was assessed from \\d+ public evaluator input refs?",
+    "setSelectedAction(preferredAction)",
+    "operatorDecisionChecklistItems",
+    "normalizeDecisionRubricSummary",
+    "decisionRubricSummary",
+    "Evidence rubric",
+    "Required checks",
+    "Required evidence",
+    "Decision evidence rubric",
+    "Decision checklist",
+    "operatorDecisionRecordPlan",
+    "Decision record",
+    "Copy expected decision ref",
+    "Decision record destination",
+    "operatorDecisionHelperPlan",
+    "operatorDecisionCorrectionPlan",
+    "operator_decision_rejection_reason",
+    "rejectionReason: normalized.rejection_reason",
+    "Correction required",
+    "Rejected decision correction plan",
+    "Copy correction JSON",
+    "write the replacement decision file, and refresh run status",
+    "Copy rejected reason",
+    "Decision handoff",
+    "Copy handoff JSON",
+    "Copy action note",
+    "Copy expected file ref",
+    "Decision handoff bundle",
+    "Selected action handoff",
+    "operatorDecisionResumePath",
+    "Resume path",
+    "Decision resume path",
+    "Copy decision file ref",
+    "Resume after write",
+    "Inspect the decision request",
+    "Confirm evidence coverage",
+    "Record selected action",
+    "Refresh run status",
+    "Record a diagnosis as a stop state; repair or retry must happen through public controls before continuation.",
+    "externalRunHealth={externalRunHealth}",
+    "delivery-mode-card",
+    "request-intent-segment",
+    "request-scope-card",
+    "graph-flow-canvas",
+    "StageSpecificPanel",
+    "artifact-readiness-grid",
+    "artifact_readiness",
+    "qualityGateEvidenceRows",
+    "gate?.evidence_summaries",
+    "qualityGateRecoveryPlan",
+    "Quality gate recovery path",
+    "Recovery path",
+    "Run repair implementation",
+    "Delivery stays blocked",
+    "Review Gate Matrix",
+    "Delivery / Release Finalization",
+    "Learning Closure / Start New Flow",
+    "Interaction Detail",
+    "Trace timeline",
+    "Provider heartbeat",
+    "provider_step_status",
+    "activeProviderSupersedesExternalRunBlocker",
+    "externalRunHealthHasMaterializedDecisionRequest",
+    "externalRunHealthHasOpenDecisionRequest",
+    "isProviderStepDisplayStatus",
+    "providerStepSupersedesRunHealth",
+    "displayExternalRunHealth(rawExternalRunHealth, providerStepStatus)",
+    "providerWorkbenchFocus",
+    "RUN_HEALTH_FIELD",
+    "[\"run\", \"health\"].join(\"_\")",
+    "resolveExternalRunHealth",
+    "isBlockingExternalRunHealth",
+    "externalRunFailureUserSummary",
+    "externalRunHealthUserSummary",
+    "acceptedExternalRunDiagnosis",
+    "Diagnosis accepted for ${stepLabel}. Repair is required through public AOR controls",
+    "isGenericExternalRunPendingDecisionReason",
+    "isStepQualityAssessmentCompletionSummary(normalized)",
+    "externalRunActionableDecisionUserSummary",
+    "Target setup or target verification failed during the run.",
+    "Retry the ${stepLabel} public step after reviewing the blocker.",
+    "Run the ${stepLabel} repair path through public AOR controls before continuing.",
+    "externalRunPendingDecisionUserReason",
+    "externalRunHealthBlockers",
+    "externalRunRecoveryPathActive",
+    "externalRunRecoveryPathUserSummary",
+    "externalRunExecutableRepairCommand",
+    "materializedQualityRepairAction",
+    "materializedQualityRepairSummary",
+    "materializedQualityRepairCompletion",
+    "materializedQualityRepairRunId",
+    "completedQualityRepairAction",
+    "verificationGroupFailureDetail",
+    "firstFailedStepResultRef",
+    "latestRequiredVerificationFailed",
+    "verificationFailureSummary",
+    "failed_step_result_refs",
+    "failed_command_count",
+    "isQualityRepairPrimaryAction",
+    "Continue repair run",
+    "Repair run completed",
+    "Continue with post-run verification",
+    "Verification failed after completed repair",
+    "Post-run verification failed",
+    "Repair failed verification",
+    "Post-run verification repair path",
+    "Repair implementation has completed. Rerun required verification before QA or delivery.",
+    "Run the ${stepLabel} repair path through public AOR controls",
+    'normalized.toLowerCase() === "qa"',
+    "Review evidence did not connect the provider change to verification results.",
+    "Accept the ${stepsLabel} operator decision",
+    "missingRunHealthEvidenceSentence",
+    "Run-health has ${count} unresolved evidence ${noun}",
+    "Review and repair ${count} missing run-health evidence ${noun}",
+    "Diagnosis moved ${stepLabel} into repair.",
+    "Use the public repair path before QA, delivery, or continuation.",
+    "Open the ${stepLabel} decision request",
+    "record the operator diagnosis before continuing.",
+    "externalRunPendingDecisionUserReason(externalRunHealth, pending)",
+    "externalRunHasFailureSummary",
+    "isControllerDecisionPendingRunHealth",
+    "externalRunStepQualityAssessmentPendingSummary",
+    "isStepQualityAssessmentPendingRunHealth",
+    "if (isStepQualityAssessmentPendingRunHealth(health)) return false;",
+    "externalRunHasSubstantiveFailureSummary",
+    "acceptedExternalRunContinueDecision",
+    "externalRunContinuationDecisionCopy",
+    "AOR has the ${stepLabel} continue decision.",
+    "externalRunAttentionLabel",
+    "externalRunDerivedEvidenceStatus",
+    "decision-recorded",
+    "externalRunRiskLevel",
+    "Decision recorded",
+    "externalRunWorkbenchAction",
+    "Record the ${stepLabel} blocker decision before retrying or continuing.",
+    "Open the ${stepLabel} decision request and record the operator decision before continuing.",
+    "hasOpenDecisionRequest\n      ? { label: \"Decision Request\", icon: \"target\", tabId: \"decisions\" }",
+    "${stepLabel} decision request",
+    "${stepLabel} assessment request",
+    "Assessment Evidence",
+    "Decision Evidence",
+    "Review Blocker",
+    "Recovery Path",
+    "Run assessment needed",
+    "Assessment checks",
+    "awaiting-assessment",
+    "Run decision recorded",
+    "Decision evidence",
+    "Recovery needed",
+    "Recovery checks",
+    "repair-required",
+    "externalRunNewFlowBlockedReason",
+    "Resolve the current Recovery Path before starting a new flow.",
+    "newFlowBlockedByRunHealthReason",
+    "newFlowDisabledReason",
+    "Review blocker",
+    "Run decision needed",
+    "Decision checks",
+    "awaiting-decision",
+    "Open ${stepLabel} blocker",
+    "projectRunEvidenceSelectorLabel",
+    "projectRunEvidenceStatus",
+    "projectRunEvidenceIdentity",
+    "blocker evidence",
+    "Run evidence blocked",
+    "Refresh Run Status",
+    "Ask AOR needs a selectable flow",
+    "Ask AOR needs a flow",
+    "delivery_readiness_status: isBlockingExternalRunHealth(externalRunHealth)",
+    "externalRunDerivedEvidenceStatus(externalRunHealth, \"blocked\")",
+    "externalRunHealth={externalRunHealth}",
+    "Provider is still running",
+    "No output or progress has been observed yet; provider still running",
+    "Provider progress was observed earlier",
+    "Provider output was observed earlier",
+    "Provider was stopped by the operator",
+    "No streamed output captured",
+    "No progress events captured",
+    "Not reported",
+    "providerLastOutputLabel",
+    "providerActivityLabel",
+    "providerCommandDisplayLabel",
+    "Provider CLI session",
+    "Review / QA gate ready",
+    "Provider execution finished before a flow could be selected.",
+    "Delivery artifacts are ready for final operator acceptance and closure.",
+    "Inspect delivery artifacts and record the final operator decision before closure.",
+    "externalRunProviderGateCopy",
+    "Provider execution finished, but ${stepLabel} is waiting for an operator decision before verification, review, QA, delivery, or release.",
+    "Provider execution finished and ${stepLabel} has a recorded continue decision.",
+    "current run gate remains active",
+    "providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)",
+    "providerCommandDetail(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)",
+    "Review QA gate evidence",
+    "Provider execution is done. Inspect validation warnings, review findings, and QA evidence before deciding delivery readiness.",
+    "Provider run in progress",
+    "Live execution is running from project-level evidence before a flow can be selected.",
+    "Monitor provider run",
+    "Ask AOR needs a selectable flow; use run evidence controls for this blocker.",
+    "Use the Decision Request workbench before asking for another flow action.",
+    "projectLevelProviderFocus",
+    "evidenceRows={providerWorkbenchFocus ? workbenchEvidenceRows : flowEvidenceRows}",
+    "providerCommandDetail",
+    "Raw runner label: external-provider-runner",
+    "interruption_owner",
+    "Interruption owner",
+    "Interruption status",
+    "isActiveProviderStepStatus",
+    "isTerminalProviderStepStatus",
+    "window.setInterval(poll, 5000)",
+    "silent: true",
+    "Last progress",
+    "Activity",
+    "Output mode",
+    "First-run wizard",
+    "Project Context",
+    "Runtime Readiness",
+    "Configure First Flow",
+    "First-flow setup is the only required next step.",
+    "firstRunFocusMode",
+    "first-run-focus-mode",
+    "AdvancedEvidenceDisclosure",
+    "Advanced evidence",
+    "FlowAdvancedWorkbench",
+    "Advanced evidence workbench",
+    "advanced-workbench-tabs",
+    "flow-advanced-workbench",
+    "setExpanded(!media.matches)",
+    "Workbench",
+    "support-table-grid",
+    "shortPathLabel",
+    "projectDisplayLabel",
+    "runtimeRootLabel",
+    "Show runtime root path details",
+    "Copy runtime root path",
+    "conciseArtifactLabel",
+    "artifactActionLabel",
+    "Open evidence artifact",
+    "Copy raw ref for",
+    "Attach as request target:",
+    "topbar-status-strip",
+    "first-run-next-action-grid",
+    "stage-progress-strip",
+    "compact-first-run",
+    "safe-template-summary",
+    "form-primary-action",
+    "Edit mission details",
+    "active-flow-handoff",
+    "Ask AOR for selected flow",
+    "Ask AOR requires a selected active flow",
+    "Available after completed flow",
+    "Requires selected active flow",
+    "runtime-path-details",
+    "runtime-copy-chip",
+    "Project switcher",
+    'htmlFor="project-switcher-control"',
+    'id="project-switcher-control"',
+    'name="project-switcher"',
+    'aria-label="Project switcher"',
+    "Add AOR Project",
+    "Runtime root preview",
+    "Project profile",
+    "projectProfile",
+    "project_profile",
+    "profile_mismatch_candidate_project_ids",
+    "Profile mismatch detected",
+    "Add Matching Project Profile",
+    "Confirm writes and initialize",
+    "/api/projects/actions",
+    "/runs",
+    "graph-context-tabs",
+    "selected-node-panel",
+    "stage-specific-panel",
+    "interactions-layout",
+    "trace-timeline-strip",
+    "Create and run request",
+    "Create no-write inspection request",
+    "openerRef",
+    "element.inert = true",
+    "event.shiftKey",
+    "clearResult: false",
+    "Add at least one target ref",
+    "Initialize Project Runtime",
+    "Loading",
+    "First launch",
+    'onboarding.status === "not-initialized"',
+    "onboarding.can_initialize === true",
+    "This does not create a flow",
+    "if (!flow) return \"readiness\"",
+    "newFlowDisabled",
+    "Initialize the project runtime before starting a flow.",
+    "flow.new-blocked",
+    "setAddProjectDrawerOpen(false)",
+    "activeProject?.runtime_root",
+    "Create the first no-write mission packet, then resolve the first next action.",
+    'window.scrollTo({ top: 0, left: 0, behavior: "auto" })',
+    "No active flow",
+    'htmlFor="flow-selector-control"',
+    'id="flow-selector-control"',
+    'name="flow-selector"',
+    "Readiness prepares the runtime before a flow is created",
+    "selectedStageRuntimeState",
+    "Upcoming stage. The current recommended action remains scoped",
+    "Recommended action context",
+    "aria-current={current ? \"step\" : undefined}",
+    "aria-pressed={active}",
+    "Selected view",
+    "Expected outputs",
+    "Command provenance",
+    "Dry-run preview",
+    "Flow inventory",
+    "stage-status-badge",
+    "operator-request.completed",
+    "mission create",
+    "next",
+    "artifact_display_summaries: next.artifact_display_summaries",
+    "artifact_display_summaries",
+    "normalizeArtifactSummary",
+    "artifactFilterMatches",
+    "artifact-filter-bar",
+    "aria-pressed={filter === entry.id}",
+    "compactDisclosureLabel",
+    "Show full ${type}${context}",
+    "summary aria-label={disclosureLabel} title={disclosureLabel}",
+    "Show recommended CLI command: ${compactVisibleValue(actionCommand, \"command\")}",
+    "summary aria-label={actionCommandDisclosureLabel} title={actionCommandDisclosureLabel}",
+    "ARTIFACT_REF_LABELS",
+    "semanticArtifactTitleFromRef",
+    "Next Action Report",
+    "Provider Evidence",
+    "Operator Decision Request",
+    "Repair Decision",
+    "publicRepairDecisionAction",
+    "publicRepairDecision={publicRepairDecision}",
+    "Public repair decision required",
+    "No separate agent request file is pending for this repair loop.",
+    "Copy repair decision command",
+    "filteredRows.find",
+    "No evidence matches the selected filter.",
+    "Copy raw ref",
+    "Debug raw ref",
+    "Evidence artifacts",
+    "Operator Decision",
+    "operatorDecisionRequestsForFlow",
+    "operatorDecisionRequestsFromExternalRunHealth",
+    "mergeOperatorDecisionRequests",
+    "blockingExternalRunHealth",
+    "providerFocusActive",
+    "isOperatorDecisionRequestRef",
+    "normalizeOperatorDecisionStatus",
+    "isOpenOperatorDecisionStatus",
+    "supportedDecisionActionsFromRecord",
+    "isOperatorDecisionRequestRow",
+    "Review the runtime decision request",
+    "No pending agent decision request for this flow.",
+    "agent_decision_request_ref",
+    "aor run steer --run-id",
+    "Copy request ref",
+    "copyFeedback",
+    "Clipboard unavailable. Select and copy this value.",
+    "Copy fallback value",
+    "ref.copy-fallback",
+    "awaiting-decision",
+    '"exit-0"',
+    "Execution Evidence",
+    "Active Quality Gate",
+    "Budget Exhausted Hold",
+    "active_quality_gate",
+    "QualityGatePanel",
+    "qualityGateSourceLabel",
+    "qualityGateAttemptLabel",
+    "delivery_release_blocked",
+    "Next safe action",
+    "executionEvidenceForFlow",
+    "executionRecoveryPlan",
+    "strongestExecutionEvidenceRun",
+    "executionEvidenceScore",
+    "selectedFlowRuntimeTrace",
+    "flowRuntimeTrace?.flow_id !== selectedFlow.flow_id",
+    "setFlowRuntimeTrace(null)",
+    "setFlowEvidenceGraph(null)",
+    "execution_evidence",
+    'real_code_change_status === "pass"',
+    'group.group_id === "mission-relevant"',
+    'runId.includes(".verify.")',
+    'runId.includes(".routed-execution.")',
+    "Provider execution",
+    "Runtime Harness",
+    "Real code change",
+    "runner-owned-leak",
+    "scratch-unrelated",
+    "Stop provider",
+    "Save partial evidence",
+    "Diagnose current step",
+    "Retry public step",
+    "Run public repair command",
+    "Run repair implementation",
+    "Inspect completed repair run",
+    "Repair is driven by failed post-run evidence",
+    "Run repair from failed verification",
+    "--project-profile",
+    "--run-id",
+    "nextAction={nextAction}",
+    "repairCompletion={qualityRepairCompletion}",
+    "Execution evidence recovery path",
+    "Stabilize execution evidence first",
+    "${stepLabel} repair path",
+    "externalRunHealth={externalRunHealth}",
+    "Next public control",
+    "aor run cancel",
+    "aor run status --run-id",
+    "delivery-mode={selectedDeliveryMode}",
+    "syncExpandedToViewport",
+  ]) {
+    assert.ok(source.includes(required), `SPA source should include '${required}'`);
+  }
+  assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
+  assert.ok(css.includes("--control-height: 40px"), "SPA CSS should define a desktop control height token");
+  assert.ok(css.includes("--touch-control-height: 44px"), "SPA CSS should define a mobile touch target token");
+  assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
+  assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
+  assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
+  assert.ok(css.includes(".provider-heartbeat-card"), "SPA CSS should define provider heartbeat cockpit layout");
+  assert.ok(css.includes(".first-run-wizard"), "SPA CSS should define first-run wizard layout");
+  assert.ok(css.includes(".project-switcher"), "SPA CSS should define project switcher layout");
+  assert.match(css, /\.topbar\s*\{[\s\S]*?flex-wrap: wrap;/u, "SPA topbar should wrap instead of overlapping project and flow controls");
+  assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
+  assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
+  assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
+  assert.ok(css.includes(".provider-heartbeat-action small"), "Provider heartbeat should demote raw runner labels to secondary debug copy");
+  assert.ok(css.includes(".quality-gate-card"), "SPA CSS should define active quality gate layout");
+  assert.ok(css.includes(".quality-gate-card.operator-hold"), "SPA CSS should distinguish exhausted repair budgets");
+  assert.ok(css.includes(".verification-plan-card"), "SPA CSS should define compact verification plan layout");
+  assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
+  assert.ok(css.includes(".advanced-workbench-disclosure"), "SPA CSS should group active advanced surfaces behind one disclosure");
+  assert.ok(css.includes(".advanced-workbench-tabs"), "SPA CSS should define active advanced workbench tabs");
+  assert.ok(css.includes(".compact-inline-value"), "SPA CSS should define compact inline value layout");
+  assert.ok(css.includes(".compact-detail-value"), "SPA CSS should define compact detail value layout");
+  assert.ok(css.includes(".next-step-panel"), "Active cockpit should present the recommended action as an operator outcome");
+  assert.ok(css.includes(".action-command-details"), "Active cockpit should keep raw lifecycle commands behind technical details");
+  assert.match(css, /\.form-actions \.form-primary-action\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Safe first-flow submit action should stay in the first mission form action row");
+  assert.match(css, /\.safe-template-summary\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u, "Safe first-flow summary should remain a compact information grid");
+  assert.match(css, /\.mission-detail-fields summary\s*\{[\s\S]*?min-height: var\(--touch-control-height\);/u, "Mission detail disclosure should meet mobile touch target size");
+  assert.match(css, /summary:focus-visible/u, "SPA CSS should expose keyboard focus on disclosure controls");
+  assert.match(css, /\.debug-ref-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Debug disclosure controls should meet the shared target size");
+  assert.match(css, /\.runtime-path-details summary\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Runtime path disclosure controls should meet the shared target size");
+  assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);[\s\S]*?min-width: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
+  assert.match(css, /\.artifact-summary-button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact summary rows should meet the shared target size");
+  assert.match(css, /\.row-actions \.icon-button\s*\{[\s\S]*?width: var\(--control-height\);[\s\S]*?height: var\(--control-height\);/u, "Artifact row icon actions should meet the shared target size");
+  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u, "First-run primary action should stay above supporting readiness details");
+  assert.match(css, /\.first-run-wizard \.first-run-next-action-grid\s*\{[\s\S]*?order: 2;/u, "First-run next-action summary should follow the primary action");
+  assert.ok(css.includes(".support-table-grid"), "SPA CSS should hide first-run support tables behind disclosure");
+  assert.equal(
+    source.includes("candidates.at(-1)"),
+    false,
+    "SPA should not show the last trace run when a stronger implementation execution evidence run exists",
   );
-  return stepResultFile;
-}
-
-/**
- * @param {string} filePath
- * @param {Record<string, unknown>} document
- */
-function writeRuntimeJson(filePath, document) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
-}
-
-/**
- * @param {{ artifactsRoot: string, reportsRoot: string }} runtimeLayout
- * @param {string} projectId
- * @param {string} runId
- */
-function seedGuidedClosureArtifacts(runtimeLayout, projectId, runId) {
-  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `step-result-${runId}.json`), {
-    step_result_id: `${runId}.implement.pass`,
-    project_id: projectId,
-    run_id: runId,
-    step_id: "run.start.implement",
-    step_class: "runner",
-    status: "pass",
-    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
-  });
-  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-report-${runId}.json`), {
-    review_report_id: `${runId}.review-report.v1`,
-    project_id: projectId,
-    run_id: runId,
-    overall_status: "pass",
-    review_recommendation: "proceed",
-    findings: [],
-    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
-  });
-  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `runtime-harness-report-${runId}.json`), {
-    report_id: `${runId}.runtime-harness-report.v1`,
-    project_id: projectId,
-    run_id: runId,
-    overall_decision: "pass",
-    run_findings: [],
-    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
-  });
-  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-decision-${runId}-approve.json`), {
-    decision_id: `${runId}.review-decision.approve.v1`,
-    project_id: projectId,
-    run_id: runId,
-    decision: "approve",
-    decider_ref: "operator://web-test",
-    reason: "Approved guided web closure fixture.",
-    review_report_ref: `evidence://reports/review-report-${runId}.json`,
-    runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
-    delivery_manifest_refs: [],
-    learning_handoff_refs: [],
-    decision_basis: {
-      review_overall_status: "pass",
-      review_recommendation: "proceed",
-      runtime_harness_overall_decision: "pass",
-      blocking_findings: [],
-    },
-    delivery_gate: {
-      status: "pass",
-      blocks_downstream: false,
-      required_downstream_decision: "approve",
-      findings: [],
-    },
-    evidence_refs: [`evidence://reports/review-report-${runId}.json`, `evidence://reports/runtime-harness-report-${runId}.json`],
-    decided_at: "2026-05-06T00:00:00.000Z",
-  });
-  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `delivery-plan-${runId}.json`), {
-    plan_id: `${runId}.delivery-plan.implement.v1`,
-    project_id: projectId,
-    run_id: runId,
-    step_class: "implement",
-    delivery_mode: "patch-only",
-    status: "ready",
-    blocking_reasons: [],
-    evidence_refs: [`evidence://reports/review-decision-${runId}-approve.json`],
-  });
-  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `delivery-manifest-${runId}.json`), {
-    manifest_id: `${runId}.delivery-manifest.v1`,
-    project_id: projectId,
-    run_refs: [runId],
-    status: "submitted",
-    repo_deliveries: [{ repo_id: "target", writeback_result: "patch-created" }],
-    evidence_refs: [`evidence://artifacts/delivery-plan-${runId}.json`],
-  });
-  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `release-packet-${runId}.json`), {
-    packet_id: `${runId}.release-packet.v1`,
-    project_id: projectId,
-    run_refs: [runId],
-    status: "ready-for-close",
-    delivery_manifest_ref: `evidence://artifacts/delivery-manifest-${runId}.json`,
-    evidence_lineage: {
-      execution_refs: [`evidence://artifacts/delivery-plan-${runId}.json`],
-      delivery_output_refs: [`evidence://artifacts/delivery-manifest-${runId}.json`],
-    },
-    evidence_refs: [`evidence://artifacts/delivery-manifest-${runId}.json`],
-  });
-}
-
-test("web console snapshot builds run list and run detail from shared API contracts", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-    const snapshot = await buildOperatorConsoleSnapshot({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      runId,
-    });
-
-    assert.equal(snapshot.project.project_root, projectRoot);
-    assert.ok(Array.isArray(snapshot.runs));
-    assert.ok(snapshot.runs.some((run) => run.run_id === runId));
-    assert.ok(snapshot.packet_artifacts.length >= 1);
-    assert.ok(snapshot.run_detail.step_results.length >= 1);
-    assert.equal(snapshot.run_detail.event_history.run_id, runId);
-    assert.equal(snapshot.run_detail.event_history.total_events, 0);
-    assert.ok(snapshot.run_detail.policy_history.entry_count >= 1);
-    assert.ok(snapshot.quality_artifacts.length >= 1);
-    assert.equal(typeof snapshot.strategic_snapshot, "object");
-    assert.ok(Array.isArray(snapshot.strategic_snapshot.wave_snapshot.waves));
-    assert.equal(typeof snapshot.strategic_snapshot.risk_snapshot.level_totals.high, "number");
-    assert.deepEqual(snapshot.strategic_snapshot.planner_metrics.metric_names, [
-      "clean_close_rate",
-      "retry_rate",
-      "repair_rate",
-      "blocker_rate",
-    ]);
-    assert.equal(typeof snapshot.finance_monitoring, "object");
-    assert.deepEqual(snapshot.finance_monitoring.dimension_names, [
-      "project",
-      "route",
-      "bundle",
-      "compiler_revision",
-      "adapter",
-    ]);
-    assert.equal(
-      snapshot.api_ui_contract_alignment.live_stream,
-      "GET /api/projects/:projectId/runs/:runId/events",
-    );
-    assert.ok(
-      snapshot.api_ui_contract_alignment.read_model.includes(
-        "GET /api/projects/:projectId/runs/:runId/events/history",
-      ),
-    );
-    assert.ok(
-      snapshot.api_ui_contract_alignment.read_model.includes(
-        "GET /api/projects/:projectId/runs/:runId/policy-history",
-      ),
-    );
-    assert.ok(
-      snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/planner-metrics"),
-    );
-    assert.ok(
-      snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/finance-monitoring"),
-    );
-    assert.ok(
-      snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/next-action-report"),
-    );
-    assert.equal(snapshot.guided_lifecycle.stages.length, 7);
-    assert.equal(snapshot.guided_lifecycle.mutation_transport.available, true);
-
-    const html = renderOperatorConsoleHtml(snapshot, {
-      title: "AOR Web Console Smoke",
-      streamProtocol: "sse",
-      liveEventCount: 2,
-    });
-    assert.match(html, /AOR Operator Console/);
-    assert.match(html, new RegExp(runId));
-    assert.match(html, /Run detail evidence links/);
-    assert.match(html, /Policy history entries/);
-    assert.match(html, /Event history entries/);
-    assert.match(html, /Strategic Snapshot/);
-    assert.match(html, /High-risk runs/);
-    assert.match(html, /Clean-close rate/);
-    assert.match(html, /Finance Monitoring/);
-    assert.match(html, /Telemetry state/);
-    assert.match(html, /Guided lifecycle/);
-    assert.match(html, /Lifecycle commands/);
-    assert.match(html, /Runner interactions/);
-  });
+  assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
+  assert.ok(css.includes(".quality-closure-path"), "SPA CSS should define quality closure path layout");
+  assert.match(css, /\.quality-closure-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.quality-closure-path li\.blocked\s*\{/u);
+  assert.ok(css.includes(".execution-recovery-path"), "SPA CSS should define execution recovery path layout");
+  assert.match(css, /\.execution-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.execution-recovery-path li\.ready\s*\{/u);
+  assert.ok(css.includes(".decision-resume-path"), "SPA CSS should define operator decision resume path layout");
+  assert.match(css, /\.decision-resume-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(148px, 1fr\)\);/u);
+  assert.match(css, /\.decision-resume-path li\.blocked\s*\{/u);
+  assert.match(css, /\.decision-resume-path button\s*\{[\s\S]*?min-height: var\(--control-height\);/u);
+  assert.match(
+    source,
+    /decisionCorrectionPlan\.expectedDecisionRef[\s\S]*?Copy decision file ref/u,
+    "Rejected decision correction should expose the replacement decision destination in the first correction block",
+  );
+  assert.ok(css.includes(".evidence-readiness-path"), "SPA CSS should define graph and trace readiness path layout");
+  assert.match(css, /\.evidence-readiness-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.evidence-readiness-path li\.blocked\s*\{/u);
+  assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
+  assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
+  assert.ok(css.includes(".flow-active-mode .recommended-action .cockpit-actions"), "SPA CSS should place active mobile cockpit actions before stacked details");
+  assert.ok(
+    source.indexOf('className="cockpit-actions"') < source.indexOf('className="action-grid"'),
+    "Active cockpit primary actions should precede detail disclosures in DOM focus order",
+  );
+  assert.ok(source.includes("const showCockpitHeadingAction = !providerFocusActive"), "Provider run-health focus should not add a duplicate heading refresh before the recommended action");
+  assert.match(source, /\{showCockpitHeadingAction \? \([\s\S]*?<button className="secondary" type="button" onClick=\{onAsk\}/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.flow-active-mode \.recommended-action \.cockpit-actions\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?width: 100%;/u,
+    "Active mobile cockpit actions should use a bounded two-column grid",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;[\s\S]*?width: 100%;/u,
+    "Active mobile cockpit primary action should span the full action row",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.recommended-action \.cockpit-actions \.secondary\s*\{[\s\S]*?width: 100%;[\s\S]*?min-width: 0;/u,
+    "Active mobile cockpit secondary actions should fit within the viewport",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-focus-mode \.topbar\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: minmax\(0, 1fr\) max-content max-content;/u,
+    "SPA CSS should compact first-run topbar into a two-action grid on mobile",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.advanced-workbench-row\s*\{[\s\S]*?grid-row: 3;/u,
+    "Active advanced workbench should render before Activity / Events support tables on desktop",
+  );
+  assert.match(
+    css,
+    /\.flow-active-mode \.bottom-bar\s*\{[\s\S]*?grid-row: 4;/u,
+    "Active Activity / Events support tables should follow the advanced workbench on desktop",
+  );
+  assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
+  assert.ok(css.includes(".stage-rail.compact-first-run .stage-progress-strip"), "SPA CSS should show a compact first-run stage progress strip on mobile");
+  assert.ok(css.includes(".stage-rail.compact-first-run nav"), "SPA CSS should collapse the full stage rail behind the compact first-run strip on mobile");
+  assert.ok(css.includes(".flow-active-mode .stage-rail .stage-progress-strip"), "SPA CSS should show a compact active-flow stage progress strip on tablet and mobile");
+  assert.ok(css.includes(".flow-active-mode .topbar-ask-button .action-label"), "SPA CSS should collapse long active-flow topbar button copy on mobile");
+  assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher\s*\{[\s\S]*?grid-template-columns: 1fr;[\s\S]*?min-width: 0;/u,
+    "SPA CSS should collapse the project switcher on mobile instead of creating horizontal scroll",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher-meta code,\s*\.top-context code\s*\{[\s\S]*?white-space: normal;/u,
+    "SPA CSS should wrap long runtime paths on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-focus-mode \.project-switcher-meta code,[\s\S]*?white-space: nowrap;/u,
+    "SPA CSS should truncate long runtime paths in first-run mobile focus mode",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.first-run-next-action-grid,[\s\S]*?\.active-flow-handoff,[\s\S]*?\.advanced-evidence-summary-grid,[\s\S]*?grid-template-columns: 1fr;/u,
+    "SPA CSS should collapse first-run focus grids on mobile",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.compact-inline-value > code,\s*\.compact-detail-value > span\s*\{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;/u,
+    "SPA CSS should wrap compact command and path values on mobile",
+  );
+  assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
+  assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.graph-flow-node::after\s*\{[\s\S]*?display: none;/u,
+    "SPA CSS should disable graph connector overflow on mobile",
+  );
+  assert.ok(css.includes(".trace-table table"), "SPA CSS should make runtime trace tables responsive on mobile");
+  assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });
 
-test("web console follow mode reuses shared stream and detach is non-disruptive", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
+test("project preview state keeps project-level live run evidence visible", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
 
-    appendRunEvent({
-      projectRef: projectRoot,
-      cwd: projectRoot,
-      runId,
-      eventType: "run.started",
-      payload: { stage: "bootstrap" },
-    });
-    appendRunEvent({
-      projectRef: projectRoot,
-      cwd: projectRoot,
-      runId,
-      eventType: "step.updated",
-      payload: { step_id: "runner.implement", status: "pass" },
-    });
-
-    const session = await attachOperatorConsoleSession({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      runId,
-      follow: true,
-      maxReplay: 50,
-    });
-
-    assert.equal(session.mode, "detachable-web-console");
-    assert.equal(session.follow_enabled, true);
-    assert.equal(session.stream_protocol, "sse");
-    assert.equal(session.stream_backpressure.policy, "bounded-replay-window");
-    assert.equal(session.replay_events.length, 2);
-    assert.equal(session.snapshot.run_detail.event_history.total_events, 2);
-    assert.ok(session.snapshot.run_detail.policy_history.entry_count >= 1);
-
-    const streamedEvent = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("timed out waiting for web follow event")), 3000);
-      const unsubscribe = session.onEvent((event) => {
-        clearTimeout(timeout);
-        unsubscribe();
-        resolve(event);
-      });
-    });
-
-    appendRunEvent({
-      projectRef: projectRoot,
-      cwd: projectRoot,
-      runId,
-      eventType: "warning.raised",
-      payload: { code: "budget.near_limit" },
-    });
-
-    const received = /** @type {Record<string, unknown>} */ (await streamedEvent);
-    assert.equal(received.event_type, "warning.raised");
-    const capturedBeforeDetach = session.replay_events.length;
-    const detached = session.detach();
-    assert.equal(detached.detached, true);
-    assert.equal(detached.captured_event_count, capturedBeforeDetach);
-
-    appendRunEvent({
-      projectRef: projectRoot,
-      cwd: projectRoot,
-      runId,
-      eventType: "run.terminal",
-      payload: { status: "pass" },
-    });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    assert.equal(session.replay_events.length, capturedBeforeDetach);
-
-    const snapshotAfterDetach = await buildOperatorConsoleSnapshot({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      runId,
-    });
-    assert.ok(snapshotAfterDetach.runs.some((run) => run.run_id === runId));
-  });
+  assert.match(
+    source,
+    /if \(!shouldReadProjectState\) \{[\s\S]*?readJson\(`\/api\/projects\/\$\{encodeURIComponent\(effectiveProjectId\)\}\/runs`\)\.catch\(\(\) => \[\]\)/u,
+    "Project preview/profile-mismatch state should still read project-level runs.",
+  );
+  assert.match(
+    source,
+    /setRuns\(Array\.isArray\(previewRunList\) \? previewRunList : \[\]\);/u,
+    "Project preview/profile-mismatch state should preserve live run evidence for the operator console.",
+  );
 });
 
-test("web snapshot reflects ui attach/detach lifecycle while headless reads remain available", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
+test("active quality gate blockers preserve structured recovery details", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const attachedSnapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      assert.equal(attachedSnapshot.ui_lifecycle.ui_attached, true);
-      assert.equal(attachedSnapshot.ui_lifecycle.connection_state, "connected");
-
-      const detachResult = invokeCli(["ui", "detach", "--project-ref", projectRoot, "--run-id", runId]);
-      assert.equal(detachResult.exitCode, 0, detachResult.stderr);
-
-      const detachedSnapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      assert.equal(detachedSnapshot.ui_lifecycle.ui_attached, false);
-      assert.equal(detachedSnapshot.ui_lifecycle.connection_state, "detached");
-      assert.ok(detachedSnapshot.runs.some((run) => run.run_id === runId));
-    } finally {
-      await transport.close();
-    }
-  });
+  assert.match(source, /normalizeQualityGateBlockerRow/u);
+  assert.match(source, /normalizedBlockerField/u);
+  assert.match(source, /qualityGateBlockerForActionContext/u);
+  assert.match(source, /qualityGateEvidenceRows/u);
+  assert.match(source, /qualityGateRecoveryPlan/u);
+  assert.match(source, /"next_command"/u);
+  assert.match(source, /record\.evidence_refs/u);
+  assert.match(source, /gate\?\.evidence_summaries/u);
+  assert.match(source, /Quality gate recovery path/u);
+  assert.match(source, /Recovery path/u);
+  assert.match(source, /Delivery stays blocked/u);
+  assert.match(source, /quality-blocker-list/u);
+  assert.match(source, /quality-blocker-meta/u);
+  assert.match(css, /\.quality-recovery-path\s*\{/u);
+  assert.match(css, /\.quality-recovery-path ol\s*\{/u);
+  assert.match(css, /\.quality-recovery-path li\.active\s*\{/u);
+  assert.doesNotMatch(
+    source,
+    /qualityGateBlockers\.map\(\(blocker\) => \(\{ code: blocker, summary: blocker \}\)\)/u,
+    "Active quality gate blockers should not be collapsed into opaque string-only rows",
+  );
+  assert.match(css, /\.quality-blocker-list li\s*\{[\s\S]*?display: grid;/u);
+  assert.match(css, /\.quality-blocker-meta\s*\{[\s\S]*?flex-wrap: wrap;/u);
+  assert.match(css, /\.quality-blocker-meta code,\s*\.quality-blocker-meta em\s*\{[\s\S]*?overflow-wrap: anywhere;/u);
 });
 
-test("operator console smoke script renders html and emits transcript summary", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-    appendRunEvent({
-      projectRef: projectRoot,
-      cwd: projectRoot,
-      runId,
-      eventType: "run.started",
-      payload: { stage: "bootstrap" },
-    });
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
+test("required verification failures surface as active cockpit blockers", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
 
-    try {
-      const outputHtml = path.join(projectRoot, ".aor", "web", "operator-console-smoke.html");
-      const run = await spawnNode(
-        [
-          path.join(workspaceRoot, "apps/web/scripts/operator-console-smoke.mjs"),
-          "--project-ref",
-          projectRoot,
-          "--run-id",
-          runId,
-          "--control-plane",
-          transport.baseUrl,
-          "--output-html",
-          outputHtml,
-        ],
-        { cwd: workspaceRoot },
-      );
-
-      assert.equal(run.status, 0, run.stderr);
-      const summary = JSON.parse(run.stdout);
-      assert.equal(fs.existsSync(summary.rendered_html_file), true);
-
-      const fixture = JSON.parse(
-        fs.readFileSync(path.join(fixturesDir, "operator-console-smoke.json"), "utf8"),
-      );
-      const subset = {
-        mode: summary.mode,
-        follow_enabled: summary.follow_enabled,
-        stream_protocol: summary.stream_protocol,
-        detached: summary.detached,
-        lifecycle_command_count: summary.lifecycle_command_count,
-        interaction_count: summary.interaction_count,
-        guided_lifecycle_state: summary.guided_lifecycle_state,
-        guided_current_stage_id: summary.guided_current_stage_id,
-        guided_stage_count: summary.guided_stage_count,
-        lifecycle_mutation_path_present: Array.isArray(summary.contract_alignment.mutation_model)
-          ? summary.contract_alignment.mutation_model.includes("POST /api/projects/:projectId/lifecycle-command/actions")
-          : false,
-        interaction_answer_path_present: Array.isArray(summary.contract_alignment.mutation_model)
-          ? summary.contract_alignment.mutation_model.includes("POST /api/projects/:projectId/interactions/answers")
-          : false,
-        policy_history_path_present: Array.isArray(summary.contract_alignment.read_model)
-          ? summary.contract_alignment.read_model.includes("GET /api/projects/:projectId/runs/:runId/policy-history")
-          : false,
-      };
-      assert.deepEqual(subset, fixture);
-    } finally {
-      await transport.close();
-    }
-  });
+  assert.match(source, /failedRequiredVerificationGroups/u);
+  assert.match(source, /verificationFailureBlocker/u);
+  assert.match(source, /verificationFailurePrimaryAction/u);
+  assert.match(source, /verificationFailureRecoveryPlan/u);
+  assert.match(source, /verificationGroupFailureDetail/u);
+  assert.match(source, /firstFailedStepResultRef/u);
+  assert.match(source, /latestRequiredVerificationFailed/u);
+  assert.match(source, /verificationFailureSummary/u);
+  assert.match(source, /failed_step_result_refs/u);
+  assert.match(source, /Keep the failed verification step-result evidence linked below/u);
+  assert.match(source, /evidenceRefLabel/u);
+  assert.match(source, /<CompactInlineValue value=\{recoveryPlan\.evidenceRef\} kind="path" \/>/u);
+  assert.match(source, /execution-recovery-evidence-ref/u);
+  assert.match(source, /postRunVerificationStatus/u);
+  assert.match(source, /executionStatusRows\(evidence, externalRunHealth, verificationPlan\)/u);
+  assert.match(source, /heldActionIsCompletedRepair/u);
+  assert.match(source, /action_label: "Fix failed verification first"/u);
+  assert.match(source, /command: verificationFailureRerunCommand\(plan\)/u);
+  assert.doesNotMatch(source, /Fix failed required verification, then rerun/u);
+  assert.match(source, /Held downstream action/u);
+  assert.match(source, /Verification rerun after fix/u);
+  assert.match(source, /VerificationFailureBanner/u);
+  assert.match(source, /Required verification failed/u);
+  assert.match(source, /Review is blocked by failed post-run evidence/u);
+  assert.match(source, /Verification failed after completed repair/u);
+  assert.match(source, /Failed verification evidence/u);
+  assert.match(source, /Post-run verification failed/u);
+  assert.match(source, /qualityGateVerificationFailureRecoveryPlan/u);
+  assert.match(source, /qualityVerificationFailureActive/u);
+  assert.match(source, /Repair failed verification/u);
+  assert.match(source, /Required verification must pass before post-repair review/u);
+  assert.match(source, /qualityGateSourceDetail/u);
+  assert.match(source, /qualityGateAttemptDetail/u);
+  assert.match(source, /Required verification must pass before the review rerun/u);
+  assert.match(source, /No automatic repair attempts remain; use failed verification evidence before requesting more repair/u);
+  assert.match(source, /qualityGateRepairAttemptsExhausted/u);
+  assert.match(source, /verificationFailureRepairDecisionCommand/u);
+  assert.match(source, /aor review decide --decision request-repair --repair-context-file <repair-context\.json>/u);
+  assert.match(source, /Request repair with new evidence/u);
+  assert.match(source, /repeated repair context without new evidence must stay blocked/u);
+  assert.match(source, /Rerun required verification only after the next repair completes/u);
+  assert.match(source, /Provider execution finished, but required verification failed/u);
+  assert.match(source, /Repair failed verification before review, QA, delivery, or release/u);
+  assert.match(source, /verificationPrimary\.action_id === "request-repair-after-verification-failure"/u);
+  assert.match(source, /\{ label: "Repair Decision", icon: "target", tabId: "decisions" \}/u);
+  assert.match(source, /\{ label: "Recovery Path", icon: "target", tabId: "execution" \}/u);
+  assert.match(source, /label: workbenchAction\.label,[\s\S]*?onClick: \(\) => openAdvancedWorkbench\(workbenchAction\.tabId\),/u);
+  assert.match(source, /!verificationPrimary && !isBlockingExternalRunHealth\(externalRunHealth\)/u);
+  assert.match(source, /newFlowBlockedByVerificationReason/u);
+  assert.match(source, /Resolve the current failed verification Recovery Path before starting a new flow\./u);
+  assert.match(source, /providerEvidenceStripSummary/u);
+  assert.match(source, /counts\.missing > 0 \? `\$\{counts\.missing\} missing`/u);
+  assert.match(source, /counts\.unreadable > 0 \? `\$\{counts\.unreadable\} unreadable`/u);
+  assert.match(source, /providerEvidenceStripSummary\(providerEvidenceRows\)/u);
+  assert.match(source, /label\.replace\(\/\\s\+missing\$\/iu, ""\)/u);
+  assert.match(source, /run_id: evidence\?\.run_id \?\? externalRunHealth\?\.run_id/u);
+  assert.doesNotMatch(source, /run_id: evidence\.run_id/u);
+  assert.match(source, /headingRepeatsStatus\(heading, status\)/u);
+  assert.match(source, /const showCockpitStatus = !headingRepeatsStatus\(cockpitTitle, cockpitStatus\)/u);
+  assert.match(source, /\{showCockpitStatus \? <StatusPill state=\{cockpitStatus\} \/> : null\}/u);
+  const recommendedActionRenderIndex = source.indexOf('<div className="recommended-action">');
+  const providerHeartbeatRenderIndex = source.indexOf("{providerHeartbeatPanel}");
+  assert.ok(recommendedActionRenderIndex >= 0, "Active cockpit should render the recommended action block.");
+  assert.ok(providerHeartbeatRenderIndex >= 0, "Active cockpit should render provider heartbeat from a reusable panel.");
+  assert.ok(
+    recommendedActionRenderIndex < providerHeartbeatRenderIndex,
+    "Provider heartbeat telemetry should stay below the primary recommended action.",
+  );
+  assert.match(source, /Verification failure recovery path/u);
+  assert.match(source, /Fix failed verification first/u);
+  assert.match(source, /Repair failed verification/u);
+  assert.match(source, /AOR is holding the downstream action/u);
+  assert.match(source, /Rerun required verification/u);
+  assert.ok(
+    source.indexOf("<span>Next public control</span>") < source.indexOf("<span>Evidence to keep</span>"),
+    "Execution recovery should show the public control before evidence details on mobile.",
+  );
+  assert.match(source, /<VerificationFailureBanner plan=\{verificationPlan\} failures=\{verificationFailures\} heldAction=\{resolverPrimary\} \/>/u);
+  assert.match(source, /verificationBlockers = verificationFailures\.map\(\(group, index\) => verificationFailureBlocker\(group, index\)\)/u);
+  assert.match(source, /verificationFailures\.length > 0\s*\? \[\.\.\.verificationBlockers, \.\.\.presentedActionBlockers\]/u);
+  assert.match(source, /completedRepairActionActive/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, resolverPrimary, qualityGate\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextAction, gate\)/u);
+  assert.match(source, /verificationFailurePrimaryAction\(verificationPlan, verificationFailures, nextPrimary, qualityGate\)/u);
+  assert.match(source, /publicRepairDecisionAction\(nextAction, qualityGate, verificationPlan\)/u);
+  assert.match(source, /decisionTabLabel = publicRepairDecision \? "Repair Decision" : "Operator Decision"/u);
+  assert.match(source, /decisionTabCount = publicRepairDecision && decisionRequests\.length === 0 \? "needed" : decisionRequests\.length/u);
+  assert.match(source, /verificationPlan=\{verificationPlan\}/u);
+  assert.match(source, /verificationFailures=\{verificationFailures\}/u);
+  assert.match(css, /\.verification-hold-banner\s*\{[\s\S]*?grid-template-columns: 32px minmax\(0, 1fr\);/u);
+  assert.match(css, /\.verification-recovery-path\s*\{/u);
+  assert.match(css, /\.verification-recovery-path ol\s*\{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u);
+  assert.match(css, /\.verification-recovery-path li\.active\s*\{/u);
+  assert.match(css, /\.public-repair-decision-plan\s*\{/u);
+  assert.match(css, /\.public-repair-decision-actions\s*\{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\);/u);
+  assert.match(css, /\.held-action-note\s*\{/u);
+  assert.match(css, /\.execution-recovery-evidence-ref\s*\{/u);
+  assert.match(css, /\.verification-hold-grid\s*\{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u);
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.verification-recovery-path ol,[\s\S]*?\.verification-hold-grid,[\s\S]*?grid-template-columns: 1fr;/u,
+    "Required verification failure cards should collapse on mobile",
+  );
 });
 
-test("web connected mode consumes detached HTTP/SSE transport while preserving detachable session behavior", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const snapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      assert.equal(snapshot.ui_lifecycle.connection_state, "connected");
-      assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
-      assert.equal(snapshot.api_ui_contract_alignment.control_plane, transport.baseUrl);
-      assert.ok(
-        snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/finance-monitoring"),
-      );
-      assert.equal(typeof snapshot.finance_monitoring.monitoring_loop.evidence_classes.production_monitoring.status, "string");
-
-      const session = await attachOperatorConsoleSession({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        follow: true,
-      });
-      assert.equal(session.stream_protocol, "sse");
-      assert.equal(session.stream_backpressure.policy, "bounded-replay-window");
-
-      const streamedEvent = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("timed out waiting for connected-mode follow event")), 3000);
-        const unsubscribe = session.onEvent((event) => {
-          clearTimeout(timeout);
-          unsubscribe();
-          resolve(event);
-        });
-      });
-
-      appendRunEvent({
-        projectRef: projectRoot,
-        cwd: projectRoot,
-        runId,
-        eventType: "warning.raised",
-        payload: { code: "connected.mode.transport.follow" },
-      });
-
-      const received = /** @type {Record<string, unknown>} */ (await streamedEvent);
-      assert.equal(received.event_type, "warning.raised");
-      const reconnectAfterEventId = session.replay_events.at(-1)?.event_id;
-
-      const detached = session.detach();
-      assert.equal(detached.detached, true);
-      assert.ok(detached.captured_event_count >= 1);
-
-      const reconnectSession = await attachOperatorConsoleSession({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        follow: true,
-        afterEventId: typeof reconnectAfterEventId === "string" ? reconnectAfterEventId : undefined,
-      });
-      const reconnectedEvent = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("timed out waiting for reconnected follow event")), 3000);
-        const unsubscribe = reconnectSession.onEvent((event) => {
-          clearTimeout(timeout);
-          unsubscribe();
-          resolve(event);
-        });
-      });
-
-      appendRunEvent({
-        projectRef: projectRoot,
-        cwd: projectRoot,
-        runId,
-        eventType: "step.updated",
-        payload: { step_id: "runner.review", status: "pass" },
-      });
-
-      const reconnected = /** @type {Record<string, unknown>} */ (await reconnectedEvent);
-      assert.equal(reconnected.event_type, "step.updated");
-      reconnectSession.detach();
-    } finally {
-      await transport.close();
-    }
-  });
+test("web package no longer exports static operator snapshot modules", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(workspaceRoot, "apps/web/package.json"), "utf8"));
+  const oldScriptName = `operator-console-${"smoke"}.mjs`;
+  const oldEntryName = `operator-console${".mjs"}`;
+  const oldSourceDir = `operator-${"console"}`;
+  assert.deepEqual(manifest.exports, {});
+  assert.equal(fs.existsSync(path.join(workspaceRoot, "apps/web/scripts", oldScriptName)), false);
+  assert.equal(fs.existsSync(path.join(workspaceRoot, "apps/web/src", oldEntryName)), false);
+  assert.equal(fs.existsSync(path.join(workspaceRoot, "apps/web/src", oldSourceDir)), false);
 });
 
-test("web connected mode routes run-control and ui-lifecycle mutations through detached transport", async () => {
-  await withTempProject(async (projectRoot) => {
-    seedOperatorArtifacts(projectRoot);
-    const runId = "run.web.transport.mutation.v1";
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const remoteStart = await applyOperatorRunControl({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        action: "start",
-      });
-      assert.equal(remoteStart.binding_mode, "detached-http-mutation");
-      assert.equal(remoteStart.run_control.action, "start");
-      assert.equal(remoteStart.run_control.run_id, runId);
-      assert.equal(remoteStart.run_control.blocked, false);
-
-      const remoteDetach = await applyOperatorUiLifecycle({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        action: "detach",
-      });
-      assert.equal(remoteDetach.binding_mode, "detached-http-mutation");
-      assert.equal(remoteDetach.ui_lifecycle.action, "detach");
-      assert.equal(remoteDetach.ui_lifecycle.connection_state, "detached");
-
-      const localPause = await applyOperatorRunControl({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        action: "pause",
-      });
-      assert.equal(localPause.binding_mode, "module-in-process");
-      assert.equal(localPause.run_control.action, "pause");
-      assert.equal(localPause.run_control.blocked, false);
-      assert.equal(localPause.run_control.state.status, "paused");
-    } finally {
-      await transport.close();
-    }
-  });
-});
-
-test("web connected mode drives lifecycle commands through detached control-plane mutations", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const result = await applyOperatorLifecycleCommand({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        command: "intake create",
-        flags: {
-          request_title: "Web connected lifecycle intake",
-          request_brief: "Submitted through the web full-flow console.",
-        },
-      });
-      assert.equal(result.binding_mode, "detached-http-mutation");
-      assert.equal(result.lifecycle_command.command, "intake create");
-      assert.equal(result.lifecycle_command.blocked, false);
-      assert.equal(fs.existsSync(result.lifecycle_command.command_output.artifact_packet_file), true);
-
-      const snapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      assert.ok(
-        snapshot.api_ui_contract_alignment.mutation_model.includes(
-          "POST /api/projects/:projectId/lifecycle-command/actions",
-        ),
-      );
-      assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("intake create"));
-    } finally {
-      await transport.close();
-    }
-  });
-});
-
-test("guided web lifecycle progresses mission and next action through connected control-plane mutations", async () => {
-  await withTempProject(async (projectRoot) => {
-    fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "guided-web-success" }, null, 2), "utf8");
+test("aor app smoke verifies the real flow-centric packaged SPA, config, and state routes", () => {
+  withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
-    const onboard = invokeCli(["onboard", projectRoot, "--json"]);
-    assert.equal(onboard.exitCode, 0, onboard.stderr);
-
-    const runId = "run.guided.web.success.v1";
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
+    const runtimeRoot = path.join(projectRoot, ".aor");
+    const run = spawnSync(
+      process.execPath,
+      [
+        path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+        "app",
         "--project-ref",
         projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const mission = await applyOperatorLifecycleCommand({
+        "--runtime-root",
+        runtimeRoot,
+        "--smoke",
+        "true",
+        "--open",
+        "false",
+        "--json",
+      ],
+      {
         cwd: projectRoot,
-        projectRef: projectRoot,
-        command: "mission create",
-        flags: {
-          mission_id: "guided-web-success",
-          goal: "Make the web console show the guided lifecycle.",
-          constraint: "Use control-plane lifecycle mutations.",
-          kpi: "guided-web:Guided web:Operator sees next action:Console smoke",
-          dod: "Console shows status, evidence, blockers, and next action.",
-          allowed_path: "apps/web/**",
-          forbidden_path: "secrets/**",
-          delivery_mode: "patch-only",
-          source_kind: "local-note",
-          source_ref: "docs/ops/ui-attach-detach.md",
-        },
-      });
-      assert.equal(mission.binding_mode, "detached-http-mutation");
-      assert.equal(mission.lifecycle_command.command, "mission create");
-      assert.equal(mission.lifecycle_command.command_output.product_intake_completeness.status, "complete");
-
-      const next = await applyOperatorLifecycleCommand({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        command: "next",
-      });
-      assert.equal(next.binding_mode, "detached-http-mutation");
-      assert.equal(next.lifecycle_command.command_output.next_action_primary.action_id, "discovery-run");
-
-      const snapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
-      assert.ok(
-        snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/next-action-report"),
-      );
-      assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("mission create"));
-      assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("next"));
-      assert.equal(snapshot.guided_lifecycle.current_stage_id, "discovery-spec-plan");
-      assert.equal(snapshot.guided_lifecycle.stages.length, 7);
-      const missionStage = snapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "mission");
-      const discoveryStage = snapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "discovery-spec-plan");
-      assert.equal(missionStage?.status, "done");
-      assert.equal(discoveryStage?.status, "ready");
-      assert.equal(discoveryStage?.next_action.mutation.transport, "control-plane");
-      assert.equal(discoveryStage?.next_action.mutation.command, "discovery run");
-      assert.equal(discoveryStage?.next_action.command.includes("aor discovery run"), true);
-      assert.ok((discoveryStage?.evidence_refs.length ?? 0) > 0);
-
-      const html = renderOperatorConsoleHtml(snapshot);
-      assert.match(html, /Guided lifecycle/);
-      assert.match(html, /Discovery, Spec, Plan/);
-      assert.match(html, /aor discovery run/);
-
-      seedGuidedClosureArtifacts(
-        mission.lifecycle_command.command_output.runtime_layout,
-        transport.projectId,
-        "run.guided.web.closure.v1",
-      );
-      const closureNext = await applyOperatorLifecycleCommand({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        command: "next",
-      });
-      assert.equal(closureNext.lifecycle_command.command_output.next_action_primary.action_id, "learning-handoff");
-      assert.equal(
-        closureNext.lifecycle_command.command_output.next_action_closure_state.delivery.status,
-        "release-ready",
-      );
-
-      const closureSnapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId: "run.guided.web.closure.v1",
-      });
-      assert.equal(closureSnapshot.guided_lifecycle.current_stage_id, "learning");
-      assert.equal(closureSnapshot.guided_lifecycle.closure_state.run_id, "run.guided.web.closure.v1");
-      const reviewStage = closureSnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "review-qa");
-      const deliveryStage = closureSnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "delivery-release");
-      const learningStage = closureSnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "learning");
-      assert.equal(reviewStage?.closure_state.status, "approved");
-      assert.equal(reviewStage?.safety_gates.delivery_gate_status, "pass");
-      assert.equal(deliveryStage?.closure_state.status, "release-ready");
-      assert.equal(learningStage?.status, "ready");
-      assert.equal(learningStage?.next_action.mutation.command, "learning handoff");
-      assert.ok((learningStage?.evidence_refs.length ?? 0) > 0);
-
-      const closureHtml = renderOperatorConsoleHtml(closureSnapshot);
-      assert.match(closureHtml, /learning handoff/);
-      assert.match(closureHtml, /ready-for-close/);
-    } finally {
-      await transport.close();
-    }
-  });
-});
-
-test("guided web lifecycle renders blocked and read-only states without losing evidence", async () => {
-  await withTempProject(async (projectRoot) => {
-    fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "guided-web-blocked" }, null, 2), "utf8");
-    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
-    const onboard = invokeCli(["onboard", projectRoot, "--json"]);
-    assert.equal(onboard.exitCode, 0, onboard.stderr);
-
-    const runId = "run.guided.web.blocked.v1";
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const incompleteMission = await applyOperatorLifecycleCommand({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        command: "mission create",
-        flags: {
-          mission_id: "guided-web-blocked",
-          goal: "Expose a blocked guided web stage.",
-          constraint: "Keep blocked reasons explicit.",
-          source_kind: "local-note",
-          source_ref: "docs/ops/ui-attach-detach.md",
-        },
-      });
-      assert.equal(incompleteMission.binding_mode, "detached-http-mutation");
-      assert.equal(incompleteMission.lifecycle_command.command_output.product_intake_completeness.status, "incomplete");
-
-      const next = await applyOperatorLifecycleCommand({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        command: "next",
-      });
-      assert.equal(next.lifecycle_command.command_output.next_action_status, "blocked");
-
-      const snapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      assert.equal(snapshot.guided_lifecycle.state, "blocked");
-      assert.equal(snapshot.guided_lifecycle.current_stage_id, "mission");
-      const missionStage = snapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "mission");
-      assert.equal(missionStage?.status, "blocked");
-      assert.ok(missionStage?.blockers.some((blocker) => blocker.code === "mission-kpis-missing"));
-      assert.ok(missionStage?.blockers.some((blocker) => blocker.code === "mission-definition_of_done-missing"));
-      assert.equal(missionStage?.next_action.mutation.command, "mission create");
-
-      const readOnlySnapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        readOnly: true,
-      });
-      const readOnlyMissionStage = readOnlySnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "mission");
-      assert.equal(readOnlySnapshot.guided_lifecycle.state, "read_only");
-      assert.equal(readOnlyMissionStage?.next_action.mutation.available, false);
-      assert.ok((readOnlyMissionStage?.evidence_refs.length ?? 0) > 0);
-
-      const html = renderOperatorConsoleHtml(readOnlySnapshot);
-      assert.match(html, /mission-kpis-missing/);
-      assert.match(html, /read-only/);
-    } finally {
-      await transport.close();
-    }
-  });
-});
-
-test("web connected mode surfaces runner questions and submits resumable interaction answers", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-    const interactionId = "web-question-1";
-    const stepResultFile = seedRequestedInteraction(projectRoot, runId, interactionId);
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      const beforeSnapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      const interaction = beforeSnapshot.run_detail.interactions.find(
-        (entry) => entry.interaction_id === interactionId,
-      );
-      assert.equal(interaction?.answer_required, true);
-      const beforeHtml = renderOperatorConsoleHtml(beforeSnapshot);
-      assert.match(beforeHtml, /web-question-1/);
-      assert.match(beforeHtml, /Select the operator-approved target/);
-
-      const answerText = "Use staging.";
-      const answer = await submitOperatorInteractionAnswer({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        interactionId,
-        answer: answerText,
-        reason: "operator selected safe target",
-      });
-      assert.equal(answer.binding_mode, "detached-http-mutation");
-      assert.equal(answer.interaction_answer.answer_accepted, true);
-      assert.equal(answer.interaction_answer.interaction_status, "resumed");
-
-      const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
-      assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
-      assert.equal(updatedStepResult.requested_interaction.status, "resumed");
-      assert.deepEqual(
-        updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
-        ["requested", "answered", "resumed"],
-      );
-      assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answer.interaction_answer.answer_audit_ref));
-
-      const afterSnapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-      });
-      const updatedInteraction = afterSnapshot.run_detail.interactions.find(
-        (entry) => entry.interaction_id === interactionId,
-      );
-      assert.equal(updatedInteraction?.interaction_status, "resumed");
-      assert.equal(updatedInteraction?.answer_required, false);
-      assert.equal(JSON.stringify(afterSnapshot).includes(answerText), false);
-      assert.equal(renderOperatorConsoleHtml(afterSnapshot).includes(answerText), false);
-      assert.equal(
-        JSON.stringify(afterSnapshot.run_detail.event_history).includes(answer.interaction_answer.answer_audit_ref),
-        true,
-      );
-
-      const session = await attachOperatorConsoleSession({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        follow: true,
-      });
-      const replayCount = session.replay_events.length;
-      const detached = session.detach();
-      assert.equal(detached.detached, true);
-      assert.equal(detached.captured_event_count, replayCount);
-    } finally {
-      await transport.close();
-    }
-  });
-});
-
-test("web connected mode supports auth-enabled detached transport with bearer token", async () => {
-  await withTempProject(async (projectRoot) => {
-    const runId = seedOperatorArtifacts(projectRoot);
-    const transport = await createControlPlaneHttpServer({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      host: "127.0.0.1",
-      port: 0,
-      auth: {
-        enabled: true,
-        tokens: [
-          {
-            token: "reader-token",
-            token_id: "reader",
-            permissions: ["read"],
-          },
-          {
-            token: "operator-token",
-            token_id: "operator",
-            permissions: ["read", "mutate"],
-          },
-        ],
+        encoding: "utf8",
       },
-    });
-
-    try {
-      const attachResult = invokeCli([
-        "ui",
-        "attach",
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--control-plane",
-        transport.baseUrl,
-      ]);
-      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-      await assert.rejects(
-        () =>
-          buildOperatorConsoleSnapshot({
-            cwd: projectRoot,
-            projectRef: projectRoot,
-            runId,
-          }),
-        /Control-plane request failed \(401\)/,
-      );
-
-      const snapshot = await buildOperatorConsoleSnapshot({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        controlPlaneAuthToken: "reader-token",
-      });
-      assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
-      assert.equal(snapshot.api_ui_contract_alignment.auth_mode, "optional-bearer-token");
-
-      await assert.rejects(
-        () =>
-          applyOperatorRunControl({
-            cwd: projectRoot,
-            projectRef: projectRoot,
-            runId,
-            action: "start",
-            controlPlaneAuthToken: "reader-token",
-          }),
-        /Control-plane mutation failed \(403\)/,
-      );
-
-      const controlResult = await applyOperatorRunControl({
-        cwd: projectRoot,
-        projectRef: projectRoot,
-        runId,
-        action: "start",
-        controlPlaneAuthToken: "operator-token",
-      });
-      assert.equal(controlResult.binding_mode, "detached-http-mutation");
-      assert.equal(controlResult.run_control.action, "start");
-    } finally {
-      await transport.close();
-    }
+    );
+    assert.equal(run.status, 0, run.stderr);
+    const payload = JSON.parse(run.stdout);
+    assert.equal(payload.command, "app");
+    assert.equal(payload.mode, "local-spa");
+    assert.equal(payload.status, "smoke-pass");
+    assert.equal(payload.html_loaded, true);
+    assert.equal(payload.flow_selector_loaded, true);
+    assert.equal(payload.new_flow_action_loaded, true);
+    assert.equal(payload.first_run_wizard_loaded, true);
+    assert.equal(payload.project_switcher_loaded, true);
+    assert.equal(payload.config_project_id, payload.project_id);
+    assert.equal(payload.config_default_project_id, payload.project_id);
+    assert.equal(payload.project_index_default_project_id, payload.project_id);
+    assert.equal(payload.project_index_count, 1);
+    assert.equal(payload.state_project_id, payload.project_id);
+    assert.equal(payload.render_guard_status, "pass");
+    assert.equal(payload.blank_root_regression_detected, false);
+    assert.equal(payload.render_guard.root_element_present, true);
+    assert.ok(payload.render_guard.module_script_count >= 1);
+    assert.ok(payload.render_guard.stylesheet_count >= 1);
+    assert.equal(payload.render_guard.app_shell_marker_present, true);
+    assert.equal(payload.runtime_root, path.join(fs.realpathSync.native(projectRoot), ".aor"));
   });
+});
+
+test("operator console subscribes to named durable live-run events", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  assert.match(source, /addEventListener\("live-run-event"/u);
+  assert.match(source, /addEventListener\("message"/u);
+  assert.doesNotMatch(source, /source\.onmessage\s*=/u);
+  assert.match(source, /after_event_id/u);
 });

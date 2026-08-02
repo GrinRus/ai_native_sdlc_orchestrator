@@ -1,4 +1,5 @@
 export { appendLiveRunEvent, listLiveRunEvents, openLiveRunEventStream } from "./live-run-events.mjs";
+export { acquireFileLock, releaseFileLock, withFileLock, writeJsonAtomic } from "./file-transaction.mjs";
 export { buildFinanceMonitoringSnapshot, FINANCE_MONITORING_DIMENSION_NAMES } from "./finance-monitoring.mjs";
 export {
   applyIncidentRecertification,
@@ -9,4 +10,11 @@ export {
 } from "./learning-loop.mjs";
 export { buildPlannerMetricsSnapshot, PLANNER_METRIC_NAMES } from "./planner-metrics.mjs";
 export { normalizeRedactionPolicy, parseRedactionSecretList, redactSensitiveValue } from "./redaction.mjs";
+export {
+  buildQualityRepairLineage,
+  closeQualityRepairRequest,
+  listQualityRepairRequests,
+  materializeQualityRepairRequest,
+  updateQualityRepairRequest,
+} from "./quality-repair-request.mjs";
 export { listReviewDecisions, materializeReviewDecision } from "./review-decision.mjs";

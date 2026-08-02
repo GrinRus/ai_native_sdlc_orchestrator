@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "wave": "W63",
+  "slice": "W63-S08",
+  "journey_id": "quiet-cockpit.safe-no-write.v1",
+  "selector": "?console=quiet-cockpit",
+  "transition_count": 15,
+  "installed_browser_case": "installed Quiet Cockpit executes the canonical no-write lifecycle with durable readback",
+  "evidence": [
+    "apps/web/browser/fixtures/golden-lifecycle.json",
+    "apps/web/browser/golden-lifecycle-loader.mjs",
+    "apps/web/browser/operator-scenarios.spec.mjs",
+    "apps/web/src/operator-control.js",
+    "docs/research/15-w63-installed-console-acceptance.md"
+  ],
+  "assertions": {
+    "structured_mutations_only": true,
+    "durable_readback": true,
+    "reload_reconstruction": true,
+    "stale_revision_retry": true,
+    "exactly_once_outcomes": true,
+    "target_source_writes": false,
+    "upstream_writes": false,
+    "external_browser_network": false,
+    "legacy_packaged_default": true
+  },
+  "excluded_claims": [
+    "hosted-ui",
+    "windows-certification",
+    "credentialed-provider-breadth",
+    "paid-calls",
+    "target-source-editing",
+    "upstream-writes"
+  ]
+}

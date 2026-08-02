@@ -233,20 +233,20 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 ### Local tasks
 1. Add an installed-user guided proof profile that starts from first-run CLI entrypoints on a clean target repository.
 2. Capture CLI transcript evidence for doctor, onboard, mission create, next, guided execution, review, delivery/release, and learning closure.
-3. Capture web smoke or screenshot evidence for the same stage model where connected web is enabled.
+3. Capture app smoke or screenshot evidence for the same stage model where connected web is enabled.
 4. Assert `.aor/` runtime-state ownership, no surprise committed target files, and no upstream writes by default.
 5. Publish proof fixtures and runbook guidance for pass, blocked, and partial-readiness branches.
 
 ### Acceptance criteria
 1. A clean-repo guided rehearsal can be reproduced from documented installed-user commands.
-2. Proof evidence includes CLI transcript, web smoke/screenshot evidence, generated packets/reports, and blocked/no-write assertions.
+2. Proof evidence includes CLI transcript, app smoke/screenshot evidence, generated packets/reports, and blocked/no-write assertions.
 3. Public-repo safety defaults are visible in the proof output and fail closed when prerequisites are missing.
 4. The proof runner and tests reject narrative-only success claims without durable artifacts.
 5. Root checks and targeted live-E2E proof tests pass.
 
 ### Done evidence
 - installed-user guided journey proof fixture
-- CLI transcript and web smoke/screenshot evidence
+- CLI transcript and app smoke/screenshot evidence
 - updated live-E2E/operator runbook
 
 ### Out of scope

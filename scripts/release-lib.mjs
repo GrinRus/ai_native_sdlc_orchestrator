@@ -11,6 +11,7 @@ export const RELEASE_NPM_VERSION = "11.15.0";
 const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "apps/cli/bin",
   "apps/cli/src",
+  "apps/web/dist",
   "packages/adapter-sdk/src",
   "packages/contracts/src",
   "packages/harness/src",
@@ -34,7 +35,11 @@ const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "docs/contracts",
   "docs/ops/npm-cli-alpha-release.md",
   "docs/ops/production-readiness-gate.md",
+  "docs/ops/self-hosted-backup-restore.md",
+  "docs/ops/self-hosted-environment-matrix.md",
+  "docs/ops/self-hosted-incident-runbook.md",
   "docs/ops/self-hosted-release.md",
+  "docs/ops/self-hosted-secrets-and-redaction.md",
   "CHANGELOG.md",
   "README.md",
   "LICENSE",
@@ -47,8 +52,11 @@ const REQUIRED_PACKED_FILES = [
   "CHANGELOG.md",
   "apps/cli/bin/aor.mjs",
   "apps/cli/src/index.mjs",
+  "apps/web/dist/index.html",
   "packages/orchestrator-core/src/project-init.mjs",
   "packages/orchestrator-core/src/operator-cli/index.mjs",
+  "packages/orchestrator-core/src/operator-cli/app-launcher.mjs",
+  "packages/orchestrator-core/src/control-plane/http/http-transport.mjs",
   "packages/contracts/src/index.mjs",
   "packages/provider-routing/src/route-resolution.mjs",
   "packages/adapter-sdk/src/index.mjs",
@@ -59,19 +67,44 @@ const REQUIRED_PACKED_FILES = [
   "examples/wrappers/wrapper-runner-default.yaml",
   "docs/contracts/00-index.md",
   "docs/ops/npm-cli-alpha-release.md",
+  "docs/ops/self-hosted-environment-matrix.md",
 ];
+
+const privateHarnessToken = ["live", "e2e"].join("-");
+const privateHarnessUnderscoreToken = ["live", "e2e"].join("_");
+const manualPrivateHarnessToken = ["manual", privateHarnessToken].join("-");
+const proofHarnessToken = ["proof", "runner"].join("-");
+const proofHarnessSpaceToken = ["proof", "runner"].join(" ");
+const privateHarnessSpaceToken = ["live", "E2E"].join(" ");
+const FORBIDDEN_PACKED_SURFACE_TOKENS = Object.freeze([
+  privateHarnessToken,
+  privateHarnessUnderscoreToken,
+  manualPrivateHarnessToken,
+  proofHarnessToken,
+  proofHarnessSpaceToken,
+  privateHarnessSpaceToken,
+]);
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
 
 const FORBIDDEN_PACKED_PATHS = [
   /^\.aor(?:\/|$)/u,
   /^\.github(?:\/|$)/u,
   /^node_modules(?:\/|$)/u,
   /^scripts(?:\/|$)/u,
-  /^examples\/live-e2e(?:\/|$)/u,
+  new RegExp(`^examples/${escapeRegExp(privateHarnessToken)}(?:/|$)`, "u"),
   /(?:^|\/)target-checkouts(?:\/|$)/u,
   /(?:^|\/)\.env(?:\.|$)/u,
   /(?:^|\/)test(?:\/|$)/u,
   /(?:^|\/)__tests__(?:\/|$)/u,
 ];
+
+const FORBIDDEN_PACKED_SURFACE_PATTERNS = FORBIDDEN_PACKED_SURFACE_TOKENS.map((token) => ({
+  token,
+  pattern: new RegExp(escapeRegExp(token), "iu"),
+}));
 
 function readText(rootDir, file) {
   return fs.readFileSync(path.join(rootDir, file), "utf8");
@@ -185,7 +218,8 @@ export function validateReleaseState(options = {}) {
 
   const readme = readText(rootDir, "README.md");
   ensureIncludes(findings, readme, RELEASE_PACKAGE_NAME, "README.md");
-  ensureIncludes(findings, readme, `npm install -g ${RELEASE_PACKAGE_NAME}@${packageVersion}`, "README.md");
+  ensureIncludes(findings, readme, `npm view ${RELEASE_PACKAGE_NAME} dist-tags.alpha`, "README.md");
+  ensureIncludes(findings, readme, `npm install -g "${RELEASE_PACKAGE_NAME}@$AOR_VERSION"`, "README.md");
   ensureIncludes(findings, readme, "docs/ops/npm-cli-alpha-release.md", "README.md");
 
   const contributing = readText(rootDir, "CONTRIBUTING.md");
@@ -229,8 +263,8 @@ export function validateReleaseState(options = {}) {
     ensureIncludes(findings, workflow, `npm@${RELEASE_NPM_VERSION}`, workflowPath);
     if (workflowPath.endsWith("release-publish.yml")) {
       ensureIncludes(findings, workflow, "id-token: write", workflowPath);
-      ensureIncludes(findings, workflow, "--prerelease", workflowPath);
-      ensureIncludes(findings, workflow, "npm publish --access public --tag alpha --provenance", workflowPath);
+      ensureIncludes(findings, workflow, "release-publish-transaction.mjs", workflowPath);
+      ensureIncludes(findings, workflow, "RELEASE_COMMIT_SHA", workflowPath);
     }
   }
 
@@ -253,7 +287,7 @@ export function packedFilesFromNpmPackJson(packJson) {
     .sort();
 }
 
-export function validatePackedFiles(files) {
+export function validatePackedFiles(files, options = {}) {
   const findings = [];
   const fileSet = new Set(files);
   for (const required of REQUIRED_PACKED_FILES) {
@@ -265,6 +299,30 @@ export function validatePackedFiles(files) {
     for (const pattern of FORBIDDEN_PACKED_PATHS) {
       if (pattern.test(file)) {
         findings.push(`Packed npm artifact must not include '${file}'.`);
+      }
+    }
+    for (const { token, pattern } of FORBIDDEN_PACKED_SURFACE_PATTERNS) {
+      if (pattern.test(file)) {
+        findings.push(`Packed npm artifact path '${file}' must not contain '${token}'.`);
+      }
+    }
+  }
+  if (options.rootDir) {
+    for (const file of files) {
+      const filePath = path.join(options.rootDir, file);
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        continue;
+      }
+      let content = "";
+      try {
+        content = fs.readFileSync(filePath, "utf8");
+      } catch {
+        continue;
+      }
+      for (const { token, pattern } of FORBIDDEN_PACKED_SURFACE_PATTERNS) {
+        if (pattern.test(content)) {
+          findings.push(`Packed npm artifact file '${file}' must not contain '${token}'.`);
+        }
       }
     }
   }

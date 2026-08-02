@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -8,6 +9,10 @@ import { materializeLearningLoopArtifacts } from "../../observability/src/index.
 import { runDeliveryMode } from "./delivery-mode-runners.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { classifyChangedPathsByRepo } from "./repo-scope.mjs";
+import { assertExactDeliveryDiff } from "./delivery-integrity.mjs";
+import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
+import { boundedDerivedId } from "./shared/bounded-derived-id.mjs";
+import { collectRepositoryOutputRefs, executeIndependentRepositoryDeliveries, resolveIndependentRepositoryTargets } from "./multi-repo-delivery-execution.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
@@ -43,6 +48,66 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeChangedPath(value) {
+  return value.trim().replace(/\\/g, "/").replace(/^\.\//u, "");
+}
+
+/**
+ * @param {string} value
+ * @param {string} executionRoot
+ * @returns {string | null}
+ */
+function normalizeExpectedChangedPath(value, executionRoot) {
+  const normalized = normalizeChangedPath(value);
+  if (!normalized) {
+    return null;
+  }
+  if (!path.isAbsolute(normalized)) {
+    return normalized;
+  }
+
+  const relative = path.relative(executionRoot, normalized).replace(/\\/g, "/");
+  if (!relative || relative.startsWith("../")) {
+    return normalized;
+  }
+  return normalizeChangedPath(relative);
+}
+
+/**
+ * @param {Record<string, unknown>} deliveryPlan
+ * @param {string} executionRoot
+ * @returns {string[]}
+ */
+function resolveExpectedMeaningfulChangedPaths(deliveryPlan, executionRoot) {
+  const runtimeHarness = asRecord(asRecord(deliveryPlan.preconditions).runtime_harness);
+  return uniqueStrings(
+    asStringArray(runtimeHarness.meaningful_changed_paths)
+      .map((changedPath) => normalizeExpectedChangedPath(changedPath, executionRoot))
+      .filter((changedPath) => typeof changedPath === "string"),
+  );
+}
+
+/**
+ * @param {{
+ *   mode: string,
+ *   expectedMeaningfulChangedPaths: string[],
+ *   changedPaths: string[],
+ * }} options
+ * @returns {string[]}
+ */
+function findMissingExpectedChangedPaths(options) {
+  if (options.mode === "no-write" || options.expectedMeaningfulChangedPaths.length === 0) {
+    return [];
+  }
+
+  const changedPathSet = new Set(options.changedPaths.map((changedPath) => normalizeChangedPath(changedPath)));
+  return options.expectedMeaningfulChangedPaths.filter((changedPath) => !changedPathSet.has(changedPath));
 }
 
 /**
@@ -208,6 +273,76 @@ function classifyEvidenceRefs(refs) {
   };
 }
 
+function verifyLockedDeliveryEvidence(deliveryPlan, projectRoot) {
+  const preconditions = asRecord(deliveryPlan.preconditions);
+  const handoffRef = asString(asRecord(preconditions.approved_handoff).ref);
+  const promotionRefs = asStringArray(asRecord(preconditions.promotion_evidence).refs);
+  const runtimeHarness = asRecord(preconditions.runtime_harness);
+  const runtimeHarnessRef = runtimeHarness.required === true && runtimeHarness.enforced === true
+    ? asString(runtimeHarness.report_ref)
+    : null;
+  const locks = Array.isArray(deliveryPlan.evidence_locks) ? deliveryPlan.evidence_locks.map(asRecord) : [];
+  for (const [ref, declaredFamily] of [
+    ...(handoffRef ? [[handoffRef, "handoff-packet"]] : []),
+    ...promotionRefs.map((ref) => [ref, null]),
+    ...(runtimeHarnessRef ? [[runtimeHarnessRef, "runtime-harness-report"]] : []),
+  ]) {
+    const lock = locks.find((entry) => asString(entry.ref) === ref);
+    if (!lock || asString(lock.status) !== "locked" || !asString(lock.sha256)) {
+      throw new Error(`Delivery evidence '${ref}' is not locked by the plan.`);
+    }
+    const candidate = asString(lock.resolved_path) ??
+      (ref.startsWith("evidence://") ? ref.slice("evidence://".length) : ref);
+    const filePath = path.isAbsolute(candidate) ? candidate : path.resolve(projectRoot, candidate);
+    const digest = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+    if (digest !== lock.sha256) {
+      throw new Error(`Delivery evidence '${ref}' changed after plan authorization.`);
+    }
+    const candidateFamilies = declaredFamily
+      ? [declaredFamily]
+      : ["promotion-decision", "review-decision", "evaluation-report", "step-result"];
+    const loadedCandidates = candidateFamilies.map((family) => ({ family, loaded: loadContractFile({ filePath, family }) }));
+    const match = loadedCandidates.find((entry) => entry.loaded.ok);
+    if (!match) throw new Error(`Delivery evidence '${ref}' does not match an allowed authorization contract family.`);
+    const { family, loaded } = match;
+    const document = asRecord(loaded.document);
+    if (family === "handoff-packet" && asString(document.project_id) !== asString(deliveryPlan.project_id)) {
+      throw new Error(`Delivery handoff evidence '${ref}' belongs to a different project.`);
+    }
+    if (family === "handoff-packet" && asString(document.status) !== "approved") {
+      throw new Error(`Delivery handoff evidence '${ref}' is not approved.`);
+    }
+    if (family === "promotion-decision" && asString(document.status) !== "pass") {
+      throw new Error(`Delivery promotion evidence '${ref}' is not pass-level.`);
+    }
+    if (family === "review-decision" && (asString(document.decision) !== "approve" ||
+        asString(asRecord(document.delivery_gate).status) !== "pass")) {
+      throw new Error(`Delivery review evidence '${ref}' is not approved for delivery.`);
+    }
+    if (family === "evaluation-report" && (asString(document.status) !== "pass" ||
+        asString(document.subject_ref) !== `run://${asString(deliveryPlan.run_id)}`)) {
+      throw new Error(`Delivery evaluation evidence '${ref}' is not pass-level evidence for the requested run.`);
+    }
+    if (family === "step-result" && asString(document.status) !== "passed") {
+      throw new Error(`Delivery step evidence '${ref}' is not pass-level.`);
+    }
+    if (family === "runtime-harness-report") {
+      const runDecision = asRecord(document.run_decision);
+      const missionLineage = asRecord(document.mission_lineage);
+      const meaningfulPaths = (Array.isArray(document.step_decisions) ? document.step_decisions : [])
+        .flatMap((step) => asStringArray(asRecord(asRecord(step).mission_semantics).meaningful_changed_paths));
+      if (asString(document.project_id) !== asString(deliveryPlan.project_id) ||
+          asString(document.run_id) !== asString(deliveryPlan.run_id) ||
+          asString(document.overall_decision) !== "pass" || asString(runDecision.overall_decision) !== "pass" ||
+          asString(runDecision.terminal_status) !== "closed" || !Array.isArray(document.step_decisions) ||
+          document.step_decisions.length === 0 || asString(missionLineage.status) !== "resolved" ||
+          asString(missionLineage.strictness_profile) === "unknown" || meaningfulPaths.length === 0) {
+        throw new Error(`Delivery Runtime Harness evidence '${ref}' does not prove a pass-level run controller decision.`);
+      }
+    }
+  }
+}
+
 /**
  * @param {{
  *   deliveryPlanPath?: string,
@@ -265,16 +400,38 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
     );
   }
 
-  const writebackAllowed = deliveryPlan.writeback_allowed;
-  if (writebackAllowed !== true) {
-    throw new Error("Delivery plan does not allow write-back for this run.");
-  }
-
   const mode = asString(deliveryPlan.delivery_mode);
   if (!mode || !SUPPORTED_DELIVERY_MODES.has(mode)) {
     throw new Error(
       `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: no-write, patch-only, local-branch, fork-first-pr.`,
     );
+  }
+
+  const schemaVersion = deliveryPlan.schema_version ?? 1;
+  if (mode !== "no-write" && schemaVersion !== 2) {
+    throw new Error("Write-capable delivery plan v1 is not supported; migrate the plan to schema_version 2.");
+  }
+  if (schemaVersion === 2) {
+    const permissions = asRecord(deliveryPlan.permissions);
+    if (permissions.execution_allowed !== true) {
+      throw new Error("Delivery plan v2 does not grant execution permission.");
+    }
+    if (mode === "local-branch" && permissions.local_commit_allowed !== true) {
+      throw new Error("Delivery plan v2 does not grant local commit permission.");
+    }
+    if (mode === "fork-first-pr" && permissions.fork_push_allowed !== true) {
+      throw new Error("Delivery plan v2 does not grant fork push permission.");
+    }
+    if (permissions.direct_upstream_write_allowed === true) {
+      throw new Error("Direct upstream writes are not supported by the W57 delivery boundary.");
+    }
+  }
+
+  if (deliveryPlan.execution_allowed !== true) {
+    throw new Error("Delivery plan does not allow execution for this run.");
+  }
+  if (mode !== "no-write" && deliveryPlan.writeback_allowed !== true) {
+    throw new Error("Delivery plan does not allow write-back for this run.");
   }
 
   if (requestedMode && requestedMode !== mode) {
@@ -309,7 +466,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
  *  deliveryPlan?: Record<string, unknown>,
  * }} options
  */
-export function runDeliveryDriver(options = {}) {
+function executeDeliveryDriverTransaction(options = {}) {
   const init = initializeProjectRuntime(options);
   const runId = options.runId ?? `${init.projectId}.delivery.v1`;
   const stepId = options.stepId ?? "delivery.apply";
@@ -325,6 +482,20 @@ export function runDeliveryDriver(options = {}) {
     deliveryPlan: options.deliveryPlan,
   });
   const mode = resolveDeliveryMode(deliveryPlan, asString(options.mode) ?? undefined);
+  if (asString(deliveryPlan.project_id) !== init.projectId) {
+    throw new Error(`Delivery plan project '${String(deliveryPlan.project_id)}' does not own runtime project '${init.projectId}'.`);
+  }
+  if (asString(deliveryPlan.run_id) !== runId) {
+    throw new Error(`Delivery plan run '${String(deliveryPlan.run_id)}' does not match requested run '${runId}'.`);
+  }
+  const planCreatedAt = Date.parse(asString(deliveryPlan.created_at) ?? "");
+  const planAgeMs = Date.now() - planCreatedAt;
+  if (!Number.isFinite(planCreatedAt) || planAgeMs < -300_000 || planAgeMs > 86_400_000) {
+    throw new Error("Delivery plan is stale or has an invalid creation timestamp; create a fresh authorization plan.");
+  }
+  if (mode !== "no-write") {
+    verifyLockedDeliveryEvidence(deliveryPlan, init.projectRoot);
+  }
   const coordination = asRecord(deliveryPlan.coordination);
   const coordinationRepoIds = asStringArray(coordination.repo_ids);
   const coordinationEvidenceRefs = asStringArray(coordination.evidence_refs);
@@ -370,11 +541,15 @@ export function runDeliveryDriver(options = {}) {
     `delivery-transcript-${normalizeForId(mode)}-${normalizeForId(runId)}-${Date.now()}.json`,
   );
 
+  const { targets: independentRepoTargets, enabled: perRepositoryDelivery } =
+    resolveIndependentRepositoryTargets(coordinationRepos, executionRoot);
   const startedAt = new Date().toISOString();
-  const gitHeadBefore = readGitHead(executionRoot);
-  /** @type {string[]} */
+  const gitHeadBefore = readGitHead(perRepositoryDelivery ? independentRepoTargets[0].repoRoot : executionRoot);
+  const expectedMeaningfulChangedPaths = resolveExpectedMeaningfulChangedPaths(deliveryPlan, executionRoot);
+  const authorizedChangedPaths = asStringArray(
+    asRecord(asRecord(deliveryPlan.diff_authorization).changes).all_paths,
+  );
   const commands = [];
-  /** @type {string[]} */
   let changedPaths = [];
   let diffStats = {
     files: [],
@@ -384,41 +559,86 @@ export function runDeliveryDriver(options = {}) {
       deleted: 0,
     },
   };
-  /** @type {Record<string, unknown>} */
   let outputs = {};
-  /** @type {"success" | "failed"} */
   let status = "success";
-  /** @type {string | null} */
   let errorMessage = null;
-  /** @type {string[] | null} */
   let recoverySteps = null;
+  let missingExpectedChangedPaths = [];
+  let repositoryExecutionResults = new Map();
 
   try {
     if (rerunPreflightIssues.length > 0) {
       throw new Error(rerunPreflightIssues.join(" "));
     }
 
-    const modeResult = runDeliveryMode({
+    if (perRepositoryDelivery) {
+      const repositoryRun = executeIndependentRepositoryDeliveries({
+        targets: independentRepoTargets,
+        authorizations: asRecord(deliveryPlan.repository_diff_authorizations),
+        mode,
+        runId,
+        branchName: options.branchName,
+        readHead: readGitHead,
+        assertDiff: assertExactDeliveryDiff,
+        runMode: runDeliveryMode,
+        modeOptions: {
+          artifactsRoot: init.runtimeLayout.artifactsRoot,
+          commitMessage: options.commitMessage,
+          forkOwner: options.forkOwner,
+          forkRemoteUrl: options.forkRemoteUrl,
+          baseRef: options.baseRef,
+          prTitle: options.prTitle,
+          prBody: options.prBody,
+          enableNetworkWrite: options.enableNetworkWrite,
+          githubToken: options.githubToken,
+          githubCliPath: options.githubCliPath,
+        },
+      });
+      repositoryExecutionResults = repositoryRun.results;
+      commands.push(...repositoryRun.commands);
+      changedPaths = repositoryRun.changedPaths;
+      diffStats = repositoryRun.diffStats;
+      outputs = repositoryRun.outputs;
+      status = repositoryRun.status;
+      errorMessage = repositoryRun.errorMessage;
+      recoverySteps = repositoryRun.recoverySteps;
+    } else {
+      if (mode !== "no-write") {
+        assertExactDeliveryDiff(executionRoot, asRecord(deliveryPlan.diff_authorization));
+      }
+      const modeResult = runDeliveryMode({
+        mode,
+        executionRoot,
+        artifactsRoot: init.runtimeLayout.artifactsRoot,
+        runId,
+        gitHeadBefore,
+        branchName: options.branchName,
+        commitMessage: options.commitMessage,
+        forkOwner: options.forkOwner,
+        forkRemoteUrl: options.forkRemoteUrl,
+        baseRef: options.baseRef,
+        prTitle: options.prTitle,
+        prBody: options.prBody,
+        enableNetworkWrite: options.enableNetworkWrite,
+        githubToken: options.githubToken,
+        githubCliPath: options.githubCliPath,
+        expectedChangedPaths: authorizedChangedPaths,
+      });
+      commands.push(...modeResult.commands);
+      changedPaths = modeResult.changedPaths;
+      diffStats = modeResult.diffStats;
+      outputs = modeResult.outputs;
+    }
+    missingExpectedChangedPaths = findMissingExpectedChangedPaths({
       mode,
-      executionRoot,
-      artifactsRoot: init.runtimeLayout.artifactsRoot,
-      runId,
-      gitHeadBefore,
-      branchName: options.branchName,
-      commitMessage: options.commitMessage,
-      forkOwner: options.forkOwner,
-      forkRemoteUrl: options.forkRemoteUrl,
-      baseRef: options.baseRef,
-      prTitle: options.prTitle,
-      prBody: options.prBody,
-      enableNetworkWrite: options.enableNetworkWrite,
-      githubToken: options.githubToken,
-      githubCliPath: options.githubCliPath,
+      expectedMeaningfulChangedPaths,
+      changedPaths,
     });
-    commands.push(...modeResult.commands);
-    changedPaths = modeResult.changedPaths;
-    diffStats = modeResult.diffStats;
-    outputs = modeResult.outputs;
+    if (missingExpectedChangedPaths.length > 0) {
+      throw new Error(
+        `Delivery current diff is missing Runtime Harness meaningful changed path(s): ${missingExpectedChangedPaths.join(", ")}.`,
+      );
+    }
   } catch (error) {
     status = "failed";
     errorMessage = error instanceof Error ? error.message : String(error);
@@ -442,7 +662,7 @@ export function runDeliveryDriver(options = {}) {
   }
 
   const finishedAt = new Date().toISOString();
-  const gitHeadAfter = readGitHead(executionRoot);
+  const gitHeadAfter = readGitHead(perRepositoryDelivery ? independentRepoTargets[0].repoRoot : executionRoot);
 
   const transcript = {
     transcript_id: transcriptId,
@@ -468,6 +688,11 @@ export function runDeliveryDriver(options = {}) {
     },
     changed_paths: changedPaths,
     diff_stats: diffStats,
+    delivery_integrity: {
+      authorized_changed_paths: authorizedChangedPaths,
+      expected_meaningful_changed_paths: expectedMeaningfulChangedPaths,
+      missing_expected_changed_paths: missingExpectedChangedPaths,
+    },
     outputs,
     error: errorMessage,
     recovery_steps: recoverySteps,
@@ -491,19 +716,7 @@ export function runDeliveryDriver(options = {}) {
   if (typeof outputs.api_intent_file === "string") {
     deliveryOutputRefs.push(toEvidenceRef(init.projectRoot, outputs.api_intent_file));
   }
-
-  const writebackResult =
-    status === "success"
-      ? mode === "no-write"
-        ? "no-write-confirmed"
-        : mode === "patch-only"
-        ? "patch-materialized"
-        : mode === "local-branch"
-          ? "local-branch-committed"
-          : asString(outputs.network_mode) === "networked"
-            ? "fork-pr-draft-created"
-            : "fork-pr-planned"
-      : "failed";
+  deliveryOutputRefs.push(...collectRepositoryOutputRefs(outputs, init.projectRoot, toEvidenceRef));
 
   const deliveryRepos =
     coordinationRepos.length > 0
@@ -528,6 +741,22 @@ export function runDeliveryDriver(options = {}) {
           ? sourceRoot
           : path.resolve(executionRoot, sourceRoot);
     const repoChangedPaths = changedPathsByRepo.get(repo.repo_id) ?? [];
+    const repositoryResult = repositoryExecutionResults.get(repo.repo_id);
+    const repositoryOutputs = asRecord(repositoryResult?.outputs);
+    const repositorySucceeded = repositoryResult ? repositoryResult.status === "success" : status === "success";
+    const repositoryWritebackResult = repositorySucceeded
+      ? mode === "no-write"
+        ? "no-write-confirmed"
+        : mode === "patch-only"
+          ? "patch-materialized"
+          : mode === "local-branch"
+            ? "local-branch-committed"
+            : asString(repositoryOutputs.network_mode ?? outputs.network_mode) === "networked"
+              ? "fork-pr-draft-created"
+              : "fork-pr-planned"
+      : "failed";
+    const repositoryHeadBefore = repositoryResult?.headBefore ?? gitHeadBefore;
+    const repositoryHeadAfter = repositoryResult?.headAfter ?? gitHeadAfter;
     const repoDelivery = {
       repo_id: repo.repo_id,
       role: repo.role,
@@ -536,16 +765,24 @@ export function runDeliveryDriver(options = {}) {
       repo_root: repoRoot,
       repo_root_ref: toEvidenceRef(init.projectRoot, repoRoot),
       checkout_provenance: {
-        head_before: gitHeadBefore,
-        head_after: gitHeadAfter,
+        head_before: repositoryHeadBefore,
+        head_after: repositoryHeadAfter,
       },
-      base_ref: repo.default_branch ?? gitHeadBefore.branch,
-      head_ref: gitHeadAfter.branch,
-      branch_name: typeof outputs.branch_name === "string" ? outputs.branch_name : null,
+      base_ref: repo.default_branch ?? repositoryHeadBefore.branch,
+      head_ref: repositoryHeadAfter.branch,
+      branch_name: typeof repositoryOutputs.branch_name === "string"
+        ? repositoryOutputs.branch_name
+        : typeof outputs.branch_name === "string" ? outputs.branch_name : null,
       changed_paths: repoChangedPaths,
       diff_totals: summarizeDiffTotalsForPaths(diffStats, repoChangedPaths),
-      commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
-      writeback_result: writebackResult,
+      commit_refs: typeof repositoryOutputs.commit_sha === "string"
+        ? [repositoryOutputs.commit_sha]
+        : typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
+      writeback_result: repositoryWritebackResult,
+      transaction_stage: repositorySucceeded ? "complete" : "failed",
+      failed_step: repositorySucceeded ? null : stepId,
+      rollback_refs: [],
+      recovery_action: repositorySucceeded ? null : "inspect-delivery-transcript",
       coordination: {
         required: coordinationMetadata.required,
         status: coordinationMetadata.status,
@@ -571,6 +808,7 @@ export function runDeliveryDriver(options = {}) {
   });
 
   const deliveryManifest = {
+    schema_version: 2,
     manifest_id: `${init.projectId}.delivery-manifest.${normalizeForId(mode)}.${Date.now()}`,
     project_id: init.projectId,
     ticket_id: ticketId,
@@ -591,9 +829,23 @@ export function runDeliveryDriver(options = {}) {
       promotion_evidence: asRecord(asRecord(deliveryPlan.preconditions).promotion_evidence),
       runtime_harness: asRecord(asRecord(deliveryPlan.preconditions).runtime_harness),
       coordination_evidence: asRecord(asRecord(deliveryPlan.preconditions).coordination_evidence),
+      integration: asRecord(asRecord(deliveryPlan.preconditions).integration),
       evidence_refs: deliveryPlanEvidenceRefs,
     },
     coordination: coordinationMetadata,
+    coordination_transaction: {
+      transaction_id: boundedDerivedId(
+        "delivery-transaction",
+        `${init.projectId}.delivery-transaction.${normalizeForId(runId)}`,
+      ),
+      status: status === "success" ? "complete" : repoDeliveries.some((repo) => repo.writeback_result !== "failed") ? "partial" : "blocked",
+      repo_ids: repoDeliveries.map((repo) => repo.repo_id),
+      completed_repo_ids: repoDeliveries.filter((repo) => repo.writeback_result !== "failed").map((repo) => repo.repo_id),
+      failed_repo_ids: repoDeliveries.filter((repo) => repo.writeback_result === "failed").map((repo) => repo.repo_id),
+      integration_report_ref: asString(asRecord(asRecord(deliveryPlan.preconditions).integration).report_ref),
+      lock_evidence_refs: coordinationMetadata.lock_evidence_refs,
+      rollback_refs: uniqueStrings(repoDeliveries.flatMap((repo) => asStringArray(repo.rollback_refs))),
+    },
     rerun_recovery: rerunMetadata,
     evidence_root: init.runtimeLayout.reportsRoot,
     source_refs: {
@@ -739,4 +991,8 @@ export function runDeliveryDriver(options = {}) {
     diffStats,
     outputs,
   };
+}
+
+export function runDeliveryDriver(options = {}) {
+  return runTransactionCoordinator(executeDeliveryDriverTransaction, options);
 }

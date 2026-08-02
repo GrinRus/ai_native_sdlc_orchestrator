@@ -13,12 +13,22 @@ live_e2e:
   agent_decision_policy: required
   interaction_answer_policy: agent-required
   target_write_policy: aor-runtime-only-before-execution
+  target_command_timeout_sec: 300
 implementation_loop:
   enabled: true
   max_iterations: 3
   review_repair_actions:
     - request-repair
     - failed-quality-findings
+  cycle_steps:
+    - execution
+    - review
+    - qa
+  repair_sources:
+    - review
+    - qa
+    - post-run-primary
+    - post-run-diagnostic
   stop_on_blocking_review: true
 target_catalog_id: ky
 feature_mission_id: ky-release-doc-typing
@@ -45,6 +55,12 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+    - npm install --prefer-offline --no-audit --no-fund
+  commands:
+    - npx xo
+    - npm run build
+    - npx ava test/hooks.ts
   eval_suites:
     - suite.release.short@v1
   harness:

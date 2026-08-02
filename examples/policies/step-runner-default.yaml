@@ -25,6 +25,7 @@ repair:
     - lint-failed
     - tests-failed
     - missing-evidence
+    - no-op
 escalation:
   after_total_failures: 4
   on:

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "pilot_id": "w65.mission-cockpit.v1",
+  "selector": "quiet-cockpit",
+  "action_categories": ["mutation", "workbench", "evidence", "copy", "refresh", "unavailable"],
+  "scenarios": [
+    {"scenario_id":"first-run","canonical_route":"project state and project init","durable_readback":"initialized project state","presentation_switch_identity":true},
+    {"scenario_id":"mission-invalid","canonical_route":"client structural validation before lifecycle action","durable_readback":"no artifact created","presentation_switch_identity":true},
+    {"scenario_id":"mission-complete","canonical_route":"mission create then next","durable_readback":"Mission, intake, Flow, and next-action refs","presentation_switch_identity":true,"exactly_once":true},
+    {"scenario_id":"partial-mission-next-retry","canonical_route":"retry next with existing Mission ID","durable_readback":"existing intake plus one next-action ref","presentation_switch_identity":true,"exactly_once":true},
+    {"scenario_id":"active-provider","canonical_route":"run status and durable events","durable_readback":"run and event refs","presentation_switch_identity":true},
+    {"scenario_id":"interaction-decision","canonical_route":"interaction answer and review decide","durable_readback":"answered/decided source evidence","presentation_switch_identity":true},
+    {"scenario_id":"verification-repair","canonical_route":"review/QA repair actions","durable_readback":"bounded repair or exhausted blocker refs","presentation_switch_identity":true},
+    {"scenario_id":"delivery-review","canonical_route":"review and no-write delivery preparation","durable_readback":"review and delivery evidence","presentation_switch_identity":true},
+    {"scenario_id":"partial-offline","canonical_route":"resource-scoped reads","durable_readback":"last-known data plus structured read error","presentation_switch_identity":true},
+    {"scenario_id":"completed-follow-up","canonical_route":"learning handoff then Mission create","durable_readback":"new Flow/intake refs with source lineage","presentation_switch_identity":true,"exactly_once":true,"source_flow_immutable":true}
+  ],
+  "safety": {"external_network":false,"target_source_writes":false,"upstream_writes":false},
+  "evidence": ["apps/web/browser/operator-console.spec.mjs","apps/web/browser/operator-scenarios.spec.mjs","apps/web/browser/fixtures/golden-lifecycle.json","docs/research/16-w63-canonical-lifecycle-closure.md","docs/research/18-w65-reversible-selector.md"]
+}

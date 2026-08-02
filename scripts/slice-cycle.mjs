@@ -80,7 +80,7 @@ function printPlan(plan) {
   if (plan.localTasks.length === 0) {
     console.log("- none");
   } else {
-    plan.localTasks.forEach((item, index) => console.log(`${index + 1}. ${item}`));
+    plan.localTasks.forEach((item) => console.log(item.markdown));
   }
 
   console.log("\nAcceptance criteria:");
@@ -115,11 +115,8 @@ function runPnpmScript(scriptName) {
 }
 
 function runGate() {
-  const commands = ["lint", "test", "build", "check"];
-  for (const command of commands) {
-    runPnpmScript(command);
-  }
-  console.log("Check gate passed: lint, test, build, and check completed successfully.");
+  runPnpmScript("check");
+  console.log("Check gate passed: the canonical check pipeline completed each quality stage once.");
 }
 
 function executeTransition(args) {

@@ -13,6 +13,19 @@ function isPlainObject(value) {
 }
 
 /**
+ * @param {string} workspaceRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toWorkspaceRelativeOrAbsolutePath(workspaceRoot, filePath) {
+  const relative = path.relative(workspaceRoot, filePath).replace(/\\/g, "/");
+  if (relative && !relative.startsWith("../") && !path.isAbsolute(relative)) {
+    return relative;
+  }
+  return filePath;
+}
+
+/**
  * @param {{
  *   workspaceRoot: string,
  *   examplesRoot: string,
@@ -37,7 +50,7 @@ function isPlainObject(value) {
 function registryIssue(options) {
   return {
     code: options.code,
-    source: path.relative(options.workspaceRoot, options.source) || options.source,
+    source: toWorkspaceRelativeOrAbsolutePath(options.workspaceRoot, options.source),
     suite_ref: options.suiteRef ?? null,
     dataset_ref: options.datasetRef ?? null,
     expected: options.expected ?? null,
@@ -116,7 +129,7 @@ export function loadEvaluationRegistry(options = {}) {
       continue;
     }
 
-    const source = path.relative(workspaceRoot, result.source) || result.source;
+    const source = toWorkspaceRelativeOrAbsolutePath(workspaceRoot, result.source);
     const document = result.document;
 
     if (result.family === "dataset") {

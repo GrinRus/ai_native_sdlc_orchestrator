@@ -1,5 +1,10 @@
 # Review report
 
+Project, run, and mission identifiers plus reviewed changed paths inherit
+`canonical-identifiers-and-paths.md`. Scope findings for rename/copy/delete
+must retain both endpoints so review cannot approve a destination while losing
+an out-of-scope source.
+
 ## Purpose
 Durable report-only quality verdict for one run after execution evidence, delivery lineage, and feature-mission traceability have been materialized.
 
@@ -56,14 +61,69 @@ Durable report-only quality verdict for one run after execution evidence, delive
 - `execution_step_result_refs`
 - `delivery_manifest_ref`
 - `release_packet_ref`
+- `verification_coverage`
 - `findings`
 
 `code_quality` should preserve:
 - `status`
+- `target_checkout_root`
+- `git_status_available`
 - `changed_paths`
+- `changed_path_diagnostics`
 - `findings`
 
-For test files, `code_quality.findings` should flag likely coverage weakening, including lowered `t.plan(...)` counts or removed assertions without an equivalent replacement. Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`, `.swp`, and `~` files should also be flagged because they are not valid implementation deliverables. Review no longer fails implementation quality from legacy allowed/forbidden path lists; it judges whether the final diff satisfies the mission and verification evidence. These findings are review signals; they do not replace deterministic post-run verification.
+For strict product-change proof, `target_checkout_root` is the canonical git
+checkout root used for review changed-path evidence. `changed_path_diagnostics`
+should preserve `git_status_root`, raw changed paths, non-bootstrap changed
+paths, non-input changed paths, meaningful changed paths, runner-owned state
+paths, and ignored input files. If the canonical root is missing or not a git
+checkout, review must fail closed with code-quality evidence rather than
+silently emitting an empty changed-path pass.
+
+`artifact_quality.verification_coverage` must preserve:
+- `changed_test_paths`
+- `covered_test_paths`
+- `uncovered_test_paths`
+- `covering_commands`
+- `recorded_test_commands`
+- `coverage_reason`
+
+For test specs, `code_quality.findings` should flag likely coverage weakening,
+including lowered `t.plan(...)` counts or removed assertions without an
+equivalent replacement. `artifact_quality.findings` should warn when changed test
+specs are not exercised by explicit primary verification commands. The review
+report may derive `recorded_test_commands` from legacy
+`verify-summary.command_overrides.test_commands`, from
+`verify-summary.command_groups[].commands`, or from the command text in
+`verify-summary.command_groups[].step_result_refs` / `step_result_refs` when the
+step result belongs to a `role=test` command group. Broad repo/package commands
+such as `npm test`, `npm run test`, `npm run test:ci`, `pnpm test`,
+`pnpm run test`, `yarn test`, `bun test`, repo-wide `pytest`,
+`python -m pytest`, or a package-level workspace/filter command that covers the
+changed test file's nearest package, such as
+`yarn workspace <package-name> test-unit`, `pnpm --filter <package-name> test`,
+or `npm --workspace <package-name> test`, count as covering changed tests. A
+broad verification mapping warning is non-repair evidence when primary
+verification passed, `code_quality.status=pass`, and
+`feature_size_fit.status=pass`; downstream quality gates must not convert that
+warning into `request-repair` without an actionable implementation finding. The
+same rule applies when primary verification passes because a failed command
+matched explicit `baseline_failure_status=pre_existing` evidence: review should
+keep the broken-baseline refs visible, but it must not treat that stale target
+failure as a new repair request by itself. The
+changed-test-spec guardrail applies to conventional test locations such as
+`test/**`, `tests/**`, package/app `test/**`, package/app `tests/**`,
+`src/test/**`, `src/tests/**`, `__tests__/**`, and `*.test.*` / `*.spec.*`
+files; support/config files under paths such as `config/tests/**` are reviewed
+as changed implementation/support files, not as standalone test specs.
+Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`,
+`.swp`, and `~` files should also be flagged because they are not valid
+implementation deliverables. Review no longer fails implementation quality from
+legacy intake `allowed_paths`/`forbidden_paths`; it judges whether the final diff
+satisfies the mission and verification evidence. When an approved handoff packet
+has explicit `allowed_paths[]`, review must fail `code_quality` for any
+non-bootstrap changed path outside that approved handoff scope. These findings
+are review signals; they do not replace deterministic post-run verification.
 
 `feature_size_fit` should preserve:
 - `status`
@@ -90,6 +150,45 @@ Each finding should keep:
 - `summary`
 - `evidence_refs`
 
+Findings may add optional `verification_failure_details[]` when the finding was
+derived from a failed `verify-summary` step-result. Each entry is generic AOR
+verification evidence and should preserve:
+- `command`
+- `command_group_id`
+- `role`
+- `phase`
+- `enforcement`
+- `enforcement_result`
+- `outcome`
+- `exit_code`
+- `signal`
+- `error_code`
+- `timed_out`
+- `timeout_class`
+- `command_timeout_ms`
+- `working_dir`
+- `repo_scope`
+- bounded `stdout_excerpt`
+- bounded `stderr_excerpt`
+- `failure_summary`
+- `evidence_refs`
+
+Review should attach these details when command-level step-result evidence is
+available. Generic "verify-summary failed" findings are only a fallback when the
+failed command details cannot be loaded.
+
+When a review or QA report participates in a W45 repair cycle, it may add
+optional `quality_repair_lineage` with:
+- `request_ref`
+- `cycle_id`
+- `source_stage` (`review|qa`)
+- `status`
+- `attempt_index`
+- `evidence_refs[]`
+
+This lineage is a read-model pointer to `quality-repair-request`; it does not
+replace the report's own findings or recommendation.
+
 ## Loader validation
 The shared contract loader validates the nested review report shape used by CLI/API/runtime readers:
 - section `status` fields must use `pass|warn|fail` when present; legacy read-model fixtures may keep empty section objects;
@@ -97,7 +196,10 @@ The shared contract loader validates the nested review report shape used by CLI/
 - nested `matrix_cell` values validate known identity, scenario, and provider fields when those fields are present;
 - nested `coverage_follow_up` validates `current_cell_required` and next/remaining matrix cells when those fields are present; legacy non-catalog outputs may keep an empty object;
 - optional provider traceability fields may be strings or `null` when the upstream runtime evidence was intentionally missing or blocked;
-- each finding must be an object with `finding_id`, `severity`, `category`, `summary`, and `evidence_refs[]`.
+- each finding must be an object with `finding_id`, `severity`, `category`, `summary`, and `evidence_refs[]`;
+- optional `verification_failure_details[]` entries must carry command,
+  role/enforcement, timeout class, process result, bounded stdout/stderr
+  excerpts, failure summary, and evidence refs.
 
 ## Notes
 `review-report` is report-only. A failing review must remain machine-readable without forcing command failure unless the CLI itself encounters usage, runtime, or contract-resolution errors.

@@ -1,0 +1,103 @@
+adapter_id: qwen-code
+runner_family: qwen
+version: 1
+default_model: qwen3-coder-plus
+supported_models:
+  - qwen3-coder-plus
+model_aliases:
+  coding-primary: qwen3-coder-plus
+  coding-fallback: qwen3-coder-plus
+  planning-primary: qwen3-coder-plus
+  planning-fallback: qwen3-coder-plus
+  judge-primary: qwen3-coder-plus
+  judge-fallback: qwen3-coder-plus
+launch_modes:
+  - interactive
+  - non-interactive
+capabilities:
+  repo_read: true
+  repo_write: true
+  shell_commands: true
+  structured_output: true
+  live_logs: true
+  mcp_tools: true
+  subagents: false
+constraints:
+  requires_local_runtime: true
+  default_network_mode: deny-by-default
+  supports_no_write_rehearsal: true
+execution:
+  live_baseline: false
+  runtime_mode: external-process
+  handler: qwen-code-external-runner
+  evidence_namespace: evidence://adapter-live/qwen-code
+  external_runtime:
+    command: qwen
+    model_argument:
+      flag: --model
+    permission_policy:
+      default_mode: restricted
+      modes:
+        full-bypass:
+          args:
+            - --bare
+            - --auth-type
+            - anthropic
+            - --output-format
+            - stream-json
+            - --include-partial-messages
+            - --approval-mode
+            - yolo
+            - --exclude-tools
+            - skill
+        restricted:
+          args:
+            - --bare
+            - --auth-type
+            - anthropic
+            - --output-format
+            - stream-json
+            - --include-partial-messages
+            - --approval-mode
+            - default
+            - --exclude-tools
+            - skill
+    env_from:
+      ANTHROPIC_API_KEY: ANTHROPIC_AUTH_TOKEN
+    native_timeout_arg:
+      flag: --max-wall-time
+      format: duration-seconds
+      reserve_ms: 5000
+    request_via_stdin: false
+    request_transport: request-artifact
+    request_file:
+      mode: pointer-prompt
+      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout; evidence inputs are read-only and must never be treated as execution roots. Read it first, open every required resolved_local_refs[].local_path, make direct edits only in the disposable execution root when required, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet.
+    execution_root_mode: short-symlink
+    preflight_timeout_ms: 120000
+    timeout_ms: 3600000
+sandbox_mode: local-or-container
+approval_features:
+  supports_human_approval: true
+  supports_pause_resume: false
+  continuation_strategy: reinvoke
+  approval_grant_scope: tool-call-scoped
+  approval_resume_mode: restricted
+  permission_request_detection:
+    - structured-output
+    - stdout-stderr-patterns
+log_features:
+  stdout: true
+  stderr: true
+  tool_calls: true
+  normalized_summary: true
+certification_state: candidate
+limitations:
+  - Candidate adapter only; not part of required provider coverage until a real runner certification promotes it.
+  - Candidate live steps keep the one-hour real-runner cap because Qwen Code can exceed shorter local proof budgets on full lifecycle implementation requests.
+  - Qwen Code runs with --bare and --exclude-tools skill so candidate live execution does not materialize runner-local .qwen skill state inside target checkouts.
+  - Qwen Code uses --output-format stream-json with --include-partial-messages because buffered --output-format json emits stdout only at session completion and makes active runs look silent to AOR.
+  - Qwen Code 0.17.0 requires explicit headless auth selection in the current host setup; this profile uses --auth-type anthropic and maps ANTHROPIC_AUTH_TOKEN to ANTHROPIC_API_KEY when the API-key variable is absent.
+  - Qwen Code receives a native --max-wall-time value slightly below the AOR subprocess timeout so timeout evidence can come from the runner before AOR has to SIGKILL the process group.
+  - Qwen Code restricted/default mode is not certified for AOR JSON-envelope requests: local smoke shows stdin and argv JSON requests can time out without structured permission_denial output.
+  - Qwen restricted/default may remove write and shell tools from the available tool set instead of emitting an approval request; keep orchestrator-mediated restricted behavior pending until the runner exposes a non-interactive permission event.

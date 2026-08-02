@@ -17,6 +17,7 @@ Durable approval decision for one reviewed run.
 - `delivery_manifest_refs`
 - `learning_handoff_refs`
 - `decision_basis`
+- `repair_context`
 - `delivery_gate`
 - `evidence_refs`
 - `decided_at`
@@ -32,6 +33,24 @@ Durable approval decision for one reviewed run.
 `hold` preserves a human stop without claiming repair has started.
 
 `request-repair` records that downstream work should repair the linked run before delivery/release approval.
+For public repair loops, `request-repair` must preserve structured
+`repair_context` in addition to the operator-readable reason. The context
+records `source_phase`, `cycle_iteration`, `unresolved_findings`,
+`unresolved_finding_details`, `meaningful_changed_paths`,
+`verification_status`, `verification_refs`, `previous_repair_decision_refs`,
+`context_fingerprint`, `new_context_since_previous`, `stop_reason`, and
+`requested_next_step`.
+It must still route repair through public AOR run/review lifecycle commands
+rather than providing a private patch or direct target mutation.
+
+W45 adds optional compatibility fields:
+- `quality_repair_request_ref`, the materialized shared repair request created
+  or accepted by this decision;
+- `quality_repair_lineage`, a read-model copy of request ref, cycle id, source
+  stage, status, attempt index, and evidence refs.
+
+These fields are additive. Existing `review-decision` examples and reports that
+only carry `repair_context` remain valid.
 
 ## Decision basis
 `decision_basis` should preserve:
@@ -39,6 +58,39 @@ Durable approval decision for one reviewed run.
 - `review_recommendation`
 - `runtime_harness_overall_decision`
 - `blocking_findings`
+
+## Repair context
+`repair_context` is always present. For `approve` and `hold`, it records
+`source_phase=none`, `cycle_iteration=0`, and empty evidence arrays. For
+`request-repair`, it records the phase that requested repair (`review`, `qa`,
+`post-run-primary`, or `post-run-diagnostic`), the quality-cycle iteration,
+unresolved findings, structured unresolved finding details, changed paths,
+verification status and refs, prior repair decision refs, a deterministic
+context fingerprint, the new evidence/context seen since the previous repair,
+the stop reason, and the requested next step. `request-repair` is invalid when
+this context is empty, omits structured finding details or the fingerprint,
+repeats prior repair lineage without new context, or points anywhere other than
+`execution` as the next public repair step.
+
+Each `repair_context.unresolved_finding_details[]` entry must include
+`finding_id`, `category`, `severity`, `summary`, `evidence_refs`, and
+`resolution_requirement`. The `finding_id` should remain stable across repair
+iterations so the runner can distinguish a stale finding from a provider repair
+that did not address the finding. `resolution_requirement` must be concrete
+enough for the next execution packet to prove closure; for example, coverage
+weakening findings should require restoring the weakened assertion or plan
+coverage, or adding equivalent stronger coverage with final diff and
+verification evidence.
+
+When the source review finding came from failed public verification evidence,
+each unresolved finding detail may add optional
+`verification_failure_details[]`. This is copied from
+`review-report.findings[].verification_failure_details[]` and keeps the repair
+packet actionable without introducing a separate repair artifact. Each entry
+preserves the failed command, role, enforcement, exit/signal/error metadata,
+timeout class, bounded stdout/stderr excerpts, failure summary, and evidence
+refs. The field is additive; older W45 repair decisions without these command
+details remain valid.
 
 ## Delivery gate
 `delivery_gate` should preserve:

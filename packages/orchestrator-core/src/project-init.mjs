@@ -1,9 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import childProcess from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { stringify as stringifyYaml } from "yaml";
 
-import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
+import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
 
 const DEFAULT_RUNTIME_ROOT = ".aor";
 const DEFAULT_BOOTSTRAP_TEMPLATE_ID = "github-default";
@@ -31,8 +35,12 @@ const DEFAULT_REGISTRY_ROOTS = Object.freeze({
  * @param {string} value
  * @returns {string}
  */
-function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+function deriveGeneratedProjectId(projectRoot) {
+  const projectName = path.basename(projectRoot);
+  if (validatePublicId(projectName).ok) return projectName;
+  const canonicalRoot = fs.realpathSync.native(projectRoot);
+  const digest = crypto.createHash("sha256").update(canonicalRoot).digest("hex").slice(0, 16);
+  return `project-${digest}`;
 }
 
 /**
@@ -51,7 +59,11 @@ function asRecord(value) {
  * @returns {string}
  */
 function toProjectRelativePath(projectRoot, filePath) {
-  return path.relative(projectRoot, filePath).replace(/\\/g, "/") || ".";
+  const relative = path.relative(projectRoot, filePath).replace(/\\/g, "/");
+  if (relative && !relative.startsWith("../") && !path.isAbsolute(relative)) {
+    return relative;
+  }
+  return filePath;
 }
 
 /**
@@ -136,7 +148,7 @@ export function discoverProjectRoot(options = {}) {
   while (true) {
     const gitDir = path.join(current, ".git");
     if (fs.existsSync(gitDir)) {
-      return current;
+      return fs.realpathSync.native(current);
     }
 
     const parent = path.dirname(current);
@@ -156,21 +168,16 @@ export function discoverProjectRoot(options = {}) {
  * @returns {string}
  */
 export function resolveProjectProfilePath(options) {
-  const cwd = options.cwd ?? process.cwd();
-
   if (options.projectProfile) {
-    const cwdCandidate = path.resolve(cwd, options.projectProfile);
-    if (fs.existsSync(cwdCandidate)) {
-      return cwdCandidate;
-    }
-
-    const projectCandidate = path.resolve(options.projectRoot, options.projectProfile);
+    const projectCandidate = path.isAbsolute(options.projectProfile)
+      ? options.projectProfile
+      : path.resolve(options.projectRoot, options.projectProfile);
     if (fs.existsSync(projectCandidate)) {
       return projectCandidate;
     }
 
     throw new Error(
-      `Project profile '${options.projectProfile}' was not found from cwd '${cwd}' or project root '${options.projectRoot}'.`,
+      `Project profile '${options.projectProfile}' was not found from canonical project root '${options.projectRoot}'. Relative profile paths never resolve from launcher cwd.`,
     );
   }
 
@@ -211,9 +218,12 @@ function resolveOptionalProjectProfilePath(options) {
 function resolveBundledExamplesRoot() {
   const override = process.env.AOR_BOOTSTRAP_ASSETS_ROOT ?? process.env.AOR_EXAMPLES_ROOT;
   if (typeof override === "string" && override.trim().length > 0) {
-    return path.isAbsolute(override) ? override : path.resolve(process.cwd(), override);
+    if (!path.isAbsolute(override)) {
+      throw new Error("AOR bootstrap asset-root overrides must be absolute; launcher cwd is not a reference base.");
+    }
+    return override;
   }
-  return path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../examples");
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../examples");
 }
 
 /**
@@ -221,15 +231,14 @@ function resolveBundledExamplesRoot() {
  * @returns {string}
  */
 function detectDefaultBranch(projectRoot) {
-  const headPath = path.join(projectRoot, ".git", "HEAD");
-  if (!fs.existsSync(headPath)) {
-    return "main";
-  }
-
   try {
-    const head = fs.readFileSync(headPath, "utf8").trim();
-    const match = head.match(/^ref:\s+refs\/heads\/(.+)$/u);
-    return match ? match[1] : "main";
+    const branch = childProcess
+      .execFileSync("git", ["-C", projectRoot, "symbolic-ref", "--quiet", "--short", "HEAD"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim();
+    return branch || "main";
   } catch {
     return "main";
   }
@@ -335,6 +344,126 @@ function detectVerificationCommands(projectRoot, overrides = {}) {
 }
 
 /**
+ * @param {{ buildCommands: string[], lintCommands: string[], testCommands: string[] }} verification
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildDefaultVerificationCommandGroups(verification) {
+  const groups = [
+    {
+      id: "baseline-build",
+      role: "build",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "build",
+      commands: verification.buildCommands,
+    },
+    {
+      id: "baseline-lint",
+      role: "lint",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "quick",
+      commands: verification.lintCommands,
+    },
+    {
+      id: "baseline-test",
+      role: "test",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: verification.testCommands,
+    },
+    {
+      id: "post-change-build",
+      role: "build",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "build",
+      commands: verification.buildCommands,
+    },
+    {
+      id: "post-change-lint",
+      role: "lint",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "quick",
+      commands: verification.lintCommands,
+    },
+    {
+      id: "post-change-test",
+      role: "test",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: verification.testCommands,
+    },
+  ];
+  return groups.filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
+}
+
+/**
+ * @param {{ buildCommands?: string[], lintCommands?: string[], testCommands?: string[] }} options
+ * @returns {boolean}
+ */
+function hasVerificationCommandOverrides(options) {
+  return [options.buildCommands, options.lintCommands, options.testCommands].some(
+    (commands) => Array.isArray(commands) && commands.length > 0,
+  );
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function quoteShellPath(value) {
+  return /^[A-Za-z0-9_./-]+$/u.test(value) ? value : `'${value.replace(/'/gu, "'\\''")}'`;
+}
+
+/**
+ * @param {Record<string, unknown>} group
+ * @param {string} command
+ * @returns {string}
+ */
+function toLegacyRepoCommand(group, command) {
+  const workingDir = typeof group.working_dir === "string" && group.working_dir.trim().length > 0
+    ? group.working_dir.trim()
+    : ".";
+  return workingDir === "." ? command : `cd ${quoteShellPath(workingDir)} && ${command}`;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} commandGroups
+ * @param {string} role
+ * @returns {string[]}
+ */
+function collectLegacyCommandsForRole(commandGroups, role) {
+  const commands = [];
+  const seen = new Set();
+  for (const group of commandGroups) {
+    if (group.role !== role || group.phase !== "post-change") continue;
+    const groupCommands = Array.isArray(group.commands) ? group.commands : [];
+    for (const command of groupCommands) {
+      if (typeof command !== "string" || command.trim().length === 0) continue;
+      const legacyCommand = toLegacyRepoCommand(group, command.trim());
+      if (seen.has(legacyCommand)) continue;
+      seen.add(legacyCommand);
+      commands.push(legacyCommand);
+    }
+  }
+  return commands;
+}
+
+/**
+ * @param {ReturnType<typeof discoverVerificationCommandGroups>} discovery
+ * @returns {Array<Record<string, unknown>>}
+ */
+function commandGroupsFromDiscovery(discovery) {
+  return discovery.command_group_candidates
+    .map((candidate) => asRecord(candidate.command_group))
+    .filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
+}
+
+/**
  * @param {{
  *   bootstrapTemplate?: string,
  *   cwd: string,
@@ -350,8 +479,7 @@ function resolveBootstrapTemplate(options) {
     templatePath = path.join(bundledExamplesRoot, "project.github.aor.yaml");
   } else {
     const candidates = [
-      path.resolve(options.cwd, bootstrapTemplate),
-      path.resolve(options.projectRoot, bootstrapTemplate),
+      path.isAbsolute(bootstrapTemplate) ? bootstrapTemplate : path.resolve(options.projectRoot, bootstrapTemplate),
       path.resolve(bundledExamplesRoot, bootstrapTemplate),
     ];
     templatePath = candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
@@ -387,12 +515,7 @@ function createBootstrapProjectProfile(options) {
   }
 
   const projectName = path.basename(options.projectRoot);
-  const projectId = normalizeId(projectName) || "target-project";
-  const verification = detectVerificationCommands(options.projectRoot, {
-    buildCommands: options.repoBuildCommands,
-    lintCommands: options.repoLintCommands,
-    testCommands: options.repoTestCommands,
-  });
+  const projectId = deriveGeneratedProjectId(options.projectRoot);
   const profile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(loaded.document)));
   profile.project_id = projectId;
   profile.display_name = projectName;
@@ -402,7 +525,6 @@ function createBootstrapProjectProfile(options) {
     options.assetMode === "bundled"
       ? registryRootsFromBase(bundledExamplesRoot)
       : { ...DEFAULT_REGISTRY_ROOTS };
-  delete profile.live_e2e_defaults;
 
   const repos = Array.isArray(profile.repos) && profile.repos.length > 0
     ? /** @type {Array<Record<string, unknown>>} */ (JSON.parse(JSON.stringify(profile.repos)))
@@ -420,10 +542,45 @@ function createBootstrapProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  primaryRepo.build_commands = verification.buildCommands;
-  primaryRepo.lint_commands = verification.lintCommands;
-  primaryRepo.test_commands = verification.testCommands;
+  const hasOverrides = hasVerificationCommandOverrides({
+    buildCommands: options.repoBuildCommands,
+    lintCommands: options.repoLintCommands,
+    testCommands: options.repoTestCommands,
+  });
+  const verification = detectVerificationCommands(options.projectRoot, {
+    buildCommands: options.repoBuildCommands,
+    lintCommands: options.repoLintCommands,
+    testCommands: options.repoTestCommands,
+  });
+  const stackDiscovery = hasOverrides
+    ? null
+    : discoverVerificationCommandGroups({
+        projectRoot: options.projectRoot,
+        repoId: String(primaryRepo.repo_id),
+      });
+  const generatedCommandGroups = hasOverrides
+    ? buildDefaultVerificationCommandGroups(verification)
+    : commandGroupsFromDiscovery(stackDiscovery);
+  primaryRepo.build_commands = hasOverrides
+    ? verification.buildCommands
+    : collectLegacyCommandsForRole(generatedCommandGroups, "build");
+  primaryRepo.lint_commands = hasOverrides
+    ? verification.lintCommands
+    : collectLegacyCommandsForRole(generatedCommandGroups, "lint");
+  primaryRepo.test_commands = hasOverrides
+    ? verification.testCommands
+    : collectLegacyCommandsForRole(generatedCommandGroups, "test");
   profile.repos = [primaryRepo];
+  profile.verification = {
+    ...asRecord(profile.verification),
+    command_groups: generatedCommandGroups,
+    ...(!hasOverrides && stackDiscovery
+      ? {
+          discovery_outcomes: stackDiscovery.outcomes,
+          discovery_suggestions: stackDiscovery.suggestions,
+        }
+      : {}),
+  };
 
   const validation = validateContractDocument({
     family: "project-profile",
@@ -436,6 +593,94 @@ function createBootstrapProjectProfile(options) {
   }
 
   return { profile, templatePath, bundledExamplesRoot };
+}
+
+function createProjectAssetTransaction(projectRoot) {
+  return { projectRoot, transactionId: crypto.randomUUID(), createdPaths: [], stagedPaths: [] };
+}
+
+function ensureTrackedDirectory(transaction, directory) {
+  if (fs.existsSync(directory)) {
+    if (!fs.statSync(directory).isDirectory()) throw new Error(`Expected directory '${directory}'.`);
+    return;
+  }
+  const missing = [];
+  let cursor = directory;
+  while (!fs.existsSync(cursor)) {
+    missing.unshift(cursor);
+    cursor = path.dirname(cursor);
+  }
+  fs.mkdirSync(directory, { recursive: true });
+  transaction.createdPaths.push(...missing);
+}
+
+function writeNewFileTransactionally(transaction, targetPath, content) {
+  if (fs.existsSync(targetPath)) return false;
+  ensureTrackedDirectory(transaction, path.dirname(targetPath));
+  const stagedPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.aor-init-${transaction.transactionId}.tmp`,
+  );
+  transaction.stagedPaths.push(stagedPath);
+  fs.writeFileSync(stagedPath, content, { encoding: "utf8", flag: "wx" });
+  fs.renameSync(stagedPath, targetPath);
+  transaction.stagedPaths = transaction.stagedPaths.filter((entry) => entry !== stagedPath);
+  transaction.createdPaths.push(targetPath);
+  return true;
+}
+
+function copyMissingAssetTree(transaction, sourceRoot, targetRoot) {
+  if (!fs.existsSync(sourceRoot)) return false;
+  let materialized = false;
+  const visit = (sourcePath, targetPath) => {
+    const stat = fs.lstatSync(sourcePath);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Bootstrap asset source '${sourcePath}' must not contain symbolic links.`);
+    }
+    if (stat.isDirectory()) {
+      ensureTrackedDirectory(transaction, targetPath);
+      for (const entry of fs.readdirSync(sourcePath)) {
+        visit(path.join(sourcePath, entry), path.join(targetPath, entry));
+      }
+      return;
+    }
+    if (fs.existsSync(targetPath)) return;
+    const stagedPath = path.join(
+      path.dirname(targetPath),
+      `.${path.basename(targetPath)}.aor-init-${transaction.transactionId}.tmp`,
+    );
+    transaction.stagedPaths.push(stagedPath);
+    fs.copyFileSync(sourcePath, stagedPath, fs.constants.COPYFILE_EXCL);
+    fs.renameSync(stagedPath, targetPath);
+    transaction.stagedPaths = transaction.stagedPaths.filter((entry) => entry !== stagedPath);
+    transaction.createdPaths.push(targetPath);
+    materialized = true;
+  };
+  visit(sourceRoot, targetRoot);
+  return materialized;
+}
+
+function rollbackProjectAssetTransaction(transaction) {
+  for (const stagedPath of transaction.stagedPaths) {
+    fs.rmSync(stagedPath, { force: true });
+  }
+  for (const createdPath of [...transaction.createdPaths].reverse()) {
+    try {
+      const stat = fs.lstatSync(createdPath);
+      if (stat.isDirectory()) fs.rmdirSync(createdPath);
+      else fs.rmSync(createdPath, { force: true });
+    } catch (error) {
+      if (error?.code !== "ENOENT" && error?.code !== "ENOTEMPTY") throw error;
+    }
+  }
+}
+
+function injectInitializationFailure(options, point) {
+  if (options.failureInjectionPoint === point) {
+    const error = new Error(`Injected project initialization failure at '${point}'.`);
+    error.code = "AOR_INIT_FAILURE_INJECTION";
+    throw error;
+  }
 }
 
 /**
@@ -477,8 +722,7 @@ function ensureMaterializedProjectProfile(options) {
   });
   const profile = generated.profile;
   const serialized = stringifyYaml(profile);
-  fs.mkdirSync(path.dirname(explicitPath), { recursive: true });
-  fs.writeFileSync(explicitPath, serialized, "utf8");
+  writeNewFileTransactionally(options.transaction, explicitPath, serialized);
 
   return {
     projectProfilePath: explicitPath,
@@ -524,12 +768,7 @@ function materializeBundledAssetTree(options) {
   if (missingPaths.length === 0) {
     return false;
   }
-  fs.cpSync(options.sourceRoot, options.targetRoot, {
-    recursive: true,
-    force: false,
-    errorOnExist: false,
-  });
-  return true;
+  return copyMissingAssetTree(options.transaction, options.sourceRoot, options.targetRoot);
 }
 
 /**
@@ -539,19 +778,16 @@ function materializeBundledAssetTree(options) {
 function ensureBootstrapAssets(options) {
   const bundledExamplesRoot = resolveBundledExamplesRoot();
   const targetExamplesRoot = path.join(options.projectRoot, "examples");
-  const targetContextRoot = path.join(options.projectRoot, "context");
   let materialized = false;
   const materializedPaths = [];
 
-  if (materializeBundledAssetTree({ sourceRoot: bundledExamplesRoot, targetRoot: targetExamplesRoot })) {
+  if (materializeBundledAssetTree({
+    transaction: options.transaction,
+    sourceRoot: bundledExamplesRoot,
+    targetRoot: targetExamplesRoot,
+  })) {
     materialized = true;
     materializedPaths.push(targetExamplesRoot);
-  }
-
-  const bundledContextRoot = path.join(bundledExamplesRoot, "context");
-  if (materializeBundledAssetTree({ sourceRoot: bundledContextRoot, targetRoot: targetContextRoot })) {
-    materialized = true;
-    materializedPaths.push(targetContextRoot);
   }
 
   return {
@@ -632,23 +868,18 @@ export function resolveRuntimeRoot(options) {
  * @param {{ runtimeRoot: string, projectId: string }} options
  * @returns {{ runtimeRoot: string, projectsRoot: string, projectRuntimeRoot: string, artifactsRoot: string, reportsRoot: string, stateRoot: string }}
  */
-export function ensureRuntimeLayout(options) {
+export function resolveRuntimeLayout(options) {
+  const projectIdValidation = validatePublicId(options.projectId);
+  if (!projectIdValidation.ok) {
+    throw new Error(
+      `Invalid project_id ${JSON.stringify(options.projectId)} (${projectIdValidation.value_class}). ${projectIdValidation.migration}`,
+    );
+  }
   const projectsRoot = path.join(options.runtimeRoot, "projects");
   const projectRuntimeRoot = path.join(projectsRoot, options.projectId);
   const artifactsRoot = path.join(projectRuntimeRoot, "artifacts");
   const reportsRoot = path.join(projectRuntimeRoot, "reports");
   const stateRoot = path.join(projectRuntimeRoot, "state");
-
-  for (const dirPath of [
-    options.runtimeRoot,
-    projectsRoot,
-    projectRuntimeRoot,
-    artifactsRoot,
-    reportsRoot,
-    stateRoot,
-  ]) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
 
   return {
     runtimeRoot: options.runtimeRoot,
@@ -658,6 +889,122 @@ export function ensureRuntimeLayout(options) {
     reportsRoot,
     stateRoot,
   };
+}
+
+/**
+ * @param {{ runtimeRoot: string, projectId: string }} options
+ * @returns {{ runtimeRoot: string, projectsRoot: string, projectRuntimeRoot: string, artifactsRoot: string, reportsRoot: string, stateRoot: string }}
+ */
+export function ensureRuntimeLayout(options) {
+  const layout = resolveRuntimeLayout(options);
+  for (const dirPath of [
+    options.runtimeRoot,
+    layout.projectsRoot,
+    layout.projectRuntimeRoot,
+    layout.artifactsRoot,
+    layout.reportsRoot,
+    layout.stateRoot,
+  ]) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+
+  return layout;
+}
+
+function isContainedPath(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`));
+}
+
+/** Canonicalize a runtime boundary before the first write. */
+function canonicalizeRuntimeRoot(runtimeRoot) {
+  const absolute = path.resolve(runtimeRoot);
+  let cursor = absolute;
+  const missing = [];
+  while (!fs.existsSync(cursor)) {
+    missing.unshift(path.basename(cursor));
+    const parent = path.dirname(cursor);
+    if (parent === cursor) throw new Error(`Cannot resolve runtime root '${runtimeRoot}'.`);
+    cursor = parent;
+  }
+  const stat = fs.lstatSync(cursor);
+  if (cursor === absolute && stat.isSymbolicLink()) {
+    throw new Error(`Runtime root '${runtimeRoot}' must not be a symbolic link or junction.`);
+  }
+  const canonicalAncestor = fs.realpathSync.native(cursor);
+  return path.join(canonicalAncestor, ...missing);
+}
+
+function createStagingRuntimeLayout(finalLayout) {
+  fs.mkdirSync(finalLayout.projectsRoot, { recursive: true });
+  const canonicalProjectsRoot = fs.realpathSync.native(finalLayout.projectsRoot);
+  if (!isContainedPath(finalLayout.runtimeRoot, canonicalProjectsRoot)) {
+    throw new Error(`Projects root '${finalLayout.projectsRoot}' escapes runtime boundary '${finalLayout.runtimeRoot}'.`);
+  }
+  const transactionId = crypto.randomUUID();
+  const stagingProjectRuntimeRoot = path.join(
+    canonicalProjectsRoot,
+    `.${path.basename(finalLayout.projectRuntimeRoot)}.init-${transactionId}.tmp`,
+  );
+  const backupProjectRuntimeRoot = path.join(
+    canonicalProjectsRoot,
+    `.${path.basename(finalLayout.projectRuntimeRoot)}.init-${transactionId}.backup`,
+  );
+  fs.mkdirSync(stagingProjectRuntimeRoot, { recursive: false });
+  const ownerMarker = path.join(stagingProjectRuntimeRoot, ".aor-init-owner.json");
+  fs.writeFileSync(ownerMarker, `${JSON.stringify({ transaction_id: transactionId, project_id: path.basename(finalLayout.projectRuntimeRoot) })}\n`, "utf8");
+  if (fs.existsSync(finalLayout.projectRuntimeRoot)) {
+    for (const entry of fs.readdirSync(finalLayout.projectRuntimeRoot)) {
+      fs.cpSync(
+        path.join(finalLayout.projectRuntimeRoot, entry),
+        path.join(stagingProjectRuntimeRoot, entry),
+        { recursive: true, force: false, errorOnExist: false, preserveTimestamps: true },
+      );
+    }
+  }
+  const stagingLayout = {
+    ...finalLayout,
+    projectRuntimeRoot: stagingProjectRuntimeRoot,
+    artifactsRoot: path.join(stagingProjectRuntimeRoot, "artifacts"),
+    reportsRoot: path.join(stagingProjectRuntimeRoot, "reports"),
+    stateRoot: path.join(stagingProjectRuntimeRoot, "state"),
+  };
+  for (const directory of [stagingLayout.artifactsRoot, stagingLayout.reportsRoot, stagingLayout.stateRoot]) {
+    fs.mkdirSync(directory, { recursive: true });
+  }
+  return { transactionId, stagingLayout, ownerMarker, backupProjectRuntimeRoot };
+}
+
+function cleanupOwnedStagingTree(transaction) {
+  if (!fs.existsSync(transaction.ownerMarker)) return;
+  const marker = JSON.parse(fs.readFileSync(transaction.ownerMarker, "utf8"));
+  if (marker.transaction_id !== transaction.transactionId) return;
+  fs.rmSync(transaction.stagingLayout.projectRuntimeRoot, { recursive: true, force: true });
+}
+
+function publishStagedRuntime(finalLayout, transaction, options = {}) {
+  const hadExistingRuntime = fs.existsSync(finalLayout.projectRuntimeRoot);
+  try {
+    if (hadExistingRuntime) {
+      fs.renameSync(finalLayout.projectRuntimeRoot, transaction.backupProjectRuntimeRoot);
+      injectInitializationFailure(options, "after-backup-rename");
+    }
+    fs.renameSync(transaction.stagingLayout.projectRuntimeRoot, finalLayout.projectRuntimeRoot);
+  } catch (error) {
+    if (!fs.existsSync(finalLayout.projectRuntimeRoot) && fs.existsSync(transaction.backupProjectRuntimeRoot)) {
+      fs.renameSync(transaction.backupProjectRuntimeRoot, finalLayout.projectRuntimeRoot);
+    }
+    if (error?.code === "EXDEV") {
+      throw new Error("Runtime publication crossed a filesystem boundary; atomic initialization was refused.", {
+        cause: error,
+      });
+    }
+    throw error;
+  }
+  fs.rmSync(path.join(finalLayout.projectRuntimeRoot, path.basename(transaction.ownerMarker)), { force: true });
+  if (hadExistingRuntime) {
+    fs.rmSync(transaction.backupProjectRuntimeRoot, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -861,6 +1208,8 @@ export function initializeProjectRuntime(options = {}) {
     options.materializeProjectProfile === true || requestedAssetMode === "materialized";
   const materializeBootstrapAssets =
     options.materializeBootstrapAssets === true || requestedAssetMode === "materialized";
+  const projectAssetTransaction = createProjectAssetTransaction(projectRoot);
+  try {
 
   let projectProfilePath;
   let projectProfileSource = "default-discovered";
@@ -869,6 +1218,7 @@ export function initializeProjectRuntime(options = {}) {
   let profileMaterialization = { materialized: false, idempotent: false, templatePath: null };
   if (materializeProjectProfile) {
     const materialized = ensureMaterializedProjectProfile({
+      transaction: projectAssetTransaction,
       cwd,
       projectRoot,
       projectProfile: options.projectProfile,
@@ -887,6 +1237,7 @@ export function initializeProjectRuntime(options = {}) {
       idempotent: materialized.idempotent,
       templatePath: materialized.templatePath,
     };
+    injectInitializationFailure(options, "after-profile-materialization");
   } else {
     projectProfilePath = resolveOptionalProjectProfilePath({
       cwd,
@@ -917,13 +1268,14 @@ export function initializeProjectRuntime(options = {}) {
   }
 
   const bootstrapAssetsMaterialization = materializeBootstrapAssets
-    ? ensureBootstrapAssets({ projectRoot })
+    ? ensureBootstrapAssets({ projectRoot, transaction: projectAssetTransaction })
     : {
         materializedRoot: null,
         materialized: false,
         idempotent: false,
         materializedPaths: [],
       };
+  injectInitializationFailure(options, "after-asset-materialization");
 
   let loadedProfile = generatedBundledProfile
     ? resolveProjectProfileRuntimeMetadata({
@@ -931,20 +1283,33 @@ export function initializeProjectRuntime(options = {}) {
         profileDocument: generatedBundledProfile.profile,
       })
     : loadProjectProfileForRuntime({ projectProfilePath });
-  const runtimeRoot = resolveRuntimeRoot({
-    projectRoot,
-    runtimeRootOverride: options.runtimeRoot,
-    runtimeRootFromProfile: loadedProfile.runtimeRootFromProfile,
-  });
+  const runtimeRoot = canonicalizeRuntimeRoot(
+    resolveRuntimeRoot({
+      projectRoot,
+      runtimeRootOverride: options.runtimeRoot,
+      runtimeRootFromProfile: loadedProfile.runtimeRootFromProfile,
+    }),
+  );
 
-  const runtimeLayout = ensureRuntimeLayout({
+  const runtimeLayout = resolveRuntimeLayout({
     runtimeRoot,
     projectId: loadedProfile.projectId,
   });
+  if (fs.existsSync(runtimeLayout.projectRuntimeRoot) && fs.lstatSync(runtimeLayout.projectRuntimeRoot).isSymbolicLink()) {
+    throw new Error(`Project runtime root '${runtimeLayout.projectRuntimeRoot}' must not be a symbolic link or junction.`);
+  }
+  const runtimeTransaction = createStagingRuntimeLayout(runtimeLayout);
+  const stagingRuntimeLayout = runtimeTransaction.stagingLayout;
+  try {
+  injectInitializationFailure(options, "after-runtime-staging");
 
   if (generatedBundledProfile) {
     projectProfilePath = path.join(runtimeLayout.stateRoot, "project.aor.yaml");
-    fs.writeFileSync(projectProfilePath, stringifyYaml(generatedBundledProfile.profile), "utf8");
+    fs.writeFileSync(
+      path.join(stagingRuntimeLayout.stateRoot, "project.aor.yaml"),
+      stringifyYaml(generatedBundledProfile.profile),
+      "utf8",
+    );
     loadedProfile = {
       ...loadedProfile,
       projectProfilePath,
@@ -994,15 +1359,22 @@ export function initializeProjectRuntime(options = {}) {
   };
 
   const stateFile = path.join(runtimeLayout.stateRoot, "project-init-state.json");
-  fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    path.join(stagingRuntimeLayout.stateRoot, "project-init-state.json"),
+    `${JSON.stringify(state, null, 2)}\n`,
+    "utf8",
+  );
+  injectInitializationFailure(options, "after-state-write");
 
   const artifactPacket = materializeBootstrapArtifactPacket({
     projectId: loadedProfile.projectId,
     projectRoot,
     projectProfileRef: state.selected_profile_ref,
     runtimeLayout,
+    outputRuntimeLayout: stagingRuntimeLayout,
     command: options.command ?? "aor project init",
   });
+  injectInitializationFailure(options, "after-artifact-write");
 
   const targetRepoWrites = [];
   if (profileMaterialization.materialized) {
@@ -1048,7 +1420,13 @@ export function initializeProjectRuntime(options = {}) {
     const issueSummary = onboardingValidation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Generated onboarding report failed contract validation: ${issueSummary}`);
   }
-  fs.writeFileSync(onboardingReportPath, `${JSON.stringify(onboardingReport, null, 2)}\n`, "utf8");
+  fs.writeFileSync(
+    path.join(stagingRuntimeLayout.reportsRoot, "onboarding-report.json"),
+    `${JSON.stringify(onboardingReport, null, 2)}\n`,
+    "utf8",
+  );
+  injectInitializationFailure(options, "before-runtime-publish");
+  publishStagedRuntime(runtimeLayout, runtimeTransaction, options);
 
   return {
     projectRoot,
@@ -1082,5 +1460,102 @@ export function initializeProjectRuntime(options = {}) {
       materializeProjectProfile || materializeBootstrapAssets
         ? profileMaterialization.idempotent && bootstrapAssetsMaterialization.idempotent
         : null,
+  };
+  } catch (error) {
+    cleanupOwnedStagingTree(runtimeTransaction);
+    throw error;
+  }
+  } catch (error) {
+    rollbackProjectAssetTransaction(projectAssetTransaction);
+    throw error;
+  }
+}
+
+/**
+ * Resolve the local app project identity and runtime paths without creating
+ * runtime directories or materializing generated profiles.
+ *
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   bootstrapTemplate?: string,
+ *   repoBuildCommands?: string[],
+ *   repoLintCommands?: string[],
+ *   repoTestCommands?: string[],
+ * }} options
+ * @returns {{
+ *   projectId: string,
+ *   displayName: string,
+ *   projectRoot: string,
+ *   projectProfileRef: string,
+ *   projectProfileSource: string,
+ *   runtimeRoot: string,
+ *   runtimeLayout: ReturnType<typeof resolveRuntimeLayout>,
+ *   stateFile: string,
+ *   onboardingReportFile: string,
+ *   stateExists: boolean,
+ *   onboardingReportExists: boolean,
+ * }}
+ */
+export function previewProjectRuntime(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const projectRoot = discoverProjectRoot({ cwd, projectRef: options.projectRef });
+  const projectProfilePath = resolveOptionalProjectProfilePath({
+    cwd,
+    projectRoot,
+    projectProfile: options.projectProfile,
+  });
+  const generatedBundledProfile = projectProfilePath
+    ? null
+    : createBootstrapProjectProfile({
+        cwd,
+        projectRoot,
+        bootstrapTemplate:
+          typeof options.bootstrapTemplate === "string" && options.bootstrapTemplate.trim().length > 0
+            ? options.bootstrapTemplate.trim()
+            : undefined,
+        assetMode: "bundled",
+        repoBuildCommands: Array.isArray(options.repoBuildCommands) ? options.repoBuildCommands : [],
+        repoLintCommands: Array.isArray(options.repoLintCommands) ? options.repoLintCommands : [],
+        repoTestCommands: Array.isArray(options.repoTestCommands) ? options.repoTestCommands : [],
+      });
+  const loadedProfile = generatedBundledProfile
+    ? resolveProjectProfileRuntimeMetadata({
+        projectProfilePath: "<generated-bundled-profile>",
+        profileDocument: generatedBundledProfile.profile,
+      })
+    : loadProjectProfileForRuntime({ projectProfilePath });
+  const runtimeRoot = resolveRuntimeRoot({
+    projectRoot,
+    runtimeRootOverride: options.runtimeRoot,
+    runtimeRootFromProfile: loadedProfile.runtimeRootFromProfile,
+  });
+  const runtimeLayout = resolveRuntimeLayout({
+    runtimeRoot,
+    projectId: loadedProfile.projectId,
+  });
+  const stateFile = path.join(runtimeLayout.stateRoot, "project-init-state.json");
+  const onboardingReportFile = path.join(runtimeLayout.reportsRoot, "onboarding-report.json");
+
+  return {
+    projectId: loadedProfile.projectId,
+    displayName: loadedProfile.displayName,
+    projectRoot,
+    projectProfileRef: generatedBundledProfile
+      ? "<generated-bundled-profile>"
+      : toProjectRelativePath(projectRoot, loadedProfile.projectProfilePath),
+    projectProfileSource: generatedBundledProfile
+      ? "generated-bundled-preview"
+      : typeof options.projectProfile === "string" && options.projectProfile.trim().length > 0
+        ? "explicit"
+        : "default-discovered",
+    runtimeRoot,
+    runtimeLayout,
+    stateFile,
+    onboardingReportFile,
+    stateExists: fs.existsSync(stateFile),
+    onboardingReportExists: fs.existsSync(onboardingReportFile),
   };
 }

@@ -1,8 +1,10 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
+import { loadContractFile } from "./contracts/index.mjs";
 
 import {
   UsageError,
@@ -18,7 +20,7 @@ import { getProfileStages } from "./stages.mjs";
 export const DEFAULT_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
-  "docs/ops/live-e2e-standard-runner.md",
+  "scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md",
 ]);
 
 
@@ -92,6 +94,22 @@ export function ensureRuntimeLayout(options) {
 }
 
 /**
+ * Keep TMPDIR short for target verification commands. Several real target
+ * suites create Unix sockets under TMPDIR, and macOS/Linux socket paths have a
+ * small fixed limit that long live E2E run ids can exceed.
+ *
+ * @param {string} runId
+ * @returns {string}
+ */
+function createShortTmpRoot(runId) {
+  const shortTmpBase = process.platform !== "win32" && fs.existsSync("/tmp") ? "/tmp" : os.tmpdir();
+  const digest = crypto.createHash("sha256").update(runId).digest("hex").slice(0, 10);
+  const tmpRoot = path.join(shortTmpBase, "aorlt", `${digest}-${process.pid}`);
+  fs.mkdirSync(tmpRoot, { recursive: true });
+  return tmpRoot;
+}
+
+/**
  * @param {{
  *   sessionsRoot: string,
  *   runId: string,
@@ -101,8 +119,8 @@ export function createSessionRoots(options) {
   const sessionRoot = path.join(options.sessionsRoot, normalizeId(options.runId));
   const aorHome = path.join(sessionRoot, "aor-home");
   const codexHome = path.join(sessionRoot, "codex-home");
-  const tmpRoot = path.join(sessionRoot, "tmp");
-  for (const dirPath of [sessionRoot, aorHome, codexHome, tmpRoot]) {
+  const tmpRoot = createShortTmpRoot(options.runId);
+  for (const dirPath of [sessionRoot, aorHome, codexHome]) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
   return {
@@ -125,6 +143,8 @@ export function createProofRunnerEnvironment(options) {
     ...process.env,
     AOR_HOME: options.sessionRoots.aorHome,
     TMPDIR: options.sessionRoots.tmpRoot,
+    npm_config_cpu: process.arch,
+    npm_config_os: process.platform,
   };
   if (options.runnerAuthMode === "isolated") {
     env.CODEX_HOME = options.sessionRoots.codexHome;
@@ -175,14 +195,17 @@ function assertLiveE2ePolicy(profile, source) {
   const agentDecisionPolicy = asNonEmptyString(policy.agent_decision_policy);
   const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
   const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
-  const internalTestHooks = asRecord(profile.internal_test_hooks);
+  const auditHoldPolicy = asNonEmptyString(policy.audit_hold_policy) || "enforce";
   const implementationLoop = asRecord(profile.implementation_loop);
+  const guidedJourney = asRecord(profile.guided_journey);
+  const proofRequirements = asStringArray(guidedJourney.proof_requirements);
+  const browserTaskProof = asRecord(guidedJourney.browser_task_proof);
+  const flowLoopProof = asRecord(guidedJourney.flow_loop_proof);
   const acceptanceLike =
-    internalTestHooks.allow_deterministic_operator_for_test !== true &&
-    (["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
+    ["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
       asRecord(profile.production_proof).enabled === true ||
       asNonEmptyString(profile.journey_mode) === "full-journey" ||
-      Boolean(asNonEmptyString(profile.target_catalog_id)));
+      Boolean(asNonEmptyString(profile.target_catalog_id));
   const problems = [];
 
   if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
@@ -194,39 +217,74 @@ function assertLiveE2ePolicy(profile, source) {
   if (!["public-control-plane"].includes(interactionCapability)) {
     problems.push("live_e2e.interaction_capability must be public-control-plane");
   }
-  if (!["none", "guided-web-smoke"].includes(frontendCapability)) {
-    problems.push("live_e2e.frontend_capability must be none or guided-web-smoke");
+  if (!["none", "guided-web-smoke", "browser-task-proof"].includes(frontendCapability)) {
+    problems.push("live_e2e.frontend_capability must be none, guided-web-smoke, or browser-task-proof");
   }
   if (!["no-upstream-write"].includes(safetyPolicy)) {
     problems.push("live_e2e.safety_policy must be no-upstream-write");
   }
-  if (!["skill-agent", "deterministic-fixture"].includes(operatorMode)) {
-    problems.push("live_e2e.operator_mode must be skill-agent or deterministic-fixture");
+  if (operatorMode !== "skill-agent") {
+    problems.push("live_e2e.operator_mode must be skill-agent");
   }
-  if (!["required", "optional"].includes(agentDecisionPolicy)) {
-    problems.push("live_e2e.agent_decision_policy must be required or optional");
+  if (agentDecisionPolicy !== "required") {
+    problems.push("live_e2e.agent_decision_policy must be required");
   }
-  if (!["agent-required", "deterministic-fixture"].includes(interactionAnswerPolicy)) {
-    problems.push("live_e2e.interaction_answer_policy must be agent-required or deterministic-fixture");
+  if (interactionAnswerPolicy !== "agent-required") {
+    problems.push("live_e2e.interaction_answer_policy must be agent-required");
   }
   if (targetWritePolicy !== "aor-runtime-only-before-execution") {
     problems.push("live_e2e.target_write_policy must be aor-runtime-only-before-execution");
   }
+  if (!["enforce", "maintainer-qualification-override"].includes(auditHoldPolicy)) {
+    problems.push("live_e2e.audit_hold_policy must be enforce or maintainer-qualification-override");
+  }
+  if (
+    auditHoldPolicy === "maintainer-qualification-override" &&
+    (safetyPolicy !== "no-upstream-write" || asRecord(profile.output_policy).write_back_to_remote !== false)
+  ) {
+    problems.push(
+      "live_e2e.audit_hold_policy=maintainer-qualification-override requires no-upstream-write and output_policy.write_back_to_remote=false",
+    );
+  }
   if (acceptanceLike) {
-    if (operatorMode !== "skill-agent") {
-      problems.push("acceptance/production-proof profiles must use live_e2e.operator_mode=skill-agent");
-    }
-    if (agentDecisionPolicy !== "required") {
-      problems.push("acceptance/production-proof profiles must use live_e2e.agent_decision_policy=required");
-    }
-    if (interactionAnswerPolicy !== "agent-required") {
-      problems.push("acceptance/production-proof profiles must use live_e2e.interaction_answer_policy=agent-required");
-    }
     if (implementationLoop.enabled !== true) {
       problems.push("acceptance/production-proof profiles must enable implementation_loop.enabled=true");
     }
     if (!Number.isInteger(implementationLoop.max_iterations) || Number(implementationLoop.max_iterations) < 1) {
       problems.push("acceptance/production-proof profiles must declare implementation_loop.max_iterations >= 1");
+    }
+  }
+  if (frontendCapability === "browser-task-proof") {
+    if (guidedJourney.enabled !== true) {
+      problems.push("browser-task-proof profiles must declare guided_journey.enabled=true");
+    }
+    if (browserTaskProof.required !== true) {
+      problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.required=true");
+    }
+    if (browserTaskProof.schema_version !== 2) {
+      problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.schema_version=2");
+    }
+    if (asNonEmptyString(browserTaskProof.scenario_id) !== "installed-console-matrix") {
+      problems.push("browser-task-proof profiles must select the installed-console-matrix scenario");
+    }
+    const requiredBrowserMatrix = [
+      ["required_viewports", ["desktop", "tablet", "mobile", "zoom-200"]],
+      ["required_accessibility", ["keyboard-only", "dialog-focus", "focus-restoration", "semantic-tree", "contrast-aa", "touch-targets", "reduced-motion"]],
+      ["required_recovery", ["reload", "reconnect", "partial-read", "offline-read", "injected-error", "multi-item-attention", "project-switch", "terminal-read-only"]],
+    ];
+    for (const [field, expected] of requiredBrowserMatrix) {
+      const declared = new Set(asStringArray(browserTaskProof[field]));
+      for (const value of expected) {
+        if (!declared.has(value)) problems.push(`browser-task-proof profiles must include ${field} '${value}'`);
+      }
+    }
+    if (flowLoopProof.enabled !== true) {
+      problems.push("browser-task-proof profiles must declare guided_journey.flow_loop_proof.enabled=true");
+    }
+    for (const required of ["browser-task-proof", "flow-loop-proof", "quality-assessment-report"]) {
+      if (!proofRequirements.includes(required)) {
+        problems.push(`browser-task-proof profiles must include guided_journey.proof_requirements '${required}'`);
+      }
     }
   }
 
@@ -322,11 +380,167 @@ export function loadCatalogProviderVariant(options) {
 }
 
 /**
- * @param {string} value
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function normalizeFeatureSize(value) {
+  return asNonEmptyString(value).toLowerCase();
+}
+
+/**
+ * @param {unknown} value
  * @returns {boolean}
  */
 function isFeatureSize(value) {
-  return value === "small" || value === "medium" || value === "large" || value === "xl";
+  return ["small", "medium", "large", "xlarge"].includes(normalizeFeatureSize(value));
+}
+
+const FEATURE_SIZE_BUDGETS = Object.freeze({
+  small: { max_changed_files: 16, max_added_lines: 900 },
+  medium: { max_changed_files: 32, max_added_lines: 2200 },
+  large: { max_changed_files: 64, max_added_lines: 4500 },
+  xlarge: { max_changed_files: 100, max_added_lines: 10000 },
+});
+const PRODUCT_QUALITY_CYCLE_STEPS = Object.freeze(["execution", "review", "qa"]);
+const PRODUCT_REPAIR_SOURCES = Object.freeze(["review", "qa", "post-run-primary", "post-run-diagnostic"]);
+const PRODUCT_REPAIR_PROOF_PATHS = Object.freeze(["review-origin", "qa-origin", "budget-exhaustion"]);
+const PRODUCT_REPAIR_PROOF_FLAGS = Object.freeze([
+  "require_quality_repair_request_refs",
+  "require_implementation_repair_refs",
+  "require_review_rerun_refs",
+  "require_qa_rerun_refs",
+  "qa_origin_requires_post_repair_review",
+  "budget_exhaustion_operator_hold_required",
+  "no_upstream_write_evidence_required",
+]);
+
+/**
+ * @param {Record<string, unknown>} mission
+ * @param {string} field
+ * @returns {boolean}
+ */
+function hasMissionObject(mission, field) {
+  return Object.keys(asRecord(mission[field])).length > 0;
+}
+
+/**
+ * @param {Record<string, unknown>} mission
+ * @param {string} field
+ * @param {string} featureSize
+ * @returns {string[]}
+ */
+function validateMissionBudgetField(mission, field, featureSize) {
+  const issues = [];
+  const budget = asRecord(mission[field]);
+  const expected = FEATURE_SIZE_BUDGETS[featureSize];
+  if (Object.keys(budget).length === 0) {
+    return [`${field} must declare max_changed_files and max_added_lines`];
+  }
+  for (const key of ["max_changed_files", "max_added_lines"]) {
+    const value = budget[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      issues.push(`${field}.${key} must be a finite number`);
+      continue;
+    }
+    if (expected && value < expected[key]) {
+      issues.push(`${field}.${key} must be at least ${expected[key]} for feature_size=${featureSize}`);
+    }
+  }
+  return issues;
+}
+
+/**
+ * @param {{
+ *   targetCatalogId: string,
+ *   featureMissionId: string,
+ *   mission: Record<string, unknown>,
+ *   featureSize: string,
+ * }} options
+ */
+function assertFeatureMissionPolicy(options) {
+  const missionClass = asNonEmptyString(options.mission.mission_class);
+  const problems = [];
+  if (!["flow-regression", "product-change"].includes(missionClass)) {
+    problems.push("mission_class must be flow-regression or product-change");
+  }
+  if (options.featureSize === "small" && missionClass !== "flow-regression") {
+    problems.push("feature_size=small is reserved for mission_class=flow-regression");
+  }
+  if (["medium", "large", "xlarge"].includes(options.featureSize) && missionClass !== "product-change") {
+    problems.push(`feature_size=${options.featureSize} requires mission_class=product-change`);
+  }
+  for (const field of ["agent_visible_request", "evaluator_rubric", "final_code_rubric"]) {
+    if (!hasMissionObject(options.mission, field)) {
+      problems.push(`${field} must be present`);
+    }
+  }
+  problems.push(...validateMissionBudgetField(options.mission, "size_budget", options.featureSize));
+  problems.push(...validateMissionBudgetField(options.mission, "change_budget", options.featureSize));
+
+  if (missionClass === "product-change") {
+    const evaluatorRubric = asRecord(options.mission.evaluator_rubric);
+    if (evaluatorRubric.step_quality_required !== true) {
+      problems.push("product-change missions require evaluator_rubric.step_quality_required=true");
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new UsageError(
+      `Feature mission '${options.featureMissionId}' in catalog '${options.targetCatalogId}' violates live E2E mission policy: ${problems.join("; ")}.`,
+    );
+  }
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, mission: Record<string, unknown>, featureSize: string }} options
+ */
+function assertQualityCycleLoopPolicy(options) {
+  if (
+    asNonEmptyString(options.mission.mission_class) !== "product-change" ||
+    !["medium", "large", "xlarge"].includes(options.featureSize)
+  ) {
+    return;
+  }
+
+  const profileId = asNonEmptyString(options.profile.profile_id) || "full-journey-profile";
+  const implementationLoop = asRecord(options.profile.implementation_loop);
+  const cycleSteps = asStringArray(implementationLoop.cycle_steps);
+  const repairSources = asStringArray(implementationLoop.repair_sources);
+  const missingCycleSteps = PRODUCT_QUALITY_CYCLE_STEPS.filter((step) => !cycleSteps.includes(step));
+  const missingRepairSources = PRODUCT_REPAIR_SOURCES.filter((source) => !repairSources.includes(source));
+  const problems = [];
+  if (missingCycleSteps.length > 0) {
+    problems.push(`implementation_loop.cycle_steps must include ${missingCycleSteps.join(", ")}`);
+  }
+  if (missingRepairSources.length > 0) {
+    problems.push(`implementation_loop.repair_sources must include ${missingRepairSources.join(", ")}`);
+  }
+  if (asNonEmptyString(options.profile.scenario_family) === "repair") {
+    const proofExpectations = asRecord(implementationLoop.proof_expectations);
+    const declaredProofPaths = asStringArray(proofExpectations.required_repair_paths);
+    const missingProofPaths = PRODUCT_REPAIR_PROOF_PATHS.filter((proofPath) => !declaredProofPaths.includes(proofPath));
+    if (missingProofPaths.length > 0) {
+      problems.push(
+        `implementation_loop.proof_expectations.required_repair_paths must include ${missingProofPaths.join(", ")}`,
+      );
+    }
+    for (const flag of PRODUCT_REPAIR_PROOF_FLAGS) {
+      if (proofExpectations[flag] !== true) {
+        problems.push(`implementation_loop.proof_expectations.${flag}=true`);
+      }
+    }
+  }
+  if (problems.length > 0) {
+    throw new UsageError(`Product-change profile '${profileId}' is missing quality-cycle policy: ${problems.join("; ")}.`);
+  }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isManualOnlyFeatureSize(value) {
+  return normalizeFeatureSize(value) === "xlarge";
 }
 
 /**
@@ -361,6 +575,33 @@ export function resolveProductionProofPolicy(profile) {
  */
 function hasStrings(value) {
   return asStringArray(value).length > 0;
+}
+
+/**
+ * @param {{
+ *   catalogVerification: Record<string, unknown>,
+ *   profileVerification: Record<string, unknown>,
+ *   mission: Record<string, unknown>,
+ * }} options
+ */
+function resolveProfileVerification(options) {
+  const catalogSetupCommands = asStringArray(options.catalogVerification.setup_commands);
+  const profileSetupCommands = asStringArray(options.profileVerification.setup_commands);
+  const catalogVerificationCommands = asStringArray(options.catalogVerification.commands);
+  const profileVerificationCommands = asStringArray(options.profileVerification.commands);
+  const missionPrimaryCommands = asStringArray(asRecord(options.mission.post_run_quality).primary_commands);
+
+  return {
+    ...options.catalogVerification,
+    ...options.profileVerification,
+    setup_commands: profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+    commands:
+      profileVerificationCommands.length > 0
+        ? profileVerificationCommands
+        : missionPrimaryCommands.length > 0
+          ? missionPrimaryCommands
+          : catalogVerificationCommands,
+  };
 }
 
 /**
@@ -437,10 +678,17 @@ function assertProductionProofReadiness(resolvedProfile, proofPolicy) {
  * @param {string} providerVariantId
  */
 function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, providerVariantId) {
-  const trackedCells = Array.isArray(catalogEntry.required_matrix_cells)
+  const requiredMatrixCells = Array.isArray(catalogEntry.required_matrix_cells)
     ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.required_matrix_cells)
     : [];
-  const requiredCells = trackedCells.filter((cell) => (asNonEmptyString(cell.coverage_tier) || "required") === "required");
+  const manualMatrixCells = Array.isArray(catalogEntry.manual_matrix_cells)
+    ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.manual_matrix_cells).map((cell) => ({
+        ...cell,
+        coverage_tier: asNonEmptyString(cell.coverage_tier) || "manual",
+      }))
+    : [];
+  const trackedCells = [...requiredMatrixCells, ...manualMatrixCells];
+  const requiredCells = requiredMatrixCells.filter((cell) => (asNonEmptyString(cell.coverage_tier) || "required") === "required");
   const matchingCell =
     trackedCells.find(
       (cell) =>
@@ -448,6 +696,11 @@ function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, provi
         asNonEmptyString(cell.scenario_family) === scenarioFamily &&
         asNonEmptyString(cell.provider_variant_id) === providerVariantId,
     ) ?? null;
+  if (!matchingCell) {
+    throw new UsageError(
+      `Full-journey profile for mission '${featureMissionId}', scenario '${scenarioFamily}', provider '${providerVariantId}' must match an explicit required_matrix_cells or manual_matrix_cells entry. Generated catalog cells are no longer supported.`,
+    );
+  }
   const remainingRequiredCells = requiredCells.filter((cell) => cell !== matchingCell);
   const matchingCellCoverageTier = matchingCell ? asNonEmptyString(matchingCell.coverage_tier) || "required" : "extended";
   return {
@@ -507,6 +760,9 @@ export function resolveFullJourneyProfile(options) {
   if (asNonEmptyString(rawTargetRepo.repo_url)) {
     throw new UsageError("Full-journey profiles must resolve target repos from target_catalog_id, not raw target_repo.repo_url.");
   }
+  if (asNonEmptyString(options.profile.objective)) {
+    throw new UsageError("Full-journey profiles must resolve agent-visible work from feature_mission_id, not raw objective text.");
+  }
 
   const targetCatalogId = asNonEmptyString(options.profile.target_catalog_id);
   const featureMissionId = asNonEmptyString(options.profile.feature_mission_id);
@@ -545,12 +801,23 @@ export function resolveFullJourneyProfile(options) {
   if (!mission) {
     throw new UsageError(`Feature mission '${featureMissionId}' was not found in catalog '${targetCatalogId}'.`);
   }
-  const featureSize = asNonEmptyString(asRecord(mission).feature_size);
+  const featureSize = normalizeFeatureSize(asRecord(mission).feature_size);
   if (!isFeatureSize(featureSize)) {
     throw new UsageError(
-      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, large, or xl.`,
+      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, large, or xlarge. Legacy 'xl' is not supported.`,
     );
   }
+  assertFeatureMissionPolicy({
+    targetCatalogId,
+    featureMissionId,
+    mission: asRecord(mission),
+    featureSize,
+  });
+  assertQualityCycleLoopPolicy({
+    profile: options.profile,
+    mission: asRecord(mission),
+    featureSize,
+  });
   const supportedScenarios = asStringArray(asRecord(mission).supported_scenarios);
   if (supportedScenarios.length > 0 && !supportedScenarios.includes(scenarioFamily)) {
     throw new UsageError(
@@ -582,10 +849,11 @@ export function resolveFullJourneyProfile(options) {
 
   const resolvedProfile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(options.profile)));
   resolvedProfile.target_repo = asRecord(JSON.parse(JSON.stringify(asRecord(catalogEntry.repo))));
-  resolvedProfile.verification = {
-    ...asRecord(catalogEntry.verification),
-    ...asRecord(options.profile.verification),
-  };
+  resolvedProfile.verification = resolveProfileVerification({
+    catalogVerification: asRecord(catalogEntry.verification),
+    profileVerification: asRecord(options.profile.verification),
+    mission: asRecord(mission),
+  });
   resolvedProfile.output_policy = {
     ...asRecord(catalogEntry.safety_defaults),
     ...asRecord(options.profile.output_policy),

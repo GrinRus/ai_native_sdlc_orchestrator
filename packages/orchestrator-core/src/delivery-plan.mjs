@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+
+import { captureDeliveryDiff } from "./delivery-integrity.mjs";
+import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
 
 export const CANONICAL_DELIVERY_MODES = Object.freeze([
   "no-write",
@@ -29,6 +33,31 @@ function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function verifyIntegrationMaterialization(integrationReport, options) {
+  const reportFileValue = asString(integrationReport.filePath);
+  const parentRunId = asString(integrationReport.parentRunId);
+  if (!reportFileValue || !parentRunId) return false;
+  const reportFile = path.resolve(reportFileValue);
+  const canonical = path.join(options.runtimeLayout.reportsRoot, `integration-report-${parentRunId}.json`);
+  const authorityFile = `${reportFile}.authority.json`;
+  if (reportFile !== path.resolve(canonical) || !fs.existsSync(reportFile) || !fs.existsSync(authorityFile)) return false;
+  try {
+    const reportBytes = fs.readFileSync(reportFile);
+    const report = JSON.parse(reportBytes);
+    const authority = JSON.parse(fs.readFileSync(authorityFile, "utf8"));
+    return authority.authority_kind === "aor-integration-materialization"
+      && authority.project_id === options.projectId
+      && authority.parent_run_id === parentRunId
+      && authority.report_file === reportFile
+      && authority.report_digest === createHash("sha256").update(reportBytes).digest("hex")
+      && report.project_id === options.projectId
+      && report.parent_run_id === parentRunId
+      && report.status === "passed";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {unknown} value
  * @returns {number | null}
@@ -53,6 +82,30 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+function lockEvidenceRefs(refs, executionRoot, runtimeLayout) {
+  if (!executionRoot) return [];
+  return uniqueStrings(refs).map((ref) => {
+    const candidate = ref.startsWith("evidence://") ? ref.slice("evidence://".length) : ref;
+    const candidates = [path.isAbsolute(candidate) ? candidate : path.resolve(executionRoot, candidate)];
+    if (candidate.startsWith("handoff/") && runtimeLayout?.artifactsRoot) {
+      candidates.push(path.join(runtimeLayout.artifactsRoot, `handoff-${path.basename(candidate)}.json`));
+    }
+    if (candidate.startsWith("promotion/") && runtimeLayout?.reportsRoot) {
+      candidates.push(path.join(runtimeLayout.reportsRoot, `promotion-${path.basename(candidate)}.json`));
+    }
+    const filePath = candidates.find((entry) => fs.existsSync(entry) && fs.lstatSync(entry).isFile());
+    if (!filePath) {
+      return { ref, status: "missing", sha256: null };
+    }
+    return {
+      ref,
+      resolved_path: filePath,
+      status: "locked",
+      sha256: createHash("sha256").update(fs.readFileSync(filePath)).digest("hex"),
+    };
+  });
 }
 
 /**
@@ -131,7 +184,11 @@ function resolveGovernanceSource(policyResolution) {
 
 /**
  * @param {{
- *   runtimeLayout: { artifactsRoot: string },
+ *   runtimeLayout: { artifactsRoot: string, reportsRoot?: string },
+ *   executionRoot?: string,
+ *   authorizedDiff?: { baseline: { head_sha: string }, changes: Record<string, unknown> },
+ *   evidenceLocks?: Array<{ ref: string, status: string, sha256: string | null }>,
+ *   deliveryAuthorizationPhase?: boolean,
  *   projectId: string,
  *   runId: string,
  *   stepClass: string,
@@ -142,6 +199,7 @@ function resolveGovernanceSource(policyResolution) {
  *   coordinationEvidenceRefs?: string[],
  *   coordinationLockEvidenceRefs?: string[],
  *   crossRepoValidationRefs?: string[],
+ *   integrationReport?: { required?: boolean, status?: string, ref?: string | null, parentRunId?: string | null, executionPlanRef?: string | null, workspaceSetRef?: string | null },
  *   runtimeHarnessGate?: {
  *     required?: boolean,
  *     enforced?: boolean,
@@ -163,11 +221,13 @@ function resolveGovernanceSource(policyResolution) {
  *   deliveryPlanFile: string,
  * }}
  */
-export function materializeDeliveryPlan(options) {
+function executeDeliveryPlanTransaction(options) {
   const modeSource = resolveModeSource(asRecord(options.policyResolution));
   const governance = resolveGovernanceSource(asRecord(options.policyResolution));
   const canonicalMode = normalizeDeliveryMode(modeSource.resolvedMode);
   const nonReadOnlyMode = canonicalMode !== "no-write";
+  const deliveryAuthorizationPhase = options.deliveryAuthorizationPhase !== false;
+  const writebackAuthorizationRequired = nonReadOnlyMode && deliveryAuthorizationPhase && governance.decision === "allow";
 
   const handoffStatusRaw = asString(asRecord(options.handoffApproval ?? {}).status);
   const handoffRef = asString(asRecord(options.handoffApproval ?? {}).ref);
@@ -224,6 +284,15 @@ export function materializeDeliveryPlan(options) {
       ? "present"
       : "missing"
     : "not-required";
+  const integrationReport = asRecord(options.integrationReport ?? {});
+  const integrationRequired = nonReadOnlyMode && (multiRepoRequired || integrationReport.required === true);
+  const integrationRef = asString(integrationReport.ref);
+  const integrationAuthoritative = integrationRequired
+    ? verifyIntegrationMaterialization(integrationReport, options)
+    : true;
+  const integrationStatus = integrationRequired
+    ? integrationAuthoritative ? "passed" : "unverified"
+    : "not-required";
 
   const rerunOfRunRef = asString(options.rerunOfRunRef);
   const rerunFailedStepRef = asString(options.rerunFailedStepRef);
@@ -262,6 +331,9 @@ export function materializeDeliveryPlan(options) {
   if (nonReadOnlyMode && multiRepoRequired && coordinationStatus !== "present") {
     blockingReasons.push("multi-repo-coordination-evidence-required");
   }
+  if (integrationRequired && (integrationStatus !== "passed" || !integrationRef)) {
+    blockingReasons.push("integration-report-required");
+  }
   if (rerunStatus === "blocked") {
     blockingReasons.push(...rerunBlockingReasons);
   }
@@ -285,13 +357,32 @@ export function materializeDeliveryPlan(options) {
     );
   }
 
-  const writebackAllowed = blockingReasons.length === 0;
-  const status = writebackAllowed ? "ready" : "blocked";
-
-  const evidenceRefs = [...new Set([...(handoffRef ? [handoffRef] : []), ...promotionEvidenceRefs])];
+  const evidenceRefs = [...new Set([
+    ...(handoffRef ? [handoffRef] : []),
+    ...promotionEvidenceRefs,
+    ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),
+    ...(integrationRef ? [integrationRef] : []),
+  ])];
   const planId = `${options.projectId}.delivery-plan.${normalizeForId(options.stepClass)}.${Date.now()}`;
   const createdAt = new Date().toISOString();
+  const diffAuthorization = options.authorizedDiff ??
+    (writebackAuthorizationRequired && options.executionRoot ? captureDeliveryDiff(options.executionRoot) : null);
+  if (writebackAuthorizationRequired && diffAuthorization === null) {
+    blockingReasons.push("exact-diff-authorization-required");
+  }
+  const evidenceLocks = options.evidenceLocks ?? lockEvidenceRefs(evidenceRefs, options.executionRoot, options.runtimeLayout);
+  if (writebackAuthorizationRequired && (evidenceLocks.length !== evidenceRefs.length ||
+      evidenceLocks.some((lock) => lock.status !== "locked" || !lock.sha256))) {
+    blockingReasons.push("delivery-evidence-lock-required");
+    blockingReasons.push(...evidenceLocks
+      .filter((lock) => lock.status !== "locked" || !lock.sha256)
+      .map((lock) => `delivery-evidence-unresolved:${lock.ref}`));
+  }
+  const finalExecutionAllowed = blockingReasons.length === 0;
+  const finalWritebackAllowed = writebackAuthorizationRequired && finalExecutionAllowed;
+  const targetEditsAllowed = nonReadOnlyMode && finalExecutionAllowed;
   const deliveryPlan = {
+    schema_version: 2,
     plan_id: planId,
     project_id: options.projectId,
     run_id: options.runId,
@@ -322,6 +413,15 @@ export function materializeDeliveryPlan(options) {
         lock_refs: coordinationLockEvidenceRefs,
         cross_repo_validation_refs: crossRepoValidationRefs,
       },
+      integration: {
+        required: integrationRequired,
+        status: integrationStatus,
+        report_ref: integrationRef,
+        parent_run_id: asString(integrationReport.parentRunId),
+        execution_plan_ref: asString(integrationReport.executionPlanRef),
+        workspace_set_ref: asString(integrationReport.workspaceSetRef),
+        authority_verified: integrationAuthoritative,
+      },
     },
     governance,
     coordination: {
@@ -342,13 +442,27 @@ export function materializeDeliveryPlan(options) {
       strategy: rerunStrategy,
       blocking_reasons: rerunBlockingReasons,
     },
-    writeback_allowed: writebackAllowed,
+    permissions: {
+      execution_allowed: finalExecutionAllowed,
+      artifact_materialization_allowed: finalWritebackAllowed,
+      local_commit_allowed: finalWritebackAllowed && canonicalMode === "local-branch",
+      fork_push_allowed: finalWritebackAllowed && canonicalMode === "fork-first-pr",
+      direct_upstream_write_allowed: false,
+    },
+    diff_authorization: diffAuthorization,
+    evidence_locks: evidenceLocks,
+    execution_allowed: finalExecutionAllowed,
+    writeback_allowed: finalWritebackAllowed,
+    target_write_allowed: targetEditsAllowed,
+    direct_edits_allowed: targetEditsAllowed,
+    meaningful_change_required: targetEditsAllowed && options.stepClass === "implement",
     blocking_reasons: blockingReasons,
-    status,
+    status: finalExecutionAllowed ? "ready" : "blocked",
     evidence_refs: uniqueStrings([
       ...evidenceRefs,
       ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),
       ...coordinationEvidenceRefs,
+      ...(integrationRef ? [integrationRef] : []),
     ]),
     created_at: createdAt,
   };
@@ -373,4 +487,8 @@ export function materializeDeliveryPlan(options) {
     deliveryPlan,
     deliveryPlanFile,
   };
+}
+
+export function materializeDeliveryPlan(options) {
+  return runTransactionCoordinator(executeDeliveryPlanTransaction, options);
 }

@@ -1,0 +1,49 @@
+prompt_bundle_id: spec-default
+version: 1
+step_class: artifact
+objective: transform current discovery and research evidence into an implementation-ready specification
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Produce a specification artifact that preserves business intent, accepted
+    research decisions, constraints, acceptance criteria, and planning blockers.
+  priorities:
+    - require current discovery and research refs before declaring readiness
+    - keep scope, non-goals, and acceptance criteria testable
+    - surface stale or incomplete upstream evidence instead of smoothing it over
+required_inputs:
+  packets:
+    required:
+      - discovery
+      - research
+    optional:
+      - mission-intake
+      - architecture-decision
+      - project-analysis-report
+  files:
+    recommended:
+      - docs/contracts/00-index.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - problem
+    - goals
+    - non-goals
+    - requirements
+    - acceptance-criteria
+    - planning-readiness
+  required_evidence:
+    - discovery-ref
+    - research-ref
+    - source-refs
+stop_conditions:
+  - discovery-missing
+  - research-missing
+  - upstream-evidence-stale
+  - acceptance-criteria-ambiguous
+redaction_expectations:
+  - never include secrets or tokens in specification evidence
+  - keep sensitive operational details symbolic
+change_notes:
+  - W44 spec-specific artifact prompt split

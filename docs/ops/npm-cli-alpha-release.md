@@ -3,8 +3,9 @@
 ## Supported release channel
 
 AOR publishes one npm alpha artifact: `@grinrus/aor`. The package exposes the
-`aor` CLI and bundles the runtime source, contracts, and example assets required
-for the documented no-write onboarding path.
+`aor` CLI and bundles the runtime source, contracts, example assets, and
+packaged `apps/web/dist` SPA required for the documented no-write onboarding
+and local UI path.
 
 Internal workspace packages under `apps/*` and `packages/*` stay private. They
 are implementation modules inside the CLI package, not public semver APIs.
@@ -33,6 +34,7 @@ Run the normal source gates first:
 ```bash
 pnpm check
 pnpm production:ready
+pnpm production:ready --json
 ```
 
 Then run the npm release gate:
@@ -45,7 +47,64 @@ pnpm release:gate
 metadata verification, `npm pack --dry-run --json`, and an installed-package
 smoke test. The smoke test installs the generated tarball into a temporary npm
 project, runs `aor --help`, and runs `doctor` plus `onboard` against a temporary
-git repository while asserting that only `.aor/` runtime state changes.
+git repository while asserting that only `.aor/` runtime state changes. W30
+extends that smoke path to run `aor app --help` so optional API/web guidance is
+covered. W31 extends it further with
+`aor app --smoke --open false --json`, which starts the local packaged SPA,
+checks `/`, `/app-config.json`, `GET /api/projects`, and
+`GET /api/projects/:projectId/state`, then exits without starting a hosted
+service or making the web console required.
+W32 extends the source checkout and package smoke expectations with
+`aor request create --json`, `aor request run --json`, and sanitized
+operator-request API coverage so the packaged CLI proves bounded interactive
+runtime work without changing target files outside `.aor/`.
+W34 extends the app smoke expectation so `aor app --smoke --open false --json`
+must also prove the packaged flow-centric bundle still contains the flow
+selector and `New Flow` markers. This remains a deterministic release guardrail;
+installed-user rehearsal acceptance still comes from
+the configured guided-journey fixture with `browser-task-proof`, flow-loop
+fields, accepted skill-agent decisions, run-health evidence, post-run quality
+assessment evidence when outcome quality is claimed, and no-upstream-write
+assertions.
+W36 extends the same deterministic smoke so it must also prove the first-run
+wizard marker, project switcher marker, `/api/projects` project index, and
+matching `default_project_id` fields while preserving the single-project
+`aor app` launch contract.
+
+After a publish, registry smoke must run from a neutral temporary runner
+directory rather than from the AOR source checkout:
+
+```bash
+TMP="$(mktemp -d)"
+mkdir -p "$TMP/target" "$TMP/runner"
+git -C "$TMP/target" init
+cd "$TMP/runner"
+AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
+npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help
+npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
+  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+```
+
+This proves the registry artifact and avoids npm resolving the local source
+checkout package context. For a clean target, the app smoke should pass without
+creating `$TMP/target/.aor`; explicit runtime initialization or `aor onboard`
+is the write boundary for first-run runtime state.
+
+W30 alpha hardening also requires the production-readiness gate to verify the
+ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations
+runbooks, story-status honesty for blocked OpenCode outcomes, and alpha
+non-goals before release review.
+
+W31 local app launch readiness also requires `npm pack --dry-run --json` to
+include `apps/web/dist`, the shared app launcher, and the shared HTTP transport
+files while excluding tests and target runtime state.
+
+W32 request readiness also requires the package to include the shared
+operator-request runtime files, CLI request handler, `operator-request`
+contract/example, and operator-intervention context bundle/rule. Release smoke
+must verify no-write request runs produce proposal evidence, patch-only requests
+require explicit allowed paths, and sanitized list/status outputs omit raw
+request text.
 
 For strict release-branch validation, set the release branch explicitly:
 
@@ -66,11 +125,18 @@ publishes only when all of these conditions are true:
 - the head repository is the same as `GrinRus/ai_native_sdlc_orchestrator`;
 - the PR has the `release:publish` label;
 - `package.json` version matches the release branch version;
-- the npm package version and git tag do not already exist;
+- existing npm, tag, Release, and `alpha` dist-tag state is either absent or
+  exactly compatible with the expected version and merge commit;
 - `pnpm release:gate` passes on the merge commit.
 
-The publish workflow creates tag `v<semver-alpha>`, creates the matching GitHub
-Prerelease, and publishes prerelease builds to the npm `alpha` dist-tag with:
+The publish workflow reconciles one bounded transaction across tag
+`v<semver-alpha>`, the matching GitHub Prerelease, the immutable npm version,
+and the npm `alpha` dist-tag. Exact existing surfaces are reused; only missing
+compatible surfaces are created. The workflow re-inspects remote state after
+each operation and deletes the release branch only after all four surfaces are
+verified as complete.
+
+Publication uses:
 
 ```bash
 npm publish --access public --tag alpha --provenance
@@ -103,7 +169,22 @@ Before the first publish, maintainers must configure:
 
 If those prerequisites are missing, the publish workflow must fail closed.
 
-## Rollback and recovery
+## Partial publication recovery
+
+Rerun the failed `Release publish` workflow against the same merged release PR.
+The transaction classifies the remote state before mutation:
+
+- `absent` starts a fresh publication;
+- `tag-only`, `release-only`, `npm-only`, and other compatible partial states
+  create only the missing surfaces;
+- `complete` performs no publication and only removes a retained release branch;
+- `conflict` stops before mutation and retains the branch for investigation.
+
+Before retrying a conflict, capture the tag target SHA, GitHub Release JSON,
+published npm version, `alpha` dist-tag, merge commit, and failed workflow URL.
+Do not delete or overwrite a conflicting remote artifact automatically.
+
+## Bad-release rollback
 
 npm package versions are immutable. Do not overwrite an existing package
 version. If a release is bad:
@@ -114,5 +195,5 @@ version. If a release is bad:
 4. Leave the original git tag and GitHub Release intact unless they expose
    secrets. If secrets are exposed, treat it as a security incident.
 
-No Docker, GHCR, hosted SaaS, enterprise identity, or public SDK package release
-is part of this alpha channel.
+No Docker, GHCR, hosted SaaS, enterprise identity, default upstream write-back,
+or public SDK package release is part of this alpha channel.

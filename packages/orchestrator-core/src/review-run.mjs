@@ -1,14 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
-
 import { initializeProjectRuntime } from "./project-init.mjs";
 import {
+  collectMissionChangeEvidence,
   isTransientBackupPath,
-  listChangedPaths,
+  matchesScopePattern,
 } from "./shared/mission-scope.mjs";
+
+const VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS = 2000;
 
 /**
  * @param {unknown} value
@@ -47,6 +48,231 @@ function uniqueStrings(values) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNumberOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function boundedOutputExcerpt(value) {
+  const text = typeof value === "string" ? value : "";
+  return text.length > VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS
+    ? text.slice(-VERIFY_FAILURE_OUTPUT_EXCERPT_CHARS)
+    : text;
+}
+
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function isTestSourcePath(candidate) {
+  const normalized = candidate.replace(/\\/g, "/");
+  const fileName = path.posix.basename(normalized);
+  const segments = normalized.split("/");
+  const testDirectoryIndex = segments.findIndex((segment) => ["test", "tests", "spec"].includes(segment));
+  const hasConventionalTestDirectory =
+    testDirectoryIndex === 0 ||
+    (testDirectoryIndex === 1 && segments[0] === "src") ||
+    (testDirectoryIndex === 2 && ["apps", "packages", "libs", "services"].includes(segments[0])) ||
+    (testDirectoryIndex === 3 &&
+      ["apps", "packages", "libs", "services"].includes(segments[0]) &&
+      segments[2] === "src");
+  return (
+    /\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/u.test(normalized) &&
+    (/(?:^|\/)__tests__\//u.test(normalized) ||
+      /\.(?:test|spec)\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/u.test(fileName) ||
+      hasConventionalTestDirectory)
+  );
+}
+
+/**
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isBroadTestCommand(command) {
+  const normalized = command.trim();
+  if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+run\s+test:[^\s]+(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:python3?|uv\s+run\s+python)\s+-m\s+pytest(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:uv\s+run\s+)?pytest(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:npx\s+)?ava(?:\s|$)/u.test(normalized) && !/(?:^|\s)(?:test|tests|spec|__tests__)\/[^\s]+/u.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} changedPath
+ * @returns {{ packageName: string | null, packageDir: string | null }}
+ */
+function findNearestPackageContext(projectRoot, changedPath) {
+  const normalizedProjectRoot = path.resolve(projectRoot);
+  const absolutePath = path.resolve(normalizedProjectRoot, changedPath);
+  let currentDir = fs.statSync(absolutePath, { throwIfNoEntry: false })?.isDirectory()
+    ? absolutePath
+    : path.dirname(absolutePath);
+  while (currentDir.startsWith(normalizedProjectRoot)) {
+    const packageJsonPath = path.join(currentDir, "package.json");
+    if (fs.existsSync(packageJsonPath)) {
+      const packageJson = readJson(packageJsonPath);
+      const packageName = asString(packageJson.name);
+      const packageDir = path.relative(normalizedProjectRoot, currentDir).replace(/\\/g, "/");
+      return {
+        packageName,
+        packageDir: packageDir === "" ? "." : packageDir,
+      };
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+  return { packageName: null, packageDir: null };
+}
+
+/**
+ * @param {string} command
+ * @param {{ packageName: string | null, packageDir: string | null }} packageContext
+ * @returns {boolean}
+ */
+function testCommandCoversChangedPackage(command, packageContext) {
+  const normalizedCommand = command.replace(/\\/g, "/");
+  const packageName = packageContext.packageName;
+  const packageDir = packageContext.packageDir;
+  if (packageName) {
+    const escapedPackageName = escapeRegExp(packageName);
+    if (new RegExp(`(?:^|\\s)yarn\\s+workspace\\s+${escapedPackageName}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+    if (new RegExp(`(?:^|\\s)(?:pnpm|npm)\\s+[^\\n]*--workspace(?:=|\\s+)${escapedPackageName}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+    if (new RegExp(`(?:^|\\s)pnpm\\s+[^\\n]*(?:--filter|-F)(?:=|\\s+)${escapedPackageName}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+  }
+  if (packageDir && packageDir !== ".") {
+    const escapedPackageDir = escapeRegExp(packageDir);
+    if (new RegExp(`(?:^|\\s)(?:pnpm\\s+[^\\n]*(?:--filter|-F)|npm\\s+[^\\n]*--workspace)(?:=|\\s+)\\.?/?${escapedPackageDir}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {string} command
+ * @param {string} changedPath
+ * @param {string} projectRoot
+ * @returns {string | null}
+ */
+function describeTestCommandCoverage(command, changedPath, projectRoot) {
+  if (isBroadTestCommand(command)) {
+    return "broad-repo-test-command";
+  }
+  const normalizedCommand = command.replace(/\\/g, "/");
+  const normalizedPath = changedPath.replace(/\\/g, "/");
+  if (normalizedCommand.includes(normalizedPath) || normalizedCommand.includes(`./${normalizedPath}`)) {
+    return "explicit-test-path";
+  }
+  if (normalizedCommand.includes(path.posix.basename(normalizedPath))) {
+    return "explicit-test-file-name";
+  }
+  if (testCommandCoversChangedPackage(command, findNearestPackageContext(projectRoot, changedPath))) {
+    return "workspace-or-package-scoped-test-command";
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown> | null} verifySummary
+ * @param {string[]} changedPaths
+ * @param {string} projectRoot
+ * @returns {{ changedTestPaths: string[], coveredTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[], coveringCommands: string[], coverageReason: string }}
+ */
+function findChangedTestVerificationGaps(verifySummary, changedPaths, projectRoot) {
+  const changedTestPaths = changedPaths.filter((candidate) => isTestSourcePath(candidate));
+  const testCommands = collectVerifySummaryTestCommands(verifySummary, projectRoot);
+  if (changedTestPaths.length === 0) {
+    return {
+      changedTestPaths,
+      coveredTestPaths: [],
+      uncoveredTestPaths: [],
+      testCommands,
+      coveringCommands: [],
+      coverageReason: "no-changed-test-paths",
+    };
+  }
+  if (testCommands.length === 0) {
+    return {
+      changedTestPaths,
+      coveredTestPaths: [],
+      uncoveredTestPaths: changedTestPaths,
+      testCommands,
+      coveringCommands: [],
+      coverageReason: "no-primary-test-commands-recorded",
+    };
+  }
+  /** @type {string[]} */
+  const coveredTestPaths = [];
+  /** @type {string[]} */
+  const uncoveredTestPaths = [];
+  /** @type {string[]} */
+  const coveringCommands = [];
+  /** @type {string[]} */
+  const coverageReasons = [];
+  for (const changedPath of changedTestPaths) {
+    const covering = testCommands
+      .map((command) => ({
+        command,
+        reason: describeTestCommandCoverage(command, changedPath, projectRoot),
+      }))
+      .find((candidate) => candidate.reason !== null);
+    if (covering) {
+      coveredTestPaths.push(changedPath);
+      coveringCommands.push(covering.command);
+      coverageReasons.push(/** @type {string} */ (covering.reason));
+    } else {
+      uncoveredTestPaths.push(changedPath);
+    }
+  }
+  return {
+    changedTestPaths,
+    coveredTestPaths,
+    uncoveredTestPaths,
+    testCommands,
+    coveringCommands: uniqueStrings(coveringCommands),
+    coverageReason:
+      uncoveredTestPaths.length > 0
+        ? "some-changed-test-paths-not-covered"
+        : uniqueStrings(coverageReasons).join(",") || "covered",
+  };
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -64,11 +290,153 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {string}
+ */
+function normalizeEvidenceRef(projectRoot, ref) {
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) return ref;
+  if (path.isAbsolute(ref)) {
+    const relative = path.relative(projectRoot, ref).replace(/\\/g, "/");
+    if (relative.length > 0 && !relative.startsWith("../")) {
+      return `evidence://${relative}`;
+    }
+  }
+  return `evidence://${ref.replace(/\\/g, "/")}`;
+}
+
+/**
  * @param {string} filePath
  * @returns {Record<string, unknown>}
  */
 function readJson(filePath) {
   return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {string | null}
+ */
+function resolveArtifactPath(projectRoot, ref) {
+  if (path.isAbsolute(ref)) return ref;
+  if (ref.startsWith("evidence://")) {
+    const relativeRef = ref.slice("evidence://".length);
+    return path.resolve(projectRoot, relativeRef);
+  }
+  return path.resolve(projectRoot, ref);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {Record<string, unknown> | null}
+ */
+function readArtifactRef(projectRoot, ref) {
+  const filePath = resolveArtifactPath(projectRoot, ref);
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    return readJson(filePath);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {Record<string, unknown> | null} verifySummary
+ * @param {string} projectRoot
+ * @returns {string[]}
+ */
+function collectVerifySummaryTestCommands(verifySummary, projectRoot) {
+  const summary = asRecord(verifySummary);
+  const commandOverrides = asRecord(summary.command_overrides);
+  const commands = [...asStringArray(commandOverrides.test_commands)];
+  const groups = Array.isArray(summary.command_groups) ? summary.command_groups : [];
+  for (const entry of groups) {
+    const group = asRecord(entry);
+    if (asString(group.role) !== "test") continue;
+    commands.push(...asStringArray(group.commands));
+    for (const ref of asStringArray(group.step_result_refs)) {
+      const stepResult = readArtifactRef(projectRoot, ref);
+      const command = asString(stepResult?.command);
+      if (command) commands.push(command);
+    }
+  }
+  if (commands.length > 0) return uniqueStrings(commands);
+
+  for (const ref of asStringArray(summary.step_result_refs)) {
+    const stepResult = readArtifactRef(projectRoot, ref);
+    const commandKind = asString(stepResult?.command_kind);
+    const commandGroupRole = asString(stepResult?.command_group_role);
+    if (commandKind !== "test" && commandGroupRole !== "test") continue;
+    const command = asString(stepResult?.command);
+    if (command) commands.push(command);
+  }
+  return uniqueStrings(commands);
+}
+
+/**
+ * @param {Record<string, unknown> | null} verifySummary
+ * @returns {string[]}
+ */
+function collectVerifySummaryStepResultRefs(verifySummary) {
+  const summary = asRecord(verifySummary);
+  return uniqueStrings([
+    ...asStringArray(summary.step_result_refs),
+    ...asStringArray(asRecord(summary.enforcement_summary).required_failed_step_result_refs),
+    ...asStringArray(asRecord(summary.enforcement_summary).warn_step_result_refs),
+    ...asStringArray(asRecord(summary.enforcement_summary).observe_step_result_refs),
+    ...asStringArray(asRecord(summary.phase_summary).baseline_failed_step_result_refs),
+    ...asStringArray(asRecord(summary.phase_summary).post_change_failed_step_result_refs),
+    ...(Array.isArray(summary.command_groups)
+      ? summary.command_groups.flatMap((entry) => asStringArray(asRecord(entry).step_result_refs))
+      : []),
+  ]);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {Record<string, unknown> | null} verifySummary
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectVerificationFailureDetails(projectRoot, verifySummary) {
+  /** @type {Array<Record<string, unknown>>} */
+  const details = [];
+  for (const ref of collectVerifySummaryStepResultRefs(verifySummary)) {
+    const stepResult = readArtifactRef(projectRoot, ref);
+    if (asString(stepResult?.status) !== "failed") continue;
+    const outputExcerpt = asRecord(stepResult?.output_excerpt);
+    const command = asString(stepResult?.command) ?? "unknown verification command";
+    const stepEvidenceRefs = asStringArray(stepResult?.evidence_refs).map((entry) =>
+      normalizeEvidenceRef(projectRoot, entry),
+    );
+    details.push({
+      command,
+      command_group_id: asString(stepResult?.command_group_id),
+      role: asString(stepResult?.command_group_role) ?? asString(stepResult?.command_kind) ?? "unknown",
+      phase: asString(stepResult?.command_group_phase),
+      enforcement: asString(stepResult?.command_group_enforcement) ?? "required",
+      enforcement_result: asString(stepResult?.enforcement_result) ?? "fail",
+      outcome: asString(stepResult?.command_group_outcome),
+      exit_code: Object.prototype.hasOwnProperty.call(stepResult ?? {}, "exit_code")
+        ? asNumberOrNull(stepResult?.exit_code)
+        : null,
+      signal: asString(stepResult?.signal),
+      error_code: asString(stepResult?.error_code),
+      timed_out: stepResult?.timed_out === true,
+      timeout_class: asString(stepResult?.command_group_timeout_class) ?? "unknown",
+      command_timeout_ms: Object.prototype.hasOwnProperty.call(stepResult ?? {}, "command_timeout_ms")
+        ? asNumberOrNull(stepResult?.command_timeout_ms)
+        : null,
+      working_dir: asString(stepResult?.working_dir),
+      repo_scope: asString(stepResult?.repo_scope),
+      stdout_excerpt: boundedOutputExcerpt(outputExcerpt.stdout_tail),
+      stderr_excerpt: boundedOutputExcerpt(outputExcerpt.stderr_tail),
+      failure_summary: asString(stepResult?.summary) ?? `Verification command '${command}' failed.`,
+      evidence_refs: uniqueStrings([normalizeEvidenceRef(projectRoot, ref), ...stepEvidenceRefs]),
+    });
+  }
+  return details;
 }
 
 /**
@@ -317,16 +685,21 @@ function detectTestWeakening(projectRoot, changedPaths) {
  *   category: string,
  *   summary: string,
  *   evidenceRefs?: string[],
+ *   verificationFailureDetails?: Array<Record<string, unknown>>,
  * }} options
  */
 function pushFinding(options) {
-  options.findings.push({
+  const finding = {
     finding_id: `${options.category}.${String(options.findings.length + 1).padStart(2, "0")}`,
     severity: options.severity,
     category: options.category,
     summary: options.summary,
     evidence_refs: uniqueStrings(options.evidenceRefs ?? []),
-  });
+  };
+  if (Array.isArray(options.verificationFailureDetails) && options.verificationFailureDetails.length > 0) {
+    finding.verification_failure_details = options.verificationFailureDetails;
+  }
+  options.findings.push(finding);
 }
 
 /**
@@ -344,16 +717,53 @@ function summarizeFindings(findings) {
 }
 
 /**
+ * @param {Record<string, unknown>} handoffPacket
+ * @returns {boolean}
+ */
+function isApprovedHandoffPacket(handoffPacket) {
+  const approvalState = asRecord(handoffPacket.approval_state);
+  return asString(handoffPacket.status) === "approved" || asString(approvalState.state) === "approved";
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} handoffPacket
+ * @returns {string[]}
+ */
+function resolveApprovedHandoffAllowedPaths(handoffPacket) {
+  if (!handoffPacket || !isApprovedHandoffPacket(handoffPacket)) {
+    return [];
+  }
+  const allowedPaths = asStringArray(handoffPacket.allowed_paths);
+  if (allowedPaths.some((entry) => entry === "**" || entry === "**/*")) {
+    return [];
+  }
+  return allowedPaths;
+}
+
+/**
+ * @param {string} changedPath
+ * @param {string[]} allowedPaths
+ * @returns {boolean}
+ */
+function isChangedPathInsideApprovedScope(changedPath, allowedPaths) {
+  return allowedPaths.length === 0 || allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath));
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef?: string,
  *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId: string,
+ *   executionRoot?: string | null,
  * }} options
  */
-export function materializeReviewReport(options) {
+function materializeReviewReportImplementation(options) {
   const init = initializeProjectRuntime(options);
+  const evidenceRoot = asString(options.executionRoot)
+    ? path.resolve(init.projectRoot, /** @type {string} */ (options.executionRoot))
+    : init.projectRoot;
   const packetArtifacts = loadPacketArtifacts(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const stepResults = loadStepResults(init.projectRoot, init.runtimeLayout.reportsRoot);
   const analysisReport = loadOptionalQualityArtifact(
@@ -534,13 +944,23 @@ export function materializeReviewReport(options) {
 
   /** @type {Array<Record<string, unknown>>} */
   const artifactFindings = [];
+  const verifySummaryFailureDetails = collectVerificationFailureDetails(init.projectRoot, verifySummary);
   if (!verifySummary || verifySummary.status !== "passed") {
+    const failedCommands = uniqueStrings(
+      verifySummaryFailureDetails
+        .map((detail) => asString(detail.command))
+        .filter((entry) => entry !== null),
+    );
     pushFinding({
       findings: artifactFindings,
       severity: "fail",
       category: "artifact-quality",
-      summary: "Verify-summary is missing or did not pass, so build/lint/test linkage is incomplete.",
+      summary:
+        verifySummaryFailureDetails.length > 0
+          ? `Verify-summary failed with command-level details for: ${failedCommands.join("; ")}.`
+          : "Verify-summary is missing or did not pass, so build/lint/test linkage is incomplete.",
       evidenceRefs: fs.existsSync(verifySummaryPath) ? [toEvidenceRef(init.projectRoot, verifySummaryPath)] : [],
+      verificationFailureDetails: verifySummaryFailureDetails,
     });
   }
   if (executionStepResults.length === 0) {
@@ -567,7 +987,8 @@ export function materializeReviewReport(options) {
   if (deliveryManifest) {
     const repoDeliveries = Array.isArray(deliveryManifest.document.repo_deliveries) ? deliveryManifest.document.repo_deliveries : [];
     const firstRepoDelivery = asRecord(repoDeliveries[0]);
-    if (asString(firstRepoDelivery.repo_root) && asString(firstRepoDelivery.repo_root) !== init.projectRoot) {
+    const deliveryRepoRoot = asString(firstRepoDelivery.repo_root);
+    if (deliveryRepoRoot && path.resolve(deliveryRepoRoot) !== path.resolve(evidenceRoot)) {
       pushFinding({
         findings: artifactFindings,
         severity: "fail",
@@ -589,25 +1010,55 @@ export function materializeReviewReport(options) {
 
   /** @type {Array<Record<string, unknown>>} */
   const codeFindings = [];
-  const bootstrapOwnedPrefixes = ["examples/", "context/", ".aor/"];
-  const bootstrapOwnedFiles = new Set(["project.aor.yaml"]);
-  const ignoredInputFiles = new Set();
-  const requestFile = asString(featureRequest.request_file);
-  if (requestFile) {
-    const resolvedRequestFile = path.isAbsolute(requestFile)
-      ? requestFile
-      : path.resolve(init.projectRoot, requestFile);
-    const relativeRequestFile = path.relative(init.projectRoot, resolvedRequestFile).replace(/\\/g, "/");
-    if (!relativeRequestFile.startsWith("../") && relativeRequestFile !== "") {
-      ignoredInputFiles.add(relativeRequestFile);
+  const changeEvidence = collectMissionChangeEvidence({
+    projectRoot: init.projectRoot,
+    artifactsRoot: init.runtimeLayout.artifactsRoot,
+    evidenceRoot,
+  });
+  const ignoredInputFiles = new Set(changeEvidence.ignoredInputFiles);
+  const transientChangedPaths = changeEvidence.nonBootstrapChangedPaths.filter(
+    (changedPath) => !ignoredInputFiles.has(changedPath) && isTransientBackupPath(changedPath),
+  );
+  const rawChangedPaths = changeEvidence.changedPaths;
+  const codeChangedPaths = changeEvidence.meaningfulChangedPaths;
+  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths, evidenceRoot);
+  const approvedHandoffAllowedPaths = resolveApprovedHandoffAllowedPaths(latestHandoffPacket?.document);
+  if (!changeEvidence.gitStatusAvailable) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "fail",
+      category: "code-quality",
+      summary: `Git status was unavailable for review evidence root '${changeEvidence.gitStatusRoot}'.`,
+      evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
+    });
+  }
+  if (changedTestVerification.uncoveredTestPaths.length > 0) {
+    const commandSummary =
+      changedTestVerification.testCommands.length > 0
+        ? changedTestVerification.testCommands.join("; ")
+        : "no primary test command was recorded";
+    pushFinding({
+      findings: artifactFindings,
+      severity: "warn",
+      category: "artifact-quality",
+      summary: `Primary verification did not explicitly exercise changed test file(s): ${changedTestVerification.uncoveredTestPaths.join(", ")}. Recorded primary test command(s): ${commandSummary}.`,
+      evidenceRefs: fs.existsSync(verifySummaryPath) ? [toEvidenceRef(init.projectRoot, verifySummaryPath)] : [],
+    });
+  }
+  if (approvedHandoffAllowedPaths.length > 0) {
+    const outOfScopeChangedPaths = codeChangedPaths.filter(
+      (changedPath) => !isChangedPathInsideApprovedScope(changedPath, approvedHandoffAllowedPaths),
+    );
+    if (outOfScopeChangedPaths.length > 0) {
+      pushFinding({
+        findings: codeFindings,
+        severity: "fail",
+        category: "code-quality",
+        summary: `Changed path(s) outside approved handoff scope: ${outOfScopeChangedPaths.join(", ")}. Approved scope: ${approvedHandoffAllowedPaths.join(", ")}.`,
+        evidenceRefs: latestHandoffPacket ? [latestHandoffPacket.artifact_ref] : [],
+      });
     }
   }
-  const rawChangedPaths = listChangedPaths(init.projectRoot).changedPaths;
-  const codeChangedPaths = rawChangedPaths.filter((candidate) => {
-    if (ignoredInputFiles.has(candidate)) return false;
-    if (bootstrapOwnedFiles.has(candidate)) return false;
-    return !bootstrapOwnedPrefixes.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
-  });
   if (codeChangedPaths.length === 0) {
     pushFinding({
       findings: codeFindings,
@@ -617,19 +1068,18 @@ export function materializeReviewReport(options) {
       evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
     });
   }
+  for (const changedPath of transientChangedPaths) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "warn",
+      category: "code-quality",
+      summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
+    });
+  }
   for (const changedPath of codeChangedPaths) {
-    if (isTransientBackupPath(changedPath)) {
-      pushFinding({
-        findings: codeFindings,
-        severity: "warn",
-        category: "code-quality",
-        summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
-      });
-    }
     if (
       changedPath.startsWith("docs/backlog/") ||
-      changedPath.startsWith(".agents/") ||
-      changedPath.startsWith("scripts/live-e2e/")
+      changedPath.startsWith(".agents/")
     ) {
       pushFinding({
         findings: codeFindings,
@@ -639,13 +1089,13 @@ export function materializeReviewReport(options) {
       });
     }
   }
-  for (const weakening of detectTestWeakening(init.projectRoot, codeChangedPaths)) {
+  for (const weakening of detectTestWeakening(evidenceRoot, codeChangedPaths)) {
     pushFinding({
       findings: codeFindings,
       severity: "warn",
       category: "code-quality",
       summary: weakening.summary,
-      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(init.projectRoot, weakening.path))],
+      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(evidenceRoot, weakening.path))],
     });
   }
 
@@ -655,19 +1105,19 @@ export function materializeReviewReport(options) {
     Object.keys(asRecord(requestDocument.size_budget)).length > 0
       ? asRecord(requestDocument.size_budget)
       : asRecord(requestDocument.change_budget);
-  const diffBudget = summarizeDiffBudget(init.projectRoot, codeChangedPaths);
+  const diffBudget = summarizeDiffBudget(evidenceRoot, codeChangedPaths);
   const maxChangedFiles =
     typeof declaredSizeBudget.max_changed_files === "number" ? declaredSizeBudget.max_changed_files : null;
   const maxAddedLines =
     typeof declaredSizeBudget.max_added_lines === "number" ? declaredSizeBudget.max_added_lines : null;
   const maxTouchedLines =
     typeof declaredSizeBudget.max_touched_lines === "number" ? declaredSizeBudget.max_touched_lines : null;
-  if (featureSize && !["small", "medium", "large"].includes(featureSize)) {
+  if (featureSize && !["small", "medium", "large", "xlarge"].includes(featureSize)) {
     pushFinding({
       findings: featureSizeFindings,
       severity: "warn",
       category: "feature-size-fit",
-      summary: `Declared feature size '${featureSize}' is outside the shared small/medium/large taxonomy.`,
+      summary: `Declared feature size '${featureSize}' is outside the shared small/medium/large/xlarge taxonomy.`,
       evidenceRefs: intakePacket ? [intakePacket.artifact_ref] : [],
     });
   }
@@ -810,11 +1260,30 @@ export function materializeReviewReport(options) {
       execution_step_result_refs: executionStepResults.map((artifact) => artifact.artifact_ref),
       delivery_manifest_ref: deliveryManifest?.artifact_ref ?? null,
       release_packet_ref: releasePacket?.artifact_ref ?? null,
+      verification_coverage: {
+        changed_test_paths: changedTestVerification.changedTestPaths,
+        covered_test_paths: changedTestVerification.coveredTestPaths,
+        uncovered_test_paths: changedTestVerification.uncoveredTestPaths,
+        covering_commands: changedTestVerification.coveringCommands,
+        recorded_test_commands: changedTestVerification.testCommands,
+        coverage_reason: changedTestVerification.coverageReason,
+      },
       findings: artifactFindings,
     },
     code_quality: {
       status: summarizeFindings(codeFindings),
       changed_paths: codeChangedPaths,
+      target_checkout_root: evidenceRoot,
+      git_status_available: changeEvidence.gitStatusAvailable,
+      changed_path_diagnostics: {
+        git_status_root: changeEvidence.gitStatusRoot,
+        raw_changed_paths: rawChangedPaths,
+        non_bootstrap_changed_paths: changeEvidence.nonBootstrapChangedPaths,
+        non_input_changed_paths: changeEvidence.nonInputChangedPaths,
+        meaningful_changed_paths: changeEvidence.meaningfulChangedPaths,
+        runner_owned_state_paths: changeEvidence.runnerOwnedStatePaths,
+        ignored_input_files: changeEvidence.ignoredInputFiles,
+      },
       findings: codeFindings,
     },
     feature_size_fit: {
@@ -863,3 +1332,5 @@ export function materializeReviewReport(options) {
     reviewReportFile,
   };
 }
+
+export function materializeReviewReport(options) { return materializeReviewReportImplementation(options); }

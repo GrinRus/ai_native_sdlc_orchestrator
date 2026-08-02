@@ -11,9 +11,12 @@ import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { createOperatorRequest } from "../../../packages/orchestrator-core/src/operator-request.mjs";
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
+  listFlowProjections,
+  listOperatorRequests,
   listDeliveryManifests,
   listCompilerRevisionStatuses,
   listMultirepoCoordinationStatuses,
@@ -54,6 +57,82 @@ function withTempRepo(callback) {
   return withTempRepoHelper({ prefix: "aor-w5-s01-", workspaceRoot }, callback);
 }
 
+function byteSnapshot(root) {
+  const entries = [];
+  const visit = (directory) => {
+    for (const name of fs.readdirSync(directory).sort()) {
+      if (name === ".git") continue;
+      const absolute = path.join(directory, name);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      const stat = fs.lstatSync(absolute);
+      if (stat.isDirectory()) {
+        entries.push([relative, "directory"]);
+        visit(absolute);
+      } else if (stat.isSymbolicLink()) {
+        entries.push([relative, `symlink:${fs.readlinkSync(absolute)}`]);
+      } else {
+        entries.push([relative, fs.readFileSync(absolute).toString("base64")]);
+      }
+    }
+  };
+  visit(root);
+  return entries;
+}
+
+test("operator-request read model applies the canonical list bound", () => {
+  withTempRepo((repoRoot) => {
+    for (let index = 0; index < 3; index += 1) {
+      createOperatorRequest({
+        cwd: repoRoot,
+        projectRef: repoRoot,
+        targetStage: "discovery",
+        intentType: "analyze",
+        requestText: `bounded request ${index}`,
+      });
+    }
+    assert.equal(listOperatorRequests({ cwd: repoRoot, projectRef: repoRoot, limit: 2 }).length, 2);
+  });
+});
+
+test("module read surfaces leave an uninitialized project byte-for-byte unchanged", () => {
+  withTempRepo((repoRoot) => {
+    const options = { projectRef: repoRoot, cwd: repoRoot };
+    const before = byteSnapshot(repoRoot);
+
+    const state = readProjectState(options);
+    assert.equal(state.initialized, false);
+    assert.equal(state.state_file, null);
+    assert.deepEqual(listPacketArtifacts(options), []);
+    assert.deepEqual(listStepResults(options), []);
+    assert.deepEqual(listQualityArtifacts(options), []);
+    assert.deepEqual(listDeliveryManifests(options), []);
+    assert.deepEqual(listPromotionDecisions(options), []);
+    assert.deepEqual(listOperatorRequests(options), []);
+    assert.deepEqual(listRuns(options), []);
+    assert.deepEqual(listFlowProjections(options), {
+      project_id: state.project_id,
+      initialized: false,
+      selected_flow_id: null,
+      active_flow_ids: [],
+      completed_flow_ids: [],
+      flows: [],
+      generated_from: {
+        read_model: "control-plane.flow-projections",
+        runtime_root: state.runtime_root,
+        artifacts_root: state.runtime_layout.artifactsRoot,
+        reports_root: state.runtime_layout.reportsRoot,
+      },
+      read_only: true,
+    });
+    assert.deepEqual(readRunEventHistory({ ...options, runId: "clean.read" }).events, []);
+    assert.deepEqual(readRunPolicyHistory({ ...options, runId: "clean.read" }).entries, []);
+    assert.equal(readUiLifecycleState(options).initialized, false);
+
+    assert.deepEqual(byteSnapshot(repoRoot), before);
+    assert.equal(fs.existsSync(path.join(repoRoot, ".aor")), false);
+  });
+});
+
 test("read surface exposes project state, packets, runs, and quality artifacts", () => {
   withTempRepo((repoRoot) => {
     const runId = "run.api.read.v1";
@@ -75,9 +154,25 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         status: "pass",
       },
     });
+    const handoffPath = path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.handoff.bootstrap.v1.json`);
+    writeContractFile({
+      family: "handoff-packet",
+      filePath: handoffPath,
+      document: {
+        packet_id: `${init.projectId}.handoff.bootstrap.v1`, project_id: init.projectId,
+        ticket_id: "api-read", version: 1, status: "approved", risk_tier: "medium",
+        approved_objective: "Authorize API read-surface delivery fixture.", repo_scopes: ["main"],
+        allowed_paths: ["examples/project.aor.yaml"], allowed_commands: ["git"],
+        verification_plan: {}, scope_constraints: {}, command_policy: {}, writeback_mode: "patch-only",
+        approval_state: { status: "approved" },
+      },
+    });
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w5-s01 api read smoke\n", "utf8");
 
     const plan = materializeDeliveryPlan({
       runtimeLayout: init.runtimeLayout,
+      executionRoot: init.projectRoot,
       projectId: init.projectId,
       runId,
       stepClass: "implement",
@@ -94,13 +189,11 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
       },
       handoffApproval: {
         status: "pass",
-        ref: path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.handoff.bootstrap.v1.json`),
+        ref: handoffPath,
       },
       promotionEvidenceRefs: [promotionDecisionPath],
     });
 
-    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
-    fs.appendFileSync(targetFile, "\n# w5-s01 api read smoke\n", "utf8");
     const deliveryResult = runDeliveryDriver({
       projectRef: repoRoot,
       cwd: repoRoot,
@@ -144,6 +237,8 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         subject_ref: "wrapper://wrapper.runner.default@v3",
         subject_type: "wrapper-profile",
         subject_fingerprint: "wrapper.runner.default-v3",
+        subject_snapshot: { reference: "wrapper://wrapper.runner.default@v3", family: "wrapper-profile", version: 3, digest: "sha256:wrapper", source_refs: ["evidence://wrapper.yaml"] },
+        case_resolution: [{ case_id: "case-api", status: "resolved", input_digest: "sha256:input", expected_digest: "sha256:expected" }],
         suite_ref: "suite.release.core@v1",
         dataset_ref: "dataset://dataset.release.core@v1",
         scorer_metadata: [{ scorer: "deterministic", version: "1" }],
@@ -211,6 +306,20 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
           runtime_harness_overall_decision: "pass",
           blocking_findings: [],
         },
+        repair_context: {
+          source_phase: "none",
+          cycle_iteration: 0,
+          unresolved_findings: [],
+          unresolved_finding_details: [],
+          meaningful_changed_paths: [],
+	          verification_status: "pass",
+	          verification_refs: [],
+	          previous_repair_decision_refs: [],
+	          context_fingerprint: "none",
+	          new_context_since_previous: [],
+	          stop_reason: "none",
+	          requested_next_step: "none",
+	        },
         delivery_gate: {
           status: "pass",
           blocks_downstream: false,
@@ -224,7 +333,7 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
 
     const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
     assert.equal(projectState.project_id, init.projectId);
-    assert.equal(projectState.project_root, repoRoot);
+    assert.equal(projectState.project_root, fs.realpathSync.native(repoRoot));
 
     const packets = listPacketArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(packets.some((packet) => packet.family === "artifact-packet"));
@@ -241,10 +350,54 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     const promotions = listPromotionDecisions({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(promotions.some((decision) => decision.document.status === "pass"));
 
+    writeContractFile({
+      family: "quality-repair-request",
+      filePath: path.join(init.runtimeLayout.reportsRoot, `quality-repair-request-${runId}.json`),
+      document: {
+        request_id: `${runId}.quality-repair-request.review.v1`,
+        project_id: init.projectId,
+        run_id: runId,
+        cycle_id: `${runId}.quality-cycle.review.v1`,
+        source_stage: "review",
+        source_ref: `evidence://reports/review-report-${runId}.json`,
+        finding_refs: ["review.finding.api-read-surface"],
+        repair_scope: {
+          target_step: "implement",
+          requested_next_step: "execution",
+          allowed_paths: ["apps/api/**"],
+          verification_refs: [`evidence://reports/runtime-harness-report-${runId}.json`],
+          required_evidence_refs: [
+            `evidence://reports/review-report-${runId}.json`,
+            `evidence://reports/runtime-harness-report-${runId}.json`,
+          ],
+          compiled_context_refs: [],
+          reason: "API read surface fixture for active quality repair request.",
+        },
+        attempt_budget: {
+          policy_ref: `project-profile://${init.projectId}#quality_repair_policy`,
+          max_attempts: 2,
+          attempt_index: 1,
+          remaining_attempts: 1,
+        },
+        status: "requested",
+        blockers: ["delivery-blocked-until-post-repair-review"],
+        evidence_refs: [`evidence://reports/review-report-${runId}.json`],
+        created_at: new Date().toISOString(),
+      },
+    });
+
     const qualityArtifacts = listQualityArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "validation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "evaluation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "review-decision"));
+    assert.ok(
+      qualityArtifacts.some(
+        (artifact) =>
+          artifact.family === "quality-repair-request" &&
+          artifact.document.status === "requested" &&
+          artifact.document.attempt_budget.remaining_attempts === 1,
+      ),
+    );
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "multirepo-coordination-status"));
@@ -265,6 +418,115 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     assert.ok(runSummary.packet_refs.length >= 1);
     assert.ok(runSummary.step_result_refs.length >= 1);
     assert.ok(runSummary.quality_refs.length >= 1);
+    assert.equal(runSummary.quality_refs.some((ref) => ref.includes("quality-repair-request")), true);
+  });
+});
+
+test("project state exposes verification plan and per-group status surface", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const groups = [
+      ["required-failed", "test", "post-change", "required", "focused-test", "failed", null],
+      ["warning-group", "lint", "post-change", "warn", "quick", "warn", null],
+      ["observed-group", "custom", "diagnostic", "observe", "quick", "observed", null],
+      ["skipped-group", "build", "post-change", "required", "build", "skipped", null],
+      ["not-applicable-group", "test", "post-change", "required", "focused-test", "skipped", "not-applicable"],
+    ].map(([id, role, phase, enforcement, timeoutClass, status, outcome]) => ({
+      id,
+      repo_id: "main",
+      role,
+      phase,
+      enforcement,
+      timeout_class: timeoutClass,
+      working_dir: ".",
+      depends_on: [],
+      command_count: 1,
+      status: "planned",
+      latest_status: status,
+      ...(outcome ? { skip_policy: { outcome } } : {}),
+    }));
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "verification-plan-post-run-primary.json"),
+      `${JSON.stringify(
+        {
+          report_id: `${init.projectId}.verification-plan.post-run-primary.v1`,
+          project_id: init.projectId,
+          version: 1,
+          verification_label: "post-run-primary",
+          status: "planned",
+          command_count: groups.length,
+          command_groups: groups,
+          discovered_command_groups: [
+            {
+              candidate_id: "post-change-test",
+              confidence: "high",
+              source_refs: ["package.json#scripts.test"],
+            },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"),
+      `${JSON.stringify(
+        {
+          run_id: `${init.projectId}.verify.post-run-primary.v1`,
+          verification_label: "post-run-primary",
+          status: "failed",
+          command_groups: groups.map((group) => ({
+            id: group.id,
+            status: group.latest_status,
+            failed_command_count: group.id === "required-failed" ? 1 : 0,
+            ...(group.skip_policy ? { outcome: group.skip_policy.outcome } : {}),
+            step_result_refs: [`evidence://reports/step-result-${group.id}.json`],
+          })),
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "step-result-required-failed.json"),
+      `${JSON.stringify(
+        {
+          step_result_id: `${init.projectId}.verify.post-run-primary.v1.step.1`,
+          run_id: `${init.projectId}.verify.post-run-primary.v1`,
+          step_id: "verify.post-run-primary.required-failed",
+          step_class: "runner",
+          status: "failed",
+          summary: "Post-change verification failed.",
+          evidence_refs: ["evidence://reports/verify-command-required-failed.log"],
+          blocked_next_step: "Inspect failed post-change step-result files, fix target changes or command prerequisites, then rerun verify.",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(projectState.verification_plan.verification_label, "post-run-primary");
+    assert.equal(projectState.verification_plan.latest_verify_status, "failed");
+    assert.deepEqual(
+      projectState.verification_plan.command_groups.map((group) => group.status),
+      ["failed", "warn", "observed", "skipped", "skipped"],
+    );
+    assert.equal(
+      projectState.verification_plan.command_groups.find((group) => group.id === "not-applicable-group").outcome,
+      "not-applicable",
+    );
+    const failedGroup = projectState.verification_plan.command_groups.find((group) => group.id === "required-failed");
+    assert.equal(failedGroup.failed_command_count, 1);
+    assert.deepEqual(failedGroup.failed_step_result_refs, ["evidence://reports/step-result-required-failed.json"]);
+    assert.equal(
+      failedGroup.blocked_next_step,
+      "Inspect failed post-change step-result files, fix target changes or command prerequisites, then rerun verify.",
+    );
+    assert.equal(projectState.verification_plan.discovered_command_groups[0].confidence, "high");
   });
 });
 
@@ -874,7 +1136,11 @@ test("selected-run history surfaces expose policy and event troubleshooting cont
             },
           ],
         },
+        execution_allowed: false,
         writeback_allowed: false,
+        target_write_allowed: false,
+        direct_edits_allowed: false,
+        meaningful_change_required: false,
         blocking_reasons: ["high-risk-security-review-required"],
         status: "blocked",
         evidence_refs: [init.stateFile],
@@ -1053,7 +1319,16 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
           review_recommendation: recommendation,
           feature_traceability: {},
           discovery_quality: {},
-          artifact_quality: {},
+          artifact_quality: {
+            verification_coverage: {
+              changed_test_paths: [],
+              covered_test_paths: [],
+              uncovered_test_paths: [],
+              covering_commands: [],
+              recorded_test_commands: [],
+              coverage_reason: "no-changed-test-paths",
+            },
+          },
           code_quality: {},
           feature_size_fit: {},
           provider_traceability: {},
@@ -1074,6 +1349,7 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
           generated_at: new Date().toISOString(),
           mission_type: "code-changing",
           strictness_profile: "strict-code-changing",
+          mission_lineage: { status: "resolved", run_id: runId, intake_packet_ref: "evidence://intake.json", intake_body_ref: "evidence://intake-body.json", mission_type: "code-changing", strictness_profile: "strict-code-changing" },
           overall_decision: decision,
           step_decisions: [
             {
@@ -1103,6 +1379,8 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
     };
 
     const writeReviewDecision = (runId, decision, gateStatus) => {
+      const reviewRef = `evidence://reports/review-report-${runId}.json`;
+      const harnessRef = `evidence://reports/runtime-harness-report-${runId}.json`;
       writeContractFile({
         family: "review-decision",
         filePath: path.join(reportsRoot, `review-decision-${runId}.json`),
@@ -1113,11 +1391,50 @@ test("planner metrics expose empty, partial, and populated run histories", () =>
           decision,
           decider_ref: "operator://planner-metrics-test",
           reason: `Fixture ${decision} decision.`,
-          review_report_ref: `evidence://reports/review-report-${runId}.json`,
-          runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+          review_report_ref: reviewRef,
+          runtime_harness_report_ref: harnessRef,
           delivery_manifest_refs: [],
           learning_handoff_refs: [],
           decision_basis: {},
+          repair_context:
+            decision === "request-repair"
+              ? {
+                  source_phase: "review",
+                  cycle_iteration: 1,
+                  unresolved_findings: ["Planner metrics fixture repair decision blocks clean close."],
+                  unresolved_finding_details: [
+                    {
+                      finding_id: "planner-metrics.fixture-repair",
+                      category: "review",
+                      severity: "blocking",
+                      summary: "Planner metrics fixture repair decision blocks clean close.",
+                      evidence_refs: [reviewRef, harnessRef],
+                      resolution_requirement: "Resolve the fixture repair finding before clean close.",
+                    },
+                  ],
+                  meaningful_changed_paths: [],
+	                  verification_status: "not_pass",
+	                  verification_refs: [reviewRef, harnessRef],
+	                  previous_repair_decision_refs: [],
+	                  context_fingerprint: "sha256:planner-metrics-fixture-repair",
+	                  new_context_since_previous: ["first-repair-decision"],
+	                  stop_reason: "Fixture repair decision requested another execution iteration.",
+	                  requested_next_step: "execution",
+	                }
+              : {
+                  source_phase: "none",
+                  cycle_iteration: 0,
+                  unresolved_findings: [],
+                  unresolved_finding_details: [],
+                  meaningful_changed_paths: [],
+	                  verification_status: gateStatus === "pass" ? "pass" : "not_pass",
+	                  verification_refs: [],
+	                  previous_repair_decision_refs: [],
+	                  context_fingerprint: "none",
+	                  new_context_since_previous: [],
+	                  stop_reason: "none",
+	                  requested_next_step: "none",
+	                },
           delivery_gate: {
             status: gateStatus,
             blocks_downstream: gateStatus !== "pass",
@@ -1237,7 +1554,7 @@ test("ui lifecycle API supports attach/detach idempotency and disconnected mode"
       projectRef: repoRoot,
       cwd: repoRoot,
       runId: "ui-api-smoke",
-      controlPlane: "http://localhost:8080",
+      controlPlane: "http://127.0.0.1:8080",
     });
     assert.equal(attached.action, "attach");
     assert.equal(attached.idempotent, false);
@@ -1249,7 +1566,7 @@ test("ui lifecycle API supports attach/detach idempotency and disconnected mode"
       projectRef: repoRoot,
       cwd: repoRoot,
       runId: "ui-api-smoke",
-      controlPlane: "http://localhost:8080",
+      controlPlane: "http://127.0.0.1:8080",
     });
     assert.equal(attachedRetry.idempotent, true);
 

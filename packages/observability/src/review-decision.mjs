@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
+import { materializeQualityRepairRequest } from "./quality-repair-request.mjs";
 
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
 const REVIEW_DECISIONS = new Set(["approve", "hold", "request-repair"]);
@@ -45,6 +47,53 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function stableJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stableJsonValue(entry));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, stableJsonValue(entry)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} context
+ * @returns {string}
+ */
+function fingerprintRepairContext(context) {
+  const payload = {
+    source_phase: asString(context.source_phase) ?? "review",
+    unresolved_findings: uniqueStrings(asStringArray(context.unresolved_findings)).sort(),
+    unresolved_finding_details: Array.isArray(context.unresolved_finding_details)
+      ? context.unresolved_finding_details
+          .map((entry) => {
+            const record = typeof entry === "object" && entry !== null ? entry : {};
+            return {
+              finding_id: asString(record.finding_id) ?? "",
+              category: asString(record.category) ?? "",
+              severity: asString(record.severity) ?? "",
+              summary: asString(record.summary) ?? "",
+              resolution_requirement: asString(record.resolution_requirement) ?? "",
+            };
+          })
+          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+      : [],
+    meaningful_changed_paths: uniqueStrings(asStringArray(context.meaningful_changed_paths)).sort(),
+    verification_status: asString(context.verification_status) ?? "unknown",
+    requested_next_step: asString(context.requested_next_step) ?? "execution",
+  };
+  return `sha256:${createHash("sha256").update(JSON.stringify(stableJsonValue(payload))).digest("hex")}`;
 }
 
 /**
@@ -142,6 +191,198 @@ function evaluateDecisionGate(options) {
 
 /**
  * @param {{
+ *   decision: "approve" | "hold" | "request-repair",
+ *   context?: Record<string, unknown> | null,
+ *   defaultVerificationStatus: string,
+ *   fallbackFindings?: string[],
+ *   fallbackVerificationRefs?: string[],
+ *   fallbackFindingDetails?: Array<Record<string, unknown>>,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function normalizeRepairContext(options) {
+  const context =
+    typeof options.context === "object" && options.context !== null && !Array.isArray(options.context)
+      ? options.context
+      : {};
+  if (options.decision !== "request-repair") {
+    return {
+      source_phase: "none",
+      cycle_iteration: 0,
+      unresolved_findings: [],
+      unresolved_finding_details: [],
+      meaningful_changed_paths: [],
+      verification_status: options.defaultVerificationStatus || "pass",
+      verification_refs: [],
+      previous_repair_decision_refs: [],
+      context_fingerprint: "none",
+      new_context_since_previous: [],
+      stop_reason: "none",
+      requested_next_step: "none",
+    };
+  }
+  const fallbackFindings = asStringArray(options.fallbackFindings);
+  const fallbackVerificationRefs = asStringArray(options.fallbackVerificationRefs);
+  const fallbackFindingDetails = asRecordArray(options.fallbackFindingDetails);
+  const contextDetails = Array.isArray(context.unresolved_finding_details)
+    ? context.unresolved_finding_details
+    : [];
+
+  const normalized = {
+    source_phase: asString(context.source_phase) ?? "review",
+    cycle_iteration:
+      typeof context.cycle_iteration === "number" && Number.isInteger(context.cycle_iteration)
+        ? context.cycle_iteration
+        : 1,
+    unresolved_findings: asStringArray(context.unresolved_findings).length > 0
+      ? asStringArray(context.unresolved_findings)
+      : fallbackFindings,
+    unresolved_finding_details: contextDetails.length > 0
+      ? contextDetails
+      : fallbackFindingDetails.length > 0
+        ? fallbackFindingDetails
+        : fallbackFindings.map((finding, index) => ({
+            finding_id: `fallback.${index + 1}`,
+            category: "review",
+            severity: "blocking",
+            summary: finding,
+            evidence_refs: fallbackVerificationRefs,
+            resolution_requirement:
+              "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
+          })),
+    meaningful_changed_paths: asStringArray(context.meaningful_changed_paths),
+    verification_status: asString(context.verification_status) ?? options.defaultVerificationStatus ?? "unknown",
+    verification_refs: asStringArray(context.verification_refs).length > 0
+      ? asStringArray(context.verification_refs)
+      : fallbackVerificationRefs,
+    previous_repair_decision_refs: asStringArray(context.previous_repair_decision_refs),
+    context_fingerprint: asString(context.context_fingerprint) ?? "",
+    new_context_since_previous: asStringArray(context.new_context_since_previous),
+    stop_reason: asString(context.stop_reason) ?? "Repair requested before delivery.",
+    requested_next_step: asString(context.requested_next_step) ?? "execution",
+  };
+  normalized.context_fingerprint = normalized.context_fingerprint || fingerprintRepairContext(normalized);
+  if (
+    normalized.previous_repair_decision_refs.length === 0 &&
+    normalized.new_context_since_previous.length === 0
+  ) {
+    normalized.new_context_since_previous = ["first-repair-decision"];
+  }
+  return normalized;
+}
+
+/**
+ * @param {Record<string, unknown>} repairContext
+ * @returns {string}
+ */
+function normalizeRepairSourceStage(repairContext) {
+  return asString(repairContext.source_phase) === "qa" ? "qa" : "review";
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} findingDetails
+ * @returns {string[]}
+ */
+function findingRefsFromDetails(findingDetails) {
+  return uniqueStrings(
+    findingDetails.flatMap((finding) => [
+      asString(finding.finding_id),
+      ...asStringArray(finding.evidence_refs),
+    ]),
+  );
+}
+
+/**
+ * @param {{ findings: Array<Record<string, unknown>>, fallbackEvidenceRefs: string[] }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildFallbackRepairFindingDetails(options) {
+  return options.findings
+    .filter((finding) => asString(finding.severity) === "fail")
+    .map((finding, index) => {
+      const evidenceRefs = uniqueStrings([
+        ...asStringArray(finding.evidence_refs),
+        ...options.fallbackEvidenceRefs,
+      ]);
+      const detail = {
+        finding_id: asString(finding.finding_id) ?? `fallback.${index + 1}`,
+        category: asString(finding.category) ?? "review",
+        severity: asString(finding.severity) ?? "blocking",
+        summary: asString(finding.summary) ?? "Blocking review finding.",
+        evidence_refs: evidenceRefs,
+        resolution_requirement:
+          asString(finding.resolution_requirement) ??
+          "Address this repair finding in the next public execution iteration or provide fresh evidence that it is stale.",
+      };
+      const verificationFailureDetails = asRecordArray(finding.verification_failure_details);
+      if (verificationFailureDetails.length > 0) {
+        detail.verification_failure_details = verificationFailureDetails;
+      }
+      return detail;
+    });
+}
+
+/**
+ * @param {{
+ *   projectId: string,
+ *   projectRoot: string,
+ *   runId: string,
+ *   reviewReportRef: string,
+ *   runtimeHarnessReportRef: string,
+ *   repairContext: Record<string, unknown>,
+ *   evidenceRefs: string[],
+ *   generatedAt: string,
+ * }}
+ */
+function buildQualityRepairRequestOptions(options) {
+  const sourceStage = normalizeRepairSourceStage(options.repairContext);
+  const findingDetails = asRecordArray(options.repairContext.unresolved_finding_details);
+  const findingRefs = uniqueStrings([
+    ...asStringArray(options.repairContext.unresolved_findings),
+    ...findingRefsFromDetails(findingDetails),
+  ]);
+  const verificationRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.repairContext.verification_refs));
+  const attemptIndex =
+    typeof options.repairContext.cycle_iteration === "number" && Number.isInteger(options.repairContext.cycle_iteration)
+      ? Math.max(options.repairContext.cycle_iteration, 1)
+      : 1;
+  const maxAttempts =
+    typeof options.repairContext.max_attempts === "number" && Number.isInteger(options.repairContext.max_attempts)
+      ? Math.max(options.repairContext.max_attempts, attemptIndex)
+      : attemptIndex;
+
+  return {
+    projectId: options.projectId,
+    projectRoot: options.projectRoot,
+    runId: options.runId,
+    sourceStage,
+    sourceRef: sourceStage === "qa" ? options.runtimeHarnessReportRef : options.reviewReportRef,
+    findingRefs,
+    repairScope: {
+      target_step: "implement",
+      requested_next_step: asString(options.repairContext.requested_next_step) ?? "execution",
+      allowed_paths: asStringArray(options.repairContext.meaningful_changed_paths),
+      verification_refs: verificationRefs,
+      required_evidence_refs: uniqueStrings([
+        options.reviewReportRef,
+        options.runtimeHarnessReportRef,
+        ...verificationRefs,
+      ]),
+      reason: asString(options.repairContext.stop_reason) ?? "Resolve the linked repair findings before delivery.",
+    },
+    attemptBudget: {
+      policy_ref: `project-profile://${options.projectId}#quality_repair_policy`,
+      max_attempts: maxAttempts,
+      attempt_index: attemptIndex,
+      remaining_attempts: Math.max(maxAttempts - attemptIndex, 0),
+    },
+    evidenceRefs: options.evidenceRefs,
+    createdAt: options.generatedAt,
+  };
+}
+
+/**
+ * @param {{
  *   projectId: string,
  *   projectRoot: string,
  *   runtimeLayout: { reportsRoot?: string, reports_root?: string },
@@ -156,6 +397,7 @@ function evaluateDecisionGate(options) {
  *   deliveryManifestRefs?: string[],
  *   learningHandoffRefs?: string[],
  *   evidenceRefs?: string[],
+ *   repairContext?: Record<string, unknown> | null,
  *   timestamp?: string,
  * }} options
  */
@@ -202,7 +444,43 @@ export function materializeReviewDecision(options) {
     ...learningHandoffRefs,
     ...normalizeEvidenceRefs(options.projectRoot, asStringArray(options.evidenceRefs)),
   ]);
-  const decisionId = `${options.runId}.review-decision.${options.decision}.${generatedAt.replace(/[:.]/g, "-")}`;
+  const repairContext = normalizeRepairContext({
+    decision: options.decision,
+    context: options.repairContext,
+    defaultVerificationStatus: runtimeDecision === "pass" && reviewStatus === "pass" ? "pass" : "not_pass",
+    fallbackFindingDetails: buildFallbackRepairFindingDetails({
+      findings: [...reviewFindings, ...runtimeFindings],
+      fallbackEvidenceRefs: evidenceRefs,
+    }),
+    fallbackFindings: uniqueStrings([
+      ...blockingFindings.map((finding) => asString(finding.summary) ?? "Blocking review finding."),
+      ...gate.findings,
+      asString(options.reason) ?? "",
+      "Operator requested public repair before delivery.",
+    ]),
+    fallbackVerificationRefs: evidenceRefs,
+  });
+  const qualityRepairResult = options.decision === "request-repair"
+    ? materializeQualityRepairRequest({
+        ...buildQualityRepairRequestOptions({
+          projectId: options.projectId,
+          projectRoot: options.projectRoot,
+          runId: options.runId,
+          reviewReportRef,
+          runtimeHarnessReportRef,
+          repairContext,
+          evidenceRefs,
+          generatedAt,
+        }),
+        runtimeLayout: options.runtimeLayout,
+      })
+    : null;
+  const qualityRepairRef = qualityRepairResult?.requestRef ?? null;
+  const qualityRepairLineage = qualityRepairResult?.lineage ?? null;
+  const decisionId = derivePublicId(
+    [options.runId, "review-decision", options.decision, generatedAt.replace(/[:.]/g, "-").toLowerCase()],
+    "review-decision",
+  );
   const document = {
     decision_id: decisionId,
     project_id: options.projectId,
@@ -224,13 +502,16 @@ export function materializeReviewDecision(options) {
       runtime_harness_overall_decision: runtimeDecision,
       blocking_findings: blockingFindings,
     },
+    repair_context: repairContext,
     delivery_gate: {
       status: gate.status,
       blocks_downstream: gate.blocksDownstream,
       required_downstream_decision: "approve",
       findings: gate.findings,
     },
-    evidence_refs: evidenceRefs,
+    ...(qualityRepairRef ? { quality_repair_request_ref: qualityRepairRef } : {}),
+    ...(qualityRepairLineage ? { quality_repair_lineage: qualityRepairLineage } : {}),
+    evidence_refs: uniqueStrings([...evidenceRefs, qualityRepairRef]),
     decided_at: generatedAt,
   };
 
@@ -254,6 +535,13 @@ export function materializeReviewDecision(options) {
     decision: document,
     decisionFile,
     decisionRef: toEvidenceRef(options.projectRoot, decisionFile),
+    ...(qualityRepairResult
+      ? {
+          qualityRepairRequest: qualityRepairResult.request,
+          qualityRepairRequestFile: qualityRepairResult.requestFile,
+          qualityRepairRequestRef: qualityRepairResult.requestRef,
+        }
+      : {}),
   };
 }
 

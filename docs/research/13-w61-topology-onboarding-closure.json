@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "wave_id": "W61",
+  "title": "Project topology, Local Workspace, and Execution Setup closure",
+  "status": "passed",
+  "closed_at": "2026-07-16",
+  "proof_scenarios": [
+    {
+      "id": "single-repo",
+      "evidence_refs": [
+        "scripts/w61-topology-onboarding-proof.mjs",
+        "packages/orchestrator-core/test/topology-control-plane.test.mjs"
+      ]
+    },
+    {
+      "id": "monorepo-components",
+      "evidence_refs": [
+        "scripts/w61-topology-onboarding-proof.mjs",
+        "apps/web/browser/operator-console.spec.mjs"
+      ]
+    },
+    {
+      "id": "bounded-multirepo",
+      "evidence_refs": [
+        "scripts/w61-topology-onboarding-proof.mjs",
+        "packages/orchestrator-core/test/local-project-registry.test.mjs"
+      ]
+    },
+    {
+      "id": "execution-setup",
+      "evidence_refs": [
+        "apps/web/src/execution-setup.jsx",
+        "packages/orchestrator-core/test/execution-profile-control-plane.test.mjs",
+        "apps/web/browser/operator-console.spec.mjs"
+      ]
+    }
+  ],
+  "compatibility": {
+    "legacy_source_root_alias": "supported",
+    "repo_attached_app_launch": "supported",
+    "neutral_workspace_launch": "supported",
+    "browser_credentials": "not_stored"
+  },
+  "reproducible_commands": [
+    "node scripts/w61-topology-onboarding-proof.mjs",
+    "pnpm test:web:browser",
+    "pnpm check",
+    "pnpm release:pack",
+    "pnpm release:smoke",
+    "pnpm slice:gate -- W61-S05"
+  ],
+  "excluded_surfaces": [
+    "repository provisioning",
+    "parallel scheduling",
+    "coordinated delivery",
+    "credentialed provider calls",
+    "upstream writes"
+  ]
+}

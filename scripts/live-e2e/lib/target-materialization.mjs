@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
 import { stringify as stringifyYaml } from "yaml";
-import { loadContractFile, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "./contracts/index.mjs";
 
 import {
   asNonEmptyString,
@@ -15,6 +17,29 @@ import {
   readYamlDocument,
   writeJson,
 } from "./common.mjs";
+
+const PRODUCT_CHANGE_FEATURE_SIZES = new Set(["medium", "large", "xlarge"]);
+
+const LIVE_E2E_STEP_POLICY_CLASSES = Object.freeze({
+  discovery: "artifact",
+  research: "artifact",
+  spec: "artifact",
+  planning: "planner",
+  implement: "runner",
+  review: "runner",
+  qa: "runner",
+  repair: "repair",
+  eval: "eval",
+  harness: "harness",
+});
+const LIVE_E2E_POLICY_SOURCE_FILES = Object.freeze({
+  artifact: "step-artifact-default.yaml",
+  planner: "step-planner-default.yaml",
+  runner: "step-runner-default.yaml",
+  repair: "step-repair-default.yaml",
+  eval: "step-eval-default.yaml",
+  harness: "step-harness-default.yaml",
+});
 
 /**
  * @param {{
@@ -35,15 +60,31 @@ export function materializeFeatureRequestFile(options) {
   fs.mkdirSync(requestsRoot, { recursive: true });
   const missionId = asNonEmptyString(options.mission.mission_id) || "feature-mission";
   const filePath = path.join(requestsRoot, `feature-request-${normalizeId(options.runId)}-${normalizeId(missionId)}.json`);
+  const agentVisibleRequest = asRecord(options.mission.agent_visible_request);
   const requestDocument = {
     mission_id: missionId,
     title: asNonEmptyString(options.mission.title) || missionId,
-    brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
+    brief:
+      asNonEmptyString(agentVisibleRequest.user_problem) ||
+      asNonEmptyString(options.mission.brief) ||
+      "Catalog-backed full-journey feature request.",
+    goals: asStringArray(options.mission.goals),
+    kpis: Array.isArray(options.mission.kpis)
+      ? options.mission.kpis.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+      : [],
+    definition_of_done: asStringArray(options.mission.definition_of_done),
     expected_evidence: asStringArray(options.mission.expected_evidence),
     acceptance_checks: asStringArray(options.mission.acceptance_checks),
+    change_evidence: asRecord(options.mission.change_evidence),
+    post_run_quality: asRecord(options.mission.post_run_quality),
+    task_plan: asRecord(options.mission.task_plan),
     scenario_family: options.scenarioFamily,
     provider_variant_id: options.providerVariantId,
     feature_size: options.featureSize,
+    mission_class: asNonEmptyString(options.mission.mission_class) || null,
+    agent_visible_request: agentVisibleRequest,
+    evaluator_rubric: asRecord(options.mission.evaluator_rubric),
+    final_code_rubric: asRecord(options.mission.final_code_rubric),
     supported_scenarios: asStringArray(options.mission.supported_scenarios),
     recommended_provider_variants: asStringArray(options.mission.recommended_provider_variants),
     size_budget: asRecord(options.mission.size_budget),
@@ -91,12 +132,35 @@ function runGitChecked(options) {
     encoding: "utf8",
   });
   if (run.status === 0) {
-    return;
+    return run;
   }
   const stderr = (run.stderr ?? run.stdout ?? "").trim();
   throw new Error(
     `Installed-user rehearsal ${options.operation} failed: git ${options.args.join(" ")} (exit ${run.status ?? -1}). ${stderr}`,
   );
+}
+
+/**
+ * @param {{
+ *   layout: ReturnType<typeof ensureRuntimeLayout>,
+ *   profile: Record<string, unknown>,
+ *   runId: string,
+ *   targetRepoId: string,
+ * }} options
+ */
+function resolveTargetCheckoutRoot(options) {
+  const livePolicy = asRecord(options.profile.live_e2e);
+  const targetRepo = asRecord(options.profile.target_repo);
+  const checkoutRootMode =
+    asNonEmptyString(livePolicy.target_checkout_root_mode) || asNonEmptyString(targetRepo.checkout_root_mode);
+  if (checkoutRootMode !== "short-physical") {
+    return path.join(options.layout.targetCheckoutsRoot, `${normalizeId(options.targetRepoId)}-${normalizeId(options.runId)}`);
+  }
+  const digest = createHash("sha256")
+    .update(`${options.runId}:${options.targetRepoId}`)
+    .digest("hex")
+    .slice(0, 16);
+  return path.join(os.tmpdir(), "aor-target-checkouts", `x-${digest}`, normalizeId(options.targetRepoId));
 }
 
 /**
@@ -121,23 +185,35 @@ export function materializeTargetCheckout(options) {
   const targetRepoRef = asNonEmptyString(targetRepo.ref) || "main";
   const targetRepoId = asNonEmptyString(targetRepo.repo_id) || "target";
   const checkoutStrategy = asNonEmptyString(targetRepo.checkout_strategy) || "full";
+  const pinnedCommit = asNonEmptyString(process.env.AOR_LIVE_E2E_TARGET_COMMIT);
+  if (pinnedCommit && !/^[a-f0-9]{40}$/u.test(pinnedCommit)) {
+    throw new Error("AOR_LIVE_E2E_TARGET_COMMIT must be one full lowercase Git commit SHA.");
+  }
   if (!targetRepoUrl) {
     throw new Error("Proof runner profile must declare target_repo.repo_url.");
   }
 
-  const targetCheckoutRoot = path.join(
-    options.layout.targetCheckoutsRoot,
-    `${normalizeId(targetRepoId)}-${normalizeId(options.runId)}`,
-  );
+  const targetCheckoutRoot = resolveTargetCheckoutRoot({
+    layout: options.layout,
+    profile: options.profile,
+    runId: options.runId,
+    targetRepoId,
+  });
   if (options.reuseExistingCheckout === true && fileExists(path.join(targetCheckoutRoot, ".git"))) {
+    const currentCommit = runGitChecked({ cwd: targetCheckoutRoot, args: ["rev-parse", "HEAD"], operation: "target checkout identity" }).stdout.trim();
+    if (pinnedCommit && currentCommit !== pinnedCommit) {
+      throw new Error(`Existing target checkout is '${currentCommit}', not pinned commit '${pinnedCommit}'.`);
+    }
     return {
       targetCheckoutRoot,
       targetRepoId,
       targetRepoRef,
       targetRepoUrl,
+      targetCommitSha: currentCommit,
     };
   }
   fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(targetCheckoutRoot), { recursive: true });
 
   /** @type {string[]} */
   const cloneArgs = ["clone"];
@@ -155,12 +231,21 @@ export function materializeTargetCheckout(options) {
     args: ["checkout", targetRepoRef],
     operation: "target checkout ref resolution",
   });
+  if (pinnedCommit) {
+    const probe = spawnSync("git", ["cat-file", "-e", `${pinnedCommit}^{commit}`], { cwd: targetCheckoutRoot, encoding: "utf8" });
+    if (probe.status !== 0) {
+      runGitChecked({ cwd: targetCheckoutRoot, args: ["fetch", "--depth", "1", "origin", pinnedCommit], operation: "pinned target commit fetch" });
+    }
+    runGitChecked({ cwd: targetCheckoutRoot, args: ["checkout", "--detach", pinnedCommit], operation: "pinned target commit checkout" });
+  }
+  const targetCommitSha = runGitChecked({ cwd: targetCheckoutRoot, args: ["rev-parse", "HEAD"], operation: "target checkout identity" }).stdout.trim();
 
   return {
     targetCheckoutRoot,
     targetRepoId,
     targetRepoRef,
     targetRepoUrl,
+    targetCommitSha,
   };
 }
 
@@ -168,6 +253,9 @@ export function materializeTargetCheckout(options) {
  * @param {{
  *   examplesRoot: string,
  *   generatedAssetsRoot: string,
+ *   providerVariant?: Record<string, unknown>,
+ *   providerVariantId?: string,
+ *   profile?: Record<string, unknown>,
  * }} options
  */
 export function materializeHostLiveE2eAssets(options) {
@@ -175,10 +263,104 @@ export function materializeHostLiveE2eAssets(options) {
   fs.rmSync(assetsRoot, { recursive: true, force: true });
   fs.mkdirSync(assetsRoot, { recursive: true });
   fs.cpSync(options.examplesRoot, assetsRoot, { recursive: true });
+  const liveE2eAdapterDefaults = materializeSelectedAdapterLiveE2eDefaults({
+    assetsRoot,
+    providerVariant: asRecord(options.providerVariant),
+  });
+  const providerVariantId = asNonEmptyString(options.providerVariantId);
+  const providerRoutes = providerVariantId
+    ? materializeProviderPinnedRouteOverrides({
+        routesRoot: path.join(assetsRoot, "routes"),
+        providerVariant: asRecord(options.providerVariant),
+        providerVariantId,
+        profile: asRecord(options.profile),
+      })
+    : { routeOverrides: {}, routeFiles: [] };
+  const providerPolicies = providerVariantId
+    ? materializeProviderPinnedPolicyOverrides({
+        policiesRoot: path.join(assetsRoot, "policies"),
+        providerVariant: asRecord(options.providerVariant),
+        providerVariantId,
+        profile: asRecord(options.profile),
+      })
+    : { policyOverrides: {}, policyFiles: [] };
   return {
     assetsRoot,
     routesRoot: path.join(assetsRoot, "routes"),
     contextRoot: path.join(assetsRoot, "context"),
+    liveE2eAdapterDefaults,
+    providerRoutes,
+    providerPolicies,
+  };
+}
+
+/**
+ * @param {{ assetsRoot: string, providerVariant: Record<string, unknown> }} options
+ */
+function materializeSelectedAdapterLiveE2eDefaults(options) {
+  const adapterId = asNonEmptyString(options.providerVariant.primary_adapter);
+  if (!adapterId) {
+    return {
+      adapter_id: null,
+      applied_args: [],
+      applied_permission_modes: [],
+    };
+  }
+
+  const adapterProfileFile = path.join(options.assetsRoot, "adapters", `${normalizeId(adapterId)}.yaml`);
+  const loaded = loadContractFile({
+    filePath: adapterProfileFile,
+    family: "adapter-capability-profile",
+  });
+  if (!loaded.ok) {
+    const issues = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Live E2E adapter profile '${adapterId}' failed validation: ${issues}`);
+  }
+
+  const adapterProfile = asRecord(JSON.parse(JSON.stringify(loaded.document)));
+  const execution = asRecord(adapterProfile.execution);
+  const externalRuntime = asRecord(execution.external_runtime);
+  const defaultArgs = asStringArray(externalRuntime.default_args);
+  if (defaultArgs.length === 0) {
+    return {
+      adapter_id: adapterId,
+      applied_args: [],
+      applied_permission_modes: [],
+    };
+  }
+
+  const permissionPolicy = asRecord(externalRuntime.permission_policy);
+  const modes = asRecord(permissionPolicy.modes);
+  const modeEntries = Object.entries(modes);
+  if (modeEntries.length === 0) {
+    throw new Error(`Live E2E adapter profile '${adapterId}' declares default args without permission policy modes.`);
+  }
+  for (const [modeId, modeEntry] of modeEntries) {
+    const mode = asRecord(modeEntry);
+    modes[modeId] = {
+      ...mode,
+      args: [...defaultArgs, ...asStringArray(mode.args)],
+    };
+  }
+  permissionPolicy.modes = modes;
+  externalRuntime.permission_policy = permissionPolicy;
+  execution.external_runtime = externalRuntime;
+  adapterProfile.execution = execution;
+
+  const validation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: adapterProfile,
+    source: `runtime://live-e2e-adapter-defaults/${normalizeId(adapterId)}`,
+  });
+  if (!validation.ok) {
+    const issues = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Live E2E adapter defaults for '${adapterId}' failed validation: ${issues}`);
+  }
+  fs.writeFileSync(adapterProfileFile, stringifyYaml(adapterProfile), "utf8");
+  return {
+    adapter_id: adapterId,
+    applied_args: defaultArgs,
+    applied_permission_modes: modeEntries.map(([modeId]) => modeId),
   };
 }
 
@@ -187,14 +369,208 @@ export function materializeHostLiveE2eAssets(options) {
  * @param {Record<string, unknown>} verification
  */
 function hydrateRepoVerificationCommands(repoRecord, verification) {
-  const setupCommands = asStringArray(verification.setup_commands);
-  const verificationCommands = asStringArray(verification.commands);
+  const setupCommands = applyTargetExecutionEnvironmentToCommands(verification, asStringArray(verification.setup_commands));
+  const verificationCommands = applyTargetExecutionEnvironmentToCommands(verification, asStringArray(verification.commands));
   const buildEnabled = verification.build === true;
   const testsEnabled = verification.tests !== false;
 
   repoRecord.build_commands = buildEnabled ? verificationCommands : [];
   repoRecord.lint_commands = setupCommands;
   repoRecord.test_commands = testsEnabled ? verificationCommands : [];
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {string[]} commands
+ * @returns {string[]}
+ */
+function applyTargetToolchainPolicyToCommands(profile, commands) {
+  const nodePolicy = asRecord(asRecord(profile.target_toolchain).node);
+  const requiredRange = asNonEmptyString(nodePolicy.required_range);
+  return requiredRange ? commands.map(wrapCommandWithTargetNodeEnv) : commands;
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   verification: Record<string, unknown>,
+ *   mission: Record<string, unknown>,
+ * }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildGeneratedVerificationCommandGroups(options) {
+  const applyEnvironment = (commands) => applyTargetExecutionEnvironmentToCommands(options.verification, commands);
+  const setupCommands = applyEnvironment(asStringArray(options.verification.setup_commands));
+  const baselineCommands = applyEnvironment(asStringArray(options.verification.commands));
+  const missionQuality = asRecord(options.mission.post_run_quality);
+  const primaryCommands = asStringArray(missionQuality.primary_commands);
+  const diagnosticCommands = applyEnvironment(applyTargetToolchainPolicyToCommands(
+    options.profile,
+    asStringArray(missionQuality.diagnostic_commands),
+  ));
+  const diagnosticFailureMode = asNonEmptyString(missionQuality.diagnostic_failure_mode) === "fail" ? "fail" : "warn";
+  const primaryGateCommands = primaryCommands.length > 0
+    ? applyEnvironment(applyTargetToolchainPolicyToCommands(options.profile, primaryCommands))
+    : baselineCommands;
+  return [
+    {
+      id: "target-readiness-setup",
+      role: "setup",
+      phase: "readiness",
+      enforcement: "required",
+      timeout_class: "install",
+      commands: setupCommands,
+    },
+    {
+      id: "baseline-target-verification",
+      role: "test",
+      phase: "baseline",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: baselineCommands,
+    },
+    {
+      id: "post-change-primary",
+      role: "test",
+      phase: "post-change",
+      enforcement: "required",
+      timeout_class: "focused-test",
+      commands: primaryGateCommands,
+    },
+    {
+      id: "post-run-diagnostic",
+      role: "full-suite",
+      phase: "diagnostic",
+      enforcement: diagnosticFailureMode === "fail" ? "required" : "warn",
+      timeout_class: "full-suite",
+      commands: diagnosticCommands,
+    },
+  ].filter((group) => Array.isArray(group.commands) && group.commands.length > 0);
+}
+
+function wrapCommandWithTargetExecutionEnvironment(command) {
+  return `CI=1 ${command}`;
+}
+
+function applyTargetExecutionEnvironmentToCommands(verification, commands) {
+  return asNonEmptyString(verification.execution_environment) === "ci"
+    ? commands.map(wrapCommandWithTargetExecutionEnvironment)
+    : commands;
+}
+
+/**
+ * @param {string} command
+ * @returns {string}
+ */
+function wrapCommandWithTargetNodeEnv(command) {
+  return `[ -z "\${AOR_LIVE_E2E_TARGET_NODE_BIN:-}" ] || export PATH="$(dirname "$AOR_LIVE_E2E_TARGET_NODE_BIN"):$PATH"; ${command}`;
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, verification: Record<string, unknown> }} options
+ * @returns {Record<string, unknown>}
+ */
+function applyTargetToolchainPolicy(options) {
+  const nodePolicy = asRecord(asRecord(options.profile.target_toolchain).node);
+  const requiredRange = asNonEmptyString(nodePolicy.required_range);
+  if (!requiredRange) return options.verification;
+  return {
+    ...options.verification,
+    target_toolchain: {
+      node: {
+        required_range: requiredRange,
+        env_override: asNonEmptyString(nodePolicy.env_override) || "AOR_LIVE_E2E_TARGET_NODE_BIN",
+      },
+    },
+    setup_commands: asStringArray(options.verification.setup_commands).map(wrapCommandWithTargetNodeEnv),
+    commands: asStringArray(options.verification.commands).map(wrapCommandWithTargetNodeEnv),
+  };
+}
+
+function applyTargetExecutionEnvironment(verification) {
+  const mode = asNonEmptyString(verification.execution_environment) || "default";
+  if (!new Set(["default", "ci"]).has(mode)) {
+    throw new Error(`Unsupported target execution environment '${mode}'.`);
+  }
+  if (mode === "default") return verification;
+  return {
+    ...verification,
+    effective_environment: { mode, variable_names: ["CI"] },
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} mission
+ * @returns {boolean}
+ */
+function requiresIsolatedProductVerification(mission) {
+  return (
+    asNonEmptyString(mission.mission_class) === "product-change" &&
+    PRODUCT_CHANGE_FEATURE_SIZES.has(asNonEmptyString(mission.feature_size))
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} mission
+ * @returns {string}
+ */
+function resolveGeneratedWorkspaceMode(profile, mission) {
+  const runtime = asRecord(profile.runtime);
+  const explicitVerificationMode = asNonEmptyString(runtime.target_verification_workspace_mode);
+  if (explicitVerificationMode) return explicitVerificationMode;
+  const declaredMode = asNonEmptyString(runtime.mode);
+  if (declaredMode && declaredMode !== "ephemeral") return declaredMode;
+  return requiresIsolatedProductVerification(mission) ? "workspace-clone" : declaredMode || "ephemeral";
+}
+
+/**
+ * @param {{
+ *   catalogVerification: Record<string, unknown>,
+ *   profileVerification: Record<string, unknown>,
+ *   mission?: Record<string, unknown>,
+ * }} options
+ */
+function resolveGeneratedProfileVerification(options) {
+  const missionQuality = asRecord(asRecord(options.mission).post_run_quality);
+  const catalogSetupCommands = asStringArray(options.catalogVerification.setup_commands);
+  const profileSetupCommands = asStringArray(options.profileVerification.setup_commands);
+  const catalogVerificationCommands = asStringArray(options.catalogVerification.commands);
+  const profileVerificationCommands = asStringArray(options.profileVerification.commands);
+  const missionPrimaryCommands = asStringArray(missionQuality.primary_commands);
+
+  return {
+    ...options.catalogVerification,
+    ...options.profileVerification,
+    setup_commands: profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+    commands:
+      profileVerificationCommands.length > 0
+        ? profileVerificationCommands
+        : missionPrimaryCommands.length > 0
+          ? missionPrimaryCommands
+          : catalogVerificationCommands,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} runtimeDefaults
+ * @returns {number | null}
+ */
+function resolveExplicitGeneratedProfileVerificationTimeoutSec(profile, runtimeDefaults) {
+  const livePolicy = asRecord(profile.live_e2e);
+  const verification = asRecord(profile.verification);
+  for (const candidate of [
+    livePolicy.target_command_timeout_sec,
+    verification.command_timeout_sec,
+    runtimeDefaults.verification_command_timeout_sec,
+  ]) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value > 0) {
+      return Math.floor(value);
+    }
+  }
+  return null;
 }
 
 /**
@@ -214,6 +590,8 @@ export function normalizeDeliveryMode(value) {
  *   profilePath: string,
  *   profile: Record<string, unknown>,
  *   catalogEntry?: Record<string, unknown>,
+ *   mission?: Record<string, unknown>,
+ *   providerVariant?: Record<string, unknown>,
  *   runId: string,
  *   targetCheckout: ReturnType<typeof materializeTargetCheckout>,
  *   generatedAssetsRoot: string,
@@ -252,7 +630,14 @@ export function materializeGeneratedProjectProfile(options) {
     ? /** @type {Array<Record<string, unknown>>} */ (JSON.parse(JSON.stringify(generatedProjectProfile.repos)))
     : [];
   const selectedRepo = asRecord(repos[0] ?? {});
-  selectedRepo.repo_id = options.targetCheckout.targetRepoId;
+  const catalogRepoId = asNonEmptyString(asRecord(options.catalogEntry).catalog_id);
+  const generatedRepoId = catalogRepoId || normalizeId(options.targetCheckout.targetRepoId);
+  if (!generatedRepoId) {
+    throw new Error(
+      `Live E2E target repository locator '${options.targetCheckout.targetRepoId}' cannot produce a canonical project repository id.`,
+    );
+  }
+  selectedRepo.repo_id = generatedRepoId;
   selectedRepo.name = options.targetCheckout.targetRepoId;
   selectedRepo.default_branch = options.targetCheckout.targetRepoRef;
   selectedRepo.role = asNonEmptyString(selectedRepo.role) || "application";
@@ -260,15 +645,40 @@ export function materializeGeneratedProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  hydrateRepoVerificationCommands(selectedRepo, {
-    ...asRecord(asRecord(options.catalogEntry).verification),
-    ...asRecord(options.profile.verification),
-  });
+  const generatedVerification = applyTargetExecutionEnvironment(applyTargetToolchainPolicy({
+    profile: options.profile,
+    verification: resolveGeneratedProfileVerification({
+      catalogVerification: asRecord(asRecord(options.catalogEntry).verification),
+      profileVerification: asRecord(options.profile.verification),
+      mission: asRecord(options.mission),
+    }),
+  }));
+  hydrateRepoVerificationCommands(selectedRepo, generatedVerification);
   generatedProjectProfile.repos = [selectedRepo];
+  generatedProjectProfile.verification = {
+    ...asRecord(generatedProjectProfile.verification),
+    command_groups: buildGeneratedVerificationCommandGroups({
+      profile: options.profile,
+      verification: generatedVerification,
+      mission: asRecord(options.mission),
+    }),
+  };
+  if (asRecord(generatedVerification.target_toolchain).node) {
+    generatedProjectProfile.target_toolchain = generatedVerification.target_toolchain;
+  }
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";
-  runtimeDefaults.workspace_mode = asNonEmptyString(asRecord(options.profile.runtime).mode) || "ephemeral";
+  runtimeDefaults.workspace_mode = resolveGeneratedWorkspaceMode(options.profile, asRecord(options.mission));
+  const explicitVerificationTimeoutSec = resolveExplicitGeneratedProfileVerificationTimeoutSec(
+    options.profile,
+    runtimeDefaults,
+  );
+  if (explicitVerificationTimeoutSec !== null) {
+    runtimeDefaults.verification_command_timeout_sec = explicitVerificationTimeoutSec;
+  } else {
+    delete runtimeDefaults.verification_command_timeout_sec;
+  }
   generatedProjectProfile.runtime_defaults = runtimeDefaults;
 
   const registryRoots = asRecord(generatedProjectProfile.registry_roots);
@@ -280,6 +690,21 @@ export function materializeGeneratedProjectProfile(options) {
     registryRoots[key] = path.join(options.generatedAssetsRoot, relative);
   }
   generatedProjectProfile.registry_roots = registryRoots;
+
+  const pinnedProvider = asNonEmptyString(asRecord(options.providerVariant).provider);
+  const pinnedAdapter = asNonEmptyString(asRecord(options.providerVariant).primary_adapter);
+  if (pinnedProvider) {
+    generatedProjectProfile.allowed_providers = Array.from(new Set([
+      ...asStringArray(generatedProjectProfile.allowed_providers),
+      pinnedProvider,
+    ]));
+  }
+  if (pinnedAdapter) {
+    generatedProjectProfile.allowed_adapters = Array.from(new Set([
+      ...asStringArray(generatedProjectProfile.allowed_adapters),
+      pinnedAdapter,
+    ]));
+  }
 
   const writebackPolicy = asRecord(generatedProjectProfile.writeback_policy);
   writebackPolicy.default_delivery_mode = normalizeDeliveryMode(
@@ -303,6 +728,7 @@ export function materializeGeneratedProjectProfile(options) {
   return {
     generatedProjectProfileFile,
     templateProjectProfilePath,
+    targetExecutionEnvironment: asRecord(generatedVerification.effective_environment),
   };
 }
 
@@ -315,10 +741,28 @@ function cloneRouteDocument(route) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNonNegativeInteger(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
+}
+
+/**
+ * @param {Record<string, unknown>} policy
+ * @returns {Record<string, unknown>}
+ */
+function clonePolicyDocument(policy) {
+  return /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(policy)));
+}
+
+/**
  * @param {{
  *   routesRoot: string,
  *   providerVariant: Record<string, unknown>,
  *   providerVariantId: string,
+ *   profile?: Record<string, unknown>,
  * }} options
  */
 export function materializeProviderPinnedRouteOverrides(options) {
@@ -359,6 +803,13 @@ export function materializeProviderPinnedRouteOverrides(options) {
     pinnedRoute.primary = primary;
     pinnedRoute.fallback = [];
     pinnedRoute.route_id = `${originalRouteId}.${normalizeId(options.providerVariantId)}`;
+    const stepTimeouts = asRecord(asRecord(options.profile).live_e2e).provider_step_timeouts_sec;
+    const stepTimeoutSec = Number(asRecord(stepTimeouts)[step]);
+    if (Number.isFinite(stepTimeoutSec) && stepTimeoutSec > 0) {
+      const constraints = asRecord(pinnedRoute.constraints);
+      constraints.timeout_sec = Math.floor(stepTimeoutSec);
+      pinnedRoute.constraints = constraints;
+    }
 
     const validation = validateContractDocument({
       family: "provider-route-profile",
@@ -379,5 +830,92 @@ export function materializeProviderPinnedRouteOverrides(options) {
   return {
     routeOverrides,
     routeFiles,
+  };
+}
+
+/**
+ * @param {{
+ *   policiesRoot: string,
+ *   providerVariantId: string,
+ *   providerVariant?: Record<string, unknown>,
+ *   profile?: Record<string, unknown>,
+ * }} options
+ */
+export function materializeProviderPinnedPolicyOverrides(options) {
+  const policiesRoot = options.policiesRoot;
+  if (!fileExists(policiesRoot) || !fs.statSync(policiesRoot).isDirectory()) {
+    throw new Error(`Policies root '${policiesRoot}' was not found for provider override materialization.`);
+  }
+
+  const livePolicy = asRecord(asRecord(options.profile).live_e2e);
+  const retryLimits = asRecord(livePolicy.provider_step_retry_max_attempts);
+  const repairLimits = asRecord(livePolicy.provider_step_repair_max_attempts);
+  const explicitSteps = [...new Set([...Object.keys(retryLimits), ...Object.keys(repairLimits)])]
+    .map((step) => asNonEmptyString(step))
+    .filter(Boolean);
+  const profileDeclaresAttemptPolicy = explicitSteps.length > 0;
+  const providerRouteSteps = asStringArray(asRecord(options.providerVariant).route_override_policy?.steps);
+  const steps = profileDeclaresAttemptPolicy
+    ? explicitSteps
+    : providerRouteSteps
+        .map((step) => asNonEmptyString(step))
+        .filter(Boolean);
+
+  /** @type {Record<string, string>} */
+  const policyOverrides = {};
+  /** @type {string[]} */
+  const policyFiles = [];
+
+  for (const step of steps) {
+    const stepClass = LIVE_E2E_STEP_POLICY_CLASSES[step];
+    if (!stepClass) {
+      continue;
+    }
+    const retryMaxAttempts = profileDeclaresAttemptPolicy ? asNonNegativeInteger(retryLimits[step]) : 0;
+    const repairMaxAttempts = profileDeclaresAttemptPolicy ? asNonNegativeInteger(repairLimits[step]) : 0;
+    if (retryMaxAttempts === null && repairMaxAttempts === null) {
+      continue;
+    }
+
+    const sourceFile = LIVE_E2E_POLICY_SOURCE_FILES[stepClass];
+    const sourcePath = path.join(policiesRoot, sourceFile);
+    if (!fileExists(sourcePath)) {
+      throw new Error(`Base step policy '${sourcePath}' was not found for provider override materialization.`);
+    }
+    const basePolicy = asRecord(readYamlDocument(sourcePath));
+    const pinnedPolicy = clonePolicyDocument(basePolicy);
+    const originalPolicyId = asNonEmptyString(basePolicy.policy_id) || `policy.step.${stepClass}.default`;
+    pinnedPolicy.policy_id = `${originalPolicyId}.${normalizeId(options.providerVariantId)}.${normalizeId(step)}.bounded`;
+
+    if (retryMaxAttempts !== null) {
+      const retry = asRecord(pinnedPolicy.retry);
+      retry.max_attempts = retryMaxAttempts;
+      pinnedPolicy.retry = retry;
+    }
+    if (repairMaxAttempts !== null) {
+      const repair = asRecord(pinnedPolicy.repair);
+      repair.max_attempts = repairMaxAttempts;
+      pinnedPolicy.repair = repair;
+    }
+
+    const validation = validateContractDocument({
+      family: "step-policy-profile",
+      document: pinnedPolicy,
+      source: `runtime://provider-policy-override/${normalizeId(options.providerVariantId)}/${step}`,
+    });
+    if (!validation.ok) {
+      const issues = validation.issues.map((issue) => issue.message).join("; ");
+      throw new Error(`Generated provider-pinned policy for step '${step}' failed validation: ${issues}`);
+    }
+
+    const policyFile = path.join(policiesRoot, `${step}-${normalizeId(options.providerVariantId)}-policy.yaml`);
+    fs.writeFileSync(policyFile, stringifyYaml(pinnedPolicy), "utf8");
+    policyOverrides[step] = /** @type {string} */ (pinnedPolicy.policy_id);
+    policyFiles.push(policyFile);
+  }
+
+  return {
+    policyOverrides,
+    policyFiles,
   };
 }

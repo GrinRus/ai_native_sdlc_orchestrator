@@ -1,0 +1,10 @@
+family: evaluation-case-expected
+case_id: case-gov-0001
+version: 1
+subject_type: run
+assertions:
+  - assertion_id: governance-run-documents-present
+    target: subject
+    path: /documents
+    operator: exists
+

@@ -4,6 +4,16 @@ step_id: step.runner.1
 step_class: runner
 status: pass
 summary: Canonical routed runner step with interaction and repair evidence.
+workspace_set_provenance:
+  workspace_set_ref: evidence://reports/workspace-set.run-canonical.json
+  workspace_root: .aor/projects/aor-core/workspace-sets/run-canonical
+  repository_map:
+    main:
+      mount_path: repos/main
+      execution_root: .aor/projects/aor-core/workspace-sets/run-canonical/repos/main
+      base_commit: "1111111111111111111111111111111111111111"
+      access_mode: write
+  cleanup_state: pending
 evidence_refs:
   - evidence://contracts/w23-s01/step-result
 runtime_harness_decision: pass

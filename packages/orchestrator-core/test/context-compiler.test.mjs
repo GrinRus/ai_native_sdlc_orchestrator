@@ -67,6 +67,134 @@ function resolveExecutionArtifacts(repoRoot, stepClass) {
   };
 }
 
+test("compileStepContext resolves distinct artifact workflow prompt refs and stable fingerprints", () => {
+  withTempRepo((repoRoot) => {
+    const cases = [
+      {
+        stepClass: "discovery",
+        promptBundleRef: "prompt-bundle://discovery-default@v1",
+        inputPacketRefs: ["packet://step-input-context"],
+        requiredPackets: ["step-input-context"],
+      },
+      {
+        stepClass: "research",
+        promptBundleRef: "prompt-bundle://research-default@v1",
+        inputPacketRefs: ["packet://discovery"],
+        requiredPackets: ["discovery"],
+      },
+      {
+        stepClass: "spec",
+        promptBundleRef: "prompt-bundle://spec-default@v1",
+        inputPacketRefs: ["packet://discovery", "packet://research"],
+        requiredPackets: ["discovery", "research"],
+      },
+    ];
+
+    const fingerprints = [];
+    for (const scenario of cases) {
+      const resolved = resolveExecutionArtifacts(repoRoot, scenario.stepClass);
+      const compile = () =>
+        compileStepContext({
+          projectRoot: repoRoot,
+          projectProfilePath: resolved.projectProfilePath,
+          stepClass: scenario.stepClass,
+          routeResolution: resolved.routeResolution,
+          assetResolution: resolved.assetResolution,
+          policyResolution: resolved.policyResolution,
+          inputPacketRefs: scenario.inputPacketRefs,
+          runtimeEvidenceRefs: [],
+          skillsRoot: path.join(repoRoot, "examples/skills"),
+        });
+
+      const compiled = compile();
+      const repeated = compile();
+      assert.equal(resolved.assetResolution.prompt_bundle.prompt_bundle_ref, scenario.promptBundleRef);
+      assert.equal(
+        compiled.compiled_context.provenance.prompt_bundle_resolution_source.field,
+        `default_prompt_bundles.${scenario.stepClass}`,
+      );
+      assert.equal(
+        compiled.context_compilation.included_sources.find((source) => source.kind === "prompt-bundle")?.reference,
+        scenario.promptBundleRef,
+      );
+      assert.deepEqual(
+        compiled.compiled_context.required_inputs_resolved.packets.required.map((entry) => entry.packet),
+        scenario.requiredPackets,
+      );
+      assert.equal(compiled.compiled_context.compiled_context_fingerprint.length, 64);
+      assert.equal(
+        compiled.compiled_context.compiled_context_fingerprint,
+        repeated.compiled_context.compiled_context_fingerprint,
+      );
+      fingerprints.push(compiled.compiled_context.compiled_context_fingerprint);
+    }
+
+    assert.equal(new Set(fingerprints).size, 3);
+  });
+});
+
+test("compileStepContext keeps artifact workflows on shared context skill and policy provenance", () => {
+  withTempRepo((repoRoot) => {
+    const cases = [
+      {
+        stepClass: "discovery",
+        promptBundleRef: "prompt-bundle://discovery-default@v1",
+        inputPacketRefs: ["packet://step-input-context"],
+      },
+      {
+        stepClass: "research",
+        promptBundleRef: "prompt-bundle://research-default@v1",
+        inputPacketRefs: ["packet://discovery"],
+      },
+      {
+        stepClass: "spec",
+        promptBundleRef: "prompt-bundle://spec-default@v1",
+        inputPacketRefs: ["packet://discovery", "packet://research"],
+      },
+    ];
+
+    for (const scenario of cases) {
+      const resolved = resolveExecutionArtifacts(repoRoot, scenario.stepClass);
+      const compiled = compileStepContext({
+        projectRoot: repoRoot,
+        projectProfilePath: resolved.projectProfilePath,
+        stepClass: scenario.stepClass,
+        routeResolution: resolved.routeResolution,
+        assetResolution: resolved.assetResolution,
+        policyResolution: resolved.policyResolution,
+        inputPacketRefs: scenario.inputPacketRefs,
+        runtimeEvidenceRefs: [],
+        skillsRoot: path.join(repoRoot, "examples/skills"),
+      });
+
+      assert.equal(resolved.routeResolution.route_profile.route_class, "artifact");
+      assert.equal(resolved.assetResolution.wrapper.wrapper_ref, "wrapper.artifact.default@v1");
+      assert.equal(resolved.assetResolution.prompt_bundle.prompt_bundle_ref, scenario.promptBundleRef);
+      assert.deepEqual(compiled.compiled_context.context_refs.context_bundle_refs, [
+        "context-bundle://context.bundle.artifact.foundation@v1",
+      ]);
+      assert.deepEqual(compiled.compiled_context.skill_refs, ["skill.artifact.default@v1"]);
+      assert.equal(compiled.compiled_context.guardrails.policy_id, "policy.step.artifact.default");
+      assert.equal(
+        compiled.compiled_context.provenance.context_bundle_sources.map((source) => path.basename(source)).join(","),
+        "artifact-foundation.yaml",
+      );
+      assert.equal(
+        compiled.compiled_context.provenance.skill_profile_sources.map((source) => path.basename(source)).join(","),
+        "skill-artifact-default.yaml",
+      );
+      assert.equal(
+        compiled.compiled_context.provenance.skill_resolution_source.field,
+        "default_skill_profiles.artifact",
+      );
+      assert.equal(
+        compiled.compiled_context.provenance.policy_resolution_source.field,
+        "default_step_policies.artifact",
+      );
+    }
+  });
+});
+
 test("compileStepContext produces compiled context and diagnostics for adapter injection", () => {
   withTempRepo((repoRoot) => {
     const resolved = resolveExecutionArtifacts(repoRoot, "implement");
@@ -252,5 +380,39 @@ test("compileStepContext uses project defaults when step override is absent", ()
 
     assert.deepEqual(compiled.compiled_context.skill_refs, ["skill.repair.default@v1"]);
     assert.equal(compiled.compiled_context.provenance.skill_resolution_source.field, "default_skill_profiles.repair");
+  });
+});
+
+test("effective context content is delivered inline and content changes invalidate the fingerprint", () => {
+  withTempRepo((repoRoot) => {
+    const compile = () => {
+      const resolved = resolveExecutionArtifacts(repoRoot, "implement");
+      return compileStepContext({
+        projectRoot: repoRoot,
+        projectProfilePath: resolved.projectProfilePath,
+        stepClass: "implement",
+        routeResolution: resolved.routeResolution,
+        assetResolution: resolved.assetResolution,
+        policyResolution: resolved.policyResolution,
+        inputPacketRefs: ["packet://handoff", "packet://spec"],
+        runtimeEvidenceRefs: [],
+        skillsRoot: path.join(repoRoot, "examples/skills"),
+      });
+    };
+    const first = compile();
+    const safetyRule = first.compiled_context.effective_assets.find(
+      (entry) => entry.reference === "context-rule://context.rule.public-repo-safety@v1",
+    );
+    assert.equal(safetyRule.delivery_mode, "inline");
+    assert.match(safetyRule.content, /bounded and evidence-first/u);
+
+    const rulePath = path.join(repoRoot, "examples/context/rules/public-repo-safety.yaml");
+    fs.writeFileSync(rulePath, fs.readFileSync(rulePath, "utf8").replace("evidence-first", "content-addressed"));
+    const second = compile();
+    assert.notEqual(
+      first.compiled_context.compiled_context_fingerprint,
+      second.compiled_context.compiled_context_fingerprint,
+    );
+    assert.equal(first.compiled_context.context_refs.context_rule_refs[0], second.compiled_context.context_refs.context_rule_refs[0]);
   });
 });

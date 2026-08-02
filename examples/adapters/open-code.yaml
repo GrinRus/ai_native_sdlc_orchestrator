@@ -1,6 +1,16 @@
 adapter_id: open-code
 runner_family: opencode
 version: 1
+default_model: openai/gpt-5.5
+supported_models:
+  - openai/gpt-5.5
+model_aliases:
+  coding-primary: openai/gpt-5.5
+  coding-fallback: openai/gpt-5.5
+  planning-primary: openai/gpt-5.5
+  planning-fallback: openai/gpt-5.5
+  judge-primary: openai/gpt-5.5
+  judge-fallback: openai/gpt-5.5
 launch_modes:
   - interactive
   - non-interactive
@@ -23,8 +33,10 @@ execution:
   evidence_namespace: evidence://adapter-live/open-code
   external_runtime:
     command: opencode
+    model_argument:
+      flag: --model
     permission_policy:
-      default_mode: full-bypass
+      default_mode: restricted
       modes:
         full-bypass:
           args:
@@ -38,16 +50,23 @@ execution:
             - --format
             - json
     request_via_stdin: false
-    request_transport: file-attachment
+    request_transport: request-artifact
     request_file:
-      message: Follow the attached AOR adapter request JSON.
+      mode: native-file-argument
+      message: Execute the approved AOR implementation using the attached AOR provider work packet JSON. Open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when required, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet.
       argument: --file
     preflight_timeout_ms: 120000
-    timeout_ms: 600000
+    timeout_ms: 3600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
   supports_pause_resume: false
+  continuation_strategy: reinvoke
+  approval_grant_scope: tool-call-scoped
+  approval_resume_mode: restricted
+  permission_request_detection:
+    - structured-output
+    - stdout-stderr-patterns
 log_features:
   stdout: true
   stderr: true

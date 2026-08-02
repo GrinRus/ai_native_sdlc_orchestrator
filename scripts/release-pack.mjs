@@ -22,7 +22,7 @@ if (jsonStart < 0) {
 
 const packJson = JSON.parse(packRun.stdout.slice(jsonStart));
 const files = packedFilesFromNpmPackJson(packJson);
-const validation = validatePackedFiles(files);
+const validation = validatePackedFiles(files, { rootDir: process.cwd() });
 
 if (!validation.ok) {
   process.stderr.write("release pack failed:\n");

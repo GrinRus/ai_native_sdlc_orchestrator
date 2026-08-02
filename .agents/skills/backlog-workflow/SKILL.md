@@ -8,7 +8,10 @@ description: Use when you need to choose a delivery slice, derive local tasks, s
 3. Use `docs/backlog/mvp-implementation-backlog.md` to find a `ready` slice or the next blocked slice whose dependencies you are explicitly closing.
 4. Confirm the hard-dependency order in `docs/backlog/slice-dependency-graph.md`.
 5. Prefer `pnpm slice:status` and `pnpm slice:next` so selection follows topological order with explicit fallback to an unblocker.
-6. Open the owning wave document and begin with its built-in `### Local tasks` section, or run `pnpm slice:plan -- <SLICE_ID>`.
+6. Open the owning wave document and begin with its built-in `### Local tasks`
+   section, or run `pnpm slice:plan -- <SLICE_ID>`. For new medium+ slices,
+   preserve each task's Purpose, concrete Changes, and Validation detail rather
+   than reducing it to a one-line checklist item.
 7. Refine those local tasks branch-locally if needed, but stay inside one slice unless the work has become a new independently acceptable outcome.
 8. If behavior changes are user-visible, use `story-traceability` to verify the slice still closes the intended user outcome.
 9. Before commit, run `pnpm slice:gate` so `lint`, `test`, `build`, and `check` all pass in sequence.

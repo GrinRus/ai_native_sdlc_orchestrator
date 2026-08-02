@@ -22,6 +22,61 @@ mission_state:
     - apps/web/**
   forbidden_paths:
     - packages/settlement/**
+artifact_readiness:
+  policy:
+    mode: strict
+    allow_incomplete_research_for_spec: false
+    reason: null
+  stages:
+    mission:
+      status: complete
+      evidence_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+      reason: Mission intake is complete and current.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+      soft_decision: null
+    discovery:
+      status: complete
+      evidence_ref: evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+      reason: Discovery evidence is complete and current.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+      soft_decision: null
+    research:
+      status: adr-ready
+      evidence_ref: evidence://.aor/projects/aor-core/reports/discovery-research-report.json
+      reason: Research evidence is ADR-ready.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/reports/discovery-research-report.json
+      soft_decision: null
+    spec:
+      status: ready
+      evidence_ref: evidence://.aor/projects/aor-core/reports/step-result-spec-artifact.json
+      reason: Spec evidence is current and can feed planning.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+        - evidence://.aor/projects/aor-core/reports/discovery-research-report.json
+        - evidence://.aor/projects/aor-core/reports/step-result-spec-artifact.json
+      soft_decision: null
+    planning:
+      status: ready
+      evidence_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
+      reason: Planning evidence is current.
+      blocked_reasons: []
+      stale_reasons: []
+      required_evidence_refs:
+        - evidence://.aor/projects/aor-core/reports/step-result-spec-artifact.json
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
+      soft_decision: null
 closure_state:
   run_id: run.closure.checkout-risk
   review:

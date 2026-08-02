@@ -17,7 +17,7 @@ if (!loadedExamples.ok) {
   process.exit(1);
 }
 
-const referenceValidation = validateExampleReferences({ workspaceRoot });
+const referenceValidation = validateExampleReferences({ workspaceRoot, loadedExamples });
 if (!referenceValidation.ok) {
   console.error("Example reference integrity failed:");
   for (const issue of referenceValidation.issues) {

@@ -1,5 +1,10 @@
 # Live run event
 
+`event_id` and `run_id` use the canonical public-ID grammar in
+`canonical-identifiers-and-paths.md`. Event identity is data, not a path or SSE
+field; CR/LF, separators, traversal, and normalization-derived values are
+rejected.
+
 ## Purpose
 Normalized event emitted during workflow execution for CLI, API, and web subscribers.
 
@@ -13,7 +18,11 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
 ## Event types
 `event_type` must be one of:
 - `run.started`
+- `parent.started`
+- `parent.updated`
+- `parent.terminal`
 - `step.updated`
+- `provider.heartbeat`
 - `evidence.linked`
 - `warning.raised`
 - `run.terminal`
@@ -22,8 +31,18 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
 - `payload.sequence` is required and must increase monotonically within one `run_id`.
 - `payload` should include only query-safe fields needed by CLI/web subscribers (ids, refs, status, summaries).
 - For later operator troubleshooting, payloads may include `policy_context` (for example action risk tier and approval requirement flags) when the emitter has policy guardrail context.
+- `provider.heartbeat` payloads may include `provider_step_status`, using the same
+  public heartbeat shape as control-plane project state and run summaries. These
+  payloads must keep provider progress summarized and must not include raw
+  process commands, command args, prompts, file contents, environment values,
+  bearer tokens, auth tokens, or provider secrets.
 - W18 interactive continuation events should use existing query-safe event types such as `step.updated`, `warning.raised`, and `evidence.linked` unless the contract family is intentionally expanded. Payloads should point to `requested_interaction` and answer audit evidence refs rather than embedding sensitive answer text.
 - W20 production hardening requires event emitters and stream presenters to apply the configured redaction policy before JSONL append or SSE replay. Configured bearer tokens and explicit redaction values must not appear in live-event logs or stream payloads.
+- Parent lifecycle events use `payload.parent_event_version: 1`. `parent.started`
+  records the durable parent identity and launch transaction, `parent.updated`
+  records a query-safe action or child transition, and `parent.terminal` records
+  the final aggregate status. A parent event must be appended only after the
+  corresponding parent state revision is durable.
 
 ## Interactive continuation payload convention
 Runner-requested questions are represented as run events about a persisted `step-result.requested_interaction`, not as UI-local state.
@@ -55,3 +74,21 @@ The shared contract loader validates the query-safe nested event surface:
 Live events should support catch-up from a read model plus the live stream.
 Reconnect behavior should support replay from the last acknowledged `event_id`.
 Backpressure should use a bounded replay window and avoid unbounded in-memory buffering.
+Live delivery tails the durable journal from a byte cursor. A process-local
+emitter is not authoritative and is not required for cross-worker delivery.
+`maxReplay=0` means no replay; positive requests are capped at 1000. Slow SSE
+clients are disconnected with their last event id as the recovery cursor.
+
+Event append is a transactional identity operation. Writers serialize through a
+per-log cross-process lease and persist a recoverable append transaction before
+the journal, cursor, and request-key sidecar are committed. The journal owns the
+sequence; startup reconciliation completes an interrupted transaction without
+losing, duplicating, or skipping its event. `event_id` is derived from the
+validated `run_id` and monotonic journal sequence. Callers may supply a
+canonical request key: replaying the same key and payload returns the original
+event, while reusing it with different content is a typed conflict.
+
+SSE startup reads only a bounded journal tail, emits named
+`live-run-event` records, and closes a late follow after an already durable
+terminal event. Browser clients subscribe to that named event and reconnect
+with the last event id.

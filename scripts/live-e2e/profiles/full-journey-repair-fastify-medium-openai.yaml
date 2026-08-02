@@ -1,0 +1,81 @@
+profile_id: live-e2e.full-journey.repair.fastify.medium.openai
+version: 1
+journey_mode: full-journey
+flow_kind: repair
+duration_class: long
+live_e2e:
+  flow_range_policy: delivery_default
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: skill-agent
+  agent_decision_policy: required
+  interaction_answer_policy: agent-required
+  target_write_policy: aor-runtime-only-before-execution
+implementation_loop:
+  enabled: true
+  max_iterations: 3
+  review_repair_actions:
+    - request-repair
+    - failed-quality-findings
+  cycle_steps:
+    - execution
+    - review
+    - qa
+  repair_sources:
+    - review
+    - qa
+    - post-run-primary
+    - post-run-diagnostic
+  stop_on_blocking_review: true
+  proof_expectations:
+    required_repair_paths:
+      - review-origin
+      - qa-origin
+      - budget-exhaustion
+    require_quality_repair_request_refs: true
+    require_implementation_repair_refs: true
+    require_review_rerun_refs: true
+    require_qa_rerun_refs: true
+    qa_origin_requires_post_repair_review: true
+    budget_exhaustion_operator_hold_required: true
+    no_upstream_write_evidence_required: true
+    acceptance_repair_drill:
+      source_phase: review
+      trigger: when-no-organic-repair
+      finding_id: w45.fastify.review.acceptance-drill
+      summary: W45 review-origin acceptance drill requires one public repair iteration after clean review evidence.
+      resolution_requirement: Complete a bounded public repair execution that refreshes the changed Fastify test or type evidence, then rerun review and QA before delivery.
+target_catalog_id: fastify
+feature_mission_id: fastify-schema-plugin-repair
+scenario_family: repair
+provider_variant_id: openai-primary
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
