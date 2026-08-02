@@ -611,7 +611,8 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S15 | Structured stream failure-signal classification | EPIC-0, EPIC-4, EPIC-7 | done | adapter failure classifier, live-adapter preflight, structured-stream regressions | W66-S14 |
 | W66-S16 | Provider work-packet command-role separation | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet v2, generated command roles, repair convergence regressions | W66-S15 |
 | W66-S17 | Environment-qualified provider command identity | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet command identity, environment-qualified allowlist parity, adapter regressions | W66-S16 |
-| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S17 |
+| W66-S18 | Guided diagnostic timeout alignment | EPIC-0, EPIC-4, EPIC-7 | done | private guided profile timeout policy, diagnostic timeout and cleanup regressions | W66-S17 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S18 |
 
 ## Planning note
 Every wave document includes a starter local-task outline for each slice. New

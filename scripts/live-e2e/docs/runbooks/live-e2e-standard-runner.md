@@ -35,7 +35,10 @@ pre-product-execution blocker classification.
 Installed-user guided profiles may set
 `live_e2e.guided_warn_diagnostic_timeout_sec` for non-blocking post-guided-proof
 diagnostics; this timeout only applies when the mission diagnostic failure mode
-is `warn`.
+is `warn`. The Ky installed qualification profile uses `1800` seconds because
+its complete diagnostic suite can validly exceed ten minutes; the timeout is
+still capped by `target_command_timeout_sec`, preserves the per-command hard
+bound, and retains process-group cleanup on exhaustion.
 
 Live E2E provider parity is required across Codex, Claude, OpenCode, and Qwen.
 Provider-specific behavior belongs only at the adapter boundary: command shape,
@@ -557,6 +560,8 @@ Full-journey layer:
   until after guided browser proof materializes and use
   `live_e2e.guided_warn_diagnostic_timeout_sec` (default `120`) so target-side
   timing-sensitive tests cannot prevent UI/accessibility evidence collection;
+  the installed Ky qualification profile explicitly raises this aggregate
+  diagnostic allowance to `1800` seconds without changing the default;
 - has the runner prepare one structured feature request input under AOR run state;
 - requires small catalog missions to use `mission_class=flow-regression`; requires medium, large, and xlarge catalog missions to use `mission_class=product-change` with `agent_visible_request`, evaluator/final-code rubrics, widened budgets, goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands; xlarge remains manual observation evidence and cannot close required acceptance;
 - materializes provider-pinned route and policy overrides in host-side AOR run

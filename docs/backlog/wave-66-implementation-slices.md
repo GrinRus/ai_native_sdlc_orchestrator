@@ -1107,6 +1107,72 @@ installed-console gates are trustworthy.
   provider execution, four-cell closure, or production clearance. If guided
   diagnostic timeout alignment is later required, it becomes W66-S18.
 
+## W66-S18 — Guided diagnostic timeout alignment
+
+- **Epic:** EPIC-0, EPIC-4, EPIC-7
+- **State:** done
+- **Outcome:** The installed Ky guided qualification profile gives the complete
+  non-blocking diagnostic suite a realistic aggregate allowance without
+  weakening per-command bounds, cleanup, or product acceptance policy.
+- **Delivery priority:** P0
+- **Estimated effort:** S
+- **Primary modules:** private guided live-E2E profile, timeout resolver tests,
+  live-E2E operator runbook
+- **Hard dependencies:** W66-S17
+- **Primary user story surfaces:** DEV-04, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Diagnostic evidence disposition**
+   - Purpose: Preserve the successful provider and primary evidence while
+     preventing a timed-out diagnostic run from entering qualification.
+   - Changes: Record `w66-s17-guided-b762eb46-r1-20260802` as diagnostic-only
+     evidence with `run_health=warn`, owned by the target-repository diagnostic
+     phase, and invalidate all qualification evidence on `b762eb46`.
+   - Validation: Medium cells remain not run and W66-S09 stays blocked until a
+     new behavior commit is frozen.
+2. **Private aggregate timeout alignment**
+   - Purpose: Allow the complete Ky suite, already observed to exceed 600
+     seconds, to finish without changing provider execution policy.
+   - Changes: Raise only
+     `live_e2e.guided_warn_diagnostic_timeout_sec` from 600 to 1800 for the
+     installed guided profile; keep the per-command timeout, warning failure
+     mode, process-group cleanup, and default policy unchanged.
+   - Validation: A synthetic duration above 600 seconds is within the profile
+     allowance, while a lower target-command bound still caps the aggregate
+     timeout.
+3. **Deterministic closure and qualification reset**
+   - Purpose: Establish a clean behavior commit before another provider call.
+   - Changes: Run focused timeout/profile tests, root/browser/package/install
+     gates, close S18, sync readiness, and freeze a replacement manifest.
+   - Validation: `pnpm slice:gate -- W66-S18` passes without a paid provider
+     call and W66-S09 returns to active only after the new commit is frozen.
+
+### Acceptance criteria
+
+1. The installed guided Ky profile uses an 1800-second aggregate warning
+   diagnostic timeout while the repository default remains 120 seconds.
+2. Per-command timeout capping, hard-timeout classification, and descendant
+   process cleanup remain intact.
+3. A complete diagnostic suite taking more than 600 seconds can finish within
+   the explicit profile allowance.
+4. The previous guided run remains diagnostic only and no medium or large
+   provider cell runs before S18 closes.
+5. Focused tests and all deterministic slice gates pass.
+
+### Done evidence
+
+- Profile-specific timeout-resolution regression and existing hard-timeout,
+  run-health, and process-group cleanup regressions.
+- Deterministic gate results, closed W66-S18 slice, and replacement frozen
+  qualification manifest.
+
+### Out of scope
+
+- Provider/session-budget changes, sandbox relaxation, product API or wire
+  changes, large provider execution, four-cell closure, or production
+  clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
@@ -1118,7 +1184,7 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S17
+- **Hard dependencies:** W66-S18
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks

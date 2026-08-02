@@ -2958,7 +2958,7 @@ function resolveLiveE2eTargetCommandTimeoutMs(profile) {
  * @param {Record<string, unknown>} profile
  * @returns {number}
  */
-function resolveGuidedWarnDiagnosticTimeoutMs(profile) {
+export function resolveGuidedWarnDiagnosticTimeoutMs(profile) {
   const livePolicy = asRecord(profile.live_e2e);
   const explicitTimeoutSec =
     positiveIntegerOrNull(livePolicy.guided_warn_diagnostic_timeout_sec) ??

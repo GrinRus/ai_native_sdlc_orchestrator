@@ -55,6 +55,7 @@ import {
   resolveActiveAcceptanceRepairDrill,
   resolveAuditHoldOverrideArgs,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
+  resolveGuidedWarnDiagnosticTimeoutMs,
   sourceInstallCacheMatches,
   shouldDeferGuidedWarnDiagnostic,
 } from "../lib/flows.mjs";
@@ -4378,7 +4379,33 @@ test("guided UI proof defers warn diagnostics until browser evidence is material
   assert.ok(guidedWebSmokeIndex < deferredDiagnosticRunIndex);
   assert.match(flowSource, /function resolveGuidedWarnDiagnosticTimeoutMs/u);
   assert.match(flowSource, /allowFailureResult: runOptions\.allowFailureResult === true/u);
-  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 600/u);
+  assert.match(profileSource, /guided_warn_diagnostic_timeout_sec: 1800/u);
+  assert.equal(
+    resolveGuidedWarnDiagnosticTimeoutMs({
+      live_e2e: {
+        guided_warn_diagnostic_timeout_sec: 1800,
+        target_command_timeout_sec: 1800,
+      },
+    }),
+    1_800_000,
+  );
+  assert.ok(
+    resolveGuidedWarnDiagnosticTimeoutMs({
+      live_e2e: {
+        guided_warn_diagnostic_timeout_sec: 1800,
+        target_command_timeout_sec: 1800,
+      },
+    }) > 600_000,
+  );
+  assert.equal(
+    resolveGuidedWarnDiagnosticTimeoutMs({
+      live_e2e: {
+        guided_warn_diagnostic_timeout_sec: 1800,
+        target_command_timeout_sec: 900,
+      },
+    }),
+    900_000,
+  );
   assert.equal(shouldDeferGuidedWarnDiagnostic({
     guidedJourneyEnabled: true,
     diagnosticFailureMode: "warn",
