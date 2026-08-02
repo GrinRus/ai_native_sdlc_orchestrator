@@ -1362,6 +1362,58 @@ behavior changes.
   close W66-S09, and does not grant release clearance. The release disposition
   remains `audit-hold` with `release_clearance=false`.
 
+### Guided plus OpenAI-medium checkpoint — 2026-08-02
+
+This checkpoint records the user-bounded qualification scope after W66-S19.
+It is valid evidence for the frozen behavior commit, but it is not the complete
+four-cell W66 matrix because Anthropic medium and both large cells were not run.
+
+- Qualification commit:
+  `c933235e046ef476707c7222ec4761223b86d937`.
+- Pinned `ky` target commit:
+  `3419113b48e034fdcf8fa6bd3be3da7b3d0d758f`.
+- Frozen manifest SHA-256:
+  `faf4de5e95131235023fdfa01ca7ffe99cf8481ca426cc227fb063f88bb3141d`.
+- Installed guided baseline:
+  `w66-s19-guided-c933235e-r1-20260802`, status `pass`,
+  `run_health=pass`, primary verification `pass`, diagnostic verification
+  `pass`, UI/UX and accessibility `pass`, and no-upstream-write checks `pass`.
+  - Run summary SHA-256:
+    `462ba170357d290314de1f74d5008a5a435a20d00da453bbc286ebee94716f8f`.
+  - Observation report SHA-256:
+    `ccd5604be7a1ecb9cf413b2cbd2458e7596b9a4f03d57462289f9695444741cf`.
+  - Run-health report SHA-256:
+    `2ad008351e6fcd8e2b9f5eb6d95dcd6142182b0c3c2adf8b5fe46a6a0559db45`.
+  - Browser-task proof SHA-256:
+    `7b0f4ecd283d87bf2b3866976dbc4e5f967f8df6c648d7755ddafaa91c23b495`.
+- `openai-primary.medium`:
+  `w66-s19-openai-medium-c933235e-r1-20260802`, status `passed`,
+  `run_health=pass`, production proof `pass`, primary and diagnostic
+  verification `pass`, final assessment all-pass, and no-upstream-write checks
+  `pass`. The meaningful target diff is limited to `source/core/Ky.ts` and
+  `source/types/retry.ts` in the disposable workspace.
+  - Run summary SHA-256:
+    `6526d48b72a58d0ea723bb45e947e503fcd009dc0646c08a98755669ed6c62ed`.
+  - Observation report SHA-256:
+    `c0e5e52e75f2bc4a74f5c395cf4a4b666678254f8ef38076c329d965827da178`.
+  - Run-health report SHA-256:
+    `1fce53e4da0f5ce2f0407e26b9bc64799f9a8639ab9610a5a7cd5a1bb4ba4c1b`.
+  - Final assessment SHA-256:
+    `42ef9b97ee19a4e70362ba0bbfd02d3b8594ecc2eb7ddeee5bfe6b169f450ae4`.
+  - Qualification-cell report SHA-256:
+    `1bc06981105803c640620c9d922282354409cf74a0f29d9348ebd63d6c159176`.
+  - Qualification analysis SHA-256:
+    `bb8960eb6841fa3d8867837aa196f479b47b5e14d02296726165449159351b16`.
+- `anthropic-primary.medium`, `openai-primary.large`, and
+  `anthropic-primary.large` were not run. No result is inferred for them.
+- The local qualification set SHA-256 is
+  `7eb5a844bbdf056cdfc34fe30d0626e94cfa4d9cc33a82b084bd6960ab0acedd`;
+  its required matrix is blocked only by the three intentionally missing
+  cells.
+- The committed closure index remains pending, W66-S09 remains `active`, and
+  the release disposition remains `audit-hold` with
+  `release_clearance=false`.
+
 ### Acceptance criteria
 
 1. All four cells use one AOR commit and one pinned target commit.
