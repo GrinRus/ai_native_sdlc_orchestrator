@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "wave_id": "W58",
+  "title": "Runtime-quality remediation closure",
+  "status": "passed",
+  "closed_at": "2026-07-16",
+  "release_disposition_after_wave": "audit-hold",
+  "release_clearance": false,
+  "integration_profile": {
+    "command": "pnpm w58:proof",
+    "implementation": "scripts/w58-runtime-quality-proof.mjs",
+    "report": "node_modules/.cache/aor/w58-runtime-quality-proof.json",
+    "status": "passed",
+    "surfaces": ["module", "HTTP", "CLI", "SSE", "worker", "packaged-SPA"],
+    "external_network_calls": false,
+    "credentialed_provider_calls": false,
+    "paid_judge_calls": false,
+    "upstream_writes": false
+  },
+  "fail_closed_matrix": [
+    {"case":"missing-or-wrong-family-evaluation-case","evidence_refs":["packages/orchestrator-core/test/eval-runner.test.mjs"]},
+    {"case":"changed-content-or-stale-capture","evidence_refs":["packages/orchestrator-core/test/harness-capture-replay.test.mjs"]},
+    {"case":"unlisted-failure-kind","evidence_refs":["packages/orchestrator-core/test/policy-resolution.test.mjs"]},
+    {"case":"foreign-origin-and-oversized-body","evidence_refs":["apps/api/test/http-transport.test.mjs","scripts/w58-runtime-quality-proof.mjs"]},
+    {"case":"malformed-openapi-fixture","evidence_refs":["scripts/test/production-readiness.test.mjs"]}
+  ],
+  "test_discovery": {
+    "manifest": "scripts/test-manifest.json",
+    "execution_report": "node_modules/.cache/aor/test-execution-manifest.json",
+    "expected_tracked_test_files": 61,
+    "required_execution_count": 61,
+    "exclusions": 0
+  },
+  "package_smoke": {
+    "commands": ["pnpm release:pack", "pnpm release:smoke"],
+    "report": "node_modules/.cache/aor/release-smoke-report.json",
+    "status": "passed",
+    "network_writes": false,
+    "upstream_writes": false,
+    "credentialed_provider_calls": false
+  },
+  "dependency_audit": {
+    "commands": ["pnpm audit --prod --json", "pnpm audit:prod:bulk"],
+    "status": "passed-via-supported-bulk-endpoint",
+    "pnpm_audit_observed_error": "ERR_PNPM_AUDIT_BAD_RESPONSE: legacy npm audit endpoint returned HTTP 410",
+    "bulk_report": "node_modules/.cache/aor/dependency-audit-prod.json",
+    "advisory_count": 0
+  },
+  "findings": [
+    {"finding_id":"AUD-006","disposition":"resolved","evidence_refs":["docs/contracts/run-job.md","apps/api/test/http-transport.test.mjs"]},
+    {"finding_id":"AUD-009","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/delivery-driver.test.mjs"]},
+    {"finding_id":"AUD-010","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/runtime-mission-lineage.test.mjs"]},
+    {"finding_id":"AUD-012","disposition":"resolved","evidence_refs":["packages/harness/test/scorer-interface.test.mjs","packages/orchestrator-core/src/eval-runner.mjs"]},
+    {"finding_id":"AUD-018","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/context-compiler.test.mjs"]},
+    {"finding_id":"AUD-019","disposition":"resolved","evidence_refs":["apps/api/test/read-surface.test.mjs"]},
+    {"finding_id":"AUD-020","disposition":"resolved","evidence_refs":["apps/api/test/http-transport.test.mjs"]},
+    {"finding_id":"AUD-021","disposition":"resolved","evidence_refs":["apps/api/test/live-event-stream.test.mjs"]},
+    {"finding_id":"AUD-024","disposition":"resolved","evidence_refs":["packages/adapter-sdk/test/adapter-sdk.test.mjs"]},
+    {"finding_id":"AUD-025","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/step-execution-engine.test.mjs"]},
+    {"finding_id":"AUD-026","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/policy-resolution.test.mjs"]},
+    {"finding_id":"AUD-027","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/harness-capture-replay.test.mjs"]},
+    {"finding_id":"AUD-028","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/asset-loader.test.mjs"]},
+    {"finding_id":"AUD-032","disposition":"resolved","evidence_refs":["apps/api/test/live-event-stream.test.mjs"]},
+    {"finding_id":"AUD-033","disposition":"resolved","evidence_refs":["apps/api/test/live-event-stream.test.mjs"]},
+    {"finding_id":"AUD-034","disposition":"resolved","evidence_refs":["apps/api/test/http-transport.test.mjs"]},
+    {"finding_id":"AUD-035","disposition":"resolved","evidence_refs":["scripts/lint.mjs"]},
+    {"finding_id":"AUD-036","disposition":"resolved","evidence_refs":["apps/api/test/read-surface.test.mjs"]},
+    {"finding_id":"AUD-037","disposition":"resolved","evidence_refs":["docs/contracts/control-plane-api.openapi.json"]},
+    {"finding_id":"AUD-038","disposition":"resolved","evidence_refs":["apps/cli/test/cli.test.mjs","apps/api/test/http-transport.test.mjs"]},
+    {"finding_id":"AUD-045","disposition":"resolved","evidence_refs":["packages/orchestrator-core/src/operator-cli/app-launcher.mjs"]},
+    {"finding_id":"AUD-046","disposition":"resolved","evidence_refs":["packages/orchestrator-core/src/control-plane/http/http-utils.mjs"]},
+    {"finding_id":"AUD-048","disposition":"resolved","evidence_refs":["scripts/lint.mjs"]},
+    {"finding_id":"AUD-052","disposition":"resolved","evidence_refs":["packages/orchestrator-core/test/asset-loader.test.mjs"]}
+  ],
+  "remaining_w59_findings": [
+    "AUD-039", "AUD-040", "AUD-041", "AUD-042", "AUD-043", "AUD-044",
+    "AUD-049", "AUD-050", "AUD-051", "AUD-053", "AUD-054", "AUD-055"
+  ],
+  "remaining_release_boundary": {
+    "owner_waves": ["W59"],
+    "reason": "W58 closes runtime truthfulness and the local transport boundary; browser behavior, maintainability, diagnostic lint, and remaining refactoring evidence stay assigned to W59.",
+    "production_ready": false
+  }
+}

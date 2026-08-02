@@ -1,0 +1,133 @@
+catalog_id: biome
+repo:
+  repo_id: biomejs/biome
+  repo_url: https://github.com/biomejs/biome.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - pnpm install --frozen-lockfile
+  commands:
+    - pnpm test
+    - pnpm lint
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: biome.regress.large.openai
+    scenario_family: regress
+    feature_size: large
+    feature_mission_id: biome-rule-or-formatter-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: biome-rule-or-formatter-regression
+    title: Improve one Biome lint or formatter behavior
+    brief: Deliver a real lint-rule, assist, or formatter behavior improvement with focused
+      snapshots and regression tests.
+    feature_size: large
+    mission_class: product-change
+    goals:
+      - Improve one user-visible lint, assist, or formatter behavior without unrelated output churn.
+      - Add focused fixture or snapshot evidence that proves the behavior.
+      - Keep relevant tests and lint evidence green.
+    kpis:
+      - kpi_id: biome-behavior-green
+        name: Biome behavior gate
+        target: relevant tests and lint pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Fixture, snapshot, or test evidence demonstrates the changed behavior.
+      - Review evidence explains why changed output is intended and scoped.
+      - Delivery evidence is materialized without upstream writes.
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside Biome rule, formatter, assist, fixture, snapshot, or docs surfaces
+        required by the behavior
+      - preserve relevant test and lint evidence
+      - avoid broad generated output churn unless the product behavior explicitly requires it
+      - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - crates/
+        - packages/
+        - tests/
+        - website/
+    post_run_quality:
+      primary_commands:
+        - pnpm test
+        - pnpm lint
+      diagnostic_commands:
+        - pnpm typecheck
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 64
+      max_added_lines: 4500
+    size_rationale: Biome rule and formatter changes can cross Rust crates, package fixtures,
+      snapshots, and docs, so they are large hard-target missions.
+    change_budget:
+      max_changed_files: 64
+      max_added_lines: 4500
+    quality_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    agent_visible_request:
+      user_problem: Deliver a real lint-rule, assist, or formatter behavior improvement with
+        focused snapshots and regression tests.
+      desired_outcome: Users get the corrected Biome behavior, and the diff proves it through
+        targeted fixture or snapshot evidence plus lint/test checks.
+      constraints:
+        - Deliver a real product change through the full public AOR flow.
+        - Use existing Biome crate/package boundaries, fixture style, and snapshot conventions.
+        - Keep upstream writes disabled and materialize delivery evidence through patch-only mode.
+        - Do not mutate target files directly from the runner or evaluator outside the public AOR
+          execution, review, and repair loop.
+      non_goals:
+        - Do not satisfy the mission with docs-only or metadata-only churn.
+        - Do not rewrite unrelated parser, formatter, analyzer, or website subsystems.
+        - Do not bypass AOR review, QA, delivery, or learning artifacts with a direct patch handoff.
+    evaluator_rubric:
+      quality_gate: accepted-step-quality-required
+      step_quality_required: true
+      step_quality_dimensions:
+        - traceability
+        - completeness
+        - actionability
+        - evidence_strength
+        - black_box_boundary
+      evidence_expectations:
+        - Accepted step-quality assessment report for every public SDLC step before continuation.
+        - Meaningful changed path under crates/
+        - Meaningful changed path under packages/
+        - Meaningful changed path under tests/
+        - "Primary verification command: pnpm test"
+        - "Primary verification command: pnpm lint"
+    final_code_rubric:
+      quality_gate: all-pass-product-quality
+      required_changed_surfaces:
+        - crates/
+        - packages/
+        - tests/
+        - website/
+      acceptance_dimensions:
+        - implementation_correctness
+        - implementation_completeness
+        - test_adequacy
+        - code_maintainability
+        - verification_quality
+        - delivery_safety
+        - acceptance_criteria_traceability

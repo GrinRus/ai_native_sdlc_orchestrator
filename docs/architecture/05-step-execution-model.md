@@ -11,6 +11,32 @@ AOR needs one execution model for both execution and non-execution steps.
 - `eval` — suite execution and scoring
 - `harness` — replay, certification, compare-to-baseline, failure-mode runs
 
+## Workflow steps versus execution classes
+
+Workflow steps are the operator-visible lifecycle slots such as `discovery`,
+`research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`,
+and `harness`. Execution classes define the reusable runtime capability used to
+run a step: `artifact`, `planner`, `runner`, `repair`, `eval`, or `harness`.
+
+Discovery, research, and spec are distinct workflow steps, but they remain
+compatible with the `artifact` execution class. Their route profiles may select
+different `step` values and prompt bundle refs while continuing to use
+`route_class: artifact`, `wrapper.artifact.default@v1`,
+`policy.step.artifact.default`, and artifact-compatible skill/context defaults.
+The split is therefore a prompt and readiness taxonomy change, not a new route
+class or adapter capability.
+
+W44-S04 keeps discovery, research, and spec on the shared artifact context
+bundle, artifact skill profile, and artifact step policy. Compiled context is
+the durable proof point: it records the workflow-specific prompt bundle
+alongside the shared artifact `context_*_refs` and `skill_refs`.
+
+`prompt_bundle.step_class` remains an execution-class field. A discovery,
+research, or spec prompt bundle should use `step_class: artifact` unless a later
+accepted slice introduces a new execution class. Project profiles select prompt
+bundles by workflow step through `default_prompt_bundles.<step>`, and wrappers
+and policies remain selected by route/execution class.
+
 ## Step resolution stack
 For each step AOR resolves:
 1. project profile
@@ -67,10 +93,26 @@ The routed execution baseline follows one deterministic sequence:
 3. resolve policy bounds and governance;
 4. materialize delivery guardrails (`delivery-plan`) for writeback policy truth;
 5. compile context and persist one `compiled-context` artifact;
-6. negotiate adapter capabilities;
+6. negotiate every primary/fallback adapter capability and resolve the requested
+   model to an adapter-supported effective model before execution;
 7. execute:
   - dry-run path: deterministic mock adapter;
   - live path: supported live adapter only when delivery guardrails are ready; external runner command execution emits `success`, `blocked`, or `failed` adapter responses with explicit prerequisite/policy diagnostics.
+
+Live execution tries each declared route candidate at most once. A fallback is
+eligible only for a canonical failure class listed by `retry.on[]`; incompatible
+or unsupported candidates fail before spawn, and exhausted transitions block
+instead of rerunning the primary implicitly. Retry, repair, and escalation use
+the same fail-closed predicate rule. Adapter-owned model arguments and semantic
+provider events keep argv/config evidence provider-specific at the boundary
+while route decisions remain runner-neutral.
+
+Before workspace or provider side effects, the engine reserves one fenced
+attempt using a versioned digest of mode, workspace, route/model/capability
+sources, policy, evidence, plan, task, and project-profile inputs. A repeated
+request with changed execution inputs is a typed conflict. Active execution
+renews the lease, and only the current owner/fencing token may publish the
+result; dry-run evidence can therefore never replay as a live attempt.
 
 The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with:
 - selected route/asset/policy/adapter metadata;

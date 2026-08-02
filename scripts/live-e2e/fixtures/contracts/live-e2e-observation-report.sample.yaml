@@ -1,0 +1,287 @@
+report_id: live-e2e.sample.observation.v3
+run_id: live-e2e.sample.run
+profile_id: live-e2e.full-journey.regress.ky
+report_status: final
+operator_context:
+  operator_kind: skill-agent
+  operator_ref: skill://live-e2e-runner
+  decision_policy: required
+  answer_policy: agent-public-control-plane
+  target_write_policy: aor-runtime-only-before-execution
+controller_state_ref: runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+flow_range:
+  start_step: discovery
+  end_step: delivery
+  included_steps:
+    - discovery
+    - spec
+    - planning
+    - handoff
+    - execution
+    - review
+    - qa
+    - delivery
+  prelude_steps:
+    - install
+    - target_checkout
+    - project_bootstrap
+    - intake
+    - readiness
+  excluded_steps:
+    - release
+    - learning
+flow_range_policy: delivery_default
+overall_status: pass
+provider_execution_status: pass
+failure_owner: null
+failure_phase: null
+failure_class: null
+provider_step_status:
+  provider: openai
+  adapter: codex-cli
+  route_id: route.implement.default.openai-primary
+  step_id: execution
+  status: completed
+  elapsed_ms: 90000
+  timeout_budget_ms: 3600000
+  remaining_budget_ms: 3510000
+  last_output_at: "2026-05-18T00:02:00.000Z"
+  last_artifact_update_at: "2026-05-18T00:01:59.000Z"
+  last_progress_at: "2026-05-18T00:01:59.000Z"
+  last_progress_kind: tool_call
+  last_progress_label: edit_file
+  progress_event_count: 42
+  output_mode: stream-json
+  interruption_owner: null
+  interruption_status: null
+  interruption_reason: null
+  current_command_label: external-provider-runner
+  recommended_action: Continue with public verification.
+  started_at: "2026-05-18T00:00:30.000Z"
+  updated_at: "2026-05-18T00:02:00.000Z"
+  finished_at: "2026-05-18T00:02:00.000Z"
+aor_installation:
+  status: pass
+  declared_policy: source-install-required
+  effective_policy: source-install-required
+  install_mode: isolated
+  source_channel: source-only-alpha
+  workspace_root: /tmp/aor-live-e2e/live-e2e.sample.run
+  runtime_root: /tmp/aor-live-e2e/live-e2e.sample.run/runtime
+  original_source_root: /repo/aor
+  installed_source_root: /tmp/aor-live-e2e/live-e2e.sample.run/aor-source
+  launcher_ref: runtime://reports/live-e2e-aor-install/aor-session-launcher.sh
+  command_transcripts:
+    - runtime://reports/live-e2e-aor-install/01-corepack-enable.json
+    - runtime://reports/live-e2e-aor-install/02-pnpm-install-frozen-lockfile.json
+    - runtime://reports/live-e2e-aor-install/03-pnpm-build.json
+    - runtime://reports/live-e2e-aor-install/04-pnpm-aor-help.json
+aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+setup_journal:
+  - sequence: 1
+    step_id: install
+    status: pass
+    public_surface: pnpm source install
+    evidence_refs:
+      - runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+    summary: AOR installation proof completed before public project flow execution.
+  - sequence: 2
+    step_id: target_checkout
+    status: pass
+    public_surface: git clone or local target checkout materialization
+    evidence_refs:
+      - runtime://targets/ky
+    summary: Target checkout was prepared for black-box execution.
+  - sequence: 3
+    step_id: project_bootstrap
+    status: pass
+    public_surface: aor project init
+    evidence_refs:
+      - runtime://reports/generated-project-profile-live-e2e.sample.run.yaml
+      - runtime://reports/bootstrap-artifact-packet-live-e2e.sample.run.yaml
+    summary: AOR project bootstrap evidence was materialized.
+  - sequence: 4
+    step_id: intake
+    status: pass
+    public_surface: aor intake create
+    evidence_refs:
+      - runtime://reports/intake-artifact-packet-live-e2e.sample.run.yaml
+      - runtime://reports/feature-request-live-e2e.sample.run.yaml
+    summary: Feature request evidence was materialized.
+  - sequence: 5
+    step_id: readiness
+    status: pass
+    public_surface: aor project validate and readiness verify
+    evidence_refs:
+      - runtime://reports/project-validation-live-e2e.sample.run.json
+      - runtime://reports/execution-readiness-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-target-pre-execution-status-live-e2e.sample.run.json
+    target_setup_status:
+      status: pass
+      command_label: npm install --prefer-offline --no-audit --no-fund
+      elapsed_ms: 42000
+      timeout_budget_ms: 120000
+      blocker_reason: null
+      evidence_ref: runtime://reports/live-e2e-target-pre-execution-status-live-e2e.sample.run.json
+      failure_owner: null
+      failure_phase: target_setup
+      failure_class: null
+      provider_independent: true
+    target_verification_status:
+      status: pass
+      command_label: npx ava test/headers.ts
+      elapsed_ms: 42000
+      timeout_budget_ms: 120000
+      blocker_reason: null
+      evidence_ref: runtime://reports/live-e2e-target-pre-execution-status-live-e2e.sample.run.json
+      failure_owner: null
+      failure_phase: target_verification
+      failure_class: null
+      provider_independent: true
+    failure_owner: null
+    failure_phase: null
+    failure_class: null
+    summary: Readiness validation evidence was materialized.
+step_journal:
+  - sequence: 1
+    step_id: discovery
+    step_instance_id: discovery
+    iteration: 1
+    flow_stage: discovery
+    plan:
+      objective: Observe project analysis and discovery evidence through installed public flow surfaces.
+      public_surface: aor discovery run
+      command_labels:
+        - discovery-run
+        - project-analyze
+      expected_artifacts:
+        - analysis_report_file
+        - discovery_analysis_report_file
+      inspection_sources:
+        - command_transcript
+        - stage_result
+        - artifact_refs
+        - api_output
+        - logs_or_ui_when_available
+      safety_constraints:
+        - black-box-public-surfaces-only
+        - no-runtime-internal-imports
+        - no-upstream-write-by-default
+        - persist-observation-before-next-step
+    plan_ref: runtime://reports/live-e2e-step-plan-live-e2e.sample.run-01-discovery.json
+    public_surface: aor discovery run
+    transcript_ref: runtime://reports/live-e2e-command-traces/01-discovery-run.json
+    execution_ref: runtime://reports/live-e2e-command-traces/01-discovery-run.json
+    inspection_ref: runtime://reports/live-e2e-step-inspection-live-e2e.sample.run-01-discovery.json
+    classification_ref: runtime://reports/live-e2e-step-classification-live-e2e.sample.run-01-discovery.json
+    artifact_refs:
+      - runtime://reports/project-analysis-report.json
+    started_at: "2026-05-18T00:00:00.000Z"
+    finished_at: "2026-05-18T00:00:02.000Z"
+    duration_sec: 2
+    deterministic_analysis:
+      status: pass
+      exit_code: 0
+      failure_class: null
+      missing_evidence: []
+      recommendation: continue
+    semantic_analysis:
+      status: pass
+      judge_source: skill-agent
+      findings: []
+    agent_decision_request_ref: runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
+    operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
+    operator_decision_status: accepted
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
+      - runtime://reports/live-e2e-step-inspection-live-e2e.sample.run-01-discovery.json
+      - runtime://reports/live-e2e-step-classification-live-e2e.sample.run-01-discovery.json
+    requested_interaction: null
+    decision:
+      action: continue
+      reason: Public step completed with required evidence.
+      next_step: spec
+    resume_result: null
+    frontend_interaction_refs: []
+    final_step_verdict: pass
+final_analysis:
+  status: pass
+  summary: Live E2E public-step journal completed.
+  findings: []
+  failed_stages: []
+  delivery:
+    status: pass
+    evidence_refs:
+      - runtime://artifacts/delivery-manifest-live-e2e.json
+  release:
+    status: not_pass
+    evidence_refs: []
+  learning:
+    status: not_pass
+    evidence_refs: []
+interactive_decisions: []
+frontend_interactions:
+  - step_id: learning
+    interaction_id: guided-web-smoke
+    surface: web
+    evidence_refs:
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
+      - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+      - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+    html_ref: runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
+    screenshot_refs:
+      - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+    visual_guardrail_refs:
+      - runtime://reports/installed-user-guided-web-visual-guardrail-live-e2e.sample.run.json
+    browser_task_proof_ref: runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+    dom_snapshot_ref: runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+    accessibility_summary_ref: runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    accessibility_checks:
+      - check_id: keyboard_navigation
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+      - check_id: focus_order
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+      - check_id: contrast_and_readability
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings: []
+      - check_id: semantic_structure
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+        findings: []
+      - check_id: screen_reader_labels
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings: []
+      - check_id: accessible_error_feedback
+        status: pass
+        evidence_refs:
+          - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
+        findings: []
+    task_outcome:
+      status: pass
+      checked_tasks:
+        - run-list-rendered
+        - selected-run-detail-rendered
+        - evidence-links-rendered
+        - closure-state-rendered
+    ux_findings: []
+    operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
+    status: pass
+    summary: Guided AOR operator UI interaction completed through the installed-user web surface.
+evidence_refs:
+  - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json

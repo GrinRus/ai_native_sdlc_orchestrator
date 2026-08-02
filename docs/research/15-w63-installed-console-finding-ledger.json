@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "slice_id": "W63-S07",
+  "status": "pass",
+  "blocking_finding_count": 0,
+  "findings": [
+    {
+      "finding_id": "W63-UX-001",
+      "severity": "P2",
+      "title": "Cross-browser breadth is not certified",
+      "owner": "W65",
+      "disposition": "accepted-limitation",
+      "evidence_refs": ["docs/research/15-w63-installed-console-acceptance.md"],
+      "reason": "Chromium-only acceptance is the declared W63 boundary."
+    },
+    {
+      "finding_id": "W63-UX-002",
+      "severity": "P2",
+      "title": "Canonical lifecycle closure is pending",
+      "owner": "W63-S08",
+      "disposition": "planned",
+      "evidence_refs": ["apps/web/browser/fixtures/operator-acceptance-fixtures.json"],
+      "reason": "S07 proves installed UI quality; full durable lifecycle parity is a separate executable gate."
+    }
+  ]
+}

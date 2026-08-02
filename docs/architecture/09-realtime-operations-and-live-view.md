@@ -6,7 +6,7 @@ Operators need live state without making the UI part of the critical path.
 ## Design rules
 - the runtime must stay headless-first;
 - the API and event stream must work without the web UI;
-- the UI can attach late and catch up from the read model plus the live stream;
+- the local UI can launch late and catch up from the read model plus the live stream;
 - detaching the UI must not change workflow state.
 - connected UI actions must call control-plane command mutations and must not own orchestration decisions.
 - production-hardened transport mode must authenticate every read, stream, and mutation route before handlers run.
@@ -17,14 +17,73 @@ Operators need live state without making the UI part of the critical path.
 - route and policy decisions
 - approval requests
 - runner-requested questions and answer audit refs
+- operator-request creation, run, proposal, patch, and next-action refresh evidence
 - validation, eval, and harness outcomes
 - delivery and release milestones
 - incident creation and follow-up actions
 
 ## Operator surfaces
 - CLI for direct operational control
-- optional web UI for dashboards and drill-down views
+- optional local web UI for dashboards, guided Mission intake, and drill-down views
 - API queries for automation and integrations
+
+## Local app launch
+
+`aor app` starts a local loopback web console from the installed package. The
+same process serves:
+- `/` for the packaged SPA;
+- `/app-config.json` for project id, default project id, project list, project ref, runtime root, package version, and API base;
+- `/api/projects` for local app-session project summaries;
+- `/api/projects/:projectId/**` for the existing control-plane read, mutation, and SSE routes.
+
+The app starts with one explicit project context from `--project-ref` or the
+current working directory. Additional projects can be added only by explicit
+operator input. The app does not scan the filesystem for projects, persist a
+global recent-project list, or merge multiple `project_id` contexts into one
+portfolio flow.
+
+The app can submit the first Mission form through
+`POST /api/projects/:projectId/lifecycle-command/actions` with
+`command: "mission create"`, then invoke `next` to refresh the durable
+`next-action-report`. It does not own run-state transitions, answer
+continuation, review decisions, or delivery gates.
+
+Release and internal maintainer smoke for the web surface uses
+`aor app --smoke true --open false --json`, which loads the real SPA,
+`/app-config.json`, local project index, control-plane state route, the
+first-run wizard / project switcher markers, and the flow selector / `New Flow`
+bundle markers. A generated static HTML snapshot is not a supported operator
+console or proof path.
+
+The app can also submit operator-initiated interventions through
+`POST /api/projects/:projectId/operator-requests` and run them through
+`POST /api/projects/:projectId/operator-requests/:requestId/actions` with
+`action=run`. Read views use `GET /api/projects/:projectId/operator-requests`
+and must show sanitized summaries and refs, not raw request text. Successful
+runs refresh/materialize `next-action-report` so the right rail and headless
+CLI/API surfaces converge on the same next action.
+
+## Flow-centric local view
+
+The W34 local console uses flow projections from the control plane instead of
+browser-owned lifecycle state. The flow selector, active-flow cockpit,
+completed-flow history, and flow-scoped advanced views all read stable
+`flow_id`, `status`, `selected_stage`, evidence refs, and write-back policy
+from runtime artifacts.
+
+Connected UI actions may select a flow, create an operator request for that
+flow, or start `New Flow` through lifecycle-command mutations. They must not
+mutate completed flow evidence, infer a selected flow from local storage, or
+create a follow-up without durable mission/intake and next-action evidence.
+
+When a W45 `quality-repair-request` is active, the flow projection exposes
+`active_quality_gate` for the local console. The cockpit renders the request
+ref, cycle id, source stage, request status, bounded attempt budget, blockers,
+evidence summaries, and the resolver's single primary action. Review-origin
+repair, QA-origin repair, and exhausted repair budgets are displayed as
+operator-visible quality gates; delivery and release actions remain hidden
+behind the gate until the request closes or an explicit exhausted-budget
+operator hold/override is recorded by the runtime.
 
 ## Interactive continuation
 When a runner asks a question, AOR treats it as a run continuation boundary:

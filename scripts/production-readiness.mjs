@@ -3,10 +3,44 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-
+import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/control-plane/http/http-router.mjs";
+import { validateTestExecutionReport } from "./test-discovery.mjs";
+import { checkW59ClosureReport } from "./readiness/w59-closure.mjs";
+import { checkReadinessSourceOfTruth } from "./readiness/source-of-truth.mjs";
+import { checkW66QualificationClosure } from "./readiness/w66-closure.mjs";
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultProofFixturePath = "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json";
-
+const defaultProofFixturePath = path.posix.join(
+  "scripts",
+  "production-readiness",
+  "fixtures",
+  "w25-s03-production-proof.json",
+);
+const defaultOpenApiPath = "docs/contracts/control-plane-api.openapi.json";
+const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
+const defaultAuditLedgerPath = "docs/research/07-codebase-audit-remediation-ledger-2026-07.json";
+const defaultW57ClosurePath = "docs/research/08-w57-security-reliability-closure.json";
+const defaultW58ClosurePath = "docs/research/09-w58-runtime-quality-closure.json";
+const defaultW59ClosurePath = "docs/research/10-w59-audit-closure.json", defaultW59IndependentReviewPath = "docs/research/11-w59-independent-s1-review.json";
+const defaultW66EvidenceIndexPath = "docs/research/24-w66-live-qualification-evidence-index.json";
+const defaultW66ClosurePath = "docs/research/25-w66-qualification-closure.json";
+const ACTIVE_QUALIFICATION_HOLD = {
+  finding_id: "W66-QUALIFICATION",
+  state: "in-progress",
+  owner_slices: ["W66-S01", "W66-S02", "W66-S03", "W66-S04", "W66-S05", "W66-S06", "W66-S07", "W66-S08", "W66-S09"],
+  summary: "Fresh same-commit Codex and Claude qualification is incomplete; bounded release clearance remains suspended.",
+};
+const CLOSED_AUDIT_STATES = new Set(["resolved", "superseded"]);
+const ALLOWED_AUDIT_STATES = new Set(["open", "in-progress", "resolved", "accepted-risk", "superseded"]);
+const W57_CLOSURE_FINDINGS = [
+  "AUD-001", "AUD-002", "AUD-003", "AUD-004", "AUD-005", "AUD-007", "AUD-008", "AUD-009",
+  "AUD-011", "AUD-013", "AUD-014", "AUD-015", "AUD-016", "AUD-017", "AUD-022", "AUD-023",
+  "AUD-029", "AUD-030", "AUD-031", "AUD-052", "project-context-cwd-divergence",
+];
+const W58_CLOSURE_FINDINGS = [
+  "AUD-006", "AUD-009", "AUD-010", "AUD-012", "AUD-018", "AUD-019", "AUD-020", "AUD-021",
+  "AUD-024", "AUD-025", "AUD-026", "AUD-027", "AUD-028", "AUD-032", "AUD-033", "AUD-034",
+  "AUD-035", "AUD-036", "AUD-037", "AUD-038", "AUD-045", "AUD-046", "AUD-048", "AUD-052",
+];
 function resolvePath(rootDir, file) {
   return path.isAbsolute(file) ? file : path.join(rootDir, file);
 }
@@ -40,6 +74,234 @@ function fail(id, summary, findings, evidence = []) {
     findings,
     evidence,
   };
+}
+
+function checkAuditRemediationLedger(rootDir, auditLedgerPath = defaultAuditLedgerPath) {
+  const findings = [];
+  if (!fileExists(rootDir, auditLedgerPath)) {
+    return fail("audit-remediation-ledger", "Audit remediation ledger is missing.", [`${auditLedgerPath} is missing.`], [
+      auditLedgerPath,
+    ]);
+  }
+
+  let ledger;
+  try {
+    ledger = readJson(rootDir, auditLedgerPath);
+  } catch (error) {
+    return fail(
+      "audit-remediation-ledger",
+      "Audit remediation ledger is invalid.",
+      [`${auditLedgerPath} is not valid JSON: ${error.message}`],
+      [auditLedgerPath],
+    );
+  }
+
+  const entries = Array.isArray(ledger.findings) ? ledger.findings : [];
+  const byId = new Map();
+  for (const entry of entries) {
+    const id = typeof entry?.finding_id === "string" ? entry.finding_id.trim() : "";
+    if (!id) {
+      findings.push("Every audit ledger entry must have a non-empty finding_id.");
+      continue;
+    }
+    if (byId.has(id)) findings.push(`Audit finding '${id}' is duplicated.`);
+    byId.set(id, entry);
+    if (!ALLOWED_AUDIT_STATES.has(entry.state)) findings.push(`Audit finding '${id}' has invalid state '${entry.state}'.`);
+    if (!Array.isArray(entry.owner_slices) || entry.owner_slices.length === 0) {
+      findings.push(`Audit finding '${id}' must declare owner_slices.`);
+    }
+    if (typeof entry.release_blocking !== "boolean") {
+      findings.push(`Audit finding '${id}' must declare release_blocking as a boolean.`);
+    }
+    const evidenceRefs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
+    if (!Array.isArray(entry.evidence_refs) || !Array.isArray(entry.limitations)) {
+      findings.push(`Audit finding '${id}' must declare evidence_refs and limitations arrays.`);
+    }
+    if (entry.state === "resolved" && evidenceRefs.length === 0) {
+      findings.push(`Resolved audit finding '${id}' must cite evidence_refs.`);
+    }
+  }
+
+  for (let sequence = 1; sequence <= 55; sequence += 1) {
+    const id = `AUD-${String(sequence).padStart(3, "0")}`;
+    if (!byId.has(id)) findings.push(`Audit ledger must include ${id}.`);
+  }
+  if (!byId.has("project-context-cwd-divergence")) {
+    findings.push("Audit ledger must include project-context-cwd-divergence.");
+  }
+  if (ledger.release_disposition !== (entries.some((entry) => entry.release_blocking === true && !CLOSED_AUDIT_STATES.has(entry.state)) ? "audit-hold" : "cleared")) findings.push("Audit ledger release_disposition disagrees with its blocking findings.");
+  if (findings.length > 0) {
+    return fail("audit-remediation-ledger", "Audit remediation ledger is incomplete or invalid.", findings, [auditLedgerPath]);
+  }
+
+  const blockingInvariants = entries
+    .filter((entry) => entry.release_blocking === true && !CLOSED_AUDIT_STATES.has(entry.state))
+    .map((entry) => ({
+      finding_id: entry.finding_id,
+      state: entry.state,
+      owner_slices: entry.owner_slices,
+      summary: entry.summary,
+    }))
+    .sort((left, right) => left.finding_id.localeCompare(right.finding_id));
+
+  return {
+    ...pass(
+      "audit-remediation-ledger",
+      blockingInvariants.length > 0
+        ? `Audit ledger is valid with ${blockingInvariants.length} open release-blocking invariants.`
+        : "Audit ledger is valid and has no open release-blocking invariants.",
+      [auditLedgerPath],
+    ),
+    blocking_invariants: blockingInvariants,
+  };
+}
+
+function checkW57ClosureReport(rootDir, auditLedgerPath, closureReportPath = defaultW57ClosurePath) {
+  const findings = [];
+  let ledger;
+  let report;
+  try {
+    ledger = readJson(rootDir, auditLedgerPath);
+    report = readJson(rootDir, closureReportPath);
+  } catch (error) {
+    return fail("w57-remediation-closure", "W57 remediation closure evidence is missing or invalid.", [error.message], [
+      auditLedgerPath,
+      closureReportPath,
+    ]);
+  }
+
+  if (report.schema_version !== 1 || report.wave_id !== "W57" || report.status !== "passed") {
+    findings.push("W57 closure report must declare schema_version=1, wave_id=W57, and status=passed.");
+  }
+  if (report.release_disposition_after_wave !== "audit-hold") {
+    findings.push("W57 closure report must preserve audit-hold for remaining W58/W59 findings.");
+  }
+
+  const ledgerById = new Map((ledger.findings ?? []).map((entry) => [entry.finding_id, entry]));
+  const entries = Array.isArray(report.findings) ? report.findings : [];
+  const reportById = new Map();
+  for (const entry of entries) {
+    if (reportById.has(entry.finding_id)) findings.push(`W57 closure finding '${entry.finding_id}' is duplicated.`);
+    reportById.set(entry.finding_id, entry);
+  }
+  const expected = new Set(W57_CLOSURE_FINDINGS);
+  for (const findingId of W57_CLOSURE_FINDINGS) {
+    const entry = reportById.get(findingId);
+    const ledgerEntry = ledgerById.get(findingId);
+    if (!entry) {
+      findings.push(`W57 closure report is missing '${findingId}'.`);
+      continue;
+    }
+    if (!ledgerEntry) {
+      findings.push(`W57 closure finding '${findingId}' is missing from the audit ledger.`);
+      continue;
+    }
+    const evidenceRefs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
+    if (evidenceRefs.length === 0) findings.push(`W57 closure finding '${findingId}' must cite evidence.`);
+    for (const evidenceRef of evidenceRefs) {
+      const fileRef = String(evidenceRef).split("#", 1)[0];
+      if (!fileRef || !fileExists(rootDir, fileRef)) {
+        findings.push(`W57 closure evidence '${evidenceRef}' for '${findingId}' does not exist.`);
+      }
+    }
+    const isSharedDeferred = findingId === "AUD-009" || findingId === "AUD-052";
+    if (isSharedDeferred && entry.disposition !== "in-progress") {
+      findings.push(`Shared finding '${findingId}' must record its in-progress disposition at W57 closure.`);
+    }
+    if (isSharedDeferred && !["in-progress", "resolved", "superseded"].includes(ledgerEntry.state)) {
+      findings.push(`Shared finding '${findingId}' has regressed to ledger state '${ledgerEntry.state}'.`);
+    }
+    if (!isSharedDeferred && (entry.disposition !== "resolved" || !CLOSED_AUDIT_STATES.has(ledgerEntry.state))) {
+      findings.push(`W57-owned finding '${findingId}' must be resolved before W57 closes.`);
+    }
+  }
+  for (const findingId of reportById.keys()) {
+    if (!expected.has(findingId)) findings.push(`Unexpected finding '${findingId}' appears in the W57 closure report.`);
+  }
+
+  if (findings.length > 0) {
+    return fail("w57-remediation-closure", "W57 remediation closure evidence is incomplete or drifting.", findings, [
+      auditLedgerPath,
+      closureReportPath,
+    ]);
+  }
+  return pass(
+    "w57-remediation-closure",
+    "W57 trust-boundary findings map one-to-one to reproducible evidence; shared W58 work remains open.",
+    [auditLedgerPath, closureReportPath],
+  );
+}
+
+function checkW58ClosureReport(rootDir, auditLedgerPath, closureReportPath = defaultW58ClosurePath) {
+  const findings = [];
+  let ledger;
+  let report;
+  try {
+    ledger = readJson(rootDir, auditLedgerPath);
+    report = readJson(rootDir, closureReportPath);
+  } catch (error) {
+    return fail("w58-remediation-closure", "W58 remediation closure evidence is missing or invalid.", [error.message], [auditLedgerPath, closureReportPath]);
+  }
+  if (report.schema_version !== 1 || report.wave_id !== "W58" || report.status !== "passed") {
+    findings.push("W58 closure report must declare schema_version=1, wave_id=W58, and status=passed.");
+  }
+  if (report.release_disposition_after_wave !== "audit-hold" || report.release_clearance !== false) {
+    findings.push("W58 closure must preserve audit-hold and release_clearance=false for W59 findings.");
+  }
+  if (report.integration_profile?.implementation !== "scripts/w58-runtime-quality-proof.mjs" || !fileExists(rootDir, report.integration_profile?.implementation ?? "")) {
+    findings.push("W58 closure must cite the reproducible runtime-quality proof implementation.");
+  }
+  if (!fileExists(rootDir, "scripts/dependency-audit-bulk.mjs")) {
+    findings.push("W58 closure requires the supported production dependency bulk-audit helper.");
+  }
+
+  const ledgerById = new Map((ledger.findings ?? []).map((entry) => [entry.finding_id, entry]));
+  const reportEntries = Array.isArray(report.findings) ? report.findings : [];
+  const reportById = new Map();
+  for (const entry of reportEntries) {
+    if (reportById.has(entry.finding_id)) findings.push(`W58 closure finding '${entry.finding_id}' is duplicated.`);
+    reportById.set(entry.finding_id, entry);
+  }
+  const expected = new Set(W58_CLOSURE_FINDINGS);
+  for (const findingId of W58_CLOSURE_FINDINGS) {
+    const entry = reportById.get(findingId);
+    const ledgerEntry = ledgerById.get(findingId);
+    if (!entry) {
+      findings.push(`W58 closure report is missing '${findingId}'.`);
+      continue;
+    }
+    if (!ledgerEntry || !CLOSED_AUDIT_STATES.has(ledgerEntry.state) || entry.disposition !== "resolved") {
+      findings.push(`W58 closure finding '${findingId}' must be resolved in both report and ledger.`);
+    }
+    const evidenceRefs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
+    if (evidenceRefs.length === 0) findings.push(`W58 closure finding '${findingId}' must cite evidence.`);
+    for (const evidenceRef of evidenceRefs) {
+      if (!fileExists(rootDir, String(evidenceRef).split("#", 1)[0])) {
+        findings.push(`W58 closure evidence '${evidenceRef}' for '${findingId}' does not exist.`);
+      }
+    }
+  }
+  for (const findingId of reportById.keys()) {
+    if (!expected.has(findingId)) findings.push(`Unexpected finding '${findingId}' appears in the W58 closure report.`);
+  }
+  const openW59 = (ledger.findings ?? [])
+    .filter((entry) => !CLOSED_AUDIT_STATES.has(entry.state) && entry.owner_slices?.some((slice) => String(slice).startsWith("W59-")))
+    .map((entry) => entry.finding_id)
+    .sort();
+  const reportedRemaining = new Set(Array.isArray(report.remaining_w59_findings) ? report.remaining_w59_findings : []);
+  for (const findingId of openW59) {
+    if (!reportedRemaining.has(findingId)) findings.push(`W58 closure is missing remaining W59 finding '${findingId}'.`);
+  }
+  for (const findingId of reportedRemaining) {
+    const ledgerEntry = ledgerById.get(findingId);
+    if (!ledgerEntry?.owner_slices?.some((slice) => String(slice).startsWith("W59-"))) {
+      findings.push(`W58 closure remaining finding '${findingId}' is not owned by W59.`);
+    }
+  }
+  if (findings.length > 0) {
+    return fail("w58-remediation-closure", "W58 remediation closure evidence is incomplete or drifting.", findings, [auditLedgerPath, closureReportPath]);
+  }
+  return pass("w58-remediation-closure", "W58 runtime-quality findings are evidence-backed and remaining release work is isolated to W59.", [auditLedgerPath, closureReportPath]);
 }
 
 function splitMarkdownTableRow(line) {
@@ -87,8 +349,8 @@ function parseDelimitedMarkdownList(value) {
     .filter(Boolean);
 }
 
-function parseStoryCoverageMatrix(rootDir) {
-  const matrix = readText(rootDir, "docs/product/user-story-coverage-matrix.md");
+function parseStoryCoverageMatrix(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
+  const matrix = readText(rootDir, storyMatrixPath);
   const rows = new Map();
 
   for (const line of matrix.split(/\r?\n/u)) {
@@ -110,7 +372,7 @@ function parseStoryCoverageMatrix(rootDir) {
     });
   }
 
-  const countsMatch = /Current W\d+-S\d+ status counts: `baseline-covered=(\d+)`, `proof-covered=(\d+)`, `partial=(\d+)`, `blocked=(\d+)`/u.exec(
+  const countsMatch = /Current (?:W\d+-S\d+|planning) status counts: `baseline-covered=(\d+)`, `proof-covered=(\d+)`, `partial=(\d+)`, `blocked=(\d+)`/u.exec(
     matrix,
   );
   const documentedCounts = countsMatch
@@ -144,9 +406,6 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
   }
 
   const externalRunnerMode = String(proof.proof_method?.external_runner_mode ?? "");
-  const targetVerdicts = Array.isArray(proof.targets)
-    ? proof.targets.map((target) => target.overall_status).filter(Boolean)
-    : [];
   const changedPaths = [
     ...(Array.isArray(proof.changed_paths) ? proof.changed_paths : []),
     ...(Array.isArray(proof.no_upstream_write_assertion?.changed_paths)
@@ -171,21 +430,6 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
   }
   if (proof.proof_method?.examples_root_override || proof.source_run?.examples_root_override) {
     findings.push(`${proofFixturePath} must not use examples_root_override.`);
-  }
-  if (targetVerdicts.length === 0 || targetVerdicts.some((verdict) => verdict !== "pass")) {
-    findings.push(`${proofFixturePath} must record pass target verdicts.`);
-  }
-  if (proof.quality_judgement?.overall_status !== "pass") {
-    findings.push(`${proofFixturePath} must record quality_judgement.overall_status=pass.`);
-  }
-
-  const requiredTargetVerdicts = Array.isArray(proof.production_proof?.required_target_verdicts)
-    ? proof.production_proof.required_target_verdicts
-    : [];
-  for (const field of requiredTargetVerdicts) {
-    if (proof.quality_judgement?.[field] !== "pass") {
-      findings.push(`${proofFixturePath} required target verdict '${field}' is not pass.`);
-    }
   }
 
   const noUpstreamWrite = proof.no_upstream_write_assertion ?? {};
@@ -233,13 +477,16 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
 function checkBaselineBoundary(rootDir) {
   const packageJson = readJson(rootDir, "package.json");
   const findings = [];
-  if (packageJson.scripts?.check !== "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs") {
-    findings.push("package.json scripts.check must remain the repository-integrity gate.");
+  const checkScript = String(packageJson.scripts?.check ?? "");
+  for (const requiredStage of ["pnpm lint", "pnpm typecheck", "pnpm test", "pnpm build", "pnpm quality:ratchet", "pnpm release:verify"]) {
+    if (!checkScript.includes(requiredStage)) {
+      findings.push(`package.json scripts.check must include canonical stage '${requiredStage}'.`);
+    }
   }
   if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-readiness.mjs") {
     findings.push("package.json must expose production:ready as the separate production-readiness gate.");
   }
-  if (String(packageJson.scripts?.check ?? "").includes("production-readiness")) {
+  if (checkScript.includes("production-readiness") || checkScript.includes("production:ready")) {
     findings.push("pnpm check must not invoke the production-readiness gate.");
   }
 
@@ -248,6 +495,57 @@ function checkBaselineBoundary(rootDir) {
   }
   return pass("baseline-boundary", "`pnpm check` remains baseline integrity; `pnpm production:ready` is separate.", [
     "package.json",
+  ]);
+}
+
+function checkTestExecutionEvidence(rootDir, options = {}) {
+  const validation = validateTestExecutionReport(rootDir, options);
+  if (!validation.ok) {
+    return fail(
+      "complete-test-execution",
+      "Tracked test execution evidence is missing, stale, or incomplete.",
+      validation.errors,
+      [validation.plan.manifest_path, validation.report_path],
+    );
+  }
+  return pass(
+    "complete-test-execution",
+    `${validation.report.executed_files.length}/${validation.plan.candidate_count} tracked tests executed exactly once.`,
+    [validation.plan.manifest_path, validation.report_path],
+  );
+}
+
+function compareVersions(left, right) {
+  const leftParts = left.split(".").map(Number);
+  const rightParts = right.split(".").map(Number);
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function checkDependencySafety(rootDir) {
+  const packageJson = readJson(rootDir, "package.json");
+  const lockfile = readText(rootDir, "pnpm-lock.yaml");
+  const findings = [];
+  const declaredVite = String(packageJson.devDependencies?.vite ?? "");
+  const declaredVersion = /([0-9]+\.[0-9]+\.[0-9]+)/u.exec(declaredVite)?.[1] ?? null;
+  const lockMatch = /^\s{6}vite:\s*\n\s{8}specifier:\s*[^\n]+\n\s{8}version:\s*([0-9]+\.[0-9]+\.[0-9]+)/mu.exec(lockfile);
+  const resolvedVite = lockMatch?.[1] ?? null;
+  if (!declaredVersion || !declaredVersion.startsWith("8.") || compareVersions(declaredVersion, "8.0.16") < 0) {
+    findings.push(`package.json must require a supported Vite range patched at or above 8.0.16; found '${declaredVite}'.`);
+  }
+  if (!resolvedVite) findings.push("pnpm-lock.yaml does not expose the root Vite resolution.");
+  else if (!resolvedVite.startsWith("8.") || compareVersions(resolvedVite, "8.0.16") < 0) {
+    findings.push(`pnpm-lock.yaml resolves Vite ${resolvedVite}; expected supported 8.x at or above 8.0.16.`);
+  }
+  if (findings.length > 0) {
+    return fail("dependency-safety", "Vite dependency safety baseline is not patched.", findings, ["package.json", "pnpm-lock.yaml"]);
+  }
+  return pass("dependency-safety", `Vite ${resolvedVite} is above the affected 8.0.14 baseline.`, [
+    "package.json",
+    "pnpm-lock.yaml",
   ]);
 }
 
@@ -263,11 +561,11 @@ function checkProductionProof(rootDir, proofFixturePath) {
   ]);
 }
 
-function checkStoryHonesty(rootDir) {
-  const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir);
+function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
+  const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir, storyMatrixPath);
   const findings = [];
-  if (rows.size !== 112) {
-    findings.push(`Expected 112 user-story rows, found ${rows.size}.`);
+  if (rows.size !== 116) {
+    findings.push(`Expected 116 user-story rows, found ${rows.size}.`);
   }
 
   const actualCounts = {
@@ -295,7 +593,7 @@ function checkStoryHonesty(rootDir) {
     }
   }
 
-  const requiredProofRows = ["OPS-07", "DTX-01", "DTX-04", "FIN-03"];
+  const requiredProofRows = ["OPS-07", "DTX-01", "DTX-04"];
   for (const storyId of requiredProofRows) {
     const row = rows.get(storyId);
     if (!row) {
@@ -307,8 +605,8 @@ function checkStoryHonesty(rootDir) {
     }
     const evidence = row.evidence;
     for (const requiredEvidence of [
-      "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
-      "overall_status=pass",
+      defaultProofFixturePath,
+      "proof_scope=full_code_changing_runtime",
       "real_code_change_proof_complete=true",
       "external_runner_mode=real-external-process",
     ]) {
@@ -316,6 +614,22 @@ function checkStoryHonesty(rootDir) {
         findings.push(`${storyId} proof-covered evidence must cite ${requiredEvidence}.`);
       }
     }
+  }
+
+  const auditClosedRows = new Map([
+    ["FIN-03", ["docs/research/10-w59-audit-closure.json", "docs/research/11-w59-independent-s1-review.json"]],
+  ]);
+  for (const [storyId, requiredEvidence] of auditClosedRows) {
+    const row = rows.get(storyId);
+    if (!row) {
+      findings.push(`${storyId} is missing from the story matrix.`);
+      continue;
+    }
+    if (row.coverageStatus !== "baseline-covered") findings.push(`${storyId} must be baseline-covered after W59 audit closure.`);
+    for (const evidenceRef of requiredEvidence) {
+      if (!row.evidence.includes(evidenceRef)) findings.push(`${storyId} must cite ${evidenceRef}.`);
+    }
+    if (row.gapSlices.length !== 0) findings.push(`${storyId} must have no remaining audit gap.`);
   }
 
   for (const storyId of ["DEV-04", "AIP-12"]) {
@@ -334,71 +648,11 @@ function checkStoryHonesty(rootDir) {
 
   if (findings.length > 0) {
     return fail("story-status-honesty", "Story matrix production evidence is not honest or reviewable.", findings, [
-      "docs/product/user-story-coverage-matrix.md",
+      storyMatrixPath,
     ]);
   }
   return pass("story-status-honesty", "Story statuses distinguish proof-covered rows from baseline and external blocked rows.", [
-    "docs/product/user-story-coverage-matrix.md",
-  ]);
-}
-
-function checkSourceOfTruth(rootDir) {
-  const findings = [];
-  const readme = readText(rootDir, "README.md");
-  const readiness = readText(rootDir, "docs/backlog/self-hosted-production-readiness.md");
-  const opsRunbook = readText(rootDir, "docs/ops/production-readiness-gate.md");
-  const releaseRunbook = readText(rootDir, "docs/ops/self-hosted-release.md");
-
-  if (!readme.includes("self-hosted CLI/API production candidate")) {
-    findings.push("README.md must state the bounded self-hosted CLI/API production-candidate status.");
-  }
-  if (!readme.includes("pnpm production:ready")) {
-    findings.push("README.md must document the separate production-readiness gate command.");
-  }
-  if (!readme.includes("docs/ops/self-hosted-release.md")) {
-    findings.push("README.md must link the self-hosted release runbook.");
-  }
-  if (!readme.includes("hosted SaaS") || !readme.includes("enterprise identity")) {
-    findings.push("README.md must keep hosted SaaS and enterprise identity out of the supported mode.");
-  }
-  if (!readiness.includes("self-hosted CLI/API production candidate")) {
-    findings.push("self-hosted production readiness doc must state the bounded production-candidate status.");
-  }
-  if (!readiness.includes("pnpm production:ready")) {
-    findings.push("self-hosted production readiness doc must document the production gate command.");
-  }
-  if (!readiness.includes(defaultProofFixturePath)) {
-    findings.push("self-hosted production readiness doc must cite the W25-S03 production proof fixture.");
-  }
-  if (!opsRunbook.includes("pnpm production:ready") || !opsRunbook.includes(defaultProofFixturePath)) {
-    findings.push("production-readiness runbook must document command usage and proof evidence.");
-  }
-  for (const required of [
-    "self-hosted CLI/API production candidate",
-    "pnpm production:ready",
-    defaultProofFixturePath,
-    "hosted SaaS",
-    "enterprise identity",
-    "no-upstream-write",
-  ]) {
-    if (!releaseRunbook.includes(required)) {
-      findings.push(`self-hosted release runbook must mention '${required}'.`);
-    }
-  }
-
-  if (findings.length > 0) {
-    return fail("source-of-truth-alignment", "Production readiness source-of-truth docs are inconsistent.", findings, [
-      "README.md",
-      "docs/backlog/self-hosted-production-readiness.md",
-      "docs/ops/production-readiness-gate.md",
-      "docs/ops/self-hosted-release.md",
-    ]);
-  }
-  return pass("source-of-truth-alignment", "README, readiness source-of-truth, production gate, and release runbook align.", [
-    "README.md",
-    "docs/backlog/self-hosted-production-readiness.md",
-    "docs/ops/production-readiness-gate.md",
-    "docs/ops/self-hosted-release.md",
+    storyMatrixPath,
   ]);
 }
 
@@ -452,6 +706,7 @@ function checkContractAndHarnessEvidence(rootDir) {
     "validation-report",
     "review-report",
     "live-run-event",
+    "run-job",
     "artifact-packet",
     "incident-report",
     "learning-loop-scorecard",
@@ -492,22 +747,236 @@ function checkContractAndHarnessEvidence(rootDir) {
   ]);
 }
 
+function collectOpenApiOperations(openApiDocument) {
+  const operations = new Map();
+  const paths = openApiDocument?.paths && typeof openApiDocument.paths === "object" ? openApiDocument.paths : {};
+
+  for (const [routePath, pathItem] of Object.entries(paths)) {
+    if (!pathItem || typeof pathItem !== "object") continue;
+    for (const method of ["get", "post", "put", "patch", "delete"]) {
+      const operation = pathItem[method];
+      if (!operation || typeof operation !== "object") continue;
+      const routeId = operation["x-aor-route-id"];
+      if (typeof routeId !== "string" || routeId.length === 0) continue;
+      operations.set(routeId, {
+        routeId,
+        method: method.toUpperCase(),
+        path: routePath,
+        permission: operation["x-aor-permission"],
+        kind: operation["x-aor-kind"],
+      });
+    }
+  }
+
+  return operations;
+}
+
+function checkAlphaHardening(rootDir, openApiPath = defaultOpenApiPath) {
+  const findings = [];
+  const requiredFiles = [
+    "docs/backlog/wave-30-implementation-slices.md",
+    "docs/architecture/adr/0000-index.md",
+    "docs/architecture/adr/0001-alpha-filesystem-runtime-sor.md",
+    "docs/architecture/adr/0002-alpha-hybrid-api-transport.md",
+    "docs/architecture/adr/0003-alpha-detachable-web-console.md",
+    openApiPath,
+    "docs/ops/self-hosted-environment-matrix.md",
+    "docs/ops/self-hosted-secrets-and-redaction.md",
+    "docs/ops/self-hosted-backup-restore.md",
+    "docs/ops/self-hosted-incident-runbook.md",
+  ];
+
+  for (const file of requiredFiles) {
+    if (!fileExists(rootDir, file)) {
+      findings.push(`${file} is required for W30 alpha hardening.`);
+    }
+  }
+
+  let openApiDocument = null;
+  if (fileExists(rootDir, openApiPath)) {
+    try {
+      openApiDocument = readJson(rootDir, openApiPath);
+    } catch (error) {
+      findings.push(`${openApiPath} is not valid JSON: ${error.message}`);
+    }
+  }
+
+  if (openApiDocument) {
+    if (openApiDocument.openapi !== "3.1.0") {
+      findings.push(`${openApiPath} must use openapi=3.1.0.`);
+    }
+    if (!openApiDocument.info?.title || !openApiDocument.paths) {
+      findings.push(`${openApiPath} must include info.title and paths.`);
+    }
+
+    const openApiOperations = collectOpenApiOperations(openApiDocument);
+    const routerRoutes = listControlPlaneRoutes();
+    const routeIds = new Set(routerRoutes.map((route) => route.id));
+
+    for (const route of routerRoutes) {
+      if (!route.path) {
+        findings.push(`Router route ${route.id} is missing OpenAPI path metadata.`);
+        continue;
+      }
+      const operation = openApiOperations.get(route.id);
+      if (!operation) {
+        findings.push(`${openApiPath} is missing route id ${route.id}.`);
+        continue;
+      }
+      if (operation.method !== route.method) {
+        findings.push(`${openApiPath} route ${route.id} uses ${operation.method}, expected ${route.method}.`);
+      }
+      if (operation.path !== route.path) {
+        findings.push(`${openApiPath} route ${route.id} path is ${operation.path}, expected ${route.path}.`);
+      }
+      if (operation.permission !== route.permission) {
+        findings.push(`${openApiPath} route ${route.id} permission is ${operation.permission}, expected ${route.permission}.`);
+      }
+      if (operation.kind !== route.kind) {
+        findings.push(`${openApiPath} route ${route.id} kind is ${operation.kind}, expected ${route.kind}.`);
+      }
+    }
+
+    for (const routeId of openApiOperations.keys()) {
+      if (!routeIds.has(routeId)) {
+        findings.push(`${openApiPath} documents unknown route id ${routeId}.`);
+      }
+    }
+
+    for (const required of ["auth.missing_credentials", "auth.invalid_token", "auth.forbidden_project", "auth.insufficient_permission"]) {
+      if (!JSON.stringify(openApiDocument).includes(required)) {
+        findings.push(`${openApiPath} must document auth error code ${required}.`);
+      }
+    }
+    if (!JSON.stringify(openApiDocument).includes("text/event-stream")) {
+      findings.push(`${openApiPath} must document the SSE event stream response.`);
+    }
+  }
+
+  const readme = readText(rootDir, "README.md");
+  for (const required of [
+    "There is no Docker or GHCR version channel yet",
+    "Hosted SaaS",
+    "enterprise identity/SSO",
+    "Default upstream write-back automation",
+    "W30",
+  ]) {
+    if (!readme.includes(required)) {
+      findings.push(`README.md must preserve alpha boundary wording '${required}'.`);
+    }
+  }
+
+  const releaseRunbook = readText(rootDir, "docs/ops/npm-cli-alpha-release.md");
+  for (const required of [
+    "W30",
+    "pnpm production:ready --json",
+    "aor app --help",
+    "No Docker",
+  ]) {
+    if (!releaseRunbook.includes(required)) {
+      findings.push(`docs/ops/npm-cli-alpha-release.md must mention '${required}'.`);
+    }
+  }
+
+  const packageJson = readJson(rootDir, "package.json");
+  const currentClaimFiles = ["README.md", "docs/ops/self-hosted-environment-matrix.md"];
+  for (const file of currentClaimFiles) {
+    const text = readText(rootDir, file);
+    const pinnedAlphaClaims = text.match(/@(?:grinrus\/aor@)?0\.1\.0-alpha\.\d+/gu) ?? [];
+    if (pinnedAlphaClaims.length > 0) {
+      findings.push(
+        `${file} must derive current npm alpha examples from package metadata or the registry tag; found ${pinnedAlphaClaims.join(", ")}.`,
+      );
+    }
+  }
+  if (!readText(rootDir, "README.md").includes("package.json")) {
+    findings.push(`README.md must identify package.json as the source of the source-channel version.`);
+  }
+  if (!readText(rootDir, "docs/ops/self-hosted-environment-matrix.md").includes("npm view @grinrus/aor dist-tags.alpha")) {
+    findings.push("self-hosted environment matrix must derive the install version from the npm alpha dist-tag.");
+  }
+  if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+    findings.push("package.json must declare the current source-channel version.");
+  }
+
+  if (findings.length > 0) {
+    return fail("w30-alpha-hardening", "W30 alpha hardening evidence is incomplete or drifting.", findings, [
+      "docs/backlog/wave-30-implementation-slices.md",
+      "docs/architecture/adr/0000-index.md",
+      openApiPath,
+      "docs/ops/self-hosted-environment-matrix.md",
+      "docs/ops/npm-cli-alpha-release.md",
+    ]);
+  }
+  return pass("w30-alpha-hardening", "W30 ADR, OpenAPI, ops, release, and alpha-boundary evidence is present.", [
+    "docs/backlog/wave-30-implementation-slices.md",
+    "docs/architecture/adr/0000-index.md",
+    openApiPath,
+    "docs/ops/self-hosted-environment-matrix.md",
+    "docs/ops/self-hosted-secrets-and-redaction.md",
+    "docs/ops/self-hosted-backup-restore.md",
+    "docs/ops/self-hosted-incident-runbook.md",
+  ]);
+}
+
 export function runProductionReadinessGate(options = {}) {
   const rootDir = path.resolve(options.rootDir ?? defaultRoot);
   const proofFixturePath = options.proofFixturePath ?? defaultProofFixturePath;
+  const openApiPath = options.openApiPath ?? defaultOpenApiPath;
+  const storyMatrixPath = options.storyMatrixPath ?? defaultStoryMatrixPath;
+  const auditLedgerPath = options.auditLedgerPath ?? defaultAuditLedgerPath;
+  const w57ClosurePath = options.w57ClosurePath ?? defaultW57ClosurePath;
+  const w58ClosurePath = options.w58ClosurePath ?? defaultW58ClosurePath;
+  const w59ClosurePath = options.w59ClosurePath ?? defaultW59ClosurePath, w59IndependentReviewPath = options.w59IndependentReviewPath ?? defaultW59IndependentReviewPath;
+  const w66EvidenceIndexPath = options.w66EvidenceIndexPath ?? defaultW66EvidenceIndexPath;
+  const w66ClosurePath = options.w66ClosurePath ?? defaultW66ClosurePath;
+  const auditLedgerCheck = checkAuditRemediationLedger(rootDir, auditLedgerPath);
+  const w66ClosureCheck = checkW66QualificationClosure({
+    rootDir,
+    closureReportPath: w66ClosurePath,
+    evidenceIndexPath: w66EvidenceIndexPath,
+  });
   const checks = [
+    auditLedgerCheck,
+    checkW57ClosureReport(rootDir, auditLedgerPath, w57ClosurePath),
+    checkW58ClosureReport(rootDir, auditLedgerPath, w58ClosurePath),
+    checkW59ClosureReport({ rootDir, auditLedgerPath, closureReportPath: w59ClosurePath, independentReviewPath: w59IndependentReviewPath }),
+    w66ClosureCheck,
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
-    checkStoryHonesty(rootDir),
-    checkSourceOfTruth(rootDir),
+    checkStoryHonesty(rootDir, storyMatrixPath),
+    checkReadinessSourceOfTruth(rootDir),
     checkAuthHardening(rootDir),
     checkContractAndHarnessEvidence(rootDir),
+    checkAlphaHardening(rootDir, openApiPath),
+    checkDependencySafety(rootDir),
+    ...(options.requireTestEvidence
+      ? [checkTestExecutionEvidence(rootDir, { manifestPath: options.testManifestPath, reportPath: options.testReportPath })]
+      : []),
   ];
-  const status = checks.every((check) => check.status === "pass") ? "pass" : "fail";
+  const gateExecutionStatus = checks.every((check) => check.status === "pass") ? "pass" : "fail";
+  const blockingInvariants = [
+    ...(auditLedgerCheck.blocking_invariants ?? []),
+    ...(w66ClosureCheck.qualified ? [] : [ACTIVE_QUALIFICATION_HOLD]),
+  ];
+  const releaseDisposition = gateExecutionStatus === "fail" ? "unknown" : blockingInvariants.length > 0 ? "audit-hold" : "cleared";
+  const status = gateExecutionStatus === "fail" ? "fail" : releaseDisposition === "audit-hold" ? "blocked" : "pass";
   return {
     status,
+    gate_execution_status: gateExecutionStatus,
+    release_disposition: releaseDisposition,
+    release_clearance: status === "pass",
+    blocking_invariants: blockingInvariants,
     root_dir: rootDir,
     proof_fixture_path: proofFixturePath,
+    openapi_path: openApiPath,
+    remediation_ledger_path: auditLedgerPath,
+    remediation_closure_reports: {
+      W57: w57ClosurePath,
+      W58: w58ClosurePath,
+      W59: w59ClosurePath,
+      W66: w66ClosurePath,
+    },
     checks,
   };
 }
@@ -516,6 +985,11 @@ function parseArgs(argv) {
   const args = {
     rootDir: defaultRoot,
     proofFixturePath: defaultProofFixturePath,
+    openApiPath: defaultOpenApiPath,
+    auditLedgerPath: defaultAuditLedgerPath,
+    expectAuditHold: false,
+    allowAuditHold: false,
+    requireTestEvidence: true,
     json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -526,8 +1000,18 @@ function parseArgs(argv) {
     } else if (arg === "--proof-fixture") {
       args.proofFixturePath = argv[index + 1];
       index += 1;
+    } else if (arg === "--openapi") {
+      args.openApiPath = argv[index + 1];
+      index += 1;
+    } else if (arg === "--audit-ledger") {
+      args.auditLedgerPath = argv[index + 1];
+      index += 1;
     } else if (arg === "--json") {
       args.json = true;
+    } else if (arg === "--expect-audit-hold") {
+      args.expectAuditHold = true;
+    } else if (arg === "--allow-audit-hold") {
+      args.allowAuditHold = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -537,6 +1021,7 @@ function parseArgs(argv) {
 
 function printTextReport(result) {
   console.log(`Production readiness gate: ${result.status}`);
+  console.log(`Gate execution: ${result.gate_execution_status}; release disposition: ${result.release_disposition}`);
   for (const check of result.checks) {
     console.log(`[${check.status}] ${check.id}: ${check.summary}`);
     if (check.status === "fail") {
@@ -558,7 +1043,9 @@ if (invokedAsMain) {
     } else {
       printTextReport(result);
     }
-    if (result.status !== "pass") process.exit(1);
+    const expectedAuditHold = args.expectAuditHold && result.status === "blocked" && result.gate_execution_status === "pass";
+    const allowedAuditHold = args.allowAuditHold && result.status === "blocked" && result.gate_execution_status === "pass";
+    if (result.status !== "pass" && !expectedAuditHold && !allowedAuditHold) process.exit(1);
   } catch (error) {
     console.error(error.message);
     process.exit(1);

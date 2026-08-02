@@ -13,6 +13,9 @@ Task-specific scoring definition for a dataset, including graders, thresholds, b
 
 ## Notes
 Suites must only reference datasets with matching subject types.
+Deterministic graders execute the resolved expected assertions. Judge graders
+use an injected judge interface over the same immutable subject/input/expected
+snapshots; no synthetic or hash-derived score is authoritative.
 Naming and scoping guidance:
 - `suite_id` should be stable and purpose-oriented (for example `suite.release.short`, `suite.cert.core`).
 - `version` should increment when grader logic, thresholds, or blocking rules change.

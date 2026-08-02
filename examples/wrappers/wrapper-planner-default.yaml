@@ -7,9 +7,10 @@ tool_policy:
   allow_network: false
 command_policy:
   allowed: []
-output_schema_ref: schema://handoff-packet.v1
+output_schema_ref: schema://wave-ticket.structured-task-model.v1
 verification_section:
   must_produce:
-    - wave-ticket
-    - handoff-packet
+    - wave-ticket-candidate
+    - task-criteria-traceability
+  runtime_materialization_owner: orchestrator-core
 redaction_policy_ref: redact://default-secret-safe

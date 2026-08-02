@@ -1,0 +1,22 @@
+request_id: operator-request.aor-core.checkout-risk.1
+project_id: aor-core
+version: 1
+source_surface: web
+target_stage: discovery
+target_flow_id: flow.aor-core.checkout-risk
+intent_type: analyze
+request_text: Explain the blockers for the selected checkout-risk flow using only linked evidence.
+request_summary: Explain blockers for the selected checkout-risk flow.
+target_refs:
+  - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+  - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+allowed_paths: []
+delivery_mode: no-write
+status: completed
+created_at: "2026-05-28T00:00:00.000Z"
+updated_at: "2026-05-28T00:00:10.000Z"
+result_refs:
+  - evidence://reports/operator-request-analysis-operator-request-aor-core-checkout-risk-1.json
+evidence_refs:
+  - packet://operator-request@evidence://reports/operator-request-aor-core-checkout-risk-1.json
+  - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json

@@ -1,21 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-
+import { validatePublicId } from "../../../contracts/src/index.mjs";
 import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../../../observability/src/index.mjs";
-import { initializeProjectRuntime } from "../project-init.mjs";
+import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs";
+import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
+import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
+import { attachParentRunProjections } from "./parent-run-read-model.mjs";
+import { listExternalRunHealthProjectionsForRuntime } from "./external-run-health-read-model.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
-import {
-  listJsonFiles,
-  listPacketArtifacts,
-  listQualityArtifacts,
-  listRunControlAudits,
-  listStepResults,
-} from "./read-artifact-readers.mjs";
-
-const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
+import { runProjectionCoordinator } from "../operator-projection-services.mjs";
+import { applyReadModelLimit, listPacketArtifacts, listQualityArtifacts, listRunControlAudits, listRunControlStateFiles, listStepResults } from "./read-artifact-readers.mjs";
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
-
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -56,6 +53,34 @@ function asNumber(value) {
  */
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function toTimestampMs(value) {
+  const timestamp = asString(value);
+  if (!timestamp) return null;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * @param {Array<{ document?: Record<string, unknown> } | Record<string, unknown>>} stepResults
+ * @returns {string[]}
+ */
+function collectRequiredPathPrefixes(stepResults) {
+  return Array.from(new Set(stepResults.flatMap((stepResult) => {
+    const document = asRecord(asRecord(stepResult).document ?? stepResult);
+    const routedExecution = asRecord(document.routed_execution);
+    const featureTraceability = asRecord(routedExecution.feature_traceability);
+    const changeEvidence = asRecord(featureTraceability.change_evidence);
+    return [
+      ...asStringArray(featureTraceability.required_path_prefixes),
+      ...asStringArray(changeEvidence.required_path_prefixes),
+    ];
+  })));
 }
 
 /**
@@ -428,26 +453,28 @@ function classifyRunRisk(run) {
  * }} options
  * @returns {string[]}
  */
-function listRunControlStateIds(options = {}) {
-  const init = initializeProjectRuntime(options);
-  const stateFiles = listJsonFiles(init.runtimeLayout.stateRoot).filter((filePath) =>
-    RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)),
-  );
+function listRunControlStateRecords(options = {}) {
+  const init = createProjectReadContext(options);
+  const stateFiles = applyReadModelLimit(listRunControlStateFiles(init), options.limit);
 
-  /** @type {string[]} */
-  const runIds = [];
+  /** @type {Array<{ runId: string, file: string, state: Record<string, unknown> }>} */
+  const records = [];
   for (const filePath of stateFiles) {
     try {
       const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
       if (typeof parsed?.run_id === "string" && parsed.run_id.trim().length > 0) {
-        runIds.push(parsed.run_id.trim());
+        records.push({
+          runId: parsed.run_id.trim(),
+          file: filePath,
+          state: asRecord(parsed),
+        });
       }
     } catch {
       // Ignore malformed runtime state snapshots.
     }
   }
 
-  return runIds;
+  return applyReadModelLimit(records, options.limit);
 }
 
 /**
@@ -458,11 +485,12 @@ function listRunControlStateIds(options = {}) {
  *   runtimeRoot?: string,
  * }} options
  */
-export function listRuns(options = {}) {
+function executeRunReadProjection(options = {}) {
+  const init = createProjectReadContext(options);
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
   const quality = listQualityArtifacts(options);
-  const runControlStateIds = listRunControlStateIds(options);
+  const externalRunHealth = listExternalRunHealthProjectionsForRuntime(init);
 
   /**
    * @typedef {{
@@ -502,7 +530,7 @@ export function listRuns(options = {}) {
    *     governance_reason_codes: string[],
    *     approval_required: boolean,
    *   },
-   *   context_lifecycle: {
+ *   context_lifecycle: {
    *     context_asset_refs: string[],
    *     provenance_refs: string[],
    *     decision_trail: Array<{
@@ -516,10 +544,22 @@ export function listRuns(options = {}) {
    *       update_status: string | null,
    *       security_gate_status: string | null,
    *       created_at: string | null,
-   *     }>,
-   *   },
-   * }} RunSummaryEntry
-   */
+ *     }>,
+ *   },
+ *   run_control_state: Record<string, unknown> | null,
+ *   parent_run: Record<string, unknown> | null, parent_relation: Record<string, unknown> | null,
+ *   provider_step_status: Record<string, unknown> | null,
+ *   run_health: Record<string, unknown> | null,
+ *   execution_documents: {
+ *     step_results: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     runtime_harness_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     verification_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     review_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     delivery_manifests: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *   },
+ *   artifact_display_summaries: Record<string, unknown>[],
+ * }} RunSummaryEntry
+ */
 
   /** @type {Map<string, RunSummaryEntry>} */
   const runMap = new Map();
@@ -563,6 +603,18 @@ export function listRuns(options = {}) {
           provenance_refs: [],
           decision_trail: [],
         },
+        run_control_state: null,
+        parent_run: null, parent_relation: null,
+        provider_step_status: null,
+        run_health: null,
+        execution_documents: {
+          step_results: [],
+          runtime_harness_reports: [],
+          verification_reports: [],
+          review_reports: [],
+          delivery_manifests: [],
+        },
+        artifact_display_summaries: [],
       });
     }
     return /** @type {RunSummaryEntry} */ (runMap.get(runId));
@@ -576,6 +628,14 @@ export function listRuns(options = {}) {
     for (const runRef of runRefs) {
       const run = ensureRun(runRef);
       run.packet_refs.push(packet.artifact_ref);
+      run.artifact_display_summaries.push(...(packet.artifact_display_summaries ?? []));
+
+      if (packet.family === "delivery-manifest") {
+        run.execution_documents.delivery_manifests.push({
+          artifact_ref: packet.artifact_ref,
+          document: packet.document,
+        });
+      }
 
       if (packet.family !== "delivery-plan") {
         continue;
@@ -607,6 +667,11 @@ export function listRuns(options = {}) {
     if (!runId) continue;
     const run = ensureRun(normalizeRunRef(runId));
     run.step_result_refs.push(stepResult.artifact_ref);
+    run.artifact_display_summaries.push(...(stepResult.artifact_display_summaries ?? []));
+    run.execution_documents.step_results.push({
+      artifact_ref: stepResult.artifact_ref,
+      document: stepResult.document,
+    });
 
     const routedExecution = asRecord(stepResult.document.routed_execution);
     const routeResolution = asRecord(routedExecution.route_resolution);
@@ -682,8 +747,27 @@ export function listRuns(options = {}) {
     for (const runId of runIds) {
       const run = ensureRun(runId);
       run.quality_refs.push(artifact.artifact_ref);
+      run.artifact_display_summaries.push(...(artifact.artifact_display_summaries ?? []));
 
       if (artifact.family !== "promotion-decision") {
+        if (artifact.family === "runtime-harness-report") {
+          run.execution_documents.runtime_harness_reports.push({
+            artifact_ref: artifact.artifact_ref,
+            document: artifact.document,
+          });
+        }
+        if (artifact.family === "validation-report" || artifact.family === "evaluation-report") {
+          run.execution_documents.verification_reports.push({
+            artifact_ref: artifact.artifact_ref,
+            document: artifact.document,
+          });
+        }
+        if (artifact.family === "review-report") {
+          run.execution_documents.review_reports.push({
+            artifact_ref: artifact.artifact_ref,
+            document: artifact.document,
+          });
+        }
         continue;
       }
 
@@ -761,11 +845,32 @@ export function listRuns(options = {}) {
     }
   }
 
-  for (const runId of runControlStateIds) {
-    ensureRun(normalizeRunRef(runId));
+  for (const record of listRunControlStateRecords(options)) {
+    const run = ensureRun(normalizeRunRef(record.runId));
+    run.run_control_state = {
+      run_id: asString(record.state.run_id),
+      status: asString(record.state.status),
+      current_step: asString(record.state.current_step),
+      last_action: asString(record.state.last_action),
+      started_at: asString(record.state.started_at),
+      updated_at: asString(record.state.updated_at),
+      action_sequence: asNumber(record.state.action_sequence),
+      state_file: record.file,
+    };
+    run.provider_step_status = normalizeProviderStepStatus(asRecord(record.state.provider_step_status));
   }
 
-  return [...runMap.values()].map((entry) => {
+  attachParentRunProjections(options, ensureRun, normalizeRunRef);
+
+  for (const health of externalRunHealth) {
+    const runId = asString(health.run_id);
+    if (!runId) continue;
+    const run = ensureRun(normalizeRunRef(runId));
+    run.run_health = health;
+    run.artifact_display_summaries.push(...(Array.isArray(health.artifact_display_summaries) ? health.artifact_display_summaries : []));
+  }
+
+  return applyReadModelLimit([...runMap.values()], options.limit).map((entry) => {
     const selectedPromotionCandidate = selectCanonicalPromotionCandidate(entry.finance_evidence.promotion_candidates);
     const seenTrailKeys = new Set();
     const decisionTrail = entry.context_lifecycle.decision_trail
@@ -821,9 +926,27 @@ export function listRuns(options = {}) {
         provenance_refs: Array.from(new Set(entry.context_lifecycle.provenance_refs)),
         decision_trail: decisionTrail,
       },
+      run_control_state: entry.run_control_state,
+      parent_run: entry.parent_run, parent_relation: entry.parent_relation,
+      provider_step_status: entry.provider_step_status,
+      run_health: entry.run_health,
+      execution_evidence: buildExecutionEvidenceSummary({
+        runId: entry.run_id,
+        stepResults: entry.execution_documents.step_results,
+        runtimeHarnessReports: entry.execution_documents.runtime_harness_reports,
+        verificationReports: entry.execution_documents.verification_reports,
+        reviewReports: entry.execution_documents.review_reports,
+        deliveryManifests: entry.execution_documents.delivery_manifests,
+        providerStepStatus: entry.provider_step_status,
+        requiredPathPrefixes: collectRequiredPathPrefixes(entry.execution_documents.step_results),
+        policyContext: entry.policy_context,
+      }),
+      artifact_display_summaries: uniqueArtifactDisplaySummaries(entry.artifact_display_summaries),
     };
   });
 }
+
+export function listRuns(options = {}) { return runProjectionCoordinator(executeRunReadProjection, options); }
 
 /**
  * @param {{
@@ -857,6 +980,9 @@ export function readRunEventHistory(options) {
     const policyContext = asRecord(payload.policy_context);
     const interaction = asRecord(payload.interaction);
     const continuation = asRecord(interaction.continuation);
+    const providerStepStatus = normalizeProviderStepStatus(asRecord(payload.provider_step_status), {
+      nowMs: toTimestampMs(event.timestamp) ?? undefined,
+    });
     return {
       event_id: asString(event.event_id) ?? "",
       timestamp: asString(event.timestamp) ?? null,
@@ -869,6 +995,7 @@ export function readRunEventHistory(options) {
       interaction_id: asString(payload.interaction_id),
       step_result_ref: asString(payload.step_result_ref),
       answer_audit_ref: asString(payload.answer_audit_ref),
+      provider_step_status: providerStepStatus,
       interaction:
         Object.keys(interaction).length > 0
           ? {
@@ -1022,7 +1149,7 @@ export function readRunPolicyHistory(options) {
  * }} options
  */
 export function readPlannerMetrics(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   return buildPlannerMetricsSnapshot({
     projectId: init.projectId,
     runSummaries: listRuns(options),
@@ -1043,7 +1170,7 @@ export function readPlannerMetrics(options = {}) {
 function listRunEventsForSummaries(options, runs) {
   return runs.flatMap((run) => {
     const runId = asString(run.run_id);
-    if (!runId) return [];
+    if (!runId || !validatePublicId(runId).ok) return [];
     return readRunEvents({
       cwd: options.cwd,
       projectRef: options.projectRef,
@@ -1063,7 +1190,7 @@ function listRunEventsForSummaries(options, runs) {
  * }} options
  */
 export function readFinanceMonitoringSnapshot(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const runs = listRuns(options);
   return buildFinanceMonitoringSnapshot({
     projectId: init.projectId,
@@ -1081,7 +1208,7 @@ export function readFinanceMonitoringSnapshot(options = {}) {
  * }} options
  */
 export function readStrategicSnapshot(options = {}) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const generatedAt = new Date().toISOString();
   const backlogPath = path.join(init.projectRoot, MASTER_BACKLOG_FILE);
   const backlogRows =

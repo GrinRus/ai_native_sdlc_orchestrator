@@ -1,0 +1,21 @@
+request_id: operator-request.aor-core.sample.1
+project_id: aor-core
+version: 1
+source_surface: cli
+target_stage: spec
+intent_type: revise-document
+request_text: Add a short first-run UI note to README.md without changing runtime semantics.
+request_summary: Add a first-run UI note to README.md.
+target_refs:
+  - README.md
+allowed_paths:
+  - README.md
+delivery_mode: no-write
+status: completed
+created_at: "2026-05-25T00:00:00.000Z"
+updated_at: "2026-05-25T00:00:10.000Z"
+result_refs:
+  - evidence://reports/operator-request-proposal-operator-request-aor-core-sample-1.json
+evidence_refs:
+  - packet://operator-request@evidence://reports/operator-request-operator-request-aor-core-sample-1.json
+  - compiled-context://compiled-context.aor-core.operator-request.sample.spec.attempt.1

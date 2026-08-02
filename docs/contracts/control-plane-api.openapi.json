@@ -1,0 +1,4342 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AOR detached control-plane API",
+    "version": "1.0.0-alpha",
+    "description": "Machine-readable contract for the implemented self-hosted alpha HTTP/SSE control-plane routes. This spec describes the current hybrid module plus detached transport baseline; it does not claim hosted SaaS, full CLI-over-HTTP parity, or target-stack APIs."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:{port}",
+      "description": "Self-hosted detached control-plane transport",
+      "variables": {
+        "port": {
+          "default": "3000"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "read"
+    },
+    {
+      "name": "mutation"
+    },
+    {
+      "name": "stream"
+    }
+  ],
+  "paths": {
+    "/api/projects": {
+      "get": {
+        "operationId": "listLocalAppProjects",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "project-index",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ProjectIndex"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/actions": {
+      "post": {
+        "operationId": "applyLocalAppProjectAction",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "project-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectActionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": { "$ref": "#/components/schemas/ProjectActionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ProjectAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/topology": {
+      "get": {
+        "operationId": "getProjectTopology",
+        "tags": ["read"],
+        "x-aor-route-id": "project-topology",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/topology/validation": {
+      "get": {
+        "operationId": "getLatestProjectTopologyValidation",
+        "tags": ["read"],
+        "x-aor-route-id": "project-topology-validation",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/topology/actions": {
+      "post": {
+        "operationId": "applyProjectTopologyAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "project-topology-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TopologyActionRequest" } },
+            "application/*+json": { "schema": { "$ref": "#/components/schemas/TopologyActionRequest" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/execution-profile": {
+      "get": {
+        "operationId": "getExecutionProfile",
+        "tags": ["read"],
+        "x-aor-route-id": "execution-profile",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/execution-profile/actions": {
+      "post": {
+        "operationId": "applyExecutionProfileAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "execution-profile-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExecutionProfileActionRequest" } },
+            "application/*+json": { "schema": { "$ref": "#/components/schemas/ExecutionProfileActionRequest" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/state": {
+      "get": {
+        "operationId": "getProjectState",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "project-state",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ProjectState"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/packets": {
+      "get": {
+        "operationId": "listPackets",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "packets",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/step-results": {
+      "get": {
+        "operationId": "listStepResults",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "step-results",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/quality-artifacts": {
+      "get": {
+        "operationId": "listQualityArtifacts",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "quality-artifacts",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/delivery-manifests": {
+      "get": {
+        "operationId": "listDeliveryManifests",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "delivery-manifests",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/promotion-decisions": {
+      "get": {
+        "operationId": "listPromotionDecisions",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "promotion-decisions",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/strategic-snapshot": {
+      "get": {
+        "operationId": "getStrategicSnapshot",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "strategic-snapshot",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/planner-metrics": {
+      "get": {
+        "operationId": "getPlannerMetrics",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "planner-metrics",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/finance-monitoring": {
+      "get": {
+        "operationId": "getFinanceMonitoring",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "finance-monitoring",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/next-action-report": {
+      "get": {
+        "operationId": "getNextActionReport",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "next-action-report",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NextActionReport"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows": {
+      "get": {
+        "operationId": "listFlows",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flows",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowList"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/selected": {
+      "get": {
+        "operationId": "getSelectedFlow",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "selected-flow",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowDetail"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/evidence-graph": {
+      "get": {
+        "operationId": "getFlowEvidenceGraph",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-evidence-graph",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowEvidenceGraph"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/runtime-trace": {
+      "get": {
+        "operationId": "getFlowRuntimeTrace",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-runtime-trace",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowRuntimeTrace"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/attention": {
+      "get": {
+        "operationId": "getFlowAttention",
+        "tags": ["read"],
+        "x-aor-route-id": "flow-attention",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } },
+          { "$ref": "#/components/parameters/readModelLimit" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/FlowAttention" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/plan": {
+      "get": {
+        "operationId": "getFlowPlan",
+        "tags": ["read"],
+        "x-aor-route-id": "flow-plan",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/plan/progress": {
+      "get": {
+        "operationId": "getFlowPlanProgress",
+        "tags": ["read"],
+        "x-aor-route-id": "flow-plan-progress",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}": {
+      "get": {
+        "operationId": "getFlow",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-detail",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowDetail"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/operator-requests": {
+      "get": {
+        "operationId": "listOperatorRequests",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "operator-requests",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOperatorRequest",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "operator-request-create",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/JsonObject"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/operator-requests/{requestId}/actions": {
+      "post": {
+        "operationId": "runOperatorRequest",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "operator-request-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/JsonObject"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "409": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/multirepo-coordination": {
+      "get": {
+        "operationId": "getMultirepoCoordination",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "multirepo-coordination",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/compiler-revisions": {
+      "get": {
+        "operationId": "listCompilerRevisions",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "compiler-revisions",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs": {
+      "get": {
+        "operationId": "listRuns",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "runs",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Runs"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs/{runId}/events/history": {
+      "get": {
+        "operationId": "getRunEventHistory",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "event-history",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/runId"
+          },
+          {
+            "$ref": "#/components/parameters/eventHistoryLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RunEventHistory"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs/{runId}/policy-history": {
+      "get": {
+        "operationId": "getRunPolicyHistory",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "policy-history",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/runId"
+          },
+          {
+            "$ref": "#/components/parameters/eventHistoryLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs/{runId}/events": {
+      "get": {
+        "operationId": "streamRunEvents",
+        "tags": [
+          "stream"
+        ],
+        "x-aor-route-id": "run-events",
+        "x-aor-permission": "read",
+        "x-aor-kind": "stream",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/runId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replay-safe server-sent event stream using live-run-event payloads.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/plan/actions": {
+      "post": {
+        "operationId": "flowPlanAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "flow-plan-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "flowId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/run-control/actions": {
+      "post": {
+        "operationId": "runControlAction",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "run-control-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/RunControlAction"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RunControlAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "409": {
+            "$ref": "#/components/responses/RunControlActionError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/ui-lifecycle/actions": {
+      "post": {
+        "operationId": "uiLifecycleAction",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "ui-lifecycle-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/UiLifecycleAction"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/UiLifecycleAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "409": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/lifecycle-command/actions": {
+      "post": {
+        "operationId": "lifecycleCommandAction",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "lifecycle-command-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/LifecycleCommandAction"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/LifecycleCommandAction"
+          },
+          "202": {
+            "$ref": "#/components/responses/RunJobAccepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "409": {
+            "$ref": "#/components/responses/LifecycleCommandActionError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/interactions/answers": {
+      "post": {
+        "operationId": "submitInteractionAnswer",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "interaction-answers",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/InteractionAnswer"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/InteractionAnswer"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "409": {
+            "$ref": "#/components/responses/InteractionAnswerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Required in production-hardened mode. local-trusted loopback mode may run without bearer credentials."
+      }
+    },
+    "parameters": {
+      "projectId": {
+        "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "runId": {
+        "name": "runId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "readModelLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Optional local-alpha read-model window. Detached read routes default to a bounded 200-entry window and cap explicit requests at 1000 entries.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 200
+        }
+      },
+      "eventHistoryLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Optional bounded history window. Defaults to the route-specific replay window.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "requestBodies": {
+      "JsonObject": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/JsonObject" }
+          }
+        }
+      },
+      "RunControlAction": {
+        "required": true,
+        "description": "Run-control mutation request for bounded start/pause/resume/steer/cancel actions.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunControlActionRequest"
+            }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/RunControlActionRequest" }
+          }
+        }
+      },
+      "UiLifecycleAction": {
+        "required": true,
+        "description": "UI lifecycle attach/detach request. The web surface remains optional and detachable.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UiLifecycleActionRequest"
+            }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/UiLifecycleActionRequest" }
+          }
+        }
+      },
+      "LifecycleCommandAction": {
+        "required": true,
+        "description": "Bounded lifecycle command request for the documented guided command subset.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LifecycleCommandActionRequest"
+            }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/LifecycleCommandActionRequest" }
+          }
+        }
+      },
+      "RunJobAccepted": {
+        "description": "Asynchronous run start accepted with durable job and event references.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunJobAcceptedResponse"
+            }
+          }
+        }
+      },
+      "InteractionAnswer": {
+        "required": true,
+        "description": "Operator answer request for a pending runner interaction.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InteractionAnswerRequest"
+            }
+          },
+          "application/*+json": {
+            "schema": { "$ref": "#/components/schemas/InteractionAnswerRequest" }
+          }
+        }
+      }
+    },
+    "responses": {
+      "NextActionReport": {
+        "description": "Current durable next-action report or null before the first next projection.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/NextActionReportResponse" }
+          }
+        }
+      },
+      "JsonObject": {
+        "description": "Route-specific JSON response backed by the documented AOR contract families.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        }
+      },
+      "JsonError": {
+        "description": "Stable JSON error envelope.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "RequestTimeout": {
+        "description": "Mutation body did not complete within five seconds.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "Mutation body exceeded the 1 MiB declared or incremental limit.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "UnsupportedMediaType": {
+        "description": "Mutation body media type is not application/json or application/*+json.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      },
+      "AuthError": {
+        "description": "Authentication or authorization denial. Transport-level denials do not invoke mutation handlers.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthErrorEnvelope"
+            }
+          }
+        }
+      },
+      "ProjectState": {
+        "description": "Resolved project state and runtime-root layout.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProjectStateResponse"
+            }
+          }
+        }
+      },
+      "ProjectIndex": {
+        "description": "Local app-session project summaries. This route is read-only and must not initialize runtime state.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProjectIndexResponse"
+            }
+          }
+        }
+      },
+      "ProjectAction": {
+        "description": "Local app-session project action result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProjectActionResponse"
+            }
+          }
+        }
+      },
+      "FlowList": {
+        "description": "Read-only runtime flow projection list built from mission, next-action, and closure evidence.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowListResponse"
+            }
+          }
+        }
+      },
+      "FlowDetail": {
+        "description": "Read-only runtime flow projection or null when no selected flow exists.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FlowProjection"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "FlowEvidenceGraph": {
+        "description": "Flow-scoped evidence graph. Nodes and edges are limited to the selected flow evidence refs and matching target-flow operator requests.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowEvidenceGraphResponse"
+            }
+          }
+        }
+      },
+      "FlowRuntimeTrace": {
+        "description": "Flow-scoped runtime trace linking run events, step results, harness decisions, and delivery or release artifacts.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowRuntimeTraceResponse"
+            }
+          }
+        }
+      },
+      "FlowAttention": {
+        "description": "Flow-scoped attention projection derived from existing durable evidence without materializing runtime state.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/AttentionProjection" }
+          }
+        }
+      },
+      "Runs": {
+        "description": "Read-only run summary list built from filesystem runtime artifacts.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunsResponse"
+            }
+          }
+        }
+      },
+      "RunEventHistory": {
+        "description": "Bounded run event-history read model.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunEventHistoryResponse"
+            }
+          }
+        }
+      },
+      "RunControlAction": {
+        "description": "Run-control mutation result with durable state and audit refs.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunControlActionResponse"
+            }
+          }
+        }
+      },
+      "RunControlActionError": {
+        "description": "Blocked run-control mutation with persisted audit evidence.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunControlActionErrorResponse"
+            }
+          }
+        }
+      },
+      "UiLifecycleAction": {
+        "description": "UI lifecycle mutation result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UiLifecycleActionResponse"
+            }
+          }
+        }
+      },
+      "LifecycleCommandAction": {
+        "description": "Lifecycle command mutation result with CLI output parity.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LifecycleCommandActionResponse"
+            }
+          }
+        }
+      },
+      "LifecycleCommandActionError": {
+        "description": "Blocked lifecycle command mutation with command output when available.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LifecycleCommandActionErrorResponse"
+            }
+          }
+        }
+      },
+      "InteractionAnswer": {
+        "description": "Accepted interaction answer result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InteractionAnswerResponse"
+            }
+          }
+        }
+      },
+      "InteractionAnswerError": {
+        "description": "Accepted but non-resumable interaction answer result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InteractionAnswerErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "OperatorControl": {
+        "type": "object",
+        "required": ["category", "label", "availability", "operation", "target_surface", "requires_confirmation"],
+        "properties": {
+          "category": { "type": "string", "enum": ["mutation", "workbench", "evidence", "copy", "refresh", "unavailable"] },
+          "label": { "type": "string", "minLength": 1 },
+          "availability": { "type": "string", "enum": ["ready", "blocked"] },
+          "operation": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["command", "flags"],
+                "properties": {
+                  "command": { "type": "string", "minLength": 1 },
+                  "flags": { "type": "object", "additionalProperties": true }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "target_surface": { "type": ["string", "null"], "enum": ["cockpit", "attention", "journey", "evidence", null] },
+          "requires_confirmation": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "AttentionItem": {
+        "type": "object",
+        "required": ["item_id", "source_family", "source_ref", "stage", "state", "severity", "title", "consequence", "operator_control", "evidence_refs", "created_at", "updated_at"],
+        "properties": {
+          "item_id": { "type": "string", "minLength": 1 },
+          "source_family": { "type": "string", "minLength": 1 },
+          "source_ref": { "type": "string", "minLength": 1 },
+          "stage": { "type": ["string", "null"] },
+          "state": { "type": "string", "enum": ["needs-attention", "running", "upcoming", "resolved"] },
+          "severity": { "type": "string", "enum": ["danger", "warning", "information", "neutral"] },
+          "title": { "type": "string", "minLength": 1 },
+          "consequence": { "type": "string", "minLength": 1 },
+          "operator_control": { "oneOf": [{ "type": "null" }, { "$ref": "#/components/schemas/OperatorControl" }] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "created_at": { "type": ["string", "null"] },
+          "updated_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "AttentionProjection": {
+        "type": "object",
+        "required": ["project_id", "flow_id", "initialized", "read_only", "freshness", "latest_source_at", "items"],
+        "properties": {
+          "project_id": { "type": ["string", "null"] },
+          "flow_id": { "type": "string", "minLength": 1 },
+          "initialized": { "type": "boolean" },
+          "read_only": { "const": true },
+          "freshness": { "type": "string", "enum": ["current", "stale", "partial", "offline"] },
+          "latest_source_at": { "type": ["string", "null"] },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/AttentionItem" } }
+        },
+        "additionalProperties": false
+      },
+      "NextActionReportResponse": {
+        "oneOf": [
+          { "type": "null" },
+          {
+            "type": "object",
+            "required": ["report_id", "project_id", "primary_action", "status", "evidence_refs"],
+            "properties": {
+              "report_id": { "type": "string" },
+              "project_id": { "type": "string" },
+              "status": { "type": "string", "enum": ["ready", "blocked"] },
+              "evidence_refs": { "type": "array", "items": { "type": "string" } },
+              "primary_action": {
+                "type": "object",
+                "required": ["action_id", "command", "reason", "low_level_command", "evidence_refs"],
+                "properties": {
+                  "action_id": { "type": "string" },
+                  "command": { "type": "string" },
+                  "reason": { "type": "string" },
+                  "low_level_command": { "type": "string" },
+                  "evidence_refs": { "type": "array", "items": { "type": "string" } },
+                  "operator_control": { "$ref": "#/components/schemas/OperatorControl" }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      },
+      "JsonObject": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "additionalProperties": true
+      },
+      "AuthErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "allOf": [
+              { "$ref": "#/components/schemas/ErrorBody" },
+              {
+                "type": "object",
+                "required": ["auth"],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "auth.missing_credentials",
+                      "auth.invalid_token",
+                      "auth.forbidden_project",
+                      "auth.insufficient_permission"
+                    ]
+                  },
+                  "auth": {
+                    "type": "object",
+                    "required": ["required_permission", "project_id", "token_id", "security_mode"],
+                    "properties": {
+                      "required_permission": { "type": "string", "enum": ["read", "mutate"] },
+                      "project_id": { "type": "string" },
+                      "token_id": { "type": ["string", "null"] },
+                      "security_mode": { "type": "string", "enum": ["local-trusted", "production-hardened"] }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectStateResponse": {
+        "type": "object",
+        "required": [
+          "initialized",
+          "project_id",
+          "project_root",
+          "runtime_root",
+          "runtime_layout",
+          "state_file"
+        ],
+        "properties": {
+          "initialized": {
+            "type": "boolean",
+            "description": "False when the resolved runtime has not been explicitly initialized. Reads never change this value by materializing state."
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "project_profile_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime_root": {
+            "type": "string"
+          },
+          "runtime_layout": {
+            "$ref": "#/components/schemas/RuntimeLayout"
+          },
+          "state_file": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "onboarding_summary": {
+            "$ref": "#/components/schemas/OnboardingSummary"
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalRunHealthProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification_plan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "Latest verification-plan read model with generated command groups, discovery candidates, per-group status, outcome, failed command count, failed step-result refs, blocked next step, and evidence refs.",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "description": "User-facing summaries for recent readable artifact refs. Raw refs remain available only inside each summary raw_ref/debug action.",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectIndexResponse": {
+        "type": "object",
+        "required": [
+          "default_project_id",
+          "projects",
+          "read_only"
+        ],
+        "properties": {
+          "default_project_id": {
+            "type": "string"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectSummary"
+            }
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectActionRequest": {
+        "type": "object",
+        "required": [
+          "action",
+          "project_ref"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "add"
+            ]
+          },
+          "project_ref": {
+            "type": "string"
+          },
+          "runtime_root": {
+            "type": "string"
+          },
+          "project_profile": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectActionResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProjectIndexResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "project"
+            ],
+            "properties": {
+              "project": {
+                "$ref": "#/components/schemas/ProjectSummary"
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      },
+      "ProjectSummary": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "runtime_project_id",
+          "label",
+          "project_ref",
+          "runtime_root",
+          "onboarding_summary",
+          "active_flow_summary",
+          "read_only"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "runtime_project_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "project_ref": {
+            "type": "string"
+          },
+          "project_profile_ref": {
+            "type": "string"
+          },
+          "project_profile_source": {
+            "type": "string"
+          },
+          "runtime_root": {
+            "type": "string"
+          },
+          "onboarding_summary": {
+            "$ref": "#/components/schemas/OnboardingSummary"
+          },
+          "active_flow_summary": {
+            "$ref": "#/components/schemas/ActiveFlowSummary"
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "OnboardingSummary": {
+        "type": "object",
+        "required": [
+          "status",
+          "initialized",
+          "can_initialize",
+          "recommended_action",
+          "blockers"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not-initialized",
+              "runtime-ready",
+              "initialized"
+            ]
+          },
+          "initialized": {
+            "type": "boolean"
+          },
+          "state_exists": {
+            "type": "boolean"
+          },
+          "onboarding_report_exists": {
+            "type": "boolean"
+          },
+          "can_initialize": {
+            "type": "boolean"
+          },
+          "recommended_action": {
+            "type": "string"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile_mismatch_candidate_project_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ActiveFlowSummary": {
+        "type": "object",
+        "required": [
+          "status",
+          "selected_flow_id",
+          "active_flow_count",
+          "completed_flow_count"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not-initialized",
+              "no-flows",
+              "active-flow",
+              "completed-only",
+              "unreadable"
+            ]
+          },
+          "selected_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active_flow_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed_flow_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocker": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ArtifactDisplaySummary": {
+        "type": "object",
+        "description": "User-facing artifact reference summary for rendering evidence without making long paths or packet URIs the primary label.",
+        "required": [
+          "type",
+          "stage",
+          "label",
+          "status",
+          "severity",
+          "description",
+          "raw_ref",
+          "actions"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_ref": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplayAction"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ArtifactDisplayAction": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionEvidenceSummary": {
+        "type": "object",
+        "description": "Operator-facing execution evidence summary derived from public read surfaces. It classifies changed paths, fail-closed blockers, provider execution state, verification status, and public recovery actions.",
+        "required": [
+          "status",
+          "provider_execution_status",
+          "runtime_harness_decision",
+          "real_code_change_status",
+          "post_run_verification_status",
+          "review_status",
+          "delivery_readiness_status",
+          "no_upstream_write_status",
+          "changed_path_groups",
+          "blockers",
+          "actions"
+        ],
+        "properties": {
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "provider_execution_status": {
+            "type": "string"
+          },
+          "provider_interruption_owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "operator",
+              "provider",
+              "environment",
+              "unknown",
+              null
+            ]
+          },
+          "provider_interruption_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_interruption_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime_harness_decision": {
+            "type": "string"
+          },
+          "real_code_change_status": {
+            "type": "string"
+          },
+          "post_run_verification_status": {
+            "type": "string"
+          },
+          "review_status": {
+            "type": "string"
+          },
+          "delivery_readiness_status": {
+            "type": "string"
+          },
+          "no_upstream_write_status": {
+            "type": "string"
+          },
+          "required_path_prefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_path_groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionChangedPathGroup"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionEvidenceAction"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExternalRunHealthProjection": {
+        "type": "object",
+        "description": "Compact, query-safe projection of public external run-health and observation artifacts visible from a selected project runtime.",
+        "required": [
+          "run_id",
+          "status",
+          "blockers",
+          "artifact_display_summaries"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "profile_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "blocked",
+              null
+            ]
+          },
+          "report_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "final",
+              "in_progress",
+              null
+            ]
+          },
+          "generated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "current_step": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocked_step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completed_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_operator_decision_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failure_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pending_decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "controller_health": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "resume_interaction_health": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadModelBlocker"
+            }
+          },
+          "report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_observation_report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ReadModelBlocker": {
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "summary"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "warning",
+              "info"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionChangedPathGroup": {
+        "type": "object",
+        "required": [
+          "group_id",
+          "label",
+          "status",
+          "severity",
+          "paths",
+          "count",
+          "description"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "enum": [
+              "mission-relevant",
+              "runtime-owned",
+              "runner-owned-leak",
+              "scratch-unrelated"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionEvidenceAction": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "label",
+          "enabled",
+          "command_surface",
+          "reason"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "enum": [
+              "stop_provider",
+              "save_partial_evidence",
+              "diagnose_current_step",
+              "retry_public_step"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "command_surface": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProviderStepStatus": {
+        "type": "object",
+        "description": "Public, query-safe heartbeat for a routed external provider step. Raw process commands and secrets are not exposed here.",
+        "required": [
+          "status",
+          "elapsed_ms",
+          "current_command_label",
+          "recommended_action"
+        ],
+        "properties": {
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adapter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "route_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "running",
+              "silent-running",
+              "artifact-updated",
+              "timeout-risk",
+              "completed",
+              "interrupted",
+              "failed"
+            ]
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timeout_budget_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "remaining_budget_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "last_output_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_artifact_update_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_progress_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_progress_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_progress_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress_event_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "output_mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "json",
+              "stream-json",
+              "text",
+              null
+            ]
+          },
+          "interruption_owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "operator",
+              "provider",
+              "environment",
+              "unknown",
+              null
+            ]
+          },
+          "interruption_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sanitized user-facing reason for an interrupted provider step. Must not include raw commands, prompts, file contents, env vars, tokens, or secrets."
+          },
+          "interruption_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional public interruption status, for example operator-stopped when a public run-control cancel stopped the provider."
+          },
+          "current_command_label": {
+            "type": "string"
+          },
+          "recommended_action": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuntimeLayout": {
+        "type": "object",
+        "description": "Filesystem runtime layout owned by .aor; property names mirror the runtime state artifact.",
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "root_dir": {
+            "type": "string"
+          },
+          "stateRoot": {
+            "type": "string"
+          },
+          "state_root": {
+            "type": "string"
+          },
+          "artifactsRoot": {
+            "type": "string"
+          },
+          "artifacts_root": {
+            "type": "string"
+          },
+          "reportsRoot": {
+            "type": "string"
+          },
+          "reports_root": {
+            "type": "string"
+          },
+          "logsRoot": {
+            "type": "string"
+          },
+          "logs_root": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowListResponse": {
+        "type": "object",
+        "required": [
+          "initialized",
+          "project_id",
+          "selected_flow_id",
+          "active_flow_ids",
+          "completed_flow_ids",
+          "flows",
+          "read_only"
+        ],
+        "properties": {
+          "initialized": {
+            "type": "boolean"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "selected_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active_flow_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completed_flow_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowProjection"
+            }
+          },
+          "generated_from": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowProjection": {
+        "type": "object",
+        "required": [
+          "flow_id",
+          "status",
+          "selected_stage",
+          "mission_id",
+          "intake_packet_ref",
+          "latest_next_action_report_ref",
+          "evidence_refs",
+          "writeback_policy",
+          "mission_settings",
+          "closure_state",
+          "completed_read_only"
+        ],
+        "properties": {
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "selected_stage": {
+            "type": "string"
+          },
+          "mission_id": {
+            "type": "string"
+          },
+          "intake_packet_ref": {
+            "type": "string"
+          },
+          "intake_body_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_next_action_report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
+          },
+          "writeback_policy": {
+            "$ref": "#/components/schemas/FlowWritebackPolicy"
+          },
+          "mission_settings": {
+            "$ref": "#/components/schemas/FlowMissionSettings"
+          },
+          "closure_state": {
+            "$ref": "#/components/schemas/FlowClosureState"
+          },
+          "completed_read_only": {
+            "type": "boolean"
+          },
+          "follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at_ref": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowMissionSettings": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "brief": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "goals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kpis": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "definition_of_done": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "delivery_mode": {
+            "type": "string"
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowClosureState": {
+        "type": "object",
+        "required": [
+          "status",
+          "completed",
+          "completed_read_only",
+          "follow_up_eligible",
+          "source_learning_handoff_refs"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "completed_read_only": {
+            "type": "boolean"
+          },
+          "follow_up_eligible": {
+            "type": "boolean"
+          },
+          "learning_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_learning_handoff_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommended_follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceGraphResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "flow_id",
+          "status",
+          "read_only",
+          "evidence_refs",
+          "nodes",
+          "edges",
+          "isolation"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowEvidenceNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowEvidenceEdge"
+            }
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceNode": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "ref",
+          "family"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "target_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceEdge": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "relation"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowRuntimeTraceResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "flow_id",
+          "status",
+          "read_only",
+          "run_ids",
+          "trace_items",
+          "inspected_evidence_refs",
+          "isolation"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trace_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowRuntimeTraceItem"
+            }
+          },
+          "inspected_evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowRuntimeTraceItem": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "kind",
+          "event_type"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowWritebackPolicy": {
+        "type": "object",
+        "required": [
+          "mode",
+          "upstream_writes_default",
+          "requires_explicit_review"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "no-write",
+              "patch-only",
+              "local-branch",
+              "fork-first-pr"
+            ]
+          },
+          "upstream_writes_default": {
+            "type": "boolean"
+          },
+          "requires_explicit_review": {
+            "type": "boolean"
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunsResponse": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RunSummary"
+        }
+      },
+      "RunSummary": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "packet_refs",
+          "step_result_refs",
+          "quality_refs"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "packet_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "step_result_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quality_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "finance_evidence": {
+            "$ref": "#/components/schemas/FinanceEvidenceSummary"
+          },
+          "policy_context": {
+            "$ref": "#/components/schemas/PolicyContextSummary"
+          },
+          "context_lifecycle": {
+            "$ref": "#/components/schemas/ContextLifecycleSummary"
+          },
+          "run_control_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentRunProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parent_relation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentRunRelation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalRunHealthProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_evidence": {
+            "$ref": "#/components/schemas/ExecutionEvidenceSummary"
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "FinanceEvidenceSummary": {
+        "type": "object",
+        "properties": {
+          "route_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wrapper_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prompt_bundle_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "context_bundle_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "compiler_revision_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adapter_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_cost_usd": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "timeout_sec": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "max_cost_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeout_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "step_latency_samples_sec": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "certification_latency_samples_sec": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "promotion_candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "PolicyContextSummary": {
+        "type": "object",
+        "properties": {
+          "route_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "policy_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "writeback_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "governance_decisions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "governance_reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ContextLifecycleSummary": {
+        "type": "object",
+        "properties": {
+          "context_asset_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provenance_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decision_trail": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunEventHistoryResponse": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "total_events",
+          "events"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "total_events": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunEventHistoryEntry"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunEventHistoryEntry": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "control_action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "interaction_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answer_audit_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interaction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InteractionHistorySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyEventContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionHistorySummary": {
+        "type": "object",
+        "properties": {
+          "interaction_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "question_summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answer_required": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "answer_audit_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "continuation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InteractionContinuation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionContinuation": {
+        "type": "object",
+        "properties": {
+          "next_action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "PolicyEventContext": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "risk_tier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "high_risk": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "approval_required": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "approval_ref_present": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlActionRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "pause",
+              "resume",
+              "steer",
+              "cancel"
+            ]
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "target_step": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "approval_ref": {
+            "type": "string"
+          },
+          "execution_plan_ref": {
+            "type": "string"
+          },
+          "execution_unit_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlActionResponse": {
+        "type": "object",
+        "required": [
+          "run_control"
+        ],
+        "properties": {
+          "run_control": {
+            "$ref": "#/components/schemas/RunControlPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlActionErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "run_control"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "run_control": {
+            "$ref": "#/components/schemas/RunControlPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlPayload": {
+        "type": "object",
+        "required": [
+          "action",
+          "run_id",
+          "blocked",
+          "applied",
+          "state_file",
+          "audit_file"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "transition": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "guardrails": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "state_file": {
+            "type": "string"
+          },
+          "audit_id": {
+            "type": "string"
+          },
+          "audit_file": {
+            "type": "string"
+          },
+          "primary_event_id": {
+            "type": "string"
+          },
+          "evidence_event_id": {
+            "type": "string"
+          },
+          "stream_log_file": {
+            "type": "string"
+          },
+          "next_actions": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ParentRunProjection": {
+        "type": "object",
+        "required": [
+          "parent_run_id",
+          "status",
+          "revision",
+          "execution_plan_ref",
+          "workspace_set_ref",
+          "max_concurrency",
+          "capacity",
+          "budgets",
+          "consumed",
+          "units",
+          "integration_gates"
+        ],
+        "properties": {
+          "parent_run_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["queued", "running", "paused", "canceling", "canceled", "blocked", "integration-pending", "succeeded"]
+          },
+          "revision": { "type": "integer", "minimum": 0 },
+          "execution_plan_ref": { "type": "string" },
+          "workspace_set_ref": { "type": "string" },
+          "max_concurrency": { "type": "integer", "minimum": 1 },
+          "capacity": { "$ref": "#/components/schemas/JsonObject" },
+          "budgets": { "$ref": "#/components/schemas/JsonObject" },
+          "consumed": { "$ref": "#/components/schemas/JsonObject" },
+          "units": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/JsonObject" }
+          },
+          "integration_gates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/JsonObject" }
+          },
+          "state_file": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "ParentRunRelation": {
+        "type": "object",
+        "required": ["parent_run_id", "execution_unit_id", "task_refs", "attempt"],
+        "properties": {
+          "parent_run_id": { "type": "string" },
+          "execution_unit_id": { "type": "string" },
+          "task_refs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "attempt": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      },
+      "UiLifecycleActionRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "attach",
+              "detach"
+            ]
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "control_plane": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "UiLifecycleActionResponse": {
+        "type": "object",
+        "required": [
+          "ui_lifecycle"
+        ],
+        "properties": {
+          "ui_lifecycle": {
+            "$ref": "#/components/schemas/UiLifecyclePayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "UiLifecyclePayload": {
+        "type": "object",
+        "required": [
+          "action",
+          "idempotent",
+          "connection_state",
+          "headless_safe",
+          "state",
+          "state_file"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "idempotent": {
+            "type": "boolean"
+          },
+          "connection_state": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "disconnected",
+              "detached"
+            ]
+          },
+          "headless_safe": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "state_file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandActionRequest": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "flags": {
+            "type": "object",
+            "properties": {
+              "run_id": { "type": "string" },
+              "closure_run_id": { "type": "string" },
+              "parent_run_id": { "type": "string" },
+              "execution_plan_ref": { "type": "string" },
+              "execution_unit_id": { "type": "string" },
+              "workspace_set_ref": { "type": "string" },
+              "command_id": { "type": "string" },
+              "expected_revision": { "type": "integer", "minimum": 0 },
+              "max_concurrency": { "type": "integer", "minimum": 1 },
+              "max_child_starts": { "type": "integer", "minimum": 1 },
+              "request_ref": { "type": "string" },
+              "evidence_ref": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+              "qa_evidence_ref": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+            },
+            "additionalProperties": true
+          },
+          "unsafe_development_override": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit auditable maintainer override for external write-capable live execution while the audit release hold is open. It is not release clearance."
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandActionResponse": {
+        "type": "object",
+        "required": [
+          "lifecycle_command"
+        ],
+        "properties": {
+          "lifecycle_command": {
+            "$ref": "#/components/schemas/LifecycleCommandPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunJobAcceptedResponse": {
+        "type": "object",
+        "required": ["run_id", "job_id", "status", "revision", "status_ref", "event_ref", "lifecycle_command"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "paused", "waiting-input", "canceling", "succeeded", "failed", "canceled"] },
+          "revision": { "type": "integer", "minimum": 0 },
+          "status_ref": { "type": "string" },
+          "event_ref": { "type": "string" },
+          "lifecycle_command": { "$ref": "#/components/schemas/LifecycleCommandPayload" }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandActionErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "lifecycle_command": {
+            "$ref": "#/components/schemas/LifecycleCommandPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandPayload": {
+        "type": "object",
+        "required": [
+          "command",
+          "args",
+          "exit_code",
+          "stdout",
+          "stderr",
+          "blocked"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "command_output": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interactive_continuation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerRequest": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "interaction_id"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "interaction_id": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "approval_ref": {
+            "type": "string"
+          },
+          "answer_evidence_ref": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerResponse": {
+        "type": "object",
+        "required": [
+          "interaction_answer"
+        ],
+        "properties": {
+          "interaction_answer": {
+            "$ref": "#/components/schemas/InteractionAnswerPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "interaction_answer"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "interaction_answer": {
+            "$ref": "#/components/schemas/InteractionAnswerPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerPayload": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "interaction_id",
+          "interaction_status",
+          "answer_accepted",
+          "blocked",
+          "answer_audit_file",
+          "answer_audit_ref"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "interaction_id": {
+            "type": "string"
+          },
+          "interaction_status": {
+            "type": "string"
+          },
+          "answer_accepted": {
+            "type": "boolean"
+          },
+          "decision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answer_audit_file": {
+            "type": "string"
+          },
+          "answer_audit_ref": {
+            "type": "string"
+          },
+          "step_result_file": {
+            "type": "string"
+          },
+          "step_result_ref": {
+            "type": "string"
+          },
+          "run_control_transition": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_event_id": {
+            "type": "string"
+          },
+          "step_event_id": {
+            "type": "string"
+          },
+          "resumed_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocked_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warning_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stream_log_file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "TopologyActionRequest": {
+        "type": "object",
+        "required": ["action", "family"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["add", "update", "disable", "rebind", "upsert", "remove", "reanalyze", "validate"]
+          },
+          "family": {
+            "type": "string",
+            "enum": ["repository", "component", "dependency", "binding", "topology"]
+          },
+          "expected_revision": { "type": "integer", "minimum": 0 },
+          "value": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
+      },
+      "ExecutionProfileActionRequest": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": { "type": "string", "enum": ["select", "reset", "check"] },
+          "step": {
+            "type": "string",
+            "enum": ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"]
+          },
+          "route_id": { "type": "string" },
+          "expected_revision": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "title",
+          "detail",
+          "message",
+          "operation",
+          "phase",
+          "resource",
+          "consequence",
+          "retryable",
+          "project_ref",
+          "flow_ref",
+          "run_ref",
+          "field_errors",
+          "evidence_refs",
+          "recovery_actions"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "operation": { "type": ["string", "null"] },
+          "phase": { "type": "string" },
+          "resource": { "type": ["string", "null"] },
+          "consequence": { "type": "string" },
+          "retryable": { "type": "boolean" },
+          "project_ref": { "type": ["string", "null"] },
+          "flow_ref": { "type": ["string", "null"] },
+          "run_ref": { "type": ["string", "null"] },
+          "field_errors": { "type": "array", "items": { "type": "object" } },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "recovery_actions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RecoveryAction" }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RecoveryAction": {
+        "type": "object",
+        "required": ["action", "payload"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["retry", "refresh", "inspect", "select_project", "rebind_repository", "configure_execution", "copy_command", "continue_in_terminal"]
+          },
+          "payload": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

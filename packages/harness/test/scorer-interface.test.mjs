@@ -3,6 +3,17 @@ import test from "node:test";
 
 import { createDefaultScorerRegistry, scoreEvaluationSuite } from "../src/scorer-interface.mjs";
 
+function resolvedCase(testCase, assertions) {
+  return {
+    status: "resolved",
+    testCase,
+    input: { family: "evaluation-case-input", case_id: testCase.case_id, version: 1, subject_type: "run", content: { prompt: "inspect" } },
+    expected: { family: "evaluation-case-expected", case_id: testCase.case_id, version: 1, subject_type: "run", assertions },
+  };
+}
+
+const passingSubject = { content: { run_id: "candidate-42", documents: [{ status: "pass" }] } };
+
 test("scoreEvaluationSuite supports deterministic scoring through one interface", () => {
   const suite = {
     suite_id: "suite.release.core",
@@ -35,6 +46,8 @@ test("scoreEvaluationSuite supports deterministic scoring through one interface"
   const scorecard = scoreEvaluationSuite({
     suite,
     dataset,
+    resolvedCases: dataset.cases.map((entry) => resolvedCase(entry, [{ assertion_id: `${entry.case_id}-documents`, target: "subject", path: "/documents", operator: "exists" }])),
+    subjectSnapshot: passingSubject,
     subjectRef: "run://candidate-42",
     subjectType: "run",
   });
@@ -73,6 +86,8 @@ test("scoreEvaluationSuite supports judge scoring and keeps deterministic output
     dataset,
     subjectRef: "run://candidate-43",
     subjectType: "run",
+    resolvedCases: dataset.cases.map((entry) => resolvedCase(entry, [{ assertion_id: "judge-status", target: "subject", path: "/documents/0/status", operator: "equals", value: "pass" }])),
+    subjectSnapshot: passingSubject,
     scorerRegistry: createDefaultScorerRegistry(),
   });
 
@@ -114,10 +129,25 @@ test("scoreEvaluationSuite supports mixed scorers and explicit composite failure
     dataset,
     subjectRef: "wrapper://wrapper.eval.default@v1",
     subjectType: "wrapper",
+    resolvedCases: [
+      { status: "failed", reason: "missing expected artifact", testCase: dataset.cases[0], input: null, expected: null },
+      resolvedCase(dataset.cases[1], [{ assertion_id: "wrapper-id", target: "subject", path: "/wrapper_id", operator: "exists" }]),
+    ],
+    subjectSnapshot: { content: { wrapper_id: "wrapper.eval.default" } },
   });
 
   assert.equal(scorecard.status, "fail");
   assert.ok(scorecard.summary_metrics.blocking_rule_hits.includes("any-critical-regression"));
   assert.ok(scorecard.summary_metrics.blocking_rule_hits.includes("missing-traces"));
   assert.ok(scorecard.summary_metrics.threshold_checks.some((check) => check.passed === false));
+});
+
+test("controlled subject mutation changes deterministic scorer verdict", () => {
+  const suite = { suite_id: "suite.mutation", version: 1, graders: ["deterministic"], thresholds: { min_pass_rate: 1 }, blocking_rules: [] };
+  const dataset = { cases: [{ case_id: "case-mutation", input_ref: "input", expected_ref: "expected" }] };
+  const resolvedCases = [resolvedCase(dataset.cases[0], [{ assertion_id: "terminal-status", target: "subject", path: "/status", operator: "equals", value: "pass" }])];
+  const passing = scoreEvaluationSuite({ suite, dataset, resolvedCases, subjectSnapshot: { content: { status: "pass" } }, subjectRef: "run://mutation", subjectType: "run" });
+  const failing = scoreEvaluationSuite({ suite, dataset, resolvedCases, subjectSnapshot: { content: { status: "fail" } }, subjectRef: "run://mutation", subjectType: "run" });
+  assert.equal(passing.status, "pass");
+  assert.equal(failing.status, "fail");
 });

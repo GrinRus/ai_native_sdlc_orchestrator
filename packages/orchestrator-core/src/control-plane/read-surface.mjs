@@ -1,7 +1,9 @@
 export {
+  listArtifactDisplaySummaries,
   listCompilerRevisionStatuses,
   listDeliveryManifests,
   listMultirepoCoordinationStatuses,
+  listOperatorRequests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -10,6 +12,17 @@ export {
   readNextActionReport,
   readProjectState,
 } from "./read-artifact-readers.mjs";
+
+export {
+  assertFlowMutationAllowed,
+  readFlowEvidenceGraph,
+  listFlowProjections,
+  readFlowProjection,
+  readFlowRuntimeTrace,
+  readSelectedFlowProjection,
+} from "./flow-projections.mjs";
+
+export { readAttentionProjection } from "./attention-projection.mjs";
 
 export {
   readFinanceMonitoringSnapshot,

@@ -43,6 +43,26 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   handoffApprovalState: null,
   waveTicketId: null,
   waveTicketFile: null,
+  plan: null,
+  planRef: null,
+  planFile: null,
+  planDiff: null,
+    planRevisionRequest: null,
+    planRevisionRequestFile: null,
+    planValidationReport: null,
+    planValidationReportFile: null,
+    planningRun: null,
+    planningRunRef: null,
+    planningRunFile: null,
+    planEvaluationReport: null,
+    planEvaluationReportFile: null,
+    semanticEvaluationRun: null,
+    semanticEvaluationRunRef: null,
+    semanticEvaluationRunFile: null,
+  executionPlan: null,
+  executionPlanFile: null,
+  taskProgress: null,
+  taskProgressFile: null,
   artifactPacketId: null,
   artifactPacketFile: null,
   artifactPacketBodyFile: null,
@@ -50,9 +70,12 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   onboardingReportFile: null,
   assetMode: null,
   registryRoots: null,
+  executionProfile: null,
+  executionReadinessReport: null,
   productIntake: null,
   productIntakeCompleteness: null,
   productIntakeSourceRefs: null,
+  followUpSourceHandoffRef: null,
   nextActionReportId: null,
   nextActionReportFile: null,
   nextActionStatus: null,
@@ -68,8 +91,13 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   bootstrapMaterializationIdempotent: null,
   verifySummaryFile: null,
   verifyStepResultFiles: null,
+  verificationPlanFile: null,
+  verificationPlan: null,
+  verificationPlanCommandGroups: null,
+  verificationPlanDiscoveredCommandGroups: null,
   routedStepResultId: null,
   routedStepResultFile: null,
+  unsafeDevelopmentOverride: null,
   reviewReportId: null,
   reviewReportFile: null,
   reviewOverallStatus: null,
@@ -81,7 +109,20 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   reviewDecision: null,
   reviewDecisionGate: null,
   reviewDecisionReason: null,
+  reviewDecisionRepairContext: null,
   reviewDecisionEvidenceRefs: null,
+  qualityRepairRequestRef: null,
+  qualityRepairRequestFile: null,
+  qualityRepairRequestStatus: null,
+  qualityRepairRequestCycleId: null,
+  qualityRepairRequestSourceStage: null,
+  qualityRepairRequestAttemptBudget: null,
+  qualityRepairRequestBlockers: null,
+  qualityRepairRequestEvidenceRefs: null,
+  qualityRepairNextActionStatus: null,
+  qualityRepairNextActionStage: null,
+  qualityRepairNextActionPrimary: null,
+  qualityRepairNextActionReportFile: null,
   runtimeHarnessReportId: null,
   runtimeHarnessReportFile: null,
   runtimeHarnessOverallDecision: null,
@@ -133,9 +174,19 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   runControlAuditId: null,
   runControlAuditFile: null,
   runControlBlocked: null,
+  runControlBlockedReason: null,
   runControlGuardrails: null,
   runControlTransition: null,
   interactionAnswer: null,
+  operatorRequest: null,
+  operatorRequestFile: null,
+  operatorRequestRef: null,
+  operatorRequestId: null,
+  operatorRequestStatus: null,
+  operatorRequestRun: null,
+  compiledContextRef: null,
+  proposalRefs: null,
+  patchRefs: null,
   primaryEventId: null,
   evidenceEventId: null,
   streamLogFile: null,
@@ -223,6 +274,12 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   guidedActionableBlockers: null,
   guidedRecommendedCommands: null,
   guidedWebSurface: null,
+  workspace: null,
+  project: null,
+  topology: null,
+  validation: null,
+  proposals: null,
+  revisionEvent: null,
 });
 
 const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
@@ -268,6 +325,26 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["handoff_approval_state", "handoffApprovalState"],
   ["wave_ticket_id", "waveTicketId"],
   ["wave_ticket_file", "waveTicketFile"],
+  ["plan", "plan"],
+  ["plan_ref", "planRef"],
+  ["plan_file", "planFile"],
+  ["plan_diff", "planDiff"],
+  ["plan_revision_request", "planRevisionRequest"],
+  ["plan_revision_request_file", "planRevisionRequestFile"],
+  ["plan_validation_report", "planValidationReport"],
+  ["plan_validation_report_file", "planValidationReportFile"],
+  ["planning_run", "planningRun"],
+  ["planning_run_ref", "planningRunRef"],
+  ["planning_run_file", "planningRunFile"],
+  ["plan_evaluation_report", "planEvaluationReport"],
+  ["plan_evaluation_report_file", "planEvaluationReportFile"],
+  ["semantic_evaluation_run", "semanticEvaluationRun"],
+  ["semantic_evaluation_run_ref", "semanticEvaluationRunRef"],
+  ["semantic_evaluation_run_file", "semanticEvaluationRunFile"],
+  ["execution_plan", "executionPlan"],
+  ["execution_plan_file", "executionPlanFile"],
+  ["task_progress", "taskProgress"],
+  ["task_progress_file", "taskProgressFile"],
   ["artifact_packet_id", "artifactPacketId"],
   ["artifact_packet_file", "artifactPacketFile"],
   ["artifact_packet_body_file", "artifactPacketBodyFile"],
@@ -275,9 +352,12 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["onboarding_report_file", "onboardingReportFile"],
   ["asset_mode", "assetMode"],
   ["registry_roots", "registryRoots"],
+  ["execution_profile", "executionProfile"],
+  ["execution_readiness_report", "executionReadinessReport"],
   ["product_intake", "productIntake"],
   ["product_intake_completeness", "productIntakeCompleteness"],
   ["product_intake_source_refs", "productIntakeSourceRefs"],
+  ["follow_up_source_handoff_ref", "followUpSourceHandoffRef"],
   ["next_action_report_id", "nextActionReportId"],
   ["next_action_report_file", "nextActionReportFile"],
   ["next_action_status", "nextActionStatus"],
@@ -285,6 +365,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["next_action_blockers", "nextActionBlockers"],
   ["next_action_evidence_refs", "nextActionEvidenceRefs"],
   ["next_action_mission_state", "nextActionMissionState"],
+  ["next_action_artifact_readiness", "nextActionArtifactReadiness"],
   ["next_action_closure_state", "nextActionClosureState"],
   ["next_action_bounded_execution", "nextActionBoundedExecution"],
   ["bootstrap_materialization_status", "bootstrapMaterializationStatus"],
@@ -293,8 +374,13 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["bootstrap_materialization_idempotent", "bootstrapMaterializationIdempotent"],
   ["verify_summary_file", "verifySummaryFile"],
   ["step_result_files", "verifyStepResultFiles"],
+  ["verification_plan_file", "verificationPlanFile"],
+  ["verification_plan", "verificationPlan"],
+  ["verification_plan_command_groups", "verificationPlanCommandGroups"],
+  ["verification_plan_discovered_command_groups", "verificationPlanDiscoveredCommandGroups"],
   ["routed_step_result_id", "routedStepResultId"],
   ["routed_step_result_file", "routedStepResultFile"],
+  ["unsafe_development_override", "unsafeDevelopmentOverride"],
   ["review_report_id", "reviewReportId"],
   ["review_report_file", "reviewReportFile"],
   ["review_overall_status", "reviewOverallStatus"],
@@ -306,7 +392,20 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["review_decision", "reviewDecision"],
   ["review_decision_gate", "reviewDecisionGate"],
   ["review_decision_reason", "reviewDecisionReason"],
+  ["review_decision_repair_context", "reviewDecisionRepairContext"],
   ["review_decision_evidence_refs", "reviewDecisionEvidenceRefs"],
+  ["quality_repair_request_ref", "qualityRepairRequestRef"],
+  ["quality_repair_request_file", "qualityRepairRequestFile"],
+  ["quality_repair_request_status", "qualityRepairRequestStatus"],
+  ["quality_repair_request_cycle_id", "qualityRepairRequestCycleId"],
+  ["quality_repair_request_source_stage", "qualityRepairRequestSourceStage"],
+  ["quality_repair_request_attempt_budget", "qualityRepairRequestAttemptBudget"],
+  ["quality_repair_request_blockers", "qualityRepairRequestBlockers"],
+  ["quality_repair_request_evidence_refs", "qualityRepairRequestEvidenceRefs"],
+  ["quality_repair_next_action_status", "qualityRepairNextActionStatus"],
+  ["quality_repair_next_action_stage", "qualityRepairNextActionStage"],
+  ["quality_repair_next_action_primary", "qualityRepairNextActionPrimary"],
+  ["quality_repair_next_action_report_file", "qualityRepairNextActionReportFile"],
   ["runtime_harness_report_id", "runtimeHarnessReportId"],
   ["runtime_harness_report_file", "runtimeHarnessReportFile"],
   ["runtime_harness_overall_decision", "runtimeHarnessOverallDecision"],
@@ -334,15 +433,27 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["certification_harness_capture_file", "certificationHarnessCaptureFile"],
   ["certification_harness_replay_file", "certificationHarnessReplayFile"],
   ["run_control_action", "runControlAction"],
+  ["run_control_command_id", "runControlCommandId"],
+  ["run_control_revision", "runControlRevision"],
   ["run_control_run_id", "runControlRunId"],
   ["run_control_state", "runControlState"],
   ["run_control_state_file", "runControlStateFile"],
   ["run_control_audit_id", "runControlAuditId"],
   ["run_control_audit_file", "runControlAuditFile"],
   ["run_control_blocked", "runControlBlocked"],
+  ["run_control_blocked_reason", "runControlBlockedReason"],
   ["run_control_guardrails", "runControlGuardrails"],
   ["run_control_transition", "runControlTransition"],
   ["interaction_answer", "interactionAnswer"],
+  ["operator_request", "operatorRequest"],
+  ["operator_request_file", "operatorRequestFile"],
+  ["operator_request_ref", "operatorRequestRef"],
+  ["operator_request_id", "operatorRequestId"],
+  ["operator_request_status", "operatorRequestStatus"],
+  ["operator_request_run", "operatorRequestRun"],
+  ["compiled_context_ref", "compiledContextRef"],
+  ["proposal_refs", "proposalRefs"],
+  ["patch_refs", "patchRefs"],
   ["primary_event_id", "primaryEventId"],
   ["evidence_event_id", "evidenceEventId"],
   ["ui_lifecycle_action", "uiLifecycleAction"],
@@ -431,6 +542,12 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["guided_actionable_blockers", "guidedActionableBlockers"],
   ["guided_recommended_commands", "guidedRecommendedCommands"],
   ["guided_web_surface", "guidedWebSurface"],
+  ["workspace", "workspace"],
+  ["project", "project"],
+  ["topology", "topology"],
+  ["validation", "validation"],
+  ["proposals", "proposals"],
+  ["revision_event", "revisionEvent"],
   ["run_summaries", "runSummaries"],
   ["run_event_history", "runEventHistory"],
   ["run_policy_history", "runPolicyHistory"],
@@ -442,6 +559,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["replay_events", "replayEvents"],
   ["packet_artifacts", "packetArtifacts"],
   ["selected_family", "selectedFamily"],
+  ["read_model_limit", "readModelLimit"],
   ["step_results", "stepResults"],
   ["quality_artifacts", "qualityArtifacts"],
   ["delivery_manifests", "deliveryManifests"],
@@ -479,4 +597,61 @@ export function buildCliOutput({ command, resolvedFamilies, state }) {
       secretValues: parseRedactionSecretList(process.env.AOR_REDACTION_SECRETS),
     })
   );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function compactOutputValue(value) {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => compactOutputValue(item))
+      .filter((item) => item !== undefined);
+    return items.length > 0 ? items : undefined;
+  }
+
+  if (isPlainObject(value)) {
+    /** @type {Record<string, unknown>} */
+    const compacted = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const compactedValue = compactOutputValue(nestedValue);
+      if (compactedValue !== undefined) {
+        compacted[key] = compactedValue;
+      }
+    }
+    return Object.keys(compacted).length > 0 ? compacted : undefined;
+  }
+
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} output
+ * @returns {Record<string, unknown>}
+ */
+export function buildCompactCliOutput(output) {
+  /** @type {Record<string, unknown>} */
+  const compacted = {};
+
+  for (const [key, value] of Object.entries(output)) {
+    const compactedValue = compactOutputValue(value);
+    if (compactedValue !== undefined) {
+      compacted[key] = compactedValue;
+    }
+  }
+
+  return compacted;
 }

@@ -33,6 +33,9 @@ import {
   applyIncidentRecertification,
   materializeLearningLoopArtifacts,
   materializeReviewDecision,
+  closeQualityRepairRequest,
+  listQualityRepairRequests,
+  resolveNextAction,
   resolveStepPolicyForStep,
   analyzeProjectRuntime,
   initializeProjectRuntime,
@@ -84,6 +87,7 @@ export const QUALITY_COMMANDS = Object.freeze([
   "harness certify",
   "review run",
   "review decide",
+  "repair close",
   "learning handoff"
 ]);
 
@@ -91,6 +95,20 @@ export const QUALITY_COMMAND_GROUP = Object.freeze({
   group_id: "quality",
   commands: QUALITY_COMMANDS,
 });
+
+/**
+ * @param {{ currentStatus: string, runId: string, closureRunId: string }} options
+ * @returns {string | null}
+ */
+export function resolveRepairClosureStatusBlocker(options) {
+  if (["in-progress", "budget-exhausted"].includes(options.currentStatus)) {
+    return `Quality repair request in '${options.currentStatus}' cannot be closed.`;
+  }
+  if (options.currentStatus === "requested" && options.closureRunId === options.runId) {
+    return "A requested quality repair requires a distinct '--closure-run-id' with refreshed repair evidence.";
+  }
+  return null;
+}
 
 /**
  * @param {Record<string, unknown>} outputState
@@ -336,6 +354,7 @@ export function handleQualityCommand(context) {
     if (!runId) {
       throw new CliUsageError("Missing required flag '--run-id' for 'aor review run'.");
     }
+    const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
 
     const reviewResult = materializeReviewReport({
       cwd,
@@ -343,6 +362,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
 
     outputState.resolvedProjectRef = reviewResult.projectRoot;
@@ -369,6 +389,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
     outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
     outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
@@ -390,6 +411,7 @@ export function handleQualityCommand(context) {
     if (decision !== "approve" && decision !== "hold" && decision !== "request-repair") {
       throw new CliUsageError("Flag '--decision' must be approve, hold, or request-repair.");
     }
+    const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
 
     const reviewResult = materializeReviewReport({
       cwd,
@@ -397,6 +419,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
     const runtimeHarness = materializeRuntimeHarnessReport({
       cwd,
@@ -404,6 +427,7 @@ export function handleQualityCommand(context) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
+      executionRoot,
     });
     const qualityArtifacts = listQualityArtifacts({
       cwd,
@@ -425,6 +449,13 @@ export function handleQualityCommand(context) {
       runtimeLayout: reviewResult.runtimeLayout,
       runId,
     }).map((entry) => entry.artifact_ref);
+    const repairContextFile = resolveOptionalRefOrPathFlag({
+      cwd,
+      projectRoot: reviewResult.projectRoot,
+      flagValue: resolveOptionalStringFlag("repair-context-file", flags["repair-context-file"]),
+      flagName: "repair-context-file",
+    });
+    const repairContext = repairContextFile ? readJson(repairContextFile) : null;
     const decisionResult = materializeReviewDecision({
       projectId: reviewResult.projectId,
       projectRoot: reviewResult.projectRoot,
@@ -440,6 +471,7 @@ export function handleQualityCommand(context) {
       deliveryManifestRefs,
       learningHandoffRefs,
       evidenceRefs: priorDecisionRefs,
+      repairContext,
     });
 
     outputState.resolvedProjectRef = reviewResult.projectRoot;
@@ -462,13 +494,158 @@ export function handleQualityCommand(context) {
         ? /** @type {{ status?: string }} */ (decisionResult.decision.delivery_gate).status ?? null
         : null;
     outputState.reviewDecisionReason = decisionResult.decision.reason;
+    outputState.reviewDecisionRepairContext = decisionResult.decision.repair_context;
     outputState.reviewDecisionEvidenceRefs = decisionResult.decision.evidence_refs;
+    if (decisionResult.qualityRepairRequestRef) {
+      const qualityRepairRequest = asPlainObject(decisionResult.qualityRepairRequest);
+      outputState.qualityRepairRequestRef = decisionResult.qualityRepairRequestRef;
+      outputState.qualityRepairRequestFile = decisionResult.qualityRepairRequestFile;
+      outputState.qualityRepairRequestStatus = qualityRepairRequest.status;
+      outputState.qualityRepairRequestCycleId = qualityRepairRequest.cycle_id;
+      outputState.qualityRepairRequestSourceStage = qualityRepairRequest.source_stage;
+      outputState.qualityRepairRequestAttemptBudget = qualityRepairRequest.attempt_budget;
+      outputState.qualityRepairRequestBlockers = qualityRepairRequest.blockers;
+      outputState.qualityRepairRequestEvidenceRefs = qualityRepairRequest.evidence_refs;
+      const nextAction = resolveNextAction({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId,
+      });
+      outputState.qualityRepairNextActionStatus = nextAction.nextActionReport.status;
+      outputState.qualityRepairNextActionStage = nextAction.nextActionReport.project_state.stage;
+      outputState.qualityRepairNextActionPrimary = nextAction.nextActionReport.primary_action;
+      outputState.qualityRepairNextActionReportFile = nextAction.nextActionReportFile;
+    }
     outputState.readOnly = false;
     outputState.futureControlHooks = [
-      `deliver prepare --run-id ${runId} --require-review-decision`,
-      `release prepare --run-id ${runId} --require-review-decision`,
+      ...(decisionResult.qualityRepairRequestRef
+        ? [
+            `run start --run-id ${runId}.repair --target-step implement`,
+            `review run --run-id ${runId}.repair`,
+          ]
+        : [
+            `deliver prepare --run-id ${runId} --require-review-decision`,
+            `release prepare --run-id ${runId} --require-review-decision`,
+          ]),
       `evidence show --run-id ${runId}`,
     ];
+  } else if (command === "repair close") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const closureRunId = resolveOptionalStringFlag("closure-run-id", flags["closure-run-id"]) ?? runId;
+    const requestRef = resolveOptionalStringFlag("request-ref", flags["request-ref"]);
+    if (!runId || !requestRef) {
+      throw new CliUsageError("Repair closure requires '--run-id' and '--request-ref'.");
+    }
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
+      runtimeRoot,
+    });
+    const matchingRequest = listQualityRepairRequests({
+      projectRoot: projectState.project_root,
+      runtimeLayout: { reportsRoot: projectState.runtime_layout.reports_root },
+      runId,
+    }).find((entry) => entry.artifact_ref === requestRef || entry.document.request_id === requestRef);
+    if (!matchingRequest) {
+      throw new CliUsageError(`Quality repair request '${requestRef}' was not found for run '${runId}'.`);
+    }
+    if (matchingRequest.document.project_id !== projectState.project_id || matchingRequest.document.run_id !== runId) {
+      throw new CliUsageError("Quality repair request project/run ownership does not match the requested closure.");
+    }
+    const currentStatus = typeof matchingRequest.document.status === "string" ? matchingRequest.document.status : "unknown";
+    const statusBlocker = resolveRepairClosureStatusBlocker({
+      currentStatus,
+      runId,
+      closureRunId,
+    });
+    if (statusBlocker) {
+      throw new CliUsageError(statusBlocker);
+    }
+    const evidenceRefs = resolveOptionalStringListFlag("evidence-ref", flags["evidence-ref"]);
+    const qaEvidenceRefs = resolveOptionalStringListFlag("qa-evidence-ref", flags["qa-evidence-ref"]);
+    for (const evidenceRef of [...evidenceRefs, ...qaEvidenceRefs]) {
+      if (!evidenceRefExists(projectState.project_root, evidenceRef)) {
+        throw new CliUsageError(`Repair closure evidence '${evidenceRef}' was not found inside the project boundary.`);
+      }
+    }
+    const qaRequired = matchingRequest.document.source_stage === "qa" || currentStatus === "qa-required";
+    if (qaRequired && qaEvidenceRefs.length === 0) {
+      throw new CliUsageError("QA-origin repair closure requires at least one '--qa-evidence-ref'.");
+    }
+    if (currentStatus !== "closed") {
+      const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
+      const reviewResult = materializeReviewReport({
+        cwd,
+        projectRef: projectState.project_root,
+        projectProfile,
+        runtimeRoot,
+        runId: /** @type {string} */ (closureRunId),
+        executionRoot,
+      });
+      const runtimeHarness = materializeRuntimeHarnessReport({
+        cwd,
+        projectRef: projectState.project_root,
+        projectProfile,
+        runtimeRoot,
+        runId: /** @type {string} */ (closureRunId),
+        executionRoot,
+      });
+      if (reviewResult.reviewReport.overall_status !== "pass") {
+        throw new CliUsageError("Quality repair closure requires a refreshed passing review report.");
+      }
+      if (runtimeHarness.report.overall_decision !== "pass") {
+        throw new CliUsageError("Quality repair closure requires a refreshed passing Runtime Harness report.");
+      }
+      outputState.reviewReportFile = reviewResult.reviewReportFile;
+      outputState.reviewOverallStatus = reviewResult.reviewReport.overall_status;
+      outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
+      outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+      evidenceRefs.push(reviewResult.reviewReportFile, runtimeHarness.reportPath);
+    }
+    const closure = currentStatus === "closed"
+      ? {
+          request: matchingRequest.document,
+          requestFile: matchingRequest.file,
+          requestRef: matchingRequest.artifact_ref,
+        }
+      : closeQualityRepairRequest({
+          projectRoot: projectState.project_root,
+          runtimeLayout: { reportsRoot: projectState.runtime_layout.reports_root },
+          requestFile: matchingRequest.file,
+          request: matchingRequest.document,
+          evidenceRefs: uniqueStrings([...evidenceRefs, ...qaEvidenceRefs]),
+          summary: resolveOptionalStringFlag("summary", flags.summary) ??
+            "Quality repair request closed through the public repair lifecycle.",
+        });
+    const request = asPlainObject(closure.request);
+    outputState.resolvedProjectRef = projectState.project_root;
+    outputState.resolvedRuntimeRoot = projectState.runtime_root;
+    outputState.qualityRepairRequestRef = closure.requestRef;
+    outputState.qualityRepairRequestFile = closure.requestFile;
+    outputState.qualityRepairRequestStatus = request.status;
+    outputState.qualityRepairRequestCycleId = request.cycle_id;
+    outputState.qualityRepairRequestSourceStage = request.source_stage;
+    outputState.qualityRepairRequestAttemptBudget = request.attempt_budget;
+    outputState.qualityRepairRequestBlockers = request.blockers;
+    outputState.qualityRepairRequestEvidenceRefs = request.evidence_refs;
+    const nextAction = resolveNextAction({
+      cwd,
+      projectRef: projectState.project_root,
+      projectProfile,
+      runtimeRoot,
+      runId,
+    });
+    outputState.qualityRepairNextActionStatus = nextAction.nextActionReport.status;
+    outputState.qualityRepairNextActionStage = nextAction.nextActionReport.project_state.stage;
+    outputState.qualityRepairNextActionPrimary = nextAction.nextActionReport.primary_action;
+    outputState.qualityRepairNextActionReportFile = nextAction.nextActionReportFile;
+    outputState.readOnly = false;
   } else if (command === "learning handoff") {
     ensureRequiredFlags(command, flags);
     const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);

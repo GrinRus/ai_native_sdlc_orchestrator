@@ -26,6 +26,13 @@ Durable report emitted by `aor project init` and `aor onboard` to explain clean-
 
 `write_effects` must distinguish target repository writes from runtime-root writes. Bundled onboarding is allowed to write runtime state under `.aor/`, but must report zero target-repo asset writes and no copied example registries.
 
+The report is published only as part of a validated per-project runtime
+transaction. Its runtime references describe the final canonical layout, never
+the sibling staging directory. Materialized profiles and registry assets are
+created through staged sibling files with rollback tracking and cannot overwrite
+pre-existing project files. The legacy top-level `context/` copy is not emitted;
+context registry roots resolve from the declared `examples/context/**` tree.
+
 `status` is `ready` when onboarding produced a usable project profile, runtime layout, registry roots, and bootstrap packet. It is `blocked` when the report is emitted for a detected state that cannot safely continue; blockers must identify the missing or invalid precondition and a deterministic next command.
 
 ## Example

@@ -1,0 +1,31 @@
+context_bundle_id: context.bundle.operator-intervention
+version: 1
+title: Operator intervention request overlay
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - operator-request
+    - interaction
+applies_to:
+  steps:
+    - discovery
+    - research
+    - spec
+    - planning
+    - implement
+    - review
+    - qa
+    - repair
+    - eval
+    - harness
+context_doc_refs: []
+context_rule_refs:
+  - context-rule://context.rule.operator-intervention@v1
+context_skill_refs: []
+source_refs:
+  - docs/contracts/operator-request.md
+selection_policy:
+  rules: always-on
+  docs: disabled
+  skills: disabled

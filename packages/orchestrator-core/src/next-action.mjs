@@ -1,12 +1,11 @@
-import fs from "node:fs";
-import path from "node:path";
-
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import fs from "node:fs"; import path from "node:path";
+import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
-
-const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
-const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
-
+import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
+import { runProjectionCoordinator } from "./operator-projection-services.mjs"; import { operatorControlForAction } from "./next-action-operator-control.mjs";
+const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
+const DEFAULT_RUNTIME_ROOT = ".aor"; const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
@@ -54,6 +53,71 @@ function shellQuote(value) {
 }
 
 /**
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function isHandoffEvidenceRef(ref) {
+  const normalized = ref.toLowerCase();
+  return normalized.includes("handoff") && (normalized.includes("/artifacts/") || normalized.includes("artifact"));
+}
+
+/**
+ * @param {string} ref
+ * @returns {boolean}
+ */
+function isPrioritizedPromotionEvidenceRef(ref) {
+  const normalized = ref.toLowerCase();
+  return (
+    normalized.includes("execution-readiness") ||
+    (normalized.includes("step-result") && normalized.includes("implement")) ||
+    normalized.startsWith("packet://spec@")
+  );
+}
+
+/**
+ * @param {string[]} evidenceRefs
+ * @returns {string | null}
+ */
+function selectApprovedHandoffRef(evidenceRefs) {
+  const candidates = evidenceRefs.filter((ref) => isHandoffEvidenceRef(ref));
+  return candidates.find((ref) => path.isAbsolute(ref)) ?? candidates[0] ?? null;
+}
+
+/**
+ * @param {string[]} evidenceRefs
+ * @param {string | null} approvedHandoffRef
+ * @returns {string[]}
+ */
+function selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef) {
+  const nonHandoffRefs = evidenceRefs.filter((ref) => ref !== approvedHandoffRef);
+  const prioritized = nonHandoffRefs.filter((ref) => isPrioritizedPromotionEvidenceRef(ref));
+  return (prioritized.length > 0 ? uniqueStrings(prioritized) : uniqueStrings(nonHandoffRefs)).slice(0, 6);
+}
+
+/**
+ * @param {{ projectRoot: string, runId: string, targetStep: string, evidenceRefs: string[] }} options
+ * @returns {string}
+ */
+function runStartCommand(options) {
+  const evidenceRefs = uniqueStrings(options.evidenceRefs);
+  const approvedHandoffRef = selectApprovedHandoffRef(evidenceRefs);
+  const promotionEvidenceRefs = selectPromotionEvidenceRefs(evidenceRefs, approvedHandoffRef);
+  return [
+    `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(options.runId)} --target-step ${shellQuote(options.targetStep)}`,
+    approvedHandoffRef ? `--approved-handoff-ref ${shellQuote(approvedHandoffRef)}` : null,
+    promotionEvidenceRefs.length > 0 ? `--promotion-evidence-refs ${shellQuote(promotionEvidenceRefs.join(","))}` : null,
+  ].filter(Boolean).join(" ");
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeForFileName(value) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+}
+
+/**
  * @param {string} projectRoot
  * @param {string} filePath
  * @returns {string}
@@ -85,6 +149,21 @@ function listJsonFiles(dirPath) {
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => path.join(dirPath, entry))
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {boolean}
+ */
+function isClosureRunStepResult(document) {
+  const stepClass = asString(document.step_class);
+  if (stepClass === "runner" || stepClass === "repair" || stepClass === "eval" || stepClass === "harness") {
+    return true;
+  }
+  const routedExecution = asRecord(document.routed_execution);
+  const selectedStep = asRecord(asRecord(routedExecution.architecture_traceability).selected_step);
+  const requestedStepClass = asString(selectedStep.step_class);
+  return requestedStepClass === "implement" || requestedStepClass === "review" || requestedStepClass === "qa";
 }
 
 /**
@@ -137,15 +216,22 @@ function findLatestRunDocument(init, runId, family, matcher, root) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ notBeforeMs?: number }} options
  * @returns {{ runId: string, evidenceRef: string } | null}
  */
-function findLatestRunEvidence(init) {
-  /** @type {Array<{ runId: string, evidenceRef: string, file: string }>} */
+function findLatestRunEvidence(init, options = {}) {
+  /** @type {Array<{ runId: string, evidenceRef: string, file: string, priority: number }>} */
   const candidates = [];
-  const addCandidate = (filePath, document) => {
+  const addCandidate = (filePath, document, priority) => {
+    if (priority === 40 && !isClosureRunStepResult(document)) {
+      return;
+    }
+    if (typeof options.notBeforeMs === "number" && fs.statSync(filePath).mtimeMs < options.notBeforeMs) {
+      return;
+    }
     const runId = asString(document.run_id);
     if (runId) {
-      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath });
+      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath, priority });
       return;
     }
     const runRef = asStringArray(document.run_refs)[0];
@@ -154,6 +240,7 @@ function findLatestRunEvidence(init) {
         runId: runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef,
         evidenceRef: toEvidenceRef(init.projectRoot, filePath),
         file: filePath,
+        priority,
       });
     }
   };
@@ -161,36 +248,53 @@ function findLatestRunEvidence(init) {
   for (const filePath of listJsonFiles(init.runtimeLayout.stateRoot)) {
     if (!path.basename(filePath).startsWith("run-control-state-")) continue;
     const state = readJsonFile(filePath);
-    if (state) addCandidate(filePath, state);
+    if (state) addCandidate(filePath, state, 30);
   }
 
   for (const filePath of listJsonFiles(init.runtimeLayout.reportsRoot)) {
-    if (
-      !/^step-result-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^review-report.*\.json$/u.test(path.basename(filePath)) &&
-      !/^review-decision-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^runtime-harness-report.*\.json$/u.test(path.basename(filePath)) &&
-      !/^learning-loop-(?:scorecard|handoff)-.*\.json$/u.test(path.basename(filePath))
-    ) {
+    const basename = path.basename(filePath);
+    const priority =
+      /^learning-loop-handoff-.*\.json$/u.test(basename)
+        ? 95
+        : /^learning-loop-scorecard-.*\.json$/u.test(basename)
+          ? 90
+          : /^review-decision-.*\.json$/u.test(basename)
+            ? 65
+            : /^quality-repair-request-.*\.json$/u.test(basename)
+              ? 63
+            : /^review-report.*\.json$/u.test(basename) || /^runtime-harness-report.*\.json$/u.test(basename)
+              ? 60
+              : /^step-result-.*\.json$/u.test(basename)
+                ? 40
+                : 0;
+    if (priority === 0) {
       continue;
     }
     const document = readJsonFile(filePath);
-    if (document) addCandidate(filePath, document);
+    if (document) addCandidate(filePath, document, priority);
   }
 
   for (const filePath of listJsonFiles(init.runtimeLayout.artifactsRoot)) {
-    if (
-      !/^delivery-plan-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^delivery-manifest-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^release-packet-.*\.json$/u.test(path.basename(filePath))
-    ) {
+    const basename = path.basename(filePath);
+    const priority =
+      /^release-packet-.*\.json$/u.test(basename)
+        ? 85
+        : /^delivery-manifest-.*\.json$/u.test(basename)
+          ? 80
+          : /^delivery-plan-.*\.json$/u.test(basename)
+            ? 75
+            : 0;
+    if (priority === 0) {
       continue;
     }
     const document = readJsonFile(filePath);
-    if (document) addCandidate(filePath, document);
+    if (document) addCandidate(filePath, document, priority);
   }
 
-  candidates.sort((left, right) => fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs);
+  candidates.sort((left, right) => {
+    if (right.priority !== left.priority) return right.priority - left.priority;
+    return fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs;
+  });
   const latest = candidates[0] ?? null;
   return latest ? { runId: latest.runId, evidenceRef: latest.evidenceRef } : null;
 }
@@ -227,6 +331,118 @@ function isDeliveryReadyStatus(status) {
 }
 
 /**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @returns {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+function findRunControlState(init, runId) {
+  for (const filePath of listRunControlStateFiles(init)) {
+    const document = readJsonFile(filePath);
+    if (asString(document?.run_id) !== runId) continue;
+    return {
+      file: filePath,
+      artifact_ref: toEvidenceRef(init.projectRoot, filePath),
+      document,
+    };
+  }
+  return null;
+}
+
+/**
+ * @param {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null} repairRunState
+ * @returns {boolean}
+ */
+function isCompletedRepairRunState(repairRunState) {
+  const status = asString(repairRunState?.document.status);
+  return status === "completed" || status === "pass";
+}
+
+/**
+ * @param {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null} entry
+ * @param {boolean} approved
+ * @param {{ file: string, artifact_ref: string, document: Record<string, unknown> } | null} repairRunState
+ * @returns {Record<string, unknown>}
+ */
+function buildQualityRepairState(entry, approved, repairRunState = null) {
+  if (!entry) {
+    return {
+      status: "not-started",
+      flow_state: null,
+      request_ref: null,
+      request_id: null,
+      cycle_id: null,
+      source_stage: null,
+      attempt_index: null,
+      max_attempts: null,
+      remaining_attempts: null,
+      blockers: [],
+      evidence_refs: [],
+      operator_override_ref: null,
+      blocks_downstream: false,
+      lineage: null,
+    };
+  }
+
+  const document = entry.document;
+  const status = asString(document.status) ?? "requested";
+  const sourceStage = asString(document.source_stage) === "qa" ? "qa" : "review";
+  const attemptBudget = asRecord(document.attempt_budget);
+  const operatorOverrideRef = asString(document.operator_override_ref);
+  const blockers = asStringArray(document.blockers);
+  const completedRepairRun = isCompletedRepairRunState(repairRunState);
+  const blocksDownstream =
+    status !== "closed" &&
+    !(status === "budget-exhausted" && operatorOverrideRef);
+  const flowState = status === "closed"
+    ? approved
+      ? "delivery-ready"
+      : "review-required"
+    : status === "budget-exhausted"
+      ? blocksDownstream
+        ? "repair-cycle-exhausted"
+        : "delivery-ready"
+      : completedRepairRun
+        ? "review-required"
+      : status === "in-progress"
+        ? "repair-running"
+        : status === "review-required"
+          ? "review-required"
+          : status === "qa-required"
+            ? "qa-required"
+            : sourceStage === "qa"
+              ? "qa-repair-requested"
+              : "review-repair-requested";
+  const evidenceRefs = uniqueStrings([entry.artifact_ref, repairRunState?.artifact_ref, ...asStringArray(document.evidence_refs)]);
+  const lineage = {
+    request_ref: entry.artifact_ref,
+    cycle_id: asString(document.cycle_id) ?? "quality-cycle.unknown",
+    source_stage: sourceStage,
+    status,
+    attempt_index: typeof attemptBudget.attempt_index === "number" ? attemptBudget.attempt_index : 1,
+    evidence_refs: evidenceRefs,
+  };
+
+  return {
+    status,
+    flow_state: flowState,
+    request_ref: entry.artifact_ref,
+    request_id: asString(document.request_id),
+    cycle_id: asString(document.cycle_id),
+    source_stage: sourceStage,
+    source_ref: asString(document.source_ref),
+    finding_refs: asStringArray(document.finding_refs),
+    attempt_index: typeof attemptBudget.attempt_index === "number" ? attemptBudget.attempt_index : null,
+    max_attempts: typeof attemptBudget.max_attempts === "number" ? attemptBudget.max_attempts : null,
+    remaining_attempts: typeof attemptBudget.remaining_attempts === "number" ? attemptBudget.remaining_attempts : null,
+    blockers,
+    evidence_refs: evidenceRefs,
+    operator_override_ref: operatorOverrideRef,
+    blocks_downstream: blocksDownstream,
+    lineage,
+  };
+}
+
+/**
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string | null,
@@ -234,7 +450,7 @@ function isDeliveryReadyStatus(status) {
  * }} options
  * @returns {Record<string, unknown>}
  */
-function buildClosureState(options) {
+function projectClosureState(options) {
   const runId = options.runId;
   const emptyEvidence = uniqueStrings([options.runEvidenceRef ?? null]);
   if (!runId) {
@@ -266,6 +482,7 @@ function buildClosureState(options) {
         handoff_ref: null,
         linked_evidence_refs: [],
       },
+      quality_repair: buildQualityRepairState(null, false),
       evidence_chain: emptyEvidence,
     };
   }
@@ -291,6 +508,14 @@ function buildClosureState(options) {
     /^review-decision-.*\.json$/u,
     "reports",
   );
+  const qualityRepairRequest = findLatestRunDocument(
+    options.init,
+    runId,
+    "quality-repair-request",
+    QUALITY_REPAIR_REQUEST_REGEX,
+    "reports",
+  );
+  const repairRunState = findRunControlState(options.init, `${runId}.repair`);
   const deliveryPlan = findLatestRunDocument(
     options.init,
     runId,
@@ -335,6 +560,7 @@ function buildClosureState(options) {
     decision === "approve" &&
     deliveryGateStatus === "pass" &&
     blocksDownstream !== true;
+  const qualityRepair = buildQualityRepairState(qualityRepairRequest, approved, repairRunState);
   const reviewStatus = !reviewReport && !runtimeHarnessReport
     ? "missing"
     : !reviewDecision
@@ -351,8 +577,18 @@ function buildClosureState(options) {
   const deliveryPlanBlockers = asStringArray(deliveryPlan?.document.blocking_reasons);
   const releaseRisks = asStringArray(releasePacket?.document.residual_risks);
   const reviewRequiredReason = approved ? [] : ["approved-review-decision-required"];
-  const deliveryBlockedReasons = uniqueStrings([...reviewRequiredReason, ...deliveryPlanBlockers, ...releaseRisks]);
-  const deliveryStatus = !approved
+  const qualityRepairBlockers = qualityRepair.blocks_downstream === true
+    ? asStringArray(qualityRepair.blockers)
+    : [];
+  const deliveryBlockedReasons = uniqueStrings([
+    ...reviewRequiredReason,
+    ...qualityRepairBlockers,
+    ...deliveryPlanBlockers,
+    ...releaseRisks,
+  ]);
+  const deliveryStatus = qualityRepair.blocks_downstream === true
+    ? "blocked-quality-repair"
+    : !approved
     ? "blocked-review-required"
     : deliveryPlanStatus === "blocked" || releasePacketStatus === "blocked" || deliveryPlanBlockers.length > 0 || releaseRisks.length > 0
       ? "blocked"
@@ -381,6 +617,7 @@ function buildClosureState(options) {
     reviewReport?.artifact_ref,
     runtimeHarnessReport?.artifact_ref,
     reviewDecision?.artifact_ref,
+    qualityRepairRequest?.artifact_ref,
     deliveryPlan?.artifact_ref,
     deliveryManifest?.artifact_ref,
     releasePacket?.artifact_ref,
@@ -389,6 +626,7 @@ function buildClosureState(options) {
     ...collectDocumentEvidenceRefs(reviewReport?.document ?? {}),
     ...collectDocumentEvidenceRefs(runtimeHarnessReport?.document ?? {}),
     ...collectDocumentEvidenceRefs(reviewDecision?.document ?? {}),
+    ...collectDocumentEvidenceRefs(qualityRepairRequest?.document ?? {}),
     ...collectDocumentEvidenceRefs(deliveryPlan?.document ?? {}),
     ...collectDocumentEvidenceRefs(deliveryManifest?.document ?? {}),
     ...collectDocumentEvidenceRefs(releasePacket?.document ?? {}),
@@ -433,7 +671,140 @@ function buildClosureState(options) {
         ...asStringArray(learningHandoff?.document.evidence_refs),
       ]),
     },
+    quality_repair: qualityRepair,
     evidence_chain: evidenceChain,
+  };
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   runId: string,
+ *   qualityRepair: Record<string, unknown>,
+ *   evidenceRefs: string[],
+ * }} options
+ */
+function resolveQualityRepairAction(options) {
+  const flowState = asString(options.qualityRepair.flow_state);
+  const requestRef = asString(options.qualityRepair.request_ref);
+  const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.qualityRepair.evidence_refs)]);
+  const repairRunId = `${options.runId}.repair`;
+  const implementCommand = runStartCommand({
+    projectRoot: options.projectRoot,
+    runId: repairRunId,
+    targetStep: "implement",
+    evidenceRefs,
+  });
+  const reviewCommand = `${projectCommand("review run", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
+  const qaCommand = runStartCommand({
+    projectRoot: options.projectRoot,
+    runId: `${repairRunId}.qa`,
+    targetStep: "qa",
+    evidenceRefs,
+  });
+  const statusCommand = `${projectCommand("run status", options.projectRoot)} --run-id ${shellQuote(repairRunId)}`;
+  const holdCommand = `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision hold`;
+
+  if (flowState === "repair-running") {
+    return {
+      status: "blocked",
+      stage: "repair",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "repair-running",
+          summary: "A quality repair request is already in progress; wait for repair evidence before review or QA.",
+          evidenceRefs,
+          nextCommand: statusCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "inspect-quality-repair",
+        command: statusCommand,
+        reason: "Repair implementation is already in progress.",
+        low_level_command: "run status",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (flowState === "review-required") {
+    return {
+      status: "ready",
+      stage: "review",
+      blockers: [],
+      primaryAction: {
+        action_id: "review-quality-repair",
+        command: reviewCommand,
+        reason: "A repair attempt completed; rerun review before QA or delivery.",
+        low_level_command: "review run",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (flowState === "qa-required") {
+    return {
+      status: "ready",
+      stage: "qa",
+      blockers: [],
+      primaryAction: {
+        action_id: "qa-quality-repair",
+        command: qaCommand,
+        reason: "Post-repair review passed; run QA before delivery can continue.",
+        low_level_command: "run start",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (flowState === "repair-cycle-exhausted") {
+    return {
+      status: "blocked",
+      stage: "review",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "repair-cycle-exhausted",
+          summary: "The quality repair budget is exhausted; delivery and release require an explicit operator decision.",
+          evidenceRefs,
+          nextCommand: holdCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "hold-exhausted-quality-repair",
+        command: holdCommand,
+        reason: "Repair budget exhaustion is an operator-visible hold, not another automatic repair run.",
+        low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  const qaOrigin = flowState === "qa-repair-requested";
+  return {
+    status: "blocked",
+    stage: "repair",
+    blockers: [
+      createBlocker({
+        projectRoot: options.projectRoot,
+        code: qaOrigin ? "qa-repair-requested" : "review-repair-requested",
+        summary: qaOrigin
+          ? "QA requested repair; delivery and release must wait for repair implementation, review, and QA closure."
+          : "Review requested repair; delivery and release must wait for repaired execution and refreshed review evidence.",
+        evidenceRefs,
+        nextCommand: implementCommand,
+      }),
+    ],
+    primaryAction: {
+      action_id: qaOrigin ? "run-qa-quality-repair" : "run-review-quality-repair",
+      command: implementCommand,
+      reason: qaOrigin
+        ? "QA-origin repair must start with implementation, then return through review and QA."
+        : "Review-origin repair must start with implementation, then return through review.",
+      low_level_command: "run start",
+      evidence_refs: uniqueStrings([...evidenceRefs, requestRef]),
+    },
   };
 }
 
@@ -451,10 +822,21 @@ function resolveClosureAction(options) {
   const review = asRecord(options.closureState.review);
   const delivery = asRecord(options.closureState.delivery);
   const learning = asRecord(options.closureState.learning);
+  const qualityRepair = asRecord(options.closureState.quality_repair);
   const reviewStatus = asString(review.status);
   const deliveryStatus = asString(delivery.status);
   const learningStatus = asString(learning.status);
+  const qualityRepairFlowState = asString(qualityRepair.flow_state);
   const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.closureState.evidence_chain)]);
+
+  if (qualityRepairFlowState && qualityRepairFlowState !== "delivery-ready") {
+    return resolveQualityRepairAction({
+      projectRoot: options.projectRoot,
+      runId: options.runId,
+      qualityRepair,
+      evidenceRefs,
+    });
+  }
 
   if (reviewStatus === "missing") {
     return {
@@ -511,7 +893,12 @@ function resolveClosureAction(options) {
   }
 
   if (reviewStatus === "repair-requested") {
-    const nextCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${options.runId}.repair`)} --target-step implement`;
+    const nextCommand = runStartCommand({
+      projectRoot: options.projectRoot,
+      runId: `${options.runId}.repair`,
+      targetStep: "implement",
+      evidenceRefs,
+    });
     return {
       status: "blocked",
       stage: "review",
@@ -553,6 +940,27 @@ function resolveClosureAction(options) {
         command: nextCommand,
         reason: "Downstream delivery is blocked until the review decision gate passes.",
         low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (learningStatus === "handoff-complete") {
+    const learningHandoffRef = asString(learning.handoff_ref);
+    const followUpCommand = [
+      `${projectCommand("mission create", options.projectRoot)} --delivery-mode no-write`,
+      ...(learningHandoffRef ? [`--follow-up-source-handoff-ref ${shellQuote(learningHandoffRef)}`] : []),
+    ].join(" ");
+
+    return {
+      status: "ready",
+      stage: "learning",
+      blockers: [],
+      primaryAction: {
+        action_id: "start-new-flow",
+        command: followUpCommand,
+        reason: "Review, delivery, release, and learning evidence are linked; start a fresh follow-up flow while keeping the completed flow read-only.",
+        low_level_command: "mission create",
         evidence_refs: evidenceRefs,
       },
     };
@@ -627,15 +1035,21 @@ function resolveClosureAction(options) {
     };
   }
 
+  const learningHandoffRef = asString(learning.handoff_ref);
+  const followUpCommand = [
+    `${projectCommand("mission create", options.projectRoot)} --delivery-mode no-write`,
+    ...(learningHandoffRef ? [`--follow-up-source-handoff-ref ${shellQuote(learningHandoffRef)}`] : []),
+  ].join(" ");
+
   return {
     status: "ready",
     stage: "learning",
     blockers: [],
     primaryAction: {
-      action_id: "closure-complete",
-      command: `${projectCommand("evidence show", options.projectRoot)} --run-id ${shellQuote(options.runId)}`,
-      reason: "Review, delivery, release, and learning evidence are linked; inspect the closure evidence chain.",
-      low_level_command: "evidence show",
+      action_id: "start-new-flow",
+      command: followUpCommand,
+      reason: "Review, delivery, release, and learning evidence are linked; start a fresh follow-up flow while keeping the completed flow read-only.",
+      low_level_command: "mission create",
       evidence_refs: evidenceRefs,
     },
   };
@@ -651,14 +1065,76 @@ function projectCommand(command, projectRoot) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+function defaultRuntimeRoot(projectRoot) {
+  return path.resolve(projectRoot, DEFAULT_RUNTIME_ROOT);
+}
+
+/**
+ * @param {{ projectRoot: string, runtimeRoot: string, explicitRuntimeRoot?: boolean }} options
+ * @returns {boolean}
+ */
+function shouldIncludeRuntimeRoot(options) {
+  return options.explicitRuntimeRoot === true || path.resolve(options.runtimeRoot) !== defaultRuntimeRoot(options.projectRoot);
+}
+
+/**
+ * @param {string} command
+ * @param {string} runtimeRoot
+ * @param {boolean} includeRuntimeRoot
+ * @returns {string}
+ */
+function appendRuntimeRootFlag(command, runtimeRoot, includeRuntimeRoot) {
+  if (!includeRuntimeRoot || /\s--runtime-root(?:\s|=)/u.test(command)) {
+    return command;
+  }
+  return `${command} --runtime-root ${shellQuote(runtimeRoot)}`;
+}
+
+/**
+ * @param {Record<string, unknown>} action
+ * @param {string} runtimeRoot
+ * @param {boolean} includeRuntimeRoot
+ * @returns {Record<string, unknown>}
+ */
+function withRuntimeRootActionCommand(action, runtimeRoot, includeRuntimeRoot) {
+  const command = asString(action.command);
+  return command
+    ? {
+        ...action,
+        command: appendRuntimeRootFlag(command, runtimeRoot, includeRuntimeRoot),
+      }
+    : action;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} blockers
+ * @param {string} runtimeRoot
+ * @param {boolean} includeRuntimeRoot
+ * @returns {Array<Record<string, unknown>>}
+ */
+function withRuntimeRootBlockerCommands(blockers, runtimeRoot, includeRuntimeRoot) {
+  return blockers.map((blocker) => {
+    const nextCommand = asString(blocker.next_command);
+    return nextCommand
+      ? {
+          ...blocker,
+          next_command: appendRuntimeRootFlag(nextCommand, runtimeRoot, includeRuntimeRoot),
+        }
+      : blocker;
+  });
+}
+
+/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {{ packetFile: string, bodyFile: string | null, packet: Record<string, unknown>, body: Record<string, unknown> | null } | null}
  */
 function findLatestIntakePacket(init) {
   for (const filePath of listJsonFiles(init.runtimeLayout.artifactsRoot)) {
-    if (!path.basename(filePath).includes(".artifact.intake.")) continue;
-    const packet = readJsonFile(filePath);
-    if (asString(packet?.packet_type) !== "intake-request") continue;
+    const packet = loadValidatedIntakePacket(filePath);
+    if (!packet) continue;
     const bodyFile = asString(packet?.body_ref);
     return {
       packetFile: filePath,
@@ -688,15 +1164,405 @@ function findActiveRun(init) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
- * @returns {string | null}
+ * @returns {Record<string, unknown>}
  */
-function findDiscoveryReport(init) {
-  return (
-    listJsonFiles(init.runtimeLayout.reportsRoot).find((filePath) => {
-      const report = readJsonFile(filePath);
-      return asString(report?.report_id)?.includes(".analysis.") || asRecord(report?.discovery_research).status;
-    }) ?? null
+function loadProjectProfileDocument(init) {
+  const loaded = loadContractFile({
+    filePath: init.projectProfilePath,
+    family: "project-profile",
+  });
+  return loaded.ok ? asRecord(loaded.document) : {};
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @returns {{ mode: "strict" | "soft", allow_incomplete_research_for_spec: boolean, reason: string | null }}
+ */
+function resolveArtifactReadinessPolicy(init) {
+  const profile = loadProjectProfileDocument(init);
+  const policy = asRecord(profile.artifact_readiness_policy);
+  const research = asRecord(policy.research);
+  const allowIncomplete =
+    research.allow_incomplete_for_spec === true ||
+    asString(research.incomplete_research_for_spec) === "allow";
+  return {
+    mode: allowIncomplete ? "soft" : "strict",
+    allow_incomplete_research_for_spec: allowIncomplete,
+    reason: asString(research.reason),
+  };
+}
+
+/**
+ * @param {string} filePath
+ * @returns {number | null}
+ */
+function fileMtimeMs(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {"reports" | "artifacts"} root
+ * @param {string} family
+ * @param {(document: Record<string, unknown>, filePath: string) => boolean} predicate
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown>, mtime_ms: number } | null}
+ */
+function findLatestRuntimeEvidence(init, root, family, predicate) {
+  const rootPath = root === "reports" ? init.runtimeLayout.reportsRoot : init.runtimeLayout.artifactsRoot;
+  for (const filePath of listJsonFiles(rootPath)) {
+    const document = readJsonFile(filePath);
+    if (!document || !predicate(document, filePath)) continue;
+    return {
+      family,
+      file: filePath,
+      artifact_ref: toEvidenceRef(init.projectRoot, filePath),
+      document,
+      mtime_ms: fileMtimeMs(filePath) ?? 0,
+    };
+  }
+  return null;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function findAnalysisEvidence(init) {
+  return findLatestRuntimeEvidence(
+    init,
+    "reports",
+    "project-analysis-report",
+    (document, filePath) =>
+      path.basename(filePath) === "project-analysis-report.json" ||
+      Boolean(asString(document.report_id)?.includes(".analysis.")) ||
+      Boolean(asRecord(document.discovery_completeness).status),
   );
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown>, mtime_ms: number } | null} analysis
+ */
+function findResearchEvidence(init, analysis) {
+  return (
+    findLatestRuntimeEvidence(
+      init,
+      "reports",
+      "discovery-research-report",
+      (document, filePath) =>
+        path.basename(filePath) === "discovery-research-report.json" ||
+        Boolean(asString(document.report_id)?.includes(".discovery-research.")) ||
+        Boolean(asRecord(document.research_inputs).source_refs),
+    ) ??
+    (asRecord(analysis?.document.discovery_research).status
+      ? {
+          family: "project-analysis-report",
+          file: analysis?.file ?? "",
+          artifact_ref: analysis?.artifact_ref ?? "",
+          document: asRecord(analysis?.document.discovery_research),
+          mtime_ms: analysis?.mtime_ms ?? 0,
+        }
+      : null)
+  );
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function findSpecEvidence(init) {
+  return findLatestRuntimeEvidence(init, "reports", "step-result", (document) => {
+    const routedExecution = asRecord(document.routed_execution);
+    const selectedStep = asRecord(asRecord(routedExecution.architecture_traceability).selected_step);
+    return asString(selectedStep.step_class) === "spec";
+  });
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ */
+function findPlanningEvidence(init) {
+  return findLatestRuntimeEvidence(init, "artifacts", "planning-artifact", (document, filePath) => {
+    const basename = path.basename(filePath);
+    return (
+      basename.startsWith("wave-ticket-") ||
+      /^.+\.handoff\..*\.json$/u.test(basename) ||
+      asString(document.status) === "ready-for-handoff" ||
+      asString(document.status) === "pending-approval"
+    );
+  });
+}
+
+/**
+ * @param {Array<{ name: string, mtime_ms: number | null }>} upstreams
+ * @param {number | null} evidenceMtime
+ * @param {string} stage
+ * @returns {string[]}
+ */
+function staleReasons(upstreams, evidenceMtime, stage) {
+  if (typeof evidenceMtime !== "number") return [];
+  return upstreams
+    .filter((upstream) => typeof upstream.mtime_ms === "number" && upstream.mtime_ms > evidenceMtime)
+    .map((upstream) => `${upstream.name}-changed-after-${stage}`);
+}
+
+/**
+ * @param {{
+ *   status: string,
+ *   evidenceRef?: string | null,
+ *   reason: string,
+ *   blockedReasons?: string[],
+ *   staleReasons?: string[],
+ *   requiredEvidenceRefs?: string[],
+ *   softDecision?: Record<string, unknown> | null,
+ * }} options
+ */
+function readinessStage(options) {
+  return {
+    status: options.status,
+    evidence_ref: options.evidenceRef ?? null,
+    reason: options.reason,
+    blocked_reasons: options.blockedReasons ?? [],
+    stale_reasons: options.staleReasons ?? [],
+    required_evidence_refs: options.requiredEvidenceRefs ?? [],
+    soft_decision: options.softDecision ?? null,
+  };
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   intake: { packetFile: string, bodyFile: string | null, packet: Record<string, unknown>, body: Record<string, unknown> | null } | null,
+ *   missionState: Record<string, unknown>,
+ * }} options
+ */
+function projectArtifactReadiness(options) {
+  const policy = resolveArtifactReadinessPolicy(options.init);
+  const packetRef = options.intake ? toEvidenceRef(options.init.projectRoot, options.intake.packetFile) : null;
+  const bodyRef = options.intake?.bodyFile ? toEvidenceRef(options.init.projectRoot, options.intake.bodyFile) : null;
+  const missionMtime = Math.max(
+    fileMtimeMs(options.intake?.packetFile ?? "") ?? 0,
+    fileMtimeMs(options.intake?.bodyFile ?? "") ?? 0,
+  );
+  const missionComplete = asString(options.missionState.completeness_status) === "complete";
+  const missionStage = !options.intake
+    ? readinessStage({
+        status: "pending",
+        reason: "Mission intake has not been materialized.",
+        blockedReasons: ["intake-request-required"],
+      })
+    : !options.intake.body || !missionComplete
+      ? readinessStage({
+          status: "blocked",
+          evidenceRef: packetRef,
+          reason: "Mission intake is incomplete or unreadable.",
+          blockedReasons: asStringArray(options.missionState.missing_fields).length > 0
+            ? asStringArray(options.missionState.missing_fields)
+            : ["intake-body-readable-required"],
+          requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+        })
+      : readinessStage({
+          status: "complete",
+          evidenceRef: packetRef,
+          reason: "Mission intake is complete and current.",
+          requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+        });
+
+  const analysis = findAnalysisEvidence(options.init);
+  const research = findResearchEvidence(options.init, analysis);
+  const spec = findSpecEvidence(options.init);
+  const planning = findPlanningEvidence(options.init);
+  const missionUpstream = [{ name: "mission", mtime_ms: missionMtime }];
+  const discoveryStale = staleReasons(missionUpstream, analysis?.mtime_ms ?? null, "discovery");
+  const discoveryCompleteness = asRecord(analysis?.document.discovery_completeness);
+  const discoveryBlocking = discoveryCompleteness.blocking === true || asString(discoveryCompleteness.status) === "fail";
+  const discoveryStage = !missionComplete
+    ? readinessStage({
+        status: "pending",
+        reason: "Discovery waits for complete mission intake.",
+        blockedReasons: ["mission-complete-required"],
+        requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+      })
+    : !analysis
+      ? readinessStage({
+          status: "pending",
+          reason: "Discovery evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef]),
+        })
+      : discoveryStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: analysis.artifact_ref,
+            reason: "Mission intake changed after discovery evidence was created.",
+            staleReasons: discoveryStale,
+            requiredEvidenceRefs: uniqueStrings([packetRef, bodyRef, analysis.artifact_ref]),
+          })
+        : discoveryBlocking
+          ? readinessStage({
+              status: "blocked",
+              evidenceRef: analysis.artifact_ref,
+              reason: "Discovery completeness checks are blocking downstream spec readiness.",
+              blockedReasons: asStringArray(discoveryCompleteness.checks).length > 0
+                ? ["discovery-completeness-failed"]
+                : [asString(discoveryCompleteness.status) ?? "discovery-blocked"],
+              requiredEvidenceRefs: uniqueStrings([analysis.artifact_ref]),
+            })
+          : readinessStage({
+              status: "complete",
+              evidenceRef: analysis.artifact_ref,
+              reason: "Discovery evidence is complete and current.",
+              requiredEvidenceRefs: uniqueStrings([analysis.artifact_ref]),
+            });
+
+  const researchStatus = asString(research?.document.status) ?? asString(asRecord(research?.document.completeness).status);
+  const researchBlocking = asRecord(research?.document.completeness).blocking === true;
+  const researchStale = staleReasons(
+    [
+      ...missionUpstream,
+      { name: "discovery", mtime_ms: analysis?.mtime_ms ?? null },
+    ],
+    research?.mtime_ms ?? null,
+    "research",
+  );
+  const researchStage = discoveryStage.status === "pending" || discoveryStage.status === "blocked"
+    ? readinessStage({
+        status: "pending",
+        reason: "Research waits for complete discovery evidence.",
+        blockedReasons: ["discovery-complete-required"],
+        requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref]),
+      })
+    : !research
+      ? readinessStage({
+          status: "pending",
+          reason: "Research evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref]),
+        })
+      : researchStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: research.artifact_ref,
+            reason: "Mission or discovery evidence changed after research evidence was created.",
+            staleReasons: researchStale,
+            requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research.artifact_ref]),
+          })
+        : researchStatus === "adr-ready" && !researchBlocking
+          ? readinessStage({
+              status: "adr-ready",
+              evidenceRef: research.artifact_ref,
+              reason: "Research evidence is ADR-ready.",
+              requiredEvidenceRefs: uniqueStrings([research.artifact_ref]),
+            })
+          : policy.allow_incomplete_research_for_spec && researchStatus === "incomplete"
+            ? readinessStage({
+                status: "incomplete",
+                evidenceRef: research.artifact_ref,
+                reason: "Incomplete research is explicitly allowed by the project readiness policy.",
+                blockedReasons: [],
+                requiredEvidenceRefs: uniqueStrings([research.artifact_ref]),
+                softDecision: {
+                  allowed: true,
+                  reason: policy.reason ?? "project-profile artifact_readiness_policy allows incomplete research for spec",
+                  profile_field: "artifact_readiness_policy.research.allow_incomplete_for_spec",
+                },
+              })
+            : readinessStage({
+                status: "blocked",
+                evidenceRef: research.artifact_ref,
+                reason: "Research is not ADR-ready under the strict readiness policy.",
+                blockedReasons: ["research-adr-ready-required"],
+                requiredEvidenceRefs: uniqueStrings([research.artifact_ref]),
+              });
+
+  const specStale = staleReasons(
+    [
+      ...missionUpstream,
+      { name: "discovery", mtime_ms: analysis?.mtime_ms ?? null },
+      { name: "research", mtime_ms: research?.mtime_ms ?? null },
+    ],
+    spec?.mtime_ms ?? null,
+    "spec",
+  );
+  const researchCanFeedSpec = researchStage.status === "adr-ready" || researchStage.status === "incomplete";
+  const specStatus = asString(spec?.document.status);
+  const specStage = !researchCanFeedSpec
+    ? readinessStage({
+        status: "blocked",
+        evidenceRef: spec?.artifact_ref,
+        reason: "Spec cannot be ready until current discovery and research evidence are consumable.",
+        blockedReasons: ["current-discovery-and-research-required"],
+        requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref]),
+      })
+    : !spec
+      ? readinessStage({
+          status: "pending",
+          reason: "Spec evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref]),
+        })
+      : specStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: spec.artifact_ref,
+            reason: "Mission, discovery, or research evidence changed after spec evidence was created.",
+            staleReasons: specStale,
+            requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref, spec.artifact_ref]),
+          })
+        : specStatus === "pass" || specStatus === "passed"
+          ? readinessStage({
+              status: "ready",
+              evidenceRef: spec.artifact_ref,
+              reason: "Spec evidence is current and can feed planning.",
+              requiredEvidenceRefs: uniqueStrings([analysis?.artifact_ref, research?.artifact_ref, spec.artifact_ref]),
+            })
+          : readinessStage({
+              status: "blocked",
+              evidenceRef: spec.artifact_ref,
+              reason: "Spec evidence exists but did not pass.",
+              blockedReasons: [specStatus ?? "spec-not-passing"],
+              requiredEvidenceRefs: uniqueStrings([spec.artifact_ref]),
+            });
+
+  const planningStale = staleReasons([{ name: "spec", mtime_ms: spec?.mtime_ms ?? null }], planning?.mtime_ms ?? null, "planning");
+  const planningStage = specStage.status !== "ready"
+    ? readinessStage({
+        status: "blocked",
+        evidenceRef: planning?.artifact_ref,
+        reason: "Planning waits for current ready spec evidence.",
+        blockedReasons: ["spec-ready-required"],
+        requiredEvidenceRefs: uniqueStrings([spec?.artifact_ref]),
+      })
+    : !planning
+      ? readinessStage({
+          status: "pending",
+          reason: "Planning handoff evidence has not been materialized.",
+          requiredEvidenceRefs: uniqueStrings([spec.artifact_ref]),
+        })
+      : planningStale.length > 0
+        ? readinessStage({
+            status: "stale",
+            evidenceRef: planning.artifact_ref,
+            reason: "Spec evidence changed after planning handoff evidence was created.",
+            staleReasons: planningStale,
+            requiredEvidenceRefs: uniqueStrings([spec.artifact_ref, planning.artifact_ref]),
+          })
+        : readinessStage({
+            status: "ready",
+            evidenceRef: planning.artifact_ref,
+            reason: "Planning evidence is current.",
+            requiredEvidenceRefs: uniqueStrings([spec.artifact_ref, planning.artifact_ref]),
+          });
+
+  return {
+    policy,
+    stages: {
+      mission: missionStage,
+      discovery: discoveryStage,
+      research: researchStage,
+      spec: specStage,
+      planning: planningStage,
+    },
+  };
 }
 
 /**
@@ -710,6 +1576,56 @@ function createBlocker(blocker) {
     evidence_refs: blocker.evidenceRefs ?? [],
     next_command: blocker.nextCommand,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} readiness
+ * @param {string} stage
+ * @returns {Record<string, unknown>}
+ */
+function artifactReadinessStage(readiness, stage) {
+  return asRecord(asRecord(readiness.stages)[stage]);
+}
+
+/**
+ * @param {Record<string, unknown>} stage
+ * @returns {string[]}
+ */
+function artifactReadinessEvidenceRefs(stage) {
+  return uniqueStrings([asString(stage.evidence_ref), ...asStringArray(stage.required_evidence_refs)]);
+}
+
+/**
+ * @param {string} stageName
+ * @param {Record<string, unknown>} stage
+ * @returns {string}
+ */
+function artifactReadinessBlockerCode(stageName, stage) {
+  const stale = asStringArray(stage.stale_reasons);
+  if (stale.length > 0) {
+    return `${stageName}-stale`;
+  }
+  const blocked = asStringArray(stage.blocked_reasons);
+  return blocked[0] ?? `${stageName}-blocked`;
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   stageName: string,
+ *   stage: Record<string, unknown>,
+ *   nextCommand: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function createArtifactReadinessBlocker(options) {
+  return createBlocker({
+    projectRoot: options.projectRoot,
+    code: artifactReadinessBlockerCode(options.stageName, options.stage),
+    summary: asString(options.stage.reason) ?? `${options.stageName} readiness is blocked.`,
+    evidenceRefs: artifactReadinessEvidenceRefs(options.stage),
+    nextCommand: options.nextCommand,
+  });
 }
 
 /**
@@ -752,9 +1668,10 @@ function resolveMissionState(body) {
  *   projectRef?: string,
  *   projectProfile?: string,
  *   runtimeRoot?: string,
+ *   runId?: string,
  * }} options
  */
-export function resolveNextAction(options = {}) {
+function executeNextActionProjection(options = {}) {
   const init = initializeProjectRuntime({
     cwd: options.cwd,
     projectRef: options.projectRef,
@@ -763,6 +1680,11 @@ export function resolveNextAction(options = {}) {
     command: "aor next",
   });
   const projectRoot = init.projectRoot;
+  const includeRuntimeRoot = shouldIncludeRuntimeRoot({
+    projectRoot,
+    runtimeRoot: init.runtimeRoot,
+    explicitRuntimeRoot: options.runtimeRoot !== undefined,
+  });
   const reportFile = path.join(init.runtimeLayout.reportsRoot, "next-action-report.json");
   const onboardingStatus = asString(init.onboardingReport?.status) ?? "blocked";
   const onboardingEvidenceRef = toEvidenceRef(projectRoot, init.onboardingReportFile);
@@ -789,9 +1711,25 @@ export function resolveNextAction(options = {}) {
     forbidden_paths: [],
   };
   let closureState = buildClosureState({ init, runId: null });
+  let latestIntake = null;
+  let artifactReadiness = null;
 
-  const activeRun = findActiveRun(init);
-  if (activeRun) {
+  const explicitRunId = asString(options.runId);
+  const activeRun = explicitRunId ? null : findActiveRun(init);
+  if (explicitRunId) {
+    closureState = buildClosureState({ init, runId: explicitRunId });
+    const closureAction = resolveClosureAction({
+      projectRoot,
+      runId: explicitRunId,
+      closureState,
+      evidenceRefs,
+      missionState,
+    });
+    status = closureAction.status;
+    stage = closureAction.stage;
+    primaryAction = closureAction.primaryAction;
+    blockers = closureAction.blockers;
+  } else if (activeRun) {
     const runId = asString(activeRun.state.run_id) ?? "current";
     const activeRunRef = toEvidenceRef(projectRoot, activeRun.stateFile);
     closureState = buildClosureState({ init, runId, runEvidenceRef: activeRunRef });
@@ -828,6 +1766,7 @@ export function resolveNextAction(options = {}) {
     };
   } else {
     const intake = findLatestIntakePacket(init);
+    latestIntake = intake;
     if (intake) {
       const packetRef = toEvidenceRef(projectRoot, intake.packetFile);
       const bodyRef = intake.bodyFile ? toEvidenceRef(projectRoot, intake.bodyFile) : null;
@@ -884,8 +1823,8 @@ export function resolveNextAction(options = {}) {
             evidence_refs: [...evidenceRefs],
           };
         } else {
-          const discoveryReport = findDiscoveryReport(init);
-          const runEvidence = findLatestRunEvidence(init);
+          artifactReadiness = buildArtifactReadiness({ init, intake, missionState });
+          const runEvidence = findLatestRunEvidence(init, { notBeforeMs: fs.statSync(intake.packetFile).mtimeMs });
           if (runEvidence) {
             closureState = buildClosureState({
               init,
@@ -903,30 +1842,120 @@ export function resolveNextAction(options = {}) {
             stage = closureAction.stage;
             primaryAction = closureAction.primaryAction;
             blockers = closureAction.blockers;
-          } else if (discoveryReport) {
-            const discoveryRef = toEvidenceRef(projectRoot, discoveryReport);
-            stage = "spec-build";
-            primaryAction = {
-              action_id: "spec-build",
-              command: `${projectCommand("spec build", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`,
-              reason: "Mission intake and discovery evidence exist; build the routed specification next.",
-              low_level_command: "spec build",
-              evidence_refs: [...evidenceRefs, discoveryRef],
-            };
           } else {
-            stage = "discovery";
-            primaryAction = {
-              action_id: "discovery-run",
-              command: `${projectCommand("discovery run", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`,
-              reason: "Mission intake is complete; discovery should collect repository and research evidence before planning.",
-              low_level_command: "discovery run",
-              evidence_refs: [...evidenceRefs],
-            };
+            const discoveryReadiness = artifactReadinessStage(artifactReadiness, "discovery");
+            const researchReadiness = artifactReadinessStage(artifactReadiness, "research");
+            const specReadiness = artifactReadinessStage(artifactReadiness, "spec");
+            const planningReadiness = artifactReadinessStage(artifactReadiness, "planning");
+            const discoveryCommand = `${projectCommand("discovery run", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`;
+            const specCommand = `${projectCommand("spec build", projectRoot)} --input-packet ${shellQuote(intake.packetFile)}`;
+            const planCreateCommand = `${projectCommand("plan create", projectRoot)} --approved-artifact ${shellQuote(intake.packetFile)}`;
+            const discoveryStatus = asString(discoveryReadiness.status);
+            const researchStatus = asString(researchReadiness.status);
+            const specStatus = asString(specReadiness.status);
+            const planningStatus = asString(planningReadiness.status);
+
+            if (discoveryStatus !== "complete") {
+              status = discoveryStatus === "blocked" ? "blocked" : "ready";
+              stage = "discovery";
+              primaryAction = {
+                action_id: "discovery-run",
+                command: discoveryCommand,
+                reason: asString(discoveryReadiness.reason) ?? "Mission intake is complete; discovery evidence should be refreshed.",
+                low_level_command: "discovery run",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(discoveryReadiness)]),
+              };
+              blockers = discoveryStatus === "blocked"
+                ? [
+                    createArtifactReadinessBlocker({
+                      projectRoot,
+                      stageName: "discovery",
+                      stage: discoveryReadiness,
+                      nextCommand: discoveryCommand,
+                    }),
+                  ]
+                : [];
+            } else if (researchStatus !== "adr-ready" && researchStatus !== "incomplete") {
+              status = "blocked";
+              stage = "research";
+              primaryAction = {
+                action_id: "discovery-run",
+                command: discoveryCommand,
+                reason: asString(researchReadiness.reason) ?? "Research readiness must be refreshed before spec build.",
+                low_level_command: "discovery run",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(researchReadiness)]),
+              };
+              blockers = [
+                createArtifactReadinessBlocker({
+                  projectRoot,
+                  stageName: "research",
+                  stage: researchReadiness,
+                  nextCommand: discoveryCommand,
+                }),
+              ];
+            } else if (specStatus !== "ready") {
+              status = specStatus === "pending" ? "ready" : "blocked";
+              stage = "spec-build";
+              primaryAction = {
+                action_id: "spec-build",
+                command: specCommand,
+                reason: asString(specReadiness.reason) ?? "Discovery and research evidence are ready; build the routed specification next.",
+                low_level_command: "spec build",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(specReadiness)]),
+              };
+              blockers = specStatus === "pending"
+                ? []
+                : [
+                    createArtifactReadinessBlocker({
+                      projectRoot,
+                      stageName: "spec",
+                      stage: specReadiness,
+                      nextCommand: specCommand,
+                    }),
+                  ];
+            } else if (planningStatus !== "ready") {
+              status = planningStatus === "pending" ? "ready" : "blocked";
+              stage = "planning";
+              primaryAction = {
+                action_id: "plan-create",
+                command: planCreateCommand,
+                reason: asString(planningReadiness.reason) ?? "Spec evidence is ready; create and validate a structured task plan next.",
+                low_level_command: "plan create",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(planningReadiness)]),
+              };
+              blockers = planningStatus === "pending"
+                ? []
+                : [
+                    createArtifactReadinessBlocker({
+                      projectRoot,
+                      stageName: "planning",
+                      stage: planningReadiness,
+                      nextCommand: planCreateCommand,
+                    }),
+                  ];
+            } else {
+              const approvalRef = `approval://operator/${normalizeForFileName(asString(missionState.mission_id) ?? "current") || "current"}`;
+              stage = "planning";
+              primaryAction = {
+                action_id: "handoff-approve",
+                command: `${projectCommand("handoff approve", projectRoot)} --approval-ref ${shellQuote(approvalRef)}`,
+                reason: asString(planningReadiness.reason) ?? "Planning evidence is current; approve the handoff before execution-style flows.",
+                low_level_command: "handoff approve",
+                evidence_refs: uniqueStrings([...evidenceRefs, ...artifactReadinessEvidenceRefs(planningReadiness)]),
+              };
+            }
           }
         }
       }
     }
   }
+
+  artifactReadiness ??= buildArtifactReadiness({ init, intake: latestIntake, missionState });
+
+  primaryAction = withRuntimeRootActionCommand(primaryAction, init.runtimeRoot, includeRuntimeRoot);
+  primaryAction = { ...primaryAction, operator_control: operatorControlForAction(primaryAction, missionState, closureState) };
+  blockers = withRuntimeRootBlockerCommands(blockers, init.runtimeRoot, includeRuntimeRoot);
+  const qualityRepairLineage = asRecord(asRecord(closureState.quality_repair).lineage);
 
   const report = {
     report_id: `${init.projectId}.next-action.v1`,
@@ -945,6 +1974,7 @@ export function resolveNextAction(options = {}) {
       active_run_ref: activeRun ? toEvidenceRef(projectRoot, activeRun.stateFile) : null,
     },
     mission_state: missionState,
+    artifact_readiness: artifactReadiness,
     closure_state: closureState,
     primary_action: primaryAction,
     blockers,
@@ -956,6 +1986,7 @@ export function resolveNextAction(options = {}) {
       forbidden_paths: missionState.forbidden_paths,
       requires_review_before_writeback: missionState.delivery_mode !== "no-write",
     },
+    ...(Object.keys(qualityRepairLineage).length > 0 ? { quality_repair_lineage: qualityRepairLineage } : {}),
     evidence_refs: Array.from(new Set([...evidenceRefs, ...primaryAction.evidence_refs])),
     status,
     created_at: new Date().toISOString(),
@@ -970,12 +2001,24 @@ export function resolveNextAction(options = {}) {
     const issueSummary = validation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Generated next-action report failed contract validation: ${issueSummary}`);
   }
+  const archiveSuffix =
+    normalizeForFileName(asString(missionState.mission_id) ?? path.basename(asString(missionState.intake_packet_ref) ?? "current", ".json")) ||
+    "current";
+  const archiveReportFile = path.join(init.runtimeLayout.reportsRoot, `next-action-report-${archiveSuffix}.json`);
+  if (archiveReportFile !== reportFile) {
+    fs.writeFileSync(archiveReportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  }
   fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
   return {
     ...init,
     nextActionReport: report,
     nextActionReportFile: reportFile,
+    nextActionReportArchiveFile: archiveReportFile,
     nextActionReportId: report.report_id,
   };
 }
+
+function buildClosureState(options) { return runProjectionCoordinator(projectClosureState, options); }
+function buildArtifactReadiness(options) { return runProjectionCoordinator(projectArtifactReadiness, options); }
+export function resolveNextAction(options = {}) { return runProjectionCoordinator(executeNextActionProjection, options); }

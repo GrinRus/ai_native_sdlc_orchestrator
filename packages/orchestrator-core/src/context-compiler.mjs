@@ -105,6 +105,42 @@ function uniqueStrings(values) {
   return [...new Set(values)];
 }
 
+function effectiveSourceAsset({ reference, family, source, order }) {
+  if (typeof source !== "string" || source.length === 0 || !fs.existsSync(source)) {
+    throw new Error(`Context compilation failed: selected ${family} '${String(reference)}' has no readable source.`);
+  }
+  const content = fs.readFileSync(source, "utf8").replace(/\r\n?/gu, "\n").normalize("NFC");
+  const loaded = loadContractFile({ filePath: source, family });
+  if (!loaded.ok) {
+    throw new Error(`Context compilation failed: selected ${family} '${String(reference)}' failed contract validation.`);
+  }
+  const idFields = {
+    "provider-route-profile": "route_id",
+    "wrapper-profile": "wrapper_id",
+    "prompt-bundle": "prompt_bundle_id",
+    "context-bundle": "context_bundle_id",
+    "step-policy-profile": "policy_id",
+    "skill-profile": "skill_id",
+  };
+  const canonicalId = loaded.document?.[idFields[family]];
+  if (typeof canonicalId !== "string" || canonicalId.length === 0) {
+    throw new Error(`Context compilation failed: selected ${family} '${String(reference)}' has no canonical ID.`);
+  }
+  return {
+    canonical_id: canonicalId,
+    reference: String(reference),
+    family,
+    digest: `sha256:${crypto.createHash("sha256").update(content, "utf8").digest("hex")}`,
+    source_root: path.dirname(source),
+    source,
+    provenance: "selected",
+    deduplicated_provenance: [],
+    order,
+    delivery_mode: "inline",
+    content,
+  };
+}
+
 /**
  * @param {unknown} value
  * @param {"context_doc_refs" | "context_rule_refs" | "context_skill_refs"} field
@@ -310,6 +346,9 @@ export function compileStepContext(options) {
         .map((entry) => asRecord(entry).profile_source)
         .filter((entry) => typeof entry === "string")
     : [];
+  const resolvedContextAssets = Array.isArray(contextBundleResolution.effective_assets)
+    ? contextBundleResolution.effective_assets.map((entry) => asRecord(entry))
+    : [];
 
   const routeClass = typeof routeProfile.route_class === "string" ? routeProfile.route_class : null;
   if (!routeClass) {
@@ -420,6 +459,35 @@ export function compileStepContext(options) {
     writeback_mode: asRecord(policyResolution.resolved_bounds?.writeback_mode),
   };
 
+  const selectedSourceAssets = [
+    {
+      reference: routeResolution.resolved_route_id,
+      family: "provider-route-profile",
+      source: routeResolution.route_profile_source,
+    },
+    { reference: wrapperResolution.wrapper_ref, family: "wrapper-profile", source: wrapperProfileSource },
+    { reference: promptResolution.prompt_bundle_ref, family: "prompt-bundle", source: promptProfileSource },
+    ...contextBundleRefs.map((reference, index) => ({
+      reference,
+      family: "context-bundle",
+      source: contextBundleSources[index],
+    })),
+  ];
+  const effectiveAssets = selectedSourceAssets.map((entry, order) => effectiveSourceAsset({ ...entry, order }));
+  for (const entry of resolvedContextAssets) {
+    effectiveAssets.push({ ...entry, order: effectiveAssets.length });
+  }
+  for (const entry of [
+    { reference: policy.policy_id, family: "step-policy-profile", source: policy.profile_source },
+    ...skillResolution.skills.map((skill) => ({
+      reference: skill.skill_ref,
+      family: "skill-profile",
+      source: skill.profile_source,
+    })),
+  ]) {
+    effectiveAssets.push(effectiveSourceAsset({ ...entry, order: effectiveAssets.length }));
+  }
+
   const contextCompilation = {
     included_sources: [
       {
@@ -478,6 +546,8 @@ export function compileStepContext(options) {
       context_rule_refs: contextRuleRefs,
       context_skill_refs: contextSkillRefs,
     },
+    compiler_revision: "runtime-context-compiler@v2",
+    effective_assets: effectiveAssets,
     skill_refs: skillResolution.skill_refs,
     provenance: {
       project_profile_path: options.projectProfilePath,
@@ -494,6 +564,7 @@ export function compileStepContext(options) {
       skill_resolution_source: asRecord(skillResolution.resolution_source),
       input_packet_refs: packetResolution.resolved_input_packet_refs,
       runtime_evidence_refs: stableRuntimeEvidenceRefs,
+      compiler_revision: "runtime-context-compiler@v2",
     },
   };
 
@@ -510,6 +581,7 @@ export function compileStepContext(options) {
       compiled_context_fingerprint: compiledContextFingerprint,
       resolved_input_packet_refs: packetResolution.resolved_input_packet_refs,
       skill_refs: skillResolution.skill_refs,
+      effective_assets: effectiveAssets,
     },
   };
 }

@@ -29,6 +29,10 @@ Supported `source_refs[].source_kind` values are:
 - `local-note`
 - `local-mail`
 
+The public `mission create` surface accepts repeatable `--source-kind` and
+`--source-ref` values paired by position. Scalar legacy calls remain valid.
+Mismatched pair counts fail before intake evidence is written.
+
 External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook connectors is out of scope for this contract. Such sources must be represented only after they have been exported or mirrored into a local structured source reference.
 
 `product_intake_completeness.status` is `complete` when goals, constraints, KPIs, Definition of Done, and source refs are present; otherwise it is `incomplete` and `missing_fields` names the absent evidence groups.
@@ -38,9 +42,23 @@ External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook conn
 - `delivery_mode` - one of `no-write`, `patch-only`, `local-branch`, or `fork-first-pr`.
 - `writeback_policy` - explicit write-back defaults. `upstream_writes_default` must remain false for installed-user guided flows, and delivery-capable modes require review before write-back.
 
-`allowed_paths` and `forbidden_paths` are legacy path-scope hints and must not be used by Runtime Harness or live E2E acceptance logic. Product acceptance should be expressed through goals, constraints, KPIs, Definition of Done, expected evidence, and verification commands.
+`allowed_paths` and `forbidden_paths` are project-relative authorization hints
+and follow `canonical-identifiers-and-paths.md`. Absence, `[]`, bounded patterns,
+and explicit unrestricted scope are distinct. Malformed values fail contract
+validation. These fields bound filesystem authorization; they do not replace
+Runtime Harness product acceptance, which remains expressed through goals,
+constraints, KPIs, Definition of Done, expected evidence, and verification
+commands.
 
 ## Notes
 The artifact packet owns packet identity and lifecycle status. This body owns product acceptance evidence and source-material traceability.
 
 Guided mission intake in W21 must populate these same product-intake fields instead of creating a parallel mission schema. Missing goals, constraints, KPIs, Definition of Done, or source refs should remain explicit through `product_intake_completeness` so `aor next` and guided web stages can report blockers deterministically. Delivery mode is an execution boundary, not a product acceptance substitute.
+
+W34 flow creation reuses this contract. `New Flow` and follow-up flow creation
+must write a fresh intake-request body rather than editing a completed flow's
+intake evidence. Follow-up lineage may be recorded in
+`mission_traceability.coverage_follow_up.follow_up_source_handoff_ref` by the
+runtime-owned `mission create --follow-up-source-handoff-ref <ref>` path, and is
+then projected through the control-plane `follow_up_source_handoff_ref` field.
+The body still owns only the new flow's product acceptance evidence.

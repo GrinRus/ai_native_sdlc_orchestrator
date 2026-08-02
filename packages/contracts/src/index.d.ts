@@ -1,5 +1,9 @@
 export type ContractFamily =
   | "project-profile"
+  | "project-binding"
+  | "workspace-set"
+  | "execution-profile"
+  | "execution-readiness-report"
   | "onboarding-report"
   | "next-action-report"
   | "project-analysis-report"
@@ -8,6 +12,9 @@ export type ContractFamily =
   | "intake-request-body"
   | "wave-ticket"
   | "handoff-packet"
+  | "execution-plan"
+  | "integration-report"
+  | "task-progress-report"
   | "release-packet"
   | "delivery-plan"
   | "delivery-manifest"
@@ -15,10 +22,12 @@ export type ContractFamily =
   | "step-result"
   | "validation-report"
   | "evaluation-report"
+  | "evaluation-case-input"
+  | "evaluation-case-expected"
   | "review-report"
   | "review-decision"
+  | "quality-repair-request"
   | "runtime-harness-report"
-  | "live-e2e-observation-report"
   | "multirepo-coordination-status"
   | "planner-metrics-snapshot"
   | "finance-monitoring-snapshot"
@@ -27,6 +36,7 @@ export type ContractFamily =
   | "evaluation-suite"
   | "promotion-decision"
   | "compiled-context-artifact"
+  | "operator-request"
   | "provider-route-profile"
   | "wrapper-profile"
   | "prompt-bundle"
@@ -38,13 +48,11 @@ export type ContractFamily =
   | "adapter-capability-profile"
   | "skill-profile"
   | "live-run-event"
+  | "run-job"
   | "learning-loop-scorecard"
   | "learning-loop-handoff"
   | "incident-backfill-proposal"
-  | "control-plane-api"
-  | "live-e2e-provider-variant"
-  | "live-e2e-scenario-policy"
-  | "live-e2e-target-catalog";
+  | "control-plane-api";
 
 export type ContractFieldType = "string" | "number" | "boolean" | "array" | "object";
 
@@ -56,6 +64,9 @@ export type ContractValidationIssueCode =
   | "field_type_mismatch"
   | "unsupported_field_present"
   | "enum_value_invalid"
+  | "identifier_format_invalid"
+  | "path_scope_invalid"
+  | "reference_base_invalid"
   | "yaml_parse_error";
 
 export interface ContractValidationIssue {
@@ -110,12 +121,6 @@ export interface LoadExampleContractsOptions {
   examplesRoot?: string;
 }
 
-export interface ValidateLiveE2eCatalogReferencesOptions {
-  workspaceRoot?: string;
-  examplesRoot?: string;
-  catalogRoot?: string;
-}
-
 export interface LoadedExampleContracts {
   ok: boolean;
   workspaceRoot: string;
@@ -157,12 +162,35 @@ export function validateContractDocument(options: {
   source?: string;
 }): ContractValidationResult;
 
+export const STRUCTURED_TASK_MODEL_VERSION: 1;
+export const PLAN_STATUS_VALUES: readonly string[];
+export const PLAN_SIZE_VALUES: readonly string[];
+export const TASK_TYPE_VALUES: readonly string[];
+export const CRITERION_KIND_VALUES: readonly string[];
+export function validateStructuredTaskPlan(
+  document: Record<string, unknown>,
+  source: string,
+): ContractValidationIssue[];
+
 export function loadContractFile(options: LoadContractFileOptions): LoadedContractFile;
+export function normalizeProjectTopology(document: Record<string, unknown>): Record<string, unknown>;
 
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
 
-export function validateExampleReferences(options?: LoadExampleContractsOptions): ReferenceValidationResult;
-
-export function validateLiveE2eCatalogReferences(
-  options?: ValidateLiveE2eCatalogReferencesOptions,
+export function validateExampleReferences(
+  options?: LoadExampleContractsOptions & { loadedExamples?: LoadedExampleContracts },
 ): ReferenceValidationResult;
+
+export const PUBLIC_ID_PATTERN: RegExp;
+export const PUBLIC_ID_FIELDS: readonly string[];
+export const CANONICAL_REFERENCE_BASES: readonly string[];
+export function validatePublicId(value: unknown): { ok: boolean; value_class: string; migration: string | null };
+export function derivePublicId(components: string[], fallbackPrefix: string): string;
+export function validateAllowedPathPattern(value: unknown): { ok: boolean; value_class: string; migration: string | null };
+export function matchesAllowedPath(pattern: string, candidate: string): boolean;
+export function classifyAllowedPaths(value: unknown): { ok: boolean; state: string; patterns: string[] };
+export function validateReferenceBinding(options: { reference: unknown; base: unknown }): {
+  ok: boolean;
+  value_class: string;
+  migration: string | null;
+};

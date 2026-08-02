@@ -8,7 +8,7 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 - preflight executes machine-readable setup and verification commands from the live E2E profile
 - routed live execution invokes the supported external adapter path from the target checkout root
 - delivery manifests and release packets anchor repo root and changed paths to the target checkout
-- fresh `regress-short` and `release-short` evidence bundles prove the target-backed flow without narrative-only assumptions
+- historical `regress-short` and `release-short` evidence bundles were removed after the skill-agent-only migration; current proof must use supported catalog-backed live profiles
 
 ## Parallel start and sequencing notes
 - `W11-S01` starts immediately because the source-of-truth docs and backlog must reflect the reopened proof gap before more runtime work is queued.
@@ -151,21 +151,21 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 - **Primary user-story surfaces:** operator / SRE, delivery engineer, finance / audit / hygiene
 
 ### Local tasks
-1. Run fresh `regress-short` and `release-short` target-backed rehearsals through the supported external adapter path.
-2. Capture refreshed fixtures, scorecards, manifests, incident or learning-loop artifacts, and supporting transcripts under `examples/live-e2e/fixtures/**`.
-3. Update runbooks and the dependency matrix with observed prerequisites, failure signatures, and safety defaults from the fresh runs.
-4. Link the refreshed proof bundle back to W11 and W10 closure criteria.
+1. Historical task: run target-backed short-profile rehearsals through the then-supported external adapter path.
+2. Historical task: capture fixtures, scorecards, manifests, incident or learning-loop artifacts, and supporting transcripts.
+3. Current repository state: those short-profile bundles were deleted after the skill-agent-only migration.
+4. Link any new closure claim to supported full-journey or guided proof evidence instead of the removed short-profile bundles.
 
 ### Acceptance criteria
-1. Both `regress-short` and `release-short` use a real target checkout rather than the AOR workspace.
-2. The evidence bundle includes raw adapter execution evidence, target-root delivery evidence, and linked learning-loop artifacts.
-3. Runbooks cite the refreshed fixtures as the canonical proof bundle for the short catalog profiles.
-4. The resulting evidence is sufficient to unblock and close `W10-S05` without narrative-only assumptions.
+1. Historical short-profile evidence is not current live E2E acceptance evidence.
+2. New proof evidence must include accepted skill-agent decisions, raw adapter execution evidence, target-root delivery evidence, and linked learning-loop artifacts.
+3. Runbooks cite only supported current proof profiles as canonical live E2E proof.
+4. Current acceptance closure cannot rely on removed short-profile bundles.
 
 ### Done evidence
-- refreshed `regress-short` and `release-short` fixtures with target-backed run summaries and delivery evidence
-- updated runbooks and dependency matrix entries pointing at the refreshed canonical bundle
-- backlog references linking W11 closure evidence to W10 proof closure
+- removed historical `regress-short` and `release-short` fixtures after the skill-agent-only migration
+- updated runbooks and dependency matrix entries pointing at supported current proof evidence
+- backlog references mark W11 closure evidence as historical context rather than current acceptance proof
 
 ### Out of scope
 - long-profile proof refresh in the same slice

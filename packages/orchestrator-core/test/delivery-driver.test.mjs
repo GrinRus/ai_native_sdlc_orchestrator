@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { loadContractFile } from "../../contracts/src/index.mjs";
 import { materializeDeliveryPlan } from "../src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../src/delivery-driver.mjs";
+import { captureDeliveryDiff } from "../src/delivery-integrity.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -70,12 +72,125 @@ function withTempRepo(callback) {
  *   rerunOfRunRef?: string,
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
+ *   runtimeHarnessGate?: Record<string, unknown>,
+ *   additionalPromotionEvidenceRefs?: string[],
  * }} options
  * @returns {{ deliveryPlanFile: string }}
  */
 function createReadyPlan(options) {
+  const handoffPath = path.join(
+    options.init.runtimeLayout.artifactsRoot,
+    `${options.init.projectId}.handoff.bootstrap.v1.json`,
+  );
+  fs.writeFileSync(handoffPath, `${JSON.stringify({
+    packet_id: `${options.init.projectId}.handoff.bootstrap.v1`,
+    project_id: options.init.projectId,
+    ticket_id: "w57-s05",
+    version: 1,
+    status: "approved",
+    risk_tier: "medium",
+    approved_objective: "Verify delivery authorization",
+    repo_scopes: ["main"],
+    allowed_paths: ["**"],
+    allowed_commands: ["git"],
+    verification_plan: {},
+    scope_constraints: {},
+    command_policy: {},
+    writeback_mode: options.mode,
+    approval_state: { status: "approved" },
+  }, null, 2)}\n`, "utf8");
+  const promotionPath = path.join(options.init.runtimeLayout.reportsRoot, "promotion-decision-wrapper-wrapper.runner.default-v3.json");
+  fs.writeFileSync(promotionPath, `${JSON.stringify({
+    decision_id: `${options.init.projectId}.promotion.delivery`,
+    subject_ref: "wrapper://wrapper.runner.default@v3",
+    from_channel: "candidate",
+    to_channel: "stable",
+    evidence_refs: [handoffPath],
+    evidence_summary: { reason: "delivery test approval" },
+    status: "pass",
+  }, null, 2)}\n`, "utf8");
+  let runtimeHarnessGate = options.runtimeHarnessGate;
+  if (options.runtimeHarnessGate?.required === true) {
+    const reportPath = path.join(options.init.runtimeLayout.reportsRoot, `runtime-harness-${options.runId}.json`);
+    fs.writeFileSync(reportPath, `${JSON.stringify({
+      report_id: options.runtimeHarnessGate.reportId ?? `${options.init.projectId}.runtime-harness.delivery`,
+      project_id: options.init.projectId,
+      run_id: options.runId,
+      generated_at: new Date().toISOString(),
+      mission_type: "code-changing",
+      strictness_profile: "strict-code-changing",
+      mission_lineage: {
+        status: "resolved",
+        run_id: options.runId,
+        intake_packet_ref: handoffPath,
+        intake_body_ref: handoffPath,
+        mission_type: "code-changing",
+        strictness_profile: "strict-code-changing",
+      },
+      overall_decision: options.runtimeHarnessGate.overallDecision ?? "pass",
+      run_decision: {
+        overall_decision: options.runtimeHarnessGate.runDecision ?? "pass",
+        terminal_status: "closed",
+        failure_class: null,
+        repair_status: "not-required",
+        summary: "Delivery fixture passed",
+        evidence_refs: [handoffPath],
+      },
+      step_decisions: [{
+        step_id: "implement",
+        runtime_harness_decision: "pass",
+        mission_semantics: { meaningful_changed_paths: options.runtimeHarnessGate.meaningfulChangedPaths ?? ["examples/project.aor.yaml"] },
+      }],
+      run_findings: [],
+      recommendations: [],
+      impacted_asset_refs: [],
+      promotion_recommendations: [],
+      unresolved_gaps: [],
+      evidence_refs: [handoffPath],
+    }, null, 2)}\n`, "utf8");
+    runtimeHarnessGate = { ...options.runtimeHarnessGate, reportRef: reportPath };
+  }
+  let integrationReport = {};
+  if ((options.coordinationRepos?.length ?? 0) > 1) {
+    const integrationPath = path.join(options.init.runtimeLayout.reportsRoot, `integration-report-${options.runId}.json`);
+    const integration = {
+      schema_version: 1,
+      report_id: `integration-report-${options.runId}`,
+      project_id: options.init.projectId,
+      parent_run_id: options.runId,
+      execution_plan_ref: "evidence://execution-plan.json",
+      workspace_set_ref: "evidence://workspace-set.json",
+      status: "passed",
+      revision: 1,
+      source_attempts: [], repository_results: [], aggregate_gates: [], stale_units: [], repair_refs: [], blockers: [],
+      evidence_refs: [integrationPath],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    fs.writeFileSync(integrationPath, `${JSON.stringify(integration, null, 2)}\n`);
+    const integrationBytes = fs.readFileSync(integrationPath);
+    fs.writeFileSync(`${integrationPath}.authority.json`, `${JSON.stringify({
+      schema_version: 1,
+      authority_kind: "aor-integration-materialization",
+      project_id: options.init.projectId,
+      parent_run_id: options.runId,
+      report_file: integrationPath,
+      report_digest: createHash("sha256").update(integrationBytes).digest("hex"),
+      workspace_owner_digest: "fixture",
+      source_output_digests: [],
+      created_at: new Date().toISOString(),
+    }, null, 2)}\n`);
+    integrationReport = {
+      required: true,
+      status: "passed",
+      ref: integrationPath,
+      filePath: integrationPath,
+      parentRunId: options.runId,
+    };
+  }
   const plan = materializeDeliveryPlan({
     runtimeLayout: options.init.runtimeLayout,
+    executionRoot: options.init.projectRoot,
     projectId: options.init.projectId,
     runId: options.runId,
     stepClass: "implement",
@@ -92,15 +207,18 @@ function createReadyPlan(options) {
     },
     handoffApproval: {
       status: "pass",
-      ref: path.join(options.init.runtimeLayout.artifactsRoot, `${options.init.projectId}.handoff.bootstrap.v1.json`),
+      ref: handoffPath,
     },
     promotionEvidenceRefs: [
-      path.join(options.init.runtimeLayout.reportsRoot, "promotion-decision-wrapper-wrapper.runner.default-v3.json"),
+      promotionPath,
+      ...(options.additionalPromotionEvidenceRefs ?? []),
     ],
     coordinationRepos: options.coordinationRepos,
     coordinationEvidenceRefs: options.coordinationEvidenceRefs,
     coordinationLockEvidenceRefs: options.coordinationLockEvidenceRefs,
     crossRepoValidationRefs: options.crossRepoValidationRefs,
+    integrationReport,
+    runtimeHarnessGate,
     rerunOfRunRef: options.rerunOfRunRef,
     rerunFailedStepRef: options.rerunFailedStepRef,
     rerunPacketBoundary: options.rerunPacketBoundary,
@@ -126,11 +244,11 @@ function createMockGhCli(workspace) {
     "}",
     "const endpoint = args.find((entry) => entry.startsWith('/repos/')) || '';",
     "if (endpoint === '/repos/aor-bot/openai') {",
-    "  process.stdout.write(JSON.stringify({ full_name: 'aor-bot/openai', html_url: 'https://github.com/aor-bot/openai' }));",
+    "  process.stdout.write(JSON.stringify({ full_name: 'aor-bot/openai', html_url: 'https://github.com/aor-bot/openai', parent: { full_name: 'openai/openai' } }));",
     "  process.exit(0);",
     "}",
     "if (endpoint === '/repos/openai/openai/forks') {",
-    "  process.stdout.write(JSON.stringify({ full_name: 'aor-bot/openai', html_url: 'https://github.com/aor-bot/openai' }));",
+    "  process.stdout.write(JSON.stringify({ full_name: 'aor-bot/openai', html_url: 'https://github.com/aor-bot/openai', parent: { full_name: 'openai/openai' } }));",
     "  process.exit(0);",
     "}",
     "if (endpoint === '/repos/openai/openai/pulls') {",
@@ -217,6 +335,193 @@ test("runDeliveryDriver emits patch artifact and transcript for patch-only mode"
   });
 });
 
+test("runDeliveryDriver bounds its derived coordination transaction ID for long canonical run IDs", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "run.w66-guided-ui-anthropic-20260721t080742z-fe259a5.delivery-qualification-retry-after-provider-boundary";
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# bounded transaction identity\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({ init, runId, mode: "patch-only" });
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "success");
+    assert.match(result.deliveryManifest.coordination_transaction.transaction_id, /^delivery-transaction-[a-f0-9]{32}$/u);
+    assert.ok(result.deliveryManifest.coordination_transaction.transaction_id.length <= 128);
+    assert.match(result.learningLoopScorecard.scorecard_id, /^learning-loop-scorecard-[a-f0-9]{32}$/u);
+    assert.match(result.learningLoopHandoff.handoff_id, /^learning-loop-handoff-[a-f0-9]{32}$/u);
+    assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver accepts a pass-level run-owned evaluation report as delivery evidence", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "run.delivery.evaluation.v1";
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# evaluation-backed delivery test\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const evaluationPath = path.join(init.runtimeLayout.reportsRoot, `evaluation-report-${runId}.json`);
+    fs.writeFileSync(evaluationPath, `${JSON.stringify({
+      report_id: "aor-core.eval.delivery.v1",
+      subject_ref: `run://${runId}`,
+      subject_type: "run",
+      subject_fingerprint: `sha256:${"1".repeat(64)}`,
+      subject_snapshot: {
+        reference: `run://${runId}`,
+        family: "run",
+        version: "run-v1",
+        digest: `sha256:${"1".repeat(64)}`,
+        source_refs: [`runtime://runs/${runId}.json`],
+      },
+      case_resolution: [{
+        case_id: "case-delivery-authorization",
+        status: "resolved",
+        input_digest: `sha256:${"2".repeat(64)}`,
+        expected_digest: `sha256:${"3".repeat(64)}`,
+      }],
+      suite_ref: "suite.regress.short@v1",
+      dataset_ref: "dataset://delivery-authorization@v1",
+      scorer_metadata: [{
+        scorer_id: "deterministic",
+        scorer_mode: "deterministic",
+        scorer_impl: "harness.scorer.deterministic.v1",
+      }],
+      grader_results: {
+        deterministic: { status: "pass", evaluated_cases: 1, passed_cases: 1, failed_cases: 0, pass_rate: 1 },
+      },
+      summary_metrics: {
+        total_cases: 1,
+        passed_cases: 1,
+        failed_cases: 0,
+        aggregate_pass_rate: 1,
+        threshold_checks: [{ name: "min_pass_rate", expected: 1, actual: 1, passed: true }],
+      },
+      status: "pass",
+      evidence_refs: [evaluationPath],
+    }, null, 2)}\n`, "utf8");
+
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId,
+      mode: "patch-only",
+      additionalPromotionEvidenceRefs: [evaluationPath],
+    });
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "success");
+    assert.ok(result.changedPaths.includes("examples/project.aor.yaml"));
+  });
+});
+
+test("runDeliveryDriver fails when final diff omits Runtime Harness meaningful paths", () => {
+  withTempRepo((repoRoot) => {
+    const sourceFile = path.join(repoRoot, "examples/project.aor.yaml");
+    const testFile = path.join(repoRoot, "examples/project.test.yaml");
+    fs.writeFileSync(testFile, "name: delivery-integrity-test\n", "utf8");
+    runGitChecked({ cwd: repoRoot, args: ["add", "examples/project.test.yaml"] });
+    runGitChecked({ cwd: repoRoot, args: ["commit", "-m", "add delivery integrity fixture"] });
+
+    fs.appendFileSync(sourceFile, "\n# delivery integrity source change\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.patch.integrity-missing.v1",
+      mode: "patch-only",
+      runtimeHarnessGate: {
+        required: true,
+        enforced: true,
+        status: "pass",
+        reportId: "runtime-harness.delivery-integrity.v1",
+        reportRef: "evidence://reports/runtime-harness-delivery-integrity.json",
+        overallDecision: "pass",
+        runDecision: "pass",
+        routedStepDecisionCount: 1,
+        meaningfulChangedPaths: ["examples/project.aor.yaml", "examples/project.test.yaml"],
+      },
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.patch.integrity-missing.v1",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.deliveryManifest.status, "failed");
+    assert.equal(result.releasePacket.status, "blocked");
+    assert.ok(result.changedPaths.includes("examples/project.aor.yaml"));
+    assert.equal(result.changedPaths.includes("examples/project.test.yaml"), false);
+    assert.deepEqual(result.transcript.delivery_integrity.missing_expected_changed_paths, [
+      "examples/project.test.yaml",
+    ]);
+    assert.match(String(result.transcript.error), /Runtime Harness meaningful changed path/i);
+    assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver includes expected untracked meaningful paths in patch-only delivery", () => {
+  withTempRepo((repoRoot) => {
+    const trackedFile = path.join(repoRoot, "examples/project.aor.yaml");
+    const newFile = path.join(repoRoot, "examples/generated-output.txt");
+    fs.appendFileSync(trackedFile, "\n# delivery integrity tracked change\n", "utf8");
+    fs.writeFileSync(newFile, "generated by implementation\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.patch.untracked-expected.v1",
+      mode: "patch-only",
+      runtimeHarnessGate: {
+        required: true,
+        enforced: true,
+        status: "pass",
+        reportId: "runtime-harness.delivery-untracked.v1",
+        reportRef: "evidence://reports/runtime-harness-delivery-untracked.json",
+        overallDecision: "pass",
+        runDecision: "pass",
+        routedStepDecisionCount: 1,
+        meaningfulChangedPaths: ["examples/project.aor.yaml", "examples/generated-output.txt"],
+      },
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.patch.untracked-expected.v1",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "success");
+    assert.ok(result.changedPaths.includes("examples/project.aor.yaml"));
+    assert.ok(result.changedPaths.includes("examples/generated-output.txt"));
+    assert.equal(result.deliveryManifest.status, "submitted");
+
+    const patchBody = fs.readFileSync(result.outputs.patch_file, "utf8");
+    assert.match(patchBody, /examples\/generated-output\.txt/);
+    const status = spawnSync("git", ["status", "--short", "--", "examples/generated-output.txt"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+    assert.equal(status, "?? examples/generated-output.txt");
+    assertDeliveryArtifacts(result);
+  });
+});
+
 test("runDeliveryDriver commits to bounded local branch and captures commit metadata", () => {
   withTempRepo((repoRoot) => {
     const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
@@ -254,6 +559,7 @@ test("runDeliveryDriver commits to bounded local branch and captures commit meta
     assert.equal(transcript.status, "success");
     assert.equal(Array.isArray(transcript.git.commands), true);
     assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
+    assert.equal(transcript.git.commands.some((command) => command === "git add -A"), false);
     assertDeliveryArtifacts(result);
   });
 });
@@ -561,6 +867,10 @@ test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo
     });
 
     assert.equal(result.status, "success");
+    assert.equal(result.deliveryManifest.schema_version, 2);
+    assert.equal(result.deliveryManifest.coordination_transaction.status, "complete");
+    assert.deepEqual(result.deliveryManifest.coordination_transaction.failed_repo_ids, []);
+    assert.ok(result.deliveryManifest.coordination_transaction.integration_report_ref);
     assert.deepEqual(result.deliveryManifest.coordination.repo_ids, ["backend", "mobile", "frontend"]);
     assert.ok(result.releasePacket.evidence_lineage.coordination_refs.includes("evidence://coordination/w18-s04"));
 
@@ -581,6 +891,66 @@ test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo
     assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.cross_repo_validation_refs, [
       "validation://integration/backend-frontend/api-contract",
     ]);
+  });
+});
+
+test("runDeliveryDriver executes independent repositories separately and retains partial effects", () => {
+  withTempRepo((repoRoot) => {
+    const workspaceRoot = path.join(repoRoot, "independent-repos");
+    const apiRoot = path.join(workspaceRoot, "api");
+    const webRoot = path.join(workspaceRoot, "web");
+    for (const target of [apiRoot, webRoot]) {
+      fs.mkdirSync(target, { recursive: true });
+      runGitChecked({ cwd: target, args: ["init"] });
+      runGitChecked({ cwd: target, args: ["config", "user.email", "aor@example.com"] });
+      runGitChecked({ cwd: target, args: ["config", "user.name", "AOR Test"] });
+      fs.writeFileSync(path.join(target, "version.txt"), "v1\n");
+      runGitChecked({ cwd: target, args: ["add", "version.txt"] });
+      runGitChecked({ cwd: target, args: ["commit", "-m", "initial"] });
+      fs.writeFileSync(path.join(target, "version.txt"), "v2\n");
+    }
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.delivery.independent-partial.v1";
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId,
+      mode: "patch-only",
+      coordinationRepos: [
+        { repo_id: "api", role: "backend", default_branch: "main", source_root: "api", source_kind: "git" },
+        { repo_id: "web", role: "frontend", default_branch: "main", source_root: "web", source_kind: "git" },
+      ],
+      coordinationEvidenceRefs: ["evidence://coordination/independent"],
+      coordinationLockEvidenceRefs: ["evidence://coordination/independent-lock"],
+      crossRepoValidationRefs: ["validation://integration/api-web"],
+    });
+    const plan = JSON.parse(fs.readFileSync(deliveryPlanFile, "utf8"));
+    plan.repository_diff_authorizations = {
+      api: captureDeliveryDiff(apiRoot),
+      // Missing web authorization deliberately proves partial-effect lineage.
+    };
+    fs.writeFileSync(deliveryPlanFile, `${JSON.stringify(plan, null, 2)}\n`);
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      executionRoot: workspaceRoot,
+      runId,
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(
+      result.deliveryManifest.coordination_transaction.status,
+      "partial",
+      JSON.stringify({ transcript: result.transcript, deliveries: result.deliveryManifest.repo_deliveries }, null, 2),
+    );
+    assert.deepEqual(result.deliveryManifest.coordination_transaction.completed_repo_ids, ["api"]);
+    assert.deepEqual(result.deliveryManifest.coordination_transaction.failed_repo_ids, ["web"]);
+    const apiDelivery = result.deliveryManifest.repo_deliveries.find((entry) => entry.repo_id === "api");
+    assert.equal(apiDelivery.writeback_result, "patch-materialized");
+    assert.equal(fs.existsSync(result.outputs.repository_outputs.api.patch_file), true);
   });
 });
 
@@ -662,5 +1032,121 @@ test("runDeliveryDriver artifacts reload after runtime restart", () => {
     assert.ok(Array.isArray(releaseReload.document.evidence_lineage.handoff_refs));
     assert.ok(Array.isArray(releaseReload.document.evidence_lineage.promotion_refs));
     assert.ok(Array.isArray(releaseReload.document.evidence_lineage.execution_refs));
+  });
+});
+
+test("runDeliveryDriver blocks an unplanned file before artifact materialization", () => {
+  withTempRepo((repoRoot) => {
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# authorized\n", "utf8");
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.exact-diff.v1",
+      mode: "patch-only",
+    });
+    fs.writeFileSync(path.join(repoRoot, "unplanned.txt"), "must not ship\n", "utf8");
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.exact-diff.v1",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.match(String(result.transcript.error), /does not exactly match/i);
+    assert.equal(typeof result.outputs.patch_file, "undefined");
+  });
+});
+
+test("runDeliveryDriver rejects write-capable legacy plans with a migration error", () => {
+  withTempRepo((repoRoot) => {
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# legacy\n", "utf8");
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.legacy.v1",
+      mode: "patch-only",
+    });
+    const legacy = JSON.parse(fs.readFileSync(deliveryPlanFile, "utf8"));
+    delete legacy.schema_version;
+    delete legacy.permissions;
+    delete legacy.diff_authorization;
+
+    assert.throws(
+      () => runDeliveryDriver({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        runId: "run.delivery.legacy.v1",
+        deliveryPlan: legacy,
+      }),
+      /migrate.*schema_version 2/i,
+    );
+  });
+});
+
+test("materializeDeliveryPlan rejects symlink paths in an authorized diff", () => {
+  withTempRepo((repoRoot) => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "aor-delivery-outside-"));
+    try {
+      fs.writeFileSync(path.join(outside, "secret.txt"), "outside\n", "utf8");
+      fs.symlinkSync(path.join(outside, "secret.txt"), path.join(repoRoot, "examples/link.txt"));
+      const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+      assert.throws(
+        () => createReadyPlan({ init, runId: "run.delivery.symlink.v1", mode: "patch-only" }),
+        /symbolic link/i,
+      );
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+test("runDeliveryDriver rejects authorization evidence changed after planning", () => {
+  withTempRepo((repoRoot) => {
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# locked evidence\n", "utf8");
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.evidence-lock.v1",
+      mode: "patch-only",
+    });
+    const plan = JSON.parse(fs.readFileSync(deliveryPlanFile, "utf8"));
+    const promotionRef = plan.preconditions.promotion_evidence.refs[0];
+    fs.appendFileSync(promotionRef, "\n", "utf8");
+
+    assert.throws(
+      () => runDeliveryDriver({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        runId: "run.delivery.evidence-lock.v1",
+        deliveryPlanPath: deliveryPlanFile,
+      }),
+      /changed after plan authorization/i,
+    );
+  });
+});
+
+test("runDeliveryDriver rejects an origin-equivalent fork remote", () => {
+  withTempRepo((repoRoot) => {
+    runGitChecked({ cwd: repoRoot, args: ["remote", "add", "origin", "git@github.com:openai/openai.git"] });
+    fs.appendFileSync(path.join(repoRoot, "examples/project.aor.yaml"), "\n# fork boundary\n", "utf8");
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.origin-equivalent.v1",
+      mode: "fork-first-pr",
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.origin-equivalent.v1",
+      deliveryPlanPath: deliveryPlanFile,
+      forkRemoteUrl: "https://github.com/openai/openai.git",
+    });
+    assert.equal(result.status, "failed");
+    assert.match(String(result.transcript.error), /distinct repository/i);
   });
 });

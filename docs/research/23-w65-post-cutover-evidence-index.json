@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "wave": "W65",
+  "renderer": "quiet-cockpit",
+  "installed_default": true,
+  "legacy_renderer_reachable": false,
+  "scenario_catalog": {
+    "tests": 15,
+    "status": "pass",
+    "command": "pnpm test:web:browser",
+    "viewports": [320, 390, 768, 1024, 1180, 1181, 1440],
+    "profiles": ["keyboard-only", "reduced-motion", "zoom-200", "partial", "offline", "reload", "reconnect", "duplicate-action"]
+  },
+  "golden_lifecycle": {
+    "manifest": "apps/web/browser/fixtures/golden-lifecycle.json",
+    "selector_required": false,
+    "transitions": 15,
+    "status": "pass",
+    "exactly_once": true,
+    "terminal_handoff_required": false
+  },
+  "comparison": [
+    {"job":"mission-and-primary-action","w34":"historical flow cockpit","quiet":"cockpit","authority":"next-action-report and lifecycle command","verdict":"pass"},
+    {"job":"human-queues","w34":"interaction workbench","quiet":"attention","authority":"attention-projection and source evidence","verdict":"pass"},
+    {"job":"plan-execution-integration","w34":"advanced workbenches","quiet":"journey","authority":"plan, progress, run, integration, and delivery projections","verdict":"pass"},
+    {"job":"packet-report-lineage","w34":"evidence graph/runtime trace","quiet":"evidence","authority":"evidence graph, trace, and artifact summaries","verdict":"pass"},
+    {"job":"completed-flow-follow-up","w34":"closure projection","quiet":"cockpit and evidence","authority":"learning handoff and new intake lineage","verdict":"pass"}
+  ],
+  "safety": {
+    "external_network": false,
+    "credentials": false,
+    "target_source_writes": false,
+    "upstream_writes": false,
+    "secret_canaries_exposed": false
+  },
+  "package": {"command":"pnpm release:smoke","status":"pass","neutral_launcher_clean":true,"writes_bounded_to_runtime":true},
+  "dependency_audit": {"command":"pnpm audit --prod","status":"pass","known_vulnerabilities":0},
+  "readiness": {"command":"pnpm production:ready --json","status":"pass","gate_execution_status":"pass","release_disposition":"cleared","release_clearance":true},
+  "raw_artifacts": ".aor/quality/w63/s07",
+  "findings": {"open_p1":0,"ledger":"docs/research/17-w65-cutover-finding-ledger.json"},
+  "excluded_claims": ["hosted-ui", "collaboration", "windows-certification", "credentialed-provider-breadth", "paid-calls", "real-upstream-writes"]
+}

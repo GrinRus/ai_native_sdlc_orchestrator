@@ -59,6 +59,18 @@ export function isContextBundleRef(value) {
   return /^context-bundle:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
 }
 
+export function isContextDocRef(value) {
+  return /^context-doc:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+export function isContextRuleRef(value) {
+  return /^context-rule:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+export function isContextSkillRef(value) {
+  return /^context-skill:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
 /**
  * @param {string} value
  * @returns {boolean}
@@ -164,12 +176,16 @@ export function extractRouteAdapterRefs(routeProfile) {
  *   suiteRefs: Set<string>,
  *   datasetRefs: Set<string>,
  *   contextBundleRefs: Set<string>,
+ *   contextDocRefs: Set<string>,
+ *   contextRuleRefs: Set<string>,
+ *   contextSkillRefs: Set<string>,
+ *   skillRefs: Set<string>,
  *   promptBundleRefs: Set<string>,
  *   adapterIds: Set<string>,
  *   routeProfilesById: Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
  *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
- *   contextBundlesByRef: Map<string, { source: string, steps: Set<string> }>,
+ *   contextBundlesByRef: Map<string, { source: string, steps: Set<string>, contextDocRefs: string[], contextRuleRefs: string[], contextSkillRefs: string[] }>,
  *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
  *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
@@ -183,6 +199,10 @@ export function buildReferenceRegistry(results, workspaceRoot) {
   const suiteRefs = new Set();
   const datasetRefs = new Set();
   const contextBundleRefs = new Set();
+  const contextDocRefs = new Set();
+  const contextRuleRefs = new Set();
+  const contextSkillRefs = new Set();
+  const skillRefs = new Set();
   const promptBundleRefs = new Set();
   const adapterIds = new Set();
   /** @type {Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
@@ -191,7 +211,7 @@ export function buildReferenceRegistry(results, workspaceRoot) {
   const wrapperProfilesByRef = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const policyProfilesById = new Map();
-  /** @type {Map<string, { source: string, steps: Set<string> }>} */
+  /** @type {Map<string, { source: string, steps: Set<string>, contextDocRefs: string[], contextRuleRefs: string[], contextSkillRefs: string[] }>} */
   const contextBundlesByRef = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const promptBundlesByRef = new Map();
@@ -290,7 +310,42 @@ export function buildReferenceRegistry(results, workspaceRoot) {
           contextBundlesByRef.set(bundleRef, {
             source: result.source,
             steps,
+            contextDocRefs: Array.isArray(document.context_doc_refs) ? document.context_doc_refs.filter((entry) => typeof entry === "string") : [],
+            contextRuleRefs: Array.isArray(document.context_rule_refs) ? document.context_rule_refs.filter((entry) => typeof entry === "string") : [],
+            contextSkillRefs: Array.isArray(document.context_skill_refs) ? document.context_skill_refs.filter((entry) => typeof entry === "string") : [],
           });
+        }
+        break;
+      }
+      case "context-doc": {
+        if (typeof document.context_doc_id === "string" && typeof document.version === "number") {
+          const reference = `context-doc://${document.context_doc_id}@v${document.version}`;
+          contextDocRefs.add(reference);
+          registerKnownReference(knownReferenceFamilies, reference, "context-doc");
+        }
+        break;
+      }
+      case "context-rule": {
+        if (typeof document.context_rule_id === "string" && typeof document.version === "number") {
+          const reference = `context-rule://${document.context_rule_id}@v${document.version}`;
+          contextRuleRefs.add(reference);
+          registerKnownReference(knownReferenceFamilies, reference, "context-rule");
+        }
+        break;
+      }
+      case "context-skill": {
+        if (typeof document.context_skill_id === "string" && typeof document.version === "number") {
+          const reference = `context-skill://${document.context_skill_id}@v${document.version}`;
+          contextSkillRefs.add(reference);
+          registerKnownReference(knownReferenceFamilies, reference, "context-skill");
+        }
+        break;
+      }
+      case "skill-profile": {
+        if (typeof document.skill_id === "string" && typeof document.version === "number") {
+          const reference = `${document.skill_id}@v${document.version}`;
+          skillRefs.add(reference);
+          registerKnownReference(knownReferenceFamilies, reference, "skill-profile");
         }
         break;
       }
@@ -342,6 +397,10 @@ export function buildReferenceRegistry(results, workspaceRoot) {
     suiteRefs,
     datasetRefs,
     contextBundleRefs,
+    contextDocRefs,
+    contextRuleRefs,
+    contextSkillRefs,
+    skillRefs,
     promptBundleRefs,
     adapterIds,
     routeProfilesById,

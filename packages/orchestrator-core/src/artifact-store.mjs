@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 
 const INTAKE_SOURCE_KIND_VALUES = Object.freeze(["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"]);
 const DELIVERY_MODE_VALUES = Object.freeze(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
@@ -10,8 +11,26 @@ const DELIVERY_MODE_VALUES = Object.freeze(["no-write", "patch-only", "local-bra
  * @param {string} value
  * @returns {string}
  */
-function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+function requirePublicId(field, value) {
+  const validation = validatePublicId(value);
+  if (!validation.ok) {
+    throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+  }
+  return value;
+}
+
+function contentAddressedId(prefix, value) {
+  return `${prefix}-${crypto.createHash("sha256").update(value).digest("hex").slice(0, 32)}`;
+}
+
+function buildPacketId(parts) {
+  const candidate = parts.join(".");
+  const validation = validatePublicId(candidate);
+  if (validation.ok) return candidate;
+  if (validation.value_class === "length") {
+    return `packet-${crypto.createHash("sha256").update(candidate).digest("hex").slice(0, 32)}`;
+  }
+  return requirePublicId("packet_id", candidate);
 }
 
 /**
@@ -214,6 +233,7 @@ function dedupeSourceRefs(sourceRefs) {
  *   requestFile: string | null,
  *   sourceKind?: string | null,
  *   sourceRef?: string | null,
+ *   sourceRefs?: Array<{ source_kind: string, ref: string, title?: string }>,
  * }} options
  */
 function buildProductIntake(options) {
@@ -240,12 +260,25 @@ function buildProductIntake(options) {
         : readOptionalStringArray(options.requestDocument, "dod");
   const requestedSourceKind = normalizeSourceKind(options.sourceKind) ?? "local-note";
   const sourceRefs = readOptionalSourceRefs(options.requestDocument);
+  const inlineSourceRefs = Array.isArray(options.sourceRefs) ? options.sourceRefs : [];
+  inlineSourceRefs.forEach((entry, index) => {
+    const sourceKind = normalizeSourceKind(entry?.source_kind);
+    const ref = typeof entry?.ref === "string" ? entry.ref.trim() : "";
+    const title = typeof entry?.title === "string" && entry.title.trim() ? entry.title.trim() : options.requestTitle;
+    if (!sourceKind || !ref) throw new Error(`Guided Mission source '${index}' requires source_kind and ref.`);
+    sourceRefs.push({
+      source_id: contentAddressedId("local-source", JSON.stringify([sourceKind, ref])),
+      source_kind: sourceKind,
+      title,
+      ref,
+    });
+  });
   const sourceRef = typeof options.sourceRef === "string" && options.sourceRef.trim().length > 0
     ? options.sourceRef.trim()
     : options.requestFile;
   if (sourceRef) {
     sourceRefs.unshift({
-      source_id: normalizeId(`${requestedSourceKind}-${path.basename(sourceRef)}`) || "local-source",
+      source_id: contentAddressedId("local-source", JSON.stringify([requestedSourceKind, sourceRef])),
       source_kind: requestedSourceKind,
       title: options.requestTitle,
       ref: sourceRef,
@@ -294,13 +327,20 @@ function buildProductIntake(options) {
  *    reportsRoot: string,
  *    stateRoot: string,
  *  },
+ *  outputRuntimeLayout?: {
+ *    artifactsRoot: string,
+ *  },
  *  command: string,
  * }} options
  */
 export function materializeBootstrapArtifactPacket(options) {
-  const packetId = `${options.projectId}.artifact.bootstrap.v1`;
+  requirePublicId("project_id", options.projectId);
+  const packetId = buildPacketId([options.projectId, "artifact", "bootstrap", "v1"]);
   const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
   const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
+  const outputArtifactsRoot = options.outputRuntimeLayout?.artifactsRoot ?? options.runtimeLayout.artifactsRoot;
+  const outputPacketFile = path.join(outputArtifactsRoot, `${packetId}.json`);
+  const outputPacketBodyFile = path.join(outputArtifactsRoot, `${packetId}.body.json`);
 
   const packetBody = {
     generated_from: {
@@ -317,7 +357,7 @@ export function materializeBootstrapArtifactPacket(options) {
     },
   };
 
-  fs.writeFileSync(packetBodyFile, `${JSON.stringify(packetBody, null, 2)}\n`, "utf8");
+  fs.writeFileSync(outputPacketBodyFile, `${JSON.stringify(packetBody, null, 2)}\n`, "utf8");
 
   const packet = {
     packet_id: packetId,
@@ -346,7 +386,7 @@ export function materializeBootstrapArtifactPacket(options) {
     throw new Error(`Generated artifact packet failed contract validation: ${issueSummary}`);
   }
 
-  fs.writeFileSync(packetFile, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
+  fs.writeFileSync(outputPacketFile, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
 
   return {
     packet,
@@ -380,6 +420,8 @@ export function materializeBootstrapArtifactPacket(options) {
  *  requestFile?: string | null,
  *  sourceKind?: string | null,
  *  sourceRef?: string | null,
+ *  sourceRefs?: Array<{ source_kind: string, ref: string, title?: string }>,
+ *  followUpSourceHandoffRef?: string | null,
  * }} options
  */
 export function materializeIntakeArtifactPacket(options) {
@@ -388,16 +430,18 @@ export function materializeIntakeArtifactPacket(options) {
     : "Catalog-backed feature mission request";
   const requestBrief = typeof options.requestBrief === "string" && options.requestBrief.trim().length > 0
     ? options.requestBrief.trim()
-    : "Prepare one bounded feature mission request for full-journey live E2E.";
+    : "Prepare one bounded feature mission request for full-journey execution.";
   const missionId =
     typeof options.missionId === "string" && options.missionId.trim().length > 0 ? options.missionId.trim() : null;
+  requirePublicId("project_id", options.projectId);
+  if (missionId) requirePublicId("mission_id", missionId);
   const requestConstraints = Array.isArray(options.requestConstraints)
     ? options.requestConstraints.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
     : [];
   const requestFile =
     typeof options.requestFile === "string" && options.requestFile.trim().length > 0 ? options.requestFile.trim() : null;
-  const packetIdSuffix = missionId ? normalizeId(missionId) : normalizeId(requestTitle) || "request";
-  const packetId = `${options.projectId}.artifact.intake.${packetIdSuffix}.v1`;
+  const packetIdSuffix = missionId ?? contentAddressedId("request", requestTitle);
+  const packetId = buildPacketId([options.projectId, "artifact", "intake", packetIdSuffix, "v1"]);
   const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
   const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
 
@@ -417,6 +461,7 @@ export function materializeIntakeArtifactPacket(options) {
     requestFile,
     sourceKind: options.sourceKind ?? null,
     sourceRef: options.sourceRef ?? null,
+    sourceRefs: options.sourceRefs ?? [],
   });
   const allowedPaths = [
     ...normalizeStringArray(options.allowedPaths),
@@ -431,6 +476,25 @@ export function materializeIntakeArtifactPacket(options) {
     normalizeDeliveryMode(requestDocument.delivery_mode) ??
     normalizeDeliveryMode(requestDocument.write_mode) ??
     "no-write";
+  const requestCoverageFollowUp =
+    typeof requestDocument.coverage_follow_up === "object" &&
+    requestDocument.coverage_follow_up !== null &&
+    !Array.isArray(requestDocument.coverage_follow_up)
+      ? /** @type {Record<string, unknown>} */ (requestDocument.coverage_follow_up)
+      : {};
+  const followUpSourceHandoffRef =
+    typeof options.followUpSourceHandoffRef === "string" && options.followUpSourceHandoffRef.trim().length > 0
+      ? options.followUpSourceHandoffRef.trim()
+      : null;
+  const coverageFollowUp = {
+    ...requestCoverageFollowUp,
+    ...(followUpSourceHandoffRef
+      ? {
+          follow_up_source_handoff_ref: followUpSourceHandoffRef,
+          source_handoff_ref: followUpSourceHandoffRef,
+        }
+      : {}),
+  };
 
   const packetBody = {
     generated_from: {
@@ -457,12 +521,7 @@ export function materializeIntakeArtifactPacket(options) {
         !Array.isArray(requestDocument.matrix_cell)
           ? requestDocument.matrix_cell
           : null,
-      coverage_follow_up:
-        typeof requestDocument.coverage_follow_up === "object" &&
-        requestDocument.coverage_follow_up !== null &&
-        !Array.isArray(requestDocument.coverage_follow_up)
-          ? requestDocument.coverage_follow_up
-          : null,
+      coverage_follow_up: Object.keys(coverageFollowUp).length > 0 ? coverageFollowUp : null,
     },
     product_intake: productIntake,
     product_intake_completeness: completeness,

@@ -28,6 +28,11 @@ export function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+export function deriveRuntimeRunId(qualificationRunId, iteration = 1) {
+  const base = normalizeId(qualificationRunId);
+  return iteration === 1 ? base : `${base}.repair-${iteration}`;
+}
+
 /**
  * @param {string} filePath
  * @param {Record<string, unknown>} document
@@ -277,6 +282,34 @@ export function resolveRuntimeAgentPermissionMode(value) {
     return "restricted";
   }
   throw new UsageError("Flag '--runtime-agent-permission-mode' must be either 'full-bypass' or 'restricted'.");
+}
+
+/**
+ * @param {string | null} value
+ * @returns {"fail-closed" | "ask-all" | "orchestrator-mediated"}
+ */
+export function resolveRuntimeAgentInteractionPolicy(value) {
+  const normalized = value ? value.toLowerCase() : "fail-closed";
+  if (normalized === "fail-closed" || normalized === "ask-all" || normalized === "orchestrator-mediated") {
+    return normalized;
+  }
+  throw new UsageError(
+    "Flag '--runtime-agent-interaction-policy' must be one of: fail-closed, ask-all, orchestrator-mediated.",
+  );
+}
+
+/**
+ * @param {string | null} value
+ * @returns {"none" | "conservative" | "auto-edit" | "trusted-run"}
+ */
+export function resolveRuntimeAgentAutoApprovalProfile(value) {
+  const normalized = value ? value.toLowerCase() : "none";
+  if (normalized === "none" || normalized === "conservative" || normalized === "auto-edit" || normalized === "trusted-run") {
+    return normalized;
+  }
+  throw new UsageError(
+    "Flag '--runtime-agent-auto-approval-profile' must be one of: none, conservative, auto-edit, trusted-run.",
+  );
 }
 
 /**

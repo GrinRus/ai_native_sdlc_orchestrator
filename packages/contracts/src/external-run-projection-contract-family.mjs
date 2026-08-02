@@ -1,0 +1,52 @@
+export const EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES = Object.freeze([
+  {
+    family: "external-run-projection",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/external-run-projection.md",
+    exampleGlob: "examples/reports/external-run-projection*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "schema_version",
+      "projection_id",
+      "run_id",
+      "status",
+      "generated_at",
+      "pending_steps",
+      "completed_steps",
+      "missing_operator_decision_steps",
+      "missing_evidence_refs",
+      "blockers",
+      "artifact_display_summaries",
+      "evidence_refs",
+    ],
+    fieldTypes: {
+      schema_version: "number",
+      projection_id: "string",
+      run_id: "string",
+      profile_id: "string",
+      status: "string",
+      report_status: "string",
+      generated_at: "string",
+      current_step: "string",
+      blocked_step_id: "string",
+      pending_steps: "array",
+      completed_steps: "array",
+      missing_operator_decision_steps: "array",
+      missing_evidence_refs: "array",
+      failure_summary: "object",
+      pending_decision: "object",
+      resume_interaction_health: "object",
+      controller_health: "object",
+      blockers: "array",
+      artifact_display_summaries: "array",
+      evidence_refs: "array",
+    },
+    enumChecks: [
+      { field: "status", allowedValues: ["pass", "warn", "blocked", "fail", "failed", "not_pass", "in_progress"] },
+    ],
+  },
+]);
+
+export const EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES = Object.freeze([
+  { regex: /^examples\/reports\/external-run-projection[^/]*\.ya?ml$/, family: "external-run-projection" },
+]);

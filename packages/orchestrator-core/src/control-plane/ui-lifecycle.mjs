@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { initializeProjectRuntime } from "../project-init.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
 
 /**
  * @returns {string}
@@ -19,7 +19,7 @@ function asString(value) {
 }
 
 /**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {ReturnType<typeof createProjectReadContext>} init
  * @returns {string}
  */
 function resolveUiLifecycleStateFile(init) {
@@ -76,15 +76,17 @@ function readState(stateFile) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  * }} options
  */
 export function readUiLifecycleState(options) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const stateFile = resolveUiLifecycleStateFile(init);
   const state = readState(stateFile);
 
   return {
+    initialized: init.initialized,
     projectRoot: init.projectRoot,
     projectProfileRef: init.projectProfileRef,
     runtimeRoot: init.runtimeRoot,
@@ -98,6 +100,7 @@ export function readUiLifecycleState(options) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId?: string,
  *   controlPlane?: string,

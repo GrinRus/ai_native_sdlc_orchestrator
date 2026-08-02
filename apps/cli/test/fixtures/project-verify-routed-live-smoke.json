@@ -3,7 +3,7 @@
   "mode": "execute",
   "no_write_enforced": false,
   "delivery_plan_status": "ready",
-  "delivery_plan_writeback_allowed": true,
+  "delivery_plan_writeback_allowed": false,
   "adapter_id": "codex-cli",
   "adapter_status": "success",
   "adapter_output_mode": "execute"

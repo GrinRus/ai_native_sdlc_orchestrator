@@ -4,22 +4,35 @@ import process from "node:process";
 
 import {
   classifyExternalRunnerFailure,
+  resolveExternalRuntimeEnvironment,
+  resolveExternalRuntimeNativeTimeoutArgs,
   runExternalRuntimeProcessSync,
+  resolveExternalRuntimeExecutionRoot,
   resolveExternalRuntimePermissionPolicy,
-} from "../../../packages/adapter-sdk/src/index.mjs";
-import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
+} from "./external-runtime.mjs";
+import { loadContractFile } from "./contracts/index.mjs";
 
 import {
   asNonEmptyString,
   asPositiveInteger,
   asRecord,
-  asStringMap,
   fileExists,
   normalizeId,
   nowIso,
   stdoutHasStructuredPermissionDenials,
   writeJson,
 } from "./common.mjs";
+
+const FORBIDDEN_PREFLIGHT_PROVIDER_COMMANDS = Object.freeze(["codex", "claude", "opencode", "qwen"]);
+const MAX_READINESS_PROBE_ATTEMPTS = 2;
+const DEFAULT_PREFLIGHT_REQUEST_ARTIFACT_MESSAGE = [
+  "Run only the AOR live-adapter preflight described in the provider work packet at {provider_work_packet_path}.",
+  "Read that JSON once and follow request.objective exactly.",
+  "Do not invoke provider CLIs or nested agents such as codex, claude, opencode, or qwen from inside this preflight; this provider invocation is already the auth/runtime probe.",
+  "If the packet has no request.edit_probe or request.permission_probe, run no shell commands and immediately return a concise final preflight report with status, commands-run: [], changed-files: [], verification, and risks.",
+  "If a probe path is present, only read/write the explicitly named probe files and then return the same concise final report.",
+  "Do not write upstream and do not summarize the packet instead of completing the requested preflight.",
+].join(" ");
 
 /**
  * @param {Record<string, unknown>} profile
@@ -88,6 +101,19 @@ function resolvePreflightRequestTransport(externalRuntime) {
 }
 
 /**
+ * @param {Record<string, unknown>} attemptResult
+ * @param {number} attempt
+ * @returns {boolean}
+ */
+function shouldRetryReadinessProbe(attemptResult, attempt) {
+  if (attempt >= MAX_READINESS_PROBE_ATTEMPTS) {
+    return false;
+  }
+  const failureKind = asNonEmptyString(attemptResult.failure_kind);
+  return ["external-runner-timeout", "external-runner-failed"].includes(failureKind);
+}
+
+/**
  * @param {{
  *   targetCheckoutRoot: string,
  *   adapterProfileRoot?: string,
@@ -98,6 +124,8 @@ function resolvePreflightRequestTransport(externalRuntime) {
  *   runnerAuthMode: string,
  *   runnerAuthSource: string,
  *   runtimeAgentPermissionMode: string,
+ *   runtimeAgentInteractionPolicy?: string,
+ *   runtimeAgentAutoApprovalProfile?: string,
  *   authProbeRequired: boolean,
  *   permissionReadinessRequired?: boolean,
  *   runId: string,
@@ -130,6 +158,8 @@ export function runLiveAdapterPreflight(options) {
     runner_auth_mode: options.runnerAuthMode,
     runner_auth_source: options.runnerAuthSource,
     runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
+    runtime_agent_interaction_policy: options.runtimeAgentInteractionPolicy ?? "fail-closed",
+    runtime_agent_auto_approval_profile: options.runtimeAgentAutoApprovalProfile ?? "none",
     adapter_profile_file: adapterProfileFile,
     auth_probe: {
       enabled: options.authProbeRequired,
@@ -157,6 +187,22 @@ export function runLiveAdapterPreflight(options) {
     writeJson(reportFile, report);
     return {
       status: "fail",
+      summary,
+      report,
+      reportFile,
+    };
+  };
+  const interactionRequired = (failureKind, summary, extra = {}) => {
+    const report = {
+      ...baseReport,
+      ...extra,
+      status: "interaction_required",
+      failure_kind: failureKind,
+      summary,
+    };
+    writeJson(reportFile, report);
+    return {
+      status: "interaction_required",
       summary,
       report,
       reportFile,
@@ -191,11 +237,11 @@ export function runLiveAdapterPreflight(options) {
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const probeTimeoutMs = asPositiveInteger(externalRuntime.preflight_timeout_ms, Math.min(timeoutMs, 120000));
   const requestTransport = resolvePreflightRequestTransport(externalRuntime);
-  const envOverrides = asStringMap(externalRuntime.env);
-  const runnerEnv = {
-    ...options.env,
-    ...envOverrides,
-  };
+  const runtimeEnvironment = resolveExternalRuntimeEnvironment({
+    externalRuntime,
+    baseEnv: options.env,
+  });
+  const runnerEnv = runtimeEnvironment.env;
   const requestedPermissionMode =
     asNonEmptyString(runnerEnv.AOR_RUNTIME_AGENT_PERMISSION_MODE) || options.runtimeAgentPermissionMode;
   const runtimeInvocation = resolveExternalRuntimePermissionPolicy({
@@ -214,6 +260,12 @@ export function runLiveAdapterPreflight(options) {
       request_transport: requestTransport,
       permission_mode: runtimeInvocation.permissionMode,
       permission_mode_source: runtimeInvocation.source,
+      env_from_applied: runtimeEnvironment.applied,
+      env_from_missing: runtimeEnvironment.missing,
+      native_timeout_args: resolveExternalRuntimeNativeTimeoutArgs({
+        externalRuntime,
+        timeoutMs: probeTimeoutMs,
+      }),
     },
   };
 
@@ -238,7 +290,7 @@ export function runLiveAdapterPreflight(options) {
       runtimeReport,
     );
   }
-  if (!["stdin-json", "file-attachment", "argv-json", "none"].includes(requestTransport)) {
+  if (!["request-artifact", "stdin-json", "file-attachment", "argv-json", "none"].includes(requestTransport)) {
     return fail(
       "request-transport-invalid",
       `Adapter '${adapterId}' live runtime request transport '${requestTransport}' is not supported.`,
@@ -260,7 +312,27 @@ export function runLiveAdapterPreflight(options) {
     );
   }
 
-  const resolvedCommand = resolveCommandForPreflight(runtimeCommand, runnerEnv, options.targetCheckoutRoot);
+  let executionRootBinding;
+  try {
+    executionRootBinding = resolveExternalRuntimeExecutionRoot({
+      externalRuntime,
+      executionRoot: options.targetCheckoutRoot,
+    });
+  } catch (error) {
+    return fail(
+      "execution-root-alias-failed",
+      `Adapter '${adapterId}' live runtime could not prepare its execution root: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      runtimeReport,
+    );
+  }
+
+  runtimeReport.external_runtime.execution_root = executionRootBinding.executionRoot;
+  runtimeReport.external_runtime.execution_root_mode = executionRootBinding.mode;
+  runtimeReport.external_runtime.canonical_execution_root = executionRootBinding.canonicalExecutionRoot;
+
+  const resolvedCommand = resolveCommandForPreflight(runtimeCommand, runnerEnv, executionRootBinding.executionRoot);
   if (!resolvedCommand) {
     return fail(
       "missing-command",
@@ -270,16 +342,25 @@ export function runLiveAdapterPreflight(options) {
   }
 
   const permissionProbeRoot = path.join(
-    options.targetCheckoutRoot,
+    executionRootBinding.executionRoot,
     ".aor",
-    "live-e2e-preflight",
+    "preflight",
+    "live-e2e",
     normalizeId(options.runId),
   );
+  const editNonceFile = path.join(permissionProbeRoot, "edit-nonce.txt");
+  const editMarkerFile = path.join(permissionProbeRoot, "edit-marker.txt");
+  const editMarkerContents = `edit-readiness:${options.runId}`;
   const permissionNonceFile = path.join(permissionProbeRoot, "permission-nonce.txt");
   const permissionMarkerFile = path.join(permissionProbeRoot, "permission-marker.txt");
   const permissionMarkerContents = `permission-readiness:${options.runId}`;
 
-  const buildProbeInput = (stepClass, objective, extraRequest = {}) => `${JSON.stringify({
+  const buildProbeInput = (stepClass, objective, extraRequest = {}) => {
+    const requestExtras = asRecord(extraRequest);
+    const hasProbe =
+      Object.keys(asRecord(requestExtras.edit_probe)).length > 0 ||
+      Object.keys(asRecord(requestExtras.permission_probe)).length > 0;
+    return `${JSON.stringify({
     request: {
       request_id: `live-adapter-preflight.${stepClass}`,
       run_id: options.runId,
@@ -287,6 +368,12 @@ export function runLiveAdapterPreflight(options) {
       step_class: stepClass,
       objective,
       non_interactive: true,
+      preflight_contract: {
+        auth_probe_is_this_invocation: true,
+        shell_commands_allowed: hasProbe ? "explicit-probe-files-only" : "none",
+        forbidden_provider_commands: [...FORBIDDEN_PREFLIGHT_PROVIDER_COMMANDS],
+        final_report_required: true,
+      },
       ...extraRequest,
     },
     adapter: {
@@ -295,19 +382,41 @@ export function runLiveAdapterPreflight(options) {
       permission_mode: runtimeInvocation.permissionMode,
     },
   })}\n`;
+  };
   const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
     const probeInput = buildProbeInput(kind, objective, extraRequest);
-    let probeArgs = [...runtimeInvocation.args];
+    let probeArgs = [
+      ...runtimeInvocation.args,
+      ...resolveExternalRuntimeNativeTimeoutArgs({
+        externalRuntime,
+        timeoutMs: probeTimeoutMs,
+      }),
+    ];
     let probeStdin = undefined;
     if (requestTransport === "stdin-json") {
       probeStdin = probeInput;
     } else if (requestTransport === "argv-json") {
       probeArgs = [...probeArgs, probeInput.trim()];
+    } else if (requestTransport === "request-artifact") {
+      const requestFileProfile = asRecord(externalRuntime.request_file);
+      const requestFileArgument = asNonEmptyString(requestFileProfile.argument);
+      fs.mkdirSync(permissionProbeRoot, { recursive: true });
+      const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-work-packet.json`);
+      fs.writeFileSync(requestFile, probeInput, "utf8");
+      const requestMessageTemplate =
+        asNonEmptyString(requestFileProfile.preflight_message) || DEFAULT_PREFLIGHT_REQUEST_ARTIFACT_MESSAGE;
+      const requestMessage = requestMessageTemplate
+        .replace(/\{provider_work_packet_path\}/gu, requestFile)
+        .replace(/\{provider_work_packet_ref\}/gu, requestFile)
+        .replace(/\{request_artifact_ref\}/gu, requestFile);
+      probeArgs = requestFileArgument
+        ? [...probeArgs, requestMessage, requestFileArgument, requestFile]
+        : [...probeArgs, requestMessage];
     } else if (requestTransport === "file-attachment") {
       const requestFileProfile = asRecord(externalRuntime.request_file);
       const requestMessage =
-        asNonEmptyString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
-      const requestFileArgument = asNonEmptyString(requestFileProfile.argument) ?? "--file";
+        asNonEmptyString(requestFileProfile.message) || "Follow the attached AOR adapter request JSON.";
+      const requestFileArgument = asNonEmptyString(requestFileProfile.argument) || "--file";
       fs.mkdirSync(permissionProbeRoot, { recursive: true });
       const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-request.json`);
       fs.writeFileSync(requestFile, probeInput, "utf8");
@@ -316,7 +425,7 @@ export function runLiveAdapterPreflight(options) {
     const probe = runExternalRuntimeProcessSync({
       command: resolvedCommand,
       args: probeArgs,
-      cwd: options.targetCheckoutRoot,
+      cwd: executionRootBinding.executionRoot,
       env: runnerEnv,
       input: probeStdin,
       timeout: probeTimeoutMs,
@@ -430,127 +539,222 @@ export function runLiveAdapterPreflight(options) {
     };
   }
 
-  const editReadiness = editAndPermissionReadinessRequired
-    ? runProbeAttempt(
+  let editReadiness = null;
+  const editReadinessAttempts = [];
+  if (editAndPermissionReadinessRequired) {
+    fs.mkdirSync(permissionProbeRoot, { recursive: true });
+    fs.writeFileSync(editNonceFile, `${editMarkerContents}\n`, "utf8");
+    fs.rmSync(editMarkerFile, { force: true });
+    for (let attempt = 1; attempt <= MAX_READINESS_PROBE_ATTEMPTS; attempt += 1) {
+      editReadiness = runProbeAttempt(
         "preflight-edit-readiness",
-        1,
-        "Confirm that the external runner is allowed to perform bounded non-interactive edits in this isolated target checkout. Do not ask questions.",
-      )
-    : null;
+        attempt,
+        [
+          "Confirm that the external runner can perform one bounded non-interactive edit in this isolated target checkout.",
+          `Read ${editNonceFile}.`,
+          `Write exactly '${editMarkerContents}' to ${editMarkerFile}.`,
+          "Do not ask questions.",
+        ].join(" "),
+        {
+          edit_probe: {
+            nonce_file: editNonceFile,
+            marker_file: editMarkerFile,
+            expected_marker_contents: editMarkerContents,
+          },
+        },
+      );
+      const markerContents = fileExists(editMarkerFile) ? fs.readFileSync(editMarkerFile, "utf8").trim() : "";
+      const markerStatus =
+        markerContents === editMarkerContents
+          ? "present"
+          : markerContents
+            ? "unexpected-contents"
+            : "missing";
+      if (
+        editReadiness.status === "fail" &&
+        editReadiness.failure_kind === "external-runner-timeout" &&
+        markerContents === editMarkerContents
+      ) {
+        editReadiness = {
+          ...editReadiness,
+          status: "pass",
+          failure_kind: null,
+          warning_kind: "post-marker-timeout",
+          warnings: [
+            {
+              code: "post-marker-timeout",
+              summary:
+                "Edit readiness marker matched before the external runner timed out; edit access readiness passed, but runner completion was slow.",
+            },
+          ],
+          marker_file: editMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else if (editReadiness.status === "pass" && markerContents !== editMarkerContents) {
+        editReadiness = {
+          ...editReadiness,
+          status: "fail",
+          failure_kind: "edit-denied",
+          marker_file: editMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else {
+        editReadiness = {
+          ...editReadiness,
+          marker_file: editMarkerFile,
+          marker_status: markerStatus,
+        };
+      }
+      editReadinessAttempts.push(editReadiness);
+      if (editReadiness.status === "pass" || !shouldRetryReadinessProbe(editReadiness, attempt)) {
+        break;
+      }
+    }
+  }
   if (editReadiness && editReadiness.status !== "pass") {
     const failureKind = asNonEmptyString(editReadiness.failure_kind) || "permission-mode-blocked";
+    const reportPayload = {
+      ...runtimeReport,
+      resolved_command: resolvedCommand,
+      auth_probe: authProbeReport,
+      edit_readiness: {
+        enabled: true,
+        status: "fail",
+        failure_kind: failureKind,
+        attempts: editReadinessAttempts,
+        nonce_file: editNonceFile,
+        marker_file: editMarkerFile,
+      },
+    };
+    if (
+      (options.runtimeAgentInteractionPolicy ?? "fail-closed") !== "fail-closed" &&
+      (failureKind === "permission-mode-blocked" || failureKind === "edit-denied")
+    ) {
+      return interactionRequired(
+        failureKind,
+        `Live adapter preflight edit-readiness requires runtime permission interaction for adapter '${adapterId}'.`,
+        reportPayload,
+      );
+    }
     return fail(
       failureKind,
       `Live adapter preflight failed edit-readiness for adapter '${adapterId}' before run start.`,
-      {
-        ...runtimeReport,
-        resolved_command: resolvedCommand,
-        auth_probe: authProbeReport,
-        edit_readiness: {
-          enabled: true,
-          status: "fail",
-          failure_kind: failureKind,
-          attempts: [editReadiness],
-        },
-      },
+      reportPayload,
     );
   }
 
   let permissionReadiness = null;
+  const permissionReadinessAttempts = [];
   if (editAndPermissionReadinessRequired) {
     fs.mkdirSync(permissionProbeRoot, { recursive: true });
     fs.writeFileSync(permissionNonceFile, `${permissionMarkerContents}\n`, "utf8");
     fs.rmSync(permissionMarkerFile, { force: true });
-    permissionReadiness = runProbeAttempt(
-      "preflight-permission-readiness",
-      1,
-      [
-        "Confirm that the external runner can read a nonce file and write a marker file in the isolated runtime root.",
-        `Read ${permissionNonceFile}.`,
-        `Write exactly '${permissionMarkerContents}' to ${permissionMarkerFile}.`,
-        "Do not ask questions.",
-      ].join(" "),
-      {
-        permission_probe: {
-          nonce_file: permissionNonceFile,
-          marker_file: permissionMarkerFile,
-          expected_marker_contents: permissionMarkerContents,
-        },
-      },
-    );
-    const markerContents = fileExists(permissionMarkerFile)
-      ? fs.readFileSync(permissionMarkerFile, "utf8").trim()
-      : "";
-    const markerStatus =
-      markerContents === permissionMarkerContents
-        ? "present"
-        : markerContents
-          ? "unexpected-contents"
-          : "missing";
-    if (
-      permissionReadiness.status === "fail" &&
-      permissionReadiness.failure_kind === "external-runner-timeout" &&
-      markerContents === permissionMarkerContents
-    ) {
-      permissionReadiness = {
-        ...permissionReadiness,
-        status: "pass",
-        failure_kind: null,
-        warning_kind: "post-marker-timeout",
-        warnings: [
-          {
-            code: "post-marker-timeout",
-            summary:
-              "Permission readiness marker matched before the external runner timed out; access readiness passed, but runner completion was slow.",
+    for (let attempt = 1; attempt <= MAX_READINESS_PROBE_ATTEMPTS; attempt += 1) {
+      permissionReadiness = runProbeAttempt(
+        "preflight-permission-readiness",
+        attempt,
+        [
+          "Confirm that the external runner can read a nonce file and write a marker file in the isolated runtime root.",
+          `Read ${permissionNonceFile}.`,
+          `Write exactly '${permissionMarkerContents}' to ${permissionMarkerFile}.`,
+          "Do not ask questions.",
+        ].join(" "),
+        {
+          permission_probe: {
+            nonce_file: permissionNonceFile,
+            marker_file: permissionMarkerFile,
+            expected_marker_contents: permissionMarkerContents,
           },
-        ],
-        marker_file: permissionMarkerFile,
-        marker_status: markerStatus,
-      };
-    } else if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
-      permissionReadiness = {
-        ...permissionReadiness,
-        status: "fail",
-        failure_kind: "permission-mode-blocked",
-        marker_file: permissionMarkerFile,
-        marker_status: markerStatus,
-      };
-    } else {
-      permissionReadiness = {
-        ...permissionReadiness,
-        marker_file: permissionMarkerFile,
-        marker_status: markerStatus,
-      };
+        },
+      );
+      const markerContents = fileExists(permissionMarkerFile)
+        ? fs.readFileSync(permissionMarkerFile, "utf8").trim()
+        : "";
+      const markerStatus =
+        markerContents === permissionMarkerContents
+          ? "present"
+          : markerContents
+            ? "unexpected-contents"
+            : "missing";
+      if (
+        permissionReadiness.status === "fail" &&
+        permissionReadiness.failure_kind === "external-runner-timeout" &&
+        markerContents === permissionMarkerContents
+      ) {
+        permissionReadiness = {
+          ...permissionReadiness,
+          status: "pass",
+          failure_kind: null,
+          warning_kind: "post-marker-timeout",
+          warnings: [
+            {
+              code: "post-marker-timeout",
+              summary:
+                "Permission readiness marker matched before the external runner timed out; access readiness passed, but runner completion was slow.",
+            },
+          ],
+          marker_file: permissionMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
+        permissionReadiness = {
+          ...permissionReadiness,
+          status: "fail",
+          failure_kind: "permission-mode-blocked",
+          marker_file: permissionMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else {
+        permissionReadiness = {
+          ...permissionReadiness,
+          marker_file: permissionMarkerFile,
+          marker_status: markerStatus,
+        };
+      }
+      permissionReadinessAttempts.push(permissionReadiness);
+      if (permissionReadiness.status === "pass" || !shouldRetryReadinessProbe(permissionReadiness, attempt)) {
+        break;
+      }
     }
   }
   if (permissionReadiness && permissionReadiness.status !== "pass") {
     const failureKind = asNonEmptyString(permissionReadiness.failure_kind) || "permission-mode-blocked";
+    const reportPayload = {
+      ...runtimeReport,
+      resolved_command: resolvedCommand,
+      auth_probe: authProbeReport,
+      edit_readiness: editReadiness
+        ? {
+            enabled: true,
+            status: "pass",
+            attempts: editReadinessAttempts,
+            nonce_file: editNonceFile,
+            marker_file: editMarkerFile,
+          }
+        : {
+            enabled: false,
+            status: "not_required",
+          },
+      permission_readiness: {
+        enabled: true,
+        status: "fail",
+        failure_kind: failureKind,
+        attempts: permissionReadinessAttempts,
+        nonce_file: permissionNonceFile,
+        marker_file: permissionMarkerFile,
+      },
+    };
+    if ((options.runtimeAgentInteractionPolicy ?? "fail-closed") !== "fail-closed" && failureKind === "permission-mode-blocked") {
+      return interactionRequired(
+        failureKind,
+        `Live adapter preflight permission-readiness requires runtime permission interaction for adapter '${adapterId}'.`,
+        reportPayload,
+      );
+    }
     return fail(
       failureKind,
       `Live adapter preflight failed permission-readiness for adapter '${adapterId}' before run start.`,
-      {
-        ...runtimeReport,
-        resolved_command: resolvedCommand,
-        auth_probe: authProbeReport,
-        edit_readiness: editReadiness
-          ? {
-              enabled: true,
-              status: "pass",
-              attempts: [editReadiness],
-            }
-          : {
-              enabled: false,
-              status: "not_required",
-            },
-        permission_readiness: {
-          enabled: true,
-          status: "fail",
-          failure_kind: failureKind,
-          attempts: [permissionReadiness],
-          nonce_file: permissionNonceFile,
-          marker_file: permissionMarkerFile,
-        },
-      },
+      reportPayload,
     );
   }
 
@@ -563,7 +767,9 @@ export function runLiveAdapterPreflight(options) {
       ? {
           enabled: true,
           status: "pass",
-          attempts: [editReadiness],
+          attempts: editReadinessAttempts,
+          nonce_file: editNonceFile,
+          marker_file: editMarkerFile,
         }
       : {
           enabled: false,
@@ -573,7 +779,7 @@ export function runLiveAdapterPreflight(options) {
       ? {
           enabled: true,
           status: "pass",
-          attempts: [permissionReadiness],
+          attempts: permissionReadinessAttempts,
           nonce_file: permissionNonceFile,
           marker_file: permissionMarkerFile,
         }

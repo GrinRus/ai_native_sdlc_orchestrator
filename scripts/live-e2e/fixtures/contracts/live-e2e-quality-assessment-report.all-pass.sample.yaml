@@ -1,0 +1,170 @@
+assessment_id: live-e2e.sample.quality-assessment.all-pass.v1
+run_id: live-e2e.sample.all-pass.run
+profile_id: live-e2e.full-journey.regress.ky
+generated_at: "2026-06-15T00:10:00.000Z"
+evaluator:
+  kind: swe-agent
+  ref: skill://live-e2e-runner
+  mode: post-run-freeform
+source_run_summary_file: runtime://reports/live-e2e-run-summary-live-e2e.sample.all-pass.run.json
+source_observation_report_file: runtime://reports/live-e2e-observation-report-live-e2e.sample.all-pass.run.json
+source_run_health_report_file: runtime://reports/live-e2e-run-health-report-live-e2e.sample.all-pass.run.json
+assessment_request_file: runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.all-pass.run.json
+overall_status: pass
+dimensions:
+  artifact_content_quality:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs: &core_evidence
+      - runtime://reports/discovery-research-report-live-e2e.sample.all-pass.run.yaml
+      - runtime://reports/spec-step-result-live-e2e.sample.all-pass.run.json
+      - runtime://reports/handoff-packet-live-e2e.sample.all-pass.run.yaml
+      - runtime://reports/review-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  implementation_correctness:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs: *core_evidence
+    findings: []
+    recommended_followups: []
+  implementation_completeness:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs: *core_evidence
+    findings: []
+    recommended_followups: []
+  code_maintainability:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/review-report-live-e2e.sample.all-pass.run.json
+      - runtime://reports/provider-final-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  test_adequacy:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.all-pass.run.json
+      - runtime://reports/runtime-harness-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  security_review:
+    status: pass
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/review-report-live-e2e.sample.all-pass.run.json
+      - runtime://reports/provider-final-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  performance_regression_risk:
+    status: pass
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.all-pass.run.json
+      - runtime://reports/review-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  verification_quality:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.all-pass.run.json
+      - runtime://reports/evaluation-report-live-e2e.sample.all-pass.run.json
+      - runtime://reports/runtime-harness-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  delivery_safety:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/delivery-plan-live-e2e.sample.all-pass.run.yaml
+      - runtime://reports/delivery-manifest-live-e2e.sample.all-pass.run.json
+      - runtime://reports/no-upstream-write-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  aor_operator_ui_ux_quality:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs: &aor_ui_evidence
+      - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.all-pass.run.json
+      - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.all-pass.run.json
+      - runtime://reports/installed-user-guided-web-visual-guardrail-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+    subdimensions:
+      task_success: &aor_ui_pass
+        status: pass
+        evidence_strength: strong
+        evidence_refs: *aor_ui_evidence
+        findings: []
+      flow_navigation_clarity: *aor_ui_pass
+      next_action_clarity: *aor_ui_pass
+      blocker_and_error_understandability: *aor_ui_pass
+      recovery_affordance: *aor_ui_pass
+      state_feedback_loading_empty_error: *aor_ui_pass
+      visual_stability_responsiveness: *aor_ui_pass
+      raw_json_independence: *aor_ui_pass
+  aor_operator_accessibility_quality:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs: &aor_accessibility_evidence
+      - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.all-pass.run.json
+      - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.all-pass.run.json
+      - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+    subdimensions:
+      keyboard_navigation: &aor_accessibility_pass
+        status: pass
+        evidence_strength: strong
+        evidence_refs: *aor_accessibility_evidence
+        findings: []
+      focus_order: *aor_accessibility_pass
+      contrast_and_readability: *aor_accessibility_pass
+      semantic_structure: *aor_accessibility_pass
+      screen_reader_labels: *aor_accessibility_pass
+      accessible_error_feedback: *aor_accessibility_pass
+  evidence_strength:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-run-summary-live-e2e.sample.all-pass.run.json
+      - runtime://reports/live-e2e-observation-report-live-e2e.sample.all-pass.run.json
+      - runtime://reports/live-e2e-run-health-report-live-e2e.sample.all-pass.run.json
+      - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+  acceptance_criteria_traceability:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/feature-request-live-e2e.sample.all-pass.run.json
+      - runtime://reports/intake-artifact-packet-live-e2e.sample.all-pass.run.json
+      - runtime://reports/execution-readiness-live-e2e.sample.all-pass.run.json
+      - runtime://reports/review-report-live-e2e.sample.all-pass.run.json
+    findings: []
+    recommended_followups: []
+gap_report:
+  not_evaluated_dimensions: []
+  weak_signal_dimensions: []
+  strong_evidence_dimensions:
+    - artifact_content_quality
+    - implementation_correctness
+    - implementation_completeness
+    - code_maintainability
+    - test_adequacy
+    - verification_quality
+    - delivery_safety
+    - aor_operator_ui_ux_quality
+    - aor_operator_accessibility_quality
+    - evidence_strength
+    - acceptance_criteria_traceability
+findings: []
+recommended_followups: []
+evidence_refs:
+  - runtime://reports/live-e2e-run-summary-live-e2e.sample.all-pass.run.json
+  - runtime://reports/live-e2e-observation-report-live-e2e.sample.all-pass.run.json
+  - runtime://reports/live-e2e-run-health-report-live-e2e.sample.all-pass.run.json
+  - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.all-pass.run.json

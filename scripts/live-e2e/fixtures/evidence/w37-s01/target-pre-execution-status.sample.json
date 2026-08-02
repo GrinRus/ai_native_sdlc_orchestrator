@@ -1,0 +1,71 @@
+{
+  "fixture_id": "w37-s01.target-pre-execution-status.sample",
+  "slice_id": "W37-S01",
+  "status": "blocked",
+  "provider_independent": true,
+  "failure_owner": "target_repository",
+  "failure_phase": "target_setup",
+  "failure_class": "target_setup_blocked",
+  "blocker_reason": "Verification command 'npm install --prefer-offline --no-audit --no-fund' timed out after 120000ms.",
+  "target_setup_status": {
+    "status": "blocked",
+    "command_label": "npm install --prefer-offline --no-audit --no-fund",
+    "elapsed_ms": 121000,
+    "timeout_budget_ms": 120000,
+    "blocker_reason": "Verification command 'npm install --prefer-offline --no-audit --no-fund' timed out after 120000ms.",
+    "evidence_ref": "runtime://reports/step-result-baseline-diagnostic-1.json",
+    "evidence_refs": [
+      "runtime://reports/step-result-baseline-diagnostic-1.json",
+      "runtime://reports/verify-command-baseline-diagnostic-1.log"
+    ],
+    "failure_owner": "target_repository",
+    "failure_phase": "target_setup",
+    "failure_class": "target_setup_blocked",
+    "provider_independent": true,
+    "timed_out": true,
+    "missing_prerequisites": []
+  },
+  "target_verification_status": {
+    "status": "not_attempted",
+    "command_label": "npx ava test/headers.ts",
+    "elapsed_ms": 121000,
+    "timeout_budget_ms": 120000,
+    "blocker_reason": "Target verification was not judged because target setup blocked first.",
+    "evidence_ref": "runtime://reports/step-result-baseline-diagnostic-1.json",
+    "evidence_refs": [
+      "runtime://reports/step-result-baseline-diagnostic-1.json",
+      "runtime://reports/verify-command-baseline-diagnostic-1.log"
+    ],
+    "failure_owner": "target_repository",
+    "failure_phase": "target_verification",
+    "failure_class": "target_setup_blocked",
+    "provider_independent": true,
+    "timed_out": false,
+    "missing_prerequisites": []
+  },
+  "baseline_verify_gate_decision": {
+    "phase": "baseline_diagnostic",
+    "mode": "diagnostic",
+    "status": "fail",
+    "decision": "block",
+    "summary": "readiness-command-failed:npm install --prefer-offline --no-audit --no-fund",
+    "blocking_reasons": [
+      "readiness-command-failed:npm install --prefer-offline --no-audit --no-fund"
+    ],
+    "failure_owner": "target_repository",
+    "failure_phase": "target_setup",
+    "failure_class": "target_setup_blocked"
+  },
+  "verify_summary_file": "runtime://reports/verify-summary-baseline-diagnostic.json",
+  "step_result_files": [
+    "runtime://reports/step-result-baseline-diagnostic-1.json"
+  ],
+  "command_timeout_ms": 120000,
+  "aor_command_timeout_ms": 300000,
+  "elapsed_ms": 121000,
+  "generated_at": "2026-06-03T00:00:00.000Z",
+  "notes": [
+    "This fixture separates target repository setup failure from AOR runner/controller failure.",
+    "It is fail-closed blocker evidence and does not claim provider quality or product success."
+  ]
+}

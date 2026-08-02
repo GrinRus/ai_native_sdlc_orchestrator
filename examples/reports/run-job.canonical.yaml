@@ -1,0 +1,19 @@
+schema_version: 1
+job_id: run.canonical.job
+run_id: run.canonical
+project_id: aor-core
+status: running
+revision: 2
+accepted_at: "2026-07-15T00:00:00.000Z"
+started_at: "2026-07-15T00:00:00.100Z"
+heartbeat_at: "2026-07-15T00:00:01.000Z"
+status_ref: evidence://.aor/projects/aor-core/state/run-jobs/run-job-run.canonical.job.json
+event_ref: evidence://.aor/projects/aor-core/reports/live-run-events-run.canonical.jsonl
+worker:
+  identity: node-worker-42001
+  pid: 42001
+  claim_token: 5bd1d9a4-4cb8-4abe-9bb0-20378a311a20
+  fencing_token: 3
+  lease_expires_at: "2026-07-15T00:00:11.000Z"
+terminal_at: null
+terminal_evidence_refs: []

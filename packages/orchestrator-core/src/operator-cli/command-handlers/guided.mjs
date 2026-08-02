@@ -28,6 +28,9 @@ export const GUIDED_COMMAND_GROUP = Object.freeze({
   commands: GUIDED_COMMANDS,
 });
 
+const LOCAL_CONTROL_PLANE_HOST = "127.0.0.1";
+const LOCAL_CONTROL_PLANE_PORT = 8080;
+
 /**
  * @param {string} value
  * @returns {string}
@@ -39,10 +42,53 @@ function shellQuote(value) {
 /**
  * @param {string} command
  * @param {string} projectRoot
+ * @param {{ runtimeRoot?: string, includeRuntimeRoot?: boolean }} [context]
  * @returns {string}
  */
-function projectCommand(command, projectRoot) {
-  return `aor ${command} --project-ref ${shellQuote(projectRoot)}`;
+function projectCommand(command, projectRoot, context = {}) {
+  const baseCommand = `aor ${command} --project-ref ${shellQuote(projectRoot)}`;
+  return context.includeRuntimeRoot && context.runtimeRoot
+    ? `${baseCommand} --runtime-root ${shellQuote(context.runtimeRoot)}`
+    : baseCommand;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} runtimeRoot
+ * @returns {string}
+ */
+function controlPlaneSmokeCommand(projectRoot, runtimeRoot) {
+  return [
+    "node apps/api/scripts/control-plane-smoke.mjs",
+    "--project-ref",
+    shellQuote(projectRoot),
+    "--runtime-root",
+    shellQuote(runtimeRoot),
+    "--host",
+    LOCAL_CONTROL_PLANE_HOST,
+    "--port",
+    String(LOCAL_CONTROL_PLANE_PORT),
+  ].join(" ");
+}
+
+/**
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+function defaultRuntimeRoot(projectRoot) {
+  return path.resolve(projectRoot, ".aor");
+}
+
+/**
+ * @param {{ projectRoot: string, runtimeRoot: string, runtimeRootExplicit?: boolean }} options
+ * @returns {{ runtimeRoot: string, includeRuntimeRoot: boolean }}
+ */
+function runtimeRootCommandContext(options) {
+  return {
+    runtimeRoot: options.runtimeRoot,
+    includeRuntimeRoot:
+      options.runtimeRootExplicit === true || path.resolve(options.runtimeRoot) !== defaultRuntimeRoot(options.projectRoot),
+  };
 }
 
 /**
@@ -75,9 +121,10 @@ function resolveKpiFlags(value) {
 /**
  * @param {string} projectRoot
  * @param {string} runtimeRoot
+ * @param {{ runtimeRoot?: string, includeRuntimeRoot?: boolean }} commandContext
  * @returns {{ status: "ready" | "blocked", checks: Array<Record<string, unknown>>, blockers: Array<Record<string, string>> }}
  */
-function inspectReadiness(projectRoot, runtimeRoot) {
+function inspectReadiness(projectRoot, runtimeRoot, commandContext) {
   const checks = [];
   const blockers = [];
 
@@ -139,7 +186,7 @@ function inspectReadiness(projectRoot, runtimeRoot) {
     status: fs.existsSync(runtimeRoot) ? "pass" : "warn",
     detail: fs.existsSync(runtimeRoot)
       ? `Runtime root exists at ${runtimeRoot}.`
-      : `Runtime root is not initialized yet. Run ${projectCommand("onboard", projectRoot)}.`,
+      : `Runtime root is not initialized yet. Run ${projectCommand("onboard", projectRoot, commandContext)}.`,
   });
 
   return {
@@ -151,14 +198,16 @@ function inspectReadiness(projectRoot, runtimeRoot) {
 
 /**
  * @param {{ flags: Record<string, string | string[] | true>, cwd: string }} options
- * @returns {{ projectRoot: string, runtimeRoot: string }}
+ * @returns {{ projectRoot: string, runtimeRoot: string, runtimeRootExplicit: boolean }}
  */
 function resolveGuidedProject(options) {
   const projectRef = resolveOptionalStringFlag("project-ref", options.flags["project-ref"]) ?? ".";
   const projectRoot = path.resolve(options.cwd, projectRef);
+  const runtimeRootExplicit = options.flags["runtime-root"] !== undefined;
   return {
     projectRoot,
     runtimeRoot: resolveRuntimeRoot(options.flags["runtime-root"], projectRoot),
+    runtimeRootExplicit,
   };
 }
 
@@ -170,8 +219,9 @@ export function handleGuidedCommand(context) {
   const { command, flags, cwd, outputState } = context;
 
   if (command === "doctor") {
-    const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
-    const readiness = inspectReadiness(projectRoot, runtimeRoot);
+    const { projectRoot, runtimeRoot, runtimeRootExplicit } = resolveGuidedProject({ flags, cwd });
+    const commandContext = runtimeRootCommandContext({ projectRoot, runtimeRoot, runtimeRootExplicit });
+    const readiness = inspectReadiness(projectRoot, runtimeRoot, commandContext);
 
     outputState.resolvedProjectRef = projectRoot;
     outputState.resolvedRuntimeRoot = runtimeRoot;
@@ -189,7 +239,7 @@ export function handleGuidedCommand(context) {
     outputState.guidedActionableBlockers = readiness.blockers;
     outputState.guidedRecommendedCommands =
       readiness.status === "ready"
-        ? [projectCommand("onboard", projectRoot), projectCommand("next", projectRoot)]
+        ? [projectCommand("onboard", projectRoot, commandContext), projectCommand("next", projectRoot, commandContext)]
         : readiness.blockers.map((blocker) => blocker.next_command);
     outputState.readOnly = true;
     outputState.futureControlHooks = ["onboard", "next", "app"];
@@ -241,10 +291,15 @@ export function handleGuidedCommand(context) {
       "Onboarding ran through the existing project init path. Low-level project commands remain available and scriptable.";
     outputState.guidedLowLevelCommand = "project init";
     outputState.guidedActionableBlockers = [];
+    const commandContext = runtimeRootCommandContext({
+      projectRoot: initResult.projectRoot,
+      runtimeRoot: initResult.runtimeRoot,
+      runtimeRootExplicit: flags["runtime-root"] !== undefined,
+    });
     outputState.guidedRecommendedCommands = [
-      projectCommand("doctor", initResult.projectRoot),
-      projectCommand("next", initResult.projectRoot),
-      projectCommand("app", initResult.projectRoot),
+      projectCommand("doctor", initResult.projectRoot, commandContext),
+      projectCommand("next", initResult.projectRoot, commandContext),
+      projectCommand("app", initResult.projectRoot, commandContext),
     ];
     return true;
   }
@@ -275,6 +330,11 @@ export function handleGuidedCommand(context) {
     const constraints = resolveOptionalStringListFlag("constraint", flags.constraint);
     const definitionOfDone = resolveOptionalStringListFlag("dod", flags.dod);
     const kpis = resolveKpiFlags(flags.kpi);
+    const sourceKinds = resolveOptionalStringListFlag("source-kind", flags["source-kind"]);
+    const sourceRefs = resolveOptionalStringListFlag("source-ref", flags["source-ref"]);
+    if (sourceKinds.length !== sourceRefs.length) {
+      throw new Error("Repeatable --source-kind and --source-ref values must have the same count and pair by position.");
+    }
     const intakePacket = materializeIntakeArtifactPacket({
       projectId: missionInit.projectId,
       projectRoot: missionInit.projectRoot,
@@ -297,8 +357,11 @@ export function handleGuidedCommand(context) {
       forbiddenPaths: resolveOptionalCsvFlag("forbidden-path", flags["forbidden-path"]),
       deliveryMode,
       requestFile: requestFile ?? null,
-      sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
-      sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
+      sourceKind: null,
+      sourceRef: null,
+      sourceRefs: sourceRefs.map((ref, index) => ({ source_kind: sourceKinds[index], ref })),
+      followUpSourceHandoffRef:
+        resolveOptionalStringFlag("follow-up-source-handoff-ref", flags["follow-up-source-handoff-ref"]) ?? null,
     });
     const completeness = intakePacket.packetBody.product_intake_completeness;
     const complete = completeness.status === "complete";
@@ -315,6 +378,8 @@ export function handleGuidedCommand(context) {
     outputState.productIntakeCompleteness = completeness;
     outputState.productIntakeSourceRefs = intakePacket.packetBody.product_intake.source_refs;
     outputState.deliveryMode = deliveryMode;
+    outputState.followUpSourceHandoffRef =
+      resolveOptionalStringFlag("follow-up-source-handoff-ref", flags["follow-up-source-handoff-ref"]) ?? null;
     outputState.guidedCommand = "aor mission create";
     outputState.guidedStage = "mission-intake";
     outputState.guidedStatus = complete ? "ready" : "blocked";
@@ -322,25 +387,32 @@ export function handleGuidedCommand(context) {
       ? "Guided mission intake is complete and preserved as an intake-request artifact packet."
       : "Guided mission intake was saved, but missing product evidence blocks the next lifecycle stage.";
     outputState.guidedLowLevelCommand = "intake create";
+    const commandContext = runtimeRootCommandContext({
+      projectRoot: missionInit.projectRoot,
+      runtimeRoot: missionInit.runtimeRoot,
+      runtimeRootExplicit: flags["runtime-root"] !== undefined,
+    });
     outputState.guidedActionableBlockers = complete
       ? []
       : completeness.missing_fields.map((field) => ({
           code: `mission-${field}-missing`,
           summary: `Mission intake is missing ${field}.`,
-          next_command: projectCommand("mission create", missionInit.projectRoot),
+          next_command: projectCommand("mission create", missionInit.projectRoot, commandContext),
         }));
     outputState.guidedRecommendedCommands = complete
-      ? [projectCommand("next", missionInit.projectRoot)]
-      : [projectCommand("mission create", missionInit.projectRoot)];
+      ? [projectCommand("next", missionInit.projectRoot, commandContext)]
+      : [projectCommand("mission create", missionInit.projectRoot, commandContext)];
     outputState.futureControlHooks = ["next", "discovery run", "spec build"];
     return true;
   }
 
   if (command === "app") {
-    const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
-    const readiness = inspectReadiness(projectRoot, runtimeRoot);
-    const controlPlane =
-      resolveOptionalStringFlag("control-plane", flags["control-plane"]) ?? "http://localhost:3000";
+    const { projectRoot, runtimeRoot, runtimeRootExplicit } = resolveGuidedProject({ flags, cwd });
+    const commandContext = runtimeRootCommandContext({ projectRoot, runtimeRoot, runtimeRootExplicit });
+    const readiness = inspectReadiness(projectRoot, runtimeRoot, commandContext);
+    const host = resolveOptionalStringFlag("host", flags.host) ?? "127.0.0.1";
+    const port = resolveOptionalStringFlag("port", flags.port) ?? "0";
+    const open = resolveOptionalStringFlag("open", flags.open) ?? "true";
 
     outputState.resolvedProjectRef = projectRoot;
     outputState.resolvedRuntimeRoot = runtimeRoot;
@@ -349,25 +421,31 @@ export function handleGuidedCommand(context) {
     outputState.guidedStatus = readiness.status;
     outputState.guidedSummary =
       readiness.status === "ready"
-        ? "The web console is optional. Headless CLI and API operation remain valid when it is absent or detached."
-        : "The optional web console can be attached after project blockers are resolved.";
-    outputState.guidedLowLevelCommand = "ui attach";
+        ? "The local web console can launch from this project. Headless CLI and API operation remain valid when it is stopped."
+        : "The optional local web console can launch after project blockers are resolved.";
+    outputState.guidedLowLevelCommand = "app launch";
     outputState.guidedActionableBlockers = readiness.blockers;
     outputState.guidedRecommendedCommands =
       readiness.status === "ready"
         ? [
-            `${projectCommand("ui attach", projectRoot)} --control-plane ${shellQuote(controlPlane)}`,
-            projectCommand("ui detach", projectRoot),
-            projectCommand("run status", projectRoot),
+            `${projectCommand("app", projectRoot, commandContext)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
+            `${projectCommand("app", projectRoot, commandContext)} --smoke true --open false --json`,
+            projectCommand("ui detach", projectRoot, commandContext),
+            projectCommand("run status", projectRoot, commandContext),
           ]
         : readiness.blockers.map((blocker) => blocker.next_command);
     outputState.guidedWebSurface = {
       optional: true,
       mandatory: false,
-      control_plane: controlPlane,
-      attach_command: `${projectCommand("ui attach", projectRoot)} --control-plane ${shellQuote(controlPlane)}`,
-      detach_command: projectCommand("ui detach", projectRoot),
+      host,
+      port,
+      open,
+      launch_command: `${projectCommand("app", projectRoot, commandContext)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
+      smoke_command: `${projectCommand("app", projectRoot, commandContext)} --smoke true --open false --json`,
+      detach_command: projectCommand("ui detach", projectRoot, commandContext),
+      local_control_plane_smoke_command: controlPlaneSmokeCommand(projectRoot, runtimeRoot),
       web_app_root: "apps/web",
+      app_mode: "local-spa",
       headless_safe: true,
     };
     outputState.readOnly = true;
@@ -401,6 +479,7 @@ export function handleGuidedCommand(context) {
     outputState.nextActionBlockers = report.blockers;
     outputState.nextActionEvidenceRefs = report.evidence_refs;
     outputState.nextActionMissionState = report.mission_state;
+    outputState.nextActionArtifactReadiness = report.artifact_readiness;
     outputState.nextActionClosureState = report.closure_state;
     outputState.nextActionBoundedExecution = report.bounded_execution;
     outputState.guidedCommand = "aor next";
@@ -412,6 +491,7 @@ export function handleGuidedCommand(context) {
       status: report.status,
       stage: report.project_state.stage,
       report_file: next.nextActionReportFile,
+      artifact_readiness: report.artifact_readiness,
     };
     outputState.guidedActionableBlockers = report.blockers;
     outputState.guidedRecommendedCommands = [primary.command];

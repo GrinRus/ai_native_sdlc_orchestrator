@@ -11,6 +11,18 @@ This document defines how AOR implementation work should be represented in the s
 - **Slice** — the smallest persistent shared backlog unit. A slice should deliver one bounded outcome that can be implemented and verified end to end.
 - **Local task** — a short execution checklist derived from one slice. Local tasks can change during implementation without becoming new shared backlog items unless they introduce a new independently acceptable outcome.
 
+Runtime planning uses separate identities:
+
+- **Plan task** — a stable, versioned unit of intended work in a wave ticket or
+  handoff packet. It owns scope, criteria, verification, and expected evidence.
+- **Execution unit** — an approved grouping of one or more plan tasks for
+  scheduling. Grouping does not merge or replace task identity.
+- **Attempt** — one concrete execution of an execution unit. Retries create new
+  attempts while retaining the same task and execution-unit references.
+
+Backlog slices and local tasks are repository planning records; they are not
+runtime plan tasks and must not be reused as run or attempt identifiers.
+
 ## Source of truth rule
 
 The shared backlog tracks **waves, epics, and slices**.
@@ -78,6 +90,10 @@ Use these states in the backlog docs:
 
 A local task plan should usually break one slice into **3 to 7 tasks**.
 
+For new medium-or-larger slice definitions, every local task must retain
+`Purpose`, concrete `Changes`, and `Validation` detail. `slice:plan` emits this
+content losslessly for handoff instead of reducing it to a heading.
+
 Use local tasks for things like:
 
 - updating contracts and examples;
@@ -139,7 +155,7 @@ When closing `W7-S05`, treat one integrated rehearsal as required evidence and k
 3. Finance evidence from promotion or audit surfaces (`finance_signals` or `run_audit_records[].finance_evidence`).
 4. Learning-loop handoff (`learning-loop-handoff-*`) that references both backlog and quality follow-up surfaces.
 
-Use `docs/ops/live-e2e-w7-governance-closure.md` as the canonical closure rehearsal path.
+Use the internal maintainer installed-user rehearsal runbook with a catalog-backed full-journey profile as the canonical closure rehearsal path.
 
 ## When creating or changing slices
 
@@ -153,6 +169,50 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 ## Current planning coverage
 
-The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W29`: W22 repairs source-of-truth and OpenCode maturity claims, W23 queues contract/auth/control-plane hardening, W24 owns run-level Runtime Harness work, W25 owns real non-mock production proof, W26 owns the self-hosted production release gate, W27 owns the black-box live E2E step-journal redesign, W28 closes installed-user live E2E gaps plus target-matrix expansion, and W29 opens the guarded npm CLI alpha release channel.
+The repo carries detailed wave documents for every currently defined
+`docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
+`W66`. W22-W56 remain the completed implementation and proof history. W57 is the
+selected audit-remediation lane for release truth, contracts, no-write/isolation,
+permissions, delivery, initialization, project-context anchoring, and concurrent
+evidence integrity. W58 continues with non-materializing reads, effective
+context/evaluation, executable effective-model routing, asynchronous run control,
+canonical API/CLI/OpenAPI/error behavior, and the loopback-only local-app
+transport boundary. W59 owns executable browser confidence, truthful local
+console correctness/accessibility, quality ratchets, bounded hotspot
+decomposition, and independent closure of AUD-001 through AUD-055.
+
+After W57-W59 audit remediation closes, W60 adds structured task planning and
+the plan workbench, W61 adds portable topology, machine-local binding
+management, neutral Workspace launch, and approved execution-route setup, and
+W62 adds repo-aware workspace sets, bounded concurrency, integration, repair,
+and coordinated delivery proof. W63 then consolidates Mission intake, action
+semantics, adaptive navigation, attention/evidence work, visual-system
+contracts, and browser-operable safe lifecycle parity across the installed
+operator console under an explicit reversible presentation selector. W65 starts
+after W63-S08 and owns route/action parity, pilot activation, default-on
+cutover, rollback rehearsal, legacy renderer retirement, and post-cutover
+package proof. W59-S07 is the explicit entry dependency for that later
+product-maturity program; W63-S01 waits for W62-S06 so its UI contract covers
+the delivered planning, topology, and execution surfaces.
+
+W64 is a parallel post-audit maintenance lane, not a successor dependency of
+W63. After W59-S07 it owns idempotent alpha-publish recovery and two independently
+acceptable service-boundary refactors that should not be hidden inside P0 trust
+repairs or the W60-W63/W65 product and cutover slices. W65 does not depend on
+W64; any shared projection change must instead be contract-first and explicitly
+sequenced so W64 remains behavior-preserving.
+
+W66 is the active learning-loop remediation lane. It first freezes the original
+catalog/bootstrap fixes, then restores the product/private contract boundary,
+qualification truth, planner/controller/provider outcomes, runtime atomicity,
+parent/integration/delivery correctness, and installed browser-proof integrity.
+Deterministic closure precedes the final same-commit medium/large Codex and
+Claude matrix; backlog state does not replace the ledger-derived production
+readiness decision.
+
+Because W57-W59 are audit remediation, their owning wave documents also record
+`remediation_priority` and `estimated_effort`. These are planning metadata for
+sequencing and capacity; acceptance still depends on executable evidence, not an
+estimate or severity label.
 
 The implementation order is still constrained by hard dependencies and explicit external blockers. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close or required real-runner proof prerequisites become available.

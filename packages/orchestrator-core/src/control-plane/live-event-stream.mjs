@@ -5,14 +5,20 @@ import {
   listLiveRunEvents,
   openLiveRunEventStream,
 } from "../../../observability/src/index.mjs";
+import { validatePublicId } from "../../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
+import { createProjectReadContext } from "./project-context.mjs";
 
 /**
  * @param {string} runId
  * @returns {string}
  */
 function normalizeRunId(runId) {
-  return runId.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const validation = validatePublicId(runId);
+  if (!validation.ok) {
+    throw new TypeError(`Invalid run ID (${validation.value_class}): ${validation.migration}`);
+  }
+  return runId;
 }
 
 /**
@@ -37,6 +43,7 @@ function resolveRunEventLogFile(options) {
  *   payload: Record<string, unknown>,
  *   timestamp?: string,
  *   redactionPolicy?: unknown,
+ *   requestKey?: string,
  * }} options
  */
 export function appendRunEvent(options) {
@@ -52,6 +59,7 @@ export function appendRunEvent(options) {
     payload: options.payload,
     timestamp: options.timestamp,
     redactionPolicy: options.redactionPolicy,
+    requestKey: options.requestKey,
   });
 
   return {
@@ -70,7 +78,7 @@ export function appendRunEvent(options) {
  * }} options
  */
 export function readRunEvents(options) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const logFile = resolveRunEventLogFile({
     runtimeLayout: init.runtimeLayout,
     runId: options.runId,
@@ -94,7 +102,7 @@ export function readRunEvents(options) {
  * }} options
  */
 export function openRunEventStream(options) {
-  const init = initializeProjectRuntime(options);
+  const init = createProjectReadContext(options);
   const logFile = resolveRunEventLogFile({
     runtimeLayout: init.runtimeLayout,
     runId: options.runId,

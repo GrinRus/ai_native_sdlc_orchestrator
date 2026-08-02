@@ -1,0 +1,14 @@
+family: evaluation-case-expected
+case_id: case-run-0091
+version: 1
+subject_type: run
+assertions:
+  - assertion_id: run-documents-present
+    target: subject
+    path: /documents
+    operator: exists
+  - assertion_id: run-id-present
+    target: subject
+    path: /run_id
+    operator: exists
+

@@ -1,24 +1,25 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-
 import {
   createAdapterRequestEnvelope,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { derivePublicId, loadContractFile, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
+import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
+import { evaluateAuditReleaseHold } from "./audit-release-hold.mjs";
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
 import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import {
+  collectMissionChangeEvidence,
   filterNonBootstrapChangedPaths,
+  filterRunnerOwnedStatePaths,
   listChangedPaths,
-  loadMissionScope,
-  resolveMissionScopedChanges,
 } from "./shared/mission-scope.mjs";
 import {
   classifyRuntimeStepOutcome,
@@ -26,10 +27,21 @@ import {
   resolveRuntimeMissionProfile,
   synthesizeRepairAttempts,
 } from "./runtime-harness-report.mjs";
+import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mjs";
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
+import { applyExecutableFailurePolicy } from "./failure-policy.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
+import { completeStepAttemptReservation, renewStepAttemptReservation, reserveStepAttempt } from "./attempt-store.mjs";
+import { buildStepExecutionIdentity } from "./execution-input-identity.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
+import { captureCheckoutSnapshot, compareCheckoutSnapshots, prepareWorkspaceIsolation, resumeWorkspaceIsolation, resumeWorkspaceSetIsolation } from "./workspace-isolation.mjs";
+import {
+  evaluateRuntimePermissionRequest,
+  normalizeRuntimeAgentAutoApprovalProfile,
+  normalizeRuntimeAgentInteractionPolicy,
+  writeRuntimePermissionDecisionAudit,
+} from "./runtime-permission-policy.mjs";
 
 const STEP_CLASS_TO_RESULT_CLASS = Object.freeze({
   discovery: "artifact",
@@ -54,6 +66,8 @@ const STEP_ARCHITECTURE_CONTRACT_REFS = Object.freeze([
   "docs/contracts/wave-ticket.md",
   "docs/contracts/handoff-packet.md",
 ]);
+const DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS = 180_000;
+const CONTEXT_BUDGET_WARN_RATIO = 0.8;
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -78,6 +92,71 @@ function asString(value) {
  */
 function sha256Hex(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function estimateContextValue(value) {
+  const text = JSON.stringify(value ?? null);
+  const chars = text.length;
+  return {
+    bytes: Buffer.byteLength(text, "utf8"),
+    chars,
+    estimated_tokens: Math.ceil(chars / 3),
+  };
+}
+
+/**
+ * @param {Array<{ source: string, value: unknown }>} sources
+ * @returns {Array<{ source: string, bytes: number, chars: number, estimated_tokens: number }>}
+ */
+function buildContextSourceBreakdown(sources) {
+  return sources.map((entry) => ({
+    source: entry.source,
+    ...estimateContextValue(entry.value),
+  }));
+}
+
+/**
+ * @param {Array<{ bytes: number, chars: number, estimated_tokens: number }>} entries
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function sumContextEstimates(entries) {
+  return entries.reduce(
+    (acc, entry) => ({
+      bytes: acc.bytes + entry.bytes,
+      chars: acc.chars + entry.chars,
+      estimated_tokens: acc.estimated_tokens + entry.estimated_tokens,
+    }),
+    { bytes: 0, chars: 0, estimated_tokens: 0 },
+  );
+}
+
+/**
+ * @param {number} estimatedTokens
+ * @param {number} budgetLimitTokens
+ * @returns {"pass" | "warn" | "fail"}
+ */
+function classifyContextBudgetStatus(estimatedTokens, budgetLimitTokens) {
+  if (estimatedTokens > budgetLimitTokens) return "fail";
+  if (estimatedTokens >= budgetLimitTokens * CONTEXT_BUDGET_WARN_RATIO) return "warn";
+  return "pass";
+}
+
+/**
+ * @param {Record<string, unknown>} adapterProfile
+ * @returns {number}
+ */
+function resolveContextBudgetLimitTokens(adapterProfile) {
+  const execution = asRecord(adapterProfile.execution);
+  const externalRuntime = asRecord(execution.external_runtime);
+  const contextBudget = asRecord(externalRuntime.context_budget);
+  const value = contextBudget.max_input_tokens;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS;
 }
 
 /**
@@ -127,6 +206,56 @@ function readJsonFile(filePath) {
   } catch {
     return null;
   }
+}
+
+/**
+ * @param {string | null | undefined} filePath
+ * @param {Record<string, unknown>} patch
+ * @returns {Record<string, unknown> | null}
+ */
+function updateRunControlProviderStepStatus(filePath, patch) {
+  if (typeof filePath !== "string" || filePath.trim().length === 0) return null;
+  const stateFile = filePath.trim();
+  const existingState = readJsonFile(stateFile) ?? {};
+  const status = mergeProviderStepStatus(asRecord(existingState.provider_step_status), patch);
+  const nextState = {
+    ...existingState,
+    provider_step_status: status,
+    updated_at: status.updated_at,
+  };
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+  fs.writeFileSync(stateFile, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+  return status;
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   runId: string,
+ *   providerStepStatus: Record<string, unknown> | null | undefined,
+ *   summary: string,
+ * }} options
+ */
+function appendProviderHeartbeatEvent(options) {
+  const providerStepStatus = asRecord(options.providerStepStatus);
+  if (Object.keys(providerStepStatus).length === 0) return null;
+  return appendRunEvent({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+    runId: options.runId,
+    eventType: "provider.heartbeat",
+    payload: {
+      step_id: asString(providerStepStatus.step_id),
+      status: asString(providerStepStatus.status),
+      summary: options.summary,
+      provider_step_status: providerStepStatus,
+    },
+  });
 }
 
 /**
@@ -237,7 +366,7 @@ function uniquePacketRefsByName(packetRefs) {
 function buildRequestedInteraction(options) {
   return {
     requested: true,
-    interaction_id: `interaction.${normalizeRefSuffix(options.stepResultId) || "step"}.1`,
+    interaction_id: derivePublicId(["interaction", options.stepResultId, "1"], "interaction"),
     status: "requested",
     prompt_summary: options.summary,
     question_evidence_refs: options.evidenceRefs,
@@ -263,6 +392,220 @@ function buildRequestedInteraction(options) {
 }
 
 /**
+ * @param {{
+ *   stepResultId: string,
+ *   summary: string,
+ *   evidenceRefs: string[],
+ *   timestamp: string,
+ *   runtimePermissionRequest: Record<string, unknown>,
+ *   runtimePermissionDecision: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildRuntimePermissionRequestedInteraction(options) {
+  return {
+    ...buildRequestedInteraction({
+      stepResultId: options.stepResultId,
+      summary: options.summary,
+      evidenceRefs: options.evidenceRefs,
+      timestamp: options.timestamp,
+    }),
+    interaction_type: "permission_request",
+    runtime_permission_request: options.runtimePermissionRequest,
+    runtime_permission_decision: options.runtimePermissionDecision,
+    allowed_decisions: ["approve_once", "deny", "approve_for_run"],
+  };
+}
+
+/**
+ * @param {{
+ *   stepResultId: string,
+ *   summary: string,
+ *   evidenceRefs: string[],
+ *   adapterOutput: Record<string, unknown>,
+ *   adapterResolution: Record<string, unknown> | null,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function resolveRuntimePermissionRequest(options) {
+  const existing = asRecord(options.adapterOutput.runtime_permission_request);
+  if (Object.keys(existing).length > 0) {
+    return existing;
+  }
+  const adapter = asRecord(asRecord(options.adapterResolution).adapter);
+  const profile = asRecord(adapter.profile);
+  const externalRunner = asRecord(options.adapterOutput.external_runner);
+  return {
+    interaction_type: "permission_request",
+    adapter_id: asString(adapter.adapter_id) ?? asString(options.adapterOutput.provider_adapter) ?? "unknown",
+    runner_family: asString(profile.runner_family) ?? null,
+    permission_mode: asString(externalRunner.permission_mode) ?? null,
+    permission_mode_source: asString(externalRunner.permission_mode_source) ?? null,
+    operation_type: "unknown",
+    tool_name: null,
+    target: null,
+    target_path: null,
+    command: null,
+    confidence: "low",
+    summary: options.summary,
+    evidence_refs: options.evidenceRefs,
+  };
+}
+
+/**
+ * @param {Record<string, unknown> | null} adapterResolution
+ * @returns {Record<string, unknown>}
+ */
+function resolveApprovalFeatures(adapterResolution) {
+  const adapter = asRecord(asRecord(adapterResolution).adapter);
+  const profile = asRecord(adapter.profile);
+  return asRecord(profile.approval_features);
+}
+
+/**
+ * @param {string | null} value
+ * @returns {string}
+ */
+function normalizePermissionComparable(value) {
+  return typeof value === "string" ? value.trim().replace(/\s+/gu, " ") : "";
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @returns {{ adapterId: string, operationType: string, target: string, command: string, toolName: string }}
+ */
+function runtimePermissionSignature(request) {
+  const scope = asRecord(request.requested_scope);
+  const capabilities = asRecord(request.capabilities);
+  return {
+    adapterId: normalizePermissionComparable(asString(request.adapter_id)),
+    operationType: normalizePermissionComparable(asString(request.operation_type)),
+    resourceType: normalizePermissionComparable(asString(request.resource_type)),
+    canonicalResource: normalizePermissionComparable(asString(request.canonical_resource)),
+    projectId: normalizePermissionComparable(asString(scope.project_id)),
+    runId: normalizePermissionComparable(asString(scope.run_id)),
+    stepId: normalizePermissionComparable(asString(scope.step_id)),
+    operationId: normalizePermissionComparable(asString(scope.operation_id)),
+    capabilities: JSON.stringify(capabilities),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @param {Record<string, unknown>} grantRequest
+ * @returns {boolean}
+ */
+export function runtimePermissionGrantMatches(request, grantRequest) {
+  const current = runtimePermissionSignature(request);
+  const granted = runtimePermissionSignature(grantRequest);
+  if (current.adapterId && granted.adapterId && current.adapterId !== granted.adapterId) {
+    return false;
+  }
+  return (
+    current.operationType !== "" &&
+    current.operationType === granted.operationType &&
+    current.resourceType !== "" &&
+    current.resourceType === granted.resourceType &&
+    current.canonicalResource !== "" &&
+    current.canonicalResource === granted.canonicalResource &&
+    current.projectId !== "" &&
+    current.projectId === granted.projectId &&
+    current.runId !== "" &&
+    current.runId === granted.runId &&
+    current.stepId !== "" &&
+    current.stepId === granted.stepId &&
+    current.operationId !== "" &&
+    current.operationId === granted.operationId &&
+    current.capabilities === granted.capabilities
+  );
+}
+
+/**
+ * @param {{ runtimeLayout: { reportsRoot: string }, projectRoot: string, runId: string, runtimePermissionRequest: Record<string, unknown> }} options
+ * @returns {{ grantRef: string, grantDecision: Record<string, unknown> } | null}
+ */
+function resolveRunScopedRuntimePermissionGrant(options) {
+  if (!fs.existsSync(options.runtimeLayout.reportsRoot)) {
+    return null;
+  }
+  const entries = fs.readdirSync(options.runtimeLayout.reportsRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      continue;
+    }
+    const filePath = path.join(options.runtimeLayout.reportsRoot, entry.name);
+    let document;
+    try {
+      document = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch {
+      continue;
+    }
+    const record = asRecord(document);
+    if (asString(record.run_id) !== options.runId) {
+      continue;
+    }
+    const requestedInteraction = asRecord(record.requested_interaction);
+    const grantDecision = asRecord(record.runtime_permission_decision ?? requestedInteraction.runtime_permission_decision);
+    if (
+      asString(grantDecision.decision) !== "user_approved" ||
+      asString(grantDecision.operator_decision) !== "approve_for_run"
+    ) {
+      continue;
+    }
+    const expiresAt = asString(grantDecision.expires_at);
+    if (!expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) {
+      continue;
+    }
+    const grantRequest = asRecord(record.runtime_permission_request ?? requestedInteraction.runtime_permission_request);
+    if (!runtimePermissionGrantMatches(options.runtimePermissionRequest, grantRequest)) {
+      continue;
+    }
+    return {
+      grantRef: asString(grantDecision.audit_ref) ?? toEvidenceRef(options.projectRoot, filePath),
+      grantDecision,
+    };
+  }
+  return null;
+}
+
+/**
+ * @param {{
+ *   runtimeLayout: { reportsRoot: string },
+ *   projectRoot: string,
+ *   runId: string,
+ *   runtimePermissionRequest: Record<string, unknown>,
+ *   runtimePermissionDecision: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function applyRunScopedRuntimePermissionGrant(options) {
+  if (asString(options.runtimePermissionDecision.decision) !== "ask_user") {
+    return options.runtimePermissionDecision;
+  }
+  const grant = resolveRunScopedRuntimePermissionGrant({
+    runtimeLayout: options.runtimeLayout,
+    projectRoot: options.projectRoot,
+    runId: options.runId,
+    runtimePermissionRequest: options.runtimePermissionRequest,
+  });
+  if (!grant) {
+    return options.runtimePermissionDecision;
+  }
+  return {
+    ...options.runtimePermissionDecision,
+    decision: "auto_approve",
+    rule_id: "runtime-permission.auto-approve.approve-for-run-grant",
+    reason: "Matching run-scoped operator approval grant was found for this permission request.",
+    approval_scope: asString(grant.grantDecision.approval_scope) ?? asString(options.runtimePermissionDecision.approval_scope) ?? "step-coarse",
+    approval_resume_mode:
+      asString(grant.grantDecision.approval_resume_mode) ??
+      asString(options.runtimePermissionDecision.approval_resume_mode) ??
+      "restricted",
+    grant_ref: grant.grantRef,
+  };
+}
+
+/**
  * @param {string} projectId
  * @param {string} runId
  * @param {string} stepId
@@ -277,7 +620,10 @@ function buildCompiledContextId(projectId, runId, stepId, stepClass, promptBundl
   const runSuffix = normalizeRefSuffix(runId) || "run";
   const stepSuffix = normalizeRefSuffix(stepId) || "step";
   const classSuffix = normalizeRefSuffix(stepClass) || "step";
-  return `compiled-context.${projectId}.${runSuffix}.${stepSuffix}.${classSuffix}.attempt.${attempt}.${promptSuffix || "default"}`;
+  return derivePublicId(
+    ["compiled-context", projectId, runSuffix, stepSuffix, classSuffix, "attempt", String(attempt), promptSuffix || "default"],
+    "compiled-context",
+  );
 }
 
 /**
@@ -322,60 +668,54 @@ function readLatestAnalysisFeatureTraceability(runtimeLayout) {
 }
 
 /**
- * @param {{
- *   reportsRoot: string,
- *   runId: string,
- *   stepId: string,
- *   stepClass: string,
- * }} options
- * @returns {number}
+ * @param {unknown} handoffRef
+ * @returns {Record<string, unknown> | null}
  */
-function resolveStepExecutionAttempt(options) {
-  if (!fs.existsSync(options.reportsRoot)) {
-    return 1;
+function readHandoffFeatureTraceability(handoffRef) {
+  const handoffPath = asString(handoffRef);
+  if (!handoffPath || !path.isAbsolute(handoffPath) || !fs.existsSync(handoffPath)) {
+    return null;
   }
+  try {
+    const document = /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(handoffPath, "utf8")));
+    const featureTraceability = asRecord(document.feature_traceability);
+    const repoScopePaths = Array.isArray(document.repo_scopes)
+      ? document.repo_scopes.flatMap((scope) => asStringArray(asRecord(scope).paths))
+      : [];
+    return mergeFeatureTraceabilityRecords(
+      featureTraceability,
+      {
+        allowed_paths: uniqueStrings([...asStringArray(document.allowed_paths), ...repoScopePaths]),
+      },
+    );
+  } catch {
+    return null;
+  }
+}
 
-  const reportFiles = fs.readdirSync(options.reportsRoot).filter((entry) => STEP_RESULT_FILE_REGEX.test(entry));
-  let highestAttempt = 0;
-
-  for (const reportFile of reportFiles) {
-    const reportPath = path.join(options.reportsRoot, reportFile);
-    /** @type {Record<string, unknown>} */
-    let stepResultDoc;
-    try {
-      const raw = fs.readFileSync(reportPath, "utf8");
-      const parsed = JSON.parse(raw);
-      stepResultDoc = asRecord(parsed);
-    } catch {
-      continue;
-    }
-
-    if (stepResultDoc.run_id !== options.runId || stepResultDoc.step_id !== options.stepId) {
-      continue;
-    }
-
-    const selectedStep = asRecord(asRecord(asRecord(stepResultDoc.routed_execution).architecture_traceability).selected_step);
-    if (typeof selectedStep.step_class === "string" && selectedStep.step_class !== options.stepClass) {
-      continue;
-    }
-
-    let detectedAttempt = 1;
-    if (typeof stepResultDoc.step_result_id === "string") {
-      const explicitAttempt = /\.attempt\.(\d+)$/u.exec(stepResultDoc.step_result_id);
-      if (explicitAttempt) {
-        const parsedAttempt = Number.parseInt(explicitAttempt[1], 10);
-        if (Number.isFinite(parsedAttempt) && parsedAttempt > 0) {
-          detectedAttempt = parsedAttempt;
-        }
+/**
+ * @param {...(Record<string, unknown> | null | undefined)} records
+ * @returns {Record<string, unknown> | null}
+ */
+function mergeFeatureTraceabilityRecords(...records) {
+  /** @type {Record<string, unknown>} */
+  const merged = {};
+  for (const record of records) {
+    const source = asRecord(record);
+    for (const [key, value] of Object.entries(source)) {
+      if (Array.isArray(value)) {
+        merged[key] = uniqueStrings([...asStringArray(merged[key]), ...asStringArray(value)]);
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(merged, key)) {
+        continue;
+      }
+      if (value !== null && value !== undefined) {
+        merged[key] = value;
       }
     }
-
-    if (detectedAttempt > highestAttempt) {
-      highestAttempt = detectedAttempt;
-    }
   }
-
-  return highestAttempt + 1;
+  return Object.keys(merged).length > 0 ? merged : null;
 }
 
 /**
@@ -454,6 +794,40 @@ function resolveActionBudget(stepResult, action) {
     return maxAttempts;
   }
   return action === "escalate" ? 0 : 1;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {string | null}
+ */
+function resolveApprovalResumeMode(stepResult) {
+  const decision = asRecord(stepResult.runtime_permission_decision);
+  if (asString(decision.decision) !== "auto_approve" && asString(decision.decision) !== "user_approved") {
+    return null;
+  }
+  return asString(decision.approval_resume_mode);
+}
+
+/**
+ * @param {string | null} mode
+ * @param {() => ReturnType<typeof executeRoutedStep>} callback
+ * @returns {ReturnType<typeof executeRoutedStep>}
+ */
+function runWithRuntimePermissionMode(mode, callback) {
+  if (!mode) {
+    return callback();
+  }
+  const previous = process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+  process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = mode;
+  try {
+    return callback();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+    } else {
+      process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = previous;
+    }
+  }
 }
 
 /**
@@ -596,18 +970,38 @@ function writeRuntimeRepairInput(options) {
  *   wrappersRoot?: string,
  *   promptsRoot?: string,
  *   contextBundlesRoot?: string,
+ *   contextDocsRoot?: string,
+ *   contextRulesRoot?: string,
+ *   contextSkillsRoot?: string,
  *   policiesRoot?: string,
  *   adaptersRoot?: string,
  *   skillsRoot?: string,
  *   executionRoot?: string,
+ *   reuseDisposableWorkspace?: boolean,
  *   requireDiscoveryCompleteness?: boolean,
  *   approvedHandoffRef?: string,
  *   promotionEvidenceRefs?: string[],
  *   coordinationEvidenceRefs?: string[],
  *   runtimeEvidenceRefs?: string[],
+ *   operatorRequestRef?: string,
+ *   providerStepStatusStateFile?: string,
+ *   executionPlanRef?: string,
+ *   executionUnitId?: string,
+ *   taskRefs?: string[],
+ *   planDigest?: string,
+ *   taskDigests?: Record<string, string>,
+ *   unsafeDevelopmentOverride?: boolean,
+ *   requestKey?: string,
  * }} options
  */
-export function executeRoutedStep(options) {
+function executeRoutedStepImplementation(options) {
+  for (const [field, value] of [["runId", options.runId], ["stepId", options.stepId]]) {
+    if (value === undefined) continue;
+    const validation = validatePublicId(value);
+    if (!validation.ok) {
+      throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+    }
+  }
   const init = initializeProjectRuntime(options);
   const registryRoots =
     typeof init.registryRoots === "object" && init.registryRoots !== null
@@ -634,6 +1028,15 @@ export function executeRoutedStep(options) {
       ? options.contextBundlesRoot
       : path.resolve(init.projectRoot, options.contextBundlesRoot)
     : registryRoots.context_bundles;
+  const contextDocsRoot = options.contextDocsRoot
+    ? path.resolve(init.projectRoot, options.contextDocsRoot)
+    : registryRoots.context_docs;
+  const contextRulesRoot = options.contextRulesRoot
+    ? path.resolve(init.projectRoot, options.contextRulesRoot)
+    : registryRoots.context_rules;
+  const contextSkillsRoot = options.contextSkillsRoot
+    ? path.resolve(init.projectRoot, options.contextSkillsRoot)
+    : registryRoots.context_skills;
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
@@ -649,33 +1052,70 @@ export function executeRoutedStep(options) {
       ? options.skillsRoot
       : path.resolve(init.projectRoot, options.skillsRoot)
     : registryRoots.skills;
-  const executionRoot = options.executionRoot
-    ? path.isAbsolute(options.executionRoot)
-      ? options.executionRoot
-      : path.resolve(init.projectRoot, options.executionRoot)
-    : init.projectRoot;
-  const changedPathStatusBefore = listChangedPaths(executionRoot);
-
   const requestedStepClass = options.stepClass;
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
   const runId = options.runId ?? `${init.projectId}.routed-execution.v1`;
   const stepId = options.stepId ?? `routed.${requestedStepClass}`;
-  const executionAttempt = resolveStepExecutionAttempt({
-    reportsRoot: init.runtimeLayout.reportsRoot,
-    runId,
-    stepId,
-    stepClass: requestedStepClass,
+  const dryRun = options.dryRun !== false;
+  let workspaceIsolation = null;
+  let primaryCheckoutSnapshotBefore = null;
+  let executionRoot = options.executionRoot
+    ? path.isAbsolute(options.executionRoot)
+      ? options.executionRoot
+      : path.resolve(init.projectRoot, options.executionRoot)
+    : init.projectRoot;
+  const executionIdentity = buildStepExecutionIdentity({
+    executionOptions: options, init, requestedStepClass, dryRun, requestedExecutionRoot: executionRoot,
+    sources: { project_profile: init.projectProfilePath, routes: routesRoot, wrappers: wrappersRoot, prompts: promptsRoot, context_bundles: contextBundlesRoot, context_docs: contextDocsRoot, context_rules: contextRulesRoot, context_skills: contextSkillsRoot, policies: policiesRoot, adapters: adaptersRoot, skills: skillsRoot },
   });
-  const stepResultIdBase = `${runId}.step.${requestedStepClass}`;
-  const stepResultId = executionAttempt > 1 ? `${stepResultIdBase}.attempt.${executionAttempt}` : stepResultIdBase;
+  let attemptReservation = reserveStepAttempt({
+    stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass,
+    requestKey: options.requestKey, executionIdentity, leaseMs: 14_400_000,
+  });
+  if (attemptReservation.replay) return attemptReservation.result;
+  if (!dryRun) {
+    const loadedProjectProfile = loadContractFile({ filePath: init.projectProfilePath, family: "project-profile" });
+    if (!loadedProjectProfile.ok) throw new Error(`Project profile '${init.projectProfilePath}' failed contract validation.`);
+    primaryCheckoutSnapshotBefore = captureCheckoutSnapshot(init.projectRoot);
+    workspaceIsolation = options.workspaceSetRef && options.executionRoot
+      ? resumeWorkspaceSetIsolation({
+          projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+          executionRoot: options.executionRoot,
+        })
+      : options.reuseDisposableWorkspace === true && options.executionRoot
+        ? resumeWorkspaceIsolation({
+            projectRoot: init.projectRoot,
+            projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+            runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
+            executionRoot: options.executionRoot,
+          })
+        : prepareWorkspaceIsolation({
+            projectRoot: init.projectRoot,
+            runtimeRoot: init.runtimeRoot,
+            projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+            runtimeDefaults: asRecord(loadedProjectProfile.document.runtime_defaults),
+            runId,
+          });
+    if (!workspaceIsolation.provisioned || !workspaceIsolation.executionRoot) {
+      throw new Error(`Disposable workspace provisioning failed for mode '${workspaceIsolation.requestedMode}'.`);
+    }
+    executionRoot = workspaceIsolation.executionRoot;
+  }
+  const changedPathStatusBefore = listChangedPaths(executionRoot);
+  const executionCheckoutSnapshotBefore = captureCheckoutSnapshot(executionRoot);
+  const executionAttempt = attemptReservation.attempt;
+  const stepResultId = derivePublicId(
+    executionAttempt > 1
+      ? [runId, "step", requestedStepClass, "attempt", String(executionAttempt)]
+      : [runId, "step", requestedStepClass],
+    "step-result",
+  );
   const runScopeSuffix = normalizeRefSuffix(runId) || "run";
   const stepScopeSuffix = normalizeRefSuffix(stepId) || "step";
   const classScopeSuffix = normalizeRefSuffix(requestedStepClass) || "step";
   const scopedArtifactSuffix = `${runScopeSuffix}.${stepScopeSuffix}.${classScopeSuffix}.attempt.${executionAttempt}`;
   const stepResultFileName = `step-result-routed-${scopedArtifactSuffix}.json`;
   const compiledContextFileName = `compiled-context-${scopedArtifactSuffix}.json`;
-  const dryRun = options.dryRun !== false;
-
   const startedAt = new Date().toISOString();
 
   /** @type {Record<string, unknown> | null} */
@@ -715,6 +1155,7 @@ export function executeRoutedStep(options) {
     : `Routed live execution for step '${requestedStepClass}' completed.`;
   /** @type {string | null} */
   let blockedNextStep = null;
+  let auditReleaseHold = evaluateAuditReleaseHold({ dryRun, externalRuntime: {}, deliveryMode: null, unsafeDevelopmentOverride: options.unsafeDevelopmentOverride });
   /** @type {{
    *   status: "pass" | "fail",
    *   blocking: boolean,
@@ -855,6 +1296,9 @@ export function executeRoutedStep(options) {
         wrappersRoot,
         promptsRoot,
         contextBundlesRoot,
+        contextDocsRoot,
+        contextRulesRoot,
+        contextSkillsRoot,
         stepClass: requestedStepClass,
         routeOverrides: options.routeOverrides,
         wrapperOverrides: options.wrapperOverrides,
@@ -871,8 +1315,14 @@ export function executeRoutedStep(options) {
         policyOverrides: options.policyOverrides,
       });
       const approvedHandoffRef = asString(options.approvedHandoffRef);
+      featureTraceability = mergeFeatureTraceabilityRecords(
+        featureTraceability,
+        readLatestAnalysisFeatureTraceability(init.runtimeLayout),
+        readHandoffFeatureTraceability(approvedHandoffRef),
+      );
       deliveryPlanResult = materializeDeliveryPlan({
         runtimeLayout: init.runtimeLayout,
+        deliveryAuthorizationPhase: false,
         projectId: init.projectId,
         runId,
         stepClass: requestedStepClass,
@@ -892,6 +1342,26 @@ export function executeRoutedStep(options) {
         adaptersRoot,
         adapterOverrides: options.adapterOverrides,
       });
+      routeResolution = {
+        ...routeResolution,
+        requested_model: asString(adapterResolution.requested_model),
+        effective_model: asString(adapterResolution.effective_model),
+        model_source: asString(adapterResolution.model_source) ?? "not-applicable",
+        fallback_candidates: Array.isArray(adapterResolution.execution_candidates)
+          ? adapterResolution.execution_candidates.slice(1).map((candidate) => {
+              const record = asRecord(candidate);
+              return {
+                candidate_index: record.candidate_index,
+                adapter: asString(record.adapter_id),
+                provider: asString(record.provider),
+                requested_model: asString(record.requested_model),
+                effective_model: asString(record.effective_model),
+                model_source: asString(record.model_source),
+                capability_check: asRecord(record.capability_check),
+              };
+            })
+          : [],
+      };
       const inputPacketRefs = resolveStepInputPacketRefs({
         projectRoot: init.projectRoot,
         assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
@@ -917,6 +1387,24 @@ export function executeRoutedStep(options) {
       );
       const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
       const expandedRefs = asRecord(contextBundles.expanded_refs);
+      const resolvedAdapterProfile = asRecord(asRecord(adapterResolution).adapter?.profile);
+      const externalRuntime = asRecord(asRecord(resolvedAdapterProfile.execution).external_runtime);
+      const budgetLimitTokens = resolveContextBudgetLimitTokens(resolvedAdapterProfile);
+      const effectiveAssets = Array.isArray(compiled.compiled_context.effective_assets)
+        ? compiled.compiled_context.effective_assets
+        : [];
+      const promptAssetDigest = asString(
+        asRecord(effectiveAssets.find((entry) => asRecord(entry).family === "prompt-bundle")).digest,
+      );
+      const contextSourceBreakdown = buildContextSourceBreakdown([
+        { source: "instruction_set", value: compiled.compiled_context.instruction_set },
+        { source: "required_inputs_resolved", value: compiled.compiled_context.required_inputs_resolved },
+        { source: "guardrails", value: compiled.compiled_context.guardrails },
+        { source: "context_refs", value: compiled.compiled_context.context_refs },
+        { source: "effective_assets", value: compiled.compiled_context.effective_assets },
+        { source: "provenance", value: compiled.compiled_context.provenance },
+      ]);
+      const contextEstimate = sumContextEstimates(contextSourceBreakdown);
       const compiledContextId = buildCompiledContextId(
         init.projectId,
         runId,
@@ -927,24 +1415,40 @@ export function executeRoutedStep(options) {
       );
       compiledContextArtifact = {
         compiled_context_id: compiledContextId,
-        version: 1,
+        version: 2,
         step: requestedStepClass,
+        compiler_revision: compiled.compiled_context.compiler_revision,
+        effective_assets: effectiveAssets,
         prompt_bundle_ref: promptBundleRef,
         context_bundle_refs: uniqueStrings(contextBundles.bundle_refs),
         context_doc_refs: uniqueStrings(expandedRefs.context_doc_refs),
         context_rule_refs: uniqueStrings(expandedRefs.context_rule_refs),
         context_skill_refs: uniqueStrings(expandedRefs.context_skill_refs),
+        skill_refs: uniqueStrings(compiled.compiled_context.skill_refs),
         packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         hashes: {
-          prompt_hash: `sha256:${sha256Hex(promptBundleRef)}`,
+          prompt_hash: promptAssetDigest ?? `sha256:${sha256Hex(promptBundleRef)}`,
           context_hash: `sha256:${String(compiled.context_compilation.compiled_context_fingerprint ?? "")}`,
         },
         provenance: {
-          compiler_revision_ref: "compiler-revision://runtime-context-compiler@v1",
+          compiler_revision_ref: "compiler-revision://runtime-context-compiler@v2",
           project_profile_ref: init.projectProfilePath,
           route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
           wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,
           generated_at: new Date().toISOString(),
+        },
+        budget_report: {
+          ...contextEstimate,
+          budget_limit_tokens: budgetLimitTokens,
+          budget_status: classifyContextBudgetStatus(contextEstimate.estimated_tokens, budgetLimitTokens),
+          source_breakdown: contextSourceBreakdown,
+        },
+        compaction_report: {
+          strategy: "none",
+          original_estimate: contextEstimate,
+          final_estimate: contextEstimate,
+          dropped_or_summarized_sources: [],
+          mandatory_refs_preserved: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         },
       };
       compiledContextArtifactPath = writeCompiledContextArtifact({
@@ -954,20 +1458,76 @@ export function executeRoutedStep(options) {
       });
       compiledContextRef = `compiled-context://${compiledContextId}`;
 
+      const routeProfile = asRecord(routeResolution.route_profile);
+      const routePrimary = asRecord(routeProfile.primary);
+      const adapterProfile = asRecord(asRecord(adapterResolution).adapter);
+      const resolvedBounds = asRecord(policyResolution.resolved_bounds);
+      const timeoutSec = asRecord(resolvedBounds.budget).timeout_sec;
+      const timeoutBudgetMs =
+        typeof timeoutSec === "number" && Number.isFinite(timeoutSec) && timeoutSec > 0
+          ? Math.floor(timeoutSec * 1000)
+          : null;
+      const planReady =
+        deliveryPlanResult?.deliveryPlan?.status === "ready" && deliveryPlanResult.deliveryPlan.execution_allowed === true;
+      auditReleaseHold = evaluateAuditReleaseHold({
+        dryRun,
+        externalRuntime,
+        deliveryMode: asString(deliveryPlanResult?.deliveryPlan?.delivery_mode),
+        unsafeDevelopmentOverride: options.unsafeDevelopmentOverride,
+      });
+      if (!auditReleaseHold.allowed) {
+        throw new Error(`${auditReleaseHold.code}: ${auditReleaseHold.message}`);
+      }
+      const providerStepStatusBase = {
+        provider: asString(routePrimary.provider),
+        adapter: asString(adapterProfile.adapter_id),
+        route_id: asString(routeResolution.resolved_route_id),
+        requested_model: asString(routeResolution.requested_model),
+        effective_model: asString(routeResolution.effective_model),
+        model_source: asString(routeResolution.model_source),
+        step_id: stepId,
+        status: "running",
+        timeout_budget_ms: timeoutBudgetMs,
+        remaining_budget_ms: timeoutBudgetMs,
+        last_output_at: null,
+        last_artifact_update_at: null,
+        current_command_label: "external-provider-runner",
+        recommended_action: "Provider is still running.",
+      };
+      const providerStepStatus =
+        !dryRun && planReady
+          ? updateRunControlProviderStepStatus(options.providerStepStatusStateFile, providerStepStatusBase)
+          : null;
+      if (providerStepStatus) {
+        appendProviderHeartbeatEvent({
+          cwd: options.cwd,
+          projectRef: options.projectRef,
+          projectProfile: options.projectProfile,
+          runtimeRoot: options.runtimeRoot,
+          runId,
+          providerStepStatus,
+          summary: "Provider execution heartbeat started.",
+        });
+      }
+
       adapterRequest = createAdapterRequestEnvelope({
-        request_id: `${stepResultId}.request`,
+        request_id: derivePublicId([stepResultId, "request"], "adapter-request"),
         run_id: runId,
         step_id: stepId,
         step_class: requestedStepClass,
         route: routeResolution,
         asset_bundle: assetResolution,
         policy_bundle: policyResolution,
+        feature_traceability: featureTraceability,
         input_packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         dry_run: dryRun,
         context: {
           compiled_context_ref: compiledContextRef,
+          compiled_context_file: compiledContextArtifactPath,
           compiled_context_id: compiledContextId,
           compiled_context_fingerprint: compiled.context_compilation.compiled_context_fingerprint,
+          compiler_revision: compiled.compiled_context.compiler_revision,
+          effective_assets: compiled.compiled_context.effective_assets,
           context_bundle_refs: compiledContextArtifact.context_bundle_refs,
           context_doc_refs: compiledContextArtifact.context_doc_refs,
           context_rule_refs: compiledContextArtifact.context_rule_refs,
@@ -975,12 +1535,30 @@ export function executeRoutedStep(options) {
           packet_refs: compiledContextArtifact.packet_refs,
           instruction_set: compiled.compiled_context.instruction_set,
           required_inputs_resolved: compiled.compiled_context.required_inputs_resolved,
+          runtime_evidence_refs: evidenceRefs,
+          execution_permissions: {
+            execution_allowed: deliveryPlanResult?.deliveryPlan?.execution_allowed === true,
+            writeback_allowed: deliveryPlanResult?.deliveryPlan?.writeback_allowed === true,
+            target_write_allowed: deliveryPlanResult?.deliveryPlan?.target_write_allowed === true,
+            direct_edits_allowed: deliveryPlanResult?.deliveryPlan?.direct_edits_allowed === true,
+            meaningful_change_required: deliveryPlanResult?.deliveryPlan?.meaningful_change_required === true,
+            delivery_mode: asString(deliveryPlanResult?.deliveryPlan?.delivery_mode),
+          },
           guardrails: compiled.compiled_context.guardrails,
           skill_refs: compiled.compiled_context.skill_refs,
           provenance: compiled.compiled_context.provenance,
         },
+        provider_step_status: providerStepStatus
+          ? {
+              ...providerStepStatus,
+              state_file: options.providerStepStatusStateFile,
+            }
+          : null,
       });
 
+      attemptReservation = renewStepAttemptReservation({
+        stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass, reservation: attemptReservation, leaseMs: 14_400_000,
+      });
       const invocation = invokeStepAdapterForStep({
         dryRun,
         requestedStepClass,
@@ -995,6 +1573,38 @@ export function executeRoutedStep(options) {
       status = invocation.status;
       summary = invocation.summary;
       blockedNextStep = invocation.blockedNextStep;
+      if (providerStepStatus) {
+        const adapterOutput = asRecord(adapterResponse.output);
+        const externalRunner = asRecord(adapterOutput.external_runner);
+        const stateFileSnapshot = readJsonFile(options.providerStepStatusStateFile) ?? {};
+        const currentProviderStepStatus = asRecord(stateFileSnapshot.provider_step_status);
+        const providerInterrupted =
+          asString(adapterOutput.failure_kind) === "external-runner-interrupted" ||
+          asString(stateFileSnapshot.status) === "canceled" ||
+          asString(stateFileSnapshot.status) === "cancelled" ||
+          asString(currentProviderStepStatus.status) === "interrupted";
+        const terminalProviderStepStatus = updateRunControlProviderStepStatus(options.providerStepStatusStateFile, {
+          ...providerStepStatusBase,
+          status: providerInterrupted ? "interrupted" : invocation.status === "passed" ? "completed" : "failed",
+          last_artifact_update_at: asString(externalRunner.raw_evidence_ref) ? new Date().toISOString() : null,
+          recommended_action:
+            providerInterrupted
+              ? "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step."
+              : invocation.status === "passed"
+              ? "Continue with post-run verification."
+              : "Inspect provider evidence and failure summary.",
+          finished_at: new Date().toISOString(),
+        });
+        appendProviderHeartbeatEvent({
+          cwd: options.cwd,
+          projectRef: options.projectRef,
+          projectProfile: options.projectProfile,
+          runtimeRoot: options.runtimeRoot,
+          runId,
+          providerStepStatus: terminalProviderStepStatus,
+          summary: "Provider execution heartbeat finished.",
+        });
+      }
 
       evidenceRefs = [
         ...new Set([
@@ -1007,9 +1617,6 @@ export function executeRoutedStep(options) {
           ...asStringArray(adapterResponse?.evidence_refs),
         ]),
       ];
-      if (featureTraceability === null) {
-        featureTraceability = readLatestAnalysisFeatureTraceability(init.runtimeLayout);
-      }
     } catch (error) {
       status = "failed";
       summary = error instanceof Error ? error.message : String(error);
@@ -1025,17 +1632,54 @@ export function executeRoutedStep(options) {
     changedPathStatusBefore.available && changedPathStatusAfter.available
       ? diffChangedPaths(changedPathStatusBefore.changedPaths, changedPathStatusAfter.changedPaths)
       : [];
-  const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatusAfter.changedPaths);
   const nonBootstrapChangedPathsDuringStep = filterNonBootstrapChangedPaths(changedPathsDuringStep);
-  const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
+  const runnerOwnedStatePathsDuringStep = filterRunnerOwnedStatePaths(changedPathsDuringStep);
   const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
-  const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
-  const strictCodeChangingNoop =
+  const missionEvidence = collectMissionChangeEvidence({
+    projectRoot: init.projectRoot,
+    artifactsRoot: init.runtimeLayout.artifactsRoot,
+    evidenceRoot: executionRoot,
+  });
+  const executionCheckoutSnapshotAfter = captureCheckoutSnapshot(executionRoot);
+  const executionIntegrity = compareCheckoutSnapshots(executionCheckoutSnapshotBefore, executionCheckoutSnapshotAfter);
+  const primaryCheckoutSnapshotAfter = primaryCheckoutSnapshotBefore
+    ? captureCheckoutSnapshot(init.projectRoot)
+    : null;
+  const primaryIntegrity = primaryCheckoutSnapshotBefore && primaryCheckoutSnapshotAfter
+    ? compareCheckoutSnapshots(primaryCheckoutSnapshotBefore, primaryCheckoutSnapshotAfter)
+    : { unchanged: true, changed_fields: [] };
+  const deliveryMode = asString(deliveryPlanResult?.deliveryPlan?.delivery_mode);
+  const noWriteExecution = !dryRun && deliveryMode === "no-write";
+  if (!primaryIntegrity.unchanged) {
+    status = "failed";
+    summary = `Primary checkout integrity violation: provider execution changed ${primaryIntegrity.changed_fields.join(", ")}.`;
+    blockedNextStep = "Restore the primary checkout from captured integrity evidence before retrying in a new disposable workspace.";
+  } else if (noWriteExecution && !executionIntegrity.unchanged) {
+    status = "failed";
+    summary = `No-write integrity violation: provider execution changed disposable checkout state (${executionIntegrity.changed_fields.join(", ")}).`;
+    blockedNextStep = "Inspect no-write mutation evidence and retry with a provider that honors the read-only execution contract.";
+  }
+  let workspaceCleanup = null;
+  if (workspaceIsolation) {
+    workspaceCleanup = noWriteExecution
+      ? workspaceIsolation.cleanup(status === "passed" ? "success" : "failure", "delete")
+      : status === "passed"
+        ? workspaceIsolation.cleanup("success", "retain")
+        : workspaceIsolation.finalize("failure");
+    if (workspaceCleanup.status === "delete-failed") {
+      status = "failed";
+      summary = `Disposable workspace cleanup failed: ${workspaceCleanup.error}`;
+      blockedNextStep = "Inspect the retained workspace owner marker and retry cleanup without deleting the primary checkout.";
+    }
+  }
+  const strictCodeChangingNoopDetectionApplied =
     !dryRun &&
     requestedStepClass === "implement" &&
     (missionProfile.missionType === "code-changing" || missionProfile.missionType === "release") &&
     changedPathStatusBefore.available &&
-    changedPathStatusAfter.available;
+    missionEvidence.gitStatusAvailable;
+  const strictCodeChangingNoop =
+    strictCodeChangingNoopDetectionApplied && missionEvidence.meaningfulChangedPaths.length === 0;
   const adapterOutputForStep = asRecord(adapterResponse?.output);
   const externalRunnerForStep = asRecord(adapterOutputForStep.external_runner);
   const stepResult = {
@@ -1045,10 +1689,30 @@ export function executeRoutedStep(options) {
     step_class: resultStepClass,
     status,
     summary,
+    task_refs: asStringArray(options.taskRefs),
+    plan_digest: asString(options.planDigest),
+    task_digests: asRecord(options.taskDigests),
     evidence_refs: evidenceRefs,
     routed_execution: {
       mode: dryRun ? "dry-run" : "execute",
-      no_write_enforced: dryRun,
+      no_write_enforced: dryRun || noWriteExecution,
+      workspace_isolation: workspaceIsolation
+        ? {
+            requested_mode: workspaceIsolation.requestedMode,
+            mode: workspaceIsolation.mode,
+            source_root: workspaceIsolation.sourceRoot,
+            execution_root: executionRoot,
+            checkout: workspaceIsolation.checkout,
+            provisioning: workspaceIsolation.provisioning,
+            primary_integrity: primaryIntegrity,
+            execution_integrity: executionIntegrity,
+            cleanup: workspaceCleanup,
+          }
+        : null,
+      audit_release_hold: {
+        override_requested: options.unsafeDevelopmentOverride === true,
+        override_used: auditReleaseHold.override_used,
+      },
       started_at: startedAt,
       finished_at: finishedAt,
       route_resolution: routeResolution,
@@ -1059,13 +1723,20 @@ export function executeRoutedStep(options) {
             plan_id: deliveryPlanResult.deliveryPlan.plan_id,
             delivery_mode: deliveryPlanResult.deliveryPlan.delivery_mode,
             status: deliveryPlanResult.deliveryPlan.status,
+            execution_allowed: deliveryPlanResult.deliveryPlan.execution_allowed,
             writeback_allowed: deliveryPlanResult.deliveryPlan.writeback_allowed,
+            target_write_allowed: deliveryPlanResult.deliveryPlan.target_write_allowed,
+            direct_edits_allowed: deliveryPlanResult.deliveryPlan.direct_edits_allowed,
+            meaningful_change_required: deliveryPlanResult.deliveryPlan.meaningful_change_required,
             delivery_plan_file: deliveryPlanResult.deliveryPlanFile,
           }
         : null,
       adapter_resolution: adapterResolution,
       adapter_request: adapterRequest,
       adapter_response: adapterResponse,
+      operator_request_ref: asString(options.operatorRequestRef),
+      execution_plan_ref: asString(options.executionPlanRef),
+      execution_unit_id: asString(options.executionUnitId),
       context_compilation: {
         compiled_context_ref: compiledContextRef,
         compiled_context_file: compiledContextArtifactPath,
@@ -1117,33 +1788,124 @@ export function executeRoutedStep(options) {
       evidence_root: init.runtimeLayout.reportsRoot,
     },
     mission_semantics: {
-      git_status_available: changedPathStatusBefore.available && changedPathStatusAfter.available,
-      git_status_root: executionRoot,
+      git_status_available: changedPathStatusBefore.available && missionEvidence.gitStatusAvailable,
+      git_status_root: missionEvidence.gitStatusRoot,
       changed_paths_before_step: changedPathStatusBefore.changedPaths,
-      changed_paths_after_step: changedPathStatusAfter.changedPaths,
+      changed_paths_after_step: missionEvidence.changedPaths,
       changed_paths_during_step: changedPathsDuringStep,
-      non_bootstrap_changed_paths: nonBootstrapChangedPaths,
+      non_bootstrap_changed_paths: missionEvidence.nonBootstrapChangedPaths,
       non_bootstrap_changed_paths_during_step: nonBootstrapChangedPathsDuringStep,
-      non_input_changed_paths: missionScopedChanges.nonInputChangedPaths,
-      meaningful_changed_paths: missionScopedChanges.meaningfulChangedPaths,
-      ignored_input_files: missionScopedChanges.ignoredInputFiles,
+      non_input_changed_paths: missionEvidence.nonInputChangedPaths,
+      meaningful_changed_paths: missionEvidence.meaningfulChangedPaths,
+      runner_owned_state_paths: missionEvidence.runnerOwnedStatePaths,
+      runner_owned_state_paths_during_step: runnerOwnedStatePathsDuringStep,
+      ignored_input_files: missionEvidence.ignoredInputFiles,
+      strict_code_changing_noop_detection_applied: strictCodeChangingNoopDetectionApplied,
       strict_code_changing_noop: strictCodeChangingNoop,
       mission_type: missionProfile.missionType,
       strictness_profile: missionProfile.strictnessProfile,
+      evidence_root_lineage: {
+        project_root: init.projectRoot,
+        canonical_target_checkout_root: executionRoot,
+        git_status_root: missionEvidence.gitStatusRoot,
+      },
     },
   };
   if (Object.keys(externalRunnerForStep).length > 0) {
     stepResult.external_runner = externalRunnerForStep;
   }
-  const runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
-    gitStatusAvailable: changedPathStatusBefore.available && changedPathStatusAfter.available,
+  let runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
+    gitStatusAvailable: changedPathStatusBefore.available && missionEvidence.gitStatusAvailable,
     strictCodeChangingNoop,
-    nonBootstrapChangedPaths,
-    meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
+    nonBootstrapChangedPaths: missionEvidence.nonBootstrapChangedPaths,
+    meaningfulChangedPaths: missionEvidence.meaningfulChangedPaths,
+    runnerOwnedStatePaths: missionEvidence.runnerOwnedStatePaths,
   });
+  runtimeOutcome = applyExecutableFailurePolicy(runtimeOutcome, asRecord(policyResolution));
+  let runtimePermissionRequest = null;
+  let runtimePermissionDecision = null;
+  let runtimePermissionDecisionAuditRef = null;
+  let runtimePermissionDecisionAuditFile = null;
+  if (runtimeOutcome.failureClass === "permission-mode-blocked" || runtimeOutcome.failureClass === "edit-denied") {
+    const interactionPolicy = normalizeRuntimeAgentInteractionPolicy(process.env.AOR_RUNTIME_AGENT_INTERACTION_POLICY);
+    const autoApprovalProfile = normalizeRuntimeAgentAutoApprovalProfile(
+      process.env.AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE,
+      interactionPolicy,
+    );
+    if (interactionPolicy !== "fail-closed") {
+      const approvalFeatures = resolveApprovalFeatures(adapterResolution);
+      runtimePermissionRequest = resolveRuntimePermissionRequest({
+        stepResultId,
+        summary,
+        evidenceRefs,
+        adapterOutput: adapterOutputForStep,
+        adapterResolution,
+      });
+      runtimePermissionDecision = evaluateRuntimePermissionRequest({
+        runtimePermissionRequest,
+        context: {
+          execution_root: executionRoot,
+          runtime_agent_interaction_policy: interactionPolicy,
+          runtime_agent_auto_approval_profile: autoApprovalProfile,
+          approval_grant_scope: asString(approvalFeatures.approval_grant_scope) ?? "tool-call-scoped",
+          approval_resume_mode: asString(approvalFeatures.approval_resume_mode) ?? "restricted",
+          project_id: init.projectId,
+          run_id: runId,
+          step_id: stepId,
+          declared_verification_commands: asStringArray(
+            asRecord(asRecord(policyResolution).resolved_bounds).command_constraints?.allowed_commands,
+          ),
+        },
+      });
+      runtimePermissionRequest = asRecord(runtimePermissionDecision.normalized_request);
+      runtimePermissionDecision = { ...runtimePermissionDecision };
+      delete runtimePermissionDecision.normalized_request;
+      runtimePermissionDecision = {
+        ...runtimePermissionDecision,
+        continuation_strategy: asString(approvalFeatures.continuation_strategy) ?? "reinvoke",
+      };
+      runtimePermissionDecision = applyRunScopedRuntimePermissionGrant({
+        runtimeLayout: init.runtimeLayout,
+        projectRoot: init.projectRoot,
+        runId,
+        runtimePermissionRequest,
+        runtimePermissionDecision,
+      });
+      const audit = writeRuntimePermissionDecisionAudit({
+        runtimeLayout: init.runtimeLayout,
+        projectRoot: init.projectRoot,
+        runId,
+        stepResultId,
+        runtimePermissionRequest,
+        runtimePermissionDecision,
+        evidenceRefs: uniqueStrings([...evidenceRefs, asString(runtimePermissionDecision.grant_ref) ?? ""]),
+      });
+      runtimePermissionDecisionAuditRef = audit.auditRef;
+      runtimePermissionDecisionAuditFile = audit.auditFile;
+      runtimePermissionDecision = {
+        ...runtimePermissionDecision,
+        audit_ref: runtimePermissionDecisionAuditRef,
+        audit_file: runtimePermissionDecisionAuditFile,
+      };
+      runtimeOutcome = {
+        failureClass: runtimeOutcome.failureClass,
+        decision: "block",
+        missionOutcome: "not_satisfied",
+      };
+    }
+  }
   stepResult.mission_outcome = runtimeOutcome.missionOutcome;
   stepResult.failure_class = runtimeOutcome.failureClass;
   stepResult.runtime_harness_decision = runtimeOutcome.decision;
+  if (runtimePermissionRequest) {
+    stepResult.runtime_permission_request = runtimePermissionRequest;
+  }
+  if (runtimePermissionDecision) {
+    stepResult.runtime_permission_decision = runtimePermissionDecision;
+  }
+  if (runtimePermissionDecisionAuditRef && !stepResult.evidence_refs.includes(runtimePermissionDecisionAuditRef)) {
+    stepResult.evidence_refs = [...stepResult.evidence_refs, runtimePermissionDecisionAuditRef];
+  }
   stepResult.repair_attempts = synthesizeRepairAttempts(
     stepResult,
     runtimeOutcome,
@@ -1166,7 +1928,18 @@ export function executeRoutedStep(options) {
         ]
       : [];
   stepResult.requested_interaction =
-    runtimeOutcome.failureClass === "interactive-question-requested"
+    runtimePermissionRequest && runtimePermissionDecision?.decision === "ask_user"
+      ? buildRuntimePermissionRequestedInteraction({
+          stepResultId,
+          summary: runtimePermissionDecision.reason ?? summary,
+          evidenceRefs: runtimePermissionDecisionAuditRef
+            ? [...evidenceRefs, runtimePermissionDecisionAuditRef]
+            : evidenceRefs,
+          timestamp: finishedAt,
+          runtimePermissionRequest,
+          runtimePermissionDecision,
+        })
+      : runtimeOutcome.failureClass === "interactive-question-requested"
       ? buildRequestedInteraction({
           stepResultId,
           summary,
@@ -1181,7 +1954,7 @@ export function executeRoutedStep(options) {
     stepResult,
   });
 
-  return {
+  const result = {
     ...init,
     runId,
     stepId,
@@ -1189,6 +1962,22 @@ export function executeRoutedStep(options) {
     stepResult,
     stepResultPath,
   };
+  attemptReservation = renewStepAttemptReservation({
+    stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass, reservation: attemptReservation, leaseMs: 14_400_000,
+  });
+  completeStepAttemptReservation({
+    stateRoot: init.runtimeLayout.stateRoot, runId, stepId, stepClass: requestedStepClass, reservation: attemptReservation, result,
+  });
+  return result;
+}
+
+export function executeRoutedStep(options) { return executeRoutedStepImplementation(options); }
+function continueInOwnedWorkspace(options, result) {
+  const workspace = asRecord(asRecord(result.stepResult.routed_execution).workspace_isolation);
+  const executionRoot = asString(workspace.execution_root);
+  return executionRoot
+    ? { ...options, executionRoot, reuseDisposableWorkspace: true }
+    : options;
 }
 
 /**
@@ -1263,7 +2052,9 @@ export function executeRuntimeHarnessControlledStep(options) {
     const maxAttempts = resolveActionBudget(current.stepResult, decision);
     counters[decision] += 1;
     if (counters[decision] > maxAttempts) {
-      const exhaustedAttempts = executedAttempts.map((attempt) => ({ ...attempt }));
+      const exhaustedAttempts = (
+        executedAttempts.length > 0 ? executedAttempts : asRecordArray(current.stepResult.repair_attempts)
+      ).map((attempt) => ({ ...attempt }));
       if (exhaustedAttempts.length > 0) {
         exhaustedAttempts[exhaustedAttempts.length - 1] = {
           ...exhaustedAttempts[exhaustedAttempts.length - 1],
@@ -1287,7 +2078,18 @@ export function executeRuntimeHarnessControlledStep(options) {
     ]);
 
     if (decision === "retry") {
-      const retried = executeRoutedStep(options);
+      const resumeMode = resolveApprovalResumeMode(current.stepResult);
+      const permissionDecision = asRecord(current.stepResult.runtime_permission_decision);
+      const permissionDecisionRefs = uniqueStrings([
+        asString(permissionDecision.audit_ref) ?? "",
+        ...asStringArray(options.runtimeEvidenceRefs),
+      ]);
+      const retried = runWithRuntimePermissionMode(resumeMode, () =>
+        executeRoutedStep({
+          ...continueInOwnedWorkspace(options, current),
+          runtimeEvidenceRefs: permissionDecisionRefs,
+        }),
+      );
       const attemptFinishedAt = new Date().toISOString();
       executedAttempts.push({
         attempt: executedAttempts.length + 1,
@@ -1329,7 +2131,7 @@ export function executeRuntimeHarnessControlledStep(options) {
       ...baseEvidenceRefs,
     ]);
     const repair = executeRoutedStep({
-      ...options,
+      ...continueInOwnedWorkspace(options, current),
       stepClass: "repair",
       stepId: repairStepId,
       requireDiscoveryCompleteness: false,
@@ -1384,7 +2186,7 @@ export function executeRuntimeHarnessControlledStep(options) {
       return current;
     }
 
-    const rerun = executeRoutedStep(options);
+    const rerun = executeRoutedStep(continueInOwnedWorkspace(options, repair));
     persistRuntimeHarnessAttemptLedger(rerun, executedAttempts, "pending");
     current = rerun;
     refreshRuntimeHarnessReportForStep(current);

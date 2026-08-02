@@ -98,6 +98,13 @@ export function buildRouteRegistry(options) {
  *       provider: string | null,
  *       model: string | null,
  *     },
+ *     fallback: Array<{ adapter: string | null, provider: string | null, model: string | null }>,
+ *     retry_policy_ref: string | null,
+ *     repair_policy_ref: string | null,
+ *     requested_model: string | null,
+ *     effective_model: null,
+ *     model_source: "unresolved",
+ *     attempt_budget: number,
  *     required_adapter_capabilities: string[],
  *     constraints: Record<string, unknown>,
  *     promotion_channel: string | null,
@@ -170,6 +177,18 @@ export function resolveRouteForStep(options) {
   const requiredCapabilities = Array.isArray(routeProfile.required_adapter_capabilities)
     ? routeProfile.required_adapter_capabilities.filter((capability) => typeof capability === "string")
     : [];
+  const fallback = Array.isArray(routeProfile.fallback)
+    ? routeProfile.fallback
+        .filter((entry) => typeof entry === "object" && entry !== null)
+        .map((entry) => {
+          const candidate = asRecord(entry);
+          return {
+            adapter: typeof candidate.adapter === "string" ? candidate.adapter : null,
+            provider: typeof candidate.provider === "string" ? candidate.provider : null,
+            model: typeof candidate.model === "string" ? candidate.model : null,
+          };
+        })
+    : [];
 
   return {
     step_class: options.stepClass,
@@ -191,6 +210,15 @@ export function resolveRouteForStep(options) {
         provider: typeof primary.provider === "string" ? primary.provider : null,
         model: typeof primary.model === "string" ? primary.model : null,
       },
+      fallback,
+      retry_policy_ref:
+        typeof routeProfile.retry_policy_ref === "string" ? routeProfile.retry_policy_ref : null,
+      repair_policy_ref:
+        typeof routeProfile.repair_policy_ref === "string" ? routeProfile.repair_policy_ref : null,
+      requested_model: typeof primary.model === "string" ? primary.model : null,
+      effective_model: null,
+      model_source: "unresolved",
+      attempt_budget: 1 + fallback.length,
       required_adapter_capabilities: requiredCapabilities,
       constraints: asRecord(routeProfile.constraints),
       promotion_channel:

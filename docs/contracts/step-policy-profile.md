@@ -23,5 +23,11 @@ Step policies decide how the Runtime Harness reacts after a step finishes. `retr
 Runtime policy resolution merges policy fields with route constraints and project defaults before execution begins.
 Later-maturity governance flows should expose explicit deny/escalation reason codes in resolved policy outputs for delivery/release guardrails.
 
+`retry.on[]`, `repair.on[]`, and `escalation.on[]` are predicates over the
+canonical runner-neutral `failure_class`. A class absent from the selected
+action list cannot consume that action's budget: it escalates only when listed
+by escalation policy and otherwise blocks. No broad retry/repair fallback is
+permitted.
+
 ## Example
 See `examples/policies/*.yaml`.

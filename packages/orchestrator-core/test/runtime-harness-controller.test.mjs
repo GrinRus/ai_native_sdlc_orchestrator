@@ -20,7 +20,7 @@ const fixturesDir = path.join(currentDir, "fixtures");
  * @param {(repoRoot: string) => void} callback
  */
 function withTempRepo(callback) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w24-s01-"));
+  const repoRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-w24-s01-")));
   const gitInit = spawnSync("git", ["init"], { cwd: repoRoot, encoding: "utf8" });
   assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
@@ -47,6 +47,9 @@ function configureCodexExternalRuntime(repoRoot, args) {
     "  evidence_namespace: evidence://adapter-live/codex-cli",
     "  external_runtime:",
     `    command: ${JSON.stringify(process.execPath)}`,
+    "    model_argument:",
+    "      prefix_args: [--]",
+    "      flag: --model",
     "    permission_policy:",
     "      default_mode: full-bypass",
     "      modes:",
@@ -54,6 +57,7 @@ function configureCodexExternalRuntime(repoRoot, args) {
     "          args:",
     ...args.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
+    "    stdin_json_scope: test-only",
     "    timeout_ms: 30000",
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
@@ -63,11 +67,13 @@ function configureCodexExternalRuntime(repoRoot, args) {
 /**
  * @param {string} repoRoot
  * @param {string} runId
+ * @param {string | undefined} projectProfile
  */
-function executeController(repoRoot, runId) {
+function executeController(repoRoot, runId, projectProfile = undefined) {
   return executeRuntimeHarnessRun({
     projectRef: repoRoot,
     cwd: repoRoot,
+    projectProfile,
     stepClass: "implement",
     dryRun: false,
     runId,
@@ -75,6 +81,7 @@ function executeController(repoRoot, runId) {
     approvedHandoffRef: `evidence://handoff/${runId}`,
     promotionEvidenceRefs: [`evidence://promotion/${runId}`],
     executionRoot: repoRoot,
+    unsafeDevelopmentOverride: true,
   });
 }
 
@@ -102,6 +109,26 @@ test("run-level Runtime Harness controller closes a pass flow with run decision 
   });
 });
 
+test("run-level Runtime Harness report preserves an explicit project profile", () => {
+  withTempRepo((repoRoot) => {
+    const projectProfile = path.join(repoRoot, "project.aor.yaml");
+    fs.copyFileSync(path.join(repoRoot, "examples/project.aor.yaml"), projectProfile);
+    fs.writeFileSync(
+      projectProfile,
+      fs.readFileSync(projectProfile, "utf8").replace("project_id: aor-core", "project_id: live-profile"),
+    );
+    configureCodexExternalRuntime(repoRoot, [
+      "-e",
+      "process.stdout.write(JSON.stringify({summary:'pass',output:{result:'pass'},evidence_refs:['evidence://runner/pass']}));",
+    ]);
+
+    const result = executeController(repoRoot, "runtime-harness-profile-pass", projectProfile);
+
+    assert.equal(result.runtimeHarness.report.project_id, "live-profile");
+    assert.match(result.runtimeHarness.reportPath, /\.aor\/projects\/live-profile\/reports\//u);
+  });
+});
+
 test("run-level Runtime Harness controller blocks interactive continuation evidence", () => {
   withTempRepo((repoRoot) => {
     configureCodexExternalRuntime(repoRoot, [
@@ -120,6 +147,7 @@ test("run-level Runtime Harness controller blocks interactive continuation evide
     assert.equal(result.stepResult.failure_class, "interactive-question-requested");
     assert.equal(result.runController.runDecision.terminal_status, "blocked");
     assert.equal(result.runController.runDecision.overall_decision, "block");
+    assert.equal(result.runtimeHarness.report.overall_decision, "block");
     assert.equal(result.runtimeHarness.report.run_controller.status, "blocked");
     assert.equal(result.runtimeHarness.report.run_transitions.at(-1).stage, "block");
   });
@@ -206,6 +234,7 @@ test("run-level Runtime Harness controller records exhausted-repair ownership", 
     assert.equal(result.stepResult.repair_status, "exhausted");
     assert.equal(result.runController.runDecision.terminal_status, "blocked");
     assert.equal(result.runController.runDecision.overall_decision, "block");
+    assert.equal(result.runtimeHarness.report.overall_decision, "block");
     assert.equal(result.runtimeHarness.report.run_decision.repair_status, "exhausted");
     assert.equal(result.runtimeHarness.report.run_transitions.some((transition) => transition.stage === "repair"), true);
   });

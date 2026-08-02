@@ -2,6 +2,8 @@ event_id: event.canonical.1
 run_id: run.canonical
 timestamp: "2026-05-07T00:00:00.000Z"
 event_type: step.updated
+request_key: request.canonical.event.1
+request_digest: 547b4b8880918591e5bf876e6a73693d0725c8c2c0a90c354bcaa31d9a4f2640
 payload:
   sequence: 1
   status: waiting-for-operator

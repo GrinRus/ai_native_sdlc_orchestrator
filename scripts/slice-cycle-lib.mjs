@@ -75,6 +75,29 @@ function parseNumberedList(sectionContent, heading) {
   return [...block.matchAll(/^\d+\.\s+(.+)$/gm)].map((match) => match[1].trim());
 }
 
+function parseDetailedNumberedList(sectionContent, heading) {
+  const block = extractSectionBlock(sectionContent, heading);
+  if (!block) return [];
+  const starts = [...block.matchAll(/^(\d+)\.\s+(.+)$/gm)];
+  return starts.map((match, index) => {
+    const start = match.index ?? 0;
+    const end = index + 1 < starts.length ? (starts[index + 1].index ?? block.length) : block.length;
+    const markdown = block.slice(start, end).trim();
+    const field = (label) => {
+      const fieldMatch = new RegExp(`^\\s+- ${label}:\\s*(.+(?:\\n(?!\\s+- (?:Purpose|Changes|Validation):).+)*)`, "mi").exec(markdown);
+      return fieldMatch ? fieldMatch[1].replace(/\n\s+/gu, " ").trim() : null;
+    };
+    return {
+      number: Number(match[1]),
+      title: match[2].trim(),
+      purpose: field("Purpose"),
+      changes: field("Changes"),
+      validation: field("Validation"),
+      markdown,
+    };
+  });
+}
+
 function parseBulletList(sectionContent, heading) {
   const block = extractSectionBlock(sectionContent, heading);
   if (!block) return [];
@@ -204,6 +227,7 @@ export function parseWaveSlices(content, waveFile) {
     const state = stateMatch[1].trim();
     ensureState(state, `${waveFile} section '${sliceId}'`);
     const externalBlockerMatch = section.match(/^-\s+\*\*External blocker:\*\*\s*(.+)\s*$/m);
+    const epicMatch = section.match(/^-\s+\*\*Epic:\*\*\s*([\s\S]*?)(?=^-\s+\*\*|^###|^##|(?![\s\S]))/m);
 
     slices.set(sliceId, {
       sliceId,
@@ -211,8 +235,9 @@ export function parseWaveSlices(content, waveFile) {
       state,
       hardDependencies: normalizeDeps(depsMatch[1]),
       externalBlocker: externalBlockerMatch ? externalBlockerMatch[1].trim() : null,
+      epicIds: epicMatch ? [...epicMatch[1].matchAll(/EPIC-\d+/gu)].map((match) => match[0]) : [],
       waveFile,
-      localTasks: parseNumberedList(section, "Local tasks"),
+      localTasks: parseDetailedNumberedList(section, "Local tasks"),
       acceptanceCriteria: parseNumberedList(section, "Acceptance criteria"),
       doneEvidence: parseBulletList(section, "Done evidence"),
       outOfScope: parseBulletList(section, "Out of scope"),
@@ -255,6 +280,20 @@ export function loadBacklogModel(rootDir) {
     }
 
     const waveSlice = waveSlices.get(sliceId);
+
+    if (masterSlice.state !== "done" && masterSlice.title !== waveSlice.title) {
+      throw new Error(
+        `Title mismatch for ${sliceId}: master backlog has '${masterSlice.title}', wave doc has '${waveSlice.title}'.`,
+      );
+    }
+
+    const masterEpicIds = [...masterSlice.epic.matchAll(/EPIC-\d+/gu)].map((match) => match[0]).sort();
+    const waveEpicIds = [...waveSlice.epicIds].sort();
+    if (masterSlice.state !== "done" && JSON.stringify(masterEpicIds) !== JSON.stringify(waveEpicIds)) {
+      throw new Error(
+        `Epic mismatch for ${sliceId}: master backlog has '${masterEpicIds.join(", ")}', wave doc has '${waveEpicIds.join(", ")}'.`,
+      );
+    }
 
     if (masterSlice.state !== waveSlice.state) {
       throw new Error(
@@ -309,6 +348,20 @@ export function loadBacklogModel(rootDir) {
     for (const depId of slice.hardDependencies) {
       if (!slices.has(depId)) {
         throw new Error(`Slice '${sliceId}' depends on unknown slice '${depId}'.`);
+      }
+      if ((orderIndex.get(depId) ?? Number.POSITIVE_INFINITY) >= (orderIndex.get(sliceId) ?? -1)) {
+        throw new Error(`Topological order places dependency '${depId}' after or at '${sliceId}'.`);
+      }
+    }
+
+    const waveNumber = Number(/^W(\d+)-/u.exec(sliceId)?.[1] ?? 0);
+    if (waveNumber === 64 || waveNumber >= 66) {
+      for (const [index, task] of slice.localTasks.entries()) {
+        if (!task.purpose || !task.changes || !task.validation) {
+          throw new Error(
+            `${slice.waveFile} ${sliceId} local task ${index + 1} must preserve Purpose, Changes, and Validation detail.`,
+          );
+        }
       }
     }
   }

@@ -22,7 +22,8 @@ import {
   loadContractFile,
   validateContractDocument,
   approveHandoffArtifacts,
-  prepareHandoffArtifacts,
+  approveTaskPlanFromHandoff,
+  showTaskPlan,
   certifyAssetPromotion,
   runDeliveryDriver,
   materializeDeliveryPlan,
@@ -35,6 +36,7 @@ import {
   analyzeProjectRuntime,
   initializeProjectRuntime,
   validateProjectRuntime,
+  planProjectVerification,
   verifyProjectRuntime,
   materializeIntakeArtifactPacket,
   materializeReviewReport,
@@ -91,6 +93,33 @@ export const BOOTSTRAP_COMMAND_GROUP = Object.freeze({
   group_id: "bootstrap",
   commands: BOOTSTRAP_COMMANDS,
 });
+
+/**
+ * @param {string | string[] | true | undefined} value
+ * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
+ */
+function resolveKpiFlags(value) {
+  if (value === undefined) return [];
+  if (value === true) {
+    throw new CliUsageError("Flag '--kpi' requires a value.");
+  }
+  const values = Array.isArray(value) ? value : [value];
+  return values.map((entry, index) => {
+    const [kpiId, name, target, ...measurementParts] = entry.split(":").map((part) => part.trim());
+    const measurement = measurementParts.join(":").trim();
+    if (!kpiId || !name || !target) {
+      throw new CliUsageError(
+        `Flag '--kpi' value ${index + 1} must use 'kpi_id:name:target[:measurement]' format.`,
+      );
+    }
+    return {
+      kpi_id: kpiId,
+      name,
+      target,
+      ...(measurement ? { measurement } : {}),
+    };
+  });
+}
 
 /**
  * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
@@ -169,6 +198,9 @@ export function handleBootstrapCommand(context) {
       requestTitle: resolveOptionalStringFlag("request-title", flags["request-title"]) ?? null,
       requestBrief: resolveOptionalStringFlag("request-brief", flags["request-brief"]) ?? null,
       requestConstraints: resolveOptionalCsvFlag("request-constraints", flags["request-constraints"]),
+      goals: resolveOptionalStringListFlag("goal", flags.goal),
+      kpis: resolveKpiFlags(flags.kpi),
+      definitionOfDone: resolveOptionalStringListFlag("dod", flags.dod),
       requestFile: requestFile ?? null,
       sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
       sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
@@ -299,23 +331,68 @@ export function handleBootstrapCommand(context) {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+    const planOnly = resolveOptionalBooleanFlag("plan", flags.plan);
 
     outputState.validationGateEnforced = resolveOptionalBooleanFlag(
       "require-validation-pass",
       flags["require-validation-pass"],
     );
     outputState.verificationLabel = resolveOptionalStringFlag("verification-label", flags["verification-label"]) ?? "default";
+    const routedDryRunStep = resolveOptionalStringFlag("routed-dry-run-step", flags["routed-dry-run-step"]);
+    const routedLiveStep = resolveOptionalStringFlag("routed-live-step", flags["routed-live-step"]);
+    if (routedDryRunStep && routedLiveStep) {
+      throw new CliUsageError(
+        "Flags '--routed-dry-run-step' and '--routed-live-step' are mutually exclusive.",
+      );
+    }
+    if (planOnly && (routedDryRunStep || routedLiveStep)) {
+      throw new CliUsageError("Flag '--plan' cannot be combined with routed step execution flags.");
+    }
+    if (planOnly && flags["execution-root"] !== undefined) {
+      throw new CliUsageError("Flag '--execution-root' cannot be combined with '--plan'.");
+    }
+
+    if (planOnly) {
+      const planResult = planProjectVerification({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        requireValidationPass: outputState.validationGateEnforced,
+        verificationLabel: outputState.verificationLabel,
+        repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
+        repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
+        repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
+      });
+
+      outputState.resolvedProjectRef = planResult.projectRoot;
+      outputState.resolvedRuntimeRoot = planResult.runtimeRoot;
+      outputState.runtimeLayout = planResult.runtimeLayout;
+      outputState.runtimeStateFile = planResult.stateFile;
+      outputState.projectProfileRef = planResult.projectProfileRef;
+      outputState.validationGateStatus = planResult.validationGateStatus;
+      outputState.verificationPlanFile = planResult.verificationPlanPath;
+      outputState.verificationPlan = planResult.verificationPlan;
+      outputState.verificationPlanCommandGroups = planResult.verificationPlan.command_groups;
+      outputState.verificationPlanDiscoveredCommandGroups = planResult.verificationPlan.discovered_command_groups;
+      return true;
+    }
 
     const verifyResult = verifyProjectRuntime({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      executionRoot: resolveOptionalStringFlag("execution-root", flags["execution-root"]),
       requireValidationPass: outputState.validationGateEnforced,
       verificationLabel: outputState.verificationLabel,
       repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
       repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
       repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
+      outputQualityBaselineFiles: resolveOptionalStringListFlag(
+        "output-quality-baseline",
+        flags["output-quality-baseline"],
+      ),
     });
 
     outputState.resolvedProjectRef = verifyResult.projectRoot;
@@ -327,14 +404,6 @@ export function handleBootstrapCommand(context) {
     outputState.verifySummaryFile = verifyResult.verifySummaryPath;
     outputState.verifyStepResultFiles = verifyResult.stepResultFiles;
 
-    const routedDryRunStep = resolveOptionalStringFlag("routed-dry-run-step", flags["routed-dry-run-step"]);
-    const routedLiveStep = resolveOptionalStringFlag("routed-live-step", flags["routed-live-step"]);
-    if (routedDryRunStep && routedLiveStep) {
-      throw new CliUsageError(
-        "Flags '--routed-dry-run-step' and '--routed-live-step' are mutually exclusive.",
-      );
-    }
-
     const selectedRoutedStep = routedDryRunStep ?? routedLiveStep;
     if (selectedRoutedStep) {
       const routedExecutor = routedLiveStep ? executeRuntimeHarnessControlledStep : executeRoutedStep;
@@ -343,6 +412,10 @@ export function handleBootstrapCommand(context) {
         projectRef: /** @type {string} */ (flags["project-ref"]),
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        unsafeDevelopmentOverride: resolveOptionalBooleanFlag(
+          "unsafe-development-override",
+          flags["unsafe-development-override"],
+        ),
         stepClass: selectedRoutedStep,
         dryRun: routedDryRunStep ? true : false,
         approvedHandoffRef: resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]),
@@ -356,6 +429,10 @@ export function handleBootstrapCommand(context) {
 
       outputState.routedStepResultId = routedResult.stepResultId;
       outputState.routedStepResultFile = routedResult.stepResultPath;
+      outputState.unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
+        "unsafe-development-override",
+        flags["unsafe-development-override"],
+      );
       outputState.verifyStepResultFiles = [...verifyResult.stepResultFiles, routedResult.stepResultPath];
     }
   } else if (command === "spec build") {
@@ -394,47 +471,53 @@ export function handleBootstrapCommand(context) {
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);
 
-    const prepareResult = prepareHandoffArtifacts({
+    const prepareResult = showTaskPlan({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
-      approvedArtifactPath: resolveOptionalStringFlag("approved-artifact", flags["approved-artifact"]),
     });
+    if (["revision-required", "revision-requested"].includes(String(prepareResult.plan.plan_status)) || !prepareResult.handoffPacket) {
+      const error = new Error("A deterministically valid structured plan is required before preparing a handoff.");
+      error.code = "structured-plan-required";
+      throw error;
+    }
 
     outputState.resolvedProjectRef = prepareResult.projectRoot;
     outputState.resolvedRuntimeRoot = prepareResult.runtimeRoot;
     outputState.runtimeLayout = prepareResult.runtimeLayout;
     outputState.runtimeStateFile = prepareResult.stateFile;
     outputState.projectProfileRef = prepareResult.projectProfileRef;
-    outputState.waveTicketId = prepareResult.waveTicket.ticket_id;
-    outputState.waveTicketFile = prepareResult.waveTicketFile;
+    outputState.waveTicketId = prepareResult.plan.ticket_id;
+    outputState.waveTicketFile = prepareResult.planFile;
     outputState.handoffPacketId = prepareResult.handoffPacket.packet_id;
-    outputState.handoffPacketFile = prepareResult.handoffPacketFile;
+    outputState.handoffPacketFile = prepareResult.handoffFile;
     outputState.handoffStatus = prepareResult.handoffPacket.status;
     outputState.handoffApprovalState = prepareResult.handoffPacket.approval_state;
   } else if (command === "wave create") {
     ensureRequiredFlags(command, flags);
 
-    const waveResult = prepareHandoffArtifacts({
+    const waveResult = showTaskPlan({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
-      approvedArtifactPath: resolveOptionalStringFlag("approved-artifact", flags["approved-artifact"]),
     });
+    if (["revision-required", "revision-requested"].includes(String(waveResult.plan.plan_status)) || !waveResult.handoffPacket) {
+      const error = new Error("A deterministically valid structured plan is required before creating a wave.");
+      error.code = "structured-plan-required";
+      throw error;
+    }
 
     outputState.resolvedProjectRef = waveResult.projectRoot;
     outputState.resolvedRuntimeRoot = waveResult.runtimeRoot;
     outputState.runtimeLayout = waveResult.runtimeLayout;
     outputState.runtimeStateFile = waveResult.stateFile;
     outputState.projectProfileRef = waveResult.projectProfileRef;
-    outputState.waveTicketId = waveResult.waveTicket.ticket_id;
-    outputState.waveTicketFile = waveResult.waveTicketFile;
+    outputState.waveTicketId = waveResult.plan.ticket_id;
+    outputState.waveTicketFile = waveResult.planFile;
     outputState.handoffPacketId = waveResult.handoffPacket.packet_id;
-    outputState.handoffPacketFile = waveResult.handoffPacketFile;
+    outputState.handoffPacketFile = waveResult.handoffFile;
     outputState.handoffStatus = waveResult.handoffPacket.status;
     outputState.handoffApprovalState = waveResult.handoffPacket.approval_state;
   } else if (command === "handoff approve") {
@@ -444,23 +527,30 @@ export function handleBootstrapCommand(context) {
       throw new CliUsageError("Missing required flag '--approval-ref' for 'aor handoff approve'.");
     }
 
-    const approveResult = approveHandoffArtifacts({
+    const approvalOptions = {
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       handoffPacketPath: resolveOptionalStringFlag("handoff-packet", flags["handoff-packet"]),
       approvalRef,
-    });
+    };
+    const approveResult = approveTaskPlanFromHandoff(approvalOptions) ?? approveHandoffArtifacts(approvalOptions);
+    const approvedHandoff = approveResult.handoffPacket ?? approveResult.handoff;
 
     outputState.resolvedProjectRef = approveResult.projectRoot;
     outputState.resolvedRuntimeRoot = approveResult.runtimeRoot;
     outputState.runtimeLayout = approveResult.runtimeLayout;
     outputState.runtimeStateFile = approveResult.stateFile;
     outputState.projectProfileRef = approveResult.projectProfileRef;
-    outputState.handoffPacketId = approveResult.handoffPacket.packet_id;
-    outputState.handoffPacketFile = approveResult.handoffPacketFile;
-    outputState.handoffStatus = approveResult.handoffPacket.status;
-    outputState.handoffApprovalState = approveResult.handoffPacket.approval_state;
+    outputState.handoffPacketId = approvedHandoff.packet_id;
+    outputState.handoffPacketFile = approveResult.handoffPacketFile ?? approveResult.handoffFile;
+    outputState.handoffStatus = approvedHandoff.status;
+    outputState.handoffApprovalState = approvedHandoff.approval_state;
+    outputState.executionPlan = approveResult.executionPlan ?? null;
+    outputState.executionPlanFile = approveResult.executionPlanFile ?? null;
+    outputState.taskProgress = approveResult.taskProgress ?? null;
+    outputState.taskProgressFile = approveResult.taskProgressFile ?? null;
 
   } else {
     return false;

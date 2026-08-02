@@ -1,0 +1,46 @@
+prompt_bundle_id: discovery-default
+version: 1
+step_class: artifact
+objective: materialize discovery evidence from mission intake and repository facts
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Produce a discovery packet that names current repository facts, missing facts,
+    constraints, and evidence gaps before downstream research or specification.
+  priorities:
+    - separate observed repository facts from assumptions
+    - preserve mission goals, constraints, KPI, and Definition of Done
+    - name blockers and stale inputs before recommending the next stage
+required_inputs:
+  packets:
+    required:
+      - step-input-context
+    optional:
+      - mission-intake
+      - project-analysis-report
+      - related-packets
+  files:
+    recommended:
+      - README.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - mission-summary
+    - repository-facts
+    - evidence-gaps
+    - constraints
+    - open-questions
+    - next-readiness
+  required_evidence:
+    - source-refs
+    - project-analysis-report
+stop_conditions:
+  - mission-intake-missing
+  - repository-source-unavailable
+  - evidence-insufficient
+redaction_expectations:
+  - never include secrets or tokens in discovery evidence
+  - reference sensitive configuration symbolically
+change_notes:
+  - W44 discovery-specific artifact prompt split

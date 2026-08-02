@@ -39,7 +39,7 @@ mission_scope:
     requires_explicit_review: false
 feature_request:
   title: Catalog-backed feature mission request
-  brief: Prepare one bounded feature mission request for full-journey live E2E.
+  brief: Prepare one bounded feature mission request for a full-journey rehearsal.
   constraints: []
   allowed_paths: []
   forbidden_paths: []

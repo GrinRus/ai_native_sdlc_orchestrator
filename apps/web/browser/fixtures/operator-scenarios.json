@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "catalog_id": "quiet-cockpit.operator-journeys.v1",
+  "primary_persona": "operator-sre",
+  "secondary_persona": "reviewer-qa",
+  "external_network": false,
+  "upstream_writes": false,
+  "scenarios": [
+    {
+      "id": "clean-first-run",
+      "title": "Clean first run",
+      "entry_state": { "initialized": false, "lifecycle": "readiness", "connection": "connected" },
+      "authoritative_evidence": ["project-state", "app-config"],
+      "primary_action": { "category": "mutation", "label": "Initialize project runtime", "operation": "project init" },
+      "blockers": [],
+      "expected_recovery": "Show a write-effect preview before initialization.",
+      "success_signal": "Runtime is initialized only after explicit confirmation.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "mission-invalid",
+      "title": "Invalid Mission intake",
+      "entry_state": { "initialized": true, "lifecycle": "mission", "connection": "connected" },
+      "authoritative_evidence": ["intake-request-body", "operator-error"],
+      "primary_action": { "category": "unavailable", "label": "Create Mission", "operation": null },
+      "blockers": ["mission-fields-invalid"],
+      "expected_recovery": "Focus the first invalid field without invoking a mutation.",
+      "success_signal": "All deterministic field errors are resolved.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "mission-complete",
+      "title": "Complete Mission intake",
+      "entry_state": { "initialized": true, "lifecycle": "mission", "connection": "connected" },
+      "authoritative_evidence": ["intake-request-body", "mission-packet"],
+      "primary_action": { "category": "mutation", "label": "Create Mission evidence", "operation": "mission create" },
+      "blockers": [],
+      "expected_recovery": "Preserve created refs and retry only unresolved next-action work.",
+      "success_signal": "Mission and intake refs are durable and selected Flow is stable.",
+      "coverage": { "viewports": ["desktop", "tablet"], "keyboard": true }
+    },
+    {
+      "id": "active-flow",
+      "title": "Active Flow with one safe action",
+      "entry_state": { "initialized": true, "lifecycle": "discovery", "connection": "connected" },
+      "authoritative_evidence": ["flow-projection", "next-action-report"],
+      "primary_action": { "category": "mutation", "label": "Create discovery evidence", "operation": "discovery run" },
+      "blockers": [],
+      "expected_recovery": "Render a structured OperatorError and retain the selected Flow.",
+      "success_signal": "The durable next-action report advances exactly once.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "partial-mutation",
+      "title": "Partial multi-step mutation",
+      "entry_state": { "initialized": true, "lifecycle": "mission", "connection": "partial" },
+      "authoritative_evidence": ["mission-packet", "next-action-report", "operator-error"],
+      "primary_action": { "category": "refresh", "label": "Resolve next action", "operation": "next" },
+      "blockers": ["next-action-incomplete"],
+      "expected_recovery": "Reuse existing Mission refs and resume only the incomplete operation.",
+      "success_signal": "No duplicate Mission or intake evidence is created.",
+      "coverage": { "viewports": ["desktop"], "keyboard": true }
+    },
+    {
+      "id": "queued-human-work",
+      "title": "Multiple interactions and decisions",
+      "entry_state": { "initialized": true, "lifecycle": "execution", "connection": "connected" },
+      "authoritative_evidence": ["interaction-request", "review-decision", "run-event"],
+      "primary_action": { "category": "workbench", "label": "Review pending interaction", "operation": "open-attention" },
+      "blockers": ["interaction-required", "decision-required"],
+      "expected_recovery": "Preserve independent selection, draft, and refs for every item.",
+      "success_signal": "Durable completion advances to the next unresolved item.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "provider-progress",
+      "title": "Provider progress",
+      "entry_state": { "initialized": true, "lifecycle": "execution", "connection": "connected" },
+      "authoritative_evidence": ["run-job", "live-run-event", "runtime-harness-report"],
+      "primary_action": { "category": "evidence", "label": "Inspect active run", "operation": "open-run" },
+      "blockers": [],
+      "expected_recovery": "Show stale heartbeat or supported run controls from durable state.",
+      "success_signal": "Terminal status and event cursor survive reconnect.",
+      "coverage": { "viewports": ["desktop", "tablet"], "keyboard": true }
+    },
+    {
+      "id": "verification-failure",
+      "title": "Required verification failure",
+      "entry_state": { "initialized": true, "lifecycle": "review", "connection": "connected" },
+      "authoritative_evidence": ["verification-report", "operator-error", "next-action-report"],
+      "primary_action": { "category": "workbench", "label": "Review failed verification", "operation": "open-verification" },
+      "blockers": ["required-verification-failed"],
+      "expected_recovery": "Expose consequence, command evidence, and catalog-owned recovery actions.",
+      "success_signal": "A passing fresh verification report replaces the blocker.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "bounded-repair",
+      "title": "Bounded repair",
+      "entry_state": { "initialized": true, "lifecycle": "repair", "connection": "connected" },
+      "authoritative_evidence": ["quality-repair-request", "runtime-harness-report", "review-report"],
+      "primary_action": { "category": "mutation", "label": "Run approved repair", "operation": "run retry" },
+      "blockers": ["quality-repair-required"],
+      "expected_recovery": "Keep the parent blocked when the repair budget is exhausted.",
+      "success_signal": "Repair closure cites the accepted attempt and fresh verification.",
+      "coverage": { "viewports": ["desktop"], "keyboard": true }
+    },
+    {
+      "id": "completed-read-only",
+      "title": "Completed read-only closure",
+      "entry_state": { "initialized": true, "lifecycle": "completed", "connection": "connected" },
+      "authoritative_evidence": ["flow-projection", "release-packet", "learning-loop-handoff"],
+      "primary_action": { "category": "evidence", "label": "Inspect closure evidence", "operation": "open-evidence" },
+      "blockers": [],
+      "expected_recovery": "Keep completed evidence immutable.",
+      "success_signal": "Closure remains readable without mutation controls.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "follow-up-flow",
+      "title": "Follow-up Flow",
+      "entry_state": { "initialized": true, "lifecycle": "completed", "connection": "connected" },
+      "authoritative_evidence": ["learning-loop-handoff", "intake-request-body", "flow-projection"],
+      "primary_action": { "category": "mutation", "label": "Start follow-up Flow", "operation": "mission create" },
+      "blockers": [],
+      "expected_recovery": "Preserve source closure and retry only new-Flow creation.",
+      "success_signal": "A new Flow cites the handoff while the source Flow stays unchanged.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    },
+    {
+      "id": "partial-offline-reads",
+      "title": "Partial and offline reads",
+      "entry_state": { "initialized": true, "lifecycle": "execution", "connection": "offline" },
+      "authoritative_evidence": ["project-snapshot", "operator-error", "live-run-event"],
+      "primary_action": { "category": "refresh", "label": "Refresh state", "operation": "refresh" },
+      "blockers": ["authoritative-state-stale"],
+      "expected_recovery": "Retain last-known data, label failed resources, and disable unsafe mutations.",
+      "success_signal": "Reconnect refreshes only failed reads and revalidates action safety.",
+      "coverage": { "viewports": ["desktop", "mobile"], "keyboard": true }
+    }
+  ]
+}

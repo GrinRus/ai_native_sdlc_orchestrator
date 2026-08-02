@@ -1,6 +1,6 @@
-packet_id: HANDOFF-004
+packet_id: handoff-004
 project_id: aor-core
-ticket_id: WAVE-004
+ticket_id: wave-004
 version: 2
 status: approved
 risk_tier: medium
@@ -23,6 +23,40 @@ allowed_paths:
 allowed_commands:
   - pnpm lint
   - pnpm test
+goals:
+  - Implement bounded multirepo support without unscoped cross-repository writes.
+definition_of_done:
+  - Repo graph, scoped locks, delivery manifest, and integration validation evidence are linked.
+local_tasks:
+  - task_id: local-task.implementation
+    objective: Add bounded multirepo support across backend, mobile, and frontend scopes.
+    allowed_paths:
+      - repos/backend/**
+      - repos/mobile/**
+      - repos/frontend/**
+    acceptance_criteria:
+      - Repo graph, scoped locks, delivery manifest, and integration validation evidence are linked.
+    expected_evidence:
+      - review-report
+      - delivery-manifest
+  - task_id: local-task.verification
+    objective: Run bounded repository checks for the approved multirepo scope.
+    verification_commands:
+      - pnpm test
+    expected_evidence:
+      - verify-summary
+acceptance_criteria:
+  - Repo graph, scoped locks, delivery manifest, and integration validation evidence are linked.
+expected_evidence:
+  - verify-summary
+  - review-report
+  - delivery-manifest
+verification_expectations:
+  primary_commands:
+    - pnpm test
+  diagnostic_commands:
+    - pnpm lint
+  diagnostic_failure_mode: warn
 scope_constraints:
   max_changed_files: 18
   enforce_repo_scope: true
@@ -46,6 +80,33 @@ verification_plan:
     - contract-shape
     - repo-scope
     - evidence-complete
+  command_groups:
+    - id: post-change-test
+      repo_id: backend
+      role: test
+      phase: post-change
+      enforcement: required
+      timeout_class: focused-test
+      working_dir: .
+      detected_from:
+        - package.json#scripts.test
+      package_manager: pnpm
+      commands:
+        - pnpm test
+    - id: diagnostic-lint
+      repo_id: backend
+      role: lint
+      phase: diagnostic
+      enforcement: warn
+      timeout_class: quick
+      depends_on:
+        - post-change-test
+      skip_policy:
+        outcome: not-applicable
+        applies_when: lint script is absent from the target package manifest.
+        reason: Diagnostic lint is informative and must not become acceptance evidence.
+      commands:
+        - pnpm lint
   commands:
     - pnpm test
 route_overrides:
@@ -55,7 +116,7 @@ approval_refs:
 baseline_refs:
   - route://route.implement.default@stable
 coordination_refs:
-  - evidence://coordination/WAVE-004/backend-mobile-frontend
+  - evidence://coordination/wave-004/backend-mobile-frontend
 integration_validation_refs:
   - validation://integration/backend-frontend/api-contract
   - validation://integration/backend-mobile/api-contract

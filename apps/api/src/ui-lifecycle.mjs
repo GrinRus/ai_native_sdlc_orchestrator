@@ -1,1 +1,1 @@
-export * from "../../../packages/orchestrator-core/src/control-plane/ui-lifecycle.mjs";
+export { attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../../../packages/orchestrator-core/src/control-plane/ui-lifecycle.mjs";

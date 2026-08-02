@@ -1,4 +1,4 @@
-decision_id: fixture-review-mission.review-decision.approve.2026-05-06T00-00-00Z
+decision_id: fixture-review-mission.review-decision.approve.2026-05-06t00-00-00z
 project_id: aor-core
 run_id: fixture-review-mission
 decision: approve
@@ -13,6 +13,19 @@ decision_basis:
   review_recommendation: proceed
   runtime_harness_overall_decision: pass
   blocking_findings: []
+repair_context:
+  source_phase: none
+  cycle_iteration: 0
+  unresolved_findings: []
+  unresolved_finding_details: []
+  meaningful_changed_paths: []
+  verification_status: pass
+  verification_refs: []
+  previous_repair_decision_refs: []
+  context_fingerprint: none
+  new_context_since_previous: []
+  stop_reason: none
+  requested_next_step: none
 delivery_gate:
   status: pass
   blocks_downstream: false

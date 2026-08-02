@@ -4,7 +4,7 @@ Use this runbook when a connected operator surface attaches to the detached HTTP
 
 ## Modes
 
-- `local-trusted`: default loopback mode for local CLI, tests, and harness workflows. Auth may be disabled, but route permission metadata and redaction helpers still exist.
+- `local-trusted`: default same-account mode for local CLI, tests, and harness workflows. It binds only to literal `127.0.0.1` or `::1`, validates canonical Host and browser Origin, and bounds JSON mutation bodies. Auth may be disabled because other processes under the same OS account are inside this topology's trust boundary.
 - `production-hardened`: connected transport mode that requires bearer credentials for reads, streams, and mutations.
 
 ## Operator checks
@@ -15,6 +15,10 @@ Before starting production-hardened transport:
 - scope principals to the expected `project_id` unless cross-project read automation is intentional;
 - configure any extra redaction values that should be treated as secrets;
 - keep upstream Git/provider permissions separate from AOR transport auth.
+
+Use `docs/ops/self-hosted-environment-matrix.md` to choose the operating mode
+and `docs/ops/self-hosted-secrets-and-redaction.md` to place bearer tokens,
+runner credentials, and local redaction values outside committed files.
 
 ## Denied actions
 

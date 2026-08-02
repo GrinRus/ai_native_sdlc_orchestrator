@@ -10,6 +10,7 @@ repos:
       root: .
     default_branch: main
     role: application
+    workspace_mount: repos/main
     build_commands:
       - pnpm build
     test_commands:
@@ -17,6 +18,27 @@ repos:
     lint_commands:
       - pnpm lint
 repo_graph: []
+components:
+  - component_id: api
+    repo_id: main
+    name: Control-plane API
+    root: apps/api
+    role: service
+    command_group_refs:
+      - baseline-test
+  - component_id: web
+    repo_id: main
+    name: Operator console
+    root: apps/web
+    role: application
+    command_group_refs:
+      - baseline-build
+component_graph:
+  - from_component_id: web
+    to_component_id: api
+    relationship: consumes
+    validation_refs:
+      - validation://integration/web-api/control-plane
 allowed_providers:
   - openai
   - anthropic
@@ -64,9 +86,9 @@ default_wrapper_profiles:
   eval: wrapper.eval.default@v1
   harness: wrapper.harness.default@v1
 default_prompt_bundles:
-  discovery: prompt-bundle://artifact-default@v1
-  research: prompt-bundle://artifact-default@v1
-  spec: prompt-bundle://artifact-default@v1
+  discovery: prompt-bundle://discovery-default@v1
+  research: prompt-bundle://research-default@v1
+  spec: prompt-bundle://spec-default@v1
   planning: prompt-bundle://planner-default@v1
   implement: prompt-bundle://runner-default@v3
   review: prompt-bundle://runner-default@v3
@@ -127,6 +149,15 @@ security_policy:
 eval_policy:
   required_for_release: true
   default_release_suite_ref: suite.release.core@v1
+quality_repair_policy:
+  policy_ref: project-profile://aor-core#quality_repair_policy
+  max_attempts_per_cycle: 2
+  requires_review_after_repair: true
+  requires_qa_after_passing_review: true
+  budget_exhausted_requires_operator_approval: true
+  blocks_delivery_while_open: true
+  qa_in_scope_stages:
+    - qa
 runtime_defaults:
   runtime_root: .aor
   workspace_mode: ephemeral

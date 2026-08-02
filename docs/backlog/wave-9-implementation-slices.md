@@ -104,7 +104,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ### Done evidence
 - updated control-plane API and operator-surface docs
-- refreshed API/web smoke fixtures or transcripts aligned with the corrected wording
+- refreshed API/app smoke fixtures or transcripts aligned with the corrected wording
 - explicit deferred-transport references linked to `W9-S07`
 
 ### Out of scope

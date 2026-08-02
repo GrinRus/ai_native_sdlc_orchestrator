@@ -2,7 +2,7 @@ handoff_id: handoff.canonical
 project_id: aor-example
 run_id: run.canonical
 run_status: pass
-source_kind: live-e2e
+source_kind: runtime-harness
 scorecard_ref: scorecard://scorecard.canonical
 incident_ref: null
 backlog_refs:

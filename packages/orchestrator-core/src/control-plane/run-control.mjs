@@ -1,3 +1,6 @@
+import crypto from "node:crypto";
+import path from "node:path";
+import { withFileLock } from "../../../observability/src/index.mjs";
 import { applyRunControlAction as applyRunControlActionCore, readRunControlState as readRunControlStateCore } from "../run-control.mjs";
 
 import { appendRunEvent } from "./live-event-stream.mjs";
@@ -62,6 +65,9 @@ function buildPrimaryPayload(result) {
       control_action: result.action,
       blocked: true,
       audit_id: result.auditRecord.audit_id,
+      evidence_refs: Array.isArray(result.auditRecord.blocking_evidence_refs)
+        ? result.auditRecord.blocking_evidence_refs
+        : [],
       policy_context: policyContext,
     };
   }
@@ -101,31 +107,44 @@ function buildPrimaryPayload(result) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId?: string,
  *   action: "start" | "pause" | "resume" | "steer" | "cancel",
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   executionPlanRef?: string,
+ *   executionUnitId?: string,
+ *   taskRefs?: string[],
+ *   workspaceSetRef?: string,
+ *   executionRoot?: string,
+ *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
+ *   commandId?: string,
+ *   expectedRevision?: number,
  * }} options
  */
-export function applyRunControlAction(options) {
+function applyRunControlActionWithEvents(options) {
   const result = applyRunControlActionCore(options);
+  const eventRequestPrefix = `event-command-${crypto.createHash("sha256").update(result.commandId).digest("hex").slice(0, 24)}`;
   const primaryEventType = resolveLiveEventType(result.action, result.blocked);
   const primaryEvent = appendRunEvent({
     cwd: options.cwd,
     projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
     redactionPolicy: options.redactionPolicy,
     runId: result.runId,
     eventType: primaryEventType,
     payload: buildPrimaryPayload(result),
+    requestKey: `${eventRequestPrefix}.primary`,
   });
 
   const evidenceEvent = appendRunEvent({
     cwd: options.cwd,
     projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
     redactionPolicy: options.redactionPolicy,
     runId: result.runId,
@@ -135,9 +154,13 @@ export function applyRunControlAction(options) {
       control_audit_file: result.auditFile,
       control_state_file: result.stateFile,
       blocked: result.blocked,
+      blocking_evidence_refs: Array.isArray(result.auditRecord.blocking_evidence_refs)
+        ? result.auditRecord.blocking_evidence_refs
+        : [],
       evidence_root: result.runtimeLayout.reportsRoot,
       policy_context: buildPolicyContext(result),
     },
+    requestKey: `${eventRequestPrefix}.evidence`,
   });
 
   return {
@@ -146,6 +169,14 @@ export function applyRunControlAction(options) {
     evidenceEvent: evidenceEvent.event,
     streamLogFile: evidenceEvent.logFile,
   };
+}
+
+export function applyRunControlAction(options) {
+  const projectRootHint = path.resolve(options.projectRef ?? options.cwd ?? process.cwd());
+  const runtimeRootHint = options.runtimeRoot
+    ? path.resolve(projectRootHint, options.runtimeRoot)
+    : path.join(projectRootHint, ".aor");
+  return withFileLock(`${runtimeRootHint}.run-control-events.lock`, () => applyRunControlActionWithEvents(options));
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "@grinrus/aor",
   "private": false,
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.15",
   "description": "AI-native SDLC orchestrator CLI for bounded packets, evidence, reviews, and delivery decisions.",
   "license": "Apache-2.0",
   "type": "module",
@@ -11,6 +11,7 @@
   "files": [
     "apps/cli/bin",
     "apps/cli/src",
+    "apps/web/dist",
     "packages/adapter-sdk/src",
     "packages/contracts/src",
     "packages/harness/src",
@@ -34,7 +35,12 @@
     "docs/contracts",
     "docs/ops/npm-cli-alpha-release.md",
     "docs/ops/production-readiness-gate.md",
+    "docs/ops/project-topology-onboarding.md",
+    "docs/ops/self-hosted-backup-restore.md",
+    "docs/ops/self-hosted-environment-matrix.md",
+    "docs/ops/self-hosted-incident-runbook.md",
     "docs/ops/self-hosted-release.md",
+    "docs/ops/self-hosted-secrets-and-redaction.md",
     "CHANGELOG.md",
     "README.md",
     "LICENSE"
@@ -53,16 +59,25 @@
   },
   "scripts": {
     "build": "node ./scripts/build.mjs",
-    "test": "node ./scripts/test.mjs",
+    "web:build": "vite build --config apps/web/vite.config.mjs && node ./scripts/web-dist-freshness.mjs write",
+    "test:web:browser": "playwright test --config apps/web/playwright.config.mjs",
+    "test": "node ./scripts/test-runner.mjs",
+    "typecheck": "node ./scripts/typecheck-ratchet.mjs",
+    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/contract-kernel-parity.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",
-    "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm quality:ratchet && pnpm release:verify",
     "production:ready": "node ./scripts/production-readiness.mjs",
+    "w58:proof": "node ./scripts/w58-runtime-quality-proof.mjs",
+    "w61:proof": "node ./scripts/w61-topology-onboarding-proof.mjs",
+    "w62:proof": "node ./scripts/w62-full-flow-proof.mjs",
+    "w66:freeze": "node ./scripts/w66-qualification-manifest.mjs",
+    "audit:prod:bulk": "node ./scripts/dependency-audit-bulk.mjs",
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
     "release:smoke": "node ./scripts/release-smoke.mjs",
-    "release:gate": "pnpm check && pnpm production:ready && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
+    "release:gate": "pnpm check && pnpm test:web:browser && pnpm production:ready && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
     "slice:status": "node ./scripts/slice-cycle.mjs status",
     "slice:next": "node ./scripts/slice-cycle.mjs next",
     "slice:plan": "node ./scripts/slice-cycle.mjs plan",
@@ -72,5 +87,16 @@
   },
   "dependencies": {
     "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.20.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "ajv": "^8.20.0",
+    "eslint": "^9.39.5",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "typescript": "^5.9.3",
+    "vite": "^8.1.4"
   }
 }

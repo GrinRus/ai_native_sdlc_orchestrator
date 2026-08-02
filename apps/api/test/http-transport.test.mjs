@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { request as httpRequest } from "node:http";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
+import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -19,6 +23,221 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
 async function withTempRepo(callback) {
   await withTempRepoHelper({ prefix: "aor-w9-s07-api-http-", workspaceRoot }, callback);
 }
+
+function rawHttp(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    let responseStarted = false;
+    const request = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: `${target.pathname}${target.search}`,
+      method: options.method ?? "GET",
+      headers: options.headers,
+      agent: false,
+    }, (response) => {
+      responseStarted = true;
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => resolve({
+        status: response.statusCode,
+        headers: response.headers,
+        body: Buffer.concat(chunks).toString("utf8"),
+      }));
+    });
+    request.once("error", (error) => {
+      if (!responseStarted) reject(error);
+    });
+    for (const chunk of options.bodyChunks ?? []) request.write(chunk);
+    if (options.end !== false) request.end();
+  });
+}
+
+function byteSnapshot(root) {
+  const entries = [];
+  const visit = (directory) => {
+    for (const name of fs.readdirSync(directory).sort()) {
+      if (name === ".git") continue;
+      const absolute = path.join(directory, name);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      const stat = fs.lstatSync(absolute);
+      if (stat.isDirectory()) {
+        entries.push([relative, "directory"]);
+        visit(absolute);
+      } else {
+        entries.push([relative, stat.isSymbolicLink() ? `symlink:${fs.readlinkSync(absolute)}` : fs.readFileSync(absolute).toString("base64")]);
+      }
+    }
+  };
+  visit(root);
+  return entries;
+}
+
+/**
+ * @param {{ family: import("../../../packages/contracts/src/index.d.ts").ContractFamily, filePath: string, document: Record<string, unknown> }} options
+ */
+function writeContractFile(options) {
+  const validation = validateContractDocument({
+    family: options.family,
+    document: options.document,
+    source: `runtime://${options.family}`,
+  });
+  assert.equal(validation.ok, true, `${options.family} fixture must pass contract validation`);
+  fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {{ repoRoot: string, count: number }} options
+ * @returns {ReturnType<typeof initializeProjectRuntime>}
+ */
+function seedPromotionDecisions(options) {
+  const init = initializeProjectRuntime({ projectRef: options.repoRoot, cwd: options.repoRoot });
+  for (let index = 0; index < options.count; index += 1) {
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, `promotion-decision-scale-${String(index).padStart(3, "0")}.json`),
+      document: {
+        decision_id: `${init.projectId}.promotion.scale.${index}`,
+        subject_ref: "wrapper://wrapper.runner.default@v3",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          reason: "seed fixture for bounded read-model smoke test",
+        },
+        status: "pass",
+      },
+    });
+  }
+  return init;
+}
+
+test("detached control-plane source checkout smoke command verifies local API transport", async () => {
+  await withTempRepo((repoRoot) => {
+    const runtimeRoot = path.join(repoRoot, ".aor-smoke");
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(workspaceRoot, "apps/api/scripts/control-plane-smoke.mjs"),
+        "--project-ref",
+        repoRoot,
+        "--runtime-root",
+        runtimeRoot,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "0",
+        "--json",
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.status, "ready");
+    assert.match(payload.base_url, /^http:\/\/127\.0\.0\.1:\d+$/u);
+    assert.match(payload.state_url, /^http:\/\/127\.0\.0\.1:\d+\/api\/projects\/[^/]+\/state$/u);
+    assert.equal(payload.serve, false);
+    assert.equal(payload.preview_initialized, false);
+    assert.equal(payload.init_blocked, false);
+    assert.equal(payload.initialized, true);
+    assert.equal(fs.existsSync(path.join(runtimeRoot, "projects", payload.project_id, "state", "project-init-state.json")), true);
+  });
+});
+
+test("local-trusted transport accepts only literal IPv4 and IPv6 loopback binds", async () => {
+  await withTempRepo(async (repoRoot) => {
+    for (const host of ["localhost", "0.0.0.0", "::", "127.0.0.2", "::ffff:127.0.0.1"]) {
+      await assert.rejects(
+        async () => createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host, port: 0 }),
+        /literal loopback/u,
+      );
+      assert.equal(fs.existsSync(path.join(repoRoot, ".aor")), false);
+    }
+
+    const ipv6 = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "::1", port: 0 });
+    try {
+      assert.match(ipv6.baseUrl, /^http:\/\/\[::1\]:\d+$/u);
+      const response = await fetch(`${ipv6.baseUrl}/api/projects`);
+      assert.equal(response.status, 200);
+    } finally {
+      await ipv6.close();
+    }
+  });
+});
+
+test("local app rejects spoofed Host, cross-origin browser writes, and unsafe media types before mutation", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const before = byteSnapshot(repoRoot);
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const mutationUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`;
+    try {
+      const spoofedHost = await rawHttp(`${transport.baseUrl}/api/projects`, { headers: { host: "attacker.invalid" } });
+      assert.equal(spoofedHost.status, 400);
+
+      for (const headers of [
+        { origin: "http://attacker.invalid", "content-type": "application/json" },
+        { origin: "null", "content-type": "application/json" },
+        { "sec-fetch-site": "cross-site", "content-type": "application/json" },
+      ]) {
+        const rejected = await rawHttp(mutationUrl, { method: "POST", headers, bodyChunks: [JSON.stringify({ action: "attach" })] });
+        assert.equal(rejected.status, 403);
+      }
+
+      const textPlain = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { origin: transport.baseUrl, "content-type": "text/plain" },
+        bodyChunks: [JSON.stringify({ action: "attach" })],
+      });
+      assert.equal(textPlain.status, 415);
+      assert.deepEqual(byteSnapshot(repoRoot), before);
+
+      const sameOrigin = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { origin: transport.baseUrl, "content-type": "application/merge-patch+json" },
+        bodyChunks: [JSON.stringify({ action: "attach" })],
+      });
+      assert.equal(sameOrigin.status, 200);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("mutation bodies enforce declared, incremental, and time bounds without domain writes", { timeout: 15000 }, async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const mutationUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`;
+    try {
+      const declared = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": String(1024 * 1024 + 1) },
+      });
+      assert.equal(declared.status, 413);
+
+      const incremental = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        bodyChunks: [Buffer.alloc(700000, 0x20), Buffer.alloc(400000, 0x20)],
+      });
+      assert.equal(incremental.status, 413, incremental.body);
+
+      const timedOut = await rawHttp(mutationUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        bodyChunks: ["{"],
+        end: false,
+      });
+      assert.equal(timedOut.status, 408);
+      assert.equal(fs.existsSync(path.join(repoRoot, ".aor")), false);
+    } finally {
+      await transport.close();
+    }
+  });
+});
 
 /**
  * @param {Response} response
@@ -168,6 +387,19 @@ function writeApprovedClosureArtifacts(runtimeLayout, projectId, runId) {
       runtime_harness_overall_decision: "pass",
       blocking_findings: [],
     },
+    repair_context: {
+      source_phase: "none",
+      cycle_iteration: 0,
+      unresolved_findings: [],
+      meaningful_changed_paths: [],
+	      verification_status: "pass",
+	      verification_refs: [],
+	      previous_repair_decision_refs: [],
+	      context_fingerprint: "none",
+	      new_context_since_previous: [],
+	      stop_reason: "none",
+	      requested_next_step: "none",
+	    },
     delivery_gate: {
       status: "pass",
       blocks_downstream: false,
@@ -225,6 +457,22 @@ async function postJsonWithToken(url, payload, token = null) {
   });
 }
 
+async function waitForRunJob(file, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastJob = null;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(file)) {
+      const job = JSON.parse(fs.readFileSync(file, "utf8"));
+      lastJob = job;
+      if (["succeeded", "failed", "canceled", "waiting-input"].includes(job.status)) return job;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(
+    `timed out waiting for run job '${file}'; last status=${lastJob?.status ?? "missing"}, revision=${lastJob?.revision ?? "missing"}`,
+  );
+}
+
 test("detached control-plane transport serves read baseline endpoints", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.read.v1";
@@ -277,7 +525,7 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
       assert.equal(stateResponse.status, 200);
       const state = await stateResponse.json();
-      assert.equal(state.project_root, repoRoot);
+      assert.equal(state.project_root, fs.realpathSync.native(repoRoot));
 
       const runsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs`);
       assert.equal(runsResponse.status, 200);
@@ -364,6 +612,43 @@ test("detached control-plane transport serves read baseline endpoints", async ()
   });
 });
 
+test("detached control-plane read routes bound large runtime artifact windows", async () => {
+  await withTempRepo(async (repoRoot) => {
+    seedPromotionDecisions({ repoRoot, count: 225 });
+
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const defaultResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions`);
+      assert.equal(defaultResponse.status, 200);
+      const defaultDecisions = await defaultResponse.json();
+      assert.equal(defaultDecisions.length <= 200, true);
+      assert.equal(defaultDecisions.length > 0, true);
+
+      const explicitLimitResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions?limit=5`,
+      );
+      assert.equal(explicitLimitResponse.status, 200);
+      const explicitLimitDecisions = await explicitLimitResponse.json();
+      assert.equal(explicitLimitDecisions.length, 5);
+
+      const cappedLimitResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions?limit=5000`,
+      );
+      assert.equal(cappedLimitResponse.status, 200);
+      const cappedLimitDecisions = await cappedLimitResponse.json();
+      assert.equal(cappedLimitDecisions.length, 225);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("detached control-plane transport streams follow events through SSE", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.follow.v1";
@@ -406,20 +691,36 @@ test("detached control-plane transport streams follow events through SSE", async
       assert.equal(streamResponse.status, 200);
 
       const nextEventPromise = readNextLiveRunEvent(streamResponse, { timeoutMs: 3000 });
+      const providerHeartbeatAt = new Date().toISOString();
       appendRunEvent({
         projectRef: repoRoot,
         cwd: repoRoot,
         runId,
-        eventType: "warning.raised",
+        eventType: "provider.heartbeat",
         payload: {
-          code: "scope.target_step_required",
-          summary: "Transport follow smoke warning.",
+          step_id: "run.start.implement",
+          status: "running",
+          summary: "Provider heartbeat is visible through SSE.",
+          provider_step_status: {
+            provider: "codex",
+            adapter: "codex-cli",
+            route_id: "route.implement.default",
+            step_id: "run.start.implement",
+            status: "running",
+            timeout_budget_ms: 300_000,
+            started_at: providerHeartbeatAt,
+            last_output_at: providerHeartbeatAt,
+          },
         },
+        timestamp: providerHeartbeatAt,
       });
 
       const streamed = await nextEventPromise;
-      assert.equal(streamed.event_type, "warning.raised");
-      assert.equal(streamed.summary, "Transport follow smoke warning.");
+      assert.equal(streamed.event_type, "provider.heartbeat");
+      assert.equal(streamed.summary, "Provider heartbeat is visible through SSE.");
+      assert.equal(streamed.provider_step_status.provider, "codex");
+      assert.equal(streamed.provider_step_status.status, "running");
+      assert.equal(Object.hasOwn(streamed.provider_step_status, "state_file"), false);
       controller.abort();
     } finally {
       await transport.close();
@@ -543,6 +844,18 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(fs.existsSync(successPayload.lifecycle_command.command_output.artifact_packet_file), true);
       assert.ok(successPayload.lifecycle_command.artifact_refs.includes(successPayload.lifecycle_command.command_output.artifact_packet_file));
 
+      const invalidFlagsResponse = await postJson(commandUrl, {
+        command: "intake create",
+        flags: { request_titel: "typo must fail before invocation" },
+      });
+      assert.equal(invalidFlagsResponse.status, 400);
+      const invalidFlagsPayload = await invalidFlagsResponse.json();
+      assert.equal(invalidFlagsPayload.error.code, "invalid_lifecycle_flags");
+      assert.equal(invalidFlagsPayload.error.phase, "lifecycle");
+      assert.equal(invalidFlagsPayload.error.message, invalidFlagsPayload.error.detail);
+      assert.deepEqual(invalidFlagsPayload.error.field_errors, []);
+      assert.ok(Array.isArray(invalidFlagsPayload.error.recovery_actions));
+
       const missionResponse = await postJson(commandUrl, {
         command: "mission create",
         flags: {
@@ -554,6 +867,7 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
           allowed_path: "apps/web/**",
           forbidden_path: "secrets/**",
           delivery_mode: "patch-only",
+          "follow-up-source-handoff-ref": "evidence://reports/learning-loop-handoff-run.previous.json",
           source_kind: "local-note",
           source_ref: "docs/ops/ui-attach-detach.md",
         },
@@ -562,7 +876,28 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const missionPayload = await missionResponse.json();
       assert.equal(missionPayload.lifecycle_command.command, "mission create");
       assert.equal(missionPayload.lifecycle_command.blocked, false);
+      assert.equal(
+        missionPayload.lifecycle_command.command_output.follow_up_source_handoff_ref,
+        "evidence://reports/learning-loop-handoff-run.previous.json",
+      );
       assert.equal(missionPayload.lifecycle_command.command_output.product_intake_completeness.status, "complete");
+      const missionBody = JSON.parse(
+        fs.readFileSync(missionPayload.lifecycle_command.command_output.artifact_packet_body_file, "utf8"),
+      );
+      assert.equal(
+        missionBody.mission_traceability.coverage_follow_up.follow_up_source_handoff_ref,
+        "evidence://reports/learning-loop-handoff-run.previous.json",
+      );
+
+      const packetsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/packets`);
+      assert.equal(packetsResponse.status, 200);
+      const packetsPayload = await packetsResponse.json();
+      assert.equal(
+        packetsPayload.some(
+          (entry) => entry.family === "artifact-packet" && entry.document.packet_type === "intake-request",
+        ),
+        true,
+      );
 
       const nextResponse = await postJson(commandUrl, {
         command: "next",
@@ -579,7 +914,83 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const nextReportPayload = await nextReportResponse.json();
       assert.equal(nextReportPayload.family, "next-action-report");
       assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
+      assert.equal(nextReportPayload.document.artifact_readiness.stages.discovery.status, "pending");
       assert.equal(nextReportPayload.document.closure_state.run_id, null);
+
+      const flowsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows`);
+      assert.equal(flowsResponse.status, 200);
+      const flowsPayload = await flowsResponse.json();
+      assert.equal(flowsPayload.read_only, true);
+      assert.ok(flowsPayload.active_flow_ids.includes(`flow.${transport.projectId}.web-guided-flow`));
+      assert.equal(flowsPayload.completed_flow_ids.length, 0);
+
+      const selectedFlowResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows/selected`);
+      assert.equal(selectedFlowResponse.status, 200);
+      const selectedFlowPayload = await selectedFlowResponse.json();
+      assert.equal(selectedFlowPayload.flow_id, `flow.${transport.projectId}.web-guided-flow`);
+      assert.equal(selectedFlowPayload.status, "active");
+
+      const flowDetailResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}`,
+      );
+      assert.equal(flowDetailResponse.status, 200);
+      const flowDetailPayload = await flowDetailResponse.json();
+      assert.equal(flowDetailPayload.latest_next_action_report_ref.includes("next-action-report"), true);
+
+      const targetedRequestResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/operator-requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          target_flow_id: selectedFlowPayload.flow_id,
+          target_stage: "discovery",
+          intent_type: "analyze",
+          request_text: "RAW WEB FLOW TARGET TEXT",
+          target_refs: [flowDetailPayload.intake_packet_ref],
+          delivery_mode: "no-write",
+        }),
+      });
+      assert.equal(targetedRequestResponse.status, 201);
+      const targetedRequestPayload = await targetedRequestResponse.json();
+      assert.equal(targetedRequestPayload.operator_request.document.target_flow_id, selectedFlowPayload.flow_id);
+      assert.equal(Object.hasOwn(targetedRequestPayload.operator_request.document, "request_text"), false);
+
+      const evidenceGraphResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/evidence-graph`,
+      );
+      assert.equal(evidenceGraphResponse.status, 200);
+      const evidenceGraphPayload = await evidenceGraphResponse.json();
+      assert.equal(evidenceGraphPayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(evidenceGraphPayload.isolation.excludes_unrelated_flows, true);
+      assert.equal(JSON.stringify(evidenceGraphPayload).includes("request_text"), false);
+      assert.ok(
+        evidenceGraphPayload.nodes.some(
+          (node) => node.family === "operator-request" && node.target_flow_id === selectedFlowPayload.flow_id,
+        ),
+      );
+
+      const runtimeTraceResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/runtime-trace`,
+      );
+      assert.equal(runtimeTraceResponse.status, 200);
+      const runtimeTracePayload = await runtimeTraceResponse.json();
+      assert.equal(runtimeTracePayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(runtimeTracePayload.read_only, true);
+
+      const attentionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/attention`,
+      );
+      assert.equal(attentionResponse.status, 200);
+      const attentionPayload = await attentionResponse.json();
+      assert.equal(attentionPayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(attentionPayload.read_only, true);
+      assert.equal(attentionPayload.freshness, "current");
+      assert.ok(Array.isArray(attentionPayload.items));
+
+      const missingAttentionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/flow.missing/attention`,
+      );
+      assert.equal(missingAttentionResponse.status, 404);
+      assert.equal((await missingAttentionResponse.json()).error.code, "flow.not_found");
 
       const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
       assert.equal(typeof runtimeLayout.reportsRoot, "string");
@@ -650,6 +1061,208 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(blockedPayload.lifecycle_command.command, "run cancel");
       assert.equal(blockedPayload.lifecycle_command.command_output.run_control_blocked, true);
       assert.equal(fs.existsSync(blockedPayload.lifecycle_command.command_output.run_control_audit_file), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("HTTP run start returns 202 while a durable worker job executes", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const startedAt = Date.now();
+      const response = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`, {
+        command: "run start",
+        flags: {
+          run_id: "run.http.async.worker.v1",
+          target_step: "implement",
+          require_validation_pass: false,
+          unsafe_development_override: true,
+        },
+      });
+      assert.equal(response.status, 202);
+      assert.ok(Date.now() - startedAt < 2000, "run start must return before provider execution completes");
+      const accepted = await response.json();
+      assert.equal(accepted.run_id, "run.http.async.worker.v1");
+      assert.equal(accepted.job_id, "run.http.async.worker.v1.job");
+      assert.equal(accepted.status, "queued");
+      assert.equal(typeof accepted.revision, "number");
+      assert.equal(typeof accepted.status_ref, "string");
+      assert.equal(typeof accepted.event_ref, "string");
+
+      const stateStartedAt = Date.now();
+      const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      assert.ok(Date.now() - stateStartedAt < 1000, "state GET must remain responsive while worker runs");
+      const jobFile = accepted.lifecycle_command.artifact_refs[0];
+      const terminal = await waitForRunJob(jobFile);
+      assert.ok(terminal.worker?.identity.startsWith("node-worker-"));
+      assert.ok(terminal.heartbeat_at);
+      assert.ok(Array.isArray(terminal.terminal_evidence_refs));
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("HTTP shutdown bounds active SSE stream lifetime", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.shutdown.stream.v1";
+    appendRunEvent({ projectRef: repoRoot, cwd: repoRoot, runId, eventType: "run.started", payload: { status: "running" } });
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const response = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?max_replay=0`);
+    assert.equal(response.status, 200);
+    const startedAt = Date.now();
+    await transport.close();
+    assert.ok(Date.now() - startedAt < 1500, "server shutdown must bound active stream lifetime");
+    await response.body?.cancel().catch(() => {});
+  });
+});
+
+test("flow plan API creates, reads, approves, reports progress, and invalidates approval on revision", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const requestFile = path.join(repoRoot, "structured-plan-api.request.json");
+    fs.writeFileSync(requestFile, `${JSON.stringify({ feature_size: "small" }, null, 2)}\n`, "utf8");
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+    try {
+      const lifecycleUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`;
+      const missionResponse = await postJson(lifecycleUrl, {
+        command: "mission create",
+        flags: {
+          mission_id: "structured-plan-api",
+          goal: "Review a complete mission-specific task plan.",
+          kpi: "task-plan:Task plan coverage:Every criterion has a task:API proof",
+          dod: "The approved plan materializes execution units and progress.",
+          allowed_path: "packages/orchestrator-core/**",
+          delivery_mode: "patch-only",
+          request_file: requestFile,
+        },
+      });
+      assert.equal(missionResponse.status, 200);
+
+      const selectedFlowResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows/selected`);
+      assert.equal(selectedFlowResponse.status, 200);
+      const flow = await selectedFlowResponse.json();
+      const planUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(flow.flow_id)}/plan`;
+      const actionUrl = `${planUrl}/actions`;
+
+      const missingResponse = await fetch(planUrl);
+      assert.equal(missingResponse.status, 404);
+      assert.equal((await missingResponse.json()).error.code, "structured-plan-required");
+
+      const createResponse = await postJson(actionUrl, { action: "create" });
+      assert.equal(createResponse.status, 202);
+      const created = await createResponse.json();
+      assert.equal(created.flow_id, flow.flow_id);
+      assert.equal(created.plan_status, "proposed");
+      assert.match(created.planning_run_ref, /^evidence:\/\//u);
+
+      const showResponse = await fetch(planUrl);
+      assert.equal(showResponse.status, 200);
+      const shown = await showResponse.json();
+      assert.equal(shown.read_only, true);
+      assert.equal(shown.plan.plan_status, "proposed");
+      assert.equal(shown.plan.feature_traceability.mission_id, "structured-plan-api");
+
+      const approveResponse = await postJson(actionUrl, {
+        action: "approve",
+        plan_ref: created.plan_ref,
+        approval_ref: "approval://HTTP-W60",
+      });
+      assert.equal(approveResponse.status, 200);
+      const approved = await approveResponse.json();
+      assert.equal(approved.plan_status, "approved");
+      assert.ok(approved.execution_plan.execution_units.length >= 3);
+
+      const progressResponse = await fetch(`${planUrl}/progress`);
+      assert.equal(progressResponse.status, 200);
+      const progress = await progressResponse.json();
+      assert.equal(progress.read_only, true);
+      assert.equal(progress.execution_plan.plan_id, shown.plan.plan_id);
+      assert.equal(progress.task_progress.tasks.length, shown.plan.local_tasks.length);
+
+      const unit = progress.execution_plan.execution_units[0];
+      const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+      const workspaceRoot = path.join(init.runtimeLayout.projectRuntimeRoot, "workspace-sets", "run-http-structured-parent");
+      const executionRoot = path.join(workspaceRoot, "repos", "main");
+      const ownerMarker = path.join(workspaceRoot, ".aor-workspace-set-owner.json");
+      fs.mkdirSync(executionRoot, { recursive: true });
+      fs.writeFileSync(ownerMarker, `${JSON.stringify({
+        workspace_set_id: "workspace-set-run-http-structured-parent",
+        project_id: transport.projectId,
+        run_id: "run-http-structured-parent",
+        workspace_root: workspaceRoot,
+      })}\n`);
+      const workspaceSetFile = path.join(init.runtimeLayout.reportsRoot, "workspace-set.run-http-structured-parent.json");
+      fs.writeFileSync(workspaceSetFile, `${JSON.stringify({
+        schema_version: 2,
+        workspace_set_id: "workspace-set-run-http-structured-parent",
+        project_id: transport.projectId,
+        run_id: "run-http-structured-parent",
+        binding_ref: "binding://main",
+        status: "ready",
+        workspace_root: workspaceRoot,
+        owner_marker: ownerMarker,
+        repositories: [{
+          repo_id: "main",
+          mount_path: "repos/main",
+          base_ref: "main",
+          resolved_commit: "1".repeat(40),
+          execution_root: executionRoot,
+          provisioning: { strategy: "independent-clone", state: "ready" },
+        }],
+        conflicts: [],
+        cleanup: {
+          policy: { on_success: "delete", on_abort: "delete", on_failure: "retain" },
+          state: "pending",
+        },
+        evidence_refs: ["evidence://workspace-set.run-http-structured-parent.json"],
+      })}\n`);
+      const workspaceValidation = validateContractDocument({
+        family: "workspace-set",
+        document: JSON.parse(fs.readFileSync(workspaceSetFile, "utf8")),
+        source: workspaceSetFile,
+      });
+      assert.equal(workspaceValidation.ok, true, JSON.stringify(workspaceValidation.issues));
+      const runStartResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "start",
+          run_id: "run.http.structured-plan-unit",
+          execution_plan_ref: progress.task_progress.execution_plan_ref,
+          execution_unit_id: unit.unit_id,
+          workspace_set_ref: `evidence://${path.relative(init.projectRoot, workspaceSetFile)}`,
+        },
+      );
+      const runStart = await runStartResponse.json();
+      assert.equal(runStartResponse.status, 200, JSON.stringify(runStart));
+      assert.equal(runStart.run_control.state.execution_unit_id, unit.unit_id);
+      assert.deepEqual(runStart.run_control.state.task_refs, unit.task_refs);
+      assert.equal(runStart.run_control.state.execution_root, executionRoot);
+
+      const revisionResponse = await postJson(actionUrl, {
+        action: "request_revision",
+        plan_ref: created.plan_ref,
+        reason: "Clarify verification ownership before execution.",
+      });
+      assert.equal(revisionResponse.status, 202);
+      const revision = await revisionResponse.json();
+      assert.equal(revision.plan_status, "revision-requested");
+      assert.match(revision.planning_run_ref, /^evidence:\/\//u);
+
+      const staleApprovalResponse = await postJson(actionUrl, {
+        action: "approve",
+        plan_ref: created.plan_ref,
+        approval_ref: "approval://HTTP-W60-STALE",
+      });
+      assert.equal(staleApprovalResponse.status, 409);
+      assert.equal((await staleApprovalResponse.json()).error.code, "plan-incomplete");
     } finally {
       await transport.close();
     }
@@ -880,6 +1493,261 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
       assert.equal(mutateAllowedPayload.run_control.action, "start");
       assert.equal(mutateAllowedPayload.run_control.blocked, false);
       assert.equal(fs.existsSync(mutateAllowedPayload.run_control.audit_file), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("local app server serves SPA config and existing control-plane routes", async () => {
+  await withTempRepo(async (projectRoot) => {
+    const beforeReads = byteSnapshot(projectRoot);
+    const transport = await createControlPlaneHttpServer({
+      cwd: workspaceRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+      app: {
+        staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+        packageVersion: "0.0.0-test",
+      },
+    });
+
+    try {
+      const htmlResponse = await fetch(`${transport.baseUrl}/`);
+      assert.equal(htmlResponse.status, 200);
+      const html = await htmlResponse.text();
+      assert.match(html, /AOR Operator Console/);
+
+      const configResponse = await getJson(`${transport.baseUrl}/app-config.json`);
+      assert.equal(configResponse.status, 200);
+      assert.equal(configResponse.headers.get("cache-control"), "no-store");
+      const config = await configResponse.json();
+      assert.equal(config.project_id, transport.projectId);
+      assert.equal(config.api_base_url, transport.baseUrl);
+      assert.equal(config.console_experience, "quiet-cockpit");
+      assert.equal(JSON.stringify(config).includes(projectRoot), false, "app config must not disclose absolute project paths");
+
+      const stateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      const state = await stateResponse.json();
+      assert.equal(state.project_id, transport.projectId);
+      assert.equal(state.initialized, false);
+
+      const readPaths = [
+        "/api/projects",
+        `/api/projects/${transport.projectId}/packets`,
+        `/api/projects/${transport.projectId}/step-results`,
+        `/api/projects/${transport.projectId}/quality-artifacts`,
+        `/api/projects/${transport.projectId}/delivery-manifests`,
+        `/api/projects/${transport.projectId}/promotion-decisions`,
+        `/api/projects/${transport.projectId}/strategic-snapshot`,
+        `/api/projects/${transport.projectId}/planner-metrics`,
+        `/api/projects/${transport.projectId}/finance-monitoring`,
+        `/api/projects/${transport.projectId}/next-action-report`,
+        `/api/projects/${transport.projectId}/flows`,
+        `/api/projects/${transport.projectId}/flows/selected`,
+        `/api/projects/${transport.projectId}/operator-requests`,
+        `/api/projects/${transport.projectId}/multirepo-coordination`,
+        `/api/projects/${transport.projectId}/compiler-revisions`,
+        `/api/projects/${transport.projectId}/runs`,
+        `/api/projects/${transport.projectId}/runs/clean.read/events/history`,
+        `/api/projects/${transport.projectId}/runs/clean.read/policy-history`,
+      ];
+      for (const readPath of readPaths) {
+        const readResponse = await fetch(`${transport.baseUrl}${readPath}`);
+        assert.equal(readResponse.status, 200, readPath);
+        await readResponse.arrayBuffer();
+      }
+      assert.deepEqual(byteSnapshot(projectRoot), beforeReads);
+      assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
+
+      const missionResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`,
+        {
+          command: "mission create",
+          flags: {
+            title: "Local app mission",
+            brief: "Create mission evidence from the local app.",
+            goal: ["Prove app lifecycle mutation."],
+            constraint: ["No upstream writes."],
+            kpi: ["app-ready:App ready:ready:status"],
+            dod: ["Mission packet exists."],
+            "delivery-mode": "no-write",
+          },
+        },
+      );
+      assert.equal(missionResponse.status, 200);
+      const mission = await missionResponse.json();
+      assert.equal(mission.lifecycle_command.command, "mission create");
+      assert.equal(mission.lifecycle_command.blocked, false);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("local app project index and add-project action keep project runtimes isolated", async () => {
+  await withTempRepo(async (firstProjectRoot) => {
+    await withTempRepo(async (secondProjectRoot) => {
+      const firstRuntimeRoot = path.join(firstProjectRoot, ".aor");
+      const secondRuntimeRoot = path.join(secondProjectRoot, ".aor-alt");
+      const canonicalFirstRuntimeRoot = path.join(fs.realpathSync.native(firstProjectRoot), ".aor");
+      const canonicalSecondRuntimeRoot = path.join(fs.realpathSync.native(secondProjectRoot), ".aor-alt");
+      const transport = await createControlPlaneHttpServer({
+        cwd: workspaceRoot,
+        projectRef: firstProjectRoot,
+        runtimeRoot: firstRuntimeRoot,
+        host: "127.0.0.1",
+        port: 0,
+        app: {
+          staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+          packageVersion: "0.0.0-test",
+        },
+      });
+
+      try {
+        const configResponse = await getJson(`${transport.baseUrl}/app-config.json`);
+        assert.equal(configResponse.status, 200);
+        const config = await configResponse.json();
+        assert.equal(config.project_id, transport.projectId);
+        assert.equal(config.default_project_id, transport.projectId);
+        assert.equal(config.projects.length, 1);
+
+        const indexResponse = await getJson(`${transport.baseUrl}/api/projects`);
+        assert.equal(indexResponse.status, 200);
+        const index = await indexResponse.json();
+        assert.equal(index.default_project_id, transport.projectId);
+        assert.equal(index.projects.length, 1);
+        assert.equal(index.projects[0].onboarding_summary.initialized, false);
+        assert.equal(fs.existsSync(firstRuntimeRoot), false, "project index must not initialize runtime state");
+
+        const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
+          action: "add",
+          project_ref: secondProjectRoot,
+          runtime_root: secondRuntimeRoot,
+          label: "Second target",
+        });
+        assert.equal(addResponse.status, 200);
+        const added = await addResponse.json();
+        assert.equal(added.projects.length, 2);
+        assert.equal(added.project.label, "Second target");
+        assert.equal(added.project.runtime_root, canonicalSecondRuntimeRoot);
+        assert.notEqual(added.project.project_id, transport.projectId);
+        assert.equal(typeof added.project.runtime_project_id, "string");
+        assert.equal(fs.existsSync(secondRuntimeRoot), false, "adding a project must not initialize runtime state");
+
+        const secondPreviewResponse = await getJson(`${transport.baseUrl}/api/projects/${added.project.project_id}/state`);
+        assert.equal(secondPreviewResponse.status, 200);
+        const secondPreview = await secondPreviewResponse.json();
+        assert.equal(secondPreview.project_id, added.project.runtime_project_id);
+        assert.equal(secondPreview.runtime_root, canonicalSecondRuntimeRoot);
+        assert.equal(secondPreview.state_file, null);
+        assert.equal(secondPreview.onboarding_summary.initialized, false);
+        assert.equal(secondPreview.onboarding_summary.recommended_action, "initialize-runtime");
+        assert.deepEqual(secondPreview.artifact_display_summaries, []);
+        assert.equal(fs.existsSync(secondRuntimeRoot), false, "project state preview must not initialize runtime state");
+
+        const secondInitResponse = await postJson(
+          `${transport.baseUrl}/api/projects/${added.project.project_id}/lifecycle-command/actions`,
+          {
+            command: "project init",
+            flags: {},
+          },
+        );
+        assert.equal(secondInitResponse.status, 200);
+        const secondInit = await secondInitResponse.json();
+        assert.equal(secondInit.lifecycle_command.blocked, false);
+        assert.equal(fs.existsSync(secondRuntimeRoot), true, "second project init must initialize the selected runtime root");
+        assert.equal(fs.existsSync(firstRuntimeRoot), false, "second project init must not initialize the default runtime root");
+
+        const secondStateResponse = await getJson(`${transport.baseUrl}/api/projects/${added.project.project_id}/state`);
+        assert.equal(secondStateResponse.status, 200);
+        const secondState = await secondStateResponse.json();
+        assert.equal(secondState.project_id, added.project.runtime_project_id);
+        assert.equal(secondState.runtime_root, fs.realpathSync.native(secondRuntimeRoot));
+
+        const firstStateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+        assert.equal(firstStateResponse.status, 200);
+        const firstState = await firstStateResponse.json();
+        assert.equal(firstState.project_id, transport.projectId);
+        assert.equal(firstState.runtime_root, canonicalFirstRuntimeRoot);
+        assert.equal(firstState.state_file, null);
+        assert.equal(firstState.onboarding_summary.initialized, false);
+        assert.equal(fs.existsSync(firstRuntimeRoot), false, "default project state preview must not initialize runtime state");
+      } finally {
+        await transport.close();
+      }
+    });
+  });
+});
+
+test("local app add-project action accepts an explicit project profile", async () => {
+  await withTempRepo(async (profiledProjectRoot) => {
+    const profiledRuntimeRoot = path.join(profiledProjectRoot, ".aor-explicit");
+    const explicitProjectProfile = path.join(profiledProjectRoot, "explicit-project.aor.yaml");
+    const explicitProjectProfileText = fs.readFileSync(path.join(workspaceRoot, "examples/project.aor.yaml"), "utf8")
+      .replace("project_id: aor-core", "project_id: explicit-profile-target")
+      .replace("display_name: AOR Core", "display_name: Explicit Profile Target")
+      .replace("routes: examples/routes", `routes: ${path.join(workspaceRoot, "examples/routes")}`)
+      .replace("wrappers: examples/wrappers", `wrappers: ${path.join(workspaceRoot, "examples/wrappers")}`)
+      .replace("prompts: examples/prompts", `prompts: ${path.join(workspaceRoot, "examples/prompts")}`)
+      .replace("policies: examples/policies", `policies: ${path.join(workspaceRoot, "examples/policies")}`)
+      .replace("adapters: examples/adapters", `adapters: ${path.join(workspaceRoot, "examples/adapters")}`)
+      .replace("evaluation: examples", `evaluation: ${path.join(workspaceRoot, "examples")}`)
+      .replace("skills: examples/skills", `skills: ${path.join(workspaceRoot, "examples/skills")}`)
+      .replace("context_docs: examples/context/docs", `context_docs: ${path.join(workspaceRoot, "examples/context/docs")}`)
+      .replace("context_rules: examples/context/rules", `context_rules: ${path.join(workspaceRoot, "examples/context/rules")}`)
+      .replace("context_skills: examples/context/skills", `context_skills: ${path.join(workspaceRoot, "examples/context/skills")}`)
+      .replace("context_bundles: examples/context/bundles", `context_bundles: ${path.join(workspaceRoot, "examples/context/bundles")}`);
+    fs.writeFileSync(explicitProjectProfile, explicitProjectProfileText, "utf8");
+    const initialized = initializeProjectRuntime({
+      cwd: workspaceRoot,
+      projectRef: profiledProjectRoot,
+      projectProfile: explicitProjectProfile,
+      runtimeRoot: profiledRuntimeRoot,
+    });
+    assert.equal(initialized.projectId, "explicit-profile-target");
+    const transport = await createControlPlaneHttpServer({
+      cwd: profiledProjectRoot,
+      projectRef: profiledProjectRoot,
+      runtimeRoot: profiledRuntimeRoot,
+      host: "127.0.0.1",
+      port: 0,
+      app: {
+        staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+        packageVersion: "0.0.0-test",
+      },
+    });
+
+    try {
+      const initialIndexResponse = await getJson(`${transport.baseUrl}/api/projects`);
+      assert.equal(initialIndexResponse.status, 200);
+      const initialIndex = await initialIndexResponse.json();
+      assert.equal(initialIndex.projects.length, 1);
+      assert.equal(initialIndex.projects[0].onboarding_summary.initialized, false);
+      assert.deepEqual(initialIndex.projects[0].onboarding_summary.profile_mismatch_candidate_project_ids, ["explicit-profile-target"]);
+      assert.match(initialIndex.projects[0].onboarding_summary.blockers[0], /matching project profile/u);
+
+      const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
+        action: "add",
+        project_ref: profiledProjectRoot,
+        project_profile: explicitProjectProfile,
+        runtime_root: profiledRuntimeRoot,
+        label: "Profiled target",
+      });
+      assert.equal(addResponse.status, 200);
+      const added = await addResponse.json();
+      assert.equal(added.projects.length, 2);
+      assert.equal(added.project.label, "Profiled target");
+      assert.equal(added.project.runtime_project_id, "explicit-profile-target");
+      assert.equal(added.project.project_profile_ref, fs.realpathSync.native(explicitProjectProfile));
+      assert.equal(added.project.project_profile_source, "explicit");
+      assert.equal(added.project.runtime_root, fs.realpathSync.native(profiledRuntimeRoot));
+      assert.equal(added.project.onboarding_summary.initialized, true);
+      assert.equal(added.project.active_flow_summary.status, "no-flows");
+      assert.notEqual(added.project.project_id, initialIndex.projects[0].project_id);
+      assert.equal(fs.existsSync(profiledRuntimeRoot), true, "explicit profile evidence fixture should already exist");
     } finally {
       await transport.close();
     }

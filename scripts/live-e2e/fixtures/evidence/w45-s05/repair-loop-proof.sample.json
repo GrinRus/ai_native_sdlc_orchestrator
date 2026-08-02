@@ -1,0 +1,131 @@
+{
+  "slice_id": "W45-S05",
+  "artifact_type": "repair-loop-proof-fixture",
+  "profile_refs": [
+    "scripts/live-e2e/profiles/full-journey-repair-httpie-medium-anthropic.yaml",
+    "scripts/live-e2e/profiles/full-journey-repair-fastify-medium-openai.yaml"
+  ],
+  "proof_scope": {
+    "deterministic_fixture_only": true,
+    "live_acceptance_deferred_to": "W45-S06",
+    "runner_boundary": "public-control-plane",
+    "provider_specific_behavior_allowed": false
+  },
+  "required_profile_expectations": {
+    "required_repair_paths": [
+      "review-origin",
+      "qa-origin",
+      "budget-exhaustion"
+    ],
+    "require_quality_repair_request_refs": true,
+    "require_implementation_repair_refs": true,
+    "require_review_rerun_refs": true,
+    "require_qa_rerun_refs": true,
+    "qa_origin_requires_post_repair_review": true,
+    "budget_exhaustion_operator_hold_required": true,
+    "no_upstream_write_evidence_required": true
+  },
+  "repair_paths": [
+    {
+      "path_id": "review-origin-repair-closure",
+      "source_stage": "review",
+      "final_status": "closed",
+      "quality_repair_request_ref": "evidence://runs/w45-s05-review/reports/quality-repair-request-review-origin.json",
+      "implementation_repair_ref": "step-result://w45-s05-review/repair#1",
+      "review_rerun_ref": "evidence://runs/w45-s05-review/reports/review-report-repair-rerun.json",
+      "qa_rerun_ref": "evidence://runs/w45-s05-review/reports/qa-report-repair-rerun.json",
+      "delivery_manifest_ref": "evidence://runs/w45-s05-review/reports/delivery-manifest.json",
+      "no_upstream_write_evidence_ref": "evidence://runs/w45-s05-review/reports/no-upstream-write.json",
+      "stage_sequence": [
+        "execution#1",
+        "review#1",
+        "repair#1",
+        "review#2",
+        "qa#1",
+        "delivery"
+      ],
+      "attempt_budget": {
+        "attempt_index": 1,
+        "max_attempts": 3,
+        "remaining_attempts": 2
+      },
+      "delivery_release_blocked_until_closed": true
+    },
+    {
+      "path_id": "qa-origin-repair-closure",
+      "source_stage": "qa",
+      "final_status": "closed",
+      "quality_repair_request_ref": "evidence://runs/w45-s05-qa/reports/quality-repair-request-qa-origin.json",
+      "implementation_repair_ref": "step-result://w45-s05-qa/repair#1",
+      "review_rerun_ref": "evidence://runs/w45-s05-qa/reports/review-report-post-repair.json",
+      "qa_rerun_ref": "evidence://runs/w45-s05-qa/reports/qa-report-post-review.json",
+      "delivery_manifest_ref": "evidence://runs/w45-s05-qa/reports/delivery-manifest.json",
+      "no_upstream_write_evidence_ref": "evidence://runs/w45-s05-qa/reports/no-upstream-write.json",
+      "stage_sequence": [
+        "execution#1",
+        "review#1",
+        "qa#1",
+        "repair#1",
+        "review#2",
+        "qa#2",
+        "delivery"
+      ],
+      "attempt_budget": {
+        "attempt_index": 1,
+        "max_attempts": 3,
+        "remaining_attempts": 2
+      },
+      "qa_origin_post_repair_review_required": true,
+      "delivery_release_blocked_until_closed": true
+    },
+    {
+      "path_id": "budget-exhaustion-operator-hold",
+      "source_stage": "review",
+      "final_status": "operator-hold",
+      "quality_repair_request_ref": "evidence://runs/w45-s05-exhausted/reports/quality-repair-request-exhausted.json",
+      "implementation_repair_refs": [
+        "step-result://w45-s05-exhausted/repair#1",
+        "step-result://w45-s05-exhausted/repair#2",
+        "step-result://w45-s05-exhausted/repair#3"
+      ],
+      "review_rerun_refs": [
+        "evidence://runs/w45-s05-exhausted/reports/review-report-repair-1.json",
+        "evidence://runs/w45-s05-exhausted/reports/review-report-repair-2.json",
+        "evidence://runs/w45-s05-exhausted/reports/review-report-repair-3.json"
+      ],
+      "qa_rerun_refs": [],
+      "operator_hold_ref": "evidence://runs/w45-s05-exhausted/reports/next-action-budget-exhausted.json",
+      "blocker_refs": [
+        "evidence://runs/w45-s05-exhausted/reports/quality-repair-request-exhausted.json",
+        "evidence://runs/w45-s05-exhausted/reports/next-action-budget-exhausted.json"
+      ],
+      "no_upstream_write_evidence_ref": "evidence://runs/w45-s05-exhausted/reports/no-upstream-write.json",
+      "stage_sequence": [
+        "execution#1",
+        "review#1",
+        "repair#1",
+        "review#2",
+        "repair#2",
+        "review#3",
+        "repair#3",
+        "review#4",
+        "operator-hold"
+      ],
+      "attempt_budget": {
+        "attempt_index": 3,
+        "max_attempts": 3,
+        "remaining_attempts": 0
+      },
+      "delivery_release_blocked_until_closed": true,
+      "requires_operator_override_for_delivery": true
+    }
+  ],
+  "no_upstream_write": {
+    "required": true,
+    "write_back_to_remote": false,
+    "allowed_delivery_modes": [
+      "patch-only",
+      "fork-first-pr"
+    ]
+  }
+}

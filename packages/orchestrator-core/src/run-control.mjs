@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
-import { redactSensitiveValue } from "../../observability/src/index.mjs";
+import { validatePublicId } from "../../contracts/src/index.mjs";
+import { redactSensitiveValue, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
+import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
@@ -28,6 +31,14 @@ function nowIso() {
  */
 function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function requirePublicId(field, value) {
+  const validation = validatePublicId(value);
+  if (!validation.ok) {
+    throw new Error(`Invalid ${field} ${JSON.stringify(value)} (${validation.value_class}). ${validation.migration}`);
+  }
+  return value;
 }
 
 /**
@@ -86,8 +97,7 @@ function readJson(filePath) {
  * @param {Record<string, unknown>} payload
  */
 function writeJson(filePath, payload) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeJsonAtomic(filePath, payload);
 }
 
 /**
@@ -97,15 +107,6 @@ function writeJson(filePath, payload) {
  */
 function resolveRunControlStateFile(init, runId) {
   return path.join(init.runtimeLayout.stateRoot, `run-control-state-${normalizeId(runId)}.json`);
-}
-
-/**
- * @param {ReturnType<typeof initializeProjectRuntime>} init
- * @param {string} runId
- * @returns {string}
- */
-function resolveLiveE2ESummaryFile(init, runId) {
-  return path.join(init.runtimeLayout.reportsRoot, `live-e2e-run-summary-${normalizeId(runId)}.json`);
 }
 
 /**
@@ -320,7 +321,7 @@ function evaluateGuardrails(profile, action, approvalRef, targetStep) {
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} runId
- * @returns {{ state: Record<string, unknown> | null, stateFile: string, source: "state-file" | "live-e2e-summary" | "none" }}
+ * @returns {{ state: Record<string, unknown> | null, stateFile: string, source: "state-file" | "none" }}
  */
 function readExistingRunState(init, runId) {
   const stateFile = resolveRunControlStateFile(init, runId);
@@ -329,28 +330,6 @@ function readExistingRunState(init, runId) {
       state: readJson(stateFile),
       stateFile,
       source: "state-file",
-    };
-  }
-
-  const summaryFile = resolveLiveE2ESummaryFile(init, runId);
-  if (fs.existsSync(summaryFile)) {
-    const summary = readJson(summaryFile);
-    return {
-      state: {
-        schema_version: 1,
-        run_id: runId,
-        status: normalizeStatus(asString(summary.status) ?? "running") ?? "running",
-        current_step: null,
-        last_action: "live-e2e.import",
-        started_at: asString(summary.started_at),
-        updated_at: asString(summary.finished_at) ?? asString(summary.started_at) ?? nowIso(),
-        action_sequence: 0,
-        approval_refs: [],
-        audit_refs: [],
-        evidence_root: init.runtimeLayout.reportsRoot,
-      },
-      stateFile,
-      source: "live-e2e-summary",
     };
   }
 
@@ -394,10 +373,19 @@ function resolveNextActions(action, state) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   executionPlanRef?: string,
+ *   executionUnitId?: string,
+ *   taskRefs?: string[],
+ *   workspaceSetRef?: string,
+ *   executionRoot?: string,
+ *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
+ *   commandId?: string,
+ *   expectedRevision?: number,
+ *   initializedRuntime?: ReturnType<typeof initializeProjectRuntime>,
  * }} options
  */
-export function applyRunControlAction(options) {
+function applyRunControlActionUnlocked(options) {
   const cwd = options.cwd ?? process.cwd();
   const action = options.action;
   if (!RUN_CONTROL_ACTIONS.has(action)) {
@@ -411,11 +399,17 @@ export function applyRunControlAction(options) {
   if (!runId) {
     throw new Error(`Run-control action '${action}' requires 'runId'.`);
   }
+  requirePublicId("run_id", runId);
 
   const reason = asString(options.reason);
   const targetStep = asString(options.targetStep);
   const approvalRef = asString(options.approvalRef);
-  const init = initializeProjectRuntime({
+  const executionPlanRef = asString(options.executionPlanRef);
+  const executionUnitId = asString(options.executionUnitId);
+  const taskRefs = asStringArray(options.taskRefs);
+  const workspaceSetRef = asString(options.workspaceSetRef);
+  const executionRoot = asString(options.executionRoot);
+  const init = options.initializedRuntime ?? initializeProjectRuntime({
     cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
@@ -424,20 +418,37 @@ export function applyRunControlAction(options) {
 
   const existingState = readExistingRunState(init, runId);
   const stateBefore = existingState.state;
+  const previousSequenceRaw = stateBefore ? Number(stateBefore.action_sequence) : 0;
+  const previousSequence = Number.isFinite(previousSequenceRaw) ? previousSequenceRaw : 0;
+  if (options.expectedRevision !== undefined && options.expectedRevision !== previousSequence) {
+    const conflict = new Error(
+      `Run-control revision conflict for '${runId}': expected ${options.expectedRevision}, current ${previousSequence}.`,
+    );
+    conflict.code = "run-control-revision-conflict";
+    conflict.expected_revision = options.expectedRevision;
+    conflict.current_revision = previousSequence;
+    throw conflict;
+  }
   const transition = resolveTransition(action, normalizeStatus(asString(stateBefore?.status)));
   const guardrails = evaluateGuardrails(profile, action, approvalRef, targetStep);
+  const preflightBlock = asRecord(options.preflightBlock);
+  const preflightBlockedReason =
+    action === "start" && asString(preflightBlock.code)
+      ? {
+          code: asString(preflightBlock.code) ?? "preflight.blocked",
+          message: asString(preflightBlock.message) ?? "Run start preflight blocked execution.",
+        }
+      : null;
   const blockedReason = guardrails.blocked
     ? guardrails.blocked_reason
     : transition.allowed
-      ? null
+      ? preflightBlockedReason
       : {
           code: transition.code ?? "transition.invalid",
           message: transition.message ?? "Transition is not allowed.",
         };
   const blocked = Boolean(blockedReason);
 
-  const previousSequenceRaw = stateBefore ? Number(stateBefore.action_sequence) : 0;
-  const previousSequence = Number.isFinite(previousSequenceRaw) ? previousSequenceRaw : 0;
   const actionSequence = previousSequence + 1;
   const stateFile = existingState.stateFile;
   const auditFile = resolveRunControlAuditFile(init, runId, actionSequence);
@@ -449,11 +460,19 @@ export function applyRunControlAction(options) {
     run_id: runId,
     action,
     applied: !blocked,
+    command_id: options.commandId,
+    expected_revision: options.expectedRevision ?? null,
+    revision: actionSequence,
     blocked,
     blocked_reason: blockedReason,
     requested_scope: {
       target_step: targetStep,
       reason,
+      execution_plan_ref: executionPlanRef,
+      execution_unit_id: executionUnitId,
+      task_refs: taskRefs,
+      workspace_set_ref: workspaceSetRef,
+      execution_root: executionRoot,
     },
     transition: {
       from_status: normalizeStatus(asString(stateBefore?.status)),
@@ -462,6 +481,15 @@ export function applyRunControlAction(options) {
     },
     guardrails: guardrails.decision,
     approval_ref: approvalRef,
+    blocking_evidence_refs: asStringArray(preflightBlock.evidenceRefs),
+    provider_interruption:
+      action === "cancel" && !blocked
+        ? {
+            status: "operator-stopped",
+            provider_step_status: "interrupted",
+            reason: reason ?? "Run canceled by operator.",
+          }
+        : null,
     evidence_root: init.runtimeLayout.reportsRoot,
     state_file: stateFile,
     timestamp: eventTimestamp,
@@ -482,6 +510,21 @@ export function applyRunControlAction(options) {
       approvalRefs.push(approvalRef);
     }
 
+    const providerStepStatus =
+      action === "cancel" && !blocked
+        ? mergeProviderStepStatus(asRecord(stateBefore?.provider_step_status), {
+            status: "interrupted",
+            finished_at: eventTimestamp,
+            last_artifact_update_at: eventTimestamp,
+            interruption_owner: "operator",
+            interruption_reason: reason ?? "Run canceled by operator.",
+            interruption_status: "operator-stopped",
+            recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+          })
+        : Object.keys(asRecord(stateBefore?.provider_step_status)).length > 0
+          ? asRecord(stateBefore?.provider_step_status)
+          : null;
+
     const auditRefs = stateBefore ? asStringArray(stateBefore.audit_refs) : [];
     const auditRef = toEvidenceRef(init.projectRoot, auditFile);
     if (!auditRefs.includes(auditRef)) {
@@ -501,6 +544,12 @@ export function applyRunControlAction(options) {
       action_sequence: actionSequence,
       approval_refs: approvalRefs,
       audit_refs: auditRefs,
+      provider_step_status: providerStepStatus,
+      execution_plan_ref: executionPlanRef ?? asString(stateBefore?.execution_plan_ref),
+      execution_unit_id: executionUnitId ?? asString(stateBefore?.execution_unit_id),
+      task_refs: taskRefs.length > 0 ? taskRefs : asStringArray(stateBefore?.task_refs),
+      workspace_set_ref: workspaceSetRef ?? asString(stateBefore?.workspace_set_ref),
+      execution_root: executionRoot ?? asString(stateBefore?.execution_root),
       evidence_root: init.runtimeLayout.reportsRoot,
     };
 
@@ -514,6 +563,8 @@ export function applyRunControlAction(options) {
     runtimeLayout: init.runtimeLayout,
     runId,
     action,
+    commandId: options.commandId,
+    revision: actionSequence,
     state: stateAfter,
     stateFile,
     auditRecord,
@@ -523,8 +574,72 @@ export function applyRunControlAction(options) {
     guardrails: guardrails.decision,
     transition: auditRecord.transition,
     applied: !blocked,
-    nextActions: resolveNextActions(action, stateAfter),
+    nextActions: blocked && !stateAfter ? ["run start"] : resolveNextActions(action, stateAfter),
   };
+}
+
+export function applyRunControlAction(options) {
+  const cwd = options.cwd ?? process.cwd();
+  const projectRootHint = path.resolve(options.projectRef ?? cwd);
+  const runtimeRootHint = options.runtimeRoot
+    ? path.resolve(projectRootHint, options.runtimeRoot)
+    : path.join(projectRootHint, ".aor");
+  return withFileLock(`${runtimeRootHint}.run-control-operation.lock`, () => {
+    const init = initializeProjectRuntime({
+      cwd,
+      projectRef: options.projectRef,
+      projectProfile: options.projectProfile,
+      runtimeRoot: options.runtimeRoot,
+    });
+  const runId = asString(options.runId) ?? (options.action === "start" ? `run-control-${Date.now()}` : null);
+  if (!runId) throw new Error(`Run-control action '${options.action}' requires 'runId'.`);
+  requirePublicId("run_id", runId);
+  const commandId = asString(options.commandId) ?? `command-${crypto.randomUUID()}`;
+  requirePublicId("command_id", commandId);
+  if (options.expectedRevision !== undefined && (!Number.isInteger(options.expectedRevision) || options.expectedRevision < 0)) {
+    const error = new Error("expectedRevision must be a non-negative integer.");
+    error.code = "run-control-revision-invalid";
+    throw error;
+  }
+  const lockDirectory = path.join(init.runtimeLayout.stateRoot, `run-control-${normalizeId(runId)}.lock`);
+    return withFileLock(lockDirectory, () => {
+    const commandDirectory = path.join(init.runtimeLayout.stateRoot, "run-control-commands", normalizeId(runId));
+    const commandFile = path.join(commandDirectory, `${normalizeId(commandId)}.json`);
+    const requestDigest = crypto.createHash("sha256").update(JSON.stringify({
+      action: options.action,
+      target_step: options.targetStep ?? null,
+      reason: options.reason ?? null,
+      approval_ref: options.approvalRef ?? null,
+      execution_plan_ref: options.executionPlanRef ?? null,
+      execution_unit_id: options.executionUnitId ?? null,
+      task_refs: options.taskRefs ?? [],
+      workspace_set_ref: options.workspaceSetRef ?? null,
+      execution_root: options.executionRoot ?? null,
+      preflight_block: options.preflightBlock ?? null,
+      project_profile: options.projectProfile ?? null,
+      runtime_root: options.runtimeRoot ?? null,
+      expected_revision: options.expectedRevision ?? null,
+    })).digest("hex");
+    if (fs.existsSync(commandFile)) {
+      const stored = readJson(commandFile);
+      if (stored.request_digest !== requestDigest) {
+        const conflict = new Error(`Run-control command '${commandId}' was reused with a different payload.`);
+        conflict.code = "run-control-command-conflict";
+        throw conflict;
+      }
+      return stored.result;
+    }
+    const result = applyRunControlActionUnlocked({
+      ...options,
+      cwd,
+      runId,
+      commandId,
+      initializedRuntime: init,
+    });
+    writeJsonAtomic(commandFile, { command_id: commandId, request_digest: requestDigest, result });
+    return result;
+    });
+  });
 }
 
 /**
@@ -537,6 +652,7 @@ export function applyRunControlAction(options) {
  * }} options
  */
 export function readRunControlState(options) {
+  requirePublicId("run_id", options.runId);
   const cwd = options.cwd ?? process.cwd();
   const init = initializeProjectRuntime({
     cwd,

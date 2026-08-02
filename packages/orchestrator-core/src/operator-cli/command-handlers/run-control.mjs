@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import {
   CliUsageError,
   InteractionAnswerError,
@@ -37,7 +39,17 @@ import {
   verifyProjectRuntime,
   materializeIntakeArtifactPacket,
   materializeReviewReport,
+  materializeTaskProgress,
   executeRuntimeHarnessRun,
+  resolveExecutionUnitContext,
+  controlParentRun,
+  readParentRun,
+  requestRunJobCancel,
+  retryParentUnit,
+  scheduleParentRun,
+  startRunJob,
+  startParentRun,
+  applyIntegrationToParent,
   submitInteractionAnswer,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
@@ -63,6 +75,7 @@ import {
   runtimeHarnessReportHasMeaningfulPatch,
   assertRuntimeHarnessAllowsDelivery,
   finalizeRunControlState,
+  finalizeRunControlFailure,
   normalizeRunRef,
   filterArtifactsByRunId,
   resolveRouteOverridesFlag,
@@ -77,6 +90,8 @@ export const RUN_CONTROL_COMMANDS = Object.freeze([
   "run resume",
   "run steer",
   "run cancel",
+  "run retry",
+  "run integration",
   "run answer",
   "run status",
   "ui attach",
@@ -89,11 +104,142 @@ export const RUN_CONTROL_COMMAND_GROUP = Object.freeze({
 });
 
 /**
+ * @param {Record<string, unknown>} outputState
+ * @param {ReturnType<typeof applyRunControlAction>} controlResult
+ */
+function populateRunControlOutputState(outputState, controlResult) {
+  outputState.resolvedProjectRef = controlResult.projectRoot;
+  outputState.resolvedRuntimeRoot = controlResult.runtimeRoot;
+  outputState.runtimeLayout = controlResult.runtimeLayout;
+  outputState.projectProfileRef = controlResult.projectProfileRef;
+  outputState.runtimeStateFile = controlResult.stateFile;
+  outputState.runControlAction = controlResult.action;
+  outputState.runControlCommandId = controlResult.commandId;
+  outputState.runControlRevision = controlResult.revision;
+  outputState.runControlRunId = controlResult.runId;
+  outputState.runControlState = controlResult.state;
+  outputState.runControlStateFile = controlResult.stateFile;
+  outputState.runControlAuditId = controlResult.auditRecord.audit_id;
+  outputState.runControlAuditFile = controlResult.auditFile;
+  outputState.runControlBlocked = controlResult.blocked;
+  outputState.runControlBlockedReason = controlResult.blockedReason;
+  outputState.runControlGuardrails = controlResult.guardrails;
+  outputState.runControlTransition = controlResult.transition;
+  outputState.primaryEventId = controlResult.primaryEvent.event_id;
+  outputState.evidenceEventId = controlResult.evidenceEvent.event_id;
+  outputState.streamLogFile = controlResult.streamLogFile;
+  outputState.readOnly = false;
+  outputState.futureControlHooks = controlResult.nextActions;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
  * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
  * @returns {boolean}
  */
 export function handleRunControlCommand(context) {
   const { command, flags, cwd, outputState } = context;
+  if (command === "run integration") {
+    ensureRequiredFlags(command, flags);
+    const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const parentRunId = /** @type {string} */ (flags["parent-run-id"]);
+    const action = /** @type {string} */ (flags.action);
+    const current = readParentRun({ cwd, projectRef, runtimeRoot, parentRunId });
+    if (!current.parent) throw new CliUsageError(`Parent run '${parentRunId}' was not found.`);
+    outputState.resolvedProjectRef = current.init.projectRoot;
+    outputState.resolvedRuntimeRoot = current.init.runtimeRoot;
+    outputState.parentRunFile = current.file;
+    if (action === "show") {
+      outputState.parentRun = current.parent;
+      outputState.readOnly = true;
+      return true;
+    }
+    const commandId = resolveOptionalStringFlag("command-id", flags["command-id"]);
+    const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
+    if (!commandId || expectedRevision === null) throw new CliUsageError("Integration mutations require '--command-id' and '--expected-revision'.");
+    if (action === "apply" || action === "verify") {
+      const reportFile = resolveOptionalStringFlag("integration-report-file", flags["integration-report-file"]);
+      if (!reportFile) throw new CliUsageError(`Integration action '${action}' requires '--integration-report-file'.`);
+      const report = readJson(path.resolve(cwd, reportFile));
+      const validation = validateContractDocument({ family: "integration-report", document: report, source: reportFile });
+      if (!validation.ok || report.project_id !== current.init.projectId || report.parent_run_id !== parentRunId) {
+        throw new CliUsageError("Integration report is invalid or owned by another project/parent run.");
+      }
+      const reportRef = toEvidenceRef(current.init.projectRoot, path.resolve(cwd, reportFile));
+      outputState.parentRun = applyIntegrationToParent({
+        parentFile: current.file,
+        expectedRevision,
+        reportFile: path.resolve(cwd, reportFile),
+        integrationReportRef: reportRef,
+      });
+      outputState.integrationReport = report;
+    } else if (action === "hold") {
+      outputState.parentRun = controlParentRun({ parentFile: current.file, expectedRevision, action: "pause", commandId });
+    } else if (action === "resume") {
+      outputState.parentRun = controlParentRun({ parentFile: current.file, expectedRevision, action: "resume", commandId });
+    } else if (action === "repair") {
+      const repairRef = resolveOptionalStringFlag("quality-repair-ref", flags["quality-repair-ref"]);
+      if (!repairRef) throw new CliUsageError("Integration repair requires '--quality-repair-ref'.");
+      outputState.parentRun = applyIntegrationToParent({
+        parentFile: current.file,
+        expectedRevision,
+        repairRef,
+      });
+    } else {
+      throw new CliUsageError(`Unsupported integration action '${action}'.`);
+    }
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [`run integration --parent-run-id ${parentRunId} --action show`];
+    return true;
+  }
+  if (command === "run retry") {
+    ensureRequiredFlags(command, flags);
+    const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const parentRunId = /** @type {string} */ (flags["parent-run-id"]);
+    const executionUnitId = /** @type {string} */ (flags["execution-unit-id"]);
+    const commandId = /** @type {string} */ (flags["command-id"]);
+    const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
+    const current = readParentRun({ cwd, projectRef, runtimeRoot, parentRunId });
+    if (!current.parent) throw new CliUsageError(`Parent run '${parentRunId}' was not found.`);
+    const parent = retryParentUnit({
+      parentFile: current.file,
+      executionUnitId,
+      commandId,
+      expectedRevision,
+    });
+    outputState.resolvedProjectRef = current.init.projectRoot;
+    outputState.resolvedRuntimeRoot = current.init.runtimeRoot;
+    outputState.parentRun = parent;
+    outputState.parentRunFile = current.file;
+    const retryEvent = appendRunEvent({
+      cwd,
+      projectRef,
+      runtimeRoot,
+      runId: parentRunId,
+      eventType: "parent.updated",
+      requestKey: commandId,
+      payload: {
+        parent_event_version: 1,
+        action: "unit.retry-requested",
+        execution_unit_id: executionUnitId,
+        revision: parent.revision,
+      },
+    });
+    outputState.primaryEventId = retryEvent.event.event_id;
+    outputState.streamLogFile = retryEvent.logFile;
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [`run status --run-id ${parentRunId}`];
+    return true;
+  }
   if (
     command === "run start" ||
     command === "run pause" ||
@@ -111,12 +257,29 @@ export function handleRunControlCommand(context) {
         ? runAction === "start"
         : resolveOptionalBooleanFlag("require-validation-pass", flags["require-validation-pass"]);
     const approvedHandoffRef = resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]);
+    const executionRoot = resolveOptionalStringFlag("execution-root", flags["execution-root"]);
+    const executionPlanRef = resolveOptionalStringFlag("execution-plan-ref", flags["execution-plan-ref"]);
+    const executionUnitId = resolveOptionalStringFlag("execution-unit-id", flags["execution-unit-id"]);
+    const workspaceSetRef = resolveOptionalStringFlag("workspace-set-ref", flags["workspace-set-ref"]);
+    const maxConcurrency = resolveOptionalIntegerFlag("max-concurrency", flags["max-concurrency"], { min: 1 });
+    const maxChildStarts = resolveOptionalIntegerFlag("max-child-starts", flags["max-child-starts"], { min: 1 });
     const promotionEvidenceRefs = resolveOptionalCsvFlag(
       "promotion-evidence-refs",
       flags["promotion-evidence-refs"],
     );
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+    const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const reason = resolveOptionalStringFlag("reason", flags.reason);
+    const approvalRef = resolveOptionalStringFlag("approval-ref", flags["approval-ref"]);
+    const commandId = resolveOptionalStringFlag("command-id", flags["command-id"]);
+    const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
+    const unsafeDevelopmentOverride = resolveOptionalBooleanFlag(
+      "unsafe-development-override",
+      flags["unsafe-development-override"],
+    );
 
     if (runAction !== "start" && runAction !== "steer" && targetStep) {
       throw new CliUsageError(`Flag '--target-step' is only valid for 'aor run start' or 'aor run steer'.`);
@@ -126,6 +289,29 @@ export function handleRunControlCommand(context) {
     }
     if (runAction !== "start" && approvedHandoffRef) {
       throw new CliUsageError(`Flag '--approved-handoff-ref' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && executionRoot) {
+      throw new CliUsageError(`Flag '--execution-root' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && (executionPlanRef || executionUnitId || workspaceSetRef)) {
+      throw new CliUsageError(
+        "Flags '--execution-plan-ref', '--execution-unit-id', and '--workspace-set-ref' are only valid for 'aor run start'.",
+      );
+    }
+    if (runAction !== "start" && (maxConcurrency !== undefined || maxChildStarts !== undefined)) {
+      throw new CliUsageError("Flags '--max-concurrency' and '--max-child-starts' are only valid for 'aor run start'.");
+    }
+    const childStart = runAction === "start" && Boolean(executionPlanRef && executionUnitId && workspaceSetRef);
+    const parentStart = runAction === "start" && Boolean(executionPlanRef && workspaceSetRef && !executionUnitId);
+    if (
+      runAction === "start" &&
+      (executionPlanRef || executionUnitId || workspaceSetRef) &&
+      !childStart &&
+      !parentStart
+    ) {
+      throw new CliUsageError(
+        "Use '--execution-plan-ref' with '--workspace-set-ref' and either omit '--execution-unit-id' for a parent run or provide it for one workspace-bound child run.",
+      );
     }
     if (runAction !== "start" && promotionEvidenceRefs.length > 0) {
       throw new CliUsageError(`Flag '--promotion-evidence-refs' is only valid for 'aor run start'.`);
@@ -137,65 +323,345 @@ export function handleRunControlCommand(context) {
       throw new CliUsageError(`Flag '--policy-overrides' is only valid for 'aor run start'.`);
     }
 
+    let executionContext = null;
+    if (childStart) {
+      try {
+        executionContext = resolveExecutionUnitContext({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          executionPlanRef,
+          executionUnitId,
+          workspaceSetRef,
+        });
+        if (
+          executionRoot
+          && path.resolve(cwd, executionRoot) !== path.resolve(executionContext.executionRoot)
+        ) {
+          throw new Error("Explicit execution root does not match the workspace-set repository binding.");
+        }
+      } catch (error) {
+        throw new CliUsageError(errorMessage(error));
+      }
+    }
+
+    if (runAction !== "start" && runId && (runAction === "pause" || runAction === "resume" || runAction === "cancel")) {
+      const currentParent = readParentRun({ cwd, projectRef, runtimeRoot, parentRunId: runId });
+      if (currentParent.parent) {
+        if (!commandId) throw new CliUsageError(`Flag '--command-id' is required for parent run ${runAction}.`);
+        if (expectedRevision === undefined) {
+          throw new CliUsageError(`Flag '--expected-revision' is required for parent run ${runAction}.`);
+        }
+        const parent = controlParentRun({
+          parentFile: currentParent.file,
+          action: runAction,
+          commandId,
+          expectedRevision,
+          controlChild: ({ action, childRunId }) => {
+            applyRunControlAction({
+              cwd,
+              projectRef,
+              runtimeRoot,
+              runId: childRunId,
+              action,
+              commandId: `${commandId}-${childRunId}`,
+            });
+            if (action === "cancel") {
+              requestRunJobCancel({ cwd, projectRef, runtimeRoot, runId: childRunId });
+            }
+          },
+        });
+        outputState.resolvedProjectRef = currentParent.init.projectRoot;
+        outputState.resolvedRuntimeRoot = currentParent.init.runtimeRoot;
+        outputState.parentRun = parent;
+        outputState.parentRunFile = currentParent.file;
+        const parentEvent = appendRunEvent({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          runId,
+          eventType: parent.status === "canceled" ? "parent.terminal" : "parent.updated",
+          requestKey: commandId,
+          payload: {
+            parent_event_version: 1,
+            action: runAction,
+            status: parent.status,
+            revision: parent.revision,
+          },
+        });
+        outputState.primaryEventId = parentEvent.event.event_id;
+        outputState.streamLogFile = parentEvent.logFile;
+        outputState.readOnly = false;
+        outputState.futureControlHooks = [`run status --run-id ${runId}`];
+        return true;
+      }
+    }
+
+    if (runAction === "start" && requireValidationPass) {
+      const existingRun = runId
+        ? readRunControlState({
+            cwd,
+            projectRef,
+            projectProfile,
+            runtimeRoot,
+            runId,
+          })
+        : null;
+      const existingStatus =
+        typeof existingRun?.state?.status === "string" && existingRun.state.status.trim().length > 0
+          ? existingRun.state.status.trim()
+          : null;
+
+      if (!existingStatus) {
+        let validationGate = null;
+        try {
+          validationGate = validateProjectRuntime({
+            cwd,
+            projectRef,
+            projectProfile,
+            runtimeRoot,
+          });
+        } catch (error) {
+          const controlResult = applyRunControlAction({
+            cwd,
+            projectRef,
+            projectProfile,
+            runtimeRoot,
+            runId,
+            action: runAction,
+            targetStep,
+            reason,
+            approvalRef,
+            commandId,
+            expectedRevision,
+            preflightBlock: {
+              code: "validation.error",
+              message: `Run start validation preflight failed before durable start transition: ${errorMessage(error)}`,
+            },
+          });
+          populateRunControlOutputState(outputState, controlResult);
+          return true;
+        }
+
+        if (validationGate.report.status === "fail") {
+          const controlResult = applyRunControlAction({
+            cwd,
+            projectRef,
+            projectProfile,
+            runtimeRoot,
+            runId,
+            action: runAction,
+            targetStep,
+            reason,
+            approvalRef,
+            commandId,
+            expectedRevision,
+            preflightBlock: {
+              code: "validation.failed",
+              message: "Run start requires a passing validation report before execution can begin.",
+              evidenceRefs: [validationGate.validationReportPath],
+            },
+          });
+          populateRunControlOutputState(outputState, controlResult);
+          return true;
+        }
+      }
+    }
+
+    if (parentStart) {
+      const projectRoot = resolveProjectRef(projectRef, cwd);
+      const executionPlanPath = resolveOptionalRefOrPathFlag({
+        cwd,
+        projectRoot,
+        flagName: "execution-plan-ref",
+        flagValue: executionPlanRef,
+      });
+      const loadedPlan = loadContractFile({
+        filePath: /** @type {string} */ (executionPlanPath),
+        family: "execution-plan",
+      });
+      if (!loadedPlan.ok) {
+        const issues = loadedPlan.validation.issues.map((issue) => issue.message).join("; ");
+        throw new CliUsageError(`Execution plan '${executionPlanRef}' failed validation: ${issues}`);
+      }
+      const workspaceSetPath = resolveOptionalRefOrPathFlag({
+        cwd,
+        projectRoot: workspaceSetRef.startsWith("evidence://") &&
+          !workspaceSetRef.slice("evidence://".length).startsWith(".aor/")
+          ? /** @type {{ projectRuntimeRoot: string }} */ (
+              readProjectState({ cwd, projectRef, runtimeRoot }).runtime_layout
+            ).projectRuntimeRoot
+          : projectRoot,
+        flagName: "workspace-set-ref",
+        flagValue: workspaceSetRef,
+      });
+      const loadedWorkspaceSet = loadContractFile({
+        filePath: /** @type {string} */ (workspaceSetPath),
+        family: "workspace-set",
+      });
+      if (!loadedWorkspaceSet.ok) {
+        const issues = loadedWorkspaceSet.validation.issues.map((issue) => issue.message).join("; ");
+        throw new CliUsageError(`Workspace set '${workspaceSetRef}' failed validation: ${issues}`);
+      }
+      const started = startParentRun({
+        cwd,
+        projectRef,
+        runtimeRoot,
+        parentRunId: runId,
+        executionPlan: loadedPlan.document,
+        executionPlanRef,
+        workspaceSet: loadedWorkspaceSet.document,
+        workspaceSetRef,
+        maxConcurrency,
+        budgets: maxChildStarts === undefined ? undefined : { max_child_starts: maxChildStarts },
+      });
+      const scheduled = scheduleParentRun({
+        parentFile: started.file,
+        startChild: (child) => {
+          const childArgs = [
+            "run",
+            "start",
+            "--project-ref",
+            started.init.projectRoot,
+            "--run-id",
+            child.child_run_id,
+            "--execution-plan-ref",
+            executionPlanRef,
+            "--execution-unit-id",
+            child.execution_unit_id,
+            "--workspace-set-ref",
+            workspaceSetRef,
+            "--require-validation-pass",
+            "false",
+            ...(runtimeRoot ? ["--runtime-root", runtimeRoot] : []),
+          ];
+          const job = startRunJob({
+            cwd: started.init.projectRoot,
+            projectRef: started.init.projectRoot,
+            runtimeRoot,
+            runId: child.child_run_id,
+            args: childArgs,
+          });
+          return {
+            ...child,
+            job_id: job.job.job_id,
+            job_status: job.job.status,
+            status_ref: job.job.status_ref,
+            event_ref: job.job.event_ref,
+          };
+        },
+      });
+      outputState.resolvedProjectRef = started.init.projectRoot;
+      outputState.resolvedRuntimeRoot = started.init.runtimeRoot;
+      outputState.parentRun = scheduled.parent;
+      outputState.parentRunFile = started.file;
+      outputState.scheduledChildren = scheduled.started;
+      const parentEvent = appendRunEvent({
+        cwd,
+        projectRef,
+        runtimeRoot,
+        runId: scheduled.parent.parent_run_id,
+        eventType: "parent.started",
+        requestKey: commandId ?? `parent-start-${scheduled.parent.request_digest}`,
+        payload: {
+          parent_event_version: 1,
+          revision: scheduled.parent.revision,
+          execution_plan_ref: executionPlanRef,
+          workspace_set_ref: workspaceSetRef,
+          scheduled_children: scheduled.started,
+        },
+      });
+      outputState.primaryEventId = parentEvent.event.event_id;
+      outputState.streamLogFile = parentEvent.logFile;
+      outputState.readOnly = false;
+      outputState.futureControlHooks = [
+        `run status --run-id ${scheduled.parent.parent_run_id}`,
+        `run pause --run-id ${scheduled.parent.parent_run_id} --command-id <id> --expected-revision ${scheduled.parent.revision}`,
+      ];
+      return true;
+    }
+
     const controlResult = applyRunControlAction({
       cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      projectRef,
+      projectProfile,
+      runtimeRoot,
       runId,
       action: runAction,
       targetStep,
-      reason: resolveOptionalStringFlag("reason", flags.reason),
-      approvalRef: resolveOptionalStringFlag("approval-ref", flags["approval-ref"]),
+      reason,
+      approvalRef,
+      commandId,
+      expectedRevision,
+      executionPlanRef: executionContext?.executionPlanRef,
+      executionUnitId: executionContext?.executionUnitId,
+      taskRefs: executionContext?.taskRefs,
+      workspaceSetRef: executionContext?.workspaceSetRef,
+      executionRoot: executionContext?.executionRoot,
     });
 
-    outputState.resolvedProjectRef = controlResult.projectRoot;
-    outputState.resolvedRuntimeRoot = controlResult.runtimeRoot;
-    outputState.runtimeLayout = controlResult.runtimeLayout;
-    outputState.projectProfileRef = controlResult.projectProfileRef;
-    outputState.runtimeStateFile = controlResult.stateFile;
-    outputState.runControlAction = controlResult.action;
-    outputState.runControlRunId = controlResult.runId;
-    outputState.runControlState = controlResult.state;
-    outputState.runControlStateFile = controlResult.stateFile;
-    outputState.runControlAuditId = controlResult.auditRecord.audit_id;
-    outputState.runControlAuditFile = controlResult.auditFile;
-    outputState.runControlBlocked = controlResult.blocked;
-    outputState.runControlGuardrails = controlResult.guardrails;
-    outputState.runControlTransition = controlResult.transition;
-    outputState.primaryEventId = controlResult.primaryEvent.event_id;
-    outputState.evidenceEventId = controlResult.evidenceEvent.event_id;
-    outputState.streamLogFile = controlResult.streamLogFile;
-    outputState.readOnly = false;
-    outputState.futureControlHooks = controlResult.nextActions;
+    populateRunControlOutputState(outputState, controlResult);
 
     if (runAction === "start" && !controlResult.blocked) {
-      if (requireValidationPass) {
-        const validationGate = validateProjectRuntime({
+      let routedExecution;
+      try {
+        routedExecution = executeRuntimeHarnessRun({
           cwd,
-          projectRef: /** @type {string} */ (flags["project-ref"]),
-          runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+          projectRef,
+          projectProfile,
+          runtimeRoot,
+          stepClass: targetStep ?? "implement",
+          dryRun: false,
+          runId: controlResult.runId,
+          stepId: `run.start.${targetStep ?? "implement"}`,
+          requireDiscoveryCompleteness: true,
+          approvedHandoffRef: approvedHandoffRef ?? undefined,
+          executionRoot: executionContext?.executionRoot ?? executionRoot ?? undefined,
+          reuseDisposableWorkspace: Boolean(executionContext?.executionRoot ?? executionRoot),
+          workspaceSetRef: executionContext?.workspaceSetRef ?? undefined,
+          promotionEvidenceRefs,
+          routeOverrides,
+          policyOverrides,
+          providerStepStatusStateFile: controlResult.stateFile,
+          executionPlanRef: executionContext?.executionPlanRef,
+          executionUnitId: executionContext?.executionUnitId,
+          taskRefs: executionContext?.taskRefs,
+          planDigest: executionContext?.planDigest,
+          taskDigests: executionContext?.taskDigests,
+          unsafeDevelopmentOverride,
         });
-        if (validationGate.report.status === "fail") {
-          throw new CliUsageError("Run start requires a passing validation report before execution can begin.");
-        }
+      } catch (error) {
+        const message = errorMessage(error);
+        outputState.runControlState = finalizeRunControlFailure({
+          stateFile: controlResult.stateFile,
+          previousState:
+            typeof controlResult.state === "object" && controlResult.state !== null ? controlResult.state : null,
+          targetStep: targetStep ?? "implement",
+          failureCode: "runtime_execution.error",
+          failureSummary: message,
+        });
+        const terminalEvent = appendRunEvent({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          runId: controlResult.runId,
+          eventType: "run.terminal",
+          payload: {
+            status: "failed",
+            summary: `Run start failed after durable start transition: ${message}`,
+            failure_code: "runtime_execution.error",
+          },
+        });
+        outputState.primaryEventId = terminalEvent.event.event_id;
+        outputState.streamLogFile = terminalEvent.logFile;
+        outputState.futureControlHooks = [
+          `incident open --run-id ${controlResult.runId} --summary <text>`,
+          `run status --run-id ${controlResult.runId}`,
+        ];
+        throw new CliUsageError(`Run start failed after durable start transition: ${message}`);
       }
-
-      const routedExecution = executeRuntimeHarnessRun({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-        stepClass: targetStep ?? "implement",
-        dryRun: false,
-        runId: controlResult.runId,
-        stepId: `run.start.${targetStep ?? "implement"}`,
-        requireDiscoveryCompleteness: true,
-        approvedHandoffRef: approvedHandoffRef ?? undefined,
-        promotionEvidenceRefs,
-        routeOverrides,
-        policyOverrides,
-      });
       outputState.routedStepResultId = routedExecution.stepResult.step_result_id;
+      outputState.unsafeDevelopmentOverride = unsafeDevelopmentOverride;
       outputState.routedStepResultFile = routedExecution.stepResultPath;
       outputState.runControlState = finalizeRunControlState({
         projectRoot: controlResult.projectRoot,
@@ -233,8 +699,9 @@ export function handleRunControlCommand(context) {
 
       const stepEvent = appendRunEvent({
         cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        projectRef,
+        projectProfile,
+        runtimeRoot,
         runId: controlResult.runId,
         eventType: "step.updated",
         payload: {
@@ -247,8 +714,9 @@ export function handleRunControlCommand(context) {
       });
       const terminalEvent = appendRunEvent({
         cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        projectRef,
+        projectProfile,
+        runtimeRoot,
         runId: controlResult.runId,
         eventType: "run.terminal",
         payload: {
@@ -279,14 +747,29 @@ export function handleRunControlCommand(context) {
               `review run --run-id ${controlResult.runId}`,
               `audit runs --run-id ${controlResult.runId}`,
             ];
+      if (executionContext) {
+        const progress = materializeTaskProgress({
+          cwd,
+          projectRef,
+          runtimeRoot,
+          planRef: executionContext.planFile,
+        });
+        outputState.executionPlan = progress.executionPlan;
+        outputState.executionPlanFile = progress.executionPlanFile;
+        outputState.taskProgress = progress.taskProgress;
+        outputState.taskProgressFile = progress.taskProgressFile;
+      }
     }
   } else if (command === "run answer") {
     ensureRequiredFlags(command, flags);
     const answerEvidenceRef = resolveOptionalStringFlag("answer-evidence-ref", flags["answer-evidence-ref"]);
+    const decision = resolveOptionalStringFlag("decision", flags.decision);
     const answer =
       flags.answer === undefined ? "" : (resolveOptionalStringFlag("answer", flags.answer) ?? "");
-    if (answer.length === 0 && !answerEvidenceRef) {
-      throw new CliUsageError("Flag '--answer' is required unless '--answer-evidence-ref' points to durable evidence.");
+    if (answer.length === 0 && !answerEvidenceRef && !decision) {
+      throw new CliUsageError(
+        "Flag '--answer' is required unless '--answer-evidence-ref' points to durable evidence or '--decision' is supplied.",
+      );
     }
 
     try {
@@ -297,6 +780,7 @@ export function handleRunControlCommand(context) {
         runId: /** @type {string} */ (resolveOptionalStringFlag("run-id", flags["run-id"])),
         interactionId: /** @type {string} */ (resolveOptionalStringFlag("interaction-id", flags["interaction-id"])),
         answer,
+        decision,
         reason: resolveOptionalStringFlag("reason", flags.reason),
         approvalRef: resolveOptionalStringFlag("approval-ref", flags["approval-ref"]),
         answerEvidenceRef,
@@ -311,6 +795,7 @@ export function handleRunControlCommand(context) {
         interaction_id: answerResult.interactionId,
         interaction_status: answerResult.interactionStatus,
         answer_accepted: answerResult.answerAccepted,
+        decision: answerResult.decision,
         answer_audit_file: answerResult.answerAuditFile,
         answer_audit_ref: answerResult.answerAuditRef,
         step_result_file: answerResult.stepResultFile,
@@ -353,49 +838,43 @@ export function handleRunControlCommand(context) {
       throw new CliUsageError("Flag '--run-id' is required when '--follow' is enabled.");
     }
 
-    const projectState = readProjectState({
+    const readOptions = {
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
+    };
+    const projectState = readProjectState(readOptions);
     outputState.resolvedProjectRef = projectState.project_root;
     outputState.resolvedRuntimeRoot = projectState.runtime_root;
     outputState.runtimeLayout = projectState.runtime_layout;
     outputState.runtimeStateFile = projectState.state_file;
     outputState.projectProfileRef = projectState.project_profile_ref;
-    const uiState = readUiLifecycleState({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
+    const uiState = readUiLifecycleState(readOptions);
     outputState.uiLifecycleState = uiState.state;
     outputState.uiLifecycleStateFile = uiState.stateFile;
     outputState.uiLifecycleConnectionState =
       typeof uiState.state.connection_state === "string" ? uiState.state.connection_state : null;
     outputState.uiLifecycleHeadlessSafe = uiState.state.headless_safe === true;
 
-    outputState.runSummaries = listRuns({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    }).filter((summary) => !runId || summary.run_id === runId);
-    outputState.strategicSnapshot = readStrategicSnapshot({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
+    outputState.runSummaries = listRuns(readOptions).filter((summary) => !runId || summary.run_id === runId);
+    if (runId) {
+      const parent = readParentRun({
+        ...readOptions,
+        parentRunId: runId,
+      });
+      outputState.parentRun = parent.parent;
+      outputState.parentRunFile = parent.parent ? parent.file : null;
+    }
+    outputState.strategicSnapshot = readStrategicSnapshot(readOptions);
     if (runId) {
       outputState.runEventHistory = readRunEventHistory({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         runId,
         limit: maxReplay ?? 50,
       });
       outputState.runPolicyHistory = readRunPolicyHistory({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         runId,
       });
     }
@@ -408,9 +887,7 @@ export function handleRunControlCommand(context) {
 
     if (follow) {
       const stream = openRunEventStream({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        ...readOptions,
         runId: /** @type {string} */ (runId),
         afterEventId,
         maxReplay,

@@ -1,0 +1,30 @@
+context_rule_id: context.rule.operator-intervention
+version: 1
+title: Operator intervention handling
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - operator-request
+    - bounded-execution
+instruction: >
+  Treat packet://operator-request inputs as durable operator intent, not as an
+  unbounded chat. Validate target refs, allowed paths, delivery mode, and
+  policy scope before proposing work. For no-write requests, produce analysis
+  or proposal evidence only. For patch-only requests, produce patch evidence
+  within allowed paths and do not silently mutate project files.
+source_refs:
+  - docs/contracts/operator-request.md
+  - docs/architecture/12-orchestrator-operating-model.md
+applies_to:
+  steps:
+    - discovery
+    - research
+    - spec
+    - planning
+    - implement
+    - review
+    - qa
+    - repair
+    - eval
+    - harness

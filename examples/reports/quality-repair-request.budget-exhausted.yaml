@@ -1,0 +1,54 @@
+request_id: quality-repair-request.budget-exhausted.001
+project_id: aor-core
+run_id: run.budget-exhausted
+cycle_id: quality-cycle.budget-exhausted.001
+source_stage: review
+source_ref: evidence://.aor/projects/aor-core/reports/review-report-run-budget-exhausted.json
+finding_refs:
+  - review.finding.missing-contract-evidence
+repair_scope:
+  target_step: implement
+  requested_next_step: execution
+  allowed_paths:
+    - docs/contracts/**
+    - examples/reports/**
+  verification_refs:
+    - evidence://.aor/projects/aor-core/reports/verify-summary-run-budget-exhausted.json
+  required_evidence_refs:
+    - evidence://.aor/projects/aor-core/reports/review-report-run-budget-exhausted.json
+    - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run-budget-exhausted.json
+  compiled_context_refs:
+    - evidence://.aor/projects/aor-core/context/compiled-repair-budget-exhausted.json
+  reason: Required contract evidence stayed missing after the allowed repair attempts.
+attempt_budget:
+  policy_ref: project-profile://aor-core#quality_repair_policy
+  max_attempts: 2
+  attempt_index: 2
+  remaining_attempts: 0
+status: budget-exhausted
+blockers:
+  - repair-budget-exhausted
+  - operator-approval-required-before-delivery
+evidence_refs:
+  - evidence://.aor/projects/aor-core/reports/review-report-run-budget-exhausted.json
+  - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run-budget-exhausted.json
+  - evidence://.aor/projects/aor-core/context/compiled-repair-budget-exhausted.json
+status_history:
+  - status: requested
+    changed_at: "2026-07-04T13:40:00.000Z"
+    summary: Review requested repair for missing contract evidence.
+    evidence_refs:
+      - evidence://.aor/projects/aor-core/reports/review-decision-run-budget-exhausted.json
+  - status: in-progress
+    changed_at: "2026-07-04T13:45:00.000Z"
+    summary: Final policy-approved repair attempt started.
+    evidence_refs:
+      - evidence://.aor/projects/aor-core/context/compiled-repair-budget-exhausted.json
+  - status: budget-exhausted
+    changed_at: "2026-07-04T14:00:00.000Z"
+    summary: Attempt budget exhausted without closing the required finding.
+    evidence_refs:
+      - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run-budget-exhausted.json
+created_at: "2026-07-04T13:40:00.000Z"
+updated_at: "2026-07-04T14:00:00.000Z"
+operator_override_ref: null

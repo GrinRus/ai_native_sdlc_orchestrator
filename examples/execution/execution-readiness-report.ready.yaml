@@ -1,0 +1,18 @@
+report_id: execution-readiness.aor-core.revision-12
+project_id: aor-core
+revision: 12
+status: ready
+checked_at: "2026-07-16T12:00:00.000Z"
+step_results:
+  - step: implement
+    route_id: route.implement.default
+    adapter: codex-cli
+    runner_available: true
+    auth_ready: true
+    requested_model: coding-primary
+    effective_model: gpt-5.5
+    model_source: policy-approved-alias
+    status: ready
+    blocker_codes: []
+evidence_refs:
+  - evidence://execution-readiness/aor-core/revision-12
