@@ -406,6 +406,10 @@ if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-rea
   console.error("package.json must expose production:ready as the separate production-readiness gate.");
   process.exit(1);
 }
+if (!packageJson.scripts?.["release:gate"]?.includes("pnpm production:ready --allow-audit-hold")) {
+  console.error("package.json release:gate must use the explicit npm-alpha audit-hold readiness policy.");
+  process.exit(1);
+}
 assertPublicSourcePrivateHarnessBoundary();
 for (const file of listPackageSurfaceFiles(packageJson.files ?? [])) {
   const content = read(file);

@@ -62,6 +62,12 @@ Release PRs must:
 - include a matching `CHANGELOG.md` entry;
 - run `pnpm release:gate` before merge.
 
+The npm alpha release gate may accept a valid production-readiness
+`audit-hold` through `--allow-audit-hold`. This is limited to pre-release
+snapshot distribution: it leaves `release_clearance=false` and still fails on
+invalid evidence or failed execution. Stable and production readiness continue
+to require the unqualified `pnpm production:ready` gate to pass.
+
 After a labeled release PR is merged, `.github/workflows/release-publish.yml`
 re-runs the release gate on the merge commit, creates the matching tag and
 GitHub Release, and publishes `@grinrus/aor` with npm Trusted Publishing and
@@ -106,7 +112,9 @@ The repository-integrity workflow runs on:
 What the workflows prove today:
 - `pnpm check` runs the repository-integrity baseline (`lint`, `test`, and `build`);
 - `pnpm production:ready` runs the stricter self-hosted production-readiness gate;
-- release candidate PRs from `release/v<semver-alpha>` run `pnpm release:gate`;
+- release candidate PRs from `release/v<semver-alpha>` run `pnpm release:gate`,
+  which may accept only a valid npm-alpha audit hold while production clearance
+  remains false;
 - dependency review, CodeQL, and OpenSSF Scorecard run as separate security workflows.
 
 If the repository-integrity workflow fails, the failing step maps directly to one of the root checks so the remediation path stays explicit. If a security workflow fails, treat it as a supply-chain or code-scanning finding unless the workflow output clearly identifies a setup problem.

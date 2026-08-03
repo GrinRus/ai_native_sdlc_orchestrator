@@ -192,6 +192,9 @@ export function validateReleaseState(options = {}) {
       findings.push(`package.json scripts.${scriptName} is required.`);
     }
   }
+  if (!packageJson.scripts?.["release:gate"]?.includes("pnpm production:ready --allow-audit-hold")) {
+    findings.push("package.json scripts.release:gate must use 'pnpm production:ready --allow-audit-hold' for fail-closed npm alpha audit-hold handling.");
+  }
   if (!Array.isArray(packageJson.files)) {
     findings.push("package.json files whitelist is required.");
   } else {

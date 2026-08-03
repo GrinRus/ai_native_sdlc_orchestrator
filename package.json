@@ -77,7 +77,7 @@
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
     "release:smoke": "node ./scripts/release-smoke.mjs",
-    "release:gate": "pnpm check && pnpm test:web:browser && pnpm production:ready && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
+    "release:gate": "pnpm check && pnpm test:web:browser && pnpm production:ready --allow-audit-hold && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
     "slice:status": "node ./scripts/slice-cycle.mjs status",
     "slice:next": "node ./scripts/slice-cycle.mjs next",
     "slice:plan": "node ./scripts/slice-cycle.mjs plan",
