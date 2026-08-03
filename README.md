@@ -119,6 +119,12 @@ npm install -g "@grinrus/aor@$AOR_VERSION"
 aor --help
 ```
 
+For the prepared alpha.16 release, the equivalent pinned install is:
+
+```bash
+npm install -g @grinrus/aor@0.1.0-alpha.16
+```
+
 The package includes the CLI, bundled onboarding assets, and the local web
 console used by `aor app`. The npm alpha is a tagged snapshot and may not yet
 include features visible on `main`.
