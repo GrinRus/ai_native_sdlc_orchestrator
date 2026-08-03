@@ -89,7 +89,7 @@ test("topology reads return a stable empty model without materializing a missing
       });
       const projectId = registry.defaultProjectId;
       const profilePath = registry.getContext(projectId).canonicalProfilePath;
-      fs.rmSync(profilePath);
+      fs.rmSync(profilePath, { force: true });
       const before = fs.readdirSync(projectRoot).sort();
       const topology = readProjectTopology({ registry, projectId });
       assert.equal(topology.initialized, false);

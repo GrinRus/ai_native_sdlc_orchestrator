@@ -4,9 +4,10 @@
 Define how harness capture and replay artifacts are produced, stored, replayed, and pruned.
 
 ## Artifact locations
-All harness artifacts are written under:
+All harness artifacts are written under the project reports directory in AOR
+Home and are referenced publicly as:
 
-`<runtime_root>/projects/<project_id>/reports/`
+`evidence://projects/<workspace-project-id>/reports/`
 
 Files:
 - `harness-capture-*.json` — captured step evidence plus scoring snapshot baseline.
@@ -31,7 +32,7 @@ Use `replayHarnessCapture(...)` to:
 
 CLI surface (`W9-S05`):
 - `aor harness replay --project-ref <path> --capture-file <path>`
-- writes one durable `harness-replay-*.json` artifact under runtime reports;
+- writes one durable `harness-replay-*.json` artifact under the selected AOR Home project reports directory;
 - reports explicit incompatibility guidance in `harness_replay_blocked_next_step` when replay is blocked.
 
 ## Minimum evidence bar for promotion decisions

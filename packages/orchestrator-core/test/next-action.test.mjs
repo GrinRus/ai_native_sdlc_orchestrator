@@ -208,8 +208,8 @@ function writeReviewEvidence(init, runId) {
 function writeReviewDecision(init, runId, decision) {
   const held = decision !== "approve";
   const filePath = path.join(init.runtimeLayout.reportsRoot, `review-decision-${runId}-${decision}.json`);
-  const reviewRef = `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`;
-  const harnessRef = `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`;
+  const reviewRef = `evidence://projects/${init.projectId}/reports/review-report-${runId}.json`;
+  const harnessRef = `evidence://projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`;
   writeRuntimeJson(filePath, {
     decision_id: `${runId}.review-decision.${decision}.v1`,
     project_id: init.projectId,
@@ -300,8 +300,8 @@ function writeQualityRepairRequest(init, runId, options = {}) {
   const status = options.status ?? "requested";
   const filePath = path.join(init.runtimeLayout.reportsRoot, `quality-repair-request-${runId}-${sourceStage}-${status}.json`);
   const sourceRef = sourceStage === "qa"
-    ? `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`
-    : `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`;
+    ? `evidence://projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`
+    : `evidence://projects/${init.projectId}/reports/review-report-${runId}.json`;
   writeRuntimeJson(filePath, {
     request_id: `${runId}.quality-repair-request.${sourceStage}.v1`,
     project_id: init.projectId,
@@ -316,8 +316,8 @@ function writeQualityRepairRequest(init, runId, options = {}) {
       allowed_paths: ["apps/web/**"],
       verification_refs: [sourceRef],
       required_evidence_refs: [
-        `evidence://.aor/projects/${init.projectId}/reports/review-report-${runId}.json`,
-        `evidence://.aor/projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`,
+        `evidence://projects/${init.projectId}/reports/review-report-${runId}.json`,
+        `evidence://projects/${init.projectId}/reports/runtime-harness-report-${runId}.json`,
       ],
       compiled_context_refs: [],
       reason: "Fixture quality repair request.",
@@ -456,6 +456,13 @@ test("resolveNextAction recommends discovery for complete guided mission intake"
 
     assert.equal(report.status, "ready");
     assert.equal(report.project_state.stage, "discovery");
+    assert.deepEqual(report.project_state.storage, {
+      kind: "aor-home",
+      project_ref: `evidence://projects/${init.workspaceProjectId}/`,
+      server_owned: true,
+    });
+    assert.equal(Object.hasOwn(report.project_state, "runtime_root"), false);
+    assert.equal(Object.hasOwn(report.project_state, "runtime_state_file"), false);
     assert.equal(report.primary_action.action_id, "discovery-run");
     assert.match(report.primary_action.command, /aor discovery run/);
     assert.deepEqual(report.primary_action.operator_control, {
@@ -667,10 +674,10 @@ test("resolveNextAction returns one safe primary action for quality repair reque
   withCleanRepo((tempRoot) => {
     const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
     const runId = "run.quality.guarded-repair";
-    const handoffEvidenceRef = `evidence://.aor/projects/${init.projectId}/artifacts/${init.projectId}.handoff.bootstrap.v1.json`;
+    const handoffEvidenceRef = `evidence://projects/${init.projectId}/artifacts/${init.projectId}.handoff.bootstrap.v1.json`;
     const handoffFile = path.join(init.runtimeLayout.artifactsRoot, `${init.projectId}.handoff.bootstrap.v1.json`);
     const readinessRef = `/tmp/live-e2e-execution-readiness-${runId}.json`;
-    const implementRef = `evidence://.aor/projects/${init.projectId}/reports/step-result-routed-${runId}.routed.implement.implement.attempt.1.json`;
+    const implementRef = `evidence://projects/${init.projectId}/reports/step-result-routed-${runId}.routed.implement.implement.attempt.1.json`;
     writeMission(init);
     writeExecutionEvidence(init, runId);
     writeReviewEvidence(init, runId);
@@ -946,13 +953,12 @@ test("resolveNextAction blocks when guided mission intake is missing KPI and Def
   });
 });
 
-test("resolveNextAction preserves explicit runtime root in primary and blocker commands", () => {
+test("resolveNextAction never exposes the internal runtime root in commands", () => {
   withCleanRepo((tempRoot) => {
     const defaultReport = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
     assert.equal(defaultReport.primary_action.command.includes("--runtime-root"), false);
 
     const runtimeRoot = path.join(tempRoot, "custom-aor-runtime");
-    const runtimeRootFlag = `--runtime-root ${runtimeRoot}`;
     const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot, runtimeRoot });
     writeMission(init, {
       kpis: [],
@@ -962,8 +968,8 @@ test("resolveNextAction preserves explicit runtime root in primary and blocker c
 
     const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot, runtimeRoot }).nextActionReport;
     assert.equal(report.status, "blocked");
-    assert.ok(report.primary_action.command.includes(runtimeRootFlag));
-    assert.ok(report.blockers.every((blocker) => String(blocker.next_command).includes(runtimeRootFlag)));
+    assert.equal(report.primary_action.command.includes("--runtime-root"), false);
+    assert.ok(report.blockers.every((blocker) => !String(blocker.next_command).includes("--runtime-root")));
   });
 });
 

@@ -48,6 +48,8 @@ function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-parent-run-"));
   fs.mkdirSync(path.join(root, ".git"));
   fs.cpSync(path.resolve("examples"), path.join(root, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(root, ".aor"), { recursive: true });
+  fs.linkSync(path.join(root, "examples/project.aor.yaml"), path.join(root, ".aor/project.yaml"));
   return root;
 }
 

@@ -284,7 +284,6 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
 
 const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["resolved_project_ref", "resolvedProjectRef"],
-  ["resolved_runtime_root", "resolvedRuntimeRoot"],
   ["project_profile_ref", "projectProfileRef"],
   ["runtime_layout", "runtimeLayout"],
   ["runtime_state_file", "runtimeStateFile"],

@@ -1,0 +1,13 @@
+schema_version: 2
+revision: 3
+selected_project_id: decision-a1b2c3d4
+projects:
+  - workspace_project_id: decision-a1b2c3d4
+    runtime_project_id: decision
+    label: Decision
+    source:
+      kind: local
+      local_path: /Users/operator/code/decision
+      resolved_identity: github.com/example/decision
+    project_profile_ref: evidence://projects/decision-a1b2c3d4/state/project.aor.yaml
+    status: connected

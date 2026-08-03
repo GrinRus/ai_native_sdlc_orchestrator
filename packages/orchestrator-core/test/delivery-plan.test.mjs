@@ -36,6 +36,8 @@ function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w4-s02-"));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
 
   try {
     callback(repoRoot);
@@ -70,6 +72,31 @@ test("materializeDeliveryPlan blocks non-no-write mode without approved handoff 
     assert.ok(result.deliveryPlan.blocking_reasons.includes("approved-handoff-required"));
     assert.ok(result.deliveryPlan.blocking_reasons.includes("promotion-evidence-required"));
     assert.equal(result.deliveryPlan.governance.decision, "allow");
+  });
+});
+
+test("forceReadOnly narrows a write-capable project policy for intent preparation", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const policyResolution = resolveStepPolicyForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+    const result = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId: "run.intent.read-only.v1",
+      stepClass: "discovery",
+      policyResolution,
+      forceReadOnly: true,
+      deliveryAuthorizationPhase: false,
+    });
+    assert.equal(result.deliveryPlan.delivery_mode, "no-write");
+    assert.equal(result.deliveryPlan.target_write_allowed, false);
+    assert.equal(result.deliveryPlan.writeback_allowed, false);
+    assert.equal(result.deliveryPlan.permissions.direct_upstream_write_allowed, false);
   });
 });
 

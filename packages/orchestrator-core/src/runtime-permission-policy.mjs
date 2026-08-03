@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 
 const INTERACTION_POLICIES = new Set(["fail-closed", "ask-all", "orchestrator-mediated"]);
 const AUTO_APPROVAL_PROFILES = new Set(["none", "conservative", "auto-edit", "trusted-run"]);
@@ -43,7 +44,7 @@ function normalizeId(value) {
 }
 
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 function commandDigest(command) {

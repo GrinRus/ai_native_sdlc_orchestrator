@@ -40,7 +40,7 @@ legacy removal, and installed-package acceptance.
 
 The primary object in the console is a flow.
 
-- The top bar always exposes the selected project, runtime root, flow selector,
+- The top bar always exposes the selected project, AOR Home storage status, flow selector,
   and `New Flow`.
 - An active flow can advance through the guided stages by invoking runtime-owned
   lifecycle mutations.
@@ -99,7 +99,7 @@ flow's learning handoff, but the completed source flow remains read-only.
 - Completed flows must remain inspectable and read-only.
 - The `New Flow` path must be available from the flow selector and from learning
   closure.
-- Safety gates, blockers, write-back mode, runtime root, evidence refs, and
+- Safety gates, blockers, write-back mode, AOR Home storage status, evidence refs, and
   latest operator request status must stay visible in the main cockpit.
 - Long-running external provider steps must show a query-safe heartbeat in the
   stage rail and active cockpit: provider, adapter, route, step, elapsed time,
@@ -113,12 +113,12 @@ flow's learning handoff, but the completed source flow remains read-only.
 
 The packaged SPA now treats the flow as the primary object:
 
-- The top bar exposes project identity, selected flow, runtime root, connection
+- The top bar exposes project identity, selected flow, storage status, connection
   status, no-write safety status, refresh, and `New Flow`.
 - `New Flow` opens mission intake as a draft and still creates durable evidence
   only through `mission create` followed by `next`.
 - Active flows render an active cockpit with one recommended action, blockers,
-  evidence artifacts, runtime root, write-back mode, and safety status.
+  evidence artifacts, storage status, write-back mode, and safety status.
 - When the operator has not manually selected a completed or future stage for
   inspection, the stage rail, compact stage strip, active cockpit heading, and
   next-action context must agree on the current runtime stage.
@@ -216,8 +216,7 @@ The packaged SPA now treats the flow as the primary object:
   provider evidence to preserve, and the next public control to use. When
   run-health exposes a repair-required blocker and
   `pending_decision.public_repair_command`, the panel promotes that public
-  repair command with the current `--project-ref`, `--project-profile`,
-  `--runtime-root`, and `--run-id` context instead of falling back to generic
+  repair command with the current `--project-ref`, `--project-profile`, and `--run-id` context instead of falling back to generic
   diagnose/retry controls. When the latest `next-action-report` already points
   at the follow-up repair run, the panel promotes the `aor run start ...repair`
   next-action instead of re-showing the earlier `review decide` command. When

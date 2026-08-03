@@ -47,6 +47,18 @@ function withReadModelLimit(runtimeOptions, searchParams) {
   };
 }
 
+function toPublicProjectState(state) {
+  const { runtime_layout: _runtimeLayout, state_file: _stateFile, ...publicState } = state;
+  return {
+    ...publicState,
+    storage: {
+      kind: "aor-home",
+      project_ref: `evidence://projects/${state.project_id}/`,
+      server_owned: true,
+    },
+  };
+}
+
 /**
  * @param {{
  *   routeId: string,
@@ -59,7 +71,7 @@ function withReadModelLimit(runtimeOptions, searchParams) {
 export function handleReadRoute({ routeId, params, requestUrl, response, runtimeOptions }) {
   switch (routeId) {
     case "project-state":
-      sendJson(response, 200, readProjectState(runtimeOptions));
+      sendJson(response, 200, toPublicProjectState(readProjectState(runtimeOptions)));
       return;
     case "packets":
       sendJson(response, 200, listPacketArtifacts(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));

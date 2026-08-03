@@ -84,20 +84,18 @@ function validateWritebackSafety(profile) {
  */
 function validateRuntimeDefaults(profile) {
   const runtimeDefaults = /** @type {Record<string, unknown>} */ (profile.runtime_defaults ?? {});
-  const runtimeRoot = runtimeDefaults.runtime_root;
-
-  if (typeof runtimeRoot !== "string" || runtimeRoot.trim().length === 0) {
+  if (Object.prototype.hasOwnProperty.call(runtimeDefaults, "runtime_root")) {
     return {
       status: "fail",
-      summary: "runtime_defaults.runtime_root is missing or invalid.",
-      details: { runtime_root: runtimeRoot ?? null },
+      summary: "runtime_defaults.runtime_root is no longer supported; AOR Home is selected centrally.",
+      details: { runtime_root: runtimeDefaults.runtime_root },
     };
   }
 
   return {
     status: "pass",
-    summary: "runtime_defaults.runtime_root is configured.",
-    details: { runtime_root: runtimeRoot },
+    summary: "Runtime storage uses the central AOR Home.",
+    details: { override: "AOR_HOME" },
   };
 }
 

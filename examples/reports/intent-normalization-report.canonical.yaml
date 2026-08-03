@@ -1,0 +1,30 @@
+report_id: intent-normalization-report.decision.login.v1
+submission_id: intent-submission.decision.login-a1b2c3d4
+workspace_project_id: decision-a1b2c3d4
+project_id: decision
+revision: 1
+status: prepared
+title: Add session timeout handling
+outcome: Expired sessions are rejected consistently and covered by tests.
+constraints:
+  - Do not write to upstream remotes.
+acceptance:
+  - Expired sessions return the documented response.
+  - Existing authentication tests continue to pass.
+scope:
+  - src/auth/**
+  - test/auth/**
+work_type: code-change
+delivery_mode: patch-only
+assumptions: []
+open_questions: []
+confidence: 0.91
+provider:
+  route_id: route.intake-normalize.default
+  adapter_id: claude-code
+input_refs:
+  - intent-submission://intent-submission.decision.login-a1b2c3d4
+validation:
+  status: pass
+  findings: []
+created_at: 2026-08-03T00:01:00.000Z

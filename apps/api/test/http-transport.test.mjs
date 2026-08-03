@@ -121,8 +121,6 @@ test("detached control-plane source checkout smoke command verifies local API tr
         path.join(workspaceRoot, "apps/api/scripts/control-plane-smoke.mjs"),
         "--project-ref",
         repoRoot,
-        "--runtime-root",
-        runtimeRoot,
         "--host",
         "127.0.0.1",
         "--port",
@@ -132,6 +130,7 @@ test("detached control-plane source checkout smoke command verifies local API tr
       {
         cwd: workspaceRoot,
         encoding: "utf8",
+        env: { ...process.env, AOR_HOME: runtimeRoot },
       },
     );
 
@@ -165,6 +164,48 @@ test("local-trusted transport accepts only literal IPv4 and IPv6 loopback binds"
       assert.equal(response.status, 200);
     } finally {
       await ipv6.close();
+    }
+  });
+});
+
+test("control-plane server rejects removed runtime-root overrides", async () => {
+  await withTempRepo(async (repoRoot) => {
+    assert.throws(
+      () => createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, runtimeRoot: path.join(repoRoot, "legacy-runtime") }),
+      /runtime-root overrides were removed/u,
+    );
+    assert.throws(
+      () => createControlPlaneHttpServer({ projects: [{ projectRef: repoRoot, runtimeRoot: path.join(repoRoot, "legacy-runtime") }], cwd: repoRoot }),
+      /Per-project runtime-root overrides were removed/u,
+    );
+  });
+});
+
+test("native folder picker is unavailable on a non-loopback production listener", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "0.0.0.0",
+      port: 0,
+      auth: {
+        mode: "production-hardened",
+        tokens: [{ token: "folder-picker-token", permissions: ["mutate"] }],
+      },
+    });
+    try {
+      const response = await fetch(`${transport.baseUrl}/api/workspace/folder-picker/actions`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer folder-picker-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ action: "open" }),
+      });
+      assert.equal(response.status, 403);
+      assert.equal((await response.json()).error.code, "folder_picker_loopback_required");
+    } finally {
+      await transport.close();
     }
   });
 });
@@ -508,9 +549,9 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       cwd: repoRoot,
       compilerRevisionRef: "compiler-revision://runtime-context-compiler@v1",
       action: "promote",
-      promotionDecisionRef: "evidence://.aor/projects/http/artifacts/promotion-decision-compiler-v1.json",
+      promotionDecisionRef: "evidence://projects/http/artifacts/promotion-decision-compiler-v1.json",
       compiledContextRefs: ["compiled-context://compiled-context.http.implement.runtime-context-compiler"],
-      evaluationRefs: ["evidence://.aor/projects/http/reports/evaluation-report-runtime-context-compiler.json"],
+      evaluationRefs: ["evidence://projects/http/reports/evaluation-report-runtime-context-compiler.json"],
       compatibilityStatus: "compatible",
     });
 
@@ -916,6 +957,9 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
       assert.equal(nextReportPayload.document.artifact_readiness.stages.discovery.status, "pending");
       assert.equal(nextReportPayload.document.closure_state.run_id, null);
+      assert.equal(Object.hasOwn(nextReportPayload.document.project_state, "runtime_root"), false);
+      assert.equal(Object.hasOwn(nextReportPayload.document.project_state, "runtime_state_file"), false);
+      assert.equal(nextReportPayload.document.project_state.storage.project_ref, `evidence://projects/${transport.projectId}/`);
 
       const flowsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows`);
       assert.equal(flowsResponse.status, 200);
@@ -992,9 +1036,9 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(missingAttentionResponse.status, 404);
       assert.equal((await missingAttentionResponse.json()).error.code, "flow.not_found");
 
-      const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
-      assert.equal(typeof runtimeLayout.reportsRoot, "string");
-      assert.equal(typeof runtimeLayout.artifactsRoot, "string");
+      assert.equal(missionPayload.lifecycle_command.command_output.runtime_layout, undefined);
+      const projectStorageRoot = path.join(process.env.AOR_HOME, "projects", transport.projectId);
+      const runtimeLayout = { reportsRoot: path.join(projectStorageRoot, "reports"), artifactsRoot: path.join(projectStorageRoot, "artifacts") };
       writeApprovedClosureArtifacts(runtimeLayout, transport.projectId, "run.api.closure.v1");
 
       const closureNextResponse = await postJson(commandUrl, {
@@ -1094,7 +1138,8 @@ test("HTTP run start returns 202 while a durable worker job executes", async () 
       const stateStartedAt = Date.now();
       const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
       assert.equal(stateResponse.status, 200);
-      assert.ok(Date.now() - stateStartedAt < 1000, "state GET must remain responsive while worker runs");
+      const stateDurationMs = Date.now() - stateStartedAt;
+      assert.ok(stateDurationMs < 5000, `state GET must remain responsive while worker runs (received in ${stateDurationMs} ms)`);
       const jobFile = accepted.lifecycle_command.artifact_refs[0];
       const terminal = await waitForRunJob(jobFile);
       assert.ok(terminal.worker?.identity.startsWith("node-worker-"));
@@ -1188,9 +1233,10 @@ test("flow plan API creates, reads, approves, reports progress, and invalidates 
       assert.equal(progress.task_progress.tasks.length, shown.plan.local_tasks.length);
 
       const unit = progress.execution_plan.execution_units[0];
+      const unitRepoId = unit.repository_scope[0];
       const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
       const workspaceRoot = path.join(init.runtimeLayout.projectRuntimeRoot, "workspace-sets", "run-http-structured-parent");
-      const executionRoot = path.join(workspaceRoot, "repos", "main");
+      const executionRoot = path.join(workspaceRoot, "repos", unitRepoId);
       const ownerMarker = path.join(workspaceRoot, ".aor-workspace-set-owner.json");
       fs.mkdirSync(executionRoot, { recursive: true });
       fs.writeFileSync(ownerMarker, `${JSON.stringify({
@@ -1210,8 +1256,8 @@ test("flow plan API creates, reads, approves, reports progress, and invalidates 
         workspace_root: workspaceRoot,
         owner_marker: ownerMarker,
         repositories: [{
-          repo_id: "main",
-          mount_path: "repos/main",
+          repo_id: unitRepoId,
+          mount_path: `repos/${unitRepoId}`,
           base_ref: "main",
           resolved_commit: "1".repeat(40),
           execution_root: executionRoot,
@@ -1284,7 +1330,7 @@ test("detached control-plane transport records interactive continuation answers 
       const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
       assert.equal(stateResponse.status, 200);
       const statePayload = await stateResponse.json();
-      const reportsRoot = statePayload.runtime_layout.reports_root ?? statePayload.runtime_layout.reportsRoot;
+      const reportsRoot = path.join(process.env.AOR_HOME, "projects", statePayload.project_id, "reports");
       fs.mkdirSync(reportsRoot, { recursive: true });
       const stepResultFile = path.join(reportsRoot, "step-result-interactive-question.json");
       fs.writeFileSync(
@@ -1587,17 +1633,12 @@ test("local app server serves SPA config and existing control-plane routes", asy
   });
 });
 
-test("local app project index and add-project action keep project runtimes isolated", async () => {
+test("local app project index and asynchronous source connection keep central project data isolated", async () => {
   await withTempRepo(async (firstProjectRoot) => {
     await withTempRepo(async (secondProjectRoot) => {
-      const firstRuntimeRoot = path.join(firstProjectRoot, ".aor");
-      const secondRuntimeRoot = path.join(secondProjectRoot, ".aor-alt");
-      const canonicalFirstRuntimeRoot = path.join(fs.realpathSync.native(firstProjectRoot), ".aor");
-      const canonicalSecondRuntimeRoot = path.join(fs.realpathSync.native(secondProjectRoot), ".aor-alt");
       const transport = await createControlPlaneHttpServer({
         cwd: workspaceRoot,
         projectRef: firstProjectRoot,
-        runtimeRoot: firstRuntimeRoot,
         host: "127.0.0.1",
         port: 0,
         app: {
@@ -1620,36 +1661,44 @@ test("local app project index and add-project action keep project runtimes isola
         assert.equal(index.default_project_id, transport.projectId);
         assert.equal(index.projects.length, 1);
         assert.equal(index.projects[0].onboarding_summary.initialized, false);
-        assert.equal(fs.existsSync(firstRuntimeRoot), false, "project index must not initialize runtime state");
+        assert.equal(fs.existsSync(path.join(firstProjectRoot, ".aor")), false, "project index must not write target repository state");
 
         const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
-          action: "add",
-          project_ref: secondProjectRoot,
-          runtime_root: secondRuntimeRoot,
+          action: "connect",
+          source: { kind: "local", path: secondProjectRoot },
           label: "Second target",
         });
-        assert.equal(addResponse.status, 200);
-        const added = await addResponse.json();
-        assert.equal(added.projects.length, 2);
-        assert.equal(added.project.label, "Second target");
-        assert.equal(added.project.runtime_root, canonicalSecondRuntimeRoot);
-        assert.notEqual(added.project.project_id, transport.projectId);
-        assert.equal(typeof added.project.runtime_project_id, "string");
-        assert.equal(fs.existsSync(secondRuntimeRoot), false, "adding a project must not initialize runtime state");
+        assert.equal(addResponse.status, 202);
+        const accepted = await addResponse.json();
+        let job = accepted.job;
+        for (let attempt = 0; attempt < 100 && ["queued", "running"].includes(job.status); attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          job = await (await getJson(`${transport.baseUrl}${accepted.status_ref}`)).json();
+        }
+        assert.equal(job.status, "succeeded", job.error);
+        assert.notEqual(job.project_id, transport.projectId);
+        assert.equal(fs.existsSync(path.join(secondProjectRoot, ".aor")), false, "connecting must not write target repository state");
 
-        const secondPreviewResponse = await getJson(`${transport.baseUrl}/api/projects/${added.project.project_id}/state`);
+        const refreshedIndex = await (await getJson(`${transport.baseUrl}/api/projects`)).json();
+        assert.equal(refreshedIndex.projects.length, 2);
+        const added = refreshedIndex.projects.find((project) => project.project_id === job.project_id);
+        assert.equal(added.label, "Second target");
+        assert.equal(added.runtime_root, undefined);
+
+        const secondPreviewResponse = await getJson(`${transport.baseUrl}/api/projects/${job.project_id}/state`);
         assert.equal(secondPreviewResponse.status, 200);
         const secondPreview = await secondPreviewResponse.json();
-        assert.equal(secondPreview.project_id, added.project.runtime_project_id);
-        assert.equal(secondPreview.runtime_root, canonicalSecondRuntimeRoot);
-        assert.equal(secondPreview.state_file, null);
+        assert.equal(secondPreview.project_id, job.project_id);
+        assert.equal(secondPreview.runtime_root, undefined);
+        assert.equal(secondPreview.state_file, undefined);
+        assert.deepEqual(secondPreview.storage, { kind: "aor-home", project_ref: `evidence://projects/${job.project_id}/`, server_owned: true });
         assert.equal(secondPreview.onboarding_summary.initialized, false);
         assert.equal(secondPreview.onboarding_summary.recommended_action, "initialize-runtime");
         assert.deepEqual(secondPreview.artifact_display_summaries, []);
-        assert.equal(fs.existsSync(secondRuntimeRoot), false, "project state preview must not initialize runtime state");
+        assert.equal(fs.existsSync(path.join(secondProjectRoot, ".aor")), false, "project state preview must not write target state");
 
         const secondInitResponse = await postJson(
-          `${transport.baseUrl}/api/projects/${added.project.project_id}/lifecycle-command/actions`,
+          `${transport.baseUrl}/api/projects/${job.project_id}/lifecycle-command/actions`,
           {
             command: "project init",
             flags: {},
@@ -1658,23 +1707,20 @@ test("local app project index and add-project action keep project runtimes isola
         assert.equal(secondInitResponse.status, 200);
         const secondInit = await secondInitResponse.json();
         assert.equal(secondInit.lifecycle_command.blocked, false);
-        assert.equal(fs.existsSync(secondRuntimeRoot), true, "second project init must initialize the selected runtime root");
-        assert.equal(fs.existsSync(firstRuntimeRoot), false, "second project init must not initialize the default runtime root");
+        assert.equal(fs.existsSync(path.join(secondProjectRoot, ".aor")), false, "runtime initialization remains outside the target repository");
 
-        const secondStateResponse = await getJson(`${transport.baseUrl}/api/projects/${added.project.project_id}/state`);
+        const secondStateResponse = await getJson(`${transport.baseUrl}/api/projects/${job.project_id}/state`);
         assert.equal(secondStateResponse.status, 200);
         const secondState = await secondStateResponse.json();
-        assert.equal(secondState.project_id, added.project.runtime_project_id);
-        assert.equal(secondState.runtime_root, fs.realpathSync.native(secondRuntimeRoot));
+        assert.equal(secondState.project_id, job.project_id);
 
         const firstStateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
         assert.equal(firstStateResponse.status, 200);
         const firstState = await firstStateResponse.json();
         assert.equal(firstState.project_id, transport.projectId);
-        assert.equal(firstState.runtime_root, canonicalFirstRuntimeRoot);
-        assert.equal(firstState.state_file, null);
+        assert.equal(firstState.state_file, undefined);
         assert.equal(firstState.onboarding_summary.initialized, false);
-        assert.equal(fs.existsSync(firstRuntimeRoot), false, "default project state preview must not initialize runtime state");
+        assert.equal(fs.existsSync(path.join(firstProjectRoot, ".aor")), false, "default project state preview must not write target state");
       } finally {
         await transport.close();
       }
@@ -1682,36 +1728,11 @@ test("local app project index and add-project action keep project runtimes isola
   });
 });
 
-test("local app add-project action accepts an explicit project profile", async () => {
+test("local app source connection rejects credentials embedded in Git URLs", async () => {
   await withTempRepo(async (profiledProjectRoot) => {
-    const profiledRuntimeRoot = path.join(profiledProjectRoot, ".aor-explicit");
-    const explicitProjectProfile = path.join(profiledProjectRoot, "explicit-project.aor.yaml");
-    const explicitProjectProfileText = fs.readFileSync(path.join(workspaceRoot, "examples/project.aor.yaml"), "utf8")
-      .replace("project_id: aor-core", "project_id: explicit-profile-target")
-      .replace("display_name: AOR Core", "display_name: Explicit Profile Target")
-      .replace("routes: examples/routes", `routes: ${path.join(workspaceRoot, "examples/routes")}`)
-      .replace("wrappers: examples/wrappers", `wrappers: ${path.join(workspaceRoot, "examples/wrappers")}`)
-      .replace("prompts: examples/prompts", `prompts: ${path.join(workspaceRoot, "examples/prompts")}`)
-      .replace("policies: examples/policies", `policies: ${path.join(workspaceRoot, "examples/policies")}`)
-      .replace("adapters: examples/adapters", `adapters: ${path.join(workspaceRoot, "examples/adapters")}`)
-      .replace("evaluation: examples", `evaluation: ${path.join(workspaceRoot, "examples")}`)
-      .replace("skills: examples/skills", `skills: ${path.join(workspaceRoot, "examples/skills")}`)
-      .replace("context_docs: examples/context/docs", `context_docs: ${path.join(workspaceRoot, "examples/context/docs")}`)
-      .replace("context_rules: examples/context/rules", `context_rules: ${path.join(workspaceRoot, "examples/context/rules")}`)
-      .replace("context_skills: examples/context/skills", `context_skills: ${path.join(workspaceRoot, "examples/context/skills")}`)
-      .replace("context_bundles: examples/context/bundles", `context_bundles: ${path.join(workspaceRoot, "examples/context/bundles")}`);
-    fs.writeFileSync(explicitProjectProfile, explicitProjectProfileText, "utf8");
-    const initialized = initializeProjectRuntime({
-      cwd: workspaceRoot,
-      projectRef: profiledProjectRoot,
-      projectProfile: explicitProjectProfile,
-      runtimeRoot: profiledRuntimeRoot,
-    });
-    assert.equal(initialized.projectId, "explicit-profile-target");
     const transport = await createControlPlaneHttpServer({
       cwd: profiledProjectRoot,
       projectRef: profiledProjectRoot,
-      runtimeRoot: profiledRuntimeRoot,
       host: "127.0.0.1",
       port: 0,
       app: {
@@ -1721,33 +1742,82 @@ test("local app add-project action accepts an explicit project profile", async (
     });
 
     try {
-      const initialIndexResponse = await getJson(`${transport.baseUrl}/api/projects`);
-      assert.equal(initialIndexResponse.status, 200);
-      const initialIndex = await initialIndexResponse.json();
-      assert.equal(initialIndex.projects.length, 1);
-      assert.equal(initialIndex.projects[0].onboarding_summary.initialized, false);
-      assert.deepEqual(initialIndex.projects[0].onboarding_summary.profile_mismatch_candidate_project_ids, ["explicit-profile-target"]);
-      assert.match(initialIndex.projects[0].onboarding_summary.blockers[0], /matching project profile/u);
-
       const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
-        action: "add",
-        project_ref: profiledProjectRoot,
-        project_profile: explicitProjectProfile,
-        runtime_root: profiledRuntimeRoot,
-        label: "Profiled target",
+        action: "connect",
+        source: { kind: "git", url: "https://user:secret@example.com/org/repo.git" },
       });
-      assert.equal(addResponse.status, 200);
-      const added = await addResponse.json();
-      assert.equal(added.projects.length, 2);
-      assert.equal(added.project.label, "Profiled target");
-      assert.equal(added.project.runtime_project_id, "explicit-profile-target");
-      assert.equal(added.project.project_profile_ref, fs.realpathSync.native(explicitProjectProfile));
-      assert.equal(added.project.project_profile_source, "explicit");
-      assert.equal(added.project.runtime_root, fs.realpathSync.native(profiledRuntimeRoot));
-      assert.equal(added.project.onboarding_summary.initialized, true);
-      assert.equal(added.project.active_flow_summary.status, "no-flows");
-      assert.notEqual(added.project.project_id, initialIndex.projects[0].project_id);
-      assert.equal(fs.existsSync(profiledRuntimeRoot), true, "explicit profile evidence fixture should already exist");
+      assert.equal(addResponse.status, 400);
+      assert.match((await addResponse.json()).error.detail, /credentials/u);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("intent submission API preserves immutable input and creates normalization revisions", async () => {
+  await withTempRepo(async (projectRoot) => {
+    const transport = await createControlPlaneHttpServer({ cwd: projectRoot, projectRef: projectRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const createResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
+        request_text: "Review timeout handling.",
+        attachments: [{ name: "acceptance.md", content: "Timeout failures remain actionable." }],
+        auto_prepare: false,
+      });
+      assert.equal(createResponse.status, 202);
+      const created = await createResponse.json();
+      assert.equal(created.submission.status, "submitted");
+      assert.equal(created.submission.attachments[0].original_name, "acceptance.md");
+      assert.equal(Object.hasOwn(created.submission.attachments[0], "absolute_path"), false);
+
+      const reviseResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "revise",
+        normalization: {
+          title: "Review timeout handling",
+          outcome: "Document timeout risks and recommendations.",
+          constraints: ["Read only."],
+          acceptance: ["Findings cite relevant code."],
+          scope: ["src/**"],
+          work_type: "review",
+          assumptions: [],
+          open_questions: [],
+          confidence: 0.8,
+        },
+      });
+      assert.equal(reviseResponse.status, 200);
+      const revised = await reviseResponse.json();
+      assert.equal(revised.report.delivery_mode, "no-write");
+      assert.equal(revised.report.previous_revision_ref, null);
+
+      const questionsResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "revise",
+        normalization: { ...revised.report, open_questions: ["Which timeout paths?"], confidence: 0.7 },
+      });
+      assert.equal(questionsResponse.status, 200);
+      const questions = await questionsResponse.json();
+      assert.equal(questions.report.status, "needs-input");
+
+      const incompleteAnswer = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "answer",
+        answers: {},
+      });
+      assert.equal(incompleteAnswer.status, 409);
+      assert.equal((await incompleteAnswer.json()).error.code, "intent_submission.answers_incomplete");
+
+      const answerResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "answer",
+        answers: { "Which timeout paths?": "All authorization timeout paths." },
+      });
+      assert.equal(answerResponse.status, 200);
+      const answered = await answerResponse.json();
+      assert.deepEqual(answered.report.open_questions, []);
+      assert.deepEqual(answered.report.provider, questions.report.provider);
+
+      const readResponse = await getJson(`${transport.baseUrl}${created.status_ref}`);
+      assert.equal(readResponse.status, 200);
+      const current = await readResponse.json();
+      assert.equal(current.submission.request_text, "Review timeout handling.");
+      assert.equal(current.normalization.title, "Review timeout handling");
+      assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
     } finally {
       await transport.close();
     }

@@ -9,6 +9,7 @@ import { derivePublicId, loadContractFile, validateContractDocument, validatePub
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 import { evaluateAuditReleaseHold } from "./audit-release-hold.mjs";
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
 import { compileStepContext } from "./context-compiler.mjs";
@@ -299,9 +300,8 @@ function diffChangedPaths(before, after) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
-
 /**
  * @param {string} projectRoot
  * @param {string} sourceRef
@@ -991,6 +991,7 @@ function writeRuntimeRepairInput(options) {
  *   planDigest?: string,
  *   taskDigests?: Record<string, string>,
  *   unsafeDevelopmentOverride?: boolean,
+ *   forceReadOnly?: boolean,
  *   requestKey?: string,
  * }} options
  */
@@ -1327,6 +1328,7 @@ function executeRoutedStepImplementation(options) {
         runId,
         stepClass: requestedStepClass,
         policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
+        forceReadOnly: options.forceReadOnly === true,
         handoffApproval: approvedHandoffRef
           ? {
               status: "pass",
@@ -2185,7 +2187,6 @@ export function executeRuntimeHarnessControlledStep(options) {
       refreshRuntimeHarnessReportForStep(current);
       return current;
     }
-
     const rerun = executeRoutedStep(continueInOwnedWorkspace(options, repair));
     persistRuntimeHarnessAttemptLedger(rerun, executedAttempts, "pending");
     current = rerun;

@@ -6,6 +6,7 @@ import { getCommandDefinition } from "../operator-cli/command-catalog.mjs";
 import { executeImplementedCommand } from "../operator-cli/command-handler.mjs";
 import { startRunJob } from "../run-job.mjs";
 import { createOperatorError } from "./operator-error.mjs";
+import { toLogicalEvidenceRef } from "../aor-home.mjs";
 
 const LIFECYCLE_COMMANDS = new Set([
   "project init",
@@ -77,7 +78,7 @@ function toEvidenceRef(projectRef, value) {
   if (!path.isAbsolute(value)) {
     return value;
   }
-  return `evidence://${path.relative(projectRef, value).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot: projectRef, filePath: value });
 }
 
 /**
@@ -402,7 +403,6 @@ export function runLifecycleCommand(options) {
   const commandParts = command.split(" ");
   const executionFlags = {
     "project-ref": options.projectRef,
-    ...(options.runtimeRoot ? { "runtime-root": options.runtimeRoot } : {}),
     ...(command === "next" && flagResult.cliFlags.json === undefined ? { json: true } : {}),
     ...flagResult.cliFlags,
   };
@@ -410,7 +410,6 @@ export function runLifecycleCommand(options) {
     ...commandParts,
     "--project-ref",
     options.projectRef,
-    ...(options.runtimeRoot ? ["--runtime-root", options.runtimeRoot] : []),
     ...(command === "next" && flagResult.cliFlags.json === undefined ? ["--json"] : []),
     ...flagResult.args,
   ];

@@ -104,7 +104,7 @@ test("flow and next-action reads discover content-addressed intake packet filena
     fs.renameSync(materialized.packetFile, contentAddressedPacketFile);
 
     const flowList = listFlowProjections({ cwd: repoRoot, projectRef: repoRoot });
-    assert.equal(flowList.selected_flow_id, `flow.${init.projectId}.${missionId}`);
+    assert.equal(flowList.selected_flow_id, `flow.${init.workspaceProjectId}.${missionId}`);
     assert.equal(flowList.flows[0]?.mission_id, missionId);
     assert.equal(flowList.flows[0]?.intake_packet_ref.endsWith(path.basename(contentAddressedPacketFile)), true);
 
@@ -363,8 +363,8 @@ test("flow projections keep completed evidence read-only while new flow selectio
     assert.match(completedNext.nextActionReportArchiveFile, /next-action-report-checkout-risk\.json$/u);
 
     let flowList = listFlowProjections({ cwd: repoRoot, projectRef: repoRoot });
-    const checkoutFlowId = `flow.${init.projectId}.checkout-risk`;
-    const followUpFlowId = `flow.${init.projectId}.follow-up-risk`;
+    const checkoutFlowId = `flow.${init.workspaceProjectId}.checkout-risk`;
+    const followUpFlowId = `flow.${init.workspaceProjectId}.follow-up-risk`;
     const completedFlow = flowList.flows.find((flow) => flow.flow_id === checkoutFlowId);
     assert.ok(completedFlow);
     assert.equal(completedFlow.status, "completed");
@@ -424,8 +424,8 @@ test("flow evidence graph and runtime trace stay scoped and sanitized", () => {
     writeMission(init, "follow-up-risk", "no-write");
     resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
 
-    const completedFlowId = `flow.${init.projectId}.checkout-risk`;
-    const activeFlowId = `flow.${init.projectId}.follow-up-risk`;
+    const completedFlowId = `flow.${init.workspaceProjectId}.checkout-risk`;
+    const activeFlowId = `flow.${init.workspaceProjectId}.follow-up-risk`;
     createOperatorRequest({
       cwd: repoRoot,
       projectRef: repoRoot,
@@ -541,7 +541,7 @@ test("attention projection is stable, ordered, flow scoped, and non-materializin
     writeReviewEvidence(init, runId);
     writeQualityRepairRequest(init, runId, { sourceStage: "review" });
     resolveNextAction({ cwd: repoRoot, projectRef: repoRoot, runId });
-    const flowId = `flow.${init.projectId}.attention-proof`;
+    const flowId = `flow.${init.workspaceProjectId}.attention-proof`;
     const before = runtimeJsonSnapshot(init);
     const first = readAttentionProjection({ cwd: repoRoot, projectRef: repoRoot, flowId });
     const second = readAttentionProjection({ cwd: repoRoot, projectRef: repoRoot, flowId });

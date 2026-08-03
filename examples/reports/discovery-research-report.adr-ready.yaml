@@ -3,7 +3,7 @@ project_id: aor-core
 version: 1
 generated_from:
   command: aor discovery run
-  project_analysis_report_ref: evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+  project_analysis_report_ref: evidence://projects/aor-core/reports/project-analysis-report.json
 repository_facts:
   topology: monorepo
   languages:
@@ -21,7 +21,7 @@ context_assets:
     - context-rule://context.rule.public-repo-safety@v1
   context_skill_refs: []
 research_inputs:
-  intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+  intake_packet_ref: evidence://projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
   source_refs:
     - source_id: checkout-risk-prd
       source_kind: local-prd

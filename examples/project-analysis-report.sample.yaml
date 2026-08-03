@@ -115,7 +115,7 @@ evaluation_registry:
       source: examples/eval/suite-release-core.yaml
 discovery_research:
   report_id: github-sandbox.discovery-research.v1
-  report_ref: evidence://.aor/projects/github-sandbox/reports/discovery-research-report.json
+  report_ref: evidence://projects/github-sandbox/reports/discovery-research-report.json
   status: adr-ready
   adr_ready: true
   blocking: false

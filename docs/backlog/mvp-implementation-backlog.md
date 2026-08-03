@@ -616,6 +616,16 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S19 |
 
 ## Planning note
+
+## W67 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W67-S01 | Storage and contract baseline | EPIC-0, EPIC-1, EPIC-2, EPIC-6 | blocked | product, architecture, contracts, examples, backlog | W66-S09 |
+| W67-S02 | Project source connection and central runtime | EPIC-1, EPIC-6 | blocked | core, CLI, API, source connection tests | W67-S01 |
+| W67-S03 | Durable intent preparation | EPIC-2, EPIC-3, EPIC-6 | blocked | contracts, core, routes, CLI, API | W67-S01 |
+| W67-S04 | Intent-first installed console | EPIC-1, EPIC-2, EPIC-6 | blocked | web, control-plane client, browser tests | W67-S02, W67-S03 |
+| W67-S05 | Explicit materialization, export, and closure proof | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | blocked | core, CLI, API, web, docs, proof | W67-S04 |
+
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work
 package. Agents should normally implement one slice at a time and refine only

@@ -7,6 +7,7 @@ import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { validateProjectRuntime } from "./project-validate.mjs";
 import { runProjectionCoordinator } from "./operator-projection-services.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "frozen", "demoted"]);
 const FLAKY_PASS_RATE_DELTA_THRESHOLD = 0.02;
 const MAJOR_DRIFT_DELTA_THRESHOLD = 0.1;
@@ -1238,7 +1239,11 @@ function executeCertificationProjection(options) {
     `promotion-decision-${normalizeForId(options.assetRef)}-${Date.now()}.json`,
   );
   fs.writeFileSync(decisionPath, `${JSON.stringify(decision, null, 2)}\n`, "utf8");
-  const decisionRef = `evidence://${path.relative(init.projectRoot, decisionPath).replace(/\\/gu, "/")}`;
+  const decisionRef = toLogicalEvidenceRef({
+    projectRoot: init.projectRoot,
+    filePath: decisionPath,
+    workspaceProjectId: init.projectId,
+  });
   const compilerRevisionStatus = compilerRevision
     ? materializeCompilerRevisionStatus({
         cwd: options.cwd,

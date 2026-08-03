@@ -533,7 +533,6 @@ export function handleRunControlCommand(context) {
             workspaceSetRef,
             "--require-validation-pass",
             "false",
-            ...(runtimeRoot ? ["--runtime-root", runtimeRoot] : []),
           ];
           const job = startRunJob({
             cwd: started.init.projectRoot,

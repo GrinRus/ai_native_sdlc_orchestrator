@@ -16,6 +16,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const standardTimeoutMs = Number(process.env.AOR_TEST_GROUP_TIMEOUT_MS ?? 8 * 60 * 1000);
 const privateTimeoutMs = Number(process.env.AOR_LIVE_E2E_TEST_SUITE_TIMEOUT_MS ?? 20 * 60 * 1000);
 const privateContextFile = path.join(os.tmpdir(), `aor-live-e2e-test-context-${process.pid}`);
+const testAorHome = fs.mkdtempSync(path.join(os.tmpdir(), `aor-test-home-${process.pid}-`));
+const testEnvironment = {
+  ...process.env,
+  AOR_HOME: testAorHome,
+  AOR_TEST_WORKER_HOME_ROOT: testAorHome,
+};
+const testWorkerHomeBootstrap = path.join(root, "scripts/test/helpers/test-worker-aor-home.mjs");
 const startedAt = new Date().toISOString();
 const plan = discoverTestExecutionPlan(root);
 
@@ -49,7 +56,7 @@ function runCommand(label, command, args, options = {}) {
   const groupStarted = Date.now();
   const run = spawnSync(command, args, {
     cwd: root,
-    env: options.env ?? process.env,
+    env: options.env ?? testEnvironment,
     stdio: "inherit",
     timeout: options.timeout,
     killSignal: "SIGKILL",
@@ -78,7 +85,7 @@ persistReport();
 
 try {
   runCommand("repository integrity checks", process.execPath, ["./scripts/test.mjs"], {
-    env: { ...process.env, AOR_TEST_INTEGRITY_ONLY: "1" },
+    env: { ...testEnvironment, AOR_TEST_INTEGRITY_ONLY: "1" },
     timeout: standardTimeoutMs,
   });
   runCommand("web dist freshness", process.execPath, ["./scripts/web-dist-freshness.mjs", "check"], {
@@ -93,6 +100,8 @@ try {
         `test group '${group.group_id}'`,
         process.execPath,
         [
+          "--import",
+          testWorkerHomeBootstrap,
           "--test",
           ...(group.test_concurrency ? [`--test-concurrency=${group.test_concurrency}`] : []),
           ...group.files.map((file) => path.join(root, file)),
@@ -101,8 +110,8 @@ try {
           timeout,
           env:
             group.timeout_class === "private-proof-harness"
-              ? { ...process.env, AOR_PROOF_RUNNER_TEST_CONTEXT_FILE: privateContextFile }
-              : process.env,
+              ? { ...testEnvironment, AOR_PROOF_RUNNER_TEST_CONTEXT_FILE: privateContextFile }
+              : testEnvironment,
         },
       );
       report.groups.push({
@@ -151,4 +160,5 @@ try {
   process.exit(1);
 } finally {
   fs.rmSync(privateContextFile, { force: true });
+  fs.rmSync(testAorHome, { recursive: true, force: true });
 }

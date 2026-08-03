@@ -157,14 +157,12 @@ async function main() {
 
   const host = optionalString("host", flags.host) ?? DEFAULT_HOST;
   const port = optionalPort("port", flags.port, DEFAULT_PORT);
-  const runtimeRoot = optionalString("runtime-root", flags["runtime-root"]);
   const serve = optionalBoolean("serve", flags.serve);
   const json = jsonRequested(flags.json);
 
   const transport = await createControlPlaneHttpServer({
     cwd: process.cwd(),
     projectRef,
-    runtimeRoot,
     host,
     port,
   });

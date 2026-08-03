@@ -4,8 +4,8 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 21,
-    "source_manifest_sha256": "5b476e58a1306b14927e86aa0207ab202745ed916908c4e0fd39ad374f7a5dc6"
+    "source_file_count": 22,
+    "source_manifest_sha256": "60260e1280378f2c45706aa759edb6255afef483a1404abeda70ea3f1063cac0"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -15,10 +15,11 @@
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "bf074ff9b5ade382952dc466e55f66cc257b47956473e27c419be3b9b5838c4c",
-    "index.d.ts": "0f60bb578e3190fd5f02bbeb77d1325db3baf87566784b5bab7be8b833aa1a6b",
+    "families.mjs": "32febfcc4a257abc05c72321182bee2d604f02376ebcd127f235641e57e30d9e",
+    "index.d.ts": "1fba93263f1866ad99398bd1362d3f4c2589088e201430b531634b9874cd93fa",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
+    "intent-contract-families.mjs": "573574fcd854f3ee253ee5436a48ad602d2e75fbaafbc699545ab526c034b0bf",
     "loader.mjs": "46ce03f248b44ac38b17d37af52e87351784e8177e517f43be3681c255706fe8",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
@@ -31,6 +32,176 @@
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
   },
   "contract_families": [
+    {
+      "family": "workspace-registry",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/workspace-registry.md",
+      "exampleGlob": "examples/workspace/workspace-registry*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "revision",
+        "selected_project_id",
+        "projects"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "revision": "number",
+        "projects": "array"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "intent-submission",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/intent-submission.md",
+      "exampleGlob": "examples/packets/intent-submission*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "submission_id",
+        "workspace_project_id",
+        "project_id",
+        "revision",
+        "status",
+        "request_text",
+        "attachments",
+        "repository_snapshot",
+        "normalization_refs",
+        "created_at",
+        "updated_at"
+      ],
+      "fieldTypes": {
+        "submission_id": "string",
+        "workspace_project_id": "string",
+        "project_id": "string",
+        "revision": "number",
+        "status": "string",
+        "request_text": "string",
+        "attachments": "array",
+        "repository_snapshot": "array",
+        "normalization_refs": "array",
+        "created_at": "string",
+        "updated_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "submitted",
+            "preparing",
+            "prepared",
+            "blocked",
+            "confirmed",
+            "canceled"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "intent-normalization-report",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/intent-normalization-report.md",
+      "exampleGlob": "examples/reports/intent-normalization-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "report_id",
+        "submission_id",
+        "workspace_project_id",
+        "project_id",
+        "revision",
+        "status",
+        "title",
+        "outcome",
+        "constraints",
+        "acceptance",
+        "scope",
+        "work_type",
+        "delivery_mode",
+        "assumptions",
+        "open_questions",
+        "confidence",
+        "provider",
+        "input_refs",
+        "validation",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "report_id": "string",
+        "submission_id": "string",
+        "workspace_project_id": "string",
+        "project_id": "string",
+        "revision": "number",
+        "status": "string",
+        "title": "string",
+        "outcome": "string",
+        "constraints": "array",
+        "acceptance": "array",
+        "scope": "array",
+        "work_type": "string",
+        "delivery_mode": "string",
+        "assumptions": "array",
+        "open_questions": "array",
+        "confidence": "number",
+        "provider": "object",
+        "input_refs": "array",
+        "validation": "object",
+        "created_at": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "prepared",
+            "needs-input",
+            "invalid"
+          ]
+        },
+        {
+          "field": "work_type",
+          "allowedValues": [
+            "analyze",
+            "explain",
+            "review",
+            "document-change",
+            "code-change"
+          ]
+        },
+        {
+          "field": "delivery_mode",
+          "allowedValues": [
+            "no-write",
+            "patch-only"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "evidence-export-manifest",
+      "familyGroup": "operations",
+      "sourceContract": "docs/contracts/evidence-export-manifest.md",
+      "exampleGlob": "examples/reports/evidence-export-manifest*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "export_id",
+        "workspace_project_id",
+        "project_id",
+        "destination",
+        "entries",
+        "excluded_categories",
+        "created_at"
+      ],
+      "fieldTypes": {
+        "export_id": "string",
+        "workspace_project_id": "string",
+        "project_id": "string",
+        "flow_id": "string",
+        "destination": "string",
+        "entries": "array",
+        "excluded_categories": "array",
+        "created_at": "string"
+      },
+      "enumChecks": []
+    },
     {
       "family": "project-profile",
       "familyGroup": "core-packets-and-profiles",
@@ -55,7 +226,6 @@
         "budget_policy",
         "approval_policy",
         "security_policy",
-        "runtime_defaults",
         "writeback_policy"
       ],
       "fieldTypes": {
@@ -2551,6 +2721,26 @@
       "regex_source": "^examples\\/reports\\/integration-report-[^/]+\\.ya?ml$",
       "regex_flags": "",
       "family": "integration-report"
+    },
+    {
+      "regex_source": "^examples\\/workspace\\/workspace-registry[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "workspace-registry"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/intent-submission[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "intent-submission"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/intent-normalization-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "intent-normalization-report"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/evidence-export-manifest[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "evidence-export-manifest"
     },
     {
       "regex_source": "^examples\\/prompts\\/[^/]+\\.ya?ml$",

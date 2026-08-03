@@ -334,7 +334,7 @@ test("run finalization preserves public provider interruption instead of overwri
       started_at: "2026-06-02T00:00:00.000Z",
       updated_at: "2026-06-02T00:01:00.000Z",
       action_sequence: 2,
-      audit_refs: ["evidence://.aor/projects/provider-status-target/reports/run-control-event-external-provider-finalize-0002.json"],
+      audit_refs: ["evidence://projects/provider-status-target/reports/run-control-event-external-provider-finalize-0002.json"],
       provider_step_status: {
         provider: "qwen",
         adapter: "qwen-code",

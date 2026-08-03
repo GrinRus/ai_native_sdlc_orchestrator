@@ -193,6 +193,7 @@ function resolveGovernanceSource(policyResolution) {
  *   runId: string,
  *   stepClass: string,
  *   policyResolution: Record<string, unknown>,
+ *   forceReadOnly?: boolean,
  *   handoffApproval?: { status?: string, ref?: string | null },
  *   promotionEvidenceRefs?: string[],
  *   coordinationRepos?: Array<{ repo_id?: string, role?: string, default_branch?: string, source_root?: string, source_kind?: string, source?: Record<string, unknown> }>,
@@ -222,7 +223,9 @@ function resolveGovernanceSource(policyResolution) {
  * }}
  */
 function executeDeliveryPlanTransaction(options) {
-  const modeSource = resolveModeSource(asRecord(options.policyResolution));
+  const modeSource = options.forceReadOnly === true
+    ? { resolvedMode: "no-write", resolutionKind: "runtime-safety", resolutionField: "forceReadOnly" }
+    : resolveModeSource(asRecord(options.policyResolution));
   const governance = resolveGovernanceSource(asRecord(options.policyResolution));
   const canonicalMode = normalizeDeliveryMode(modeSource.resolvedMode);
   const nonReadOnlyMode = canonicalMode !== "no-write";

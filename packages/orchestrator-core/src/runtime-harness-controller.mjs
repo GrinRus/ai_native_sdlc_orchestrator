@@ -3,6 +3,7 @@ import path from "node:path";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 import { materializeRuntimeHarnessReport } from "./runtime-harness-report.mjs";
 import { executeRuntimeHarnessControlledStep } from "./step-execution-engine.mjs";
 
@@ -51,7 +52,7 @@ function uniqueStrings(values) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

@@ -19,6 +19,7 @@ import {
 } from "./read-artifact-readers.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import { loadValidatedIntakePacket } from "../intake-packet-discovery.mjs";
+import { resolveLogicalEvidenceRef } from "../aor-home.mjs";
 
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/u;
 const READ_ONLY_INSPECTION_INTENTS = new Set(["analyze", "explain", "review", "validate"]);
@@ -90,7 +91,7 @@ function readJsonFile(filePath) {
  */
 function resolveRuntimeRef(init, ref, baseFile) {
   if (ref.startsWith("evidence://")) {
-    return path.resolve(init.projectRoot, ref.slice("evidence://".length));
+    return resolveLogicalEvidenceRef({ projectRoot: init.projectRoot, projectRuntimeRoot: init.projectRuntimeRoot, workspaceProjectId: init.projectId, reference: ref });
   }
   if (path.isAbsolute(ref)) {
     return path.resolve(ref);
@@ -593,9 +594,7 @@ export function listFlowProjections(options = {}) {
     flows: limitedFlows,
     generated_from: {
       read_model: "control-plane.flow-projections",
-      runtime_root: init.runtimeRoot,
-      artifacts_root: init.runtimeLayout.artifactsRoot,
-      reports_root: init.runtimeLayout.reportsRoot,
+      workspace_project_id: init.projectId,
     },
     read_only: true,
   };

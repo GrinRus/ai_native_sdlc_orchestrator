@@ -4,6 +4,7 @@ import path from "node:path";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 
 const LOCK_STATE_FILE = "multirepo-locks.json";
 const LOCK_STATUS_VALUES = new Set(["active", "released", "conflict", "stale", "inspected"]);
@@ -82,7 +83,7 @@ function iso(date) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

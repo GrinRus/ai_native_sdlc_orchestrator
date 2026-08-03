@@ -7,8 +7,8 @@ revision: 2
 accepted_at: "2026-07-15T00:00:00.000Z"
 started_at: "2026-07-15T00:00:00.100Z"
 heartbeat_at: "2026-07-15T00:00:01.000Z"
-status_ref: evidence://.aor/projects/aor-core/state/run-jobs/run-job-run.canonical.job.json
-event_ref: evidence://.aor/projects/aor-core/reports/live-run-events-run.canonical.jsonl
+status_ref: evidence://projects/aor-core/state/run-jobs/run-job-run.canonical.job.json
+event_ref: evidence://projects/aor-core/reports/live-run-events-run.canonical.jsonl
 worker:
   identity: node-worker-42001
   pid: 42001

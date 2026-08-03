@@ -119,7 +119,7 @@ aor request create \
   --stage discovery \
   --intent analyze \
   --request "Analyze the current next action and explain the safest follow-up." \
-  --target-ref evidence://.aor/projects/<PROJECT_ID>/reports/next-action-report.json \
+  --target-ref evidence://projects/<PROJECT_ID>/reports/next-action-report.json \
   --delivery-mode no-write \
   --json
 

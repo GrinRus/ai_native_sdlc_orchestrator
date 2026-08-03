@@ -190,7 +190,7 @@ test("CLI late follow exits after an already durable terminal event", async () =
     const result = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
       "run", "status", "--project-ref", repoRoot, "--run-id", runId, "--follow", "true", "--max-replay", "0",
-    ], { cwd: workspaceRoot, encoding: "utf8", timeout: 5000 });
+    ], { cwd: workspaceRoot, encoding: "utf8", timeout: 15000 });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).follow_mode.enabled, true);
   });

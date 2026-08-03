@@ -3,7 +3,7 @@ project_id: aor-core
 version: 1
 generated_from:
   command: aor discovery run
-  project_analysis_report_ref: evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+  project_analysis_report_ref: evidence://projects/aor-core/reports/project-analysis-report.json
 repository_facts:
   topology: monorepo
   languages:

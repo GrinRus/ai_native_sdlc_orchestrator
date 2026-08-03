@@ -1,0 +1,48 @@
+prompt_bundle_id: intake-normalize
+version: 1
+step_class: artifact
+objective: normalize immutable operator intent into one bounded task preview
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Read the supplied intent-submission JSON and its referenced UTF-8 attachments.
+    Return one JSON object under the key intent_normalization. Do not edit files,
+    run mutation commands, or infer upstream-write permission.
+  priorities:
+    - preserve operator wording and identify assumptions explicitly
+    - express acceptance as observable pass or fail statements
+    - keep scope project-relative and bounded
+    - use no-write for analyze, explain, or review work
+    - use patch-only for document-change or code-change work
+required_inputs:
+  packets:
+    required:
+      - step-input-context
+    optional:
+      - related-packets
+  files:
+    recommended: []
+output_contract_hints:
+  format: structured-json
+  required_sections:
+    - title
+    - outcome
+    - constraints
+    - acceptance
+    - scope
+    - work_type
+    - delivery_mode
+    - assumptions
+    - open_questions
+    - confidence
+  required_evidence:
+    - intent-submission
+stop_conditions:
+  - intent-missing
+  - attachment-invalid
+redaction_expectations:
+  - never reproduce secrets or credentials
+  - never expose physical AOR Home paths
+change_notes:
+  - W67 intent-first onboarding

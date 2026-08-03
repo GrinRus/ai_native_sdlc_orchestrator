@@ -8,7 +8,7 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
-  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js", "mission-model.js", "mission-builder.jsx", "operator-operations.js", "quiet-shell.jsx"]
+  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js", "mission-model.js", "mission-builder.jsx", "intent-onboarding.jsx", "operator-operations.js", "quiet-shell.jsx"]
     .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
     .join("\n");
   const css = ["spa.css", "quiet-cockpit-polish.css"]
@@ -71,9 +71,9 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /graph-context-tabs/u);
   assert.match(source, /selected-node-panel/u);
   assert.match(source, /trace-timeline-strip/u);
-  assert.match(source, /Initialize Project Runtime/u);
-  assert.match(source, /Configure First Flow/u);
-  assert.match(source, /First-run wizard/u);
+  assert.doesNotMatch(source, /Initialize Project Runtime/u);
+  assert.match(source, /Intent-first task onboarding/u);
+  assert.match(source, /Confirm and start/u);
   assert.match(source, /firstRunFocusMode/u);
   assert.match(source, /AdvancedEvidenceDisclosure/u);
   assert.match(source, /Advanced evidence/u);
@@ -93,14 +93,11 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /CompactInlineValue/u);
   assert.match(source, /CompactDetailValue/u);
   assert.match(source, /topbar-status-strip/u);
-  assert.match(source, /first-run-facts/u);
   assert.match(source, /stage-progress-strip/u);
   assert.match(source, /compact-first-run/u);
-  assert.match(source, /safe-template-summary/u);
-  assert.match(source, /Edit mission details/u);
   assert.match(source, /MissionDurableSummary/u);
-  assert.match(source, /Project Context/u);
-  assert.match(source, /Runtime Readiness/u);
+  assert.match(source, /Intent-first onboarding/u);
+  assert.match(source, /read-only task preview/u);
   assert.match(source, /Project switcher/u);
   assert.match(source, /activeProjectDisplay/u);
   assert.match(source, /projectOptionsForSwitcher/u);
@@ -112,11 +109,10 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /externalRunSignalState/u);
   assert.match(source, /deterministicRunEvidenceStatus/u);
   assert.match(source, /signal-state/u);
-  assert.match(source, /Add AOR Project/u);
-  assert.match(source, /Runtime root preview/u);
-  assert.match(source, /Project profile/u);
-  assert.match(source, /project_profile/u);
-  assert.match(source, /Confirm writes and initialize/u);
+  assert.match(source, /Connect project/u);
+  assert.match(source, /Code source/u);
+  assert.match(source, /Prepare task/u);
+  assert.match(source, /Materialize project config/u);
   assert.match(source, /No active flow/u);
   assert.match(source, /Readiness prepares the runtime before a flow is created/u);
   assert.match(source, /selectedStageRuntimeState/u);

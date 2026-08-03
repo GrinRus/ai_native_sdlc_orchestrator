@@ -206,7 +206,6 @@ eval_policy:
   required_for_release: true
   default_release_suite_ref: suite.release.long@v1
 runtime_defaults:
-  runtime_root: .aor
   workspace_mode: workspace-clone
 bootstrap_policy:
   run_project_analysis: true

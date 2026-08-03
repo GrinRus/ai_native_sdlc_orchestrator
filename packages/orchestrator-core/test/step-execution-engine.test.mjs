@@ -112,6 +112,8 @@ function withTempRepo(callback) {
   const gitInit = spawnSync("git", ["init"], { cwd: repoRoot, encoding: "utf8" });
   assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
 
   try {
     callback(repoRoot);
@@ -421,13 +423,13 @@ test("materializeRuntimeHarnessReport aggregates routed step decisions for one r
     });
     const stepResult = JSON.parse(fs.readFileSync(step.stepResultPath, "utf8"));
     stepResult.quality_repair_lineage = {
-      request_ref: "evidence://.aor/projects/aor-core/reports/quality-repair-request-runtime-harness-smoke.json",
+      request_ref: "evidence://projects/aor-core/reports/quality-repair-request-runtime-harness-smoke.json",
       cycle_id: "runtime-harness-smoke.quality-cycle.review.v1",
       source_stage: "review",
       status: "review-required",
       attempt_index: 1,
       evidence_refs: [
-        "evidence://.aor/projects/aor-core/reports/quality-repair-request-runtime-harness-smoke.json",
+        "evidence://projects/aor-core/reports/quality-repair-request-runtime-harness-smoke.json",
       ],
     };
     fs.writeFileSync(step.stepResultPath, `${JSON.stringify(stepResult, null, 2)}\n`, "utf8");

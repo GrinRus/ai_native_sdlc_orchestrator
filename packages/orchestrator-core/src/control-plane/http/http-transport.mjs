@@ -10,6 +10,9 @@ import {
   handleOperatorRequestAction,
   handleOperatorRequestCreate,
   handleProjectAction,
+  handleFolderPickerAction,
+  handleIntentSubmissionAction,
+  handleIntentSubmissionCreate,
   handleProjectTopologyAction,
   handleExecutionProfileAction,
   handleRunControlAction,
@@ -29,6 +32,8 @@ import {
   sendJson,
 } from "./http-utils.mjs";
 import { createLocalProjectRegistry, summarizeProjectContext } from "../local-project-registry.mjs";
+import { readProjectConnectionJob } from "../project-source.mjs";
+import { readIntentSubmission } from "../../intent-service.mjs";
 
 const LOCAL_TRUSTED_HOSTS = new Set(["127.0.0.1", "::1"]);
 
@@ -50,11 +55,9 @@ function isJsonMediaType(value) {
  *   cwd?: string,
  *   projectRef?: string,
  *   projectProfile?: string,
- *   runtimeRoot?: string,
  *   projects?: Array<{
  *     projectRef: string,
  *     projectProfile?: string,
- *     runtimeRoot?: string,
  *     label?: string,
  *   }>,
  *   host?: string,
@@ -79,6 +82,13 @@ function isJsonMediaType(value) {
  * }} options
  */
 export function createControlPlaneHttpServer(options) {
+  if (Object.prototype.hasOwnProperty.call(options, "runtimeRoot") || Object.prototype.hasOwnProperty.call(options, "runtime_root")) {
+    throw new Error("Control-plane runtime-root overrides were removed; use AOR_HOME for isolated processes.");
+  }
+  const configuredProjects = Array.isArray(options.projects) ? options.projects : [];
+  if (configuredProjects.some((project) => Object.prototype.hasOwnProperty.call(project, "runtimeRoot") || Object.prototype.hasOwnProperty.call(project, "runtime_root"))) {
+    throw new Error("Per-project runtime-root overrides were removed; use AOR_HOME for isolated processes.");
+  }
   const host = asString(options.host) ?? "127.0.0.1";
   const securityMode = asString(options.auth?.mode ?? options.auth?.security_mode) ?? "local-trusted";
   if (securityMode === "local-trusted" && !LOCAL_TRUSTED_HOSTS.has(host)) {
@@ -87,11 +97,10 @@ export function createControlPlaneHttpServer(options) {
   const requestedPort = asPositiveInteger(options.port);
   const port = requestedPort ?? 0;
   const projectInputs = Array.isArray(options.projects)
-    ? options.projects
+    ? configuredProjects
     : asString(options.projectRef) ? [{
         projectRef: options.projectRef,
         projectProfile: options.projectProfile,
-        runtimeRoot: options.runtimeRoot,
       }] : [];
   const registry = createLocalProjectRegistry({
     cwd: options.cwd,
@@ -152,8 +161,12 @@ export function createControlPlaneHttpServer(options) {
             sendError(response, 400, "invalid_content_length", "Content-Length must be a non-negative integer.");
             return;
           }
-          if (Number(contentLength) > MAX_MUTATION_BODY_BYTES) {
-            sendError(response, 413, "request_body_too_large", "Request body exceeds the 1 MiB limit.");
+          const declaredLimit = /^\/api\/projects\/[^/]+\/intent-submissions$/u.test(requestUrl.pathname)
+            ? 6 * 1024 * 1024
+            : MAX_MUTATION_BODY_BYTES;
+          if (Number(contentLength) > declaredLimit) {
+            request.resume();
+            sendError(response, 413, "request_body_too_large", `Request body exceeds the ${Math.ceil(declaredLimit / (1024 * 1024))} MiB limit.`);
             return;
           }
         }
@@ -188,7 +201,7 @@ export function createControlPlaneHttpServer(options) {
         return;
       }
 
-      const workspaceRoute = route.id === "project-index" || route.id === "project-actions";
+      const workspaceRoute = ["project-index", "project-actions", "project-connection-job", "folder-picker-actions"].includes(route.id);
       const routeProjectId = asString(params.projectId) ?? projectId ?? "*";
       const context = workspaceRoute ? null : registry.getContext(routeProjectId);
       if (!workspaceRoute && !context) {
@@ -216,6 +229,12 @@ export function createControlPlaneHttpServer(options) {
           sendJson(response, 200, registry.summarize());
           return;
         }
+        if (route.id === "project-connection-job") {
+          const job = readProjectConnectionJob(registry.storageRoot, params.jobId);
+          if (!job) sendError(response, 404, "project_connection_job_not_found", `Project connection job '${params.jobId}' was not found.`);
+          else sendJson(response, 200, job);
+          return;
+        }
         if (route.id === "project-topology" || route.id === "project-topology-validation") {
           const topology = readProjectTopology({ registry, projectId: routeProjectId });
           sendJson(response, 200, route.id === "project-topology" ? topology : {
@@ -224,6 +243,10 @@ export function createControlPlaneHttpServer(options) {
             validation: topology.latest_validation,
             read_only: true,
           });
+          return;
+        }
+        if (route.id === "intent-submission") {
+          sendJson(response, 200, readIntentSubmission({ registry, projectId: routeProjectId, submissionId: params.submissionId }));
           return;
         }
         if (route.id === "execution-profile") {
@@ -242,6 +265,22 @@ export function createControlPlaneHttpServer(options) {
 
       if (route.id === "project-actions") {
         await handleProjectAction({ request, response, registry });
+        return;
+      }
+      if (route.id === "folder-picker-actions") {
+        if (!LOCAL_TRUSTED_HOSTS.has(host)) {
+          sendError(response, 403, "folder_picker_loopback_required", "Native folder selection is available only from a loopback-bound AOR control plane.");
+          return;
+        }
+        await handleFolderPickerAction({ request, response });
+        return;
+      }
+      if (route.id === "intent-submission-create") {
+        await handleIntentSubmissionCreate({ request, response, params, registry });
+        return;
+      }
+      if (route.id === "intent-submission-actions") {
+        await handleIntentSubmissionAction({ request, response, params, registry });
         return;
       }
       if (route.id === "project-topology-actions") {
@@ -330,7 +369,6 @@ export function createControlPlaneHttpServer(options) {
         projectId,
         projectProfileRef,
         projectRef: defaultSummary?.project_ref ?? null,
-        runtimeRoot: defaultSummary?.runtime_root ?? null,
         async close() {
           if (!server.listening) {
             return;

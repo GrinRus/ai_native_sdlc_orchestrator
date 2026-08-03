@@ -20,6 +20,10 @@ export { CliUsageError };
 const GUIDED_SHORTCUT_COMMANDS = new Set(["doctor", "onboard", "app", "next"]);
 const TOP_LEVEL_HELP_GROUPS = Object.freeze([
   {
+    title: "Intent-first start",
+    commands: ["project connect", "task prepare", "task start", "project materialize-config", "evidence export"],
+  },
+  {
     title: "Guided shortcuts",
     commands: ["doctor", "onboard", "app", "next", "mission create"],
   },
@@ -268,7 +272,7 @@ function formatGuidedHumanOutput(output) {
     String(output.guided_summary ?? ""),
     "",
     `Project: ${String(output.resolved_project_ref ?? "not resolved")}`,
-    `Runtime root: ${String(output.resolved_runtime_root ?? "not resolved")}`,
+    "Runtime storage: central AOR Home",
   ];
 
   if (output.asset_mode || output.onboarding_report_file) {
@@ -413,7 +417,7 @@ export function formatCommandHelp(definition) {
               "- Use --smoke --open false --json for CI and release smoke checks.",
               "- The local app serves the packaged SPA and same-origin /api/projects/:projectId routes.",
               "- Local source checkout detached API guidance uses http://127.0.0.1:8080 by default.",
-              "- Source checkout API smoke: node apps/api/scripts/control-plane-smoke.mjs --project-ref <repo> --runtime-root <repo>/.aor --host 127.0.0.1 --port 8080",
+              "- Source checkout API smoke: node apps/api/scripts/control-plane-smoke.mjs --project-ref <repo> --host 127.0.0.1 --port 8080",
               "- Guided commands default to human-readable output; pass --json for the full schema or --json compact for populated fields.",
             ]
           : definition.command === "next"
@@ -436,7 +440,7 @@ export function formatCommandHelp(definition) {
       ? [
           "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",
           "- --project-profile can override default profile discovery in project root.",
-          `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+          "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           "- --asset-mode bundled is the clean default and resolves bundled registry roots without copying examples/.",
           "- --asset-mode materialized requests explicit profile and bootstrap-asset materialization.",
           "- --materialize-project-profile writes project.aor.yaml from bundled bootstrap templates when the target repo is still clean.",
@@ -448,7 +452,7 @@ export function formatCommandHelp(definition) {
         ? [
             "- --project-ref must point to an existing directory.",
             "- --project-profile can override default profile discovery in project root.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
             "- --route-overrides accepts comma-separated step overrides like planning=route.plan.default.",
             "- --policy-overrides accepts comma-separated step overrides like planning=policy.step.planner.default.",
             "- Analyze emits route, asset, and policy resolution reports for downstream execution planning.",
@@ -457,7 +461,7 @@ export function formatCommandHelp(definition) {
         ? [
             "- --project-ref must point to an existing directory.",
             "- --project-profile can override default profile discovery in project root.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
             "- Validation report status can be pass, warn, or fail.",
             "- --require-approved-handoff enforces approved handoff gate for execution-style readiness.",
           ]
@@ -471,7 +475,7 @@ export function formatCommandHelp(definition) {
             "- --output-quality-baseline accepts prior verify summaries whose warning findings may be marked pre-existing instead of blocking the current verify.",
             "- Use --approved-handoff-ref and --promotion-evidence-refs with --routed-live-step for non-no-write live routes.",
             "- --routed-dry-run-step and --routed-live-step are mutually exclusive.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "eval run"
         ? [
@@ -479,7 +483,7 @@ export function formatCommandHelp(definition) {
             "- --subject-ref is required and must use '<subject_type>://<target>' format.",
             "- --suite-ref is optional and falls back to eval_policy.default_release_suite_ref.",
             "- Eval run is offline and independent from delivery automation.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "harness certify"
         ? [
@@ -490,7 +494,7 @@ export function formatCommandHelp(definition) {
             "- Freeze transitions require explicit regression evidence before rollout action becomes 'freeze'.",
             "- Context asset promotions require with-context vs without-context comparison and immutable provenance evidence.",
             "- Status semantics are pass, hold, or fail.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "harness replay"
         ? [
@@ -498,7 +502,7 @@ export function formatCommandHelp(definition) {
             "- Replay performs compatibility checks against current route/wrapper/prompt/policy/adapter resolution.",
             "- Compatible captures replay eval scoring; incompatible captures persist status='incompatible' with explicit blocked_next_step guidance.",
             "- Replay writes one durable harness-replay-*.json report under runtime reports root.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "asset promote"
         ? [
@@ -506,7 +510,7 @@ export function formatCommandHelp(definition) {
             "- Promote defaults to candidate -> stable, but channels can be overridden for bounded transitions.",
             "- Command reuses certification evidence flow (validation, eval, harness capture/replay) and writes one promotion-decision artifact.",
             "- Status semantics are pass, hold, or fail; inspect promotion_rollout_action and promotion_governance_checks for audit details.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "asset freeze"
         ? [
@@ -514,7 +518,7 @@ export function formatCommandHelp(definition) {
             "- Freeze uses the same certification evidence bar (validation, eval, harness capture/replay).",
             "- Without regression evidence, freeze remains hold with explicit guardrail rationale.",
             "- With regression evidence, rollout_decision.action can become freeze even when final decision status is fail.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "compiler revision"
         ? [
@@ -523,7 +527,7 @@ export function formatCommandHelp(definition) {
             "- --compiled-context-refs, --evaluation-refs, --incident-refs, and --certification-evidence-refs preserve lifecycle lineage for audit and API reads.",
             "- --compatibility-status=incompatible blocks the revision and keeps the lifecycle state blocked.",
             "- Use asset promote/freeze with a compiler-revision:// asset ref to produce certification evidence plus this status report in one flow.",
-            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
           ]
       : definition.command === "handoff prepare"
         ? [
@@ -545,7 +549,7 @@ export function formatCommandHelp(definition) {
               "- --source-kind and --source-ref preserve local issue, PRD, RFC, note, or mail-like source references.",
               "- Product-intake completeness is explicit: goals, constraints, KPIs, Definition of Done, and source refs are reported as present or missing.",
               "- --request-constraints accepts comma-separated values and can be repeated.",
-              `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+              "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
             ]
           : definition.command === "discovery run"
             ? [
@@ -731,7 +735,7 @@ export function formatCommandHelp(definition) {
                         ]
       : [
           "- --project-ref must point to an existing directory.",
-          `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          "- Runtime data resolves through central AOR Home; AOR_HOME is reserved for isolated runs.",
         ];
 
   const lines = [

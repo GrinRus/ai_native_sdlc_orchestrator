@@ -1,0 +1,30 @@
+route_id: route.intake-normalize.default
+step: discovery
+route_class: artifact
+risk_tier: low
+primary:
+  adapter: codex-cli
+  provider: openai
+  model: planning-primary
+fallback:
+  - adapter: claude-code
+    provider: anthropic
+    model: planning-fallback
+  - adapter: qwen-code
+    provider: anthropic
+    model: planning-fallback
+required_adapter_capabilities:
+  - repo_read
+  - structured_output
+validation_profile_ref: validate.discovery.default
+retry_policy_ref: retry.transient.default
+repair_policy_ref: repair.artifact.default
+constraints:
+  timeout_sec: 300
+  max_cost_usd: 2
+  allow_scope_expansion: false
+  force_read_only: true
+  allow_write_tools: false
+  allow_remote_mutations: false
+  network_mode: deny-by-default
+promotion_channel: candidate

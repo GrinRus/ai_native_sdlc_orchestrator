@@ -21,6 +21,8 @@ function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-context-compiler-"));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
 
   try {
     callback(repoRoot);
@@ -255,8 +257,8 @@ test("compileStepContext preserves explicit packet refs beyond prompt required_i
 test("compileStepContext resolves concrete named packet refs for adapter input", () => {
   withTempRepo((repoRoot) => {
     const resolved = resolveExecutionArtifacts(repoRoot, "implement");
-    const handoffRef = "packet://handoff@evidence://.aor/projects/demo/artifacts/handoff.json";
-    const specRef = "packet://spec@evidence://.aor/projects/demo/reports/spec-step-result.json";
+    const handoffRef = "packet://handoff@evidence://projects/demo/artifacts/handoff.json";
+    const specRef = "packet://spec@evidence://projects/demo/reports/spec-step-result.json";
     const compiled = compileStepContext({
       projectRoot: repoRoot,
       projectProfilePath: resolved.projectProfilePath,

@@ -4,8 +4,8 @@ import path from "node:path";
 import { resolveAdapterMatrix } from "../../adapter-sdk/src/index.mjs";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
-
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
@@ -55,7 +55,7 @@ const ARCHITECTURE_CONTRACT_REFS = Object.freeze([
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

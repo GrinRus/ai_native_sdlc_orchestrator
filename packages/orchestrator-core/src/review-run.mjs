@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 import {
   collectMissionChangeEvidence,
   isTransientBackupPath,
@@ -286,7 +287,7 @@ function normalizeId(value) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

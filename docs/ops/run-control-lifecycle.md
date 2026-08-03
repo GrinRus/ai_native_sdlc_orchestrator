@@ -43,17 +43,15 @@ plan, implement, or review bounded artifacts through the runtime.
 ```bash
 aor request create \
   --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor \
   --stage execution \
   --intent repair \
   --request "Analyze the failed run evidence and propose a safe repair." \
-  --target-ref evidence://.aor/projects/<PROJECT_ID>/reports/step-result-<RUN_ID>.json \
+  --target-ref evidence://projects/<PROJECT_ID>/reports/step-result-<RUN_ID>.json \
   --delivery-mode no-write \
   --json
 
 aor request run \
   --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor \
   --request-ref <OPERATOR_REQUEST_REF> \
   --target-step repair \
   --json

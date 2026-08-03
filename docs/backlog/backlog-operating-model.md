@@ -1,5 +1,8 @@
 # Backlog operating model
 
+The latest defined wave is W67. It is registered behind active W66-S09 and
+does not change the single-active-slice rule.
+
 ## Purpose
 
 This document defines how AOR implementation work should be represented in the shared backlog so that humans and agents can pick up work without guessing.
@@ -171,7 +174,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W66`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W67`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, project-context anchoring, and concurrent
 evidence integrity. W58 continues with non-materializing reads, effective
@@ -209,6 +212,11 @@ parent/integration/delivery correctness, and installed browser-proof integrity.
 Deterministic closure precedes the final same-commit medium/large Codex and
 Claude matrix; backlog state does not replace the ledger-derived production
 readiness decision.
+
+W67 is the blocked successor planning lane for the breaking central AOR Home,
+source connection, durable intent preparation, intent-first console, and
+explicit portable write-back cutover. Its first slice depends on W66-S09, so
+describing or implementing the lane does not make it the active slice.
 
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for

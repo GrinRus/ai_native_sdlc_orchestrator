@@ -24,7 +24,7 @@ Durable report emitted by `aor project init` and `aor onboard` to explain clean-
 
 `registry_roots` records the resolved roots used by route, wrapper, prompt, policy, adapter, evaluation, and context loading paths. Paths may be absolute when they point to bundled installed assets; materialized roots should usually be target-repo relative in the project profile and resolved in the report.
 
-`write_effects` must distinguish target repository writes from runtime-root writes. Bundled onboarding is allowed to write runtime state under `.aor/`, but must report zero target-repo asset writes and no copied example registries.
+`write_effects` must distinguish target repository writes from AOR Home writes. Bundled onboarding writes mutable state only under AOR Home and must report zero target-repo asset writes and no copied example registries.
 
 The report is published only as part of a validated per-project runtime
 transaction. Its runtime references describe the final canonical layout, never

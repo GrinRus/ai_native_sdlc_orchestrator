@@ -1,0 +1,16 @@
+export_id: evidence-export.decision.login.1
+workspace_project_id: decision-a1b2c3d4
+project_id: decision
+flow_id: flow.decision.login
+destination: .aor/exports/flow.decision.login/evidence-export.decision.login.1
+entries:
+  - source_ref: evidence://projects/decision-a1b2c3d4/reports/review-report.login.json
+    exported_path: review-report.login.json
+    sha256: 3333333333333333333333333333333333333333333333333333333333333333
+    byte_length: 1024
+    family: review-report
+excluded_categories:
+  - credentials
+  - provider-raw-log
+  - intent-attachment
+created_at: 2026-08-03T00:05:00.000Z

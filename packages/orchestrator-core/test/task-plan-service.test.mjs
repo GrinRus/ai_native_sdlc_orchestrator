@@ -27,6 +27,7 @@ import {
   resolveOverallTaskProgressStatus,
   resolveTaskProgressStatus,
 } from "../src/task-progress-projection.mjs";
+import { toLogicalEvidenceRef } from "../src/aor-home.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -34,6 +35,8 @@ function withTempRepo(callback) {
   const repoRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "aor-w60-plan-")));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
   try {
     return callback(repoRoot);
   } finally {
@@ -175,11 +178,11 @@ test("structured plan create is routed, idempotent, approvable, and materializes
     const resolvedUnit = resolveExecutionUnitContext({
       projectRef: repoRoot,
       cwd: repoRoot,
-      executionPlanRef: `evidence://${path.relative(repoRoot, approved.executionPlanFile)}`,
+      executionPlanRef: toLogicalEvidenceRef({ projectRoot: repoRoot, filePath: approved.executionPlanFile, workspaceProjectId: first.workspaceProjectId }),
       executionUnitId: unit.unit_id,
     });
     assert.deepEqual(resolvedUnit.taskRefs, unit.task_refs);
-    const workspaceSetRoot = path.join(repoRoot, ".aor", "projects", "aor-core", "workspace-sets", "parent-run-plan");
+    const workspaceSetRoot = path.join(first.runtimeLayout.workspacesRoot, "parent-run-plan");
     const executionRoot = path.join(workspaceSetRoot, "repos", "main");
     const ownerMarker = path.join(workspaceSetRoot, ".aor-workspace-set-owner.json");
     fs.mkdirSync(executionRoot, { recursive: true });
@@ -189,7 +192,7 @@ test("structured plan create is routed, idempotent, approvable, and materializes
       run_id: "parent-run-plan",
       workspace_root: workspaceSetRoot,
     })}\n`);
-    const workspaceSetFile = path.join(repoRoot, ".aor", "projects", "aor-core", "reports", "workspace-set.parent-run-plan.json");
+    const workspaceSetFile = path.join(first.runtimeLayout.reportsRoot, "workspace-set.parent-run-plan.json");
     fs.writeFileSync(workspaceSetFile, `${JSON.stringify({
       schema_version: 2,
       workspace_set_id: "workspace-set-parent-run-plan",
@@ -217,18 +220,18 @@ test("structured plan create is routed, idempotent, approvable, and materializes
     const workspaceBoundUnit = resolveExecutionUnitContext({
       projectRef: repoRoot,
       cwd: repoRoot,
-      executionPlanRef: `evidence://${path.relative(repoRoot, approved.executionPlanFile)}`,
+      executionPlanRef: toLogicalEvidenceRef({ projectRoot: repoRoot, filePath: approved.executionPlanFile, workspaceProjectId: first.workspaceProjectId }),
       executionUnitId: unit.unit_id,
-      workspaceSetRef: `evidence://${path.relative(repoRoot, workspaceSetFile)}`,
+      workspaceSetRef: toLogicalEvidenceRef({ projectRoot: repoRoot, filePath: workspaceSetFile, workspaceProjectId: first.workspaceProjectId }),
     });
     assert.equal(workspaceBoundUnit.executionRoot, executionRoot);
     fs.writeFileSync(ownerMarker, `${JSON.stringify({ workspace_set_id: "wrong" })}\n`);
     assert.throws(() => resolveExecutionUnitContext({
       projectRef: repoRoot,
       cwd: repoRoot,
-      executionPlanRef: `evidence://${path.relative(repoRoot, approved.executionPlanFile)}`,
+      executionPlanRef: toLogicalEvidenceRef({ projectRoot: repoRoot, filePath: approved.executionPlanFile, workspaceProjectId: first.workspaceProjectId }),
       executionUnitId: unit.unit_id,
-      workspaceSetRef: `evidence://${path.relative(repoRoot, workspaceSetFile)}`,
+      workspaceSetRef: toLogicalEvidenceRef({ projectRoot: repoRoot, filePath: workspaceSetFile, workspaceProjectId: first.workspaceProjectId }),
     }), /owner marker/u);
 
     const task = approved.plan.local_tasks[0];

@@ -24,6 +24,8 @@ function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w3-s05-"));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
 
   try {
     callback(repoRoot);

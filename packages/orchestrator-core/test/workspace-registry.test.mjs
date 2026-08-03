@@ -22,8 +22,14 @@ test("persistent Local Workspace registry survives restart without selecting a s
         projects: [{ projectRef: projectRoot, label: "Persistent project" }],
         persistence: { mode: "persistent", root: aorHome },
       });
-      assert.equal(first.defaultProjectId, "aor-core");
+      assert.match(first.defaultProjectId, /^aor-workspace-project-[a-z0-9]+-[a-f0-9]{8}$/u);
       assert.equal(first.revision, 1);
+      const persisted = JSON.parse(fs.readFileSync(path.join(aorHome, "workspace", "registry.json"), "utf8"));
+      assert.equal(persisted.projects[0].workspace_project_id, first.defaultProjectId);
+      assert.match(persisted.projects[0].runtime_project_id, /^project-[a-f0-9]{16}$/u);
+      assert.notEqual(persisted.projects[0].runtime_project_id, first.defaultProjectId);
+      assert.equal(persisted.projects[0].project_profile_ref, `evidence://projects/${first.defaultProjectId}/state/project.aor.yaml`);
+      assert.equal(persisted.projects[0].status, "connected");
 
       const restarted = createLocalProjectRegistry({
         cwd: os.tmpdir(),

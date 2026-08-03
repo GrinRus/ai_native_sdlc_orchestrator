@@ -87,7 +87,7 @@ cd "$TMP/runner"
 AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
 npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help
 npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
-  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+  aor app --project-ref "$TMP/target" --smoke --open false --json
 ```
 
 This proves the registry artifact and avoids npm resolving the local source

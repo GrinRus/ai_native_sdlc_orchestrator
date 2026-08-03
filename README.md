@@ -14,7 +14,7 @@ while keeping scope, approvals, and evidence explicit.
 **AOR coordinates coding agents; it does not replace them.**
 
 ```text
-Mission -> Discovery -> Spec -> Plan -> Execute -> Review/QA -> Deliver -> Release -> Learn
+Code source + plain-language intent -> Read-only preparation -> Confirm -> Flow
 ```
 
 > **Alpha:** AOR is for evaluation and bounded local or self-hosted use. It is not
@@ -84,6 +84,21 @@ enterprise identity, credentialed provider certification, paid calls, default
 upstream writes, or automatic upstream publication of target-repository
 changes.
 
+W67 defines the breaking central-AOR-Home and intent-first onboarding cutover.
+Its implementation candidate is present, while formal slice completion remains
+backlog-blocked behind the active W66-S09 qualification closure.
+
+Mutable AOR data lives in `~/.aor`; `AOR_HOME` is reserved for isolated tests
+and rehearsals. Runner forks can be selected without shell aliases:
+
+```bash
+export AOR_RUNNER_COMMAND_CLAUDE_CODE=tclaude
+export AOR_RUNNER_COMMAND_QWEN_CODE=nessy
+```
+
+Authentication remains owned by the selected executable and its normal
+credential store or agent.
+
 ## Current distribution channels
 
 | Channel | Use it for | Source of version truth |
@@ -139,24 +154,26 @@ Source-checkout examples use `pnpm aor`; installed-package examples use `aor`.
 
 ## Run your first no-write local mission
 
-Start in a disposable local repository and let the browser guide setup:
+Connect a disposable local repository and let the browser prepare the task:
 
 ```bash
-cd /path/to/local-project
 aor app
 ```
 
 `aor app` starts a foreground server on `127.0.0.1`, opens the local console,
 and prints its URL. Press `Ctrl+C` to stop it. In the first-run wizard:
 
-1. Confirm the project path and runtime root.
-2. Select **Initialize Project Runtime**.
-3. Create a Mission from the safe walkthrough template.
-4. Keep `delivery-mode=no-write` and open the active flow.
+1. Choose a local Git folder or enter an HTTPS/SSH Git URL.
+2. Enter the intent and optionally attach `.txt`, `.md`, `.json`, or YAML files.
+3. Select **Prepare task** for read-only AI normalization.
+4. Review acceptance, scope, provider, and safety mode, then select
+   **Confirm and start**.
 
-This path does not require an authenticated external runner. In no-write mode, AOR still writes runtime state
-under the target repository's `.aor/` directory, but it must not edit target
-source files or attempt upstream write-back.
+Preparation requires one authenticated ready runner. All mutable AOR state is
+stored under `~/.aor` (or `AOR_HOME` for isolated runs), never in the target
+repository. Repository writes occur only through explicit **Materialize project
+config** or selected evidence export actions; AOR never stages, commits, or
+pushes those files.
 
 From a flow stage, **Ask AOR** creates a durable operator request rather than a
 direct chat session. The request is validated against its target refs, allowed
@@ -167,31 +184,14 @@ runtime used by CLI and API execution.
 <summary>Headless source-checkout quickstart</summary>
 
 ```bash
-export TARGET_REPO=/path/to/local-project
-export AOR_RUNTIME="$TARGET_REPO/.aor"
-
-pnpm aor doctor --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --json
-
-pnpm aor onboard \
-  --project-ref "$TARGET_REPO" \
-  --runtime-root "$AOR_RUNTIME" \
+pnpm aor project connect --path /path/to/local-project --json
+pnpm aor task prepare \
+  --project-id <workspace-project-id> \
+  --request "Review authorization and fix timeout handling" \
+  --file requirements.md \
   --json
-
-pnpm aor mission create \
-  --project-ref "$TARGET_REPO" \
-  --runtime-root "$AOR_RUNTIME" \
-  --title "Small safe trial" \
-  --brief "Inspect the project and recommend the next no-write step" \
-  --goal "Produce bounded next-action evidence" \
-  --constraint "No upstream writes, no target file edits, and no external runner execution" \
-  --kpi "trial-ready:Trial readiness:ready:status" \
-  --dod "No upstream writes are attempted" \
-  --delivery-mode no-write \
-  --json
-
-pnpm aor next \
-  --project-ref "$TARGET_REPO" \
-  --runtime-root "$AOR_RUNTIME" \
+pnpm aor task start \
+  --submission-id <submission-id> \
   --json
 ```
 
@@ -213,7 +213,7 @@ AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
 npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help
 
 npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
-  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+  aor app --project-ref "$TMP/target" --smoke --open false --json
 ```
 
 Do not run this registry-package smoke from the AOR source checkout. npm can
@@ -224,32 +224,28 @@ found` result.
 
 First-run safety notes:
 
-- `.aor/` is ignored runtime state and must not be committed. It can contain
-  local paths, repository metadata, workflow decisions, and runner output.
-- For the safest onboarding path, do not pass `examples/project.aor.yaml`; it
-  describes the AOR repository itself.
-- `aor onboard --asset-mode materialized` intentionally ejects example assets
-  and creates target-repo files outside `.aor/`.
+- `~/.aor` is private mutable state and must not be committed.
+- Repo-local `.aor` is reserved for explicit portable config and selected
+  evidence exports; legacy runtime content is not loaded or deleted.
+- Prepare is read-only. Patch-capable execution starts only after confirmation,
+  and upstream writes are never enabled automatically.
 
 ## What you should see
 
-- `doctor` reports readiness or actionable blockers.
-- `onboard` creates the generated project profile and onboarding evidence under
-  `.aor/`.
-- Mission intake creates a bounded flow with `delivery_mode=no-write` and
-  `upstream_writes_default=false`.
-- `next` returns one evidence-backed next action.
+- Source connect derives the workspace ID, stable mount, topology, components,
+  and verification suggestions.
+- Prepare stores an immutable submission and creates a validated preview.
+- Confirm creates exactly one flow and starts its first executable action.
 - `aor app` shows the project, current flow, lifecycle stage, blockers, and
   evidence without owning the underlying lifecycle in the browser.
 
 For deterministic UI verification, run:
 
 ```bash
-aor app --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --smoke --open false --json
+aor app --project-ref "$TARGET_REPO" --smoke --open false --json
 ```
 
-On a clean target, app smoke should pass without
-creating `.aor/`; initialization remains an explicit user action.
+On a clean target, app smoke should pass without creating repo-local `.aor/`.
 
 ## How AOR works
 
@@ -306,17 +302,18 @@ currently release-qualified.
 
 ## Inspect artifacts
 
-JSON output returns artifact and report paths when files are written. The common
-runtime layout is:
+JSON output returns logical artifact and report references when files are
+written. The common mutable layout is:
 
 ```text
-$AOR_RUNTIME/projects/<project-id>/
+${AOR_HOME:-$HOME/.aor}/projects/<workspace-project-id>/
   artifacts/   packets and generated evidence
   reports/     decisions, summaries, and quality evidence
   state/       project and flow runtime state
 ```
 
-Treat the entire runtime root as sensitive. Keep `.aor/` out of commits and do
+Treat AOR Home as sensitive machine-local state. Repo-local `.aor/` is reserved
+for explicitly materialized portable configuration and selected exports; do
 not paste credential-bearing artifacts or private repository evidence into
 public issues.
 
@@ -355,7 +352,7 @@ production certification.
 
 ## Command surface status
 
-The CLI command surface currently includes **67 implemented** commands and **0 planned** commands. See the [CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags, outputs, and contract families.
+The CLI command surface currently includes **72 implemented** commands and **0 planned** commands. See the [CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags, outputs, and contract families.
 
 ## Readiness evidence
 

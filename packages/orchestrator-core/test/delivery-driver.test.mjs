@@ -47,6 +47,8 @@ function removeTempRepo(repoRoot) {
 function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w4-s03-"));
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
   runGitChecked({ cwd: repoRoot, args: ["init"] });
   runGitChecked({ cwd: repoRoot, args: ["config", "user.email", "aor@example.com"] });
   runGitChecked({ cwd: repoRoot, args: ["config", "user.name", "AOR Test"] });

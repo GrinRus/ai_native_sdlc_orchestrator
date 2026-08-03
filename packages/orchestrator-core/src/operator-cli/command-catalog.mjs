@@ -10,13 +10,11 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--json (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "guided_command",
       "guided_stage",
       "guided_status",
@@ -41,7 +39,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "<repo> (optional positional project ref)",
       "--project-ref <path> (optional, alternative to positional repo)",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--asset-mode <bundled|materialized> (optional, defaults to bundled, materialized copies example assets into the target repo)",
       "--materialize-project-profile (optional)",
       "--bootstrap-template <template_id|path> (optional)",
@@ -54,7 +51,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "project_profile_ref",
       "runtime_layout",
       "runtime_state_file",
@@ -88,9 +84,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
     status: "implemented",
     summary: "Launch the optional local web console while keeping headless CLI/API operation valid.",
     inputs: [
-      "--project-ref <path> (optional, defaults to cwd)",
+      "--project-ref <path> (optional, otherwise uses an attached Git root or the central Workspace)",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--host <host> (optional, default 127.0.0.1)",
       "--port <number> (optional, default 0)",
       "--open <true|false> (optional, default true)",
@@ -100,7 +95,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "project_profile_ref",
       "guided_command",
       "guided_stage",
@@ -126,13 +120,11 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--json (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "guided_command",
       "guided_stage",
       "guided_status",
@@ -167,7 +159,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--mission-id <id> (optional)",
       "--title <text> (optional)",
       "--brief <text> (optional)",
@@ -187,7 +178,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "project_profile_ref",
       "runtime_layout",
       "runtime_state_file",
@@ -221,7 +211,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path> (optional, defaults to cwd discovery)",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--asset-mode <bundled|materialized> (optional, defaults to bundled for clean onboarding)",
       "--materialize-project-profile (optional)",
       "--bootstrap-template <template_id|path> (optional)",
@@ -233,7 +222,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "project_profile_ref",
       "runtime_layout",
       "runtime_state_file",
@@ -269,17 +257,67 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "project-topology",
     status: "implemented",
     summary: "Add an explicit AOR Project to the persistent Local Workspace.",
-    inputs: ["--project-ref <path>", "--project-profile <path> (optional)", "--runtime-root <path> (optional)", "--label <text> (optional)", "--help"],
+    inputs: ["--project-ref <path>", "--project-profile <path> (optional)", "--label <text> (optional)", "--help"],
     outputs: ["workspace", "project", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref"],
     contractFamilies: ["project-profile", "project-binding"],
+  },
+  {
+    command: "project connect",
+    category: "intent-first",
+    status: "implemented",
+    summary: "Connect a local Git folder or clone a Git URL into the central AOR Home.",
+    inputs: ["--path <dir> | --git <url>", "--label <text> (optional)", "--help"],
+    outputs: ["project", "source", "contract_families", "command_catalog_alignment"],
+    requiredFlags: [],
+    contractFamilies: ["workspace-registry", "project-profile"],
+  },
+  {
+    command: "project materialize-config",
+    category: "intent-first",
+    status: "implemented",
+    summary: "Explicitly materialize portable project configuration at .aor/project.yaml.",
+    inputs: ["--project-id <id>", "--help"],
+    outputs: ["materialization", "contract_families", "command_catalog_alignment"],
+    requiredFlags: ["project-id"],
+    contractFamilies: ["project-profile"],
+  },
+  {
+    command: "task prepare",
+    category: "intent-first",
+    status: "implemented",
+    summary: "Persist text and text-file intent, then start read-only AI normalization.",
+    inputs: ["--project-id <id>", "--request <text> (optional)", "--file <path> (repeatable)", "--help"],
+    outputs: ["intent_submission", "status_ref", "contract_families", "command_catalog_alignment"],
+    requiredFlags: ["project-id"],
+    contractFamilies: ["intent-submission", "intent-normalization-report"],
+  },
+  {
+    command: "task start",
+    category: "intent-first",
+    status: "implemented",
+    summary: "Confirm a prepared intent submission and idempotently start its Flow.",
+    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--help"],
+    outputs: ["task_start", "contract_families", "command_catalog_alignment"],
+    requiredFlags: ["submission-id"],
+    contractFamilies: ["intent-submission", "intake-request-body"],
+  },
+  {
+    command: "evidence export",
+    category: "intent-first",
+    status: "implemented",
+    summary: "Explicitly export selected logical evidence refs without Git mutations.",
+    inputs: ["--project-id <id>", "--flow-id <id>", "--evidence-ref <ref> (repeatable)", "--export-id <id> (optional)", "--help"],
+    outputs: ["evidence_export", "contract_families", "command_catalog_alignment"],
+    requiredFlags: ["project-id", "flow-id", "evidence-ref"],
+    contractFamilies: ["evidence-export-manifest"],
   },
   {
     command: "project import",
     category: "project-topology",
     status: "implemented",
     summary: "Import an existing project profile into the persistent Local Workspace.",
-    inputs: ["--project-ref <path>", "--project-profile <path>", "--runtime-root <path> (optional)", "--label <text> (optional)", "--help"],
+    inputs: ["--project-ref <path>", "--project-profile <path>", "--label <text> (optional)", "--help"],
     outputs: ["workspace", "project", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref", "project-profile"],
     contractFamilies: ["project-profile", "project-binding"],
@@ -348,14 +386,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--route-overrides <step=route_id,...> (optional)",
       "--policy-overrides <step=policy_id,...> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "analysis_report_id",
       "analysis_report_file",
       "route_resolution_file",
@@ -390,14 +426,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--require-approved-handoff (optional)",
       "--handoff-packet <path> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "validation_report_id",
       "validation_report_file",
       "validation_status",
@@ -420,7 +454,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--execution-root <path> (optional, owned retained workspace)",
       "--require-validation-pass (optional)",
       "--verification-label <label> (optional)",
@@ -440,7 +473,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "validation_gate_enforced",
       "validation_gate_status",
       "verification_label",
@@ -467,7 +499,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--suite-ref <suite_id@vN> (optional, defaults to project eval policy)",
       "--subject-ref <subject_type://target>",
       "--subject-version <version> (optional)",
@@ -475,7 +506,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "evaluation_report_id",
       "evaluation_report_file",
       "evaluation_status",
@@ -496,13 +526,11 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--capture-file <path>",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "harness_replay_id",
       "harness_replay_file",
       "harness_replay_status",
@@ -524,7 +552,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--asset-ref <asset://target>",
       "--subject-ref <subject_type://target>",
       "--suite-ref <suite_id@vN> (optional)",
@@ -535,7 +562,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "promotion_decision_id",
       "promotion_decision_file",
       "promotion_decision_status",
@@ -556,7 +582,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--asset-ref <asset://target>",
       "--subject-ref <subject_type://target>",
       "--suite-ref <suite_id@vN> (optional)",
@@ -567,7 +592,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "promotion_decision_id",
       "promotion_decision_file",
       "promotion_decision_status",
@@ -592,7 +616,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--asset-ref <asset://target>",
       "--subject-ref <subject_type://target>",
       "--suite-ref <suite_id@vN> (optional)",
@@ -602,7 +625,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "promotion_decision_id",
       "promotion_decision_file",
       "promotion_decision_status",
@@ -627,7 +649,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--compiler-revision-ref <compiler-revision://id@vN>",
       "--action <inspect|promote|freeze|demote> (optional, defaults to inspect)",
       "--promotion-decision-ref <evidence://...> (optional, required for promote/freeze/demote readiness)",
@@ -640,7 +661,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "runtime_layout",
       "runtime_state_file",
       "compiler_revision_status_id",
@@ -670,12 +690,10 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "wave_ticket_id",
       "wave_ticket_file",
       "handoff_packet_id",
@@ -696,14 +714,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--handoff-packet <path> (optional)",
       "--approval-ref <ref>",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "handoff_packet_id",
       "handoff_packet_file",
       "handoff_status",
@@ -723,7 +739,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intake-and-planning",
     status: "implemented",
     summary: "Create a mission-specific structured task plan and pending handoff packet.",
-    inputs: ["--project-ref <path>", "--project-profile <path> (optional)", "--runtime-root <path> (optional)", "--ticket-id <id> (optional)", "--approved-artifact <path> (optional)", "--help"],
+    inputs: ["--project-ref <path>", "--project-profile <path> (optional)", "--ticket-id <id> (optional)", "--approved-artifact <path> (optional)", "--help"],
     outputs: ["resolved_project_ref", "resolved_runtime_root", "plan", "plan_ref", "plan_file", "plan_validation_report", "plan_validation_report_file", "plan_evaluation_report", "plan_evaluation_report_file", "planning_run", "planning_run_ref", "planning_run_file", "semantic_evaluation_run", "semantic_evaluation_run_ref", "semantic_evaluation_run_file", "wave_ticket_id", "wave_ticket_file", "handoff_packet_id", "handoff_packet_file", "handoff_status", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref"],
     contractFamilies: ["wave-ticket", "handoff-packet", "validation-report", "evaluation-report"],
@@ -733,7 +749,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intake-and-planning",
     status: "implemented",
     summary: "Read the latest or explicitly referenced structured task plan without changing runtime state.",
-    inputs: ["--project-ref <path>", "--project-profile <path> (optional)", "--runtime-root <path> (optional)", "--plan-ref <ref> (optional)", "--help"],
+    inputs: ["--project-ref <path>", "--project-profile <path> (optional)", "--plan-ref <ref> (optional)", "--help"],
     outputs: ["resolved_project_ref", "resolved_runtime_root", "plan", "plan_ref", "plan_file", "read_only", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref"],
     contractFamilies: ["wave-ticket"],
@@ -743,7 +759,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intake-and-planning",
     status: "implemented",
     summary: "Compare two structured task-plan revisions and classify material changes.",
-    inputs: ["--project-ref <path>", "--runtime-root <path> (optional)", "--from-plan-ref <ref>", "--to-plan-ref <ref>", "--help"],
+    inputs: ["--project-ref <path>", "--from-plan-ref <ref>", "--to-plan-ref <ref>", "--help"],
     outputs: ["resolved_project_ref", "resolved_runtime_root", "plan_diff", "read_only", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref", "from-plan-ref", "to-plan-ref"],
     contractFamilies: ["wave-ticket"],
@@ -753,7 +769,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intake-and-planning",
     status: "implemented",
     summary: "Request an audited revision of an exact structured task-plan version.",
-    inputs: ["--project-ref <path>", "--runtime-root <path> (optional)", "--plan-ref <ref>", "--reason <text>", "--help"],
+    inputs: ["--project-ref <path>", "--plan-ref <ref>", "--reason <text>", "--help"],
     outputs: ["resolved_project_ref", "resolved_runtime_root", "plan", "plan_ref", "plan_revision_request", "plan_revision_request_file", "planning_run", "planning_run_ref", "planning_run_file", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref", "plan-ref", "reason"],
     contractFamilies: ["wave-ticket", "handoff-packet"],
@@ -763,7 +779,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intake-and-planning",
     status: "implemented",
     summary: "Approve an exact structured task-plan version and materialize its execution plan.",
-    inputs: ["--project-ref <path>", "--runtime-root <path> (optional)", "--plan-ref <ref>", "--approval-ref <ref>", "--help"],
+    inputs: ["--project-ref <path>", "--plan-ref <ref>", "--approval-ref <ref>", "--help"],
     outputs: ["resolved_project_ref", "resolved_runtime_root", "plan", "plan_ref", "execution_plan", "execution_plan_file", "task_progress", "task_progress_file", "handoff_packet_id", "handoff_packet_file", "handoff_status", "handoff_approval_state", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref", "plan-ref", "approval-ref"],
     contractFamilies: ["wave-ticket", "handoff-packet", "execution-plan", "task-progress-report"],
@@ -773,7 +789,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intake-and-planning",
     status: "implemented",
     summary: "Read structured task-plan, execution-plan, and evidence-derived task progress state.",
-    inputs: ["--project-ref <path>", "--runtime-root <path> (optional)", "--plan-ref <ref> (optional)", "--help"],
+    inputs: ["--project-ref <path>", "--plan-ref <ref> (optional)", "--help"],
     outputs: ["resolved_project_ref", "resolved_runtime_root", "plan", "plan_ref", "execution_plan", "execution_plan_file", "task_progress", "task_progress_file", "read_only", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["project-ref"],
     contractFamilies: ["wave-ticket", "execution-plan", "task-progress-report"],
@@ -786,7 +802,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--request-title <text> (optional)",
       "--request-brief <text> (optional)",
       "--request-constraints <text[,text...]> (optional, repeatable)",
@@ -801,7 +816,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "project_profile_ref",
       "runtime_layout",
       "runtime_state_file",
@@ -825,7 +839,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--input-packet <path|ref> (optional)",
       "--route-overrides <step=route_id,...> (optional)",
       "--policy-overrides <step=policy_id,...> (optional)",
@@ -833,7 +846,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "analysis_report_id",
       "analysis_report_file",
       "route_resolution_file",
@@ -868,14 +880,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--route-overrides <step=route_id,...> (optional)",
       "--policy-overrides <step=policy_id,...> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "routed_step_result_id",
       "routed_step_result_file",
       "step_result_files",
@@ -901,12 +911,10 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "wave_ticket_id",
       "wave_ticket_file",
       "handoff_packet_id",
@@ -928,7 +936,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
       "--expected-revision <integer> (optional)",
@@ -938,7 +945,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "run_control_action",
       "run_control_command_id",
       "run_control_revision",
@@ -969,7 +975,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
       "--expected-revision <integer> (optional)",
@@ -979,7 +984,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "run_control_action",
       "run_control_command_id",
       "run_control_revision",
@@ -1010,7 +1014,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
       "--expected-revision <integer> (optional)",
@@ -1021,7 +1024,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "run_control_action",
       "run_control_command_id",
       "run_control_revision",
@@ -1052,7 +1054,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--command-id <id> (optional, generated when omitted)",
       "--expected-revision <integer> (optional)",
@@ -1062,7 +1063,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "run_control_action",
       "run_control_command_id",
       "run_control_revision",
@@ -1094,7 +1094,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Submit an audited answer for one unresolved runner-requested interaction without streaming raw answer text.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--interaction-id <id>",
       "--answer <text> (optional when --answer-evidence-ref is supplied)",
@@ -1106,7 +1105,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "runtime_layout",
       "interaction_answer",
       "stream_log_file",
@@ -1126,7 +1124,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--follow <true|false> (optional)",
       "--after-event-id <event_id> (optional)",
@@ -1135,7 +1132,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "run_summaries",
       "run_event_history",
       "run_policy_history",
@@ -1171,7 +1167,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--stage <stage>",
       "--intent <analyze|explain|revise-document|create-document|repair|validate|plan|implement|review>",
       "--request <text>",
@@ -1184,7 +1179,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "operator_request_id",
       "operator_request_ref",
       "operator_request_file",
@@ -1206,7 +1200,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--request-ref <ref>",
       "--target-step <step_class> (optional)",
       "--json (optional)",
@@ -1214,7 +1207,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "operator_request_id",
       "operator_request_ref",
       "operator_request_file",
@@ -1241,14 +1233,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--request-ref <ref>",
       "--json (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "operator_request_id",
       "operator_request_ref",
       "operator_request_file",
@@ -1270,7 +1260,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--execution-root <path> (optional, canonical target checkout root for changed-path evidence)",
       "--run-id <id> (optional)",
       "--step-class <step_class> (optional, defaults to implement)",
@@ -1302,7 +1291,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "delivery_plan_id",
       "delivery_plan_file",
       "delivery_plan_status",
@@ -1347,7 +1335,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--execution-root <path> (optional, canonical retained workspace root for changed-path evidence)",
       "--run-id <id> (optional)",
       "--step-class <step_class> (optional, defaults to implement)",
@@ -1377,7 +1364,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "delivery_plan_id",
       "delivery_plan_file",
       "delivery_plan_status",
@@ -1419,7 +1405,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--action <acquire|release|inspect> (optional, default inspect)",
       "--run-id <id> (optional)",
       "--owner-ref <ref> (required for acquire, optional for release)",
@@ -1435,7 +1420,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "runtime_layout",
       "runtime_state_file",
       "multirepo_coordination_id",
@@ -1462,14 +1446,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "List packet artifacts from runtime storage through the shared API read surface.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--family <contract_family|all> (optional)",
       "--limit <number> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "packet_artifacts",
       "selected_family",
       "read_model_limit",
@@ -1495,14 +1477,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Inspect step results, quality artifacts, and delivery evidence through one read-only command.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--limit <number> (optional, default 200)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "step_results",
       "quality_artifacts",
       "delivery_manifests",
@@ -1539,7 +1519,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Create a durable incident-report linked to one run and its evidence lineage.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--summary <text>",
       "--severity <level> (optional, defaults to high)",
@@ -1549,7 +1528,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "incident_id",
       "incident_report_file",
       "incident_status",
@@ -1571,7 +1549,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Create a reviewed proposal for turning incident and learning-loop evidence into dataset or suite cases.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--incident-id <id>",
       "--suite-ref <suite_id@vN> (optional, defaults to the first registry suite)",
       "--case-id <id> (optional)",
@@ -1580,7 +1557,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "incident_id",
       "incident_report_file",
       "incident_status",
@@ -1609,7 +1585,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Apply recertify/hold/re-enable incident transitions with platform rollback-safe gating.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--incident-id <id>",
       "--decision <recertify|hold|re-enable> (optional, defaults to recertify)",
       "--promotion-ref <evidence://...> (optional, required for verified re-enable when run linkage is ambiguous)",
@@ -1619,7 +1594,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "incident_id",
       "incident_report_file",
       "incident_status",
@@ -1653,7 +1627,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Inspect incident reports by incident_id or run_id with run-linked evidence refs.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--incident-id <id> (optional)",
       "--run-id <id> (optional)",
       "--limit <number> (optional)",
@@ -1661,7 +1634,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "incident_records",
       "read_only",
       "future_control_hooks",
@@ -1679,14 +1651,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "Produce run-centric audit snapshots linking run refs to incident/promotion evidence plus durable finance cost/latency signals.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--limit <number> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "run_audit_records",
       "run_audit_records.finance_evidence",
       "run_audit_records.scenario_family",
@@ -1712,12 +1682,10 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "Read finance analytics and production monitoring signals without mixing certification, rehearsal, and production evidence.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "finance_monitoring_snapshot",
       "finance_analytics",
       "production_monitoring",
@@ -1736,14 +1704,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Attach optional web operator surface with explicit lifecycle state and headless-safe semantics.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--control-plane <url> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "ui_lifecycle_action",
       "ui_lifecycle_state",
       "ui_lifecycle_state_file",
@@ -1766,14 +1732,12 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--execution-root <path> (optional, canonical target checkout root for changed-path evidence)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "review_report_id",
       "review_report_file",
       "review_overall_status",
@@ -1797,7 +1761,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--decision <approve|hold|request-repair>",
       "--execution-root <path> (optional, canonical target checkout root for changed-path evidence)",
@@ -1808,7 +1771,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "review_decision_id",
       "review_decision_file",
       "review_decision",
@@ -1849,7 +1811,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--closure-run-id <id> (optional, required to reconcile a still-requested external-runner repair from refreshed evidence)",
       "--request-ref <evidence-ref|request-id>",
@@ -1861,7 +1822,6 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "quality_repair_request_ref",
       "quality_repair_request_file",
       "quality_repair_request_status",
@@ -1890,13 +1850,11 @@ const COMMAND_DEFINITIONS = Object.freeze([
     status: "implemented",
     summary: "Close one run into public learning-loop scorecard and handoff artifacts.",
     inputs: ["--project-ref <path>", "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id>",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "learning_loop_scorecard_file",
       "learning_loop_handoff_file",
       "incident_report_file",
@@ -1916,13 +1874,11 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Detach optional web operator surface without interrupting headless CLI/API operation.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--help",
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "ui_lifecycle_action",
       "ui_lifecycle_state",
       "ui_lifecycle_state_file",
@@ -1963,7 +1919,8 @@ function parseInputDefinition(input, requiredFlags) {
 }
 
 function decorateCommandDefinition(definition) {
-  const flags = definition.inputs
+  const publicInputs = definition.inputs.filter((input) => !input.startsWith("--runtime-root"));
+  const flags = publicInputs
     .map((input) => parseInputDefinition(input, definition.requiredFlags))
     .filter(Boolean);
   for (const globalName of GLOBAL_FLAG_NAMES) {
@@ -1971,7 +1928,7 @@ function decorateCommandDefinition(definition) {
       flags.push({ name: globalName, type: "boolean", required: false, repeatable: false });
     }
   }
-  const positionals = definition.inputs
+  const positionals = publicInputs
     .filter((input) => input.startsWith("<"))
     .map((input) => ({
       name: input.slice(1, input.indexOf(">")),
@@ -1979,7 +1936,13 @@ function decorateCommandDefinition(definition) {
       required: !/optional/iu.test(input),
       repeatable: /repeatable/iu.test(input),
     }));
-  return { ...definition, flags, positionals };
+  return {
+    ...definition,
+    inputs: publicInputs,
+    outputs: definition.outputs.filter((output) => output !== "resolved_runtime_root" && output !== "runtime_root"),
+    flags,
+    positionals,
+  };
 }
 
 export function getCliCommandCatalog() {

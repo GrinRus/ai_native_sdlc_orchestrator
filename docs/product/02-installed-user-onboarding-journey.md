@@ -12,7 +12,7 @@ An installed user can connect a repository, understand readiness, launch a local
 | Stage | Guided intent | Runtime-owned evidence | Owning follow-up slice |
 |---|---|---|---|
 | First run | Discover `doctor`, `onboard`, `mission create`, `next`, and `app` entrypoints. | CLI help/catalog, environment readiness report. | W21-S02 |
-| Doctor | Report local prerequisites, installed command availability, runtime root policy, and actionable blockers. | Read-only CLI output and optional readiness report. | W21-S02 |
+| Doctor | Report local prerequisites, installed command availability, AOR Home policy, and actionable blockers. | Read-only CLI output and optional readiness report. | W21-S02 |
 | Onboard | Prepare or inspect a target repo with explicit asset mode and project-profile registry roots. | Project profile, project-analysis report, onboarding report. | W21-S03 |
 | Mission intake | Capture goals, constraints, KPI, Definition of Done, source refs, allowed paths, and delivery mode. | `intake-request-body` and artifact packet evidence. | W21-S04 |
 | Next action | Resolve exactly one recommended action for the current state, plus blockers and evidence refs. | Deterministic next-action report over runtime packets, reports, policies, and run state. | W21-S04 |
@@ -29,7 +29,7 @@ These public commands are the installed-user vocabulary. W21-S02 implements the 
 
 | Guided command | Intent | Low-level ownership |
 |---|---|---|
-| `aor doctor` | Read environment and repo readiness before mutation. | `project init`, project profile resolution, runtime-root checks. |
+| `aor doctor` | Read environment and repository readiness before mutation. | source validation, project-profile resolution, and AOR Home readiness checks. |
 | `aor onboard <repo>` | Prepare or inspect a repository using explicit asset-mode behavior. | Project bootstrap, analysis, validation, project-profile registry roots. |
 | `aor mission create` | Capture product mission evidence in one guided intake flow. | `intake-request-body` packet evidence with goals, constraints, KPI/DoD, source refs, allowed paths, and delivery mode. |
 | `aor next` | Recommend one deterministic next action and explain blockers. | `next-action-report` over onboarding reports, intake packets, run-control state, bounded write-back policy, and closure evidence. |
@@ -85,11 +85,11 @@ W31-S01 adds the installed-package local app mode, and W36 turns it into the
 primary no-settings UI onboarding path:
 - `aor app --project-ref <repo>` starts a foreground loopback server and opens the packaged SPA by default;
 - `cd <repo> && aor app` is the primary installed-user quickstart; `doctor` and `onboard` remain advanced/headless shortcuts;
-- `/` serves the SPA, `/app-config.json` returns `project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
+- `/` serves the SPA, while `/app-config.json` returns the selected workspace project, `default_project_id`, `projects[]`, package version, API base, and control-plane metadata; runtime placement is server-owned under AOR Home and is not part of the public config contract;
 - `GET /api/projects` returns explicit local project summaries without scanning the filesystem or initializing `.aor/`;
 - `/api/projects/:projectId/**` remains the control-plane route family used by CLI/API/headless flows;
 - `aor app --smoke true --open false --json` validates the real SPA, config, project index, state routes, first-run wizard marker, project switcher marker, flow selector marker, and `New Flow` marker for release and internal maintainer guardrail evidence;
-- if onboarding has not run yet, the wizard shows Project Context, Runtime Readiness, First Flow, and Next Action steps instead of silently creating mission evidence.
+- if no project is connected, the intent-first surface asks for a local Git folder or Git URL plus text and/or attachments; it never creates Flow evidence until normalization is confirmed.
 
 The optional web console keeps the seven guided stages, but W34 scopes them to
 the selected flow:
@@ -108,7 +108,7 @@ next action from the latest `next-action-report`. Connected mode invokes
 `POST /api/projects/:projectId/lifecycle-command/actions`; read-only mode keeps
 the same evidence visible while disabling mutation descriptors.
 
-The Mission form uses a safe walkthrough template for the first run. The template does not change packet schemas; it only fills existing intake fields: title, brief, goal, constraint, KPI, Definition of Done, and `delivery-mode=no-write`. Submitting the form sends `command: "mission create"` and then invokes `next` so the UI can immediately refresh the right rail with the current next action, blockers, evidence refs, and runtime root.
+The pre-W67 Mission form used a safe walkthrough template. W67 supersedes that first-run surface: free-form intent normalization now compiles title, goals, constraints, KPI, Definition of Done, and bounded delivery mode before confirmation, while UI state exposes logical evidence refs and server-owned AOR Home status.
 
 Each selected flow stage exposes an Ask AOR action. The request drawer captures
 intent, target refs, allowed paths, delivery mode, `target_flow_id`, and a

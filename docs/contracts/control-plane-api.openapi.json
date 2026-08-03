@@ -79,7 +79,13 @@
         },
         "responses": {
           "200": {
-            "$ref": "#/components/responses/ProjectAction"
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "201": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "202": {
+            "$ref": "#/components/responses/JsonObject"
           },
           "400": {
             "$ref": "#/components/responses/JsonError"
@@ -94,6 +100,63 @@
           "413": { "$ref": "#/components/responses/PayloadTooLarge" },
           "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
         }
+      }
+    },
+    "/api/project-connection-jobs/{jobId}": {
+      "get": {
+        "operationId": "getProjectConnectionJob",
+        "tags": ["read"],
+        "x-aor-route-id": "project-connection-job",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "name": "jobId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Durable project connection job with status, progress, source summary, and recoverable error.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectConnectionJob" } } } }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "404": { "$ref": "#/components/responses/JsonError" } }
+      }
+    },
+    "/api/workspace/folder-picker/actions": {
+      "post": {
+        "operationId": "openNativeFolderPicker",
+        "tags": ["mutation"],
+        "x-aor-route-id": "folder-picker-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "const": "open" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JsonObject" }, "400": { "$ref": "#/components/responses/JsonError" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "408": { "$ref": "#/components/responses/RequestTimeout" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "415": { "$ref": "#/components/responses/UnsupportedMediaType" } }
+      }
+    },
+    "/api/projects/{projectId}/intent-submissions": {
+      "post": {
+        "operationId": "createIntentSubmission",
+        "tags": ["mutation"],
+        "x-aor-route-id": "intent-submission-create",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "request_text": { "type": "string" }, "attachments": { "type": "array", "maxItems": 10, "items": { "type": "object", "required": ["name", "content"], "properties": { "name": { "type": "string" }, "content": { "type": "string", "maxLength": 1048576 } } } } }, "anyOf": [{ "required": ["request_text"] }, { "required": ["attachments"] }] } } } },
+        "responses": { "202": { "$ref": "#/components/responses/JsonObject" }, "400": { "$ref": "#/components/responses/JsonError" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "408": { "$ref": "#/components/responses/RequestTimeout" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "415": { "$ref": "#/components/responses/UnsupportedMediaType" } }
+      }
+    },
+    "/api/projects/{projectId}/intent-submissions/{submissionId}": {
+      "get": {
+        "operationId": "getIntentSubmission",
+        "tags": ["read"],
+        "x-aor-route-id": "intent-submission",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }, { "name": "submissionId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JsonObject" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "404": { "$ref": "#/components/responses/JsonError" } }
+      }
+    },
+    "/api/projects/{projectId}/intent-submissions/{submissionId}/actions": {
+      "post": {
+        "operationId": "applyIntentSubmissionAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "intent-submission-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }, { "name": "submissionId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["answer", "revise", "retry", "confirm-and-start", "retry-start", "cancel"] }, "normalization": { "type": "object" }, "answers": { "type": "object" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JsonObject" }, "202": { "$ref": "#/components/responses/JsonObject" }, "400": { "$ref": "#/components/responses/JsonError" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "408": { "$ref": "#/components/responses/RequestTimeout" }, "409": { "$ref": "#/components/responses/JsonError" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "415": { "$ref": "#/components/responses/UnsupportedMediaType" } }
       }
     },
     "/api/projects/{projectId}/topology": {
@@ -1412,7 +1475,7 @@
         }
       },
       "ProjectState": {
-        "description": "Resolved project state and runtime-root layout.",
+        "description": "Resolved project state with server-owned AOR Home storage metadata.",
         "content": {
           "application/json": {
             "schema": {
@@ -1738,9 +1801,7 @@
           "initialized",
           "project_id",
           "project_root",
-          "runtime_root",
-          "runtime_layout",
-          "state_file"
+          "storage"
         ],
         "properties": {
           "initialized": {
@@ -1765,18 +1826,7 @@
               "null"
             ]
           },
-          "runtime_root": {
-            "type": "string"
-          },
-          "runtime_layout": {
-            "$ref": "#/components/schemas/RuntimeLayout"
-          },
-          "state_file": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
+          "storage": { "type": "object", "required": ["kind", "project_ref", "server_owned"], "properties": { "kind": { "const": "aor-home" }, "project_ref": { "type": "string" }, "server_owned": { "const": true } }, "additionalProperties": false },
           "onboarding_summary": {
             "$ref": "#/components/schemas/OnboardingSummary"
           },
@@ -1849,25 +1899,17 @@
       "ProjectActionRequest": {
         "type": "object",
         "required": [
-          "action",
-          "project_ref"
+          "action"
         ],
         "properties": {
           "action": {
             "type": "string",
             "enum": [
-              "add"
+              "connect", "connect-repository", "refresh-source", "disconnect", "delete-aor-data", "materialize-project-config", "export-evidence"
             ]
           },
-          "project_ref": {
-            "type": "string"
-          },
-          "runtime_root": {
-            "type": "string"
-          },
-          "project_profile": {
-            "type": "string"
-          },
+          "source": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string", "enum": ["local", "git"] }, "path": { "type": "string" }, "url": { "type": "string" } } },
+          "project_id": { "type": "string" },
           "label": {
             "type": "string"
           }
@@ -1893,6 +1935,22 @@
           }
         ]
       },
+      "ProjectConnectionJob": {
+        "type": "object",
+        "required": ["job_id", "status", "source", "progress", "created_at", "updated_at"],
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed"] },
+          "source": { "type": "object" },
+          "project_id": { "type": ["string", "null"] },
+          "progress": { "type": "object", "required": ["stage", "percent", "message"], "properties": { "stage": { "type": "string" }, "percent": { "type": "integer", "minimum": 0, "maximum": 100 }, "message": { "type": "string" } }, "additionalProperties": false },
+          "source_summary": { "type": "object" },
+          "error": { "type": ["string", "null"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
       "ProjectSummary": {
         "type": "object",
         "required": [
@@ -1900,7 +1958,6 @@
           "runtime_project_id",
           "label",
           "project_ref",
-          "runtime_root",
           "onboarding_summary",
           "active_flow_summary",
           "read_only"
@@ -1925,9 +1982,6 @@
             "type": "string"
           },
           "project_profile_source": {
-            "type": "string"
-          },
-          "runtime_root": {
             "type": "string"
           },
           "onboarding_summary": {

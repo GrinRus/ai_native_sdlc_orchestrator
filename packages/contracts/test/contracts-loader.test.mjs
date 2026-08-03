@@ -1255,12 +1255,12 @@ test("W45 repair lineage is additive across downstream reports", () => {
     [path.join(workspaceRoot, "examples/reports/next-action-report.sample.yaml"), "next-action-report"],
   ];
   const lineage = {
-    request_ref: "evidence://.aor/projects/aor-core/reports/quality-repair-request-review-origin.json",
+    request_ref: "evidence://projects/aor-core/reports/quality-repair-request-review-origin.json",
     cycle_id: "quality-cycle.review-origin.001",
     source_stage: "review",
     status: "review-required",
     attempt_index: 1,
-    evidence_refs: ["evidence://.aor/projects/aor-core/reports/review-decision-run-review-origin.json"],
+    evidence_refs: ["evidence://projects/aor-core/reports/review-decision-run-review-origin.json"],
   };
 
   for (const [filePath, family] of fixtures) {
@@ -1774,8 +1774,8 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
       stderr_excerpt: "test/retry.ts: Type string | null is not assignable to type string.",
       failure_summary: "Post-change verification command 'npx xo' failed with exit code 1.",
       evidence_refs: [
-        "evidence://.aor/projects/aor-core/reports/step-result-post-run-primary-1.json",
-        "evidence://.aor/projects/aor-core/reports/transcript-post-run-primary-1.txt",
+        "evidence://projects/aor-core/reports/step-result-post-run-primary-1.json",
+        "evidence://projects/aor-core/reports/transcript-post-run-primary-1.txt",
       ],
     },
   ];

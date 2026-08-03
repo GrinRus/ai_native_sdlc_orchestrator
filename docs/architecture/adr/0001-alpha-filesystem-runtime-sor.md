@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for W30 alpha hardening.
+Superseded by ADR 0021 for W67. This document describes the pre-W67 alpha.
 
 ## Context
 
