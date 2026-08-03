@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 
 import { RELEASE_PACKAGE_NAME } from "./release-lib.mjs";
-import { reconcileAlphaPublication } from "./release-publish-transaction-lib.mjs";
+import { normalizeCapturedCommandOutput, reconcileAlphaPublication } from "./release-publish-transaction-lib.mjs";
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -18,7 +18,7 @@ function run(command, args, options = {}) {
 
 function output(command, args) {
   const result = run(command, args, { capture: true, allowFailure: true });
-  return result.status === 0 ? result.stdout.trim() : null;
+  return normalizeCapturedCommandOutput(result);
 }
 
 const version = process.env.RELEASE_VERSION;

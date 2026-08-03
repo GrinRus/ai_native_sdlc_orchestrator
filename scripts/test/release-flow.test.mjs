@@ -15,6 +15,7 @@ import {
 } from "../release-lib.mjs";
 import {
   classifyAlphaPublishState,
+  normalizeCapturedCommandOutput,
   planAlphaPublishReconciliation,
   reconcileAlphaPublication,
 } from "../release-publish-transaction-lib.mjs";
@@ -314,6 +315,12 @@ test("publish event guard accepts only merged release PRs with publish label", (
   });
   assert.equal(mismatch.shouldPublish, false);
   assert.match(mismatch.findings.join("\n"), new RegExp(`expects version '${RELEASE_PACKAGE_VERSION}'`, "u"));
+});
+
+test("publication inspection treats successful empty command output as an absent surface", () => {
+  assert.equal(normalizeCapturedCommandOutput({ status: 0, stdout: "\n" }), null);
+  assert.equal(normalizeCapturedCommandOutput({ status: 1, stdout: "unexpected" }), null);
+  assert.equal(normalizeCapturedCommandOutput({ status: 0, stdout: "  value\n" }), "value");
 });
 
 test("alpha publication classifier covers absent, partial, complete, and conflict states", () => {

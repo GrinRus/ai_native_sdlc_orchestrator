@@ -6,6 +6,12 @@ export const ALPHA_PUBLISH_OPERATIONS = Object.freeze([
   "delete-release-branch",
 ]);
 
+export function normalizeCapturedCommandOutput(result) {
+  if (result?.status !== 0 || typeof result.stdout !== "string") return null;
+  const output = result.stdout.trim();
+  return output.length > 0 ? output : null;
+}
+
 function present(value) {
   return value !== null && value !== undefined && value !== "";
 }
