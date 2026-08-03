@@ -32,8 +32,11 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "project-structure-model.js",
     "mission-model.js",
     "mission-builder.jsx",
+    "quiet-shell.jsx",
   ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
-  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
+  const css = ["spa.css", "quiet-cockpit-polish.css"]
+    .map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8"))
+    .join("\n");
 
   for (const required of [
     "safe-walkthrough",
@@ -363,7 +366,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Project Context",
     "Runtime Readiness",
     "Configure First Flow",
-    "First-flow setup is the only required next step.",
+    "The local runtime is ready. Define the first Mission, then AOR will resolve one safe next action.",
     "firstRunFocusMode",
     "first-run-focus-mode",
     "AdvancedEvidenceDisclosure",
@@ -377,28 +380,25 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "support-table-grid",
     "shortPathLabel",
     "projectDisplayLabel",
-    "runtimeRootLabel",
-    "Show runtime root path details",
-    "Copy runtime root path",
+    "Technical context",
+    "Runtime root",
     "conciseArtifactLabel",
     "artifactActionLabel",
     "Open evidence artifact",
     "Copy raw ref for",
     "Attach as request target:",
     "topbar-status-strip",
-    "first-run-next-action-grid",
+    "first-run-facts",
     "stage-progress-strip",
     "compact-first-run",
     "safe-template-summary",
     "form-primary-action",
     "Edit mission details",
-    "active-flow-handoff",
+    "MissionDurableSummary",
     "Ask AOR for selected flow",
     "Ask AOR requires a selected active flow",
     "Available after completed flow",
     "Requires selected active flow",
-    "runtime-path-details",
-    "runtime-copy-chip",
     "Project switcher",
     'htmlFor="project-switcher-control"',
     'id="project-switcher-control"',
@@ -410,7 +410,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "projectProfile",
     "project_profile",
     "profile_mismatch_candidate_project_ids",
-    "Profile mismatch detected",
+    "Runtime root has existing evidence for a different project profile.",
     "Add Matching Project Profile",
     "Confirm writes and initialize",
     "/api/projects/actions",
@@ -430,8 +430,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Initialize Project Runtime",
     "Loading",
     "First launch",
-    'onboarding.status === "not-initialized"',
-    "onboarding.can_initialize === true",
+    "onboarding.initialized === true",
+    "profile_mismatch_candidate_project_ids",
     "This does not create a flow",
     "if (!flow) return \"readiness\"",
     "newFlowDisabled",
@@ -468,8 +468,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "aria-pressed={filter === entry.id}",
     "compactDisclosureLabel",
     "Show full ${type}${context}",
-    "summary aria-label={disclosureLabel} title={disclosureLabel}",
-    "Show recommended CLI command: ${compactVisibleValue(actionCommand, \"command\")}",
+    "summary aria-label={actionCommandDisclosureLabel} title={actionCommandDisclosureLabel}",
+    "Show CLI command. Recommended command: ${compactVisibleValue(actionCommand, \"command\")}",
     "summary aria-label={actionCommandDisclosureLabel} title={actionCommandDisclosureLabel}",
     "ARTIFACT_REF_LABELS",
     "semanticArtifactTitleFromRef",
@@ -562,8 +562,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
   }
   assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
-  assert.ok(css.includes("--control-height: 40px"), "SPA CSS should define a desktop control height token");
-  assert.ok(css.includes("--touch-control-height: 44px"), "SPA CSS should define a mobile touch target token");
+  assert.ok(css.includes("--control-height: var(--aor-control-default)"), "SPA CSS should use the semantic desktop control height token");
+  assert.ok(css.includes("--touch-control-height: var(--aor-control-touch)"), "SPA CSS should use the semantic mobile touch target token");
   assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
   assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
@@ -571,8 +571,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
   assert.ok(css.includes(".first-run-wizard"), "SPA CSS should define first-run wizard layout");
   assert.ok(css.includes(".project-switcher"), "SPA CSS should define project switcher layout");
   assert.match(css, /\.topbar\s*\{[\s\S]*?flex-wrap: wrap;/u, "SPA topbar should wrap instead of overlapping project and flow controls");
-  assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
-  assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
+  assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 350px;/u, "Project switcher should keep a stable compact width");
+  assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 320px;/u, "Flow selector should keep a stable compact width");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
   assert.ok(css.includes(".provider-heartbeat-action small"), "Provider heartbeat should demote raw runner labels to secondary debug copy");
   assert.ok(css.includes(".quality-gate-card"), "SPA CSS should define active quality gate layout");
@@ -594,8 +594,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
   assert.match(css, /\.artifact-filter-bar button\s*\{[\s\S]*?min-height: var\(--control-height\);[\s\S]*?min-width: var\(--control-height\);/u, "Artifact filters should meet the shared target size");
   assert.match(css, /\.artifact-summary-button\s*\{[\s\S]*?min-height: var\(--control-height\);/u, "Artifact summary rows should meet the shared target size");
   assert.match(css, /\.row-actions \.icon-button\s*\{[\s\S]*?width: var\(--control-height\);[\s\S]*?height: var\(--control-height\);/u, "Artifact row icon actions should meet the shared target size");
-  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u, "First-run primary action should stay above supporting readiness details");
-  assert.match(css, /\.first-run-wizard \.first-run-next-action-grid\s*\{[\s\S]*?order: 2;/u, "First-run next-action summary should follow the primary action");
+  assert.match(css, /\.first-run-facts\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u, "First-run facts should stay compact below the primary action");
+  assert.match(css, /\.first-run-details > summary\s*\{[\s\S]*?min-height: var\(--aor-control-default\);/u, "Supporting readiness details should remain progressively disclosed");
   assert.ok(css.includes(".support-table-grid"), "SPA CSS should hide first-run support tables behind disclosure");
   assert.equal(
     source.includes("candidates.at(-1)"),
@@ -628,8 +628,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     source.indexOf('className="cockpit-actions"') < source.indexOf('className="action-grid"'),
     "Active cockpit primary actions should precede detail disclosures in DOM focus order",
   );
-  assert.ok(source.includes("const showCockpitHeadingAction = !providerFocusActive"), "Provider run-health focus should not add a duplicate heading refresh before the recommended action");
-  assert.match(source, /\{showCockpitHeadingAction \? \([\s\S]*?<button className="secondary" type="button" onClick=\{onAsk\}/u);
+  assert.doesNotMatch(source, /showCockpitHeadingAction/u, "The cockpit heading should not duplicate the recommended action");
+  assert.match(source, /const primaryActionButton = completed[\s\S]*?className="primary"/u);
   assert.match(
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.flow-active-mode \.recommended-action \.cockpit-actions\s*\{[\s\S]*?display: grid;[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?width: 100%;/u,
@@ -798,7 +798,7 @@ test("required verification failures surface as active cockpit blockers", () => 
   assert.match(source, /\{ label: "Repair Decision", icon: "target", tabId: "decisions" \}/u);
   assert.match(source, /\{ label: "Recovery Path", icon: "target", tabId: "execution" \}/u);
   assert.match(source, /label: workbenchAction\.label,[\s\S]*?onClick: \(\) => openAdvancedWorkbench\(workbenchAction\.tabId\),/u);
-  assert.match(source, /!verificationPrimary && !isBlockingExternalRunHealth\(externalRunHealth\)/u);
+  assert.match(source, /const primaryActionButton = completed[\s\S]*?: verificationPrimary[\s\S]*?label: workbenchAction\.label,/u);
   assert.match(source, /newFlowBlockedByVerificationReason/u);
   assert.match(source, /Resolve the current failed verification Recovery Path before starting a new flow\./u);
   assert.match(source, /providerEvidenceStripSummary/u);

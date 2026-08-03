@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "6e193d141ae670aea36f71985a252e87aee8ce4c64d6dc18e0e111f25abe279b",
+  "source_hash": "7803aa02e806b0d61f83e54d5beb5d6a58fda71c1b45bce8186005ca6f8cdd41",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -24,6 +24,7 @@
     "apps/web/src/project-structure-model.js",
     "apps/web/src/project-structure.css",
     "apps/web/src/project-structure.jsx",
+    "apps/web/src/quiet-cockpit-polish.css",
     "apps/web/src/quiet-modes-model.js",
     "apps/web/src/quiet-modes.css",
     "apps/web/src/quiet-modes.jsx",
@@ -39,13 +40,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-QhX_toRP.js",
-    "apps/web/dist/assets/index-WxKKYvh4.css",
+    "apps/web/dist/assets/index-BUae7sdx.js",
+    "apps/web/dist/assets/index-D4c-UCEU.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-QhX_toRP.js": "0d783687d945757180d2b54d66e54544d96d894b6a2a1372bf530a67e715ac82",
-    "apps/web/dist/assets/index-WxKKYvh4.css": "b8569258cc063a9570c33753b9748bd4de62ffb38c5ab626f127e7ebf3a1b8d0",
-    "apps/web/dist/index.html": "ae7319a7045ae379f8340392e5b62e1622f2f65f8033446ec83f30b2d7898261"
+    "apps/web/dist/assets/index-BUae7sdx.js": "ba9ed6bea5e3e9309d480cdebb7d30510315bf3f09874d7e7495f6b0f9bc3501",
+    "apps/web/dist/assets/index-D4c-UCEU.css": "1e295436400671d5b9e67140a81e2bc15edc5f7d52e22321194fffd2934eb260",
+    "apps/web/dist/index.html": "5aa5b519697ae09ee3b3d73fcab258edfdd1bd11720418622b7da28a0bb85947"
   }
 }
