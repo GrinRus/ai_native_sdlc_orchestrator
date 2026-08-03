@@ -7,6 +7,26 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.16] - 2026-08-02
+
+- Added structured medium/large planning, topology-aware workspace sets,
+  parent/child execution scheduling, coordinated multi-repository delivery, and
+  resilient lifecycle recovery across the CLI, API, and web console.
+- Reworked the operator console around guided mission intake, a semantic design
+  system, an adaptive shell, truthful action and evidence surfaces, and
+  installed-console accessibility and browser acceptance.
+- Hardened runtime ownership, atomic event persistence, replay/resume behavior,
+  verification and delivery boundaries, provider process cleanup, and
+  runner-agnostic adapter contract parity.
+- Added bounded external-provider sessions and versioned provider work packets
+  with explicit command roles, focused repair verification, environment-limited
+  outcomes, and precise timeout, cancellation, context, and budget evidence.
+- Expanded installed-user qualification tooling with immutable browser proof,
+  run-health and final-assessment gates, diagnostic isolation, and a passing
+  guided plus OpenAI medium checkpoint while retaining the W66 audit hold.
+- Refreshed open-source onboarding documentation and routine npm and GitHub
+  Actions dependencies.
+
 ## [0.1.0-alpha.15] - 2026-07-09
 
 - Hardened the installed-user web console first-run, project switcher, active
