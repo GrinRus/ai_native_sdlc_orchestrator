@@ -43,9 +43,14 @@ Then run the npm release gate:
 pnpm release:gate
 ```
 
-`pnpm release:gate` runs repository integrity, production readiness, release
-metadata verification, `npm pack --dry-run --json`, and an installed-package
-smoke test. The smoke test installs the generated tarball into a temporary npm
+`pnpm release:gate` runs repository integrity, browser acceptance, the
+production-readiness evaluator with `--allow-audit-hold`, release metadata
+verification, `npm pack --dry-run --json`, and an installed-package smoke test.
+For the npm alpha channel only, a valid `status=blocked`,
+`release_disposition=audit-hold` result may pass this release gate. That
+exception distributes a pre-release snapshot; it does not grant production or
+stable release clearance, and malformed evidence or failed readiness checks
+still fail closed. The smoke test installs the generated tarball into a temporary npm
 project, runs `aor --help`, and runs `doctor` plus `onboard` against a temporary
 git repository while asserting that only `.aor/` runtime state changes. W30
 extends that smoke path to run `aor app --help` so optional API/web guidance is
@@ -127,7 +132,8 @@ publishes only when all of these conditions are true:
 - `package.json` version matches the release branch version;
 - existing npm, tag, Release, and `alpha` dist-tag state is either absent or
   exactly compatible with the expected version and merge commit;
-- `pnpm release:gate` passes on the merge commit.
+- `pnpm release:gate` passes on the merge commit, either with production
+  clearance or with the explicit, valid npm-alpha audit-hold disposition.
 
 The publish workflow reconciles one bounded transaction across tag
 `v<semver-alpha>`, the matching GitHub Prerelease, the immutable npm version,

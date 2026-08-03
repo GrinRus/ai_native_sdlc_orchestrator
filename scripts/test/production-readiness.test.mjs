@@ -280,6 +280,12 @@ test("CI workflow accepts a valid pending hold and a completed W66 clearance", (
   assert.match(workflow, /run: pnpm production:ready --json --allow-audit-hold\s*$/mu);
 });
 
+test("npm alpha release gate preserves the strict production boundary while accepting a valid audit hold", () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  assert.equal(packageJson.scripts["production:ready"], "node ./scripts/production-readiness.mjs");
+  assert.match(packageJson.scripts["release:gate"], /pnpm production:ready --allow-audit-hold/u);
+});
+
 test("test discovery maps every tracked candidate exactly once", () => {
   const plan = discoverTestExecutionPlan(root);
   assert.equal(plan.ok, true, plan.errors.join("\n"));

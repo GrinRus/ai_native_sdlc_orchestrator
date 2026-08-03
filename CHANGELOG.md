@@ -26,6 +26,9 @@ versioned AOR snapshots.
   guided plus OpenAI medium checkpoint while retaining the W66 audit hold.
 - Refreshed open-source onboarding documentation and routine npm and GitHub
   Actions dependencies.
+- Allowed npm alpha snapshot publication under a valid audit hold while
+  preserving false production clearance and rejecting invalid readiness
+  evidence.
 
 ## [0.1.0-alpha.15] - 2026-07-09
 

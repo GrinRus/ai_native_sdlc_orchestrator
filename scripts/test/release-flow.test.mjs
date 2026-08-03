@@ -107,6 +107,27 @@ test("release verifier accepts matching release branch and package metadata", ()
   assert.equal(result.packageVersion, RELEASE_PACKAGE_VERSION);
 });
 
+test("release verifier rejects an alpha gate without explicit audit-hold handling", () => {
+  const tempRoot = copyFixtureRepo();
+  try {
+    updateJson(path.join(tempRoot, "package.json"), (json) => {
+      json.scripts["release:gate"] = json.scripts["release:gate"].replace(
+        "pnpm production:ready --allow-audit-hold",
+        "pnpm production:ready",
+      );
+    });
+    const result = validateReleaseState({
+      rootDir: tempRoot,
+      releaseBranch: RELEASE_BRANCH,
+      strictReleaseBranch: true,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /production:ready --allow-audit-hold/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("release verifier rejects release branch version mismatch", () => {
   const tempRoot = copyFixtureRepo();
   try {

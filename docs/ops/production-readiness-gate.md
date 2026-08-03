@@ -34,6 +34,11 @@ Without `--allow-audit-hold`, the command exits successfully only for
 blocker returns `status=blocked`. `--expect-audit-hold` remains available for a
 test that specifically requires the pending state.
 
+The npm alpha `pnpm release:gate` also uses `--allow-audit-hold`. This permits
+distribution of an explicitly pre-release snapshot while W66 remains open; it
+does not change `release_clearance=false`, authorize a stable or production
+release, or accept malformed/failed readiness evidence.
+
 Executable local-console acceptance runs separately as
 `pnpm test:web:browser`. It launches the built SPA through the public loopback
 `aor app` entrypoint, blocks external browser requests, and writes failure

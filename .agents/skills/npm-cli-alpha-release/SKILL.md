@@ -11,7 +11,8 @@ description: Use when preparing, reviewing, validating, or publishing an AOR npm
 3. Confirm the release branch is `release/v<semver-alpha>` and that `package.json` version exactly matches the branch version.
 4. Check the release prep files stay aligned:
    - `CHANGELOG.md` has a matching version entry;
-   - `README.md` includes the matching `npm install -g @grinrus/aor@<version>` command;
+   - `README.md` resolves the current alpha from `npm view @grinrus/aor dist-tags.alpha`
+     before installing it, so unpublished versions are never advertised;
    - `package.json` still exposes `release:verify`, `release:pack`, `release:smoke`, and `release:gate`;
    - internal workspace packages under `apps/*` and `packages/*` remain private.
 5. Run the strict local gate before treating a release PR as ready:
@@ -19,6 +20,10 @@ description: Use when preparing, reviewing, validating, or publishing an AOR npm
    ```bash
    AOR_RELEASE_BRANCH=release/v<semver-alpha> AOR_RELEASE_STRICT_BRANCH=true pnpm release:gate
    ```
+
+   The npm alpha gate may accept only a valid `audit-hold` through
+   `production:ready --allow-audit-hold`. This never grants production or stable
+   clearance, and invalid readiness evidence must still fail closed.
 
 6. Require the release PR to target `main`, come from the same repository, and carry the `release:publish` label before merge.
 7. Preserve fail-closed publishing rules: do not add npm tokens, do not overwrite an existing version, do not publish without `--tag alpha`, and do not advance `latest` manually.
