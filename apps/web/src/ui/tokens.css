@@ -27,12 +27,13 @@
   --aor-color-shadow: rgb(23 33 43 / 16%);
   --aor-type-page-size: 1.625rem;
   --aor-type-page-line: 1.2;
-  --aor-type-section-size: 1.125rem;
-  --aor-type-section-line: 1.35;
+  --aor-type-section-size: 1.25rem;
+  --aor-type-section-line: 1.4;
   --aor-type-body-size: 0.9375rem;
   --aor-type-body-line: 1.5;
   --aor-type-label-size: 0.8125rem;
   --aor-type-label-line: 1.35;
+  --aor-type-operational-size: 0.875rem;
   --aor-type-status-size: 0.8125rem;
   --aor-type-code-size: 0.8125rem;
   --aor-space-1: 0.25rem;

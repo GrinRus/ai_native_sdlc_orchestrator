@@ -8,10 +8,12 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
-  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js", "mission-model.js", "mission-builder.jsx", "operator-operations.js"]
+  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js", "mission-model.js", "mission-builder.jsx", "operator-operations.js", "quiet-shell.jsx"]
     .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
     .join("\n");
-  const css = fs.readFileSync(path.join(webRoot, "src/spa.css"), "utf8");
+  const css = ["spa.css", "quiet-cockpit-polish.css"]
+    .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
+    .join("\n");
   const stageSubtitleRule = css.match(/\.stage-copy em\s*\{[\s\S]*?\}/u)?.[0] ?? "";
 
   for (const stage of ["readiness", "mission", "discovery", "implement", "review", "delivery", "learning"]) {
@@ -81,8 +83,8 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /support-table-grid/u);
   assert.match(source, /shortPathLabel/u);
   assert.match(source, /compactVisibleValue/u);
-  assert.match(source, /Show runtime root path details/u);
-  assert.match(source, /Copy runtime root path/u);
+  assert.match(source, /Technical context/u);
+  assert.match(source, /Runtime root/u);
   assert.match(source, /conciseArtifactLabel/u);
   assert.match(source, /artifactActionLabel/u);
   assert.match(source, /Open evidence artifact/u);
@@ -91,12 +93,12 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /CompactInlineValue/u);
   assert.match(source, /CompactDetailValue/u);
   assert.match(source, /topbar-status-strip/u);
-  assert.match(source, /first-run-next-action-grid/u);
+  assert.match(source, /first-run-facts/u);
   assert.match(source, /stage-progress-strip/u);
   assert.match(source, /compact-first-run/u);
   assert.match(source, /safe-template-summary/u);
   assert.match(source, /Edit mission details/u);
-  assert.match(source, /active-flow-handoff/u);
+  assert.match(source, /MissionDurableSummary/u);
   assert.match(source, /Project Context/u);
   assert.match(source, /Runtime Readiness/u);
   assert.match(source, /Project switcher/u);
@@ -180,8 +182,8 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /Latest run/u);
   assert.match(source, /Attach as request target/u);
   assert.match(css, /button:focus-visible/u);
-  assert.match(css, /--control-height: 40px/u);
-  assert.match(css, /--touch-control-height: 44px/u);
+  assert.match(css, /--control-height: var\(--aor-control-default\)/u);
+  assert.match(css, /--touch-control-height: var\(--aor-control-touch\)/u);
   assert.match(css, /\.flow-active-mode \.stage-rail \.stage-progress-strip/u);
   assert.match(stageSubtitleRule, /white-space: normal/u);
   assert.doesNotMatch(stageSubtitleRule, /text-overflow:\s*ellipsis/u);
@@ -201,7 +203,7 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(css, /\.compact-detail-value/u);
   assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions/u);
   assert.match(css, /\.flow-active-mode \.recommended-action \.cockpit-actions \.primary\s*\{[\s\S]*?grid-column: 1 \/ -1;/u);
-  assert.match(css, /\.first-run-wizard \.readiness-action\s*\{[\s\S]*?order: 1;/u);
+  assert.match(css, /\.first-run-facts\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u);
   assert.match(css, /\.verification-plan-card/u);
   assert.match(
     css,

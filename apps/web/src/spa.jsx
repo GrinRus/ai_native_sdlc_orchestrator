@@ -12,7 +12,7 @@ import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
 import { Alert } from "./ui/components.jsx";
-import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css";
+import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css"; import "./quiet-cockpit-polish.css";
 
 const STAGES = [
   { id: "readiness", label: "Readiness", command: "project init", hint: "Environment and guardrails" },
@@ -2654,20 +2654,6 @@ function ProjectSnapshotLoading({ runtimeRoot }) {
   );
 }
 
-function projectStatusLabel(project) {
-  if (!project) return "Loading";
-  const onboarding = project?.onboarding_summary ?? {};
-  const flowSummary = project?.active_flow_summary ?? {};
-  if (flowSummary.status === "active-flow") return "Active flow";
-  if (flowSummary.status === "completed-only") return "Completed flows";
-  if (onboarding.status === "initialized") return "Initialized";
-  if (onboarding.status === "runtime-ready") return "Runtime ready";
-  if (onboarding.status === "not-initialized" || onboarding.initialized === false || onboarding.state_exists === false || flowSummary.status === "not-initialized") {
-    return onboarding.can_initialize === true ? "First launch" : "Loading";
-  }
-  return "Loading";
-}
-
 function shortPathLabel(value) {
   const text = String(value ?? "").trim();
   if (text.length <= 34) return text || "runtime pending";
@@ -2765,7 +2751,7 @@ function CompactInlineValue({ value, kind = "auto", className = "" }) {
       <code>{label}</code>
       {truncated ? (
         <details className="debug-ref-details compact-value-details">
-          <summary aria-label={disclosureLabel} title={disclosureLabel}>Details</summary>
+          <summary aria-label={`Details. ${disclosureLabel}`} title={disclosureLabel}>Details</summary>
           <code>{fullValue}</code>
         </details>
       ) : null}
@@ -2788,7 +2774,7 @@ function CompactDetailValue({ value, copyValue = null, kind = "auto" }) {
       ) : null}
       {truncated ? (
         <details className="debug-ref-details compact-value-details">
-          <summary aria-label={disclosureLabel} title={disclosureLabel}>Debug full value</summary>
+          <summary aria-label={`Debug full value. ${disclosureLabel}`} title={disclosureLabel}>Debug full value</summary>
           <code>{fullValue}</code>
         </details>
       ) : null}
@@ -2821,8 +2807,6 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
   const displayProjects = activeRuntimeReady && activeProject
     ? projects.map((project) => (project.project_id === activeProject.project_id ? activeProject : project))
     : projects;
-  const runtimeRoot = activeProject?.runtime_root ?? "runtime pending";
-  const runtimeRootLabel = shortPathLabel(runtimeRoot);
   const activeProjectLabel = projectDisplayLabel(activeProject);
   const activeProjectRawLabel = activeProject?.label ?? activeProject?.display_name ?? activeProject?.project_id ?? "";
   const activeProjectTitle = activeProjectRawLabel && activeProjectRawLabel !== activeProjectLabel
@@ -2848,15 +2832,6 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
           ))}
         </select>
       </label>
-      <div className="project-switcher-meta">
-        <StatusPill state={projectStatusLabel(activeProject)} />
-        <details className="runtime-path-details">
-          <summary aria-label="Show runtime root path details" title="Show runtime root path details">
-            <code title={runtimeRoot}>{runtimeRootLabel}</code>
-          </summary>
-          <code className="runtime-path-full">{runtimeRoot}</code>
-        </details>
-      </div>
       <button className="utility-button compact" type="button" onClick={onOpenAddProject} disabled={busy}>
         <Icon name="folder" />Add AOR Project
       </button>
@@ -3121,25 +3096,6 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
         </button>
       ) : null}
     </form>
-  );
-}
-
-function FlowTimeline({ currentStage, completed }) {
-  const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
-  return (
-    <div className="flow-timeline" aria-label="Flow lifecycle">
-      {STAGES.map((stage, index) => {
-        const done = completed ? index <= currentIndex : index < currentIndex;
-        const current = currentStage === stage.id;
-        return (
-          <div key={stage.id} className={`timeline-step ${done ? "done" : ""} ${current ? "current" : ""}`}>
-            <span>{index + 1}</span>
-            <strong>{stage.label}</strong>
-            <em>{done ? "Complete" : current ? "Active" : "Pending"}</em>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
@@ -3780,10 +3736,8 @@ function FlowCockpit({
   busy,
   onResolveNext,
   onRefresh,
-  onAsk,
   onStartNewFlow,
   onCreateFollowUp,
-  onDuplicateMission,
   initializeProject,
   activeProject = null,
   onOpenAddProject = null,
@@ -3845,67 +3799,22 @@ function FlowCockpit({
       <section className="work-card stage-work readiness-cockpit first-run-wizard" aria-label="First-run wizard">
         <div className="work-heading">
           <div>
+            <span className="eyebrow">Project onboarding</span>
             <div className="heading-line">
-              <h2>First-run wizard</h2>
+              <h2>{stateReady ? "Configure First Flow" : "Prepare this project for AOR"}</h2>
               <StatusPill state={wizardStatus} />
             </div>
-            <p>Readiness prepares the runtime before a flow is created. Validate project context, initialize explicitly, then create the first flow.</p>
+            <p>{stateReady
+              ? "The local runtime is ready. Define the first Mission, then AOR will resolve one safe next action."
+              : "AOR will connect this repository to a local runtime before any Mission or provider work can start."}</p>
           </div>
           <div className="wizard-heading-actions">
             {onOpenAddProject ? (
               <button className="secondary" type="button" onClick={onOpenAddProject} disabled={busy}>
                 <Icon name="folder" />
-                Add AOR Project
+                Change project
               </button>
             ) : null}
-            <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
-              <Icon name="refresh" />
-              Refresh readiness
-            </button>
-          </div>
-        </div>
-
-        <div className="readiness-check-list">
-          {wizardSteps.map((step) => (
-            <div key={step.label} className={step.status}>
-              <span className="check-dot" />
-              <div>
-                <strong>{step.label}</strong>
-                <p>{step.detail}</p>
-              </div>
-              <CompactInlineValue value={step.code} />
-            </div>
-          ))}
-          <div className="ready">
-            <span className="check-dot" />
-            <div>
-              <strong>Runtime root policy</strong>
-              <p>No-write safety and local control-plane defaults stay visible before any flow exists.</p>
-            </div>
-            <CompactInlineValue value={runtimeRoot} kind="path" />
-          </div>
-        </div>
-
-        <div className="first-run-next-action-grid" aria-label="First-run next action and safety">
-          <div>
-            <span>Next action</span>
-            <strong>{stateReady ? "Configure First Flow" : hasProfileMismatch ? "Add Matching Project Profile" : "Initialize Project Runtime"}</strong>
-            <p>{stateReady ? "Open the safe walkthrough mission form and create the first no-write flow." : hasProfileMismatch ? profileMismatchCopy : "Prepare local runtime state before mission intake."}</p>
-          </div>
-          <div>
-            <span>Blockers</span>
-            <strong>{stateReady ? "None for safe template" : hasProfileMismatch ? "Profile mismatch detected" : "Runtime not initialized"}</strong>
-            <p>{stateReady ? "First-flow setup is the only required next step." : hasProfileMismatch ? "Do not initialize over existing evidence; attach it with Project profile." : "AOR needs a local state file before flow evidence exists."}</p>
-          </div>
-          <div>
-            <span>Safety</span>
-            <strong>No upstream writes</strong>
-            <p>First-run defaults keep execution in local evidence mode with <code>delivery-mode=no-write</code>.</p>
-          </div>
-          <div>
-            <span>Runtime readiness</span>
-            <strong>{stateReady ? "Runtime ready" : hasProfileMismatch ? "Profile required" : "Needs initialization"}</strong>
-            <p>{stateReady ? "State evidence is reachable for this project." : hasProfileMismatch ? "Attach the matching project profile before initializing a new runtime." : "Initialize once, then configure the first flow."}</p>
           </div>
         </div>
 
@@ -3928,7 +3837,7 @@ function FlowCockpit({
               <Icon name="play" />
               <div>
                 <h3>Initialize Project Runtime</h3>
-                <p>This does not create a flow. It prepares local runtime evidence and safety controls.</p>
+                <p>Create local AOR state under <code>.aor/</code>. Source files, remotes, and provider processes are not touched.</p>
               </div>
             </div>
             <button className="primary" type="button" onClick={initializeProject} disabled={busy}>
@@ -3940,8 +3849,8 @@ function FlowCockpit({
             <div>
               <Icon name="plus" />
               <div>
-                <h3>Configure First Flow</h3>
-                <p>Runtime is ready. Create a no-write mission packet and let AOR resolve the next action.</p>
+                <h3>Describe Your First Mission</h3>
+                <p>Capture the outcome, constraints, scope, and Definition of Done. The first flow defaults to no-write.</p>
               </div>
             </div>
             <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
@@ -3950,12 +3859,43 @@ function FlowCockpit({
           </div>
         )}
 
-        <div className="flow-lifecycle-preview" aria-label="Flow lifecycle after readiness">
-          <div className="complete"><span className="check-dot" /><strong>Initialize project</strong><p>Prepare runtime and policy</p></div>
-          <div><span className="check-dot" /><strong>Configure first flow</strong><p>Create a new mission</p></div>
-          <div><span className="check-dot" /><strong>Create mission packet</strong><p>Define intent and targets</p></div>
-          <div><span className="check-dot" /><strong>Resolve next action</strong><p>Let AOR recommend the safest step</p></div>
+        <div className="first-run-facts" aria-label="Project setup summary">
+          <div><span>Repository</span><strong>{projectRef && projectRef !== "loading" ? "Connected explicitly" : "Choose a project"}</strong></div>
+          <div><span>Runtime</span><strong>{stateReady ? "Ready" : hasProfileMismatch ? "Profile required" : "Not initialized"}</strong></div>
+          <div><span>Execution</span><strong>Approved route only</strong></div>
+          <div><span>Safety</span><strong>No upstream writes</strong></div>
         </div>
+
+        <p className="first-run-safety"><Icon name="shield" /> {stateReady
+          ? "Next, choose an approved execution route below and check runner authentication before live execution. Simulation remains available when configured by the project."
+          : <>Initialization writes local runtime evidence to <code>{shortPathLabel(runtimeRoot)}</code>; it does not start a provider or modify repository sources.</>}</p>
+
+        <details className="first-run-details">
+          <summary>Show readiness details</summary>
+          <div className="readiness-check-list">
+            {wizardSteps.map((step) => (
+              <div key={step.label} className={step.status}>
+                <span className="check-dot" />
+                <div>
+                  <strong>{step.label}</strong>
+                  <p>{step.detail}</p>
+                </div>
+                <CompactInlineValue value={step.code} />
+              </div>
+            ))}
+            <div className="ready">
+              <span className="check-dot" />
+              <div>
+                <strong>Runtime root policy</strong>
+                <p>No-write safety and local control-plane defaults stay visible before any flow exists.</p>
+              </div>
+              <CompactInlineValue value={runtimeRoot} kind="path" />
+            </div>
+          </div>
+          <button className="secondary compact" type="button" onClick={onRefresh} disabled={busy}>
+            <Icon name="refresh" />Refresh readiness
+          </button>
+        </details>
       </section>
     );
   }
@@ -4047,12 +3987,9 @@ function FlowCockpit({
     );
   const operatorControl = quietCockpit ? resolveOperatorControl(nextPrimary) : null;
   const primaryActionButton = completed
-    ? {
-        label: "Inspect Evidence",
-        icon: "eye",
-        onClick: () => openAdvancedWorkbench("evidence"),
-        disabled: busy,
-      }
+    ? followUpEligible
+      ? { label: "Create follow-up from learning handoff", icon: "target", onClick: onCreateFollowUp, disabled: busy }
+      : { label: "Inspect Evidence", icon: "eye", onClick: () => openAdvancedWorkbench("evidence"), disabled: busy }
     : verificationPrimary
     ? {
       label: workbenchAction.label,
@@ -4103,7 +4040,6 @@ function FlowCockpit({
     ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion, verificationPlan)
     : stageRuntimeCopy);
   const showCockpitStatus = !headingRepeatsStatus(cockpitTitle, cockpitStatus);
-  const showCockpitHeadingAction = !providerFocusActive;
   const recommendedActionStatus = verificationPrimary
     ? "failed"
     : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
@@ -4113,12 +4049,10 @@ function FlowCockpit({
         : completed
           ? "read-only"
           : "ready";
-  const projectRunIdentity = projectRunEvidenceIdentity(providerStepStatus, externalRunHealth);
-  const projectRunStatus = projectRunEvidenceStatus(providerStepStatus, externalRunHealth);
   const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
   const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
   const actionCommand = actionCommandTitle(nextPrimary);
-  const actionCommandDisclosureLabel = `Show recommended CLI command: ${compactVisibleValue(actionCommand, "command")}`;
+  const actionCommandDisclosureLabel = `Show CLI command. Recommended command: ${compactVisibleValue(actionCommand, "command")}`;
   const openAdvancedWorkbench = (tabId = "evidence") => {
     if (typeof document === "undefined") return;
     const requestedTab = ADVANCED_WORKBENCH_TAB_IDS.has(tabId) ? tabId : "evidence";
@@ -4148,54 +4082,25 @@ function FlowCockpit({
         <StatusPill state={providerStepStatus.status} />
       </div>
       <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</p>
-      <div className="provider-heartbeat-grid">
-        <div>
-          <span>Adapter</span>
-          <strong>{providerStepStatus.adapter ?? "unknown"}</strong>
+      <details className="provider-telemetry-details">
+        <summary>Show provider telemetry</summary>
+        <div className="provider-heartbeat-grid">
+          <div><span>Adapter</span><strong>{providerStepStatus.adapter ?? "unknown"}</strong></div>
+          <div><span>Route</span><strong>{providerStepStatus.route_id ?? "unknown"}</strong></div>
+          <div><span>Elapsed / budget</span><strong>{formatDurationMs(providerStepStatus.elapsed_ms)}{providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}</strong></div>
+          <div><span>Remaining</span><strong>{formatDurationMs(providerStepStatus.remaining_budget_ms)}</strong></div>
+          <div><span>Last output</span><strong>{providerLastOutputLabel(providerStepStatus)}</strong></div>
+          <div><span>Last progress</span><strong>{providerLastProgressLabel(providerStepStatus)}</strong></div>
+          <div><span>Activity</span><strong>{providerActivityLabel(providerStepStatus)}</strong></div>
+          <div><span>Last artifact</span><strong>{formatProviderTimestamp(providerStepStatus.last_artifact_update_at)}</strong></div>
+          <div><span>Output mode</span><strong>{providerOutputModeLabel(providerStepStatus)}</strong></div>
         </div>
-        <div>
-          <span>Route</span>
-          <strong>{providerStepStatus.route_id ?? "unknown"}</strong>
+        <div className="provider-heartbeat-action">
+          <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
+          <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</strong>
+          {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? <small>Raw runner label: external-provider-runner</small> : null}
         </div>
-        <div>
-          <span>Elapsed / budget</span>
-          <strong>
-            {formatDurationMs(providerStepStatus.elapsed_ms)}
-            {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
-          </strong>
-        </div>
-        <div>
-          <span>Remaining</span>
-          <strong>{formatDurationMs(providerStepStatus.remaining_budget_ms)}</strong>
-        </div>
-        <div>
-          <span>Last output</span>
-          <strong>{providerLastOutputLabel(providerStepStatus)}</strong>
-        </div>
-        <div>
-          <span>Last progress</span>
-          <strong>{providerLastProgressLabel(providerStepStatus)}</strong>
-        </div>
-        <div>
-          <span>Activity</span>
-          <strong>{providerActivityLabel(providerStepStatus)}</strong>
-        </div>
-        <div>
-          <span>Last artifact</span>
-          <strong>{formatProviderTimestamp(providerStepStatus.last_artifact_update_at)}</strong>
-        </div>
-        <div>
-          <span>Output mode</span>
-          <strong>{providerOutputModeLabel(providerStepStatus)}</strong>
-        </div>
-      </div>
-      <div className="provider-heartbeat-action">
-        <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
-        <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</strong>
-        {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? (
-          <small>Raw runner label: external-provider-runner</small>
-        ) : null}
-      </div>
+      </details>
     </div>
   ) : null;
 
@@ -4209,12 +4114,6 @@ function FlowCockpit({
           </div>
           <p>{cockpitCopy}</p>
         </div>
-        {showCockpitHeadingAction ? (
-          <button className="secondary" type="button" onClick={onAsk}>
-            <Icon name={completed ? "eye" : "target"} />
-            {completed ? "Inspect" : "Ask AOR"}
-          </button>
-        ) : null}
       </div>
 
       <div className="recommended-action">
@@ -4231,21 +4130,6 @@ function FlowCockpit({
             {primaryActionButton.label}
           </button>
           {quietCockpit && operatorActionResult ? <span className="action-operation-status" role="status" aria-live="polite">{operatorActionResult.message}</span> : null}
-          {completed ? (
-            <button className="secondary workbench-jump" type="button" onClick={followUpEligible ? onCreateFollowUp : onStartNewFlow} disabled={busy}>
-              <Icon name={followUpEligible ? "target" : "plus"} />
-              {followUpEligible ? "Create Follow-up" : "Start New Flow"}
-            </button>
-          ) : !verificationPrimary && !isBlockingExternalRunHealth(externalRunHealth) ? (
-            <button className="secondary workbench-jump" type="button" onClick={() => openAdvancedWorkbench(workbenchAction.tabId)}>
-              <Icon name={workbenchAction.icon} />
-              {workbenchAction.label}
-            </button>
-          ) : null}
-          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
-            <Icon name="refresh" />
-            {providerFocusActive ? "Refresh Run Status" : "Refresh"}
-          </button>
         </div>
         <div className="action-grid">
           <div className="next-step-panel">
@@ -4280,33 +4164,6 @@ function FlowCockpit({
 
       {providerHeartbeatPanel}
 
-      {!completed ? (
-        <div className="active-flow-handoff" aria-label="Active flow status summary">
-          <div>
-            <span>{providerFocusActive ? "Run evidence" : "Active flow id"}</span>
-            <strong title={providerFocusActive ? projectRunIdentity : flow?.flow_id ?? flow?.mission_id ?? ""}>
-              {providerFocusActive
-                ? projectRunIdentity
-                : flow?.flow_id ?? flow?.mission_id ?? "active flow"}
-            </strong>
-          </div>
-          <div>
-            <span>Next action</span>
-            <strong title={actionCommand}>{compactVisibleValue(actionCommand, "command")}</strong>
-          </div>
-          <div>
-            <span>No-write safety</span>
-            <strong>{deliveryMode === "no-write" ? "On" : "Explicit review"}</strong>
-          </div>
-          <div>
-            <span>Evidence count</span>
-            <strong>{visibleEvidence.length}</strong>
-          </div>
-        </div>
-      ) : null}
-
-      <FlowTimeline currentStage={currentStage} completed={completed} />
-
       <QualityGatePanel
         gate={qualityGate}
         evidenceRows={evidenceRows}
@@ -4320,68 +4177,36 @@ function FlowCockpit({
           <Icon name="lock" />
           <div>
             <strong>Flow completed - evidence locked</strong>
-            <p>{followUpEligible ? "Mutation controls are replaced by no-write inspection actions. Create a follow-up from the learning handoff to continue with closure guidance." : "Mutation controls are replaced by no-write inspection actions. Start New Flow to continue work."}</p>
-          </div>
-          <div className="closure-actions">
-            <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
-              <Icon name="plus" />
-              Start New Flow
-            </button>
-            <button className="secondary" type="button" onClick={onCreateFollowUp} disabled={busy || !followUpEligible}>
-              Create follow-up from learning handoff
-            </button>
-            <button className="secondary" type="button" onClick={onDuplicateMission} disabled={busy}>
-              Duplicate mission settings
-            </button>
+            <p>{followUpEligible ? "Continue through the recommended follow-up action above. The completed evidence stays read-only." : "Inspect this evidence or start a new Flow from the global Flow control."}</p>
           </div>
         </div>
       ) : null}
 
-      <ActionContextGrid
-        stage={actionStage}
-        action={nextPrimary}
-        evidenceRefs={evidenceRefs}
-        evidenceRows={evidenceRows}
-        blockers={blockers}
-        deliveryMode={displayedDeliveryMode}
-        artifactReadiness={artifactReadiness}
-        projectLevelProviderFocus={providerFocusActive}
-        externalRunHealth={externalRunHealth}
-      />
-
-      <div className="flow-snapshot-grid">
-        <div>
-          <span>{providerFocusActive && externalRunHealth ? externalRunAttentionLabel(externalRunHealth) : "Blockers"}</span>
-          <strong>{blockers.length}</strong>
-          <p>{blockers.length === 0 ? externalRunAttentionEmptyCopy(externalRunHealth) : blockers[0]?.summary ?? blockers[0]?.code}</p>
-        </div>
-        <div>
-          <span>Evidence artifacts</span>
-          <strong>{visibleEvidence.length}</strong>
-          <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0] ? conciseArtifactLabel(visibleEvidence[0]) : "No flow evidence yet."}</p>
-        </div>
-        <div>
-          <span>{providerFocusActive ? "Run evidence" : "Flow ID"}</span>
-          <strong>{providerFocusActive ? projectRunStatus : flow?.mission_id ?? "draft"}</strong>
-          <p title={providerFocusActive ? projectRunIdentity : flow?.flow_id ?? ""}>
-            {compactVisibleValue(providerFocusActive
-              ? projectRunIdentity
-              : flow?.flow_id ?? "Mission packet will create the flow identity.")}
-          </p>
-        </div>
-      </div>
-
-      <StageSpecificPanel
-        stage={stage}
-        completed={completed}
-        flow={flow}
-        evidenceRefs={evidenceRefs}
-        evidenceRows={evidenceRows}
-        blockers={blockers}
-        deliveryMode={displayedDeliveryMode}
-        projectLevelProviderFocus={providerFocusActive}
-        externalRunHealth={externalRunHealth}
-      />
+      <details className="cockpit-supporting-details">
+        <summary>Show stage details and evidence</summary>
+        <ActionContextGrid
+          stage={actionStage}
+          action={nextPrimary}
+          evidenceRefs={evidenceRefs}
+          evidenceRows={evidenceRows}
+          blockers={blockers}
+          deliveryMode={displayedDeliveryMode}
+          artifactReadiness={artifactReadiness}
+          projectLevelProviderFocus={providerFocusActive}
+          externalRunHealth={externalRunHealth}
+        />
+        <StageSpecificPanel
+          stage={stage}
+          completed={completed}
+          flow={flow}
+          evidenceRefs={evidenceRefs}
+          evidenceRows={evidenceRows}
+          blockers={blockers}
+          deliveryMode={displayedDeliveryMode}
+          projectLevelProviderFocus={providerFocusActive}
+          externalRunHealth={externalRunHealth}
+        />
+      </details>
     </section>
   );
 }
@@ -6062,9 +5887,9 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operati
           <span>What runtime will do</span>
           <p>{scopeMissing ? `${requestPreview} Add allowed paths before running this non-no-write request.` : requestPreview}</p>
         </div>
-        <div className="request-readiness-path" aria-label="Ask AOR request readiness">
+        <details className="request-readiness-path" aria-label="Ask AOR request readiness" open={!readinessReady || undefined}>
+          <summary><span>Request readiness</span><StatusPill state={readinessReady ? "ready" : "incomplete"} /></summary>
           <div className="request-readiness-heading">
-            <span>Request readiness</span>
             <strong>{readinessReady ? "Ready to create request evidence" : "Complete required fields first"}</strong>
             <p>{readinessReady ? "Submit will create the operator-request packet, run the selected step, refresh the flow, and keep audit refs visible." : "AOR keeps submission disabled until the flow, request, targets, scope, and mode are auditable."}</p>
           </div>
@@ -6077,7 +5902,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operati
               </li>
             ))}
           </ol>
-        </div>
+        </details>
         <button className="primary drawer-submit" type="button" onClick={onRun} disabled={busy || flowMissing || targetRefsMissing || requestTextMissing || scopeMissing || !readOnlyAllowed}>
           <Icon name="play" />
           {operation?.phase === "run-pending" ? "Resume request run" : completed ? "Create no-write inspection request" : "Create and run request"}
@@ -7245,15 +7070,6 @@ function App() {
     "no-write";
   const projectSnapshotPending = !projectSnapshotLoaded && !String(error ?? "").trim();
   const firstRunFocusMode = !projectSnapshotPending && (draftSurface || (!selectedFlow && !providerWorkbenchFocus));
-  const topbarFlowStatus = blockingExternalRunHealth
-    ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
-    : activeProviderStep
-    ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth)
-    : projectSnapshotPending
-    ? "Loading project"
-    : draftSurface
-    ? "Draft flow"
-    : selectedFlow?.status ?? (projectLevelProviderFocus ? projectRunEvidenceStatus(providerStepStatus, externalRunHealth) : "No active flow");
   const topbarAskReason = projectSnapshotPending
     ? "Project state is loading."
     : blockingExternalRunHealth
@@ -7284,7 +7100,7 @@ function App() {
           ? "Recovery needed"
           : "Review blocker"
     : selectedFlow
-      ? "Ask AOR for selected flow"
+      ? "Ask AOR"
       : projectLevelProviderFocus
         ? "Ask AOR needs a flow"
         : "Ask AOR for selected flow";
@@ -7298,6 +7114,34 @@ function App() {
   const activeProjectStatusRuntimeReady = activeProjectRuntimeReady || providerWorkbenchFocus || Boolean(providerStepStatus || externalRunHealth) || (Array.isArray(runs) && runs.length > 0);
   const newFlowDisabledReason = projectSnapshotPending ? "Project state is loading." : busy ? "Wait for the current console action to finish before starting a new flow." : !activeProjectRuntimeReady ? "Initialize the project runtime before starting a flow." : newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason;
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
+  const bootstrapFailure = !config && Boolean(String(error ?? "").trim());
+
+  if (bootstrapFailure) {
+    return (
+      <div className="aor-ui bootstrap-failure-shell">
+        <header className="bootstrap-failure-header">
+          <div className="brand"><div className="brand-mark">A</div><div><strong>AOR Operator Console</strong></div></div>
+          <StatusPill state="Configuration unavailable" />
+        </header>
+        <main className="bootstrap-failure" aria-labelledby="bootstrap-failure-title">
+          <span className="eyebrow">Console unavailable</span>
+          <h1 id="bootstrap-failure-title">Console configuration could not be loaded</h1>
+          <p>AOR cannot establish a trustworthy project context. Project and lifecycle actions remain unavailable until configuration is restored.</p>
+          <div className="bootstrap-failure-actions">
+            <button className="primary" type="button" onClick={() => {
+              setError("");
+              setProjectSnapshotLoaded(false);
+              refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)));
+            }}>Retry</button>
+          </div>
+          <details className="bootstrap-technical-details">
+            <summary>Technical details</summary>
+            <pre>{String(error)}</pre>
+          </details>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} quiet-cockpit-preview`} data-console-experience={consoleExperience} data-quiet-mode={quietMode}>
@@ -7306,7 +7150,6 @@ function App() {
           <div className="brand-mark">A</div>
           <div>
             <strong>AOR Operator Console</strong>
-            <span>v{config?.version ?? "loading"}</span>
           </div>
         </div>
         <ProjectSwitcher
@@ -7328,15 +7171,11 @@ function App() {
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
         />
-        <div className="top-context runtime-context">
-          <span>Runtime root</span>
-          <code title={runtimeRoot}>{shortPathLabel(runtimeRoot)}</code>
-        </div>
         <div className="topbar-status-strip" aria-label="Console status">
-          <StatusPill state={topbarFlowStatus} />
           {providerStepStatus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
           <StatusPill state={connectionState} />
           <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
+          <StatusPill state={`${(attentionState.data?.items?.length ?? 0) + Object.keys(resourceErrors).length} attention`} />
         </div>
         <div className="topbar-spacer" />
         <button
@@ -7350,9 +7189,6 @@ function App() {
           <Icon name="target" /><span className="action-label">{topbarAskLabel}</span>
         </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
-        <button className="utility-button runtime-copy-chip" type="button" title="Copy runtime root path" aria-label="Copy runtime root path" onClick={() => copyRef(runtimeRoot)}>
-          <Icon name="folder" />Copy runtime path
-        </button>
       </header>
 
       {legacyMigrationNotice ? <Alert tone="information"><strong>Legacy console retired.</strong><span> Quiet Cockpit opened with the same Project and Flow context. Package-version rollback remains available.</span></Alert> : null}
@@ -7374,31 +7210,28 @@ function App() {
         </section>
       ) : null}
 
-        <QuietShell project={activeProjectDisplay} flow={selectedFlow} connection={connectionState} safetyMode={selectedFlow?.writeback_policy?.mode ?? "no-write"} attentionCount={(attentionState.data?.items?.length ?? 0) + Object.keys(resourceErrors).length} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode}/>
-
       <main className="main">
+        <QuietShell project={activeProjectDisplay} flow={selectedFlow} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode} runtimeRoot={runtimeRoot} version={config?.version}/>
         <QuietModeSurface mode={quietMode} attention={attentionState.data} attentionStatus={attentionState.status} resourceErrors={resourceErrors} planState={planWorkbenchState} runs={runs} deliveryManifests={deliveryManifests} graph={selectedFlowEvidenceGraph} trace={selectedFlowRuntimeTrace} onResolve={(item) => runOperatorControl(item.operator_control)} onInspect={(item) => { setSelectedRef(item.source_ref); focusAdvancedWorkbench("evidence"); }}/>
         {error ? <div className="alert" role="alert">{error}</div> : null}
         <ResourceErrorCard errors={resourceErrors} />
-        {!draftSurface ? <MissionDurableSummary flow={selectedFlow} /> : null}
         {requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
         ) : draftSurface ? (
-          <section className="work-card">
-            <MissionBuilder
-              form={form}
-              setForm={setForm}
-              busy={busy}
-              onSubmit={submitMission}
-              onResume={resumeMissionNext}
-              operation={missionOperation}
-              onCancel={cancelNewFlowDraft}
-              followUpSourceHandoffRef={draftFollowUpHandoffRef}
-            />
-          </section>
+          <MissionBuilder
+            form={form}
+            setForm={setForm}
+            busy={busy}
+            onSubmit={submitMission}
+            onResume={resumeMissionNext}
+            operation={missionOperation}
+            onCancel={cancelNewFlowDraft}
+            followUpSourceHandoffRef={draftFollowUpHandoffRef}
+          />
         ) : (
           <>
+          <MissionDurableSummary flow={selectedFlow} />
           <FlowCockpit
             flow={selectedFlow}
             stage={activeStage}
@@ -7409,10 +7242,8 @@ function App() {
             config={config}
             onResolveNext={resolveNextForSelectedFlow}
             onRefresh={() => refresh().catch((err) => setError(err.message))}
-            onAsk={() => openRequestDrawer()}
             onStartNewFlow={() => startNewFlow()}
             onCreateFollowUp={() => startNewFlow({ sourceFlow: selectedFlow, followUp: true })}
-            onDuplicateMission={() => startNewFlow({ sourceFlow: selectedFlow, duplicate: true })}
             initializeProject={initializeProject}
             activeProject={activeProjectDisplay}
             onOpenAddProject={openAddProjectDrawer}
@@ -7430,24 +7261,27 @@ function App() {
           </>
         )}
         {activeProjectDisplay ? (
-          <>
-            <ExecutionSetup
-              profile={executionSetupState.data}
-              status={executionSetupState.status}
-              error={executionSetupState.error}
-              busy={busy}
-              onRefresh={() => loadExecutionSetup(activeProjectDisplay.project_id)}
-              onAction={runExecutionSetupAction}
-            />
-            <ProjectStructure
-              topology={topologyState.data}
-              status={topologyState.status}
-              error={topologyState.error}
-              busy={busy}
-              onRefresh={() => loadProjectTopology(activeProjectDisplay.project_id)}
-              onAction={runTopologyAction}
-            />
-          </>
+          <details className="project-settings-disclosure" open={firstRunFocusMode || undefined}>
+            <summary><span>Project settings</span><small>Repositories, components, and execution route</small></summary>
+            <div className="project-settings-content">
+              <ExecutionSetup
+                profile={executionSetupState.data}
+                status={executionSetupState.status}
+                error={executionSetupState.error}
+                busy={busy}
+                onRefresh={() => loadExecutionSetup(activeProjectDisplay.project_id)}
+                onAction={runExecutionSetupAction}
+              />
+              <ProjectStructure
+                topology={topologyState.data}
+                status={topologyState.status}
+                error={topologyState.error}
+                busy={busy}
+                onRefresh={() => loadProjectTopology(activeProjectDisplay.project_id)}
+                onAction={runTopologyAction}
+              />
+            </div>
+          </details>
         ) : null}
       </main>
 
@@ -7468,7 +7302,7 @@ function App() {
         />
       ) : null}
 
-      {firstRunFocusMode ? (
+      {projectSnapshotPending ? null : firstRunFocusMode ? (
         <AdvancedEvidenceDisclosure
           newFlowDraft={draftSurface}
           evidenceCount={workbenchEvidenceRows.length}
@@ -7508,15 +7342,6 @@ function App() {
           busy={busy}
         />
       )}
-
-      {!firstRunFocusMode ? (
-        <ActivityArtifactsTables
-          activity={activity}
-          evidenceRows={workbenchEvidenceRows}
-          draftSurface={draftSurface}
-          copyValue={copyRef}
-        />
-      ) : null}
 
       <RequestDrawer
         open={requestDrawerOpen}

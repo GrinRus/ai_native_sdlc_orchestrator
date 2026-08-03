@@ -61,6 +61,7 @@ function SetupStep({ step, form, setForm }) {
       <section><span>Portable profile</span><strong>{form.topology}</strong><p>{parseSetupRows(form.repositories, ["id", "mount"]).length + 1} repositories · {parseSetupRows(form.components, ["id", "repo", "root", "role"]).length} components</p></section>
       <section><span>Machine-local binding</span><strong>{form.projectRef || "Project path required"}</strong><p>Runtime root preview: {form.runtimeRoot || "<project>/.aor"}</p></section>
       <section className="write-effect-preview"><span>Write-effect preview</span><strong>Add registry entry and approved topology revisions</strong><p>Opening, navigation, and validation do not create <code>.aor</code>. Initialization is a separate confirmed action.</p></section>
+      <section><span>After initialization</span><strong>Choose an execution route</strong><p>Execution Setup lists approved runner/provider presets. Authentication stays outside the browser and must pass an explicit readiness check.</p></section>
     </div>
   );
 }
@@ -90,13 +91,14 @@ export function AddAorProjectDialog({ open, form, setForm, busy, result, onClose
     <>
     <Dialog open={open && !confirmClose} onClose={requestClose} labelledBy="add-aor-project-title" className="request-drawer add-project-drawer project-setup-dialog">
       <div className="drawer-header">
-        <div><p className="eyebrow">Local Workspace</p><h2 id="add-aor-project-title">Add AOR Project</h2></div>
+        <div><p className="eyebrow">Local Workspace</p><h2 id="add-aor-project-title">Add AOR Project</h2><p>Connect a project by telling AOR exactly which repositories belong to this product. AOR never scans your machine for projects.</p></div>
         <button className="secondary compact" type="button" onClick={requestClose}>Close</button>
       </div>
       <ol className="project-setup-steps" aria-label="Project setup steps">
         {SETUP_STEPS.map((label, index) => <li key={label} className={index === stepIndex ? "current" : index < stepIndex ? "complete" : ""}><span>{index + 1}</span>{label}</li>)}
       </ol>
       <section className="project-setup-step" aria-labelledby="project-setup-step-title">
+        <p className="project-setup-progress">Step {stepIndex + 1} of {SETUP_STEPS.length}</p>
         <h3 id="project-setup-step-title">{step}</h3>
         <SetupStep step={step} form={form} setForm={setForm} />
       </section>
@@ -159,7 +161,7 @@ export function ProjectStructure({ topology, status, error, busy, onRefresh, onA
     if (action) await onAction(action.family, action.action, action.payload);
   };
   return (
-    <section className="work-card project-structure" aria-labelledby="project-structure-title">
+    <section id="project-structure" className="work-card project-structure" aria-labelledby="project-structure-title">
       <div className="project-structure-header">
         <div><p className="eyebrow">Project settings</p><h2 id="project-structure-title">Project Structure</h2><p>Portable topology and machine-local binding health from the canonical control plane.</p></div>
         <button className="secondary compact" type="button" onClick={onRefresh} disabled={busy}>Refresh structure</button>

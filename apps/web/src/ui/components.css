@@ -30,7 +30,9 @@
 .aor-card { border: 1px solid var(--aor-color-border-default); border-radius: var(--aor-radius-card); background: var(--aor-color-bg-surface); box-shadow: var(--aor-elevation-card); padding: var(--aor-space-4); }
 .aor-section { display: grid; gap: var(--aor-space-3); }
 .aor-section__heading { margin: 0; font-size: var(--aor-type-section-size); line-height: var(--aor-type-section-line); }
-.aor-empty { padding: var(--aor-space-5); text-align: center; color: var(--aor-color-text-secondary); }
+.aor-empty { display: grid; gap: var(--aor-space-1); padding: var(--aor-space-5); text-align: center; color: var(--aor-color-text-secondary); }
+.aor-empty h3, .aor-empty p { margin: 0; }
+.aor-empty h3 { color: var(--aor-color-text-primary); font-size: var(--aor-type-section-size); line-height: var(--aor-type-section-line); }
 .aor-disclosure > summary { min-height: var(--aor-control-default); display: flex; align-items: center; cursor: pointer; font-weight: 650; }
 .aor-tabs { display: flex; gap: var(--aor-space-1); overflow-x: auto; }
 .aor-tab { min-height: var(--aor-control-default); border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--aor-color-text-secondary); padding-inline: var(--aor-space-3); }

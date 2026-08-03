@@ -206,7 +206,8 @@ test.describe.serial("installed local operator console", () => {
       await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toBeVisible();
       await expect(page.getByText("Current lifecycle stage", { exact: true })).toBeVisible();
       await page.getByRole("tab", { name: "Evidence", exact: true }).click();
-      await page.getByRole("button", { name: "Review / QA" }).focus(); await page.keyboard.press("Enter");
+      if (viewport.width <= 768) await page.getByLabel("View lifecycle stage").selectOption("review");
+      else { await page.getByRole("button", { name: "Review / QA" }).focus(); await page.keyboard.press("Enter"); }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     }
   });
@@ -354,7 +355,7 @@ test.describe.serial("installed local operator console", () => {
       });
     });
     await page.goto(state.app_url);
-    await page.locator("#flow-advanced-workbench details").evaluate((element) => {
+    await page.locator("#flow-advanced-workbench > .advanced-workbench-disclosure").evaluate((element) => {
       element.open = true;
       element.dispatchEvent(new Event("toggle"));
     });

@@ -64,12 +64,12 @@ export function ExecutionSetup({ profile, status, error, busy, onRefresh, onActi
   const recovery = RECOVERY_BY_STATUS[selected?.readiness] ?? "Inspect the structured blocker and retry the bounded setup action.";
 
   return (
-    <section className="work-card execution-setup" aria-labelledby="execution-setup-title">
+    <section id="execution-setup" className="work-card execution-setup" aria-labelledby="execution-setup-title">
       <div className="execution-setup-header">
         <div>
           <p className="eyebrow">Project settings</p>
           <h2 id="execution-setup-title">Execution Setup</h2>
-          <p>Select an approved route preset and verify machine-local readiness before provider execution.</p>
+          <p>Choose how AOR runs work: select an approved Execution Route, then check the local runner and authentication before live provider execution. Credentials are never entered here.</p>
         </div>
         <button className="secondary compact" type="button" onClick={onRefresh} disabled={busy}>Refresh setup</button>
       </div>
