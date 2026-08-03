@@ -7,6 +7,25 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.18] - 2026-08-04
+
+- Moved mutable AOR state into the central `~/.aor` home with collision-safe
+  workspace project identities, logical evidence references, managed Git
+  checkouts, and explicit portable project configuration and evidence exports.
+- Replaced topology-first initialization with intent-first onboarding for local
+  Git folders or HTTPS/SSH Git URLs plus task text and bounded text-file
+  attachments.
+- Added read-only, provider-agnostic intent normalization with immutable
+  revisions, deterministic structured validation, clarification and retry
+  actions, and idempotent flow creation after explicit confirmation.
+- Simplified the web console around source connection, task preparation,
+  compact review, automatic safe execution modes, and recoverable start jobs,
+  while moving topology and provider details into advanced project settings.
+- Added headless CLI and control-plane surfaces for project connection, folder
+  selection, intent submission, write-back, export, disconnect, and explicit
+  AOR data deletion, with updated contracts, OpenAPI coverage, and installed
+  package proofs.
+
 ## [0.1.0-alpha.17] - 2026-08-03
 
 - Reworked the Quiet Cockpit around one global project and flow context, one
