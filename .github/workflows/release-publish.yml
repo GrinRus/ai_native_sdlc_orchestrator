@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Chromium for release browser acceptance
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Validate release event
         id: guard
         run: node ./scripts/release-event-guard.mjs

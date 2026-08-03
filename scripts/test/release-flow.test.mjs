@@ -210,9 +210,31 @@ test("release verifier rejects publish workflows without trusted publishing runt
     });
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), /node-version: 22\.14\.0/u);
+    assert.match(result.findings.join("\n"), /playwright install --with-deps chromium/u);
     assert.match(result.findings.join("\n"), /release-publish-transaction\.mjs/u);
     assert.match(result.findings.join("\n"), /RELEASE_COMMIT_SHA/u);
     assert.doesNotMatch(result.findings.join("\n"), /npm@11\.5\.1/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("release verifier rejects release workflows without the browser runtime preflight", () => {
+  const tempRoot = copyFixtureRepo();
+  try {
+    const workflowPath = path.join(tempRoot, ".github/workflows/release-candidate.yml");
+    const workflow = fs.readFileSync(workflowPath, "utf8").replace(
+      /\n\s+- name: Install Chromium for release browser acceptance\n\s+run: pnpm exec playwright install --with-deps chromium/u,
+      "",
+    );
+    fs.writeFileSync(workflowPath, workflow, "utf8");
+    const result = validateReleaseState({
+      rootDir: tempRoot,
+      releaseBranch: RELEASE_BRANCH,
+      strictReleaseBranch: true,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /release-candidate\.yml must mention 'pnpm exec playwright install --with-deps chromium'/u);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

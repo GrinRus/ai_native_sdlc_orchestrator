@@ -264,6 +264,7 @@ export function validateReleaseState(options = {}) {
     const workflow = readText(rootDir, workflowPath);
     ensureIncludes(findings, workflow, "node-version: 22.14.0", workflowPath);
     ensureIncludes(findings, workflow, `npm@${RELEASE_NPM_VERSION}`, workflowPath);
+    ensureIncludes(findings, workflow, "pnpm exec playwright install --with-deps chromium", workflowPath);
     if (workflowPath.endsWith("release-publish.yml")) {
       ensureIncludes(findings, workflow, "id-token: write", workflowPath);
       ensureIncludes(findings, workflow, "release-publish-transaction.mjs", workflowPath);
