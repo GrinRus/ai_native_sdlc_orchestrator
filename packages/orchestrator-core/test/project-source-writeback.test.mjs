@@ -51,6 +51,13 @@ test("native folder picker selects platform commands and keeps a manual fallback
   assert.match(unavailable.recovery, /absolute path/u);
 });
 
+test("managed repository identity normalizes long uncontrolled slug input in linear time", () => {
+  const startedAt = performance.now();
+  const repositoryId = deriveManagedRepositoryId(`https://example.com/${"!".repeat(250_000)}repository.git`);
+  assert.match(repositoryId, /^repository-[a-f0-9]{12}$/u);
+  assert.ok(performance.now() - startedAt < 1_000);
+});
+
 test("local source connection publishes a durable asynchronous job without target writes", async () => {
   await withTempRepo({ prefix: "aor-source-", workspaceRoot }, async (projectRoot) => {
     const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-source-home-"));

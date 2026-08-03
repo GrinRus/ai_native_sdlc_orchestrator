@@ -12,11 +12,34 @@ export function resolveAorHome(options = {}) {
 }
 
 function normalizeSlug(value) {
-  const normalized = String(value ?? "project")
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/^[^a-z0-9]+|[^a-z0-9]+$/gu, "")
-    .slice(0, 80);
+  const input = String(value ?? "project").toLowerCase();
+  let normalized = "";
+  let pendingSeparator = false;
+  for (const character of input) {
+    const code = character.charCodeAt(0);
+    const alphaNumeric = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
+    const allowedPunctuation = character === "." || character === "_" || character === "-";
+    if (alphaNumeric) {
+      if (pendingSeparator && normalized.length > 0) normalized += "-";
+      normalized += character;
+      pendingSeparator = false;
+    } else if (allowedPunctuation) {
+      if (normalized.length > 0) {
+        if (pendingSeparator) normalized += "-";
+        normalized += character;
+        pendingSeparator = false;
+      }
+    } else if (normalized.length > 0) {
+      pendingSeparator = true;
+    }
+    if (normalized.length >= 80) break;
+  }
+  normalized = normalized.slice(0, 80);
+  while (normalized.length > 0) {
+    const code = normalized.charCodeAt(normalized.length - 1);
+    if ((code >= 97 && code <= 122) || (code >= 48 && code <= 57)) break;
+    normalized = normalized.slice(0, -1);
+  }
   return validatePublicId(normalized).ok ? normalized : "project";
 }
 
