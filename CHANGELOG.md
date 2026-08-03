@@ -31,6 +31,8 @@ versioned AOR snapshots.
   evidence.
 - Installed the Playwright Chromium runtime in both alpha candidate and publish
   jobs before executable browser acceptance.
+- Hardened external-runner timeout cleanup by tracking late-spawned detached
+  descendant process groups before bounded termination.
 
 ## [0.1.0-alpha.15] - 2026-07-09
 

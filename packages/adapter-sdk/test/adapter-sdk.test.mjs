@@ -1184,7 +1184,7 @@ test("live adapter kills detached descendant process groups on timeout", () => {
   const markerFile = path.join(os.tmpdir(), `aor-adapter-orphan-${process.pid}-${Date.now()}.txt`);
   const orphanScript = [
     "const fs = require('node:fs');",
-    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerFile)}, 'survived'), 200);`,
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerFile)}, 'survived'), 400);`,
     "setTimeout(() => {}, 1000);",
   ].join("");
   const runnerScript = [
@@ -1197,7 +1197,7 @@ test("live adapter kills detached descendant process groups on timeout", () => {
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
       args: ["-e", runnerScript],
-      timeoutMs: 10,
+      timeoutMs: 150,
       handler: null,
     }),
   });
@@ -1217,7 +1217,7 @@ test("live adapter kills detached descendant process groups on timeout", () => {
     assert.equal(response.status, "failed");
     assert.equal(response.output.failure_kind, "external-runner-timeout");
     assert.equal(response.output.external_runner.timed_out, true);
-    spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 350);"]);
+    spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 550);"]);
     assert.equal(fs.existsSync(markerFile), false);
   } finally {
     fs.rmSync(markerFile, { force: true });

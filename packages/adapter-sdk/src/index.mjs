@@ -145,7 +145,7 @@ let stderr = "";
 let timedOut = false;
 let interrupted = false;
 let emitted = false;
-let heartbeatTimer = null;
+let heartbeatTimer = null, processTreeSnapshotTimer = null;
 let interruptKillTimer = null;
 let timeoutTimer = null;
 let stdoutLineBuffer = "";
@@ -235,6 +235,7 @@ function finish(result) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
   }
+  if (processTreeSnapshotTimer) clearInterval(processTreeSnapshotTimer);
   if (interruptKillTimer) {
     clearTimeout(interruptKillTimer);
     interruptKillTimer = null;
@@ -285,7 +286,7 @@ try {
   });
   process.exit(0);
 }
-
+processTreeSnapshotTimer = trackProcessTree(child, timeoutMs);
 heartbeatTimer = setInterval(() => {
   if (providerCancellationRequested()) {
     if (!interrupted) {

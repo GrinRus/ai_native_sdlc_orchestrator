@@ -35,6 +35,13 @@ function snapshotProcessTargets(rootPid) {
   }
 }
 
+function trackProcessTree(child, timeoutMs) {
+  if (!child || typeof child.pid !== "number" || process.platform === "win32") return null;
+  snapshotProcessTargets(child.pid);
+  const intervalMs = Math.min(250, Math.max(25, Math.floor(timeoutMs / 4)));
+  return setInterval(() => snapshotProcessTargets(child.pid), intervalMs);
+}
+
 function killProcessTree(child, signal) {
   if (!child || typeof child.pid !== "number") return;
   snapshotProcessTargets(child.pid);
