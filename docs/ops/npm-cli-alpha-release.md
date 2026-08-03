@@ -120,10 +120,12 @@ AOR_RELEASE_BRANCH=release/v0.1.0-alpha.1 AOR_RELEASE_STRICT_BRANCH=true pnpm re
 ## Publish automation
 
 `.github/workflows/release-candidate.yml` runs the full release gate for PRs
-from `release/v<semver-alpha>` into `main`. It does not publish.
+from `release/v<semver-alpha>` into `main`. It installs the pinned Playwright
+Chromium runtime required by browser acceptance and does not publish.
 
 `.github/workflows/release-publish.yml` runs after a release PR is merged. It
-publishes only when all of these conditions are true:
+installs the same Chromium runtime before re-running the gate on the merge
+commit. It publishes only when all of these conditions are true:
 
 - the PR was merged into `main`;
 - the head branch matches `release/v<semver-alpha>`;

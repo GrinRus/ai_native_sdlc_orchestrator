@@ -29,6 +29,8 @@ versioned AOR snapshots.
 - Allowed npm alpha snapshot publication under a valid audit hold while
   preserving false production clearance and rejecting invalid readiness
   evidence.
+- Installed the Playwright Chromium runtime in both alpha candidate and publish
+  jobs before executable browser acceptance.
 
 ## [0.1.0-alpha.15] - 2026-07-09
 

@@ -60,6 +60,8 @@ Release PRs must:
 - carry the `release:publish` label before merge;
 - keep `package.json` version equal to the release branch version;
 - include a matching `CHANGELOG.md` entry;
+- install Playwright Chromium in candidate and publish jobs before the browser
+  acceptance portion of the release gate;
 - run `pnpm release:gate` before merge.
 
 The npm alpha release gate may accept a valid production-readiness
