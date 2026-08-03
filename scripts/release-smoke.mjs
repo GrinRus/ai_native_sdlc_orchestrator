@@ -59,7 +59,7 @@ function createTargetRepo(tempRoot) {
   return targetRepo;
 }
 
-function assertOnlyRuntimeStateChanged(targetRepo) {
+function assertTargetRepoUnchanged(targetRepo) {
   const status = runChecked("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
     cwd: targetRepo,
   }).stdout
@@ -67,14 +67,8 @@ function assertOnlyRuntimeStateChanged(targetRepo) {
     .map((line) => line.trimEnd())
     .filter(Boolean);
 
-  if (status.length === 0) {
-    throw new Error("Expected package smoke to write runtime state under .aor/.");
-  }
-  for (const line of status) {
-    const changedPath = line.slice(3);
-    if (!changedPath.startsWith(".aor/")) {
-      throw new Error(`Unexpected target repo change outside .aor/: ${line}`);
-    }
+  if (status.length > 0) {
+    throw new Error(`Installed package smoke changed the target repository: ${status.join(", ")}`);
   }
 }
 
@@ -150,11 +144,12 @@ try {
   }
 
   const targetRepo = createTargetRepo(tempRoot);
-  const runtimeRoot = path.join(targetRepo, ".aor");
-  const baseArgs = ["--project-ref", targetRepo, "--runtime-root", runtimeRoot, "--json"];
+  const runtimeRoot = path.join(tempRoot, "aor-home");
+  const smokeEnv = { AOR_HOME: runtimeRoot };
+  const baseArgs = ["--project-ref", targetRepo, "--json"];
   const primaryHead = runChecked("git", ["rev-parse", "HEAD"], { cwd: targetRepo }).stdout.trim();
 
-  const doctor = parseJsonOutput(runChecked(process.execPath, [installedBin, "doctor", ...baseArgs], { cwd: launcherRoot }).stdout);
+  const doctor = parseJsonOutput(runChecked(process.execPath, [installedBin, "doctor", ...baseArgs], { cwd: launcherRoot, env: smokeEnv }).stdout);
   if (doctor.command !== "doctor" || doctor.guided_status !== "ready") {
     throw new Error(`Installed package doctor smoke failed:\n${JSON.stringify(doctor, null, 2)}`);
   }
@@ -165,21 +160,19 @@ try {
       "app",
       "--project-ref",
       targetRepo,
-      "--runtime-root",
-      runtimeRoot,
       "--smoke",
       "true",
       "--open",
       "false",
       "--json",
-    ], { cwd: launcherRoot }).stdout,
+    ], { cwd: launcherRoot, env: smokeEnv }).stdout,
   );
-  if (cleanAppSmoke.status !== "smoke-pass" || fs.existsSync(runtimeRoot)) {
-    throw new Error("Installed package first-load app smoke materialized runtime state or failed.");
+  if (cleanAppSmoke.status !== "smoke-pass" || fs.existsSync(path.join(runtimeRoot, "projects"))) {
+    throw new Error("Installed package first-load app smoke materialized project runtime state or failed.");
   }
   report.assertions.first_load_non_materializing = true;
 
-  const onboard = parseJsonOutput(runChecked(process.execPath, [installedBin, "onboard", ...baseArgs], { cwd: launcherRoot }).stdout);
+  const onboard = parseJsonOutput(runChecked(process.execPath, [installedBin, "onboard", ...baseArgs], { cwd: launcherRoot, env: smokeEnv }).stdout);
   if (onboard.command !== "onboard" || onboard.guided_status !== "ready" || onboard.asset_mode !== "bundled") {
     throw new Error(`Installed package onboard smoke failed:\n${JSON.stringify(onboard, null, 2)}`);
   }
@@ -194,14 +187,12 @@ try {
       "app",
       "--project-ref",
       targetRepo,
-      "--runtime-root",
-      runtimeRoot,
       "--smoke",
       "true",
       "--open",
       "false",
       "--json",
-    ], { cwd: launcherRoot }).stdout,
+    ], { cwd: launcherRoot, env: smokeEnv }).stdout,
   );
   if (
     appSmoke.command !== "app" ||
@@ -220,7 +211,7 @@ try {
     throw new Error(`Installed package app smoke failed:\n${JSON.stringify(appSmoke, null, 2)}`);
   }
 
-  assertOnlyRuntimeStateChanged(targetRepo);
+  assertTargetRepoUnchanged(targetRepo);
   const finalHead = runChecked("git", ["rev-parse", "HEAD"], { cwd: targetRepo }).stdout.trim();
   const trackedDiff = runChecked("git", ["diff", "--name-only", "HEAD", "--"], { cwd: targetRepo }).stdout.trim();
   const launcherEntries = fs.readdirSync(launcherRoot);
@@ -238,7 +229,7 @@ try {
   report.finished_at = new Date().toISOString();
   writeReport();
   process.stdout.write(
-    `release smoke ok: installed ${tarballName}; neutral launcher stayed clean and target writes stayed under .aor/\n`,
+    `release smoke ok: installed ${tarballName}; neutral launcher and target repository stayed clean while AOR Home held runtime data\n`,
   );
 } catch (error) {
   report.status = "fail";

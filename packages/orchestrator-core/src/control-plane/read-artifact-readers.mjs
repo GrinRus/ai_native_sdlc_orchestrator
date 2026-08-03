@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { deriveWorkspaceProjectId, resolveLogicalEvidenceRef, toLogicalEvidenceRef } from "../aor-home.mjs";
 
 import { loadContractFile } from "../../../contracts/src/index.mjs";
 import {
@@ -101,7 +102,7 @@ function toPosix(value) {
  * @returns {string}
  */
 export function toEvidenceRef(init, filePath) {
-  return `evidence://${toPosix(path.relative(init.projectRoot, filePath))}`;
+  return toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath, workspaceProjectId: init.projectId });
 }
 
 /**
@@ -478,6 +479,9 @@ function localArtifactPathForRef(init, ref) {
   if (!normalized) return null;
   if (path.isAbsolute(normalized)) return normalized;
   if (normalized.startsWith("evidence://")) {
+    if (normalized.startsWith(`evidence://projects/${init.projectId}/`)) {
+      return resolveLogicalEvidenceRef({ projectRoot: init.projectRoot, projectRuntimeRoot: init.projectRuntimeRoot, workspaceProjectId: init.projectId, reference: normalized });
+    }
     const evidencePath = normalized.slice("evidence://".length);
     const projectPath = path.resolve(init.projectRoot, evidencePath);
     if (fs.existsSync(projectPath)) return projectPath;
@@ -626,15 +630,17 @@ export function readProjectState(options = {}) {
     projectRef: options.projectRef,
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
+    storageProjectId: options.storageProjectId,
   });
   if (!preview.stateExists) {
+    const workspaceProjectId = options.storageProjectId ?? deriveWorkspaceProjectId({ projectRoot: preview.projectRoot });
     return {
       initialized: false,
-      project_id: preview.projectId,
+      project_id: workspaceProjectId,
+      runtime_project_id: preview.projectId,
       display_name: preview.displayName,
       project_root: preview.projectRoot,
       project_profile_ref: preview.projectProfileRef,
-      runtime_root: preview.runtimeRoot,
       runtime_layout: preview.runtimeLayout,
       state_file: null,
       onboarding_summary: buildOnboardingSummary(preview),
@@ -650,15 +656,16 @@ export function readProjectState(options = {}) {
     projectRef: init.projectRoot,
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
+    storageProjectId: options.storageProjectId,
   });
   const runHealth = readLatestExternalRunHealthProjectionForRuntime(init);
   return {
     initialized: init.initialized,
-    project_id: init.projectId,
+    project_id: options.storageProjectId ?? init.projectId,
+    runtime_project_id: init.runtimeProjectId,
     display_name: init.displayName,
     project_root: init.projectRoot,
     project_profile_ref: init.projectProfileRef,
-    runtime_root: init.runtimeRoot,
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
     onboarding_summary: buildOnboardingSummary(initializedPreview),

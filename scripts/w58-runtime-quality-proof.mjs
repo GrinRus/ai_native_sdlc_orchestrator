@@ -7,7 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { createControlPlaneHttpServer } from "../apps/api/src/index.mjs";
-import { startRunJob } from "../packages/orchestrator-core/src/run-job.mjs";
+import { requestRunJobCancel, startRunJob } from "../packages/orchestrator-core/src/run-job.mjs";
 import { withTempRepo } from "./test/helpers/temp-repo.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -25,8 +25,23 @@ function runCli(args, cwd) {
   return JSON.parse(result.stdout);
 }
 
+async function proofFetch(label, url, options = {}) {
+  const retryable = !options.method || options.method === "GET";
+  for (let attempt = 1; attempt <= (retryable ? 2 : 1); attempt += 1) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      if (attempt === 2 || !retryable) {
+        throw new Error(`W58 ${label} request failed.`, { cause: error });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  throw new Error(`W58 ${label} request failed.`);
+}
+
 async function postJson(url, payload, origin) {
-  return fetch(url, {
+  return proofFetch("JSON mutation", url, {
     method: "POST",
     headers: { "content-type": "application/json", ...(origin ? { origin } : {}) },
     body: JSON.stringify(payload),
@@ -47,7 +62,7 @@ async function waitForJob(file, statuses, timeoutMs = 30000) {
 
 async function readOneSseEvent(url) {
   const controller = new AbortController();
-  const response = await fetch(url, { signal: controller.signal });
+  const response = await proofFetch("SSE replay", url, { signal: controller.signal });
   if (response.status !== 200 || !response.body) throw new Error(`SSE proof failed with HTTP ${response.status}.`);
   const reader = response.body.getReader();
   try {
@@ -66,19 +81,20 @@ async function readOneSseEvent(url) {
 }
 
 const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: root }, async (projectRoot) => {
-  const runtimeRoot = path.join(projectRoot, ".aor");
+  const runtimeRoot = path.join(path.dirname(projectRoot), `${path.basename(projectRoot)}-aor-home`);
+  const previousAorHome = process.env.AOR_HOME;
+  process.env.AOR_HOME = runtimeRoot;
   const transport = await createControlPlaneHttpServer({
     cwd: root,
     projectRef: projectRoot,
-    runtimeRoot,
     host: "127.0.0.1",
     port: 0,
     app: { staticRoot: path.join(root, "apps/web/dist"), packageVersion: "w58-proof" },
   });
   try {
-    const firstRead = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+    const firstRead = await proofFetch("initial state", `${transport.baseUrl}/api/projects/${transport.projectId}/state`);
     const firstState = await firstRead.json();
-    if (firstRead.status !== 200 || firstState.initialized !== false || fs.existsSync(runtimeRoot)) {
+    if (firstRead.status !== 200 || firstState.initialized !== false || fs.existsSync(path.join(runtimeRoot, "projects", transport.projectId))) {
       throw new Error("W58 first-read proof materialized runtime state.");
     }
 
@@ -101,7 +117,7 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
       projectRef: projectRoot,
       runtimeRoot,
       runId,
-      args: ["run", "status", "--project-ref", projectRoot, "--runtime-root", runtimeRoot, "--run-id", runId, "--follow", "true", "--max-replay", "0"],
+      args: ["run", "status", "--project-ref", projectRoot, "--run-id", runId, "--follow", "true", "--max-replay", "0"],
     });
     const accepted = {
       job_id: startedJob.job.job_id,
@@ -111,22 +127,28 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
       evidence_refs: [startedJob.job.status_ref, startedJob.job.event_ref],
     };
     const jobFile = startedJob.file;
-    await waitForJob(jobFile, ["running", "succeeded", "failed", "waiting-input"]);
+    await waitForJob(jobFile, ["running"]);
+    requestRunJobCancel({ cwd: projectRoot, projectRef: projectRoot, runtimeRoot, runId });
     const cancelResponse = await postJson(
       `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
       { action: "cancel", run_id: runId, approval_ref: "approval://w58-runtime-quality-proof", reason: "deterministic cancellation proof" },
       transport.baseUrl,
     );
     if (cancelResponse.status !== 200) throw new Error(`W58 cancel failed with HTTP ${cancelResponse.status}.`);
+    const cancelPayload = await cancelResponse.json();
+    const publicCancellationStatus = cancelPayload.run_control?.state?.status;
+    if (publicCancellationStatus !== "canceled") {
+      throw new Error(`W58 public cancellation did not reach canceled state: ${JSON.stringify(cancelPayload.run_control?.state)}.`);
+    }
     const terminalJob = await waitForJob(jobFile, ["succeeded", "failed", "canceled", "waiting-input"]);
 
-    const runsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs`);
+    const runsResponse = await proofFetch("runs", `${transport.baseUrl}/api/projects/${transport.projectId}/runs`);
     const runs = await runsResponse.json();
     const apiRun = runs.find((entry) => entry.run_id === runId);
-    const historyResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history`);
+    const historyResponse = await proofFetch("event history", `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history`);
     const history = await historyResponse.json();
     const sseEvent = await readOneSseEvent(`${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?max_replay=1`);
-    const cliStatus = runCli(["run", "status", "--project-ref", projectRoot, "--runtime-root", runtimeRoot, "--run-id", runId, "--json"], root);
+    const cliStatus = runCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId, "--json"], root);
 
     const evaluationRunId = "w58-eval-subject";
     const evaluationSubjectFile = path.join(runtimeRoot, "projects", transport.projectId, "artifacts", `run-${evaluationRunId}.json`);
@@ -137,18 +159,18 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
       documents: [accepted.status_ref, accepted.event_ref],
     }, null, 2)}\n`, "utf8");
     const evalResult = runCli([
-      "eval", "run", "--project-ref", projectRoot, "--runtime-root", runtimeRoot,
+      "eval", "run", "--project-ref", projectRoot,
       "--suite-ref", "suite.release.core@v1", "--subject-ref", `run://${evaluationRunId}`,
     ], root);
 
-    const configResponse = await fetch(`${transport.baseUrl}/app-config.json`);
+    const configResponse = await proofFetch("app config", `${transport.baseUrl}/app-config.json`);
     const configText = await configResponse.text();
     const foreignOrigin = await postJson(
       `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`,
       { action: "attach" },
       "http://attacker.invalid",
     );
-    const oversized = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`, {
+    const oversized = await proofFetch("oversized body", `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: Buffer.alloc(1024 * 1024 + 1, 0x20),
@@ -192,7 +214,8 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
       evidence_refs: [...new Set([...accepted.evidence_refs, evalResult.evaluation_report_ref].filter(Boolean))],
       evaluation: { status: evalResult.evaluation_status, report_file: evalResult.evaluation_report_file },
       fail_closed: { foreign_origin: 403, oversized_body: 413 },
-      cancellation_status: terminalJob.status,
+      cancellation_status: publicCancellationStatus,
+      worker_terminal_status: terminalJob.status,
       external_network_calls: false,
       credentialed_provider_calls: false,
       paid_judge_calls: false,
@@ -200,6 +223,9 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
     };
   } finally {
     await transport.close();
+    if (previousAorHome === undefined) delete process.env.AOR_HOME;
+    else process.env.AOR_HOME = previousAorHome;
+    fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }
 });
 

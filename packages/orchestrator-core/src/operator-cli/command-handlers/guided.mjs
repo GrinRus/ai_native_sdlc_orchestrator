@@ -46,10 +46,7 @@ function shellQuote(value) {
  * @returns {string}
  */
 function projectCommand(command, projectRoot, context = {}) {
-  const baseCommand = `aor ${command} --project-ref ${shellQuote(projectRoot)}`;
-  return context.includeRuntimeRoot && context.runtimeRoot
-    ? `${baseCommand} --runtime-root ${shellQuote(context.runtimeRoot)}`
-    : baseCommand;
+  return `aor ${command} --project-ref ${shellQuote(projectRoot)}`;
 }
 
 /**
@@ -62,8 +59,6 @@ function controlPlaneSmokeCommand(projectRoot, runtimeRoot) {
     "node apps/api/scripts/control-plane-smoke.mjs",
     "--project-ref",
     shellQuote(projectRoot),
-    "--runtime-root",
-    shellQuote(runtimeRoot),
     "--host",
     LOCAL_CONTROL_PLANE_HOST,
     "--port",
@@ -86,8 +81,7 @@ function defaultRuntimeRoot(projectRoot) {
 function runtimeRootCommandContext(options) {
   return {
     runtimeRoot: options.runtimeRoot,
-    includeRuntimeRoot:
-      options.runtimeRootExplicit === true || path.resolve(options.runtimeRoot) !== defaultRuntimeRoot(options.projectRoot),
+    includeRuntimeRoot: false,
   };
 }
 

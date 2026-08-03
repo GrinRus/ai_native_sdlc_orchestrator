@@ -73,7 +73,7 @@ The top-level object remains the selected AOR project. The flow remains the
 primary lifecycle object inside that project.
 
 1. **Project switcher** - switch independent AOR projects and show topology,
-   repository readiness, runtime root, and active-flow summary.
+   repository readiness, AOR Home status, and active-flow summary.
 2. **Project Structure** - manage repositories, components, dependencies,
    bindings, commands, and validation.
 3. **Flow Plan** - inspect proposed or approved tasks, traceability, execution
@@ -123,7 +123,7 @@ state before loading the next project.
 
 The existing add-project drawer becomes a focused setup flow with these steps:
 
-1. **Project identity:** display name, stable project ID, runtime root, and
+1. **Project identity:** display name, stable workspace project ID, AOR Home status, and
    existing-profile import.
 2. **Topology:** single repository, monorepo, or bounded multirepo, with concise
    consequences rather than implementation tutorials.
@@ -151,7 +151,7 @@ absent and return a stable empty model rather than creating `.aor`.
 Project Structure uses compact tabs or equivalent navigation:
 
 - **Overview:** topology, repository/component counts, validation summary,
-  runtime root, and current blockers.
+  AOR Home status, and current blockers.
 - **Repositories:** source, role, branch/ref, dirty state, binding state,
   commands, active run conflicts, and row actions.
 - **Components:** component root, role, owning repository, commands, and

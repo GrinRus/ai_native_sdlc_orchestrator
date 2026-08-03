@@ -52,17 +52,27 @@ function isRetriableTempCleanupError(error) {
  */
 export function withTempRepo(options, callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), options.prefix));
+  const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), `${options.prefix}home-`));
+  const previousAorHome = process.env.AOR_HOME;
+  process.env.AOR_HOME = aorHome;
   initializeFixtureRepo({ repoRoot, workspaceRoot: options.workspaceRoot });
+
+  const cleanup = () => {
+    if (previousAorHome === undefined) delete process.env.AOR_HOME;
+    else process.env.AOR_HOME = previousAorHome;
+    removeTempRepo(repoRoot);
+    removeTempRepo(aorHome);
+  };
 
   try {
     const result = callback(repoRoot);
     if (result && typeof /** @type {{ then?: unknown }} */ (result).then === "function") {
-      return Promise.resolve(result).finally(() => removeTempRepo(repoRoot));
+      return Promise.resolve(result).finally(cleanup);
     }
-    removeTempRepo(repoRoot);
+    cleanup();
     return result;
   } catch (error) {
-    removeTempRepo(repoRoot);
+    cleanup();
     throw error;
   }
 }

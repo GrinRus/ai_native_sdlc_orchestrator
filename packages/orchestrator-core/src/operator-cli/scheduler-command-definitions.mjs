@@ -6,7 +6,6 @@ export const RUN_START_COMMAND_DEFINITION = Object.freeze({
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",
-      "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
       "--command-id <id> (optional, generated when omitted)",
       "--expected-revision <integer> (optional)",
@@ -28,7 +27,7 @@ export const RUN_START_COMMAND_DEFINITION = Object.freeze({
       "--help",
     ],
     outputs: [
-      "resolved_project_ref", "resolved_runtime_root", "run_control_action", "run_control_command_id",
+      "resolved_project_ref", "run_control_action", "run_control_command_id",
       "run_control_revision", "run_control_run_id", "run_control_state", "run_control_state_file",
       "run_control_audit_id", "run_control_audit_file", "run_control_blocked", "run_control_guardrails",
       "run_control_transition", "primary_event_id", "evidence_event_id", "routed_step_result_id",
@@ -49,7 +48,6 @@ export const RUN_RETRY_COMMAND_DEFINITION = Object.freeze({
     summary: "Retry one failed execution unit under its durable parent run without changing task or unit identity.",
     inputs: [
       "--project-ref <path>",
-      "--runtime-root <path> (optional)",
       "--parent-run-id <id>",
       "--execution-unit-id <id>",
       "--command-id <id>",
@@ -58,7 +56,6 @@ export const RUN_RETRY_COMMAND_DEFINITION = Object.freeze({
     ],
     outputs: [
       "resolved_project_ref",
-      "resolved_runtime_root",
       "parent_run",
       "parent_run_file",
       "read_only",
@@ -77,7 +74,6 @@ export const RUN_INTEGRATION_COMMAND_DEFINITION = Object.freeze({
   summary: "Inspect or apply revisioned integration, repair, and hold state for one parent run.",
   inputs: [
     "--project-ref <path>",
-    "--runtime-root <path> (optional)",
     "--parent-run-id <id>",
     "--action <show|apply|verify|repair|hold|resume>",
     "--integration-report-file <path> (required for apply|verify)",
@@ -87,7 +83,7 @@ export const RUN_INTEGRATION_COMMAND_DEFINITION = Object.freeze({
     "--help",
   ],
   outputs: [
-    "resolved_project_ref", "resolved_runtime_root", "parent_run", "parent_run_file",
+    "resolved_project_ref", "parent_run", "parent_run_file",
     "integration_report", "read_only", "future_control_hooks", "contract_families",
     "command_catalog_alignment",
   ],

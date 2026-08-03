@@ -11,6 +11,7 @@ import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { enrichExecutionDag, executionDagDigest, validateExecutionDagCoverage } from "./execution-dag-planner.mjs";
 import { resolveExecutionUnitWorkspace } from "./execution-unit-workspace.mjs";
 import { resolveOverallTaskProgressStatus, resolveTaskProgressStatus } from "./task-progress-projection.mjs";
+import { deriveWorkspaceProjectId, resolveLogicalEvidenceRef, toLogicalEvidenceRef } from "./aor-home.mjs";
 
 function asRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
@@ -39,16 +40,12 @@ function safeSegment(value) {
 }
 
 function evidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replaceAll("\\", "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
-function resolveEvidencePath(projectRoot, value) {
+function resolveEvidencePath(projectRoot, value, runtimeLayout) {
   if (!value) return null;
-  if (value.startsWith("evidence://")) {
-    const candidate = value.slice("evidence://".length);
-    return path.isAbsolute(candidate) ? candidate : path.resolve(projectRoot, candidate);
-  }
-  return path.isAbsolute(value) ? value : path.resolve(projectRoot, value);
+  return resolveLogicalEvidenceRef({ projectRoot, projectRuntimeRoot: runtimeLayout?.projectRuntimeRoot, workspaceProjectId: deriveWorkspaceProjectId({ projectRoot }), reference: value });
 }
 
 function readJson(filePath) {
@@ -231,7 +228,7 @@ function collectPlanningInputRefs(options) {
   const context = previewProjectRuntime(options);
   const files = [];
   if (typeof options.approvedArtifactPath === "string" && options.approvedArtifactPath.trim().length > 0) {
-    files.push(resolveEvidencePath(context.projectRoot, options.approvedArtifactPath));
+    files.push(resolveEvidencePath(context.projectRoot, options.approvedArtifactPath, context.runtimeLayout));
   } else if (fs.existsSync(context.runtimeLayout.artifactsRoot)) {
     const artifactPacket = fs.readdirSync(context.runtimeLayout.artifactsRoot, { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".json") && entry.name.includes(".artifact.") && !entry.name.includes(".body."))
@@ -265,8 +262,8 @@ function collectPlanningInputRefs(options) {
 function resolvePlanContext(options, { mutate = false } = {}) {
   const context = mutate ? initializeProjectRuntime(options) : previewProjectRuntime(options);
   const planFile = options.planRef
-    ? resolveEvidencePath(context.projectRoot, options.planRef)
-    : latestPlanFile(context.runtimeLayout, context.projectId, options.flowId);
+    ? resolveEvidencePath(context.projectRoot, options.planRef, context.runtimeLayout)
+    : latestPlanFile(context.runtimeLayout, options.storageProjectId ?? context.projectId, options.flowId);
   if (!planFile || !fs.existsSync(planFile)) {
     const error = new Error("No structured task plan was found. Run 'aor plan create' first.");
     error.code = "structured-plan-required";
@@ -285,7 +282,7 @@ function resolvePlanContext(options, { mutate = false } = {}) {
     error.code = "structured-plan-required";
     throw error;
   }
-  if (options.flowId && flowIdForPlan(context.projectId, plan) !== options.flowId) {
+  if (options.flowId && flowIdForPlan(options.storageProjectId ?? context.projectId, plan) !== options.flowId) {
     const error = new Error(`Plan '${planFile}' does not belong to flow '${options.flowId}'.`);
     error.code = "plan-flow-mismatch";
     throw error;
@@ -647,7 +644,7 @@ export function createTaskPlan(options = {}) {
     planningInputManifest: buildPlanningInputManifest(planningInputRefs),
   });
   const semanticEvaluation = materializePlanSemanticEvaluation(options, result);
-  if (options.flowId && flowIdForPlan(result.projectId, result.waveTicket) !== options.flowId) {
+  if (options.flowId && flowIdForPlan(options.storageProjectId ?? result.projectId, result.waveTicket) !== options.flowId) {
     const error = new Error(`Planner output does not belong to flow '${options.flowId}'.`);
     error.code = "plan-flow-mismatch";
     throw error;
@@ -713,8 +710,8 @@ export function diffTaskPlans(beforePlan, afterPlan) {
 
 export function diffTaskPlanRefs(options = {}) {
   const context = previewProjectRuntime(options);
-  const beforeFile = resolveEvidencePath(context.projectRoot, options.fromPlanRef);
-  const afterFile = resolveEvidencePath(context.projectRoot, options.toPlanRef);
+  const beforeFile = resolveEvidencePath(context.projectRoot, options.fromPlanRef, context.runtimeLayout);
+  const afterFile = resolveEvidencePath(context.projectRoot, options.toPlanRef, context.runtimeLayout);
   const beforePlan = readJson(beforeFile);
   const afterPlan = readJson(afterFile);
   if (!beforePlan || !afterPlan) {
@@ -865,7 +862,7 @@ export function approveTaskPlan(options = {}) {
 export function approveTaskPlanFromHandoff(options = {}) {
   const context = previewProjectRuntime(options);
   const handoffFile = options.handoffPacketPath
-    ? resolveEvidencePath(context.projectRoot, options.handoffPacketPath)
+    ? resolveEvidencePath(context.projectRoot, options.handoffPacketPath, context.runtimeLayout)
     : path.join(context.runtimeLayout.artifactsRoot, `${context.projectId}.handoff.bootstrap.v1.json`);
   const handoff = readJson(handoffFile);
   if (handoff?.task_model_version !== 1) return null;
@@ -906,7 +903,7 @@ export function resolveExecutionUnitContext(options = {}) {
     throw error;
   }
   const executionPlanFile = options.executionPlanRef
-    ? resolveEvidencePath(context.projectRoot, options.executionPlanRef)
+    ? resolveEvidencePath(context.projectRoot, options.executionPlanRef, context.runtimeLayout)
     : path.join(
         context.runtimeLayout.artifactsRoot,
         `execution-plan-${safeSegment(context.plan.plan_id)}.v${context.plan.plan_version}.json`,
@@ -946,10 +943,10 @@ export function resolveExecutionUnitContext(options = {}) {
   }
   const workspace = resolveExecutionUnitWorkspace({
     projectRoot: context.projectRoot,
-    projectId: context.projectId,
+    projectId: options.storageProjectId ?? context.projectId,
     unit,
     workspaceSetRef: options.workspaceSetRef,
-    resolveEvidencePath,
+    resolveEvidencePath: (projectRoot, reference) => resolveEvidencePath(projectRoot, reference, context.runtimeLayout),
     evidenceRef,
   });
   return {

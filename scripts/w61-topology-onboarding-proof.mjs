@@ -53,8 +53,9 @@ async function scenario(projectRoot, projectId, kind, secondaryRoot = null) {
     "--project-profile", "examples/project.aor.yaml",
     "--label", `${kind} proof`,
   ], root);
+  const workspaceProjectId = added.project.project_id;
   if (kind === "monorepo") {
-    mutate("component", projectId, "add", {
+    mutate("component", workspaceProjectId, "add", {
       component_id: "worker",
       repo_id: "main",
       name: "Worker",
@@ -64,37 +65,38 @@ async function scenario(projectRoot, projectId, kind, secondaryRoot = null) {
     }, root);
   }
   if (kind === "bounded-multirepo") {
-    mutate("repository", projectId, "add", {
+    mutate("repository", workspaceProjectId, "add", {
       repo_id: "service",
       name: "Service",
       source: { kind: "local", root: "." },
       workspace_mount: "repos/service",
       role: "service",
     }, root);
-    mutate("repository", projectId, "rebind", {
+    mutate("repository", workspaceProjectId, "rebind", {
       repo_id: "service",
       local_path: secondaryRoot,
       base_ref: "HEAD",
       access_mode: "read-only",
     }, root);
   }
-  const validated = runCli(["project", "topology", "--project-id", projectId, "--action", "validate"], root);
-  const route = runCli(["route", "show", "--project-id", projectId], root).execution_profile;
+  const validated = runCli(["project", "topology", "--project-id", workspaceProjectId, "--action", "validate"], root);
+  const route = runCli(["route", "show", "--project-id", workspaceProjectId], root).execution_profile;
   const implement = route.routes.find((entry) => entry.step === "implement") ?? route.routes[0];
   const selectedRoute = implement.approved_routes.find((entry) => entry.mode === "simulation") ?? implement.approved_routes[0];
   const selected = runCli([
     "route", "select",
-    "--project-id", projectId,
+    "--project-id", workspaceProjectId,
     "--step", implement.step,
     "--route", selectedRoute.route_id,
     "--expected-revision", String(route.revision),
   ], root).execution_profile;
-  const readiness = runCli(["route", "check", "--project-id", projectId, "--step", implement.step], root);
-  const finalTopology = topology(projectId, root);
+  const readiness = runCli(["route", "check", "--project-id", workspaceProjectId, "--step", implement.step], root);
+  const finalTopology = topology(workspaceProjectId, root);
   if (fs.existsSync(path.join(projectRoot, ".aor"))) throw new Error(`${kind} read/setup proof materialized project runtime.`);
   return {
     id: kind,
-    project_id: projectId,
+    project_id: workspaceProjectId,
+    runtime_project_id: projectId,
     repository_count: finalTopology.repositories.length,
     component_count: finalTopology.components.length,
     validation_status: validated.validation.status,

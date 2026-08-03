@@ -126,7 +126,7 @@
     "new_flow_next_action_report_file": ".aor/projects/local-target/reports/next-action-report-local-mission-follow-up.json",
     "operator_request": {
       "operator_request_file": ".aor/projects/local-target/operator-requests/operator-request-local-mission-follow-up.json",
-      "operator_request_ref": "packet://operator-request@evidence://.aor/projects/local-target/operator-requests/operator-request-local-mission-follow-up.json",
+      "operator_request_ref": "packet://operator-request@evidence://projects/local-target/operator-requests/operator-request-local-mission-follow-up.json",
       "operator_request_id": "operator-request.local-mission-follow-up",
       "target_flow_id": "flow.local-target.local-mission-follow-up",
       "target_stage": "discovery",

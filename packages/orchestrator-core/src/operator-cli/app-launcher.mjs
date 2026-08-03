@@ -95,7 +95,7 @@ function parseHost(value) {
   return host;
 }
 
-const APP_FLAGS = new Set(["project-ref", "project-profile", "runtime-root", "host", "port", "open", "json", "smoke"]);
+const APP_FLAGS = new Set(["project-ref", "project-profile", "host", "port", "open", "json", "smoke"]);
 
 function findAttachedProjectRoot(cwd) {
   let cursor = path.resolve(cwd);
@@ -283,7 +283,7 @@ async function buildRenderGuard(input) {
   const rootElementPresent = /\bid=["']root["']/u.test(input.html);
   const titlePresent = input.html.includes("AOR Operator Console");
   const appShellMarkerPresent =
-    combinedScripts.includes("AOR Operator Console") && combinedScripts.includes("Mission intake");
+    combinedScripts.includes("AOR Operator Console") && combinedScripts.includes("Intent-first onboarding");
   const blankRootRegressionDetected = /\bmissionStatus\b/u.test(combinedScripts);
   const findings = [];
   if (!rootElementPresent) findings.push("index.html does not expose the React root element");
@@ -344,8 +344,8 @@ function inspectPackagedSpa(staticRoot, html) {
   return {
     htmlLoaded: html.includes("AOR Operator Console"),
     flowSelectorLoaded: packagedText.includes("Flow selector") && packagedText.includes("flow-selector"),
-    newFlowActionLoaded: packagedText.includes("New Flow") && packagedText.includes("new-flow-button"),
-    wizardLoaded: packagedText.includes("First-run wizard") && packagedText.includes("first-run-wizard"),
+    newFlowActionLoaded: packagedText.includes("Prepare task") && packagedText.includes("Intent-first onboarding"),
+    wizardLoaded: packagedText.includes("Code source") && packagedText.includes("Connect project"),
     projectSwitcherLoaded: packagedText.includes("Project switcher") && packagedText.includes("project-switcher"),
   };
 }
@@ -370,7 +370,6 @@ export async function runAppCommand(args, options = {}) {
       throw new Error(`Project path '${projectRef}' does not exist or is not a directory.`);
     }
 
-    const runtimeRootInput = optionalString(flags, "runtime-root");
     const host = parseHost(optionalString(flags, "host"));
     const port = parsePort(optionalString(flags, "port"));
     const open = parseBooleanFlag(flags.open, true);
@@ -384,7 +383,6 @@ export async function runAppCommand(args, options = {}) {
       cwd,
       projectRef,
       projectProfile,
-      runtimeRoot: runtimeRootInput,
       workspaceRegistry: { mode: smoke ? "ephemeral" : "persistent" },
       host,
       port,
@@ -407,9 +405,6 @@ export async function runAppCommand(args, options = {}) {
       project_id: transport.projectId,
       project_profile_ref: transport.projectProfileRef,
       project_ref: transport.projectRef,
-      runtime_root: transport.runtimeRoot ?? (projectRef
-        ? (runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor"))
-        : null),
       host: transport.host,
       port: transport.port,
       open,
@@ -451,6 +446,7 @@ export async function runAppCommand(args, options = {}) {
           project_index_default_project_id: projectIndex.default_project_id,
           project_index_count: Array.isArray(projectIndex.projects) ? projectIndex.projects.length : 0,
           state_project_id: state.project_id,
+          state_runtime_project_id: state.runtime_project_id,
           state_project_profile_ref: state.project_profile_ref,
           render_guard_status: renderGuard.status,
           blank_root_regression_detected: renderGuard.blank_root_regression_detected,

@@ -5,7 +5,7 @@ Use this runbook when a run needs a durable incident record, a reviewed dataset 
 
 ## Preconditions
 - Runtime artifacts exist for the target run (`aor run status --run-id <RUN_ID>` returns at least one summary).
-- Project runtime root is accessible.
+- The selected project is connected and its AOR Home data is accessible.
 
 ## Open incident
 ```bash
@@ -19,7 +19,7 @@ aor incident open \
 
 Expected signals:
 - `incident_id` is returned.
-- `incident_report_file` exists under `.aor/projects/<project_id>/reports/incident-report-*.json`.
+- `incident_ref` resolves under `evidence://projects/<workspace-project-id>/reports/`.
 - `incident_run_ref` matches `run://<RUN_ID>`.
 
 ## Show incidents

@@ -100,11 +100,20 @@ function asNonNegativeInteger(value) {
 /**
  * @param {string} projectRoot
  * @param {string} value
+ * @param {{ reportsRoot?: unknown, reports_root?: unknown }} [runtimeLayout]
  * @returns {string}
  */
-function toEvidenceRef(projectRoot, value) {
+function toEvidenceRef(projectRoot, value, runtimeLayout = {}) {
   if (value.startsWith("evidence://") || value.startsWith("packet://")) {
     return value;
+  }
+  const reportsRoot = resolveReportsRoot(runtimeLayout);
+  if (reportsRoot && path.isAbsolute(value)) {
+    const projectRuntimeRoot = path.dirname(reportsRoot);
+    const relative = path.relative(projectRuntimeRoot, value).replace(/\\/g, "/");
+    if (relative.length > 0 && !relative.startsWith("../")) {
+      return `evidence://projects/${path.basename(projectRuntimeRoot)}/${relative}`;
+    }
   }
   if (path.isAbsolute(value)) {
     const relative = path.relative(projectRoot, value).replace(/\\/g, "/");
@@ -120,8 +129,8 @@ function toEvidenceRef(projectRoot, value) {
  * @param {unknown} refs
  * @returns {string[]}
  */
-function normalizeEvidenceRefs(projectRoot, refs) {
-  return uniqueStrings(asStringArray(refs).map((ref) => toEvidenceRef(projectRoot, ref)));
+function normalizeEvidenceRefs(projectRoot, refs, runtimeLayout = {}) {
+  return uniqueStrings(asStringArray(refs).map((ref) => toEvidenceRef(projectRoot, ref, runtimeLayout)));
 }
 
 /**
@@ -218,6 +227,7 @@ export function materializeQualityRepairRequest(options) {
   const sourceRef = toEvidenceRef(
     options.projectRoot,
     asString(options.sourceRef) ?? `.aor/projects/${options.projectId}/reports/${sourceStage}-repair-source-${normalizeId(options.runId)}.json`,
+    options.runtimeLayout,
   );
   const requestId = derivePublicId(
     [options.runId, "quality-repair-request", sourceStage, generatedAt.replace(/[:.]/g, "-").toLowerCase()],
@@ -230,7 +240,7 @@ export function materializeQualityRepairRequest(options) {
     asNonNegativeInteger(attemptBudget.remaining_attempts) ?? Math.max(maxAttempts - attemptIndex, 0);
   const evidenceRefs = uniqueStrings([
     sourceRef,
-    ...normalizeEvidenceRefs(options.projectRoot, options.evidenceRefs),
+    ...normalizeEvidenceRefs(options.projectRoot, options.evidenceRefs, options.runtimeLayout),
   ]);
   const repairScope = asRecord(options.repairScope);
   const request = {
@@ -247,9 +257,9 @@ export function materializeQualityRepairRequest(options) {
       target_step: asString(repairScope.target_step) ?? "implement",
       requested_next_step: asString(repairScope.requested_next_step) ?? "execution",
       allowed_paths: asStringArray(repairScope.allowed_paths),
-      verification_refs: normalizeEvidenceRefs(options.projectRoot, repairScope.verification_refs),
+      verification_refs: normalizeEvidenceRefs(options.projectRoot, repairScope.verification_refs, options.runtimeLayout),
       required_evidence_refs: uniqueStrings([
-        ...normalizeEvidenceRefs(options.projectRoot, repairScope.required_evidence_refs),
+        ...normalizeEvidenceRefs(options.projectRoot, repairScope.required_evidence_refs, options.runtimeLayout),
         ...evidenceRefs,
       ]),
       compiled_context_refs: asStringArray(repairScope.compiled_context_refs),
@@ -299,7 +309,7 @@ export function materializeQualityRepairRequest(options) {
     `quality-repair-request-${normalizeId(options.runId)}-${sourceStage}-${generatedAt.replace(/[^0-9]/g, "").slice(-12)}.json`,
   );
   writeJson(requestFile, request);
-  const requestRef = toEvidenceRef(options.projectRoot, requestFile);
+  const requestRef = toEvidenceRef(options.projectRoot, requestFile, options.runtimeLayout);
 
   return {
     request,
@@ -342,7 +352,7 @@ export function listQualityRepairRequests(options) {
       if (runId && document.run_id !== runId) continue;
       requests.push({
         file: filePath,
-        artifact_ref: toEvidenceRef(options.projectRoot, filePath),
+        artifact_ref: toEvidenceRef(options.projectRoot, filePath, options.runtimeLayout),
         document,
       });
     } catch {
@@ -395,7 +405,7 @@ export function updateQualityRepairRequest(options) {
   const sourceStage = asString(request.source_stage) === "qa" ? "qa" : "review";
   const evidenceRefs = uniqueStrings([
     ...asStringArray(request.evidence_refs),
-    ...normalizeEvidenceRefs(options.projectRoot, options.evidenceRefs),
+    ...normalizeEvidenceRefs(options.projectRoot, options.evidenceRefs, options.runtimeLayout),
   ]);
   request.status = options.status;
   request.blockers = uniqueStrings(asStringArray(options.blockers)).length > 0
@@ -430,7 +440,7 @@ export function updateQualityRepairRequest(options) {
   }
 
   writeJson(requestFile, request);
-  const requestRef = toEvidenceRef(options.projectRoot, requestFile);
+  const requestRef = toEvidenceRef(options.projectRoot, requestFile, options.runtimeLayout);
   return {
     request,
     requestFile,

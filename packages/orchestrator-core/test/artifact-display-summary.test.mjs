@@ -13,6 +13,7 @@ import {
 import { readFlowEvidenceGraph, readFlowRuntimeTrace, listFlowProjections } from "../src/control-plane/flow-projections.mjs";
 import { buildArtifactDisplaySummary, buildMissingArtifactDisplaySummary } from "../src/artifact-display-summary.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
+import { toLogicalEvidenceRef } from "../src/aor-home.mjs";
 
 /**
  * @param {(repoRoot: string) => void} callback
@@ -43,7 +44,7 @@ function writeJson(filePath, document) {
  * @returns {string}
  */
 function evidenceRef(repoRoot, filePath) {
-  return `evidence://${path.relative(repoRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot: repoRoot, filePath });
 }
 
 test("artifact display summary classifies refs without making raw refs the label", () => {

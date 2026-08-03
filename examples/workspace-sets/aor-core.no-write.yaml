@@ -35,4 +35,4 @@ cleanup:
     on_failure: retain
   state: pending
 evidence_refs:
-  - evidence://.aor/projects/aor-core/reports/workspace-set.run-aor-core-no-write.json
+  - evidence://projects/aor-core/reports/workspace-set.run-aor-core-no-write.json

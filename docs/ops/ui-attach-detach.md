@@ -8,7 +8,6 @@ Use this for the installed-user UI:
 ```bash
 aor app \
   --project-ref <repo> \
-  --runtime-root <repo>/.aor \
   --host 127.0.0.1 \
   --port 0 \
   --open true
@@ -17,16 +16,16 @@ aor app \
 Expected behavior:
 - the command starts a foreground loopback server and prints the local URL;
 - `/` serves the packaged SPA;
-- `/app-config.json` returns the default project id, `projects[]`, project ref, runtime root, version, and API base;
-- `GET /api/projects` returns explicit local project summaries without initializing `.aor/`;
+- `/app-config.json` returns the default workspace project id, `projects[]`, version, and API base; storage placement remains server-owned;
+- `GET /api/projects` returns explicit local project summaries without initializing AOR Home project state;
 - `/api/projects/:projectId/**` serves the same control-plane read, mutation, and SSE routes;
-- the top bar exposes the active project switcher and Add local project drawer;
+- the first-run surface exposes code source plus intent; the top bar retains the active project switcher;
 - the browser opens unless `--open false` is passed;
 - `Ctrl+C` stops the app server without changing run state.
 
 Release/CI smoke:
 ```bash
-aor app --project-ref <repo> --runtime-root <repo>/.aor --smoke --open false --json
+aor app --project-ref <repo> --smoke --open false --json
 ```
 
 Expected smoke outcome:
@@ -38,7 +37,7 @@ Expected smoke outcome:
 - `new_flow_action_loaded=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
 - `config_default_project_id` and `project_index_default_project_id` match;
-- only `.aor/` runtime state changes in the target repository.
+- mutable state changes only in AOR Home; the target repository remains unchanged.
 
 Local-alpha source checkouts use the detached API at `http://127.0.0.1:8080`
 in CLI guidance and this runbook. This is a local operator control-plane path,
@@ -49,7 +48,6 @@ Verify the local detached API transport from a source checkout:
 ```bash
 node apps/api/scripts/control-plane-smoke.mjs \
   --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor \
   --host 127.0.0.1 \
   --port 8080
 ```
@@ -58,7 +56,6 @@ Keep the local control-plane process running for attach and console checks:
 ```bash
 node apps/api/scripts/control-plane-smoke.mjs \
   --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor \
   --host 127.0.0.1 \
   --port 8080 \
   --serve true
@@ -119,7 +116,6 @@ The supported web readiness smoke is the real local app:
 ```bash
 aor app \
   --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor \
   --smoke true \
   --open false \
   --json
@@ -178,7 +174,7 @@ Operator request create and run over detached transport:
 curl -sS \
   -X POST \
   -H "content-type: application/json" \
-  -d '{"target_stage":"discovery","intent_type":"analyze","request_text":"Explain the latest blocker and propose the next safe action.","target_refs":["evidence://.aor/projects/<PROJECT_ID>/reports/next-action-report.json"],"delivery_mode":"no-write"}' \
+  -d '{"target_stage":"discovery","intent_type":"analyze","request_text":"Explain the latest blocker and propose the next safe action.","target_refs":["evidence://projects/<PROJECT_ID>/reports/next-action-report.json"],"delivery_mode":"no-write"}' \
   http://127.0.0.1:8080/api/projects/<PROJECT_ID>/operator-requests
 
 curl -sS \
@@ -203,7 +199,6 @@ The local app console must drive lifecycle actions through same-origin control-p
 ```bash
 aor app \
   --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor \
   --smoke true \
   --open false \
   --json

@@ -10,6 +10,7 @@ import {
   resolveRouteForStep,
 } from "../../../provider-routing/src/route-resolution.mjs";
 import { resolveProjectRegistryRoots } from "../project-init.mjs";
+import { listFlowProjections } from "./flow-projections.mjs";
 
 const STATUS_PRIORITY = [
   "policy-denied",
@@ -69,6 +70,11 @@ function executableAvailable(command, environment) {
       return false;
     }
   }));
+}
+
+function adapterCommand(adapterId, profile, environment) {
+  const key = `AOR_RUNNER_COMMAND_${adapterId.replace(/[^a-z0-9]/giu, "_").toUpperCase()}`;
+  return environment[key] ?? profile?.execution?.external_runtime?.command ?? null;
 }
 
 function authReady(adapterId, input, environment) {
@@ -142,7 +148,7 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
         blocker_codes: ["execution.route-policy-denied"],
       };
     }
-    const command = adapter.adapter.profile?.execution?.external_runtime?.command ?? null;
+    const command = adapterCommand(adapterId, adapter.adapter.profile, environment);
     const runnerAvailable = executableAvailable(command, environment);
     const authenticationReady = authReady(adapterId, registry.getProjectInput(projectId) ?? {}, environment);
     const readiness = !check
@@ -238,8 +244,14 @@ function assertMutable(registry, projectId, expectedRevision) {
   if (expectedRevision !== undefined && expectedRevision !== registry.revision) {
     throw new ExecutionProfileError("execution-profile.stale-revision", `Expected revision ${expectedRevision}, current ${registry.revision}.`, 409);
   }
-  const summary = registry.summarize().projects.find((project) => project.project_id === projectId);
-  if (summary?.active_flow_summary?.active_flow_count > 0) {
+  const context = registry.getContext(projectId);
+  const activeFlowCount = context
+    ? Math.max(
+        listFlowProjections(context.runtimeOptions).active_flow_ids.length,
+        listFlowProjections({ ...context.runtimeOptions, projectProfile: undefined }).active_flow_ids.length,
+      )
+    : 0;
+  if (activeFlowCount > 0) {
     throw new ExecutionProfileError("execution-profile.active-run-conflict", "Route changes are blocked while a project flow is active.", 409);
   }
 }

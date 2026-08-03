@@ -24,6 +24,8 @@ function withTempRepo(callback) {
   const gitInit = spawnSync("git", ["init"], { cwd: repoRoot, encoding: "utf8" });
   assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
 
   try {
     callback(repoRoot);
@@ -125,7 +127,8 @@ test("run-level Runtime Harness report preserves an explicit project profile", (
     const result = executeController(repoRoot, "runtime-harness-profile-pass", projectProfile);
 
     assert.equal(result.runtimeHarness.report.project_id, "live-profile");
-    assert.match(result.runtimeHarness.reportPath, /\.aor\/projects\/live-profile\/reports\//u);
+    assert.equal(path.dirname(result.runtimeHarness.reportPath), result.runtimeLayout.reportsRoot);
+    assert.match(result.runtimeHarness.reportPath, /\/projects\/[^/]+\/reports\//u);
   });
 });
 

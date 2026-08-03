@@ -8,8 +8,8 @@ intent_type: analyze
 request_text: Explain the blockers for the selected checkout-risk flow using only linked evidence.
 request_summary: Explain blockers for the selected checkout-risk flow.
 target_refs:
-  - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
-  - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+  - evidence://projects/aor-core/reports/next-action-report-checkout-risk.json
+  - evidence://projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
 allowed_paths: []
 delivery_mode: no-write
 status: completed
@@ -19,4 +19,4 @@ result_refs:
   - evidence://reports/operator-request-analysis-operator-request-aor-core-checkout-risk-1.json
 evidence_refs:
   - packet://operator-request@evidence://reports/operator-request-aor-core-checkout-risk-1.json
-  - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+  - evidence://projects/aor-core/reports/next-action-report-checkout-risk.json

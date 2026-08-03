@@ -173,7 +173,7 @@ When the interaction policy is `fail-closed`, existing diagnostic behavior is pr
 ## Boundary rules
 - Runtime Harness reports diagnose AOR runtime behavior and may recommend recertification, but they do not promote or freeze assets.
 - Strict production run closure must prefer `run_decision` when present; older step-only reports remain diagnostic evidence but not run-level ownership proof.
-- Run-level report materialization must aggregate step results explicitly referenced by `run_decision.evidence_refs[]` and `run_transitions[].evidence_refs[]`, including `evidence://.aor/projects/...` refs that point at sibling project runtime layouts for the same target checkout.
+- Run-level report materialization must aggregate step results explicitly referenced by `run_decision.evidence_refs[]` and `run_transitions[].evidence_refs[]`, including `evidence://projects/...` refs that point at sibling project runtime layouts for the same target checkout.
 - Strict delivery and release commands must treat an empty `step_decisions[]` set as missing Runtime Harness execution evidence, not as a pass.
 - Strict non-`no-write` delivery and release commands must use the latest existing run-level report for the same `run_id`; they must not create a fresh empty report to satisfy the gate.
 - Strict delivery and release gates require top-level `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, and non-empty meaningful changed-path evidence when the mission requires code changes.

@@ -32,6 +32,8 @@ function fakeRunnerEnvironment(root) {
 test("execution profile is derived, revisioned, and readiness evidence contains no secrets", async () => {
   await withTempRepo({ prefix: "aor-execution-profile-", workspaceRoot }, (projectRoot) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "aor-execution-profile-home-"));
+    const previousAorHome = process.env.AOR_HOME;
+    process.env.AOR_HOME = home;
     try {
       const registry = createLocalProjectRegistry({
         cwd: projectRoot,
@@ -137,6 +139,8 @@ test("execution profile is derived, revisioned, and readiness evidence contains 
         (error) => error.code === "execution-profile.active-run-conflict",
       );
     } finally {
+      if (previousAorHome === undefined) delete process.env.AOR_HOME;
+      else process.env.AOR_HOME = previousAorHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });

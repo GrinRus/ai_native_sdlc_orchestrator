@@ -51,6 +51,12 @@ Only one primary action is allowed. Additional suggestions belong in guided UI c
 
 `bounded_execution` makes the selected delivery mode explicit before any delivery-capable recommendation. Installed-user guided flows must keep `upstream_writes_default=false`; delivery-capable modes must require review before write-back.
 
+`project_state` exposes the current stage, logical onboarding/run evidence refs,
+and a server-owned storage summary. It must not publish `runtime_root`,
+`runtime_state_file`, or another physical AOR Home path. The storage summary uses
+`kind=aor-home` plus `project_ref=evidence://projects/<workspace-project-id>/` so
+CLI, API, and web consumers do not depend on machine-local layout.
+
 ## Artifact readiness transitions
 
 `next-action-report` is the public read model for discovery, research, spec,

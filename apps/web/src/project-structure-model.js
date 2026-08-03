@@ -1,12 +1,8 @@
 export const EMPTY_PROJECT_SETUP = Object.freeze({
+  sourceKind: "local",
   projectRef: "",
+  gitUrl: "",
   label: "",
-  runtimeRoot: "",
-  projectProfile: "",
-  topology: "single-repo",
-  repositories: "",
-  components: "",
-  dependencies: "",
 });
 
 export function parseSetupRows(value, fields) {

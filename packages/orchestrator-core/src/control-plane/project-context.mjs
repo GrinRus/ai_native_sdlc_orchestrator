@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { previewProjectRuntime } from "../project-init.mjs";
+import { deriveWorkspaceProjectId, resolveAorHome } from "../aor-home.mjs";
 
 function canonicalPath(value) {
   const absolute = path.resolve(value);
@@ -38,13 +39,21 @@ function registryIdentity(parts) {
 
 export function createProjectContext(input) {
   const launcherCwd = canonicalPath(input.cwd ?? process.cwd());
-  const preview = previewProjectRuntime({
+  const initialPreview = previewProjectRuntime({
     cwd: launcherCwd,
     projectRef: input.projectRef,
     projectProfile: input.projectProfile,
-    runtimeRoot: input.runtimeRoot,
+    runtimeRoot: input.runtimeRoot ?? resolveAorHome(),
   });
-  const projectRoot = canonicalPath(preview.projectRoot);
+  const projectRoot = canonicalPath(initialPreview.projectRoot);
+  const workspaceProjectId = deriveWorkspaceProjectId({ projectRoot });
+  const preview = previewProjectRuntime({
+    cwd: launcherCwd,
+    projectRef: projectRoot,
+    projectProfile: input.projectProfile,
+    runtimeRoot: input.runtimeRoot ?? resolveAorHome(),
+    storageProjectId: workspaceProjectId,
+  });
   const runtimeRoot = canonicalPath(preview.runtimeRoot);
   const projectRuntimeRoot = canonicalPath(preview.runtimeLayout.projectRuntimeRoot);
   const canonicalProfilePath = preview.projectProfileRef === "<generated-bundled-profile>"
@@ -52,9 +61,9 @@ export function createProjectContext(input) {
     : canonicalPath(path.isAbsolute(preview.projectProfileRef)
       ? preview.projectProfileRef
       : path.resolve(projectRoot, preview.projectProfileRef));
-  const identity = registryIdentity([projectRoot, runtimeRoot, canonicalProfilePath, preview.projectId]);
+  const identity = registryIdentity([projectRoot, canonicalProfilePath, preview.projectId]);
   return freezeContext({
-    projectId: preview.projectId,
+    projectId: workspaceProjectId,
     runtimeProjectId: preview.projectId,
     label: typeof input.label === "string" && input.label.trim() ? input.label.trim() : preview.displayName,
     projectRoot,
@@ -69,6 +78,7 @@ export function createProjectContext(input) {
       projectRef: projectRoot,
       projectProfile: input.projectProfile ? canonicalProfilePath : undefined,
       runtimeRoot,
+      storageProjectId: workspaceProjectId,
     },
   });
 }

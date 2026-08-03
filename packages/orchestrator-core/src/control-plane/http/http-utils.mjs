@@ -90,7 +90,8 @@ export function sendError(response, statusCode, code, message) {
  * @param {import("node:http").IncomingMessage} request
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function readJsonRequestBody(request) {
+export async function readJsonRequestBody(request, options = {}) {
+  const maxBytes = options.maxBytes ?? MAX_MUTATION_BODY_BYTES;
   const chunks = await new Promise((resolve, reject) => {
     /** @type {Array<Buffer>} */
     const bodyChunks = [];
@@ -113,8 +114,8 @@ export async function readJsonRequestBody(request) {
     const onData = (chunk) => {
       const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
       byteLength += buffer.length;
-      if (byteLength > MAX_MUTATION_BODY_BYTES) {
-        rejectAndDrain(new HttpRequestBodyError("request_body_too_large", "Request body exceeds the 1 MiB limit.", 413));
+      if (byteLength > maxBytes) {
+        rejectAndDrain(new HttpRequestBodyError("request_body_too_large", `Request body exceeds the ${Math.ceil(maxBytes / (1024 * 1024))} MiB limit.`, 413));
         return;
       }
       bodyChunks.push(buffer);

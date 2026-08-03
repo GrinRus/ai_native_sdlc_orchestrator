@@ -5,72 +5,13 @@ import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { EMPTY_PROJECT_SETUP, parseSetupRows } from "./project-structure-model.js";
 import "./project-structure.css";
 
-const SETUP_STEPS = ["Identity", "Topology", "Repositories", "Components", "Dependencies", "Review"];
 const STRUCTURE_TABS = ["Overview", "Repositories", "Components", "Dependencies", "Validation"];
 
 export { EMPTY_PROJECT_SETUP, parseSetupRows };
 
-function SetupStep({ step, form, setForm }) {
-  if (step === "Identity") {
-    return (
-      <div className="project-setup-fields">
-        <label>Project path<input value={form.projectRef} onChange={(event) => setForm({ ...form, projectRef: event.target.value })} placeholder="/path/to/local-project" /></label>
-        <label>Project label<input value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} placeholder="Optional operator-facing name" /></label>
-        <label>Project profile<input value={form.projectProfile} onChange={(event) => setForm({ ...form, projectProfile: event.target.value })} placeholder="Optional project.aor.yaml path" /></label>
-      </div>
-    );
-  }
-  if (step === "Topology") {
-    return (
-      <div className="project-setup-fields">
-        <label>Topology<select value={form.topology} onChange={(event) => setForm({ ...form, topology: event.target.value })}>
-          <option value="single-repo">Single repository</option>
-          <option value="monorepo">Monorepo with components</option>
-          <option value="bounded-multirepo">Bounded multirepo</option>
-        </select></label>
-        <p className="field-help">Topology is portable project data. Local checkout paths remain in machine-local bindings.</p>
-      </div>
-    );
-  }
-  if (step === "Repositories") {
-    return (
-      <div className="project-setup-fields">
-        <label>Additional repositories<textarea value={form.repositories} onChange={(event) => setForm({ ...form, repositories: event.target.value })} placeholder={"docs:repos/docs\nservice:repos/service"} /></label>
-        <p className="field-help">One repository per line: repository ID and stable mount path. The primary repository is inferred from the project path.</p>
-      </div>
-    );
-  }
-  if (step === "Components") {
-    return (
-      <div className="project-setup-fields">
-        <label>Components<textarea value={form.components} onChange={(event) => setForm({ ...form, components: event.target.value })} placeholder={"api:main:apps/api:service\nweb:main:apps/web:application"} /></label>
-        <p className="field-help">One component per line: component ID, repository ID, relative root, and role.</p>
-      </div>
-    );
-  }
-  if (step === "Dependencies") {
-    return (
-      <div className="project-setup-fields">
-        <label>Component dependencies<textarea value={form.dependencies} onChange={(event) => setForm({ ...form, dependencies: event.target.value })} placeholder="web:api" /></label>
-        <p className="field-help">One directed dependency per line: source component and target component.</p>
-      </div>
-    );
-  }
-  return (
-    <div className="project-setup-review">
-      <section><span>Portable profile</span><strong>{form.topology}</strong><p>{parseSetupRows(form.repositories, ["id", "mount"]).length + 1} repositories · {parseSetupRows(form.components, ["id", "repo", "root", "role"]).length} components</p></section>
-      <section><span>Machine-local binding</span><strong>{form.projectRef || "Project path required"}</strong><p>Runtime root preview: {form.runtimeRoot || "<project>/.aor"}</p></section>
-      <section className="write-effect-preview"><span>Write-effect preview</span><strong>Add registry entry and approved topology revisions</strong><p>Opening, navigation, and validation do not create <code>.aor</code>. Initialization is a separate confirmed action.</p></section>
-      <section><span>After initialization</span><strong>Choose an execution route</strong><p>Execution Setup lists approved runner/provider presets. Authentication stays outside the browser and must pass an explicit readiness check.</p></section>
-    </div>
-  );
-}
-
-export function AddAorProjectDialog({ open, form, setForm, busy, result, onClose, onSubmit }) {
-  const [stepIndex, setStepIndex] = useState(0);
+export function AddAorProjectDialog({ open, form, setForm, busy, result, onClose, onSubmit, onPickFolder }) {
   const [confirmClose, setConfirmClose] = useState(false);
-  const step = SETUP_STEPS[stepIndex];
-  const canContinue = stepIndex > 0 || form.projectRef.trim().length > 0;
+  const selectedValue = form.sourceKind === "git" ? form.gitUrl : form.projectRef;
   const dirty = Object.entries(EMPTY_PROJECT_SETUP).some(([key, initial]) => form[key] !== initial);
   const requestClose = () => {
     if (dirty) setConfirmClose(true);
@@ -83,7 +24,6 @@ export function AddAorProjectDialog({ open, form, setForm, busy, result, onClose
   };
   useEffect(() => {
     if (open) {
-      setStepIndex(0);
       setConfirmClose(false);
     }
   }, [open]);
@@ -91,28 +31,22 @@ export function AddAorProjectDialog({ open, form, setForm, busy, result, onClose
     <>
     <Dialog open={open && !confirmClose} onClose={requestClose} labelledBy="add-aor-project-title" className="request-drawer add-project-drawer project-setup-dialog">
       <div className="drawer-header">
-        <div><p className="eyebrow">Local Workspace</p><h2 id="add-aor-project-title">Add AOR Project</h2><p>Connect a project by telling AOR exactly which repositories belong to this product. AOR never scans your machine for projects.</p></div>
+        <div><p className="eyebrow">Code source</p><h2 id="add-aor-project-title">Connect project</h2><p>Choose a local Git folder or clone a Git URL. AOR derives identity, topology, components, and verification suggestions.</p></div>
         <button className="secondary compact" type="button" onClick={requestClose}>Close</button>
       </div>
-      <ol className="project-setup-steps" aria-label="Project setup steps">
-        {SETUP_STEPS.map((label, index) => <li key={label} className={index === stepIndex ? "current" : index < stepIndex ? "complete" : ""}><span>{index + 1}</span>{label}</li>)}
-      </ol>
       <section className="project-setup-step" aria-labelledby="project-setup-step-title">
-        <p className="project-setup-progress">Step {stepIndex + 1} of {SETUP_STEPS.length}</p>
-        <h3 id="project-setup-step-title">{step}</h3>
-        <SetupStep step={step} form={form} setForm={setForm} />
+        <h3 id="project-setup-step-title">Repository</h3>
+        <div className="project-setup-fields">
+          <label>Source<select value={form.sourceKind} onChange={(event) => setForm({ ...form, sourceKind: event.target.value })}><option value="local">Local Git folder</option><option value="git">Git URL</option></select></label>
+          {form.sourceKind === "git" ? <label>HTTPS or SSH Git URL<input value={form.gitUrl} onChange={(event) => setForm({ ...form, gitUrl: event.target.value })} placeholder="git@github.com:org/repository.git" /></label> : <><label>Absolute folder path<input value={form.projectRef} onChange={(event) => setForm({ ...form, projectRef: event.target.value })} placeholder="/path/to/repository" /></label><button className="secondary" type="button" onClick={onPickFolder} disabled={busy}>Choose folder…</button></>}
+          <label>Project label<input value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} placeholder="Optional name" /></label>
+          <p className="field-help">Credentials in URLs are rejected. Git credential helpers and your SSH agent handle authentication.</p>
+        </div>
       </section>
       {result ? <div className={result.status === "error" ? "alert" : "success-note"} role="status">{result.message}</div> : null}
       <div className="drawer-actions project-setup-actions">
-        <button className="secondary" type="button" onClick={() => setStepIndex((current) => Math.max(0, current - 1))} disabled={stepIndex === 0 || busy}>Back</button>
-        {stepIndex < SETUP_STEPS.length - 1 ? (
-          <button className="primary" type="button" onClick={() => setStepIndex((current) => current + 1)} disabled={!canContinue || busy}>Continue</button>
-        ) : (
-          <>
-            <button className="secondary" type="button" onClick={() => onSubmit(false)} disabled={busy || !form.projectRef.trim()}>Add to Local Workspace</button>
-            <button className="primary" type="button" onClick={() => onSubmit(true)} disabled={busy || !form.projectRef.trim()}>Confirm writes and initialize</button>
-          </>
-        )}
+        <button className="secondary" type="button" onClick={requestClose} disabled={busy}>Cancel</button>
+        <button className="primary" type="button" onClick={onSubmit} disabled={busy || !selectedValue.trim()}>Connect code</button>
       </div>
     </Dialog>
     <Dialog open={confirmClose} onClose={() => setConfirmClose(false)} labelledBy="discard-project-draft-title" className="request-drawer">
@@ -143,9 +77,9 @@ function EntityTable({ rows, columns, empty }) {
   );
 }
 
-export function ProjectStructure({ topology, status, error, busy, onRefresh, onAction }) {
+export function ProjectStructure({ topology, status, error, busy, onRefresh, onAction, onProjectAction, projectId }) {
   const [tab, setTab] = useState("Overview");
-  const [repoDraft, setRepoDraft] = useState({ repo_id: "", mount: "" });
+  const [repoDraft, setRepoDraft] = useState({ sourceKind: "local", path: "", url: "", label: "" });
   const [pendingAction, setPendingAction] = useState(null);
   const validation = topology?.latest_validation;
   const bindingsByRepo = useMemo(() => new Map((topology?.bindings ?? []).map((binding) => [binding.repo_id, binding])), [topology]);
@@ -160,6 +94,15 @@ export function ProjectStructure({ topology, status, error, busy, onRefresh, onA
     setPendingAction(null);
     if (action) await onAction(action.family, action.action, action.payload);
   };
+  const pickAdditionalRepository = async () => {
+    const response = await fetch("/api/workspace/folder-picker/actions", {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ action: "open" }),
+    });
+    const result = await response.json();
+    if (response.ok && result.path) setRepoDraft((current) => ({ ...current, sourceKind: "local", path: result.path }));
+  };
   return (
     <section id="project-structure" className="work-card project-structure" aria-labelledby="project-structure-title">
       <div className="project-structure-header">
@@ -173,20 +116,30 @@ export function ProjectStructure({ topology, status, error, busy, onRefresh, onA
       {error ? <ResourceErrorCard errors={{ topology: error }} /> : null}
       {status === "loading" ? <div className="project-structure-empty">Loading approved topology…</div> : null}
       {status !== "loading" && tab === "Overview" ? (
-        <div className="project-structure-overview">
+        <><div className="project-structure-overview">
           <section><span>Profile</span><StatusBadge value={topology?.initialized === false ? "not-initialized" : "available"} /></section>
           <section><span>Revision</span><strong>{topology?.revision ?? "—"}</strong></section>
           <section><span>Repositories</span><strong>{topology?.repositories?.length ?? 0}</strong></section>
           <section><span>Components</span><strong>{topology?.components?.length ?? 0}</strong></section>
           <section><span>Validation</span><StatusBadge value={validation?.status ?? "not-run"} /></section>
         </div>
+        <div className="project-structure-actions">
+          <button className="secondary" type="button" disabled={busy} onClick={() => onProjectAction?.("refresh-source")}>Refresh source</button>
+          <button className="secondary" type="button" disabled={busy} onClick={() => onProjectAction?.("materialize-project-config")}>Materialize project config</button>
+          <button className="secondary" type="button" disabled={busy} onClick={() => window.confirm("Disconnect this project? AOR data will be preserved.") && onProjectAction?.("disconnect")}>Disconnect project</button>
+          <button className="secondary danger" type="button" disabled={busy} onClick={() => {
+            const confirmation = window.prompt(`Delete all AOR data for ${projectId}? Type the project ID to confirm.`);
+            if (confirmation === projectId) onProjectAction?.("delete-aor-data", { confirmation });
+          }}>Delete AOR data</button>
+        </div></>
       ) : null}
       {tab === "Repositories" ? (
         <>
           <div className="project-structure-add-row">
-            <label>Repository ID<input value={repoDraft.repo_id} onChange={(event) => setRepoDraft({ ...repoDraft, repo_id: event.target.value })} /></label>
-            <label>Stable mount<input value={repoDraft.mount} onChange={(event) => setRepoDraft({ ...repoDraft, mount: event.target.value })} placeholder="repos/service" /></label>
-            <button className="secondary" type="button" disabled={busy || !repoDraft.repo_id || !repoDraft.mount} onClick={() => onAction("repository", "add", { repo_id: repoDraft.repo_id, name: repoDraft.repo_id, source: { kind: "local", root: "." }, workspace_mount: repoDraft.mount, role: "application" })}>Add repository</button>
+            <label>Source<select value={repoDraft.sourceKind} onChange={(event) => setRepoDraft({ ...repoDraft, sourceKind: event.target.value })}><option value="local">Local Git folder</option><option value="git">Git URL</option></select></label>
+            {repoDraft.sourceKind === "git" ? <label>HTTPS or SSH Git URL<input value={repoDraft.url} onChange={(event) => setRepoDraft({ ...repoDraft, url: event.target.value })} /></label> : <><label>Absolute folder path<input value={repoDraft.path} onChange={(event) => setRepoDraft({ ...repoDraft, path: event.target.value })} /></label><button className="secondary" type="button" disabled={busy} onClick={pickAdditionalRepository}>Choose folder…</button></>}
+            <label>Repository label<input value={repoDraft.label} onChange={(event) => setRepoDraft({ ...repoDraft, label: event.target.value })} placeholder="Optional name" /></label>
+            <button className="secondary" type="button" disabled={busy || !(repoDraft.sourceKind === "git" ? repoDraft.url.trim() : repoDraft.path.trim())} onClick={() => onProjectAction?.("connect-repository", { source: repoDraft.sourceKind === "git" ? { kind: "git", url: repoDraft.url.trim() } : { kind: "local", path: repoDraft.path.trim() }, label: repoDraft.label.trim() || undefined })}>Connect repository</button>
           </div>
           <EntityTable rows={topology?.repositories} empty="No approved repositories." columns={[
             { key: "repo_id", label: "Repository" },

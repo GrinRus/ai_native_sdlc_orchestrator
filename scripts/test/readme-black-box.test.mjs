@@ -102,7 +102,7 @@ function createTargetRepo(tempRoot) {
   return targetRepo;
 }
 
-function assertOnlyRuntimeStateChanged(targetRepo) {
+function assertTargetRepoUnchanged(targetRepo) {
   const status = runChecked("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
     cwd: targetRepo,
   }).stdout
@@ -110,22 +110,19 @@ function assertOnlyRuntimeStateChanged(targetRepo) {
     .map((line) => line.trimEnd())
     .filter(Boolean);
 
-  assert.ok(status.length > 0, "expected README smoke to write runtime state under .aor/");
-  for (const line of status) {
-    const changedPath = line.slice(3);
-    assert.match(changedPath, /^\.aor\//u, `unexpected target repo change outside .aor/: ${line}`);
-  }
+  assert.deepEqual(status, [], `AOR must keep runtime state outside the target repository: ${status.join("\n")}`);
 }
 
 test("README black-box quickstart runs no-write against an external local target repo", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-readme-black-box-"));
   try {
     const targetRepo = createTargetRepo(tempRoot);
-    const runtimeRoot = path.join(targetRepo, ".aor");
-    const baseArgs = ["--project-ref", targetRepo, "--runtime-root", runtimeRoot];
+    const aorHome = path.join(tempRoot, "aor-home");
+    const baseArgs = ["--project-ref", targetRepo];
     const fakePnpmBin = createFakePnpmBin(tempRoot);
     const env = {
       PATH: [fakePnpmBin, process.env.PATH].filter(Boolean).join(path.delimiter),
+      AOR_HOME: aorHome,
     };
 
     const doctor = runAorJson(["doctor", ...baseArgs], env);
@@ -139,7 +136,7 @@ test("README black-box quickstart runs no-write against an external local target
     assert.ok(fs.existsSync(onboard.onboarding_report_file));
     assert.ok(fs.existsSync(onboard.artifact_packet_file));
     assert.ok(fs.existsSync(onboard.runtime_state_file));
-    assert.match(onboard.project_profile_ref, /^\.aor\/projects\/local-project\/state\/project\.aor\.yaml$/u);
+    assert.match(onboard.project_profile_ref, /^evidence:\/\/projects\/local-project-[a-f0-9]{8}\/state\/project\.aor\.yaml$/u);
 
     const mission = runAorJson(
       [
@@ -176,9 +173,9 @@ test("README black-box quickstart runs no-write against an external local target
     assert.equal(next.next_action_bounded_execution?.requested_delivery_mode, "no-write");
     assert.equal(next.next_action_bounded_execution?.upstream_writes_default, false);
     assert.ok(fs.existsSync(next.next_action_report_file));
-    assert.match(next.next_action_report_file, /\/\.aor\/projects\/local-project\/reports\/next-action-report\.json$/u);
+    assert.match(next.next_action_report_file, /\/aor-home\/projects\/local-project-[a-f0-9]{8}\/reports\/next-action-report\.json$/u);
 
-    assertOnlyRuntimeStateChanged(targetRepo);
+    assertTargetRepoUnchanged(targetRepo);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -211,20 +208,19 @@ test("documented app smoke does not initialize clean target runtime", () => {
   try {
     runChecked("pnpm", ["web:build"]);
     const targetRepo = createTargetRepo(tempRoot);
-    const runtimeRoot = path.join(targetRepo, ".aor");
+    const aorHome = path.join(tempRoot, "aor-home");
     const run = runChecked(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
       "app",
       "--project-ref",
       targetRepo,
-      "--runtime-root",
-      runtimeRoot,
       "--smoke",
       "--open",
       "false",
       "--json",
     ], {
       cwd: path.join(tempRoot),
+      env: { AOR_HOME: aorHome },
     });
     const smoke = parseJsonObject(run.stdout);
     assert.equal(smoke.status, "smoke-pass");
@@ -232,8 +228,8 @@ test("documented app smoke does not initialize clean target runtime", () => {
     assert.equal(smoke.project_switcher_loaded, true);
     assert.equal(smoke.flow_selector_loaded, true);
     assert.equal(smoke.new_flow_action_loaded, true);
-    assert.equal(smoke.runtime_root, path.join(fs.realpathSync.native(targetRepo), ".aor"));
-    assert.equal(fs.existsSync(runtimeRoot), false, "clean app smoke must not create .aor before explicit initialization");
+    assert.match(smoke.project_id, /^local-project-[a-f0-9]{8}$/u);
+    assert.equal(fs.existsSync(path.join(targetRepo, ".aor")), false, "clean app smoke must not create repo-local .aor");
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

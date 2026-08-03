@@ -32,6 +32,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "project-structure-model.js",
     "mission-model.js",
     "mission-builder.jsx",
+    "intent-onboarding.jsx",
     "quiet-shell.jsx",
   ].map((file) => fs.readFileSync(path.join(workspaceRoot, "apps/web/src", file), "utf8")).join("\n");
   const css = ["spa.css", "quiet-cockpit-polish.css"]
@@ -362,11 +363,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Last progress",
     "Activity",
     "Output mode",
-    "First-run wizard",
-    "Project Context",
-    "Runtime Readiness",
-    "Configure First Flow",
-    "The local runtime is ready. Define the first Mission, then AOR will resolve one safe next action.",
+    "Intent-first onboarding",
+    "read-only task preview",
     "firstRunFocusMode",
     "first-run-focus-mode",
     "AdvancedEvidenceDisclosure",
@@ -388,12 +386,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Copy raw ref for",
     "Attach as request target:",
     "topbar-status-strip",
-    "first-run-facts",
     "stage-progress-strip",
     "compact-first-run",
-    "safe-template-summary",
-    "form-primary-action",
-    "Edit mission details",
     "MissionDurableSummary",
     "Ask AOR for selected flow",
     "Ask AOR requires a selected active flow",
@@ -404,15 +398,11 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     'id="project-switcher-control"',
     'name="project-switcher"',
     'aria-label="Project switcher"',
-    "Add AOR Project",
-    "Runtime root preview",
-    "Project profile",
-    "projectProfile",
-    "project_profile",
-    "profile_mismatch_candidate_project_ids",
-    "Runtime root has existing evidence for a different project profile.",
-    "Add Matching Project Profile",
-    "Confirm writes and initialize",
+    "Connect project",
+    "Code source",
+    "Prepare task",
+    "Materialize project config",
+    "Disconnect project",
     "/api/projects/actions",
     "/runs",
     "graph-context-tabs",
@@ -427,19 +417,15 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "event.shiftKey",
     "clearResult: false",
     "Add at least one target ref",
-    "Initialize Project Runtime",
+    "Intent-first task onboarding",
     "Loading",
-    "First launch",
-    "onboarding.initialized === true",
-    "profile_mismatch_candidate_project_ids",
-    "This does not create a flow",
     "if (!flow) return \"readiness\"",
     "newFlowDisabled",
-    "Initialize the project runtime before starting a flow.",
+    "Confirm and start",
     "flow.new-blocked",
     "setAddProjectDrawerOpen(false)",
-    "activeProject?.runtime_root",
-    "Create the first no-write mission packet, then resolve the first next action.",
+    "AOR Home",
+    "prepare a read-only task preview",
     'window.scrollTo({ top: 0, left: 0, behavior: "auto" })',
     "No active flow",
     'htmlFor="flow-selector-control"',
@@ -878,8 +864,6 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
         "app",
         "--project-ref",
         projectRoot,
-        "--runtime-root",
-        runtimeRoot,
         "--smoke",
         "true",
         "--open",
@@ -889,6 +873,7 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
       {
         cwd: projectRoot,
         encoding: "utf8",
+        env: { ...process.env, AOR_HOME: runtimeRoot },
       },
     );
     assert.equal(run.status, 0, run.stderr);
@@ -912,7 +897,7 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
     assert.ok(payload.render_guard.module_script_count >= 1);
     assert.ok(payload.render_guard.stylesheet_count >= 1);
     assert.equal(payload.render_guard.app_shell_marker_present, true);
-    assert.equal(payload.runtime_root, path.join(fs.realpathSync.native(projectRoot), ".aor"));
+    assert.equal(Object.prototype.hasOwnProperty.call(payload, "runtime_root"), false);
   });
 });
 

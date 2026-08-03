@@ -6,6 +6,13 @@ Output modes:
   - --json compact prints only populated command fields for operator inspection.
 
 Implemented commands:
+Intent-first start:
+  - aor project connect
+  - aor task prepare
+  - aor task start
+  - aor project materialize-config
+  - aor evidence export
+
 Guided shortcuts:
   - aor doctor
   - aor onboard

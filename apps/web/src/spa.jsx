@@ -4,12 +4,13 @@ import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
 import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution-orchestration.jsx";
 import { legacyConsoleRequested, resolveConsoleExperience, retiredConsoleSearch } from "./console-experience.js";
-import { MissionBuilder, MissionDurableSummary } from "./mission-builder.jsx";
+import { MissionDurableSummary } from "./mission-builder.jsx";
+import { IntentOnboarding } from "./intent-onboarding.jsx";
 import { operatorControlTargetTab, resolveOperatorControl } from "./operator-control.js"; import { createOrResumeOperatorRequest, executeOperatorControl } from "./operator-operations.js";
 import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPLATE as EMPTY_TEMPLATE, missionFlagsFromDraft, SAFE_MISSION_TEMPLATE as SAFE_TEMPLATE, SAFE_MISSION_TEMPLATE_ID as SAFE_TEMPLATE_ID } from "./mission-model.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
-import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, parseSetupRows, ProjectStructure } from "./project-structure.jsx";
+import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
 import { Alert } from "./ui/components.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css"; import "./quiet-cockpit-polish.css";
@@ -858,11 +859,11 @@ function verificationFailureBlocker(group, index) {
 
 function verificationFailureRerunCommand(plan) {
   const label = String(plan?.verification_label ?? "post-run-primary").trim() || "post-run-primary";
-  return `aor project verify --verification-label ${label} (--project-ref, --runtime-root)`;
+  return `aor project verify --verification-label ${label} (--project-ref)`;
 }
 
 function verificationFailureRepairDecisionCommand() {
-  return "aor review decide --decision request-repair --repair-context-file <repair-context.json> (--project-ref, --runtime-root, --run-id)";
+  return "aor review decide --decision request-repair --repair-context-file <repair-context.json> (--project-ref, --run-id)";
 }
 
 function qualityGateRepairAttemptsExhausted(gate) {
@@ -1266,7 +1267,6 @@ function externalRunExecutableRepairCommand(health, projectContext = null) {
   let command = repairCommand;
   command = appendCommandFlag(command, "--project-ref", projectContext?.projectRef);
   command = appendCommandFlag(command, "--project-profile", projectContext?.projectProfileRef);
-  command = appendCommandFlag(command, "--runtime-root", projectContext?.runtimeRoot);
   command = appendCommandFlag(command, "--run-id", health?.run_id);
   return command;
 }
@@ -2693,7 +2693,7 @@ function compactCommandLabel(value) {
   if (!text) return "pending";
   const parts = text.split(/\s+/u).filter(Boolean);
   const commandPrefix = parts[0] === "aor" ? parts.slice(0, 3).join(" ") : parts.slice(0, 2).join(" ");
-  const flagNames = ["--project-ref", "--project-profile", "--runtime-root", "--run-id", "--allowed-path", "--delivery-mode"]
+  const flagNames = ["--project-ref", "--project-profile", "--run-id", "--allowed-path", "--delivery-mode"]
     .filter((flag) => parts.includes(flag));
   if (flagNames.length > 0) return `${commandPrefix} (${flagNames.join(", ")})`;
   return text.length > 72 ? `${text.slice(0, 68)}...` : text;
@@ -2720,7 +2720,7 @@ function appendCommandFlag(command, flag, value) {
 function compactVisibleValue(value, kind = "auto") {
   const text = String(value ?? "").trim();
   if (!text) return "pending";
-  if (kind === "command" || /^aor\s+/u.test(text) || text.includes(" --project-ref ") || text.includes(" --runtime-root ")) {
+  if (kind === "command" || /^aor\s+/u.test(text) || text.includes(" --project-ref ")) {
     return compactCommandLabel(text);
   }
   if (kind === "path" || text.startsWith("/") || text.startsWith("~/") || /^[A-Za-z]:[\\/]/u.test(text)) {
@@ -2732,7 +2732,7 @@ function compactVisibleValue(value, kind = "auto") {
 function compactDisclosureLabel(value, kind = "auto") {
   const text = String(value ?? "").trim();
   const visible = compactVisibleValue(text, kind);
-  const type = kind === "command" || /^aor\s+/u.test(text) || text.includes(" --project-ref ") || text.includes(" --runtime-root ")
+  const type = kind === "command" || /^aor\s+/u.test(text) || text.includes(" --project-ref ")
     ? "command"
     : kind === "path" || text.startsWith("/") || text.startsWith("~/") || /^[A-Za-z]:[\\/]/u.test(text)
       ? "path"
@@ -3732,15 +3732,10 @@ function FlowCockpit({
   currentStage,
   nextAction,
   projectState,
-  config,
   busy,
   onResolveNext,
   onRefresh,
-  onStartNewFlow,
   onCreateFollowUp,
-  initializeProject,
-  activeProject = null,
-  onOpenAddProject = null,
   providerStepStatus = null,
   externalRunHealth = null,
   providerFocus = false,
@@ -3749,156 +3744,7 @@ function FlowCockpit({
   quietCockpit = false, onOperatorControl = null, operatorActionResult = null,
 }) {
   const projectLevelProviderFocus = !flow && Boolean(providerStepStatus || externalRunHealth);
-  if (!flow && !projectLevelProviderFocus) {
-    const projectRef = activeProject?.project_ref ?? config?.project_ref ?? "loading";
-    const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
-    const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
-    const stateReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
-    const profileMismatchProjectIds = Array.isArray(onboarding.profile_mismatch_candidate_project_ids)
-      ? onboarding.profile_mismatch_candidate_project_ids.filter(Boolean)
-      : [];
-    const hasProfileMismatch = !stateReady && profileMismatchProjectIds.length > 0;
-    const profileMismatchLabel = profileMismatchProjectIds.slice(0, 2).join(", ");
-    const profileMismatchSuffix = profileMismatchProjectIds.length > 2 ? `, +${profileMismatchProjectIds.length - 2} more` : "";
-    const profileMismatchCopy = profileMismatchLabel
-      ? `Existing evidence is under ${profileMismatchLabel}${profileMismatchSuffix}. Add the matching project profile to attach it.`
-      : "Add the matching project profile to attach existing runtime evidence.";
-    const flowReady = false;
-    const wizardStatus = stateReady ? "Runtime ready" : "First launch";
-    const wizardSteps = [
-      {
-        label: "Project Context",
-        status: projectRef && projectRef !== "loading" ? "ready" : "pending",
-        detail: "Confirm the target repository and runtime root before AOR writes local evidence.",
-        code: projectRef,
-      },
-      {
-        label: "Runtime Readiness",
-        status: stateReady ? "ready" : hasProfileMismatch ? "blocked" : "pending",
-        detail: stateReady
-          ? "Runtime state is reachable."
-          : hasProfileMismatch
-            ? "Runtime root has existing evidence for a different project profile."
-            : "Runtime folders and state evidence are not initialized yet.",
-        code: projectState?.state_file ?? "state file pending",
-      },
-      {
-        label: "First Flow",
-        status: flowReady ? "ready" : "pending",
-        detail: "Create the first no-write mission packet from the safe walkthrough template.",
-        code: flowReady ? "mission evidence visible" : "mission intake pending",
-      },
-      {
-        label: "Next Action",
-        status: nextAction?.primary_action ? "ready" : "pending",
-        detail: "Refresh next action and land in the active flow cockpit.",
-        code: nextAction?.primary_action?.command ?? "next pending",
-      },
-    ];
-    return (
-      <section className="work-card stage-work readiness-cockpit first-run-wizard" aria-label="First-run wizard">
-        <div className="work-heading">
-          <div>
-            <span className="eyebrow">Project onboarding</span>
-            <div className="heading-line">
-              <h2>{stateReady ? "Configure First Flow" : "Prepare this project for AOR"}</h2>
-              <StatusPill state={wizardStatus} />
-            </div>
-            <p>{stateReady
-              ? "The local runtime is ready. Define the first Mission, then AOR will resolve one safe next action."
-              : "AOR will connect this repository to a local runtime before any Mission or provider work can start."}</p>
-          </div>
-          <div className="wizard-heading-actions">
-            {onOpenAddProject ? (
-              <button className="secondary" type="button" onClick={onOpenAddProject} disabled={busy}>
-                <Icon name="folder" />
-                Change project
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {!stateReady && hasProfileMismatch ? (
-          <div className="readiness-action">
-            <div>
-              <Icon name="folder" />
-              <div>
-                <h3>Add Matching Project Profile</h3>
-                <p>{profileMismatchCopy}</p>
-              </div>
-            </div>
-            <button className="primary" type="button" onClick={onOpenAddProject ?? onRefresh} disabled={busy}>
-              Add Local Project
-            </button>
-          </div>
-        ) : !stateReady ? (
-          <div className="readiness-action">
-            <div>
-              <Icon name="play" />
-              <div>
-                <h3>Initialize Project Runtime</h3>
-                <p>Create local AOR state under <code>.aor/</code>. Source files, remotes, and provider processes are not touched.</p>
-              </div>
-            </div>
-            <button className="primary" type="button" onClick={initializeProject} disabled={busy}>
-              Initialize Project Runtime
-            </button>
-          </div>
-        ) : (
-          <div className="readiness-action">
-            <div>
-              <Icon name="plus" />
-              <div>
-                <h3>Describe Your First Mission</h3>
-                <p>Capture the outcome, constraints, scope, and Definition of Done. The first flow defaults to no-write.</p>
-              </div>
-            </div>
-            <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
-              Configure First Flow
-            </button>
-          </div>
-        )}
-
-        <div className="first-run-facts" aria-label="Project setup summary">
-          <div><span>Repository</span><strong>{projectRef && projectRef !== "loading" ? "Connected explicitly" : "Choose a project"}</strong></div>
-          <div><span>Runtime</span><strong>{stateReady ? "Ready" : hasProfileMismatch ? "Profile required" : "Not initialized"}</strong></div>
-          <div><span>Execution</span><strong>Approved route only</strong></div>
-          <div><span>Safety</span><strong>No upstream writes</strong></div>
-        </div>
-
-        <p className="first-run-safety"><Icon name="shield" /> {stateReady
-          ? "Next, choose an approved execution route below and check runner authentication before live execution. Simulation remains available when configured by the project."
-          : <>Initialization writes local runtime evidence to <code>{shortPathLabel(runtimeRoot)}</code>; it does not start a provider or modify repository sources.</>}</p>
-
-        <details className="first-run-details">
-          <summary>Show readiness details</summary>
-          <div className="readiness-check-list">
-            {wizardSteps.map((step) => (
-              <div key={step.label} className={step.status}>
-                <span className="check-dot" />
-                <div>
-                  <strong>{step.label}</strong>
-                  <p>{step.detail}</p>
-                </div>
-                <CompactInlineValue value={step.code} />
-              </div>
-            ))}
-            <div className="ready">
-              <span className="check-dot" />
-              <div>
-                <strong>Runtime root policy</strong>
-                <p>No-write safety and local control-plane defaults stay visible before any flow exists.</p>
-              </div>
-              <CompactInlineValue value={runtimeRoot} kind="path" />
-            </div>
-          </div>
-          <button className="secondary compact" type="button" onClick={onRefresh} disabled={busy}>
-            <Icon name="refresh" />Refresh readiness
-          </button>
-        </details>
-      </section>
-    );
-  }
+  if (!flow && !projectLevelProviderFocus) return null;
 
   const completed = isCompletedFlow(flow);
   const blockingExternalRunHealth = !completed && isBlockingExternalRunHealth(externalRunHealth);
@@ -4148,8 +3994,8 @@ function FlowCockpit({
             ) : null}
           </div>
           <div>
-            <span>Runtime root</span>
-            <CompactInlineValue value={projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"} kind="path" />
+            <span>Storage</span>
+            <CompactInlineValue value="AOR Home" />
           </div>
           <div>
             <span>Write-back mode</span>
@@ -4389,8 +4235,8 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
         )}
       </section>
       <section className="rail-card">
-        <h3>Runtime root</h3>
-        <p><CompactInlineValue value={projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"} kind="path" /></p>
+        <h3>Storage</h3>
+        <p><CompactInlineValue value="AOR Home" /></p>
         <div className="meter"><span /></div>
       </section>
       <section className="rail-card">
@@ -4439,7 +4285,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   );
 }
 
-function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef, qualityClosureContext = null }) {
+function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef, onExportSelected, qualityClosureContext = null }) {
   const [filter, setFilter] = useState("all");
   const qualityPlan = qualityClosurePlan(rows, qualityClosureContext);
   const filteredRows = rows.filter((row) => artifactFilterMatches(row, filter));
@@ -4541,6 +4387,7 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
                 <em>{selected.stage ?? "artifact"} / {selected.kind}</em>
               </div>
               <p>{selected.summary}</p>
+              {String(selected.rawRef ?? selected.ref).startsWith("evidence://projects/") ? <button className="secondary compact" type="button" onClick={() => onExportSelected?.(selected.rawRef ?? selected.ref)}>Export selected evidence</button> : null}
               <details className="debug-ref-details">
                 <summary>Debug raw ref</summary>
                 <code>{selected.rawRef ?? selected.ref}</code>
@@ -5585,6 +5432,7 @@ function FlowAdvancedWorkbench({
   verificationPlan,
   qualityGate,
   busy,
+  onExportSelected,
 }) {
   const [expanded, setExpanded] = useState(defaultAdvancedWorkbenchOpen);
   const [selectedTab, setSelectedTab] = useState("evidence");
@@ -5638,6 +5486,7 @@ function FlowAdvancedWorkbench({
         evidence={executionEvidence}
         providerEvidenceRows={providerEvidenceRows}
         copyRef={copyRef}
+        onExportSelected={onExportSelected}
         busy={busy}
         externalRunHealth={externalRunHealth}
         projectContext={projectContext}
@@ -6017,7 +5866,6 @@ function App() {
   const activeProjectDisplay = activeProject && projectState?.onboarding_summary
     ? {
         ...activeProject,
-        runtime_root: projectState.runtime_root ?? activeProject.runtime_root,
         onboarding_summary: projectState.onboarding_summary,
       }
     : activeProject;
@@ -6577,74 +6425,34 @@ function App() {
     setAddProjectResult(null);
   }
 
-  async function addLocalProject({ initializeAfterAdd = false } = {}) {
-    if (busy || !addProjectForm.projectRef.trim()) return;
+  async function addLocalProject() {
+    const sourceValue = addProjectForm.sourceKind === "git" ? addProjectForm.gitUrl.trim() : addProjectForm.projectRef.trim();
+    if (busy || !sourceValue) return;
     setBusy(true);
     setError("");
     setAddProjectResult(null);
     try {
-      const payload = await readJson("/api/projects/actions", {
+      const accepted = await readJson("/api/projects/actions", {
         method: "POST",
         headers: { "content-type": "application/json; charset=utf-8" },
         body: JSON.stringify({
-          action: "add",
-          project_ref: addProjectForm.projectRef.trim(),
+          action: "connect",
+          source: addProjectForm.sourceKind === "git" ? { kind: "git", url: sourceValue } : { kind: "local", path: sourceValue },
           ...(addProjectForm.label.trim() ? { label: addProjectForm.label.trim() } : {}),
-          ...(addProjectForm.runtimeRoot.trim() ? { runtime_root: addProjectForm.runtimeRoot.trim() } : {}),
-          ...(addProjectForm.projectProfile.trim() ? { project_profile: addProjectForm.projectProfile.trim() } : {}),
         }),
       });
-      const nextProjectId = payload.project?.project_id;
-      setProjectIndex({
-        default_project_id: payload.default_project_id,
-        projects: Array.isArray(payload.projects) ? payload.projects : [],
-      });
-      let resultMessage = "Project added to this local app session.";
-      if (nextProjectId) {
-        const projectBase = `/api/projects/${encodeURIComponent(nextProjectId)}`;
-        let revision = payload.revision;
-        const mutateTopology = async (family, action, value) => {
-          const result = await readJson(`${projectBase}/topology/actions`, {
-            method: "POST",
-            headers: { "content-type": "application/json; charset=utf-8" },
-            body: JSON.stringify({ family, action, value, expected_revision: revision }),
-          });
-          revision = result.topology?.revision ?? revision;
-          return result;
-        };
-        await mutateTopology("topology", "update", {
-          repo_topology: addProjectForm.topology === "bounded-multirepo" ? "bounded-multirepo" : "monorepo",
-        });
-        for (const repository of parseSetupRows(addProjectForm.repositories, ["repo_id", "workspace_mount"])) {
-          await mutateTopology("repository", "add", {
-            repo_id: repository.repo_id,
-            name: repository.repo_id,
-            source: { kind: "local", root: "." },
-            workspace_mount: repository.workspace_mount,
-            role: "application",
-          });
-        }
-        for (const component of parseSetupRows(addProjectForm.components, ["component_id", "repo_id", "root", "role"])) {
-          await mutateTopology("component", "add", { ...component, name: component.component_id, command_group_refs: [] });
-        }
-        for (const dependency of parseSetupRows(addProjectForm.dependencies, ["from_component_id", "to_component_id"])) {
-          await mutateTopology("dependency", "upsert", { ...dependency, relationship: "depends-on", validation_refs: [] });
-        }
-        resetProjectScopedState();
-        setActiveProjectId(nextProjectId);
-        if (initializeAfterAdd) {
-          await readJson(`${projectBase}/lifecycle-command/actions`, {
-            method: "POST",
-            headers: { "content-type": "application/json; charset=utf-8" },
-            body: JSON.stringify({ command: "project init", flags: {} }),
-          });
-          resultMessage = "Project added and initialized. Create the first no-write flow next.";
-          pushActivity("workspace.project-initialized", nextProjectId);
-        }
-        await refresh({ projectId: nextProjectId, selectionVersion: flowSelectionVersion.current });
+      let job = accepted.job;
+      for (let attempt = 0; attempt < 240 && ["queued", "running"].includes(job?.status); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        job = await readJson(accepted.status_ref);
       }
+      if (job?.status !== "succeeded") throw new Error(job?.error || "Project connection did not complete.");
+      const nextProjectId = job.project_id;
+      resetProjectScopedState();
+      setActiveProjectId(nextProjectId);
+      await refresh({ projectId: nextProjectId, selectionVersion: flowSelectionVersion.current });
       setAddProjectForm({ ...EMPTY_PROJECT_SETUP });
-      setAddProjectResult({ status: "ok", message: resultMessage });
+      setAddProjectResult({ status: "ok", message: "Code connected. AOR data remains in your central AOR Home." });
       setAddProjectDrawerOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -6652,6 +6460,27 @@ function App() {
       setError(message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function activateIntentProject(nextProjectId) {
+    resetProjectScopedState();
+    setActiveProjectId(nextProjectId);
+    setNewFlowDraft(true);
+    await refresh({ projectId: nextProjectId, newFlowDraft: true, selectionVersion: flowSelectionVersion.current });
+  }
+
+  async function pickProjectFolder() {
+    try {
+      const result = await readJson("/api/workspace/folder-picker/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "open" }),
+      });
+      if (result.path) setAddProjectForm((current) => ({ ...current, projectRef: result.path, sourceKind: "local" }));
+      else setAddProjectResult({ status: "error", message: result.message || "Native picker is unavailable; enter an absolute path." });
+    } catch (pickerError) {
+      setAddProjectResult({ status: "error", message: pickerError instanceof Error ? pickerError.message : String(pickerError) });
     }
   }
 
@@ -6675,6 +6504,25 @@ function App() {
     } catch (topologyError) {
       setTopologyState((current) => ({ ...current, status: "error", error: topologyError }));
       setError(topologyError instanceof Error ? topologyError.message : String(topologyError));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function runProjectAction(action, value = {}) {
+    if (!activeProjectDisplay?.project_id || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await readJson("/api/projects/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action, project_id: activeProjectDisplay.project_id, ...value }),
+      });
+      pushActivity(`project.${action}`, "completed");
+      if (action === "refresh-source" || action === "materialize-project-config") await refresh();
+      else window.location.reload();
+    } catch (projectActionError) {
+      setError(projectActionError instanceof Error ? projectActionError.message : String(projectActionError));
     } finally {
       setBusy(false);
     }
@@ -7069,7 +6917,8 @@ function App() {
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const projectSnapshotPending = !projectSnapshotLoaded && !String(error ?? "").trim();
-  const firstRunFocusMode = !projectSnapshotPending && (draftSurface || (!selectedFlow && !providerWorkbenchFocus));
+  const intentIngress = !projectSnapshotPending && (draftSurface || (!selectedFlow && !providerWorkbenchFocus));
+  const firstRunFocusMode = intentIngress;
   const topbarAskReason = projectSnapshotPending
     ? "Project state is loading."
     : blockingExternalRunHealth
@@ -7110,7 +6959,7 @@ function App() {
       operatorDecisionRequests.some((request) => isOpenOperatorDecisionStatus(request.status)),
     )
     : null;
-  const runtimeRoot = projectState?.runtime_root ?? activeProjectDisplay?.runtime_root ?? config?.runtime_root ?? ".aor";
+  const runtimeRoot = "AOR Home";
   const activeProjectStatusRuntimeReady = activeProjectRuntimeReady || providerWorkbenchFocus || Boolean(providerStepStatus || externalRunHealth) || (Array.isArray(runs) && runs.length > 0);
   const newFlowDisabledReason = projectSnapshotPending ? "Project state is loading." : busy ? "Wait for the current console action to finish before starting a new flow." : !activeProjectRuntimeReady ? "Initialize the project runtime before starting a flow." : newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason;
   const newFlowDisabled = projectSnapshotPending || !activeProjectRuntimeReady || busy || Boolean(newFlowBlockedByRunHealthReason || newFlowBlockedByVerificationReason);
@@ -7218,16 +7067,15 @@ function App() {
         {requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
-        ) : draftSurface ? (
-          <MissionBuilder
-            form={form}
-            setForm={setForm}
+        ) : intentIngress ? (
+          <IntentOnboarding
+            projectId={activeProjectId}
+            project={activeProjectDisplay}
             busy={busy}
-            onSubmit={submitMission}
-            onResume={resumeMissionNext}
-            operation={missionOperation}
+            setBusy={setBusy}
+            onProjectConnected={activateIntentProject}
+            onStarted={() => refresh().catch((err) => setError(err.message))}
             onCancel={cancelNewFlowDraft}
-            followUpSourceHandoffRef={draftFollowUpHandoffRef}
           />
         ) : (
           <>
@@ -7239,14 +7087,9 @@ function App() {
             busy={busy}
             nextAction={nextAction}
             projectState={projectState}
-            config={config}
             onResolveNext={resolveNextForSelectedFlow}
             onRefresh={() => refresh().catch((err) => setError(err.message))}
-            onStartNewFlow={() => startNewFlow()}
             onCreateFollowUp={() => startNewFlow({ sourceFlow: selectedFlow, followUp: true })}
-            initializeProject={initializeProject}
-            activeProject={activeProjectDisplay}
-            onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
             externalRunHealth={externalRunHealth}
             providerFocus={providerWorkbenchFocus}
@@ -7279,6 +7122,8 @@ function App() {
                 busy={busy}
                 onRefresh={() => loadProjectTopology(activeProjectDisplay.project_id)}
                 onAction={runTopologyAction}
+                onProjectAction={runProjectAction}
+                projectId={activeProjectDisplay.project_id}
               />
             </div>
           </details>
@@ -7333,13 +7178,13 @@ function App() {
           projectContext={{
             projectRef: activeProjectDisplay?.project_root ?? projectState?.project_root ?? config?.project_root,
             projectProfileRef: activeProjectDisplay?.project_profile_ref ?? projectState?.project_profile_ref ?? config?.project_profile_ref,
-            runtimeRoot,
           }}
           nextAction={nextAction}
           repairCompletion={qualityRepairCompletion}
           verificationPlan={projectState?.verification_plan ?? null}
           qualityGate={selectedFlow?.active_quality_gate ?? null}
           busy={busy}
+          onExportSelected={(reference) => runProjectAction("export-evidence", { flow_id: selectedFlow?.flow_id, evidence_refs: [reference] })}
         />
       )}
 
@@ -7362,7 +7207,8 @@ function App() {
         busy={busy}
         result={addProjectResult}
         onClose={closeAddProjectDrawer}
-        onSubmit={(initializeAfterAdd) => addLocalProject({ initializeAfterAdd })}
+        onSubmit={addLocalProject}
+        onPickFolder={pickProjectFolder}
       />
     </div>
   );

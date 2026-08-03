@@ -1,8 +1,9 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
-const REGISTRY_VERSION = 1;
+import { resolveAorHome } from "../aor-home.mjs";
+
+const REGISTRY_VERSION = 2;
 const LOCK_STALE_MS = 30_000;
 const LOCK_RETRY_LIMIT = 100;
 
@@ -10,15 +11,8 @@ function sleep(milliseconds) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
-function platformStateRoot(env = process.env) {
-  if (env.AOR_HOME) return path.resolve(env.AOR_HOME);
-  if (process.platform === "win32") return path.join(env.LOCALAPPDATA ?? os.homedir(), "AOR");
-  if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "AOR");
-  return path.join(env.XDG_STATE_HOME ?? path.join(os.homedir(), ".local", "state"), "aor");
-}
-
 export function resolveWorkspaceRegistryPaths(options = {}) {
-  const root = path.resolve(options.root ?? platformStateRoot(options.env));
+  const root = path.resolve(options.root ?? resolveAorHome({ env: options.env }));
   const workspaceRoot = path.join(root, "workspace");
   return Object.freeze({
     root,
@@ -87,6 +81,8 @@ function publish(paths, document) {
 
 export function createWorkspaceRegistryStore(options = {}) {
   const paths = resolveWorkspaceRegistryPaths(options);
+  fs.mkdirSync(paths.root, { recursive: true, mode: 0o700 });
+  fs.chmodSync(paths.root, 0o700);
   return Object.freeze({
     paths,
     read() {

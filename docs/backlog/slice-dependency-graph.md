@@ -1494,6 +1494,11 @@ own the stricter terminal control proof evidence for this lane.
 | W66-S18 | W66-S17 |
 | W66-S19 | W66-S18 |
 | W66-S09 | W66-S19 |
+| W67-S01 | W66-S09 |
+| W67-S02 | W67-S01 |
+| W67-S03 | W67-S01 |
+| W67-S04 | W67-S02, W67-S03 |
+| W67-S05 | W67-S04 |
 
 ## Topological order
 1. W0-S01
@@ -1847,6 +1852,23 @@ own the stricter terminal control proof evidence for this lane.
 349. W66-S18
 350. W66-S19
 351. W66-S09
+352. W67-S01
+353. W67-S02
+354. W67-S03
+355. W67-S04
+356. W67-S05
+
+W67 dependency edges:
+
+```mermaid
+graph TD
+  W66S09[W66-S09 Fresh four-cell live qualification closure] --> W67S01[W67-S01 Storage and contract baseline]
+  W67S01 --> W67S02[W67-S02 Project source connection and central runtime]
+  W67S01 --> W67S03[W67-S03 Durable intent preparation]
+  W67S02 --> W67S04[W67-S04 Intent-first installed console]
+  W67S03 --> W67S04
+  W67S04 --> W67S05[W67-S05 Explicit materialization, export, and closure proof]
+```
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

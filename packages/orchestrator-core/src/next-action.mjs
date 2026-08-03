@@ -1,11 +1,12 @@
 import fs from "node:fs"; import path from "node:path";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { listRunControlStateFiles } from "./control-plane/read-artifact-readers.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs";
 import { runProjectionCoordinator } from "./operator-projection-services.mjs"; import { operatorControlForAction } from "./next-action-operator-control.mjs";
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]); const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
-const DEFAULT_RUNTIME_ROOT = ".aor"; const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
+const QUALITY_REPAIR_REQUEST_REGEX = /^quality-repair-request-.*\.json$/u;
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
@@ -123,7 +124,7 @@ function normalizeForFileName(value) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**
@@ -1065,69 +1066,6 @@ function projectCommand(command, projectRoot) {
 }
 
 /**
- * @param {string} projectRoot
- * @returns {string}
- */
-function defaultRuntimeRoot(projectRoot) {
-  return path.resolve(projectRoot, DEFAULT_RUNTIME_ROOT);
-}
-
-/**
- * @param {{ projectRoot: string, runtimeRoot: string, explicitRuntimeRoot?: boolean }} options
- * @returns {boolean}
- */
-function shouldIncludeRuntimeRoot(options) {
-  return options.explicitRuntimeRoot === true || path.resolve(options.runtimeRoot) !== defaultRuntimeRoot(options.projectRoot);
-}
-
-/**
- * @param {string} command
- * @param {string} runtimeRoot
- * @param {boolean} includeRuntimeRoot
- * @returns {string}
- */
-function appendRuntimeRootFlag(command, runtimeRoot, includeRuntimeRoot) {
-  if (!includeRuntimeRoot || /\s--runtime-root(?:\s|=)/u.test(command)) {
-    return command;
-  }
-  return `${command} --runtime-root ${shellQuote(runtimeRoot)}`;
-}
-
-/**
- * @param {Record<string, unknown>} action
- * @param {string} runtimeRoot
- * @param {boolean} includeRuntimeRoot
- * @returns {Record<string, unknown>}
- */
-function withRuntimeRootActionCommand(action, runtimeRoot, includeRuntimeRoot) {
-  const command = asString(action.command);
-  return command
-    ? {
-        ...action,
-        command: appendRuntimeRootFlag(command, runtimeRoot, includeRuntimeRoot),
-      }
-    : action;
-}
-
-/**
- * @param {Array<Record<string, unknown>>} blockers
- * @param {string} runtimeRoot
- * @param {boolean} includeRuntimeRoot
- * @returns {Array<Record<string, unknown>>}
- */
-function withRuntimeRootBlockerCommands(blockers, runtimeRoot, includeRuntimeRoot) {
-  return blockers.map((blocker) => {
-    const nextCommand = asString(blocker.next_command);
-    return nextCommand
-      ? {
-          ...blocker,
-          next_command: appendRuntimeRootFlag(nextCommand, runtimeRoot, includeRuntimeRoot),
-        }
-      : blocker;
-  });
-}
-
-/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {{ packetFile: string, bodyFile: string | null, packet: Record<string, unknown>, body: Record<string, unknown> | null } | null}
  */
@@ -1680,11 +1618,6 @@ function executeNextActionProjection(options = {}) {
     command: "aor next",
   });
   const projectRoot = init.projectRoot;
-  const includeRuntimeRoot = shouldIncludeRuntimeRoot({
-    projectRoot,
-    runtimeRoot: init.runtimeRoot,
-    explicitRuntimeRoot: options.runtimeRoot !== undefined,
-  });
   const reportFile = path.join(init.runtimeLayout.reportsRoot, "next-action-report.json");
   const onboardingStatus = asString(init.onboardingReport?.status) ?? "blocked";
   const onboardingEvidenceRef = toEvidenceRef(projectRoot, init.onboardingReportFile);
@@ -1952,9 +1885,7 @@ function executeNextActionProjection(options = {}) {
 
   artifactReadiness ??= buildArtifactReadiness({ init, intake: latestIntake, missionState });
 
-  primaryAction = withRuntimeRootActionCommand(primaryAction, init.runtimeRoot, includeRuntimeRoot);
   primaryAction = { ...primaryAction, operator_control: operatorControlForAction(primaryAction, missionState, closureState) };
-  blockers = withRuntimeRootBlockerCommands(blockers, init.runtimeRoot, includeRuntimeRoot);
   const qualityRepairLineage = asRecord(asRecord(closureState.quality_repair).lineage);
 
   const report = {
@@ -1968,8 +1899,11 @@ function executeNextActionProjection(options = {}) {
     },
     project_state: {
       stage,
-      runtime_root: init.runtimeRoot,
-      runtime_state_file: init.stateFile,
+      storage: {
+        kind: "aor-home",
+        project_ref: `evidence://projects/${init.workspaceProjectId}/`,
+        server_owned: true,
+      },
       onboarding_report_ref: onboardingEvidenceRef,
       active_run_ref: activeRun ? toEvidenceRef(projectRoot, activeRun.stateFile) : null,
     },

@@ -4,6 +4,10 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 
 | Contract family | Source contract | Loader family key | Example glob | Status | Notes |
 |---|---|---|---|---|---|
+| Core packets and profiles | `workspace-registry.md` | `workspace-registry` | `examples/workspace/workspace-registry*.yaml` | implemented | Central Workspace revision and collision-safe project route keys. |
+| Core packets and profiles | `intent-submission.md` | `intent-submission` | `examples/packets/intent-submission*.yaml` | implemented | Immutable text/attachment metadata, snapshots, status, and normalization lineage. |
+| Core packets and profiles | `intent-normalization-report.md` | `intent-normalization-report` | `examples/reports/intent-normalization-report*.yaml` | implemented | Structured task preview, work type, safety mode, questions, confidence, and validation. |
+| Operations | `evidence-export-manifest.md` | `evidence-export-manifest` | `examples/reports/evidence-export-manifest*.yaml` | implemented | Explicit selected evidence export paths, digests, byte lengths, and exclusions. |
 | Core packets and profiles | `project-profile.md` | `project-profile` | `examples/project*.aor.yaml` | implemented | Required fields + top-level type checks. |
 | Core packets and profiles | `project-binding.md` | `project-binding` | `examples/bindings/*.yaml` | implemented | Machine-local checkout identity, availability, revision, and credential-readiness summaries with secret-bearing fields rejected. |
 | Execution and quality | `workspace-set.md` | `workspace-set` | `examples/workspace-sets/*.yaml` | implemented | Stable mounts, binding/ref/commit identity, access mode, explicit write scope, and fail-closed shared-repository overlap checks. |

@@ -5,6 +5,7 @@ import path from "node:path";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs"; import { loadValidatedIntakePacket } from "./intake-packet-discovery.mjs"; import { resolveMissionSpecificPlannerCandidate, revisionAdviceForValidationIssue } from "./planner-decomposition.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 
 /**
  * @param {string[]} values
@@ -55,7 +56,7 @@ function stableDigest(value) {
 }
 
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replaceAll("\\", "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 function stableTaskSegment(value, fallback) {
@@ -551,6 +552,8 @@ function loadArtifactPacketBody(packet) {
  */
 function resolveArtifactPacketPath(options) {
   if (options.explicitPath) {
+    const logical = options.explicitPath.match(/^evidence:\/\/projects\/[^/]+\/(.+)$/u);
+    if (logical) return path.resolve(path.dirname(options.runtimeLayout.artifactsRoot), logical[1]);
     const explicitPath = options.explicitPath.startsWith("evidence://")
       ? options.explicitPath.slice("evidence://".length)
       : options.explicitPath;
@@ -655,14 +658,14 @@ export function prepareHandoffArtifacts(options = {}) {
     verificationExpectations,
     fallbackVerificationCommands: allowedCommands,
     repoIds: repoScopes.map((scope) => scope.repo_id),
-    sourceRef: `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`,
+    sourceRef: toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath: artifactPacketFile, workspaceProjectId: init.projectId }),
     plannerCandidate: options.plannerCandidate,
   });
   const missionId = typeof missionTraceability.mission_id === "string" && missionTraceability.mission_id.trim().length > 0
     ? missionTraceability.mission_id.trim()
     : ticketId;
   const planId = `${init.projectId}.plan.${stableTaskSegment(missionId, "current")}`;
-  const approvedInputRef = `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`;
+  const approvedInputRef = toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath: artifactPacketFile, workspaceProjectId: init.projectId });
   const planningInputManifest = Array.isArray(options.planningInputManifest) && options.planningInputManifest.length > 0 ? options.planningInputManifest : [{
     input_id: "planning-input.1", kind: "approved-intake", ref: approvedInputRef,
   }];
@@ -701,7 +704,7 @@ export function prepareHandoffArtifacts(options = {}) {
     : null;
   if (!samePlan && supersededHandoff) archivePlanRevision(previousHandoffFile, supersededHandoff);
   const previousPlanRef = archivedWaveTicketFile
-    ? `evidence://${path.relative(init.projectRoot, archivedWaveTicketFile)}`
+    ? toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath: archivedWaveTicketFile, workspaceProjectId: init.projectId })
     : previousWaveTicket?.previous_plan_ref ?? null;
   const revisionSummary = samePlan
     ? previousWaveTicket.revision_summary ?? { reason: "Idempotent regeneration.", material_change: false }
@@ -900,7 +903,7 @@ export function prepareHandoffArtifacts(options = {}) {
       wave_ticket_file: waveTicketFile,
       artifact_packet_file: artifactPacketFile,
       project_profile_ref: init.projectProfileRef,
-      plan_ref: `evidence://${path.relative(init.projectRoot, waveTicketFile)}`,
+      plan_ref: toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath: waveTicketFile, workspaceProjectId: init.projectId }),
       previous_plan_ref: previousPlanRef,
       planner_attempt_ref: options.plannerAttemptRef ?? null,
       planning_input_refs: unique(asStringArray(options.planningInputRefs)),

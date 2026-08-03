@@ -29,6 +29,8 @@ async function withTempRepo(callback) {
   const gitInit = spawnSync("git", ["init"], { cwd: repoRoot, encoding: "utf8" });
   assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
   fs.writeFileSync(path.join(repoRoot, "README.md"), "# Temp project\n", "utf8");
   fs.mkdirSync(path.join(repoRoot, "docs"), { recursive: true });
   fs.writeFileSync(path.join(repoRoot, "docs/guide.md"), "Original guide\n", "utf8");
@@ -81,7 +83,7 @@ function seedCompletedFlow(repoRoot) {
     sourceKind: "local-note",
     sourceRef: "docs/guide.md",
   });
-  const handoffRef = `evidence://.aor/projects/${init.projectId}/reports/learning-loop-handoff-run.completed-flow.json`;
+  const handoffRef = `evidence://projects/${init.projectId}/reports/learning-loop-handoff-run.completed-flow.json`;
   writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, "next-action-report-completed-flow.json"), {
     report_id: `${init.projectId}.next-action.completed-flow.v1`,
     project_id: init.projectId,
@@ -139,7 +141,7 @@ function seedCompletedFlow(repoRoot) {
   });
   return {
     init,
-    flowId: `flow.${init.projectId}.completed-flow`,
+    flowId: `flow.${init.workspaceProjectId}.completed-flow`,
   };
 }
 
@@ -550,7 +552,7 @@ test("target-flow operator requests validate flows against the explicit project 
       sourceRef: "docs/guide.md",
     });
 
-    const flowId = `flow.${init.projectId}.profile-follow-up`;
+    const flowId = `flow.${init.workspaceProjectId}.profile-follow-up`;
     const created = createOperatorRequest({
       cwd: repoRoot,
       projectRef: repoRoot,

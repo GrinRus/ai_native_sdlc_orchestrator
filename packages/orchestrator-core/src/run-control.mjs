@@ -6,6 +6,7 @@ import { validatePublicId } from "../../contracts/src/index.mjs";
 import { redactSensitiveValue, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
 const HIGH_RISK_ACTIONS = new Set(["steer", "cancel"]);
@@ -81,7 +82,7 @@ function asBoolean(value) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

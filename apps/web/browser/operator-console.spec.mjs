@@ -36,7 +36,8 @@ test.describe.serial("installed local operator console", () => {
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       await page.goto(state.app_url);
-      await expect(page.getByText("Initialize Project Runtime").first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: "What should AOR do?" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Prepare task" })).toBeVisible();
       await expect(page.locator("#project-switcher-control")).toBeVisible();
       const appConfig = await page.request.get(`${new URL(state.app_url).origin}/app-config.json`).then((response) => response.json());
       await expect(page.getByText(`v${appConfig.version}`)).toHaveText(`v${appConfig.version}`);
@@ -51,7 +52,7 @@ test.describe.serial("installed local operator console", () => {
     await page.goto(state.app_url);
     await expect(page.getByRole("heading", { name: "Project Structure" })).toBeVisible();
     await page.getByRole("tab", { name: "Repositories" }).click();
-    await expect(page.getByRole("button", { name: "Add repository" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Connect repository" })).toBeVisible();
     await page.getByRole("tab", { name: "Validation" }).click();
     await expect(page.getByRole("button", { name: "Validate topology" })).toBeVisible();
     expect(fs.existsSync(state.runtime_root)).toBe(false);
@@ -150,52 +151,82 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByText(secretCanary)).toHaveCount(0);
   });
 
-  test("explicit initialization has durable readback and truthful action semantics", async ({ page }) => {
+  test("intent preview supports attachments, revisions, and idempotent failed-start recovery", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
-    await page.goto(state.app_url);
-    const action = page.getByRole("button", { name: "Initialize Project Runtime" });
-    await expect(action).toBeVisible();
-    await action.click();
-    await expect(page.getByText("Configure First Flow").first()).toBeVisible();
-    const stateResponse = await page.request.get(
-      `${new URL(state.app_url).origin}/api/projects/${encodeURIComponent(state.project_id)}/state`,
-    );
-    const projectState = await stateResponse.json();
-    expect(projectState.initialized).toBe(true);
-    expect(fs.existsSync(projectState.state_file)).toBe(true);
-    await page.reload();
-    await expect(page.getByText("Configure First Flow").first()).toBeVisible();
-  });
-
-  test("default Quiet Cockpit creates one structured Mission and restores durable refs", async ({ page }) => {
-    const state = readHarnessState();
-    await blockExternalNetwork(page, state.app_url);
-    const lifecycleCommands = [];
-    page.on("request", (request) => {
-      if (!request.url().endsWith("/lifecycle-command/actions") || request.method() !== "POST") return;
-      lifecycleCommands.push(request.postDataJSON()?.command);
+    const submissionId = "intent.browser-proof";
+    const actions = [];
+    const submission = { submission_id: submissionId, status: "prepared", attachments: [{ original_name: "requirements.md" }] };
+    let report = {
+      status: "prepared", title: "Fix timeout handling", outcome: "Make authorization timeout behavior deterministic.",
+      constraints: ["Do not change authentication semantics."], acceptance: ["Timeout behavior is covered by tests."],
+      scope: ["src/auth/**"], work_type: "code-change", delivery_mode: "patch-only", open_questions: [],
+      provider: { adapter_id: "claude-code" }, confidence: 0.91,
+    };
+    const base = new RegExp(`/api/projects/${state.project_id}/intent-submissions$`, "u");
+    const item = new RegExp(`/api/projects/${state.project_id}/intent-submissions/${submissionId}$`, "u");
+    const actionRoute = new RegExp(`/api/projects/${state.project_id}/intent-submissions/${submissionId}/actions$`, "u");
+    await page.route(base, async (route) => {
+      const payload = route.request().postDataJSON();
+      expect(payload.request_text).toContain("timeout");
+      expect(payload.attachments).toEqual([{ name: "requirements.md", content: "Acceptance from file" }]);
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission: { ...submission, status: "submitted" }, status_ref: `/api/projects/${state.project_id}/intent-submissions/${submissionId}` }) });
+    });
+    await page.route(item, (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission, normalization: report }) }));
+    await page.route(actionRoute, async (route) => {
+      const payload = route.request().postDataJSON();
+      actions.push(payload.action);
+      if (payload.action === "revise") {
+        report = payload.normalization;
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission, report }) });
+      } else if (payload.action === "confirm-and-start") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ retryable_start: true, flow_id: "flow.browser-proof" }) });
+      } else {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ retryable_start: false, flow_id: "flow.browser-proof" }) });
+      }
     });
     await page.goto(state.app_url);
-    await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
-    await page.getByRole("button", { name: "Configure First Flow" }).click();
-    await expect(page.getByRole("form", { name: "Guided Mission intake" })).toBeVisible();
+    await page.getByLabel("Request").fill("Fix the authorization timeout.");
+    await page.getByLabel("Text attachments").setInputFiles({ name: "requirements.md", mimeType: "text/markdown", buffer: Buffer.from("Acceptance from file") });
+    await page.getByRole("button", { name: "Prepare task" }).click();
+    await expect(page.getByLabel("Task title")).toHaveValue("Fix timeout handling");
+    await expect(page.getByText("patch-only", { exact: true })).toBeVisible();
+    await expect(page.getByText("claude-code", { exact: true })).toBeVisible();
+    await page.getByLabel("Task title").fill("Fix authorization timeout handling");
+    await page.getByRole("button", { name: "Save revision" }).click();
+    await expect.poll(() => report.title).toBe("Fix authorization timeout handling");
+    await page.getByRole("button", { name: "Confirm and start" }).click();
+    await expect(page.getByText("The Flow was created, but its first action did not start.")).toBeVisible();
+    await page.getByRole("button", { name: "Retry start" }).click();
+    await expect.poll(() => actions).toEqual(["revise", "confirm-and-start", "retry-start"]);
+    expect(actions.filter((action) => action === "confirm-and-start")).toHaveLength(1);
+    expect(fs.existsSync(state.runtime_root)).toBe(false);
+  });
 
-    await page.getByRole("button", { name: "Clear form" }).click();
-    await page.getByRole("button", { name: "Create Mission evidence" }).click();
-    await expect(page.getByLabel("Mission title")).toBeFocused();
-    expect(lifecycleCommands).toEqual([]);
-
-    await page.getByRole("button", { name: "Load safe walkthrough" }).click();
-    await page.getByRole("button", { name: "Create Mission evidence" }).click();
-    await expect.poll(() => lifecycleCommands).toEqual(["mission create", "next"]);
-    await expect(page.getByText("Mission evidence is durable.")).toBeVisible();
-    await page.reload();
-    await expect(page.getByText("Mission evidence is durable.")).toBeVisible();
-    expect(lifecycleCommands.filter((command) => command === "mission create")).toHaveLength(1);
-    await page.getByRole("button", { name: "Create discovery evidence" }).click();
-    await expect.poll(() => lifecycleCommands.slice(-2)).toEqual(["discovery run", "next"]);
-    await expect(page.getByRole("button", { name: "Build specification evidence" })).toBeVisible();
+  test("text-only intent prepares a no-write review without attachments", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    const submissionId = "intent.browser-text-only";
+    const submission = { submission_id: submissionId, status: "prepared", attachments: [] };
+    const report = {
+      status: "prepared", title: "Review authorization", outcome: "Explain authorization risks without changing code.",
+      constraints: [], acceptance: ["Risks and recommendations are listed."], scope: ["src/auth/**"],
+      work_type: "review", delivery_mode: "no-write", assumptions: [], open_questions: [],
+      provider: { adapter_id: "qwen-code" }, confidence: 0.88,
+    };
+    await page.route(new RegExp(`/api/projects/${state.project_id}/intent-submissions$`, "u"), async (route) => {
+      expect(route.request().postDataJSON()).toEqual({ request_text: "Review authorization risks.", attachments: [] });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission: { ...submission, status: "submitted" }, status_ref: `/api/projects/${state.project_id}/intent-submissions/${submissionId}` }) });
+    });
+    await page.route(new RegExp(`/api/projects/${state.project_id}/intent-submissions/${submissionId}$`, "u"), (route) => route.fulfill({
+      contentType: "application/json", body: JSON.stringify({ submission, normalization: report }),
+    }));
+    await page.goto(state.app_url);
+    await page.getByLabel("Request").fill("Review authorization risks.");
+    await page.getByRole("button", { name: "Prepare task" }).click();
+    await expect(page.getByLabel("Task title")).toHaveValue("Review authorization");
+    await expect(page.getByText("no-write", { exact: true })).toBeVisible();
+    await expect(page.getByText("qwen-code", { exact: true })).toBeVisible();
   });
 
   test("Quiet Cockpit lifecycle navigation reflows without hiding state", async ({ page }) => {
@@ -229,44 +260,45 @@ test.describe.serial("installed local operator console", () => {
     await page.getByRole("tab", { name: "Evidence" }).click(); await expect(page.getByRole("region", { name: "Evidence" })).toBeVisible();
   });
 
-  test("partial endpoint failure preserves project state and keyboard modal behavior", async ({ page }) => {
+  test("source chooser preserves project state and keyboard modal behavior", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
-    await page.route("**/next-action-report", async (route) => {
+    const sources = [];
+    await page.route("**/api/projects/actions", async (route) => {
+      const payload = route.request().postDataJSON();
+      sources.push(payload.source);
       await route.fulfill({
-        status: 500,
+        status: 202,
         contentType: "application/json",
-        body: JSON.stringify({
-          error: {
-            code: "fixture_partial_failure",
-            title: "Next action unavailable",
-            detail: "The fixture intentionally failed this resource.",
-            consequence: "Existing project state remains visible.",
-            retryable: true,
-            recovery_actions: [{ action_id: "retry", label: "Retry" }],
-          },
-        }),
+        body: JSON.stringify({ job: { job_id: `job-${sources.length}`, status: "failed", error: "fixture connection failure" } }),
       });
     });
     await page.goto(state.app_url);
     await expect(page.locator("#project-switcher-control")).toBeVisible();
-    await expect(page.getByText("Some live resources are unavailable.")).toBeVisible();
-    await expect(page.getByText(/Existing project state remains visible/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What should AOR do?" })).toBeVisible();
     const opener = page.getByRole("button", { name: /Add AOR Project/i }).first();
     await opener.click();
-    const dialog = page.getByRole("dialog", { name: "Add AOR Project" });
+    const dialog = page.getByRole("dialog", { name: /Connect project|Add AOR Project/u });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
     await expect.poll(() => page.locator("header.topbar").evaluate((element) => element.inert)).toBe(true);
-    await dialog.getByLabel("Project path").fill("/tmp/aor-dialog-focus-fixture");
-    for (let step = 0; step < 5; step += 1) await dialog.getByRole("button", { name: "Continue" }).click();
-    const lastAction = dialog.getByRole("button", { name: "Confirm writes and initialize" });
-    await lastAction.focus();
+    await dialog.getByLabel("Absolute folder path").fill("/tmp/aor-dialog-focus-fixture");
+    const connectAction = dialog.getByRole("button", { name: "Connect code" });
+    await connectAction.focus();
     await page.keyboard.press("Tab");
     await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
     await page.keyboard.press("Shift+Tab");
-    await expect(lastAction).toBeFocused();
-    await page.keyboard.press("Escape");
+    await expect(connectAction).toBeFocused();
+    await connectAction.click();
+    await expect(dialog.getByRole("status")).toContainText("fixture connection failure");
+    await dialog.getByLabel("Source").selectOption("git");
+    await dialog.getByLabel("HTTPS or SSH Git URL").fill("git@example.invalid:repository.git");
+    await connectAction.click();
+    await expect.poll(() => sources).toEqual([
+      { kind: "local", path: "/tmp/aor-dialog-focus-fixture" },
+      { kind: "git", url: "git@example.invalid:repository.git" },
+    ]);
+    await dialog.getByRole("button", { name: "Close" }).click();
     await expect(dialog).toBeHidden();
     const discardDialog = page.getByRole("dialog", { name: "Discard project draft?" });
     await expect(discardDialog).toBeVisible();
@@ -314,7 +346,11 @@ test.describe.serial("installed local operator console", () => {
       selected_stage: "execution",
       evidence_refs: ["step-result://interaction-one", "step-result://interaction-two"],
     };
-    await page.route(new RegExp(`/api/projects/${state.project_id}/flows$`, "u"), async (route) => {
+    await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", stage: "execution", onboarding_summary: { initialized: true, state_exists: true }, storage: { kind: "aor-home", server_owned: true } }),
+    }));
+    await page.route(new RegExp(`/api/projects/${state.project_id}/flows(?:\\?.*)?$`, "u"), async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({ flows: [flow], selected_flow_id: flow.flow_id }),
@@ -369,7 +405,11 @@ test.describe.serial("installed local operator console", () => {
     await blockExternalNetwork(page, state.app_url);
     await page.setViewportSize({ width: 390, height: 844 });
     const flow = { flow_id: "plan-proof-flow", status: "active", selected_stage: "planning", evidence_refs: [] };
-    await page.route(new RegExp(`/api/projects/${state.project_id}/flows$`, "u"), (route) => route.fulfill({
+    await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", stage: "planning", onboarding_summary: { initialized: true, state_exists: true }, storage: { kind: "aor-home", server_owned: true } }),
+    }));
+    await page.route(new RegExp(`/api/projects/${state.project_id}/flows(?:\\?.*)?$`, "u"), (route) => route.fulfill({
       contentType: "application/json", body: JSON.stringify({ flows: [flow], selected_flow_id: flow.flow_id }),
     }));
     await page.route("**/flows/selected", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(flow) }));

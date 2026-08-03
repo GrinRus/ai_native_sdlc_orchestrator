@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { previewProjectRuntime } from "../project-init.mjs";
+import { resolveAorHome } from "../aor-home.mjs";
 import { listFlowProjections } from "./flow-projections.mjs";
 import { buildOnboardingSummary } from "./onboarding-summary.mjs";
 import { createProjectContext, rekeyProjectContext } from "./project-context.mjs";
@@ -14,6 +15,13 @@ import { createWorkspaceRegistryStore } from "./workspace-registry-store.mjs";
  */
 function optionalString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function publicSource(source, projectRoot) {
+  if (source?.kind === "git") {
+    return { kind: "git", clone_source: source.clone_source, repository_id: source.repository_id };
+  }
+  return { kind: "local", local_path: projectRoot };
 }
 
 /**
@@ -211,9 +219,10 @@ export function summarizeProjectContext(context) {
     label: context.label,
     display_name: preview.displayName,
     project_ref: context.projectRoot,
-    project_profile_ref: context.canonicalProfilePath,
+    project_profile_ref: context.canonicalProfilePath.startsWith(context.projectRuntimeRoot)
+      ? `evidence://projects/${context.projectId}/state/${path.basename(context.canonicalProfilePath)}`
+      : path.relative(context.projectRoot, context.canonicalProfilePath).replace(/\\/g, "/"),
     project_profile_source: preview.projectProfileSource,
-    runtime_root: context.runtimeRoot,
     onboarding_summary: {
       ...onboardingSummary,
       ...(profileMismatchCandidateProjectIds.length > 0
@@ -256,11 +265,16 @@ export function createLocalProjectRegistry(options) {
       ...document,
       selected_project_id: null,
       projects: [...inputs.entries()].map(([projectId, input]) => ({
-        project_id: projectId,
+        workspace_project_id: projectId,
+        runtime_project_id: contexts.get(projectId)?.runtimeProjectId ?? null,
         project_ref: input.projectRef,
         project_profile: input.projectProfile ?? null,
-        runtime_root: input.runtimeRoot ?? null,
+        project_profile_ref: contexts.get(projectId)?.canonicalProfilePath?.startsWith(contexts.get(projectId)?.projectRuntimeRoot)
+          ? `evidence://projects/${projectId}/state/${path.basename(contexts.get(projectId).canonicalProfilePath)}`
+          : input.projectProfile ?? null,
         label: input.label ?? null,
+        source: input.source ?? null,
+        status: "connected",
         bindings: Array.isArray(input.bindings) ? input.bindings : [],
         latest_validation: input.latestValidation ?? null,
         topology_history: Array.isArray(input.topologyHistory) ? input.topologyHistory : [],
@@ -281,7 +295,11 @@ export function createLocalProjectRegistry(options) {
    * }} input
    */
   function addProject(input, settings = {}) {
-    const nextContext = createProjectContext({ ...input, cwd });
+    const nextContext = createProjectContext({
+      ...input,
+      runtimeRoot: input.runtimeRoot ?? store?.paths.root ?? resolveAorHome(),
+      cwd,
+    });
     const existing = [...contexts.values()].find((context) => isSameRegisteredTarget(context, nextContext));
     let selectedProjectId;
     if (existing) {
@@ -306,8 +324,8 @@ export function createLocalProjectRegistry(options) {
     addProject({
       projectRef: project.project_ref,
       projectProfile: optionalString(project.project_profile),
-      runtimeRoot: optionalString(project.runtime_root),
       label: optionalString(project.label),
+      source: project.source && typeof project.source === "object" ? project.source : undefined,
       bindings: Array.isArray(project.bindings) ? project.bindings : [],
       latestValidation: project.latest_validation ?? null,
       topologyHistory: Array.isArray(project.topology_history) ? project.topology_history : [],
@@ -321,6 +339,9 @@ export function createLocalProjectRegistry(options) {
   }
 
   return {
+    get storageRoot() {
+      return store?.paths.root ?? options.persistence?.root ?? resolveAorHome();
+    },
     get defaultProjectId() {
       return defaultProjectId;
     },
@@ -352,13 +373,24 @@ export function createLocalProjectRegistry(options) {
       persist();
       return inputs.get(projectId);
     },
+    removeProject(projectId) {
+      if (!contexts.has(projectId)) return false;
+      contexts.delete(projectId);
+      inputs.delete(projectId);
+      if (defaultProjectId === projectId) defaultProjectId = contexts.keys().next().value ?? null;
+      persist();
+      return true;
+    },
     summarize() {
       return {
         workspace_id: "default",
         revision: registryRevision,
         selected_project_id: defaultProjectId,
         default_project_id: defaultProjectId,
-        projects: [...contexts.values()].map((context) => summarizeProjectContext(context)),
+        projects: [...contexts.values()].map((context) => ({
+          ...summarizeProjectContext(context),
+          source: publicSource(inputs.get(context.projectId)?.source, context.projectRoot),
+        })),
         read_only: true,
       };
     },

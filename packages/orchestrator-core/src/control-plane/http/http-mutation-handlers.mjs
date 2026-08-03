@@ -21,6 +21,19 @@ import {
 } from "../../task-plan-service.mjs";
 import { applyTopologyAction, TopologyManagementError } from "../topology-management.mjs";
 import { applyExecutionProfileAction, ExecutionProfileError } from "../execution-profile.mjs";
+import { connectAdditionalRepository, createProjectConnectionJob, deleteProjectData, disconnectProject, refreshProjectSource } from "../project-source.mjs";
+import { openNativeFolderPicker } from "../folder-picker.mjs";
+import { exportEvidence, materializeProjectConfig, ProjectWritebackError } from "../../project-writeback.mjs";
+import {
+  IntentServiceError,
+  answerIntentQuestions,
+  cancelIntentSubmission,
+  confirmAndStartIntent,
+  createIntentSubmission,
+  prepareIntentSubmission,
+  retryIntentStart,
+  reviseIntentSubmission,
+} from "../../intent-service.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
 const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
@@ -31,9 +44,9 @@ const PLAN_ACTIONS = new Set(["create", "request_revision", "approve"]);
  * @param {import("node:http").ServerResponse} response
  * @returns {Promise<Record<string, unknown> | null>}
  */
-async function readMutationPayload(request, response) {
+async function readMutationPayload(request, response, options = {}) {
   try {
-    return await readJsonRequestBody(request);
+    return await readJsonRequestBody(request, options);
   } catch (error) {
     if (error instanceof HttpRequestBodyError) {
       sendError(response, error.statusCode, error.code, error.message);
@@ -266,30 +279,82 @@ export async function handleProjectAction({ request, response, registry }) {
   }
 
   const action = asString(payload.action);
-  if (action !== "add") {
-    sendError(response, 400, "invalid_project_action", `Unsupported project action '${action ?? "missing"}'.`);
-    return;
-  }
-
-  const projectRef = asString(payload.project_ref);
-  if (!projectRef) {
-    sendError(response, 400, "invalid_project_ref", "Project action 'add' requires project_ref.");
-    return;
-  }
-
   try {
-    const context = registry.addProject({
-      projectRef,
-      projectProfile: asString(payload.project_profile) ?? undefined,
-      runtimeRoot: asString(payload.runtime_root) ?? undefined,
-      label: asString(payload.label) ?? undefined,
-    });
-    sendJson(response, 200, {
-      project: summarizeProjectContext(context),
-      ...registry.summarize(),
-    });
+    if (action === "connect") {
+      const source = payload.source && typeof payload.source === "object" && !Array.isArray(payload.source) ? payload.source : null;
+      if (!source) {
+        sendError(response, 400, "invalid_project_source", "Project action 'connect' requires source.");
+        return;
+      }
+      const job = createProjectConnectionJob({ registry, source, label: asString(payload.label) ?? undefined });
+      sendJson(response, 202, { job, status_ref: `/api/project-connection-jobs/${encodeURIComponent(job.job_id)}` });
+      return;
+    }
+    const projectId = asString(payload.project_id);
+    if (!projectId) {
+      sendError(response, 400, "project_id_required", `Project action '${action ?? "missing"}' requires project_id.`);
+      return;
+    }
+    if (action === "refresh-source") sendJson(response, 200, refreshProjectSource({ registry, projectId }));
+    else if (action === "connect-repository") sendJson(response, 201, connectAdditionalRepository({ registry, projectId, source: payload.source, label: asString(payload.label) ?? undefined }));
+    else if (action === "disconnect") sendJson(response, 200, disconnectProject({ registry, projectId }));
+    else if (action === "delete-aor-data") sendJson(response, 200, deleteProjectData({ registry, projectId, confirmation: asString(payload.confirmation) }));
+    else if (action === "materialize-project-config") sendJson(response, 200, materializeProjectConfig({ registry, projectId }));
+    else if (action === "export-evidence") sendJson(response, 201, exportEvidence({ registry, projectId, flowId: asString(payload.flow_id), exportId: asString(payload.export_id), evidenceRefs: payload.evidence_refs }));
+    else sendError(response, 400, "invalid_project_action", `Unsupported project action '${action ?? "missing"}'.`);
   } catch (error) {
-    sendError(response, 400, "project_add_failed", error instanceof Error ? error.message : String(error));
+    sendError(response, error instanceof ProjectWritebackError ? error.statusCode : 400, error?.code ?? "project_action_failed", error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function handleFolderPickerAction({ request, response }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+  if ((asString(payload.action) ?? "open") !== "open") {
+    sendError(response, 400, "invalid_folder_picker_action", "Folder picker supports only action 'open'.");
+    return;
+  }
+  sendJson(response, 200, openNativeFolderPicker());
+}
+
+export async function handleIntentSubmissionCreate({ request, response, params, registry }) {
+  const payload = await readMutationPayload(request, response, { maxBytes: 6 * 1024 * 1024 });
+  if (!payload) return;
+  try {
+    const result = createIntentSubmission({
+      registry,
+      projectId: params.projectId,
+      requestText: typeof payload.request_text === "string" ? payload.request_text : "",
+      attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+      autoPrepare: payload.auto_prepare !== false,
+    });
+    sendJson(response, 202, { ...result, status_ref: `/api/projects/${encodeURIComponent(params.projectId)}/intent-submissions/${encodeURIComponent(result.submission.submission_id)}` });
+  } catch (error) {
+    if (error instanceof IntentServiceError) sendError(response, error.statusCode, error.code, error.message);
+    else throw error;
+  }
+}
+
+export async function handleIntentSubmissionAction({ request, response, params, registry }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+  try {
+    const action = asString(payload.action);
+    let result;
+    if (action === "retry") result = prepareIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId });
+    else if (action === "revise") result = reviseIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId, normalization: payload.normalization });
+    else if (action === "answer") result = answerIntentQuestions({ registry, projectId: params.projectId, submissionId: params.submissionId, answers: payload.answers });
+    else if (action === "cancel") result = cancelIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId });
+    else if (action === "confirm-and-start") result = confirmAndStartIntent({ registry, projectId: params.projectId, submissionId: params.submissionId });
+    else if (action === "retry-start") result = retryIntentStart({ registry, projectId: params.projectId, submissionId: params.submissionId });
+    else {
+      sendError(response, 400, "intent_submission.invalid_action", `Unsupported intent action '${action ?? "missing"}'.`);
+      return;
+    }
+    sendJson(response, action === "confirm-and-start" ? 202 : 200, result);
+  } catch (error) {
+    if (error instanceof IntentServiceError) sendError(response, error.statusCode, error.code, error.message);
+    else throw error;
   }
 }
 

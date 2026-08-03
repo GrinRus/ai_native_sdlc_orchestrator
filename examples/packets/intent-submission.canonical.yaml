@@ -1,0 +1,21 @@
+submission_id: intent-submission.decision.login-a1b2c3d4
+workspace_project_id: decision-a1b2c3d4
+project_id: decision
+revision: 1
+status: prepared
+request_text: Add session timeout handling and tests.
+attachments:
+  - attachment_id: attachment.requirements.11223344
+    original_name: requirements.md
+    media_type: text/markdown
+    byte_length: 148
+    sha256: 1111111111111111111111111111111111111111111111111111111111111111
+    storage_ref: inputs/intent-submission.decision.login-a1b2c3d4/attachment.requirements.11223344.md
+repository_snapshot:
+  - repo_id: main
+    resolved_identity: github.com/example/decision
+    resolved_commit: 2222222222222222222222222222222222222222
+normalization_refs:
+  - evidence://projects/decision-a1b2c3d4/reports/intent-normalization-report.login.v1.json
+created_at: 2026-08-03T00:00:00.000Z
+updated_at: 2026-08-03T00:01:00.000Z

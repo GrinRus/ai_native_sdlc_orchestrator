@@ -132,7 +132,7 @@ function buildReport(options, workspace, sourceAttempts, blockers) {
   });
   const gateFailed = gates.some((gate) => gate.required && gate.status !== "passed");
   const status = blockers.length > 0 ? "blocked" : gateFailed ? "verification-pending" : "passed";
-  const reportRef = `evidence://.aor/projects/${options.projectId}/reports/integration-report-${options.parentRunId}.json`;
+  const reportRef = `evidence://projects/${options.projectId}/reports/integration-report-${options.parentRunId}.json`;
   return {
     schema_version: 1,
     report_id: `integration-report-${options.parentRunId}`,

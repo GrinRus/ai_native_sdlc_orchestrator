@@ -1610,7 +1610,7 @@ test("live adapter supports file-attached request transport for argv prompt runn
 
     assert.equal(response.status, "success");
     assert.equal(response.output.external_runner.request_transport, "file-attachment");
-    assert.match(response.output.external_runner.request_file_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
+    assert.match(response.output.external_runner.request_file_ref, /^evidence:\/\/projects\/adapter-test\/reports\/adapter-live-request-/u);
     assert.equal(response.output.runner_output.message_seen, true);
     assert.equal(response.output.runner_output.request_id, "req-open-code-file");
   });
@@ -1708,7 +1708,7 @@ test("live adapter request-artifact transport sends bounded provider work packet
             required: [{
               packet: "handoff_packet",
               required: true,
-              resolved_ref: "evidence://.aor/projects/adapter-test/reports/handoff.json",
+              resolved_ref: "evidence://projects/adapter-test/reports/handoff.json",
             }],
           },
         },
@@ -1725,8 +1725,8 @@ test("live adapter request-artifact transport sends bounded provider work packet
 
     assert.equal(response.status, "success");
     assert.equal(response.output.external_runner.request_transport, "request-artifact");
-    assert.match(response.output.external_runner.request_artifact_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
-    assert.match(response.output.external_runner.provider_work_packet_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-work-packet-/u);
+    assert.match(response.output.external_runner.request_artifact_ref, /^evidence:\/\/projects\/adapter-test\/reports\/adapter-live-request-/u);
+    assert.match(response.output.external_runner.provider_work_packet_ref, /^evidence:\/\/projects\/adapter-test\/reports\/adapter-live-work-packet-/u);
     assert.equal(response.output.external_runner.context_budget_status, "pass");
     assert.equal(response.output.runner_output.packet_kind, "aor-provider-work-packet");
     assert.equal(response.output.runner_output.packet_version, 2);
@@ -1894,7 +1894,7 @@ test("provider work packet blocks an unlisted required command before spawn", ()
               required: [{
                 packet: "handoff_packet",
                 required: true,
-                resolved_ref: "evidence://.aor/projects/adapter-test/reports/handoff-invalid.json",
+                resolved_ref: "evidence://projects/adapter-test/reports/handoff-invalid.json",
               }],
             },
           },
@@ -1959,7 +1959,7 @@ test("live adapter repair request-artifact packet includes repair closure policy
       JSON.stringify(
         {
           decision: "request-repair",
-          review_report_ref: "evidence://.aor/projects/adapter-test/reports/review-report-repair.json",
+          review_report_ref: "evidence://projects/adapter-test/reports/review-report-repair.json",
           repair_context: {
             source_phase: "review",
             cycle_iteration: 1,
@@ -1970,7 +1970,7 @@ test("live adapter repair request-artifact packet includes repair closure policy
                 category: "code-quality",
                 severity: "blocking",
                 summary: "test/headers.ts coverage was weakened.",
-                evidence_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
+                evidence_refs: ["evidence://projects/adapter-test/reports/review-report-repair.json"],
                 resolution_requirement: "Restore the weakened assertion coverage or provide equivalent stronger coverage.",
                 verification_failure_details: [
                   {
@@ -1992,14 +1992,14 @@ test("live adapter repair request-artifact packet includes repair closure policy
                     stdout_excerpt: "headers coverage failed",
                     stderr_excerpt: "",
                     failure_summary: "Post-change verification command 'npx ava test/headers.ts' failed with exit code 1.",
-                    evidence_refs: ["evidence://.aor/projects/adapter-test/reports/step-result-post-run-primary-1.json"],
+                    evidence_refs: ["evidence://projects/adapter-test/reports/step-result-post-run-primary-1.json"],
                   },
                 ],
               },
             ],
             meaningful_changed_paths: ["test/headers.ts"],
             verification_status: "pass",
-            verification_refs: ["evidence://.aor/projects/adapter-test/reports/review-report-repair.json"],
+            verification_refs: ["evidence://projects/adapter-test/reports/review-report-repair.json"],
             previous_repair_decision_refs: [],
             context_fingerprint: "sha256:adapter-repair-context",
             new_context_since_previous: ["first-repair-decision"],
@@ -2071,7 +2071,7 @@ test("live adapter repair request-artifact packet includes repair closure policy
           delivery_mode: "patch-only",
         },
         runtime_evidence_refs: [
-          "evidence://.aor/projects/adapter-test/reports/review-decision-request-repair.json",
+          "evidence://projects/adapter-test/reports/review-decision-request-repair.json",
         ],
       },
     });

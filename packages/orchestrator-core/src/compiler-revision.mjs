@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 
 const ACTIONS = new Set(["inspect", "promote", "freeze", "demote"]);
 const COMPATIBILITY_STATUSES = new Set(["compatible", "incompatible", "unknown"]);
@@ -57,7 +58,7 @@ function uniqueStrings(values) {
  * @returns {string}
  */
 function toEvidenceRef(init, filePath) {
-  return `evidence://${path.relative(init.projectRoot, filePath).replace(/\\/gu, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath, workspaceProjectId: init.projectId });
 }
 
 /**

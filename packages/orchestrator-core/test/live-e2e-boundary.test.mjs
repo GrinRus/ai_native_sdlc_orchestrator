@@ -169,6 +169,8 @@ function withTempRepo(callback) {
     path.join(workspaceRoot, "examples/project.aor.yaml"),
     path.join(repoRoot, "examples/project.aor.yaml"),
   );
+  fs.mkdirSync(path.join(repoRoot, ".aor"), { recursive: true });
+  fs.linkSync(path.join(repoRoot, "examples/project.aor.yaml"), path.join(repoRoot, ".aor/project.yaml"));
 
   try {
     callback(repoRoot);

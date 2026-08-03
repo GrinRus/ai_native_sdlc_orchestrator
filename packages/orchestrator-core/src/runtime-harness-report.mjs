@@ -4,6 +4,7 @@ import path from "node:path";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 import {
   collectMissionChangeEvidence,
   filterMeaningfulCodeChangedPaths,
@@ -155,7 +156,7 @@ function isRunTokenBoundary(value) {
  * @returns {string}
  */
 function toEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return toLogicalEvidenceRef({ projectRoot, filePath });
 }
 
 /**

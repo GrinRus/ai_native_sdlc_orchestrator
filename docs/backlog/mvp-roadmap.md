@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-66-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-67-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -77,6 +77,7 @@ The authoritative planning model for implementation lives in:
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
 | W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Claude closure. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
+| W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
 
 The current roadmap contains **342 slices across 67 waves**.
 
@@ -1431,6 +1432,25 @@ before same-commit Codex/Claude runs.
   AOR commit and one pinned target commit with no upstream writes.
 
 **Detailed slices:** `docs/backlog/wave-66-implementation-slices.md`
+
+## W67 - central AOR Home and intent-first onboarding
+
+**Goal:** Keep mutable AOR state under `~/.aor`, connect code from a local Git
+folder or Git URL, and prepare free-form text/file intent before any
+write-capable execution.
+
+**Entry condition:** W66-S09 closes so the breaking storage and onboarding
+cutover cannot invalidate the active qualification baseline.
+
+**Exit criteria:**
+
+- connected repositories receive no implicit runtime writes;
+- source plus text/file intent is the only required installed-console ingress;
+- read-only AI preparation produces a validated preview before confirmation;
+- portable config and selected evidence export are explicit, bounded actions;
+- CLI, API, web, contracts, examples, and installed proof remain aligned.
+
+**Detailed slices:** `docs/backlog/wave-67-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

@@ -7,6 +7,7 @@ import { derivePublicId, validateContractDocument, validatePublicId } from "../.
 import { withFileLock, writeJsonAtomic } from "../../observability/src/file-transaction.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { createProjectReadContext } from "./control-plane/project-context.mjs";
+import { toLogicalEvidenceRef } from "./aor-home.mjs";
 
 export const RUN_JOB_STATUSES = Object.freeze([
   "queued", "running", "paused", "waiting-input", "canceling", "succeeded", "failed", "canceled",
@@ -123,8 +124,12 @@ export function reserveRunJob(options) {
       started_at: null,
       terminal_at: null,
       terminal_evidence_refs: [],
-      status_ref: `evidence://${path.relative(init.projectRoot, file).replaceAll(path.sep, "/")}`,
-      event_ref: `evidence://${path.relative(init.projectRoot, path.join(init.runtimeLayout.reportsRoot, `live-run-events-${runId}.jsonl`)).replaceAll(path.sep, "/")}`,
+      status_ref: toLogicalEvidenceRef({ projectRoot: init.projectRoot, filePath: file, workspaceProjectId: init.projectId }),
+      event_ref: toLogicalEvidenceRef({
+        projectRoot: init.projectRoot,
+        filePath: path.join(init.runtimeLayout.reportsRoot, `live-run-events-${runId}.jsonl`),
+        workspaceProjectId: init.projectId,
+      }),
       worker_request: {
         cwd: init.projectRoot,
         project_ref: init.projectRoot,

@@ -116,7 +116,7 @@ The persistent context bar contains only information needed before any action:
 - Attention count when non-zero;
 - utilities such as refresh and labelled technical context disclosure.
 
-Runtime root, long paths, raw IDs, package version, and debug metadata remain
+AOR Home internals, long paths, raw IDs, package version, and debug metadata remain
 available in **Project context** or **Technical details** disclosures. They do
 not compete with Project, Flow, connection, safety, or the primary action.
 
@@ -303,7 +303,7 @@ ledger.
 
 1. Launch `aor app` in a target repository.
 2. Read project and readiness state without creating runtime artifacts.
-3. Review the runtime root and write-effect preview.
+3. Review server-owned AOR Home status and the write-effect preview.
 4. Initialize explicitly.
 5. Build a complete Mission or explicitly preserve a contract-valid incomplete
    Mission with named blockers.
@@ -359,7 +359,7 @@ ledger.
 
 | Surface | Purpose | Primary action |
 |---|---|---|
-| Readiness Cockpit | Confirm project, runtime root, and explicit initialization. | Initialize project runtime |
+| Readiness Cockpit | Confirm project, AOR Home status, and explicit initialization. | Initialize project runtime |
 | Mission builder | Create complete Mission evidence or acknowledge incomplete blockers. | Create Mission |
 | Active Cockpit | Understand current state and take one safe action. | Outcome named by authoritative next action |
 | Running Cockpit | Monitor live provider/run state. | Inspect run or supported run control |

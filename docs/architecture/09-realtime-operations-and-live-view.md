@@ -32,7 +32,7 @@ Operators need live state without making the UI part of the critical path.
 `aor app` starts a local loopback web console from the installed package. The
 same process serves:
 - `/` for the packaged SPA;
-- `/app-config.json` for project id, default project id, project list, project ref, runtime root, package version, and API base;
+- `/app-config.json` for workspace project id, default project id, project list, package version, and API base; AOR Home placement remains server-owned;
 - `/api/projects` for local app-session project summaries;
 - `/api/projects/:projectId/**` for the existing control-plane read, mutation, and SSE routes.
 

@@ -8,15 +8,15 @@
       "command": "aor review run --project-ref /workspace/aor-core --run-id run.closure.checkout-risk",
       "stage": "review",
       "artifact_refs": [
-        "evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json",
-        "evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json"
+        "evidence://projects/aor-core/reports/review-report-run.closure.checkout-risk.json",
+        "evidence://projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json"
       ]
     },
     {
       "command": "aor review decide --project-ref /workspace/aor-core --run-id run.closure.checkout-risk --decision approve",
       "stage": "review",
       "artifact_refs": [
-        "evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json"
+        "evidence://projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json"
       ],
       "decision_state": {
         "decision": "approve",
@@ -28,8 +28,8 @@
       "command": "aor deliver prepare --project-ref /workspace/aor-core --run-id run.closure.checkout-risk --require-review-decision",
       "stage": "delivery",
       "artifact_refs": [
-        "evidence://.aor/projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json",
-        "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json"
+        "evidence://projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json",
+        "evidence://projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json"
       ],
       "blocked_reasons": []
     },
@@ -37,7 +37,7 @@
       "command": "aor release prepare --project-ref /workspace/aor-core --run-id run.closure.checkout-risk --require-review-decision",
       "stage": "release",
       "artifact_refs": [
-        "evidence://.aor/projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json"
+        "evidence://projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json"
       ],
       "release_packet_status": "ready-for-close"
     },
@@ -45,27 +45,27 @@
       "command": "aor learning handoff --project-ref /workspace/aor-core --run-id run.closure.checkout-risk",
       "stage": "learning",
       "artifact_refs": [
-        "evidence://.aor/projects/aor-core/reports/learning-loop-scorecard-run.closure.checkout-risk.json",
-        "evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.closure.checkout-risk.json"
+        "evidence://projects/aor-core/reports/learning-loop-scorecard-run.closure.checkout-risk.json",
+        "evidence://projects/aor-core/reports/learning-loop-handoff-run.closure.checkout-risk.json"
       ]
     }
   ],
   "next_action_alignment": {
-    "report_ref": "evidence://.aor/projects/aor-core/reports/next-action-report.json",
+    "report_ref": "evidence://projects/aor-core/reports/next-action-report.json",
     "closure_state_path": "closure_state",
     "cli_field": "next_action_closure_state",
     "api_route": "GET /api/projects/:projectId/next-action-report",
     "web_field": "guided_lifecycle.closure_state"
   },
   "evidence_chain": [
-    "evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json",
-    "evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json",
-    "evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json",
-    "evidence://.aor/projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json",
-    "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json",
-    "evidence://.aor/projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json",
-    "evidence://.aor/projects/aor-core/reports/learning-loop-scorecard-run.closure.checkout-risk.json",
-    "evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.closure.checkout-risk.json"
+    "evidence://projects/aor-core/reports/review-report-run.closure.checkout-risk.json",
+    "evidence://projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json",
+    "evidence://projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json",
+    "evidence://projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json",
+    "evidence://projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json",
+    "evidence://projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json",
+    "evidence://projects/aor-core/reports/learning-loop-scorecard-run.closure.checkout-risk.json",
+    "evidence://projects/aor-core/reports/learning-loop-handoff-run.closure.checkout-risk.json"
   ],
   "safety_assertions": [
     "delivery and release commands include --require-review-decision",

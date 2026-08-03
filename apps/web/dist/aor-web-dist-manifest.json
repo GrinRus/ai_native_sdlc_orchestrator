@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "7803aa02e806b0d61f83e54d5beb5d6a58fda71c1b45bce8186005ca6f8cdd41",
+  "source_hash": "62eb1881a399cc5196a1d5049ae47b6b8930a6c3f641a35f40684cdd41c30abf",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -12,6 +12,7 @@
     "apps/web/src/execution-orchestration.jsx",
     "apps/web/src/execution-setup.css",
     "apps/web/src/execution-setup.jsx",
+    "apps/web/src/intent-onboarding.jsx",
     "apps/web/src/mission-builder.css",
     "apps/web/src/mission-builder.jsx",
     "apps/web/src/mission-model.js",
@@ -40,13 +41,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-BUae7sdx.js",
+    "apps/web/dist/assets/index-CHnJqiDS.js",
     "apps/web/dist/assets/index-D4c-UCEU.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-BUae7sdx.js": "ba9ed6bea5e3e9309d480cdebb7d30510315bf3f09874d7e7495f6b0f9bc3501",
+    "apps/web/dist/assets/index-CHnJqiDS.js": "50549a001b8978be12a79bb72878c0a07ec26dbbeaad60156092ce58b4db1301",
     "apps/web/dist/assets/index-D4c-UCEU.css": "1e295436400671d5b9e67140a81e2bc15edc5f7d52e22321194fffd2934eb260",
-    "apps/web/dist/index.html": "5aa5b519697ae09ee3b3d73fcab258edfdd1bd11720418622b7da28a0bb85947"
+    "apps/web/dist/index.html": "6b1917070ac3da3230a508d0c2f6634c89c240b9e2dc967ac098e1627ccee8b2"
   }
 }

@@ -1,4 +1,8 @@
 export type ContractFamily =
+  | "workspace-registry"
+  | "intent-submission"
+  | "intent-normalization-report"
+  | "evidence-export-manifest"
   | "project-profile"
   | "project-binding"
   | "workspace-set"

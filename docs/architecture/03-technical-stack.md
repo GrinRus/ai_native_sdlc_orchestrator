@@ -6,7 +6,7 @@ The repository currently runs on a Node.js ESM JavaScript baseline:
 - Node.js runtime with `.mjs` modules across `apps/**` and `packages/**`;
 - pnpm workspace monorepo with repository-integrity gates and package/app tests;
 - headless-first control-plane behavior exposed through CLI plus module-backed API and optional React/Vite local web console;
-- `.aor/` runtime root for materialized reports, packets, manifests, and related evidence.
+- central AOR Home (`~/.aor`) for mutable reports, packets, manifests, inputs, managed checkouts, and related evidence.
 
 W30 accepted ADRs keep this alpha boundary explicit:
 - `docs/architecture/adr/0001-alpha-filesystem-runtime-sor.md` keeps `.aor/` as the alpha runtime system of record.
@@ -35,5 +35,5 @@ Planned production-oriented infrastructure surfaces include:
 ## Execution environment
 - clean workspaces or worktrees;
 - explicit repo scopes and command allowlists;
-- `.aor/` as the default runtime root;
+- `~/.aor` as canonical AOR Home, with `AOR_HOME` as the isolated-run override;
 - containerized replay when stronger reproducibility is needed.

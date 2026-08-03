@@ -150,14 +150,22 @@ headless bounded-execution baseline rather than the full operator workflow in
 - Recommend missing AOR-native runtime context assets and project-profile coverage.
 - Block execution if prerequisites are missing.
 - Open the installed app from a neutral directory, select or add an AOR Project, and configure an approved execution route without editing raw profiles or exposing credentials.
+- Connect code from a local Git folder or Git URL without implicit repository writes.
+- Submit free-form text and bounded local text files, review AOR's read-only prepared task, and confirm before write-capable execution.
 
 `W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
 
 `W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
 
-`W31-S01` closes the installed-user local UI intake story, and `W36-S03`/`W36-S04` make it no-settings and project-aware: a user who installed `@grinrus/aor` can run `cd <repo> && aor app`, confirm project context, initialize the runtime explicitly, apply the safe walkthrough Mission template, submit the first mission, switch between explicitly added local projects, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
+`W31-S01` and `W36-S03`/`W36-S04` established the earlier repo-attached local UI baseline. W67 supersedes its first-run contract with explicit local/Git source connection, central AOR Home, free-form intent preparation, confirmation, project switching, and logical evidence refs without exposing storage paths.
 
 That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S07 closes the approved Execution Setup UX over the canonical execution-profile contract, and W61-S05 records the combined neutral Workspace, topology, persistence, and installed onboarding proof that closes `PBO-10`.
+
+W67 replaces that topology-first baseline with central AOR Home and intent-first
+ingress. Its target outcome is: an installed user supplies code plus text or a
+bounded text file, receives a read-only normalized preview, and confirms one
+durable Flow without learning repository IDs, mounts, KPI syntax, or runtime
+paths.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

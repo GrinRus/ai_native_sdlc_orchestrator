@@ -67,11 +67,18 @@ failure until explicit recovery. `pnpm w62:proof` composes these invariants for
 monorepo components and a bounded contract-dependent multirepo without provider
 network or upstream writes.
 
-The default Local Workspace registry is persisted under AOR-owned user state,
+The default Local Workspace registry and all mutable runtime evidence are
+persisted under `AOR_HOME`, defaulting to `~/.aor`,
 uses atomic revisioned writes, and stores only explicitly connected projects
 and redacted bindings. Reads never scan the filesystem. A neutral launcher has
 no selected project; an attached repository is a current-session selection
 rather than a persisted ambient project.
+
+Connected repositories receive no implicit runtime writes. Explicit portable
+materialization may write `.aor/project.yaml`; explicit evidence export may
+write `.aor/exports/**`. Raw intent is first persisted as an immutable
+`intent-submission`, normalized through a read-only runner-agnostic route, and
+only then confirmed into the existing intake-request and Flow lifecycle.
 
 Query ingress derives an immutable `ProjectReadContext` from that project
 context and a non-materializing runtime preview. It resolves the same canonical

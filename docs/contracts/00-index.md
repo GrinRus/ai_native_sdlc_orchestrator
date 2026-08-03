@@ -4,6 +4,7 @@ All families inherit the cross-cutting [canonical identifier, path-scope, and
 reference-base rules](canonical-identifiers-and-paths.md).
 
 ## Core packets and profiles
+- `workspace-registry.md`
 - `project-profile.md`
 - `project-binding.md`
 - `execution-profile.md`
@@ -13,6 +14,8 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `discovery-research-report.md`
 - `artifact-packet.md`
 - `intake-request-body.md`
+- `intent-submission.md`
+- `intent-normalization-report.md`
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `execution-plan.md`
@@ -59,6 +62,7 @@ Compiled-context and external-runner contracts include context-budget evidence f
 - `skill-profile.md`
 
 ## Operations
+- `evidence-export-manifest.md`
 - `run-job.md`
 - `live-run-event.md`
 - `planner-metrics-snapshot.md`

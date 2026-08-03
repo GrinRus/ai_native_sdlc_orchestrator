@@ -46,9 +46,12 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition; `W64-S03` Operator decision projection decomposition
 - **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
 - **W66:** `W66-S01` Catalog identity and bootstrap remediation baseline; `W66-S02` Private/product boundary and contract parity; `W66-S03` Qualification verdict and evidence truth; `W66-S07` Installed browser proof and design acceptance integrity; `W66-S08` Deterministic remediation closure; `W66-S10` Non-repair review warning approval compatibility; `W66-S11` Bounded external-provider session convergence; `W66-S12` Resumable immutable browser-evidence reconciliation; `W66-S13` Stream auth telemetry classification; `W66-S14` Repair closure warning approval parity; `W66-S15` Structured stream failure-signal classification; `W66-S16` Provider work-packet command-role separation; `W66-S17` Environment-qualified provider command identity; `W66-S18` Guided diagnostic timeout alignment; `W66-S19` Provider verification-scope convergence; `W66-S09` Fresh four-cell live qualification closure
+- **W67:** `W67-S01` Storage and contract baseline; `W67-S05` Explicit materialization, export, and closure proof
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
+
+**W67:** `W67-S01` Storage and contract baseline; `W67-S02` Project source connection and central runtime; `W67-S04` Intent-first installed console
 
 **Slices by wave:**
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
@@ -75,6 +78,8 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
+**W67:** `W67-S01` Storage and contract baseline; `W67-S03` Durable intent preparation; `W67-S04` Intent-first installed console
+
 **Slices by wave:**
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
 - **W19:** `W19-S02` Product intake source and KPI/DoD model
@@ -89,6 +94,8 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 - **W66:** `W66-S04` Planner, controller, and provider outcome semantics; `W66-S05` Atomic jobs, attempts, run control, and live events; `W66-S06` Parent/child integration and coordinated delivery correctness; `W66-S11` Bounded external-provider session convergence
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
+
+**W67:** `W67-S03` Durable intent preparation
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results

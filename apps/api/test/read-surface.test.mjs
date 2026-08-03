@@ -118,9 +118,7 @@ test("module read surfaces leave an uninitialized project byte-for-byte unchange
       flows: [],
       generated_from: {
         read_model: "control-plane.flow-projections",
-        runtime_root: state.runtime_root,
-        artifacts_root: state.runtime_layout.artifactsRoot,
-        reports_root: state.runtime_layout.reportsRoot,
+        workspace_project_id: state.project_id,
       },
       read_only: true,
     });
@@ -279,9 +277,9 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
       cwd: repoRoot,
       compilerRevisionRef: "compiler-revision://runtime-context-compiler@v1",
       action: "promote",
-      promotionDecisionRef: "evidence://.aor/projects/aor-core/artifacts/promotion-decision-compiler-v1.json",
+      promotionDecisionRef: "evidence://projects/aor-core/artifacts/promotion-decision-compiler-v1.json",
       compiledContextRefs: ["compiled-context://compiled-context.aor-core.implement.runtime-context-compiler"],
-      evaluationRefs: ["evidence://.aor/projects/aor-core/reports/evaluation-report-runtime-context-compiler.json"],
+      evaluationRefs: ["evidence://projects/aor-core/reports/evaluation-report-runtime-context-compiler.json"],
       incidentRefs: ["incident://INC-COMPILER-001"],
       compatibilityStatus: "compatible",
     });
@@ -332,7 +330,8 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     });
 
     const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
-    assert.equal(projectState.project_id, init.projectId);
+    assert.equal(projectState.runtime_project_id, init.projectId);
+    assert.match(projectState.project_id, /-[a-f0-9]{8}$/u);
     assert.equal(projectState.project_root, fs.realpathSync.native(repoRoot));
 
     const packets = listPacketArtifacts({ projectRef: repoRoot, cwd: repoRoot });

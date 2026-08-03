@@ -29,7 +29,6 @@ export function mergeProjectPreview(projects, projectId, statePreview) {
   return projects.map((project) => project.project_id === projectId
     ? {
         ...project,
-        runtime_root: statePreview.runtime_root ?? project.runtime_root,
         onboarding_summary: statePreview.onboarding_summary,
       }
     : project);

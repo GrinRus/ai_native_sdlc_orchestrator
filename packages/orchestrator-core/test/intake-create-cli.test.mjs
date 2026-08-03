@@ -37,8 +37,6 @@ test("intake create preserves goal, KPI, and Definition of Done flags in product
         "create",
         "--project-ref",
         repoRoot,
-        "--runtime-root",
-        path.join(repoRoot, ".aor"),
         "--mission-id",
         "catalog-mission",
         "--request-title",

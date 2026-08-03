@@ -15,8 +15,25 @@ registry revision, and latest deterministic validation. `POST
 request with optional `expected_revision`; stale revisions, unknown references,
 blocking validation, and active-flow conflicts fail before publication. `GET
 /api/projects/:projectId/topology/validation` returns the latest stored validation
-without initializing project runtime state. The compatibility
-`POST /api/projects/actions` add action remains workspace-scoped.
+without initializing project runtime state. `POST /api/projects/actions` is the
+Workspace-scoped source and write-back action boundary. Its primary
+`action=connect` payload uses `source.kind=local|git`; it never accepts a
+runtime-root override.
+
+W67 adds intent-first onboarding:
+
+- `POST /api/projects/:projectId/intent-submissions` stores text and bounded
+  text attachments and queues read-only AI preparation;
+- `GET /api/projects/:projectId/intent-submissions/:submissionId` reads the
+  durable submission and latest normalization revision without initializing
+  missing runtime state;
+- the submission action route supports `answer`, `revise`, `retry`,
+  `confirm-and-start`, `retry-start`, and `cancel`;
+- `answer` requires a non-empty value for every current open question and
+  cannot clear blockers with a partial answer map;
+- `GET /api/project-connection-jobs/:jobId` exposes asynchronous clone progress;
+- `POST /api/workspace/folder-picker/actions` is loopback-only and falls back
+  to manual absolute-path entry when no native picker is available.
 
 Execution setup uses the same boundary. `GET
 /api/projects/:projectId/execution-profile` derives approved route, adapter,
@@ -159,7 +176,7 @@ The control plane remains the orchestration owner:
 - the installed local SPA is served by `aor app` from the shared HTTP transport, not by importing `apps/api` into the CLI launcher;
 - the installed local SPA can switch between explicitly registered local projects through app-session project summaries, but each selected project keeps separate runtime state, flow projections, evidence refs, and mutation routes;
 - CLI/app/API ingress creates one immutable selected-project context containing
-  the runtime project id, canonical project root, runtime root, project runtime
+  the runtime project id, canonical project root, server-owned AOR Home status, project runtime
   root, canonical profile path, and registry identity. Downstream compatibility
   options are derived from that context with `cwd` pinned to the canonical
   project root; launcher cwd is never an internal fallback.
@@ -479,8 +496,8 @@ HTTP lifecycle command mutation baseline:
 - payload fields: `command` plus optional `flags`;
 - `command` must be one of the bounded implemented lifecycle commands documented in `module-surface-baseline.yaml`;
 - `flags` is a JSON object whose keys map to CLI flags by replacing `_` with `-`;
-- `project_ref`, `project-ref`, `runtime_root`, `runtime-root`, and `help` are server-owned and cannot be supplied by clients;
-- the transport injects the scoped project ref and runtime root before invoking the shared operator lifecycle service;
+- `project_ref`, `project-ref`, and `help` are server-owned and cannot be supplied by clients; `runtime_root` and `runtime-root` are rejected because AOR Home owns runtime placement;
+- the transport injects the scoped project ref and internally resolved AOR Home paths before invoking the shared operator lifecycle service;
 - successful responses return `{ lifecycle_command }` with `command_output` preserving the CLI JSON fields, `artifact_refs`, `evidence_refs`, `exit_code`, `stdout`, `stderr`, and `interactive_continuation`;
 - `mission create` and `next` are included in the bounded mutation subset for guided web progress; `next` is treated as a mutation because it materializes a durable `next-action-report`;
 - unsupported commands or invalid/missing required flags return HTTP `400` with `error.code` in `invalid_lifecycle_command | invalid_lifecycle_flags`;
@@ -780,7 +797,9 @@ trigger an automatic renderer fallback after a rendering or read failure.
 - `POST /api/projects/:projectId/ui-lifecycle/actions`
 - `POST /api/projects/:projectId/lifecycle-command/actions`
 - `POST /api/projects/:projectId/interactions/answers`
-- `POST /api/projects/actions` for explicit local add-project actions in the app session.
+- `POST /api/projects/actions` for source connection, refresh, disconnect,
+  explicitly confirmed AOR-data deletion, portable-config materialization, and
+  selected evidence export.
 
 Local app project summary baseline:
 - the project index is Workspace-scoped and may return
@@ -788,17 +807,20 @@ Local app project summary baseline:
   neutral launch;
 - explicitly connected projects persist in the operator-local Workspace
   registry, but neutral launch never restores a sticky project as CLI context;
-- `project_id` as the local app route key, `runtime_project_id` as the underlying runtime contract identity, `label`, `project_ref`, `project_profile_ref`, and `runtime_root`;
-- `project_id` remains equal to `runtime_project_id` for the default single-project case; duplicate local profiles in one app session get a stable app-scoped `project_id` suffix so their runtime/evidence chains do not mix;
-- `onboarding_summary` with `status`, `initialized`, `can_initialize`, `recommended_action`, user-facing blockers, and optional `profile_mismatch_candidate_project_ids` when the runtime root already contains initialized evidence for a different project profile id;
+- collision-safe `project_id=<repo-slug>-<identity-hash>` as the Workspace route
+  key, with `runtime_project_id` retained as the independent packet identity;
+- `label`, `project_ref`, logical or project-relative `project_profile_ref`, and
+  source metadata; physical AOR Home paths are not returned;
+- `onboarding_summary` with `status`, `initialized`, `can_initialize`, `recommended_action`, user-facing blockers, and optional `profile_mismatch_candidate_project_ids` when AOR Home already contains initialized evidence for a different runtime project profile id;
 - `active_flow_summary` with active/completed flow counts and selected flow id when runtime state already exists;
-- `read_only=true` because project-list reads must not initialize `.aor/`.
+- `read_only=true` because project-list reads must not initialize AOR Home or
+  create repository-local `.aor/` files.
 
 Detached read-model scale baseline:
 - list/read-model routes that can fan out over `.aor` artifacts accept optional `?limit=<n>`;
 - detached HTTP list routes default to a bounded 200-entry local-alpha window and cap explicit `limit` requests at 1000 entries;
 - run event and policy history routes keep route-specific bounded replay windows and also accept `limit`;
-- the alpha filesystem runtime root remains the system of record; no database or storage migration is implied.
+- central AOR Home remains the mutable filesystem system of record; no database storage is implied.
 
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`,
@@ -818,8 +840,15 @@ Detached mutation payload baseline:
   integration report ref, aggregate gates, stale units, repair refs, and blocker.
 - interaction answer payload fields: `run_id`, `interaction_id`, `answer`, `reason`, `approval_ref`, `answer_evidence_ref`;
 - interaction answer response writes and references durable answer audit evidence before reporting whether continuation remains blocked.
-- project action payload fields: `action=add`, `project_ref`, optional `runtime_root`, optional `project_profile`, and optional `label`;
-- project action response returns the added project summary and the refreshed local `projects[]` list.
+- connect payload fields: `action=connect`, `source={kind:local,path}` or
+  `source={kind:git,url}`, and optional `label`; the response is `202` with a
+  durable connection job and status ref;
+- maintenance actions use `project_id`: `connect-repository` (the same local/Git
+  source union used for the primary project), `refresh-source`, `disconnect`,
+  `delete-aor-data` (exact project-id confirmation required),
+  `materialize-project-config`, and `export-evidence`;
+- credentials in Git URLs are forbidden, and disconnect preserves AOR data by
+  default.
 
 The OpenAPI component names that own these local-alpha payloads are
 `ProjectStateResponse`, `RunsResponse`, `RunEventHistoryResponse`,

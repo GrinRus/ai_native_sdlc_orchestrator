@@ -792,8 +792,11 @@ export function materializeProviderPinnedRouteOverrides(options) {
       continue;
     }
 
-    const pinnedRoute = cloneRouteDocument(routeDocument);
     const originalRouteId = asNonEmptyString(routeDocument.route_id) || `route.${step}.default`;
+    if (originalRouteId !== `route.${step}.default`) {
+      continue;
+    }
+    const pinnedRoute = cloneRouteDocument(routeDocument);
     const primary = asRecord(pinnedRoute.primary);
     primary.provider = pinnedProvider;
     if (asNonEmptyString(primary.adapter) !== "none") {

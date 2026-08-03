@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { loadContractFile, validateAllowedPathPattern, validatePublicId } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
+import { evidenceReferenceRoot, toEvidenceRef } from "./evidence-refs.mjs";
 import { normalizeSemanticEvents } from "./evidence-normalization.mjs";
 import { buildExternalExecutionOutcome, classifyProviderSemanticFailure } from "./provider-outcome.mjs";
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
@@ -1285,24 +1286,6 @@ function parseExternalRunnerStdout(stdout, options = {}) {
     runnerEvidenceRefs: [],
     runnerToolTraces: [],
   };
-}
-
-/**
- * @param {string | null} projectRoot
- * @param {string} filePath
- * @returns {string}
- */
-function toEvidenceRef(projectRoot, filePath) {
-  const normalizedPath = filePath.replace(/\\/g, "/");
-  if (!projectRoot || !path.isAbsolute(projectRoot) || !path.isAbsolute(filePath)) {
-    return `evidence://${normalizedPath}`;
-  }
-
-  const relative = path.relative(projectRoot, filePath).replace(/\\/g, "/");
-  if (!relative || relative.startsWith("..")) {
-    return `evidence://${normalizedPath}`;
-  }
-  return `evidence://${relative}`;
 }
 
 /**
@@ -2674,7 +2657,8 @@ export function createLiveAdapter(options) {
   const evidenceNamespace =
     asOptionalString(executionProfile.evidence_namespace) ?? `evidence://adapter-live/${adapterId}`;
   const externalRuntime = asRecord(executionProfile.external_runtime);
-  const runtimeCommand = asOptionalString(externalRuntime.command);
+  const commandOverrideKey = `AOR_RUNNER_COMMAND_${adapterId.replace(/[^a-z0-9]/giu, "_").toUpperCase()}`;
+  const runtimeCommand = asOptionalString(process.env[commandOverrideKey]) ?? asOptionalString(externalRuntime.command);
   const requestViaStdin = externalRuntime.request_via_stdin !== false;
   const requestTransport = resolveRequestTransport(externalRuntime, requestViaStdin);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
@@ -2900,6 +2884,7 @@ export function createLiveAdapter(options) {
           ? runtimeEvidenceRoot
           : path.resolve(executionRoot, runtimeEvidenceRoot)
         : null;
+      const logicalEvidenceRoot = evidenceReferenceRoot(projectRoot, evidenceDir);
       const requestArtifactDir = evidenceDir ?? path.join(executionRoot, ".aor", "adapter-requests");
       fs.mkdirSync(requestArtifactDir, { recursive: true });
       const requestArtifactFile = path.join(
@@ -2912,7 +2897,7 @@ export function createLiveAdapter(options) {
         }),
       );
       fs.writeFileSync(requestArtifactFile, serializedRunnerInput, "utf8");
-      const requestArtifactRef = toEvidenceRef(projectRoot, requestArtifactFile);
+      const requestArtifactRef = toEvidenceRef(logicalEvidenceRoot, requestArtifactFile);
 
       const requestFileProfile = asRecord(externalRuntime.request_file);
       const providerWorkPacket = buildProviderWorkPacket(envelope, {
@@ -2921,7 +2906,7 @@ export function createLiveAdapter(options) {
         compiledContextRef,
         requestArtifactRef,
         requestArtifactFile,
-        projectRoot,
+        projectRoot: logicalEvidenceRoot,
       });
       const providerWorkPacketFile = path.join(
         requestArtifactDir,
@@ -2932,7 +2917,7 @@ export function createLiveAdapter(options) {
           timestamp: Date.now(),
         }),
       );
-      const providerWorkPacketRef = toEvidenceRef(projectRoot, providerWorkPacketFile);
+      const providerWorkPacketRef = toEvidenceRef(logicalEvidenceRoot, providerWorkPacketFile);
       if (Array.isArray(providerWorkPacket.resolved_local_refs)) {
         providerWorkPacket.resolved_local_refs = [
           ...providerWorkPacket.resolved_local_refs,

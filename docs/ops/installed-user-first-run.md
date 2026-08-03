@@ -14,35 +14,35 @@ aor app
 
 `aor app` starts a foreground local loopback server, opens the browser by
 default, and prints the URL. Press `Ctrl+C` in that terminal to stop it.
-`aor doctor` and `aor onboard` remain the advanced/headless path for scripts,
-but the primary installed-user path is the local UI wizard.
+The primary UI and headless path share `project connect`, `task prepare`, and
+`task start`. Mutable state lives under `~/.aor`; use `AOR_HOME` only for tests
+or an intentionally isolated run.
 
 The UI first-run path is:
-1. confirm Project Context: cwd candidate, editable project path, and runtime root preview;
-2. use Runtime Readiness to explicitly run Initialize project when needed;
-3. use First Flow to apply the safe walkthrough template;
-4. submit Mission with `delivery-mode=no-write`;
-5. use Next Action to refresh the deterministic next action and land in the active flow cockpit;
-6. inspect the top-bar project switcher, flow selector, and selected active flow for blockers, evidence refs,
-   runtime root, and no-write safety;
+1. connect a local Git folder or an HTTPS/SSH Git URL;
+2. enter intent text and/or attach supported text files;
+3. run read-only **Prepare task**;
+4. review or revise the normalized outcome, acceptance, scope, safety mode, and provider;
+5. select **Confirm and start** to create the Flow and run its first executable action;
+6. inspect the top-bar project switcher, flow selector, and selected active flow for blockers, logical evidence refs, and no-write safety;
 7. use `New Flow` only when starting fresh mission/intake evidence or a
    follow-up from learning closure;
-8. use Add local project only for explicit local paths; the UI must not scan the filesystem or mix runtime/evidence between projects;
+8. use Connect project for explicit local folders or Git URLs; the UI must not scan the filesystem or mix runtime/evidence between projects;
 9. optionally use Ask AOR on any selected flow stage to create a bounded
    operator request against selected evidence or document refs.
 
-Guided shortcuts default to human-readable output. Pass `--json` when automation needs stable fields such as `guided_status`, `guided_actionable_blockers`, `resolved_project_ref`, and `resolved_runtime_root`.
+Guided shortcuts default to human-readable output. Pass `--json` when automation needs stable fields such as `guided_status`, `guided_actionable_blockers`, `workspace_project_id`, and `resolved_project_ref`. AOR Home placement is server-owned and has no public runtime-root field.
 
 ## First-run state matrix
 | State | Primary UI surface | Expected action | Runtime/evidence boundary |
 | --- | --- | --- | --- |
-| Clean local project | First-run wizard, Project Context, Runtime Readiness | Confirm the project path and click **Initialize Project Runtime** only when ready. | Page load and smoke must not create `.aor/`; initialization writes only the selected runtime root. |
-| Initialized without flows | First-run wizard, First Flow step | Create the first Mission from the safe walkthrough template. | Mission intake defaults to `delivery-mode=no-write`; target source files remain unchanged. |
+| No connected project | Code source + intent | Choose a local Git folder or Git URL, then provide text and/or supported files. | Connection writes only to AOR Home; the target repository stays unchanged. |
+| Connected without flows | Prepared task preview | Review normalization and choose **Confirm and start**. | Preparation is read-only; no partial Flow is created when normalization is blocked. |
 | Active flow | Flow selector, active cockpit, stage workbench | Follow the next action, inspect blockers/evidence, or use Ask AOR for bounded no-write analysis. | Evidence, operator requests, and runtime trace stay scoped to the selected flow. |
 | Completed flow | Completed flow view, learning closure, `New Flow` | Inspect read-only evidence or start a follow-up/new flow explicitly. | Completed-flow context is not reused as editable active state. |
-| Multiple local projects | Top-bar project switcher and Add local project drawer | Add only explicit local paths and switch by project label/id. | Runtime roots, selected flow, operator requests, evidence refs, and blockers are isolated per project. |
+| Multiple local projects | Top-bar project switcher and source chooser | Add only explicit local folders or Git URLs and switch by project label/id. | AOR Home data, selected flow, operator requests, evidence refs, and blockers are isolated by collision-safe workspace project ID. |
 
-Primary errors should name the failed project path, runtime root, profile, or
+Primary errors should name the failed project source, workspace project, profile, or
 smoke route in user-facing language. Raw stack traces and raw refs are debug
 details, not the primary installed-user explanation.
 
@@ -60,7 +60,7 @@ AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"
 npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help
 
 npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
-  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+  aor app --project-ref "$TMP/target" --smoke --open false --json
 ```
 
 The separate `$TMP/runner` directory is intentional. Do not run this
@@ -69,9 +69,11 @@ local `@grinrus/aor` package context and fail to put the registry package bin in
 PATH. A false `aor: command not found` from the source checkout is a smoke
 setup error, not proof that the published package is missing its `bin` entry.
 
-For a clean target, the app smoke should pass without creating `$TMP/target/.aor`;
-runtime state is created only after the user explicitly initializes the project
-or after headless `aor onboard`.
+For a clean target, the app smoke and source connection must leave
+`$TMP/target/.aor` absent. Mutable connection, preparation, Flow, and evidence
+state is written under AOR Home. A target-repository `.aor/` appears only after
+the operator explicitly materializes portable configuration or exports selected
+evidence.
 
 ## Quiet Cockpit installed acceptance
 
@@ -104,9 +106,9 @@ Findings and closure:
 | Registry package help and app smoke load from npm, not the source checkout. | environment | registry smoke | passed | `npm exec --package @grinrus/aor@0.1.0-alpha.10 -- aor --help`; `aor app --smoke --open false --json` reports `status: "smoke-pass"` with first-run wizard, project switcher, flow selector, and `New Flow` markers. |
 | Clean smoke does not create runtime state before explicit initialization. | aor | onboarding | passed | The clean `target-a` app smoke returned matching `project_id`, `config_project_id`, `config_default_project_id`, `project_index_default_project_id`, and `state_project_id` values while `$TMP/target-a/.aor` remained absent. |
 | Browser first run follows Project Context -> Runtime Readiness -> First Flow -> Next Action. | aor | first flow | passed | Clicking **Initialize Project Runtime** created the runtime state; **Start First Flow** used the safe no-write walkthrough template; **Resolve Next Action** landed in the active cockpit with `flow.target-a.first-aor-walkthrough-mpze0gde`, `aor discovery run`, blockers `0`, and five readable evidence artifacts. |
-| Initialized-runtime resume preserves the active flow and next action. | aor | resume | passed | Reloading the UI kept the `target-a` runtime root, selected flow, no-write status, and discovery next action; the initialization button was no longer primary. |
+| Initialized-runtime resume preserves the active flow and next action. | aor | resume | passed | Reloading the UI kept the selected workspace project, Flow, no-write status, and discovery next action; storage remained server-owned. |
 | Local multi-project state stays isolated across project switcher changes. | aor | project switching | passed | `POST /api/projects/actions` is the public action used by the Add local project drawer. A fresh minimal installed-package sequence confirmed add plus `GET /api/projects/target-b/state` kept `state_file: null` and did not create `$TMP/target-b/.aor`; the browser UI switcher then showed `target-b` without `target-a` flow/evidence and restored `target-a` flow/evidence after switching back. |
-| Evidence refs render as operator-readable rows/cards with raw refs as debug actions. | aor | evidence rendering | passed | Active cockpit and Evidence & Documents showed artifact labels, stages, status, blockers, runtime root, and `Debug raw ref` actions instead of requiring raw path inspection as the primary UI. |
+| Evidence refs render as operator-readable rows/cards with raw refs as debug actions. | aor | evidence rendering | passed | Active cockpit and Evidence & Documents showed artifact labels, stages, status, blockers, AOR Home status, and `Debug raw ref` actions instead of requiring physical path inspection. |
 | Browser text-entry automation could not type into the Add local project drawer in this environment. | environment | browser evidence capture | documented | The in-app browser driver reported `Browser Use virtual clipboard is not installed` on `locator.fill`. The product path was still validated through the same public control-plane route used by the drawer, followed by browser project-switcher verification. |
 | Source regression coverage for project route isolation remains green. | aor | regression | passed | `node --test apps/api/test/http-transport.test.mjs --test-name-pattern "local app project index and add-project action keep project runtimes isolated"` passed locally. |
 
@@ -127,8 +129,8 @@ Findings and closure:
 ## Wrapper ownership
 | Guided command | Low-level ownership | Notes |
 | --- | --- | --- |
-| `aor doctor` | environment and project readiness probe | Read-only. Reports actionable blockers without mutating `.aor/`. |
-| `aor onboard <repo>` | `aor project init --project-ref <repo>` | Initializes the runtime-root layout, emits an onboarding report, and defaults clean repos to bundled asset mode without copying `examples/`. |
+| `aor doctor` | environment and project readiness probe | Read-only. Reports actionable blockers without mutating AOR Home or the connected repository. |
+| `aor onboard <repo>` | compatibility wrapper over central project initialization | Initializes project state under AOR Home, emits an onboarding report, and leaves the connected repository unchanged. New automation should use `aor project connect` and `aor task prepare`. |
 | `aor mission create` | `aor intake create` | Writes product-intake packet evidence with goals, constraints, KPI, Definition of Done, allowed paths, source refs, and delivery mode. |
 | `aor next` | current first-run state | Writes a durable deterministic next-action report with one primary action, blockers, evidence refs, and write-back policy. |
 | `aor app` | shared control-plane HTTP transport plus packaged SPA | Launches the local UI; web is optional and headless CLI/API operation remains valid. |
@@ -152,7 +154,6 @@ Headless equivalent:
 ```sh
 aor mission create \
   --project-ref <repo> \
-  --runtime-root <repo>/.aor \
   --title "Small safe trial" \
   --brief "Inspect the project and recommend the next no-write step" \
   --goal "Produce bounded next-action evidence" \
@@ -162,7 +163,7 @@ aor mission create \
   --delivery-mode no-write \
   --json
 
-aor next --project-ref <repo> --runtime-root <repo>/.aor --json
+aor next --project-ref <repo> --json
 ```
 
 ## Artifact readiness and prompt lineage
@@ -209,17 +210,15 @@ Headless equivalent:
 ```sh
 aor request create \
   --project-ref <repo> \
-  --runtime-root <repo>/.aor \
   --stage discovery \
   --target-flow-id <flow_id> \
   --intent analyze \
   --request "Explain the current blocker and suggest the next safe action." \
-  --target-ref evidence://.aor/projects/<project_id>/reports/next-action-report.json \
+  --target-ref evidence://projects/<project_id>/reports/next-action-report.json \
   --json
 
 aor request run \
   --project-ref <repo> \
-  --runtime-root <repo>/.aor \
   --request-ref <operator_request_ref> \
   --target-step plan \
   --json
@@ -229,7 +228,6 @@ Patch proposals require explicit scope:
 ```sh
 aor request create \
   --project-ref <repo> \
-  --runtime-root <repo>/.aor \
   --stage review \
   --target-flow-id <flow_id> \
   --intent revise-document \
@@ -254,7 +252,6 @@ Use smoke mode for release or CI validation:
 ```sh
 aor app \
   --project-ref <repo> \
-  --runtime-root <repo>/.aor \
   --smoke \
   --open false \
   --json
@@ -274,7 +271,7 @@ Expected JSON:
 ## Smoke transcript shape
 The CLI test fixture `apps/cli/test/fixtures/installed-user-first-run-transcript.json` records the expected first-run command sequence:
 1. `doctor` reports ready status and no blockers on a valid temp repository for the advanced/headless path.
-2. `onboard` dispatches through `project init`, writes runtime state plus `onboarding-report.json` under `.aor/`, and does not copy example registries unless materialization is explicit.
+2. Legacy `onboard` dispatches through `project init`, writes runtime state plus `onboarding-report.json` under AOR Home, and does not copy example registries unless materialization is explicit.
 3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes plus first-run wizard, project switcher, flow selector, and `New Flow` bundle markers.
 4. `next` points to a safe low-level follow-up after onboarding.
 

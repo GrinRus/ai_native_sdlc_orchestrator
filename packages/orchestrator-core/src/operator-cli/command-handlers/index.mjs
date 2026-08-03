@@ -8,28 +8,27 @@ import { REQUEST_COMMAND_GROUP, handleRequestCommand } from "./request.mjs";
 import { RUN_CONTROL_COMMAND_GROUP, handleRunControlCommand } from "./run-control.mjs";
 import { TOPOLOGY_COMMAND_GROUP, handleTopologyCommand } from "./topology.mjs";
 import { ROUTE_COMMAND_GROUP, handleRouteCommand } from "./routes.mjs";
+import { INTENT_COMMAND_GROUP, handleIntentCommand } from "./intent.mjs";
 
-export const COMMAND_HANDLER_GROUPS = Object.freeze([
-  GUIDED_COMMAND_GROUP,
-  TOPOLOGY_COMMAND_GROUP,
-  ROUTE_COMMAND_GROUP,
-  BOOTSTRAP_COMMAND_GROUP,
-  PLAN_COMMAND_GROUP,
-  QUALITY_COMMAND_GROUP,
-  RUN_CONTROL_COMMAND_GROUP,
-  REQUEST_COMMAND_GROUP,
-  DELIVERY_COMMAND_GROUP,
-  OPERATIONS_COMMAND_GROUP,
-]);
-
-const COMMAND_TO_GROUP = new Map(
-  COMMAND_HANDLER_GROUPS.flatMap((group) =>
-    group.commands.map((command) => [command, group.group_id]),
-  ),
-);
+function commandHandlerGroups() {
+  return [
+    GUIDED_COMMAND_GROUP,
+    INTENT_COMMAND_GROUP,
+    TOPOLOGY_COMMAND_GROUP,
+    ROUTE_COMMAND_GROUP,
+    BOOTSTRAP_COMMAND_GROUP,
+    PLAN_COMMAND_GROUP,
+    QUALITY_COMMAND_GROUP,
+    RUN_CONTROL_COMMAND_GROUP,
+    REQUEST_COMMAND_GROUP,
+    DELIVERY_COMMAND_GROUP,
+    OPERATIONS_COMMAND_GROUP,
+  ];
+}
 
 const GROUP_HANDLERS = new Map([
   ["guided-first-run", handleGuidedCommand],
+  ["intent-first", handleIntentCommand],
   ["project-topology", handleTopologyCommand],
   ["execution-routes", handleRouteCommand],
   ["bootstrap", handleBootstrapCommand],
@@ -46,7 +45,7 @@ const GROUP_HANDLERS = new Map([
  * @returns {string | null}
  */
 export function resolveCommandHandlerGroup(command) {
-  return COMMAND_TO_GROUP.get(command) ?? null;
+  return commandHandlerGroups().find((group) => group.commands.includes(command))?.group_id ?? null;
 }
 
 /**

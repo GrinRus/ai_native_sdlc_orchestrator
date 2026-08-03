@@ -113,14 +113,16 @@ test("discoverProjectRoot finds git root from nested cwd", () => {
   });
 });
 
-test("resolveProjectProfilePath defaults to examples/project.aor.yaml in repo root", () => {
+test("resolveProjectProfilePath discovers only the portable .aor/project.yaml profile", () => {
   withTempRepo((tempRoot) => {
+    fs.mkdirSync(path.join(tempRoot, ".aor"), { recursive: true });
+    fs.copyFileSync(path.join(tempRoot, "examples/project.aor.yaml"), path.join(tempRoot, ".aor/project.yaml"));
     const resolved = resolveProjectProfilePath({
       cwd: tempRoot,
       projectRoot: tempRoot,
     });
 
-    assert.equal(resolved, path.join(tempRoot, "examples/project.aor.yaml"));
+    assert.equal(resolved, path.join(tempRoot, ".aor/project.yaml"));
   });
 });
 
@@ -135,7 +137,7 @@ test("relative profiles are project-bound and invalid project IDs fail before ru
       /never resolve from launcher cwd/u,
     );
     for (const projectId of ["../escape", "C:\\escape", "project\nretry: 1", "PROJECT"] ) {
-      assert.throws(() => resolveRuntimeLayout({ runtimeRoot, projectId }), /Invalid project_id/u);
+      assert.throws(() => resolveRuntimeLayout({ runtimeRoot, projectId }), /Invalid storage project id/u);
     }
     assert.equal(fs.existsSync(runtimeRoot), false);
   } finally {
@@ -150,8 +152,8 @@ test("initializeProjectRuntime creates idempotent runtime layout and durable sta
     const nestedPath = path.join(tempRoot, "apps", "cli");
     fs.mkdirSync(nestedPath, { recursive: true });
 
-    const firstRun = initializeProjectRuntime({ cwd: nestedPath });
-    const secondRun = initializeProjectRuntime({ cwd: nestedPath });
+    const firstRun = initializeProjectRuntime({ cwd: nestedPath, projectProfile: "examples/project.aor.yaml" });
+    const secondRun = initializeProjectRuntime({ cwd: nestedPath, projectProfile: "examples/project.aor.yaml" });
 
     assert.equal(firstRun.projectRoot, canonicalTempRoot);
     assert.equal(secondRun.projectRoot, canonicalTempRoot);
@@ -181,9 +183,9 @@ test("initializeProjectRuntime creates idempotent runtime layout and durable sta
     assert.equal(parsedState.display_name, "AOR Core");
     assert.equal(parsedState.selected_profile_ref, "examples/project.aor.yaml");
     assert.equal(parsedState.project_root, canonicalTempRoot);
-    assert.equal(parsedState.runtime_root, path.join(canonicalTempRoot, ".aor"));
+    assert.equal(parsedState.runtime_root, firstRun.runtimeRoot);
     assert.equal(parsedState.asset_mode, "materialized");
-    assert.equal(parsedState.onboarding_report_ref, ".aor/projects/aor-core/reports/onboarding-report.json");
+    assert.match(parsedState.onboarding_report_ref, /^evidence:\/\/projects\/.+\/reports\/onboarding-report\.json$/u);
     assert.equal(fs.existsSync(firstRun.onboardingReportFile), true);
     assert.equal(firstRun.onboardingReport.status, "ready");
     assert.equal(firstRun.onboardingReport.asset_mode, "materialized");
@@ -207,7 +209,7 @@ test("initializeProjectRuntime onboards a clean repo in bundled mode without tar
     assert.equal(initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot }).projectId, result.projectId);
     assert.equal(result.assetMode, "bundled");
     assert.equal(result.bootstrapMaterializationStatus, "bundled");
-    assert.match(result.projectProfileRef, /^\.aor\/projects\/.+\/state\/project\.aor\.yaml$/);
+    assert.match(result.projectProfileRef, /^evidence:\/\/projects\/.+\/state\/project\.aor\.yaml$/u);
     assert.equal(fs.existsSync(path.join(tempRoot, "project.aor.yaml")), false);
     assert.equal(fs.existsSync(path.join(tempRoot, "examples")), false);
     assert.equal(fs.existsSync(result.projectProfilePath), true);
@@ -559,15 +561,13 @@ test("transactional reinitialization preserves existing artifact lineage and tim
   });
 });
 
-test("runtime containment rejects a symlink boundary before external writes", () => {
+test("legacy repo-local runtime is ignored without deleting external data", () => {
   withCleanTempRepo((tempRoot) => {
     const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w57-s06-external-"));
     fs.symlinkSync(externalRoot, path.join(tempRoot, ".aor"), "dir");
     try {
-      assert.throws(
-        () => initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot }),
-        /must not be a symbolic link or junction/u,
-      );
+      const result = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+      assert.equal(result.runtimeRoot, fs.realpathSync.native(process.env.AOR_HOME ?? path.join(os.homedir(), ".aor")));
       assert.deepEqual(fs.readdirSync(externalRoot), []);
     } finally {
       fs.rmSync(externalRoot, { recursive: true, force: true });

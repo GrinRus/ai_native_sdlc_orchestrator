@@ -8,13 +8,11 @@ import { stringify as stringifyYaml } from "yaml";
 import { loadContractFile, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
 import { discoverVerificationCommandGroups } from "./stack-discovery.mjs";
+import { deriveWorkspaceProjectId, resolveAorHome, toLogicalEvidenceRef } from "./aor-home.mjs";
 
-const DEFAULT_RUNTIME_ROOT = ".aor";
 const DEFAULT_BOOTSTRAP_TEMPLATE_ID = "github-default";
 const DEFAULT_PROFILE_CANDIDATES = [
-  "project.aor.yaml",
-  "examples/project.aor.yaml",
-  "examples/project.github.aor.yaml",
+  ".aor/project.yaml",
 ];
 const ASSET_MODES = new Set(["bundled", "materialized"]);
 const DEFAULT_REGISTRY_ROOTS = Object.freeze({
@@ -806,11 +804,7 @@ function resolveProjectProfileRuntimeMetadata(options) {
   const profileDocument = options.profileDocument;
   const projectId = profileDocument.project_id;
   const displayName = profileDocument.display_name;
-  const runtimeDefaults = /** @type {Record<string, unknown>} */ (profileDocument.runtime_defaults ?? {});
-  const runtimeRootFromProfile =
-    typeof runtimeDefaults.runtime_root === "string" && runtimeDefaults.runtime_root.trim().length > 0
-      ? runtimeDefaults.runtime_root
-      : DEFAULT_RUNTIME_ROOT;
+  const runtimeRootFromProfile = resolveAorHome();
 
   if (typeof projectId !== "string" || projectId.trim().length === 0) {
     throw new Error(`Project profile '${options.projectProfilePath}' is missing a valid 'project_id'.`);
@@ -857,7 +851,7 @@ export function loadProjectProfileForRuntime(options) {
  * @returns {string}
  */
 export function resolveRuntimeRoot(options) {
-  const selectedRuntimeRoot = options.runtimeRootOverride ?? options.runtimeRootFromProfile;
+  const selectedRuntimeRoot = options.runtimeRootOverride ?? resolveAorHome();
 
   return path.isAbsolute(selectedRuntimeRoot)
     ? selectedRuntimeRoot
@@ -869,17 +863,20 @@ export function resolveRuntimeRoot(options) {
  * @returns {{ runtimeRoot: string, projectsRoot: string, projectRuntimeRoot: string, artifactsRoot: string, reportsRoot: string, stateRoot: string }}
  */
 export function resolveRuntimeLayout(options) {
-  const projectIdValidation = validatePublicId(options.projectId);
+  const storageProjectId = options.storageProjectId ?? options.projectId;
+  const projectIdValidation = validatePublicId(storageProjectId);
   if (!projectIdValidation.ok) {
     throw new Error(
-      `Invalid project_id ${JSON.stringify(options.projectId)} (${projectIdValidation.value_class}). ${projectIdValidation.migration}`,
+      `Invalid storage project id ${JSON.stringify(storageProjectId)} (${projectIdValidation.value_class}). ${projectIdValidation.migration}`,
     );
   }
   const projectsRoot = path.join(options.runtimeRoot, "projects");
-  const projectRuntimeRoot = path.join(projectsRoot, options.projectId);
+  const projectRuntimeRoot = path.join(projectsRoot, storageProjectId);
   const artifactsRoot = path.join(projectRuntimeRoot, "artifacts");
   const reportsRoot = path.join(projectRuntimeRoot, "reports");
   const stateRoot = path.join(projectRuntimeRoot, "state");
+  const inputsRoot = path.join(projectRuntimeRoot, "inputs");
+  const workspacesRoot = path.join(projectRuntimeRoot, "workspaces");
 
   return {
     runtimeRoot: options.runtimeRoot,
@@ -888,6 +885,8 @@ export function resolveRuntimeLayout(options) {
     artifactsRoot,
     reportsRoot,
     stateRoot,
+    inputsRoot,
+    workspacesRoot,
   };
 }
 
@@ -904,6 +903,8 @@ export function ensureRuntimeLayout(options) {
     layout.artifactsRoot,
     layout.reportsRoot,
     layout.stateRoot,
+    layout.inputsRoot,
+    layout.workspacesRoot,
   ]) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
@@ -936,7 +937,9 @@ function canonicalizeRuntimeRoot(runtimeRoot) {
 }
 
 function createStagingRuntimeLayout(finalLayout) {
-  fs.mkdirSync(finalLayout.projectsRoot, { recursive: true });
+  fs.mkdirSync(finalLayout.runtimeRoot, { recursive: true, mode: 0o700 });
+  fs.chmodSync(finalLayout.runtimeRoot, 0o700);
+  fs.mkdirSync(finalLayout.projectsRoot, { recursive: true, mode: 0o700 });
   const canonicalProjectsRoot = fs.realpathSync.native(finalLayout.projectsRoot);
   if (!isContainedPath(finalLayout.runtimeRoot, canonicalProjectsRoot)) {
     throw new Error(`Projects root '${finalLayout.projectsRoot}' escapes runtime boundary '${finalLayout.runtimeRoot}'.`);
@@ -950,11 +953,12 @@ function createStagingRuntimeLayout(finalLayout) {
     canonicalProjectsRoot,
     `.${path.basename(finalLayout.projectRuntimeRoot)}.init-${transactionId}.backup`,
   );
-  fs.mkdirSync(stagingProjectRuntimeRoot, { recursive: false });
+  fs.mkdirSync(stagingProjectRuntimeRoot, { recursive: false, mode: 0o700 });
   const ownerMarker = path.join(stagingProjectRuntimeRoot, ".aor-init-owner.json");
-  fs.writeFileSync(ownerMarker, `${JSON.stringify({ transaction_id: transactionId, project_id: path.basename(finalLayout.projectRuntimeRoot) })}\n`, "utf8");
+  fs.writeFileSync(ownerMarker, `${JSON.stringify({ transaction_id: transactionId, project_id: path.basename(finalLayout.projectRuntimeRoot) })}\n`, { encoding: "utf8", mode: 0o600 });
   if (fs.existsSync(finalLayout.projectRuntimeRoot)) {
     for (const entry of fs.readdirSync(finalLayout.projectRuntimeRoot)) {
+      if (entry === "workspaces") continue;
       fs.cpSync(
         path.join(finalLayout.projectRuntimeRoot, entry),
         path.join(stagingProjectRuntimeRoot, entry),
@@ -968,8 +972,10 @@ function createStagingRuntimeLayout(finalLayout) {
     artifactsRoot: path.join(stagingProjectRuntimeRoot, "artifacts"),
     reportsRoot: path.join(stagingProjectRuntimeRoot, "reports"),
     stateRoot: path.join(stagingProjectRuntimeRoot, "state"),
+    inputsRoot: path.join(stagingProjectRuntimeRoot, "inputs"),
+    workspacesRoot: path.join(stagingProjectRuntimeRoot, "workspaces"),
   };
-  for (const directory of [stagingLayout.artifactsRoot, stagingLayout.reportsRoot, stagingLayout.stateRoot]) {
+  for (const directory of [stagingLayout.artifactsRoot, stagingLayout.reportsRoot, stagingLayout.stateRoot, stagingLayout.inputsRoot, stagingLayout.workspacesRoot]) {
     fs.mkdirSync(directory, { recursive: true });
   }
   return { transactionId, stagingLayout, ownerMarker, backupProjectRuntimeRoot };
@@ -984,11 +990,20 @@ function cleanupOwnedStagingTree(transaction) {
 
 function publishStagedRuntime(finalLayout, transaction, options = {}) {
   const hadExistingRuntime = fs.existsSync(finalLayout.projectRuntimeRoot);
-  try {
-    if (hadExistingRuntime) {
-      fs.renameSync(finalLayout.projectRuntimeRoot, transaction.backupProjectRuntimeRoot);
-      injectInitializationFailure(options, "after-backup-rename");
+  if (hadExistingRuntime) {
+    injectInitializationFailure(options, "after-backup-rename");
+    for (const entry of fs.readdirSync(transaction.stagingLayout.projectRuntimeRoot)) {
+      if (entry === path.basename(transaction.ownerMarker) || entry === "workspaces") continue;
+      fs.cpSync(
+        path.join(transaction.stagingLayout.projectRuntimeRoot, entry),
+        path.join(finalLayout.projectRuntimeRoot, entry),
+        { recursive: true, force: true, errorOnExist: false, preserveTimestamps: true },
+      );
     }
+    cleanupOwnedStagingTree(transaction);
+    return;
+  }
+  try {
     fs.renameSync(transaction.stagingLayout.projectRuntimeRoot, finalLayout.projectRuntimeRoot);
   } catch (error) {
     if (!fs.existsSync(finalLayout.projectRuntimeRoot) && fs.existsSync(transaction.backupProjectRuntimeRoot)) {
@@ -1002,9 +1017,6 @@ function publishStagedRuntime(finalLayout, transaction, options = {}) {
     throw error;
   }
   fs.rmSync(path.join(finalLayout.projectRuntimeRoot, path.basename(transaction.ownerMarker)), { force: true });
-  if (hadExistingRuntime) {
-    fs.rmSync(transaction.backupProjectRuntimeRoot, { recursive: true, force: true });
-  }
 }
 
 /**
@@ -1135,7 +1147,7 @@ function createOnboardingReport(options) {
     },
     write_effects: {
       target_repo_writes: toProjectRelativePaths({ projectRoot: options.projectRoot, filePaths: options.targetRepoWrites }),
-      runtime_writes: toProjectRelativePaths({ projectRoot: options.projectRoot, filePaths: options.runtimeWrites }),
+      runtime_writes: options.runtimeWrites.map((filePath) => toLogicalEvidenceRef({ projectRoot: options.projectRoot, filePath })),
       copied_example_registries: options.bootstrapAssetsMaterialized,
       materialized_profile: options.profileMaterialized,
     },
@@ -1291,9 +1303,11 @@ export function initializeProjectRuntime(options = {}) {
     }),
   );
 
+  const storageProjectId = options.storageProjectId ?? deriveWorkspaceProjectId({ projectRoot });
   const runtimeLayout = resolveRuntimeLayout({
     runtimeRoot,
     projectId: loadedProfile.projectId,
+    storageProjectId,
   });
   if (fs.existsSync(runtimeLayout.projectRuntimeRoot) && fs.lstatSync(runtimeLayout.projectRuntimeRoot).isSymbolicLink()) {
     throw new Error(`Project runtime root '${runtimeLayout.projectRuntimeRoot}' must not be a symbolic link or junction.`);
@@ -1318,24 +1332,30 @@ export function initializeProjectRuntime(options = {}) {
 
   const registryResolution = resolveProjectRegistryRoots(loadedProfile.document, { projectRoot });
   const assetMode = registryResolution.assetMode;
-  const projectProfileRef = toProjectRelativePath(projectRoot, projectProfilePath);
+  const projectProfileRef = generatedBundledProfile
+    ? `evidence://projects/${storageProjectId}/state/project.aor.yaml`
+    : toProjectRelativePath(projectRoot, projectProfilePath);
   const onboardingReportPath = path.join(runtimeLayout.reportsRoot, "onboarding-report.json");
 
   const state = {
     schema_version: 1,
     project_id: loadedProfile.projectId,
+    runtime_project_id: loadedProfile.projectId,
+    workspace_project_id: storageProjectId,
     display_name: loadedProfile.displayName,
     selected_profile_ref: projectProfileRef,
     project_root: projectRoot,
     runtime_root: runtimeRoot,
     asset_mode: assetMode,
     registry_roots: registryResolution.roots,
-    onboarding_report_ref: toProjectRelativePath(projectRoot, onboardingReportPath),
+    onboarding_report_ref: toLogicalEvidenceRef({ projectRoot, filePath: onboardingReportPath, workspaceProjectId: storageProjectId }),
     runtime_layout: {
       project_runtime_root: runtimeLayout.projectRuntimeRoot,
       artifacts_root: runtimeLayout.artifactsRoot,
       reports_root: runtimeLayout.reportsRoot,
       state_root: runtimeLayout.stateRoot,
+      inputs_root: runtimeLayout.inputsRoot,
+      workspaces_root: runtimeLayout.workspacesRoot,
     },
     bootstrap_materialization: {
       profile: {
@@ -1433,6 +1453,8 @@ export function initializeProjectRuntime(options = {}) {
     projectProfilePath,
     projectProfileRef: state.selected_profile_ref,
     projectId: loadedProfile.projectId,
+    runtimeProjectId: loadedProfile.projectId,
+    workspaceProjectId: storageProjectId,
     displayName: loadedProfile.displayName,
     runtimeRoot,
     runtimeLayout,
@@ -1535,12 +1557,15 @@ export function previewProjectRuntime(options = {}) {
   const runtimeLayout = resolveRuntimeLayout({
     runtimeRoot,
     projectId: loadedProfile.projectId,
+    storageProjectId: options.storageProjectId ?? deriveWorkspaceProjectId({ projectRoot }),
   });
   const stateFile = path.join(runtimeLayout.stateRoot, "project-init-state.json");
   const onboardingReportFile = path.join(runtimeLayout.reportsRoot, "onboarding-report.json");
 
   return {
     projectId: loadedProfile.projectId,
+    runtimeProjectId: loadedProfile.projectId,
+    workspaceProjectId: options.storageProjectId ?? deriveWorkspaceProjectId({ projectRoot }),
     displayName: loadedProfile.displayName,
     projectRoot,
     projectProfileRef: generatedBundledProfile

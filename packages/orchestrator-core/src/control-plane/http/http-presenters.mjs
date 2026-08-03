@@ -1,6 +1,14 @@
 import { normalizeProviderStepStatus } from "../../provider-step-status.mjs";
 import { asPositiveInteger, asRecord, asString } from "./http-utils.mjs";
 
+function withoutRuntimeRootFields(value) {
+  if (Array.isArray(value)) return value.map(withoutRuntimeRootFields);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !["runtime_root", "runtimeRoot", "resolved_runtime_root", "runtime_layout", "runtimeLayout"].includes(key))
+    .map(([key, child]) => [key, withoutRuntimeRootFields(child)]));
+}
+
 /**
  * @param {{ action: string, runId: string, blocked: boolean, blockedReason?: { code?: string, message?: string } | null, applied: boolean, transition: unknown, guardrails: unknown, state: unknown, stateFile: string, auditRecord: { audit_id: string }, auditFile: string, primaryEvent: { event_id: string }, evidenceEvent: { event_id: string }, streamLogFile: string, nextActions: unknown }} result
  * @returns {Record<string, unknown>}
@@ -53,7 +61,7 @@ export function toLifecycleCommandResponse(result) {
     exit_code: result.exit_code,
     stdout: result.stdout,
     stderr: result.stderr,
-    command_output: result.command_output,
+    command_output: withoutRuntimeRootFields(result.command_output),
     artifact_refs: result.artifact_refs,
     evidence_refs: result.evidence_refs,
     blocked: result.blocked,
