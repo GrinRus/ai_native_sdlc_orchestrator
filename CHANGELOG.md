@@ -7,6 +7,20 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.17] - 2026-08-03
+
+- Reworked the Quiet Cockpit around one global project and flow context, one
+  lifecycle control per viewport, and one visually dominant recommended action.
+- Clarified first-run onboarding from repository selection and local runtime
+  initialization through Mission setup, execution-route selection, provider
+  readiness, and the first safe action.
+- Improved semantic typography and design-token adoption, reduced competing
+  cards and borders, and moved technical context and readiness evidence behind
+  progressive disclosures.
+- Added a fail-closed configuration-error surface, clearer degraded-state
+  behavior, responsive mobile lifecycle navigation, and accessible control
+  labels while preserving packaged browser acceptance coverage.
+
 ## [0.1.0-alpha.16] - 2026-08-02
 
 - Added structured medium/large planning, topology-aware workspace sets,
