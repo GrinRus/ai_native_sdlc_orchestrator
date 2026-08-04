@@ -17,7 +17,9 @@ Required top-level fields:
 - `read_only`
 
 Each route row carries `step`, `route_id`, runner/adapter, provider,
-`requested_model`, `effective_model`, `model_source`, required capabilities,
+`requested_model`, `effective_model`, `model_source`, optional
+`requested_reasoning_effort`, `effective_reasoning_effort`, and
+`reasoning_effort_source`, required capabilities,
 fallback summary, `mode` (`simulation` or `live`), qualification, readiness,
 and `approved_routes[]`. Each approved route option contains only a canonical
 route ID and bounded display metadata from the route registry; clients must

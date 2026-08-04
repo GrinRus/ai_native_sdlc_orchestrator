@@ -319,6 +319,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateAdapterCapabilityProfile(document, source));
   }
 
+  if (family === "provider-route-profile") {
+    issues.push(...validateProviderRouteProfile(document, source));
+  }
+
   if (family === "compiled-context-artifact") {
     issues.push(...validateCompiledContextArtifact(document, source));
   }
@@ -675,11 +679,35 @@ function validateArtifactPacket(document, source) {
  * @param {string} source
  * @returns {import("./index.d.ts").ContractValidationIssue[]}
  */
+function validateProviderRouteProfile(document, source) {
+  const issues = [];
+  const validateCandidate = (candidate, field) => {
+    if (candidate === undefined || candidate === null) return;
+    if (!isPlainObject(candidate)) {
+      issues.push(issue({ code: "field_type_mismatch", source, field, expected: "object", actual: describeActualType(candidate), message: `Field '${field}' must be 'object'.` }));
+      return;
+    }
+    for (const name of ["adapter", "provider", "model", "reasoning_effort"]) {
+      validateNestedNullableStringField({ record: candidate, source, field: `${field}.${name}`, issues, required: false });
+    }
+  };
+  validateCandidate(document.primary, "primary");
+  if (document.fallback !== undefined) {
+    if (!Array.isArray(document.fallback)) {
+      issues.push(issue({ code: "field_type_mismatch", source, field: "fallback", expected: "array", actual: describeActualType(document.fallback), message: "Field 'fallback' must be 'array'." }));
+    } else {
+      document.fallback.forEach((candidate, index) => validateCandidate(candidate, `fallback[${index}]`));
+    }
+  }
+  return issues;
+}
+
 function validateAdapterCapabilityProfile(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
   validateNestedStringField({ record: document, source, field: "default_model", issues, required: false });
   validateOptionalStringArrayField({ record: document, source, field: "supported_models", issues });
+  validateOptionalStringArrayField({ record: document, source, field: "supported_reasoning_efforts", issues });
   if (document.model_aliases !== undefined) {
     if (!isPlainObject(document.model_aliases)) {
       issues.push(issue({ code: "field_type_mismatch", source, field: "model_aliases", expected: "object", actual: describeActualType(document.model_aliases), message: "model_aliases must be an object." }));
@@ -711,6 +739,27 @@ function validateAdapterCapabilityProfile(document, source) {
   if (modelArgument) {
     validateNestedStringField({ record: modelArgument, source, field: "execution.external_runtime.model_argument.flag", issues, required: true });
     validateNestedArrayField({ record: modelArgument, source, field: "execution.external_runtime.model_argument.prefix_args", issues, required: false });
+  }
+  const reasoningEffortArgument = validateOptionalObjectField({
+    record: externalRuntime,
+    source,
+    field: "execution.external_runtime.reasoning_effort_argument",
+    issues,
+  });
+  if (reasoningEffortArgument) {
+    validateNestedArrayField({
+      record: reasoningEffortArgument,
+      source,
+      field: "execution.external_runtime.reasoning_effort_argument.prefix_args",
+      issues,
+    });
+    validateNestedStringField({
+      record: reasoningEffortArgument,
+      source,
+      field: "execution.external_runtime.reasoning_effort_argument.value_template",
+      issues,
+      required: true,
+    });
   }
 
   const requestTransport =

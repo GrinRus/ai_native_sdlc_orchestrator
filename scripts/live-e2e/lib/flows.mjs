@@ -963,6 +963,30 @@ function runAorCommand(options) {
 }
 
 /**
+ * The public CLI resolves runtime state through the isolated AOR_HOME
+ * launcher and rejects per-command --runtime-root overrides. Keep legacy flow
+ * builders readable while stripping that removed flag at the public boundary.
+ *
+ * @param {string[]} args
+ * @returns {string[]}
+ */
+export function normalizePublicCommandArgs(args) {
+  const normalized = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--runtime-root") {
+      index += 1;
+      continue;
+    }
+    if (value.startsWith("--runtime-root=")) {
+      continue;
+    }
+    normalized.push(value);
+  }
+  return normalized;
+}
+
+/**
  * @param {import("node:child_process").SpawnSyncReturns<string>} commandRun
  * @returns {boolean}
  */
@@ -4454,6 +4478,7 @@ export function executeInstalledUserFlow(options) {
     ];
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
+      const publicArgs = normalizePublicCommandArgs(args);
       const iteration = Number(runOptions.iteration) || 1;
       if (options.stepController?.shouldUseCachedCommand?.(label, iteration) === true) {
         const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label, iteration));
@@ -4476,14 +4501,14 @@ export function executeInstalledUserFlow(options) {
       if (runOptions.suppressControllerPlan !== true) {
         options.stepController?.planCommand?.({
           label,
-          commandSurface: resolveCommandSurface(args),
+          commandSurface: resolveCommandSurface(publicArgs),
           iteration,
         });
       }
       const result = runAorCommand({
         launch: options.aorLaunch,
         cwd: targetCheckout.targetCheckoutRoot,
-        args,
+        args: publicArgs,
         env,
         transcriptsRoot,
         label,
@@ -5157,6 +5182,7 @@ function executeFullJourneyFlowImplementation(options) {
 
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
+      const publicArgs = normalizePublicCommandArgs(args);
       const iteration = Number(runOptions.iteration) || 1;
       if (options.stepController?.shouldUseCachedCommand?.(label, iteration) === true) {
         const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label, iteration));
@@ -5179,14 +5205,14 @@ function executeFullJourneyFlowImplementation(options) {
       if (runOptions.suppressControllerPlan !== true) {
         options.stepController?.planCommand?.({
           label,
-          commandSurface: resolveCommandSurface(args),
+          commandSurface: resolveCommandSurface(publicArgs),
           iteration,
         });
       }
       const result = runAorCommand({
         launch: options.aorLaunch,
         cwd: targetCheckout.targetCheckoutRoot,
-        args,
+        args: publicArgs,
         env,
         transcriptsRoot,
         label,

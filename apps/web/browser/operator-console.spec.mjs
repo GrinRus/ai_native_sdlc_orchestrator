@@ -103,6 +103,9 @@ test.describe.serial("installed local operator console", () => {
             risk_tier: "medium",
             provider: "openai",
             requested_model: "coding-primary",
+            requested_reasoning_effort: "high",
+            effective_reasoning_effort: "high",
+            reasoning_effort_source: "route-explicit",
             required_capabilities: ["repo_write"],
             qualification: "project-approved",
           },
@@ -128,7 +131,18 @@ test.describe.serial("installed local operator console", () => {
           execution_profile: {
             ...profile,
             revision: 8,
-            routes: [{ ...profile.routes[0], route_id: request.route_id, mode: "live", readiness: "stale" }],
+            routes: [{
+              ...profile.routes[0],
+              route_id: request.route_id,
+              mode: "live",
+              readiness: "stale",
+              requested_model: "gpt-5.6-luna",
+              effective_model: "gpt-5.6-luna",
+              model_source: "route-explicit",
+              requested_reasoning_effort: "high",
+              effective_reasoning_effort: "high",
+              reasoning_effort_source: "route-explicit",
+            }],
           },
           readiness_report: null,
           diagnostic: secretCanary,
@@ -148,6 +162,12 @@ test.describe.serial("installed local operator console", () => {
     await expect(dialog.getByText("No provider process is started.")).toBeVisible();
     await dialog.getByRole("button", { name: "Confirm route change" }).click();
     await expect.poll(() => mutationCount).toBe(1);
+    await expect(
+      page.locator(".execution-route-summary section").filter({ hasText: /^Model/u }).locator("strong"),
+    ).toHaveText("gpt-5.6-luna");
+    await expect(
+      page.locator(".execution-route-summary section").filter({ hasText: /^Reasoning effort/u }).locator("strong"),
+    ).toHaveText("high");
     await expect(page.getByText(secretCanary)).toHaveCount(0);
   });
 

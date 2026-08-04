@@ -46,6 +46,7 @@ import {
   evaluateTargetToolchainPreflight,
   nextActionReportClosesFlow,
   nodeVersionSatisfiesRequiredRange,
+  normalizePublicCommandArgs,
   prepareAorInstallationProof,
   reconcileSummaryMeaningfulChangedPaths,
   reviewAllowsLiveE2eDelivery,
@@ -1354,11 +1355,27 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.equal(loaded.ok, true);
       assert.ok(loaded.document.allowed_providers.includes(current.provider));
       assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
+      assert.equal(loaded.document.runtime_defaults.runtime_root, undefined);
       assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
       assert.deepEqual(loaded.document.repos[0].lint_commands, []);
       assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
     }
   });
+});
+
+test("public live E2E commands strip the removed runtime-root override", () => {
+  assert.deepEqual(
+    normalizePublicCommandArgs([
+      "project",
+      "init",
+      "--runtime-root",
+      ".aor",
+      "--name",
+      "fixture",
+      "--runtime-root=.legacy",
+    ]),
+    ["project", "init", "--name", "fixture"],
+  );
 });
 
 test("host assets pin Codex model defaults without changing other provider defaults", () => {
@@ -1401,6 +1418,35 @@ test("host assets pin Codex model defaults without changing other provider defau
         }
       }
     }
+  });
+});
+
+test("live profile selection materializes Codex Luna and high effort without legacy defaults", () => {
+  withTempRoot((tempRoot) => {
+    const loadedProfile = loadProofRunnerProfile({
+      hostRoot: repoRoot,
+      profileRef: "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex-luna.yaml",
+    });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const assets = materializeHostLiveE2eAssets({
+      examplesRoot: path.join(repoRoot, "examples"),
+      generatedAssetsRoot: path.join(tempRoot, "luna-assets"),
+      providerVariant: resolved.providerVariant,
+      providerVariantId: resolved.resolvedProfile.provider_variant_id,
+      profile: resolved.resolvedProfile,
+    });
+    const route = loadContractFile({
+      filePath: path.join(assets.routesRoot, "implement-openai-primary.yaml"),
+      family: "provider-route-profile",
+    });
+    assert.equal(route.ok, true);
+    assert.equal(route.document.primary.model, "gpt-5.6-luna");
+    assert.equal(route.document.primary.reasoning_effort, "high");
+    assert.deepEqual(assets.liveE2eAdapterDefaults.applied_args, []);
+    assert.ok(assets.liveE2eAdapterDefaults.suppressed_args.includes("gpt-5.5"));
   });
 });
 

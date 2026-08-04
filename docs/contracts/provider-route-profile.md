@@ -1,7 +1,8 @@
 # Provider route profile
 
 ## Purpose
-Execution route for a step, including adapter/provider/model choice, required capabilities, fallbacks, and constraints.
+Execution route for a step, including adapter/provider/model choice, optional
+reasoning effort, required capabilities, fallbacks, and constraints.
 
 ## Required fields
 - `route_id`
@@ -17,10 +18,16 @@ If a resolved route points to a different `step`, resolution must fail with an e
 
 The resolved route preserves ordered `fallback[]`, `retry_policy_ref`, and
 `repair_policy_ref`. It also exposes `requested_model`, `effective_model`,
-`model_source`, capability requirements, and an attempt budget. Model resolution
-uses this precedence: a concrete model supported by the adapter, a declared
-adapter-owned alias, then the adapter default when no model was requested.
-Unknown or incompatible models fail before subprocess spawn.
+`model_source`, requested/effective reasoning effort, capability requirements,
+and an attempt budget. Model resolution uses this precedence: a concrete model
+supported by the adapter, a declared adapter-owned alias, then the runner-native
+default when no model was requested. Reasoning effort follows the same
+explicit-or-native policy. Unknown or incompatible values fail before
+subprocess spawn.
+
+Each primary or fallback candidate may optionally declare `model` and
+`reasoning_effort`. When omitted, the selected external runtime owns its native
+default; provider-specific flags must remain inside the adapter profile.
 
 Each fallback candidate may execute at most once, in declared order, only when
 its adapter satisfies the same capability requirements and the canonical

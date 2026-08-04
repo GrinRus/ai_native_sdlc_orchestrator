@@ -4,6 +4,14 @@ version: 1
 default_model: gpt-5.5
 supported_models:
   - gpt-5.5
+  - gpt-5.6-luna
+supported_reasoning_efforts:
+  - none
+  - low
+  - medium
+  - high
+  - xhigh
+  - max
 model_aliases:
   coding-primary: gpt-5.5
   coding-fallback: gpt-5.5
@@ -35,6 +43,10 @@ execution:
     command: codex
     model_argument:
       flag: --model
+    reasoning_effort_argument:
+      prefix_args:
+        - -c
+      value_template: model_reasoning_effort="{value}"
     default_args:
       - --model
       - gpt-5.5

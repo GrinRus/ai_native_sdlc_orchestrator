@@ -591,6 +591,69 @@ function resolveExternalRuntimeModelArgs(externalRuntime, route) {
   return [...asStringArray(asRecord(externalRuntime.model_argument).prefix_args), flag, effectiveModel];
 }
 
+function resolveExternalRuntimeReasoningEffortArgs(externalRuntime, route) {
+  const effectiveEffort = asOptionalString(route.effective_reasoning_effort);
+  if (!effectiveEffort) return [];
+  const argument = asRecord(externalRuntime.reasoning_effort_argument);
+  const template = asOptionalString(argument.value_template);
+  if (!template || !template.includes("{value}")) {
+    throw new Error("Effective reasoning effort requires adapter-owned execution.external_runtime.reasoning_effort_argument.value_template containing '{value}'.");
+  }
+  const rendered = template.replaceAll("{value}", effectiveEffort);
+  return [...asStringArray(argument.prefix_args), rendered];
+}
+
+function appendArgsIfMissing(baseArgs, additionalArgs) {
+  if (additionalArgs.length === 0) return [];
+  for (let index = 0; index <= baseArgs.length - additionalArgs.length; index += 1) {
+    if (additionalArgs.every((value, offset) => baseArgs[index + offset] === value)) return [];
+  }
+  return additionalArgs;
+}
+
+/**
+ * Remove stale adapter-owned model or reasoning-effort arguments before the
+ * explicitly negotiated value is appended. Permission-policy args may still
+ * carry legacy defaults when a route selects a different runtime value.
+ *
+ * @param {string[]} baseArgs
+ * @param {{ prefixArgs: string[], flag?: string | null, valueTemplate?: string | null }} spec
+ * @returns {string[]}
+ */
+function removeConfiguredSelectionArgs(baseArgs, spec) {
+  const prefixArgs = spec.prefixArgs;
+  const flag = spec.flag ?? null;
+  const template = spec.valueTemplate ?? null;
+  const result = [];
+  for (let index = 0; index < baseArgs.length;) {
+    const prefixMatches = prefixArgs.every((value, offset) => baseArgs[index + offset] === value);
+    const flagIndex = index + prefixArgs.length;
+    const flagMatches = !flag || baseArgs[flagIndex] === flag;
+    const valueIndex = flagIndex + (flag ? 1 : 0);
+    const value = baseArgs[valueIndex];
+    const valueMatches = typeof value === "string" && (!template || templateMatchesValue(template, value));
+    if (prefixMatches && flagMatches && valueMatches) {
+      index = valueIndex + 1;
+      continue;
+    }
+    result.push(baseArgs[index]);
+    index += 1;
+  }
+  return result;
+}
+
+/**
+ * @param {string} template
+ * @param {string} value
+ * @returns {boolean}
+ */
+function templateMatchesValue(template, value) {
+  const parts = template.split("{value}");
+  if (parts.length !== 2) return false;
+  return value.startsWith(parts[0]) && value.endsWith(parts[1]) &&
+    value.length >= parts[0].length + parts[1].length;
+}
+
 /**
  * @param {{ externalRuntime: Record<string, unknown>, timeoutMs: number }} options
  * @returns {string[]}
@@ -2223,14 +2286,46 @@ function resolveModelForAdapter(candidate, adapterProfile) {
       `Adapter negotiation failed: model '${requestedModel}' is not a supported concrete model or declared alias for adapter '${String(adapterProfile.adapter_id)}'.`,
     );
   }
-  if (defaultModel) {
+  if (defaultModel && asRecord(adapterProfile.execution).runtime_mode !== "external-process") {
     return {
       requested_model: null,
       effective_model: defaultModel,
       model_source: "adapter-default",
     };
   }
+  if (asRecord(adapterProfile.execution).runtime_mode === "external-process") {
+    return { requested_model: null, effective_model: null, model_source: "runner-default" };
+  }
   return { requested_model: null, effective_model: null, model_source: "not-applicable" };
+}
+
+function resolveReasoningEffortForAdapter(candidate, adapterProfile) {
+  const requestedEffort = asOptionalString(candidate.reasoning_effort);
+  if (asOptionalString(candidate.adapter) === "none") {
+    return {
+      requested_reasoning_effort: requestedEffort,
+      effective_reasoning_effort: requestedEffort,
+      reasoning_effort_source: requestedEffort ? "route-explicit" : "not-applicable",
+    };
+  }
+  const supportedEfforts = asStringArray(adapterProfile.supported_reasoning_efforts);
+  if (requestedEffort && supportedEfforts.length > 0 && !supportedEfforts.includes(requestedEffort)) {
+    throw new Error(
+      `Adapter negotiation failed: reasoning effort '${requestedEffort}' is not supported by adapter '${String(adapterProfile.adapter_id)}'.`,
+    );
+  }
+  if (requestedEffort) {
+    return {
+      requested_reasoning_effort: requestedEffort,
+      effective_reasoning_effort: requestedEffort,
+      reasoning_effort_source: supportedEfforts.length > 0 ? "route-explicit" : "adapter-native",
+    };
+  }
+  return {
+    requested_reasoning_effort: null,
+    effective_reasoning_effort: null,
+    reasoning_effort_source: "runner-default",
+  };
 }
 
 function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterRegistry, adaptersRoot, requiredCapabilities }) {
@@ -2248,6 +2343,7 @@ function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterReg
       adapter_id: "none",
       provider,
       ...resolveModelForAdapter(candidate, { adapter_id: "none" }),
+      ...resolveReasoningEffortForAdapter(candidate, { adapter_id: "none" }),
       profile_source: null,
       profile: null,
       capability_check: { required: [], satisfied: [], missing: [], status: "not-required" },
@@ -2267,9 +2363,15 @@ function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterReg
   const execution = asRecord(adapterEntry.profile.execution);
   const externalRuntime = asRecord(execution.external_runtime);
   const model = resolveModelForAdapter(candidate, adapterEntry.profile);
+  const reasoningEffort = resolveReasoningEffortForAdapter(candidate, adapterEntry.profile);
   if (model.effective_model && !asOptionalString(asRecord(externalRuntime.model_argument).flag)) {
     throw new Error(
       `Adapter negotiation failed: adapter '${adapterId}' has an effective model but no execution.external_runtime.model_argument.flag.`,
+    );
+  }
+  if (reasoningEffort.effective_reasoning_effort && !asOptionalString(asRecord(externalRuntime.reasoning_effort_argument).value_template)) {
+    throw new Error(
+      `Adapter negotiation failed: adapter '${adapterId}' has an effective reasoning effort but no execution.external_runtime.reasoning_effort_argument.value_template.`,
     );
   }
   return {
@@ -2278,6 +2380,7 @@ function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterReg
     adapter_id: adapterId,
     provider,
     ...model,
+    ...reasoningEffort,
     profile_source: adapterEntry.source,
     profile: {
       adapter_id: adapterEntry.profile.adapter_id,
@@ -2288,6 +2391,7 @@ function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterReg
       model_aliases: asRecord(adapterEntry.profile.model_aliases),
       supported_models: asStringArray(adapterEntry.profile.supported_models),
       default_model: asOptionalString(adapterEntry.profile.default_model),
+      supported_reasoning_efforts: asStringArray(adapterEntry.profile.supported_reasoning_efforts),
       execution,
     },
     capability_check: { required: requiredCapabilities, satisfied: requiredCapabilities, missing: [], status: "pass" },
@@ -2380,6 +2484,9 @@ function resolveAdapterForRouteWithRegistry(options) {
       requested_model: selectedCandidate.requested_model,
       effective_model: selectedCandidate.effective_model,
       model_source: selectedCandidate.model_source,
+      requested_reasoning_effort: selectedCandidate.requested_reasoning_effort,
+      effective_reasoning_effort: selectedCandidate.effective_reasoning_effort,
+      reasoning_effort_source: selectedCandidate.reasoning_effort_source,
       execution_candidates: executionCandidates,
       capability_check: {
         required: [],
@@ -2434,12 +2541,16 @@ function resolveAdapterForRouteWithRegistry(options) {
         model_aliases: asRecord(adapterEntry.profile.model_aliases),
         supported_models: asStringArray(adapterEntry.profile.supported_models),
         default_model: asOptionalString(adapterEntry.profile.default_model),
+        supported_reasoning_efforts: asStringArray(adapterEntry.profile.supported_reasoning_efforts),
         execution: asRecord(adapterEntry.profile.execution),
       },
     },
     requested_model: selectedCandidate.requested_model,
     effective_model: selectedCandidate.effective_model,
     model_source: selectedCandidate.model_source,
+    requested_reasoning_effort: selectedCandidate.requested_reasoning_effort,
+    effective_reasoning_effort: selectedCandidate.effective_reasoning_effort,
+    reasoning_effort_source: selectedCandidate.reasoning_effort_source,
     execution_candidates: executionCandidates,
     capability_check: {
       required: requiredCapabilities,
@@ -2867,12 +2978,32 @@ export function createLiveAdapter(options) {
           requested_model: asOptionalString(route.requested_model),
           effective_model: asOptionalString(route.effective_model),
           model_source: asOptionalString(route.model_source),
+          requested_reasoning_effort: asOptionalString(route.requested_reasoning_effort),
+          effective_reasoning_effort: asOptionalString(route.effective_reasoning_effort),
+          reasoning_effort_source: asOptionalString(route.reasoning_effort_source),
         },
       };
       const serializedRunnerInput = `${JSON.stringify(runnerInput)}\n`;
+      const modelArgs = resolveExternalRuntimeModelArgs(externalRuntime, route);
+      const reasoningEffortArgs = resolveExternalRuntimeReasoningEffortArgs(externalRuntime, route);
+      if (modelArgs.length > 0) {
+        const modelArgument = asRecord(externalRuntime.model_argument);
+        runtimeArgs = removeConfiguredSelectionArgs(runtimeArgs, {
+          prefixArgs: asStringArray(modelArgument.prefix_args),
+          flag: asOptionalString(modelArgument.flag),
+        });
+      }
+      if (reasoningEffortArgs.length > 0) {
+        const reasoningEffortArgument = asRecord(externalRuntime.reasoning_effort_argument);
+        runtimeArgs = removeConfiguredSelectionArgs(runtimeArgs, {
+          prefixArgs: asStringArray(reasoningEffortArgument.prefix_args),
+          valueTemplate: asOptionalString(reasoningEffortArgument.value_template),
+        });
+      }
       runtimeArgs = [
         ...runtimeArgs,
-        ...resolveExternalRuntimeModelArgs(externalRuntime, route),
+        ...appendArgsIfMissing(runtimeArgs, modelArgs),
+        ...appendArgsIfMissing(runtimeArgs, reasoningEffortArgs),
         ...resolveExternalRuntimeNativeTimeoutArgs({
           externalRuntime,
           timeoutMs: requestTimeoutMs,
@@ -3014,6 +3145,9 @@ export function createLiveAdapter(options) {
             requested_model: asOptionalString(route.requested_model),
             effective_model: asOptionalString(route.effective_model),
             model_source: asOptionalString(route.model_source),
+            requested_reasoning_effort: asOptionalString(route.requested_reasoning_effort),
+            effective_reasoning_effort: asOptionalString(route.effective_reasoning_effort),
+            reasoning_effort_source: asOptionalString(route.reasoning_effort_source),
             timeout_ms: requestTimeoutMs,
             request_via_stdin: requestViaStdin,
             request_transport: requestTransport,
@@ -3182,6 +3316,9 @@ export function createLiveAdapter(options) {
           requested_model: asOptionalString(route.requested_model),
           effective_model: asOptionalString(route.effective_model),
           model_source: asOptionalString(route.model_source),
+          requested_reasoning_effort: asOptionalString(route.requested_reasoning_effort),
+          effective_reasoning_effort: asOptionalString(route.effective_reasoning_effort),
+          reasoning_effort_source: asOptionalString(route.reasoning_effort_source),
           timeout_ms: requestTimeoutMs,
           request_via_stdin: requestViaStdin,
           request_transport: requestTransport,
@@ -3235,6 +3372,9 @@ export function createLiveAdapter(options) {
         requested_model: asOptionalString(route.requested_model),
         effective_model: asOptionalString(route.effective_model),
         model_source: asOptionalString(route.model_source),
+        requested_reasoning_effort: asOptionalString(route.requested_reasoning_effort),
+        effective_reasoning_effort: asOptionalString(route.effective_reasoning_effort),
+        reasoning_effort_source: asOptionalString(route.reasoning_effort_source),
         compiled_context_ref: compiledContextRef,
         external_runner: {
           runtime_mode: runtimeMode,
@@ -3243,6 +3383,9 @@ export function createLiveAdapter(options) {
           requested_model: asOptionalString(route.requested_model),
           effective_model: asOptionalString(route.effective_model),
           model_source: asOptionalString(route.model_source),
+          requested_reasoning_effort: asOptionalString(route.requested_reasoning_effort),
+          effective_reasoning_effort: asOptionalString(route.effective_reasoning_effort),
+          reasoning_effort_source: asOptionalString(route.reasoning_effort_source),
           execution_root: runnerExecutionRoot,
           execution_root_mode: executionRootBinding.mode,
           canonical_execution_root: executionRootBinding.canonicalExecutionRoot,

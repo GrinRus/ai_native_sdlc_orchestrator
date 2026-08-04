@@ -355,6 +355,11 @@ graph TD
   W66S18[W66-S18 Guided diagnostic timeout alignment]
   W66S19[W66-S19 Provider verification-scope convergence]
   W66S09[W66-S09 Fresh four-cell live qualification closure]
+  W68S01[W68-S01 Contract and migration baseline for runtime selection]
+  W68S02[W68-S02 Runtime resolution and adapter argument mapping]
+  W68S03[W68-S03 Runtime selection projection and presets]
+  W68S04[W68-S04 Live E2E selection and Codex Luna/high rehearsal]
+  W68S05[W68-S05 Cutover, certification, and docs closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -870,6 +875,12 @@ graph TD
   W66S17 --> W66S18
   W66S18 --> W66S19
   W66S19 --> W66S09
+  W66S09 --> W68S01
+  W68S01 --> W68S02
+  W68S02 --> W68S03
+  W68S02 --> W68S04
+  W68S03 --> W68S05
+  W68S04 --> W68S05
 ```
 
 ## W0 hard dependencies
@@ -1499,6 +1510,11 @@ own the stricter terminal control proof evidence for this lane.
 | W67-S03 | W67-S01 |
 | W67-S04 | W67-S02, W67-S03 |
 | W67-S05 | W67-S04 |
+| W68-S01 | W67-S05 |
+| W68-S02 | W68-S01 |
+| W68-S03 | W68-S02 |
+| W68-S04 | W68-S02 |
+| W68-S05 | W68-S03, W68-S04 |
 
 ## Topological order
 1. W0-S01
@@ -1857,6 +1873,11 @@ own the stricter terminal control proof evidence for this lane.
 354. W67-S03
 355. W67-S04
 356. W67-S05
+357. W68-S01
+358. W68-S02
+359. W68-S03
+360. W68-S04
+361. W68-S05
 
 W67 dependency edges:
 
@@ -1867,7 +1888,19 @@ graph TD
   W67S01 --> W67S03[W67-S03 Durable intent preparation]
   W67S02 --> W67S04[W67-S04 Intent-first installed console]
   W67S03 --> W67S04
-  W67S04 --> W67S05[W67-S05 Explicit materialization, export, and closure proof]
+W67S04 --> W67S05[W67-S05 Explicit materialization, export, and closure proof]
+```
+
+W68 dependency edges:
+
+```mermaid
+graph TD
+  W67S05[W67-S05 Explicit materialization, export, and closure proof] --> W68S01[W68-S01 Contract and migration baseline]
+  W68S01 --> W68S02[W68-S02 Runtime resolution and adapter argument mapping]
+  W68S02 --> W68S03[W68-S03 Runtime selection projection and presets]
+  W68S02 --> W68S04[W68-S04 Live E2E selection and Codex Luna/high rehearsal]
+  W68S03 --> W68S05[W68-S05 Cutover, certification, and docs closure]
+  W68S04 --> W68S05
 ```
 
 ## Planning rule

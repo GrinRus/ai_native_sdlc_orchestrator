@@ -153,6 +153,9 @@ export function invokeStepAdapterForStep(options) {
           requested_model: null,
           effective_model: null,
           model_source: "not-applicable",
+          requested_reasoning_effort: null,
+          effective_reasoning_effort: null,
+          reasoning_effort_source: "not-applicable",
           profile: asRecord(asRecord(resolution.adapter).profile),
         }];
     const policyProfile = asRecord(asRecord(asRecord(options.adapterRequest.policy_bundle).policy).profile);
@@ -173,6 +176,9 @@ export function invokeStepAdapterForStep(options) {
         requested_model: asString(candidate.requested_model),
         effective_model: asString(candidate.effective_model),
         model_source: asString(candidate.model_source) ?? "not-applicable",
+        requested_reasoning_effort: asString(candidate.requested_reasoning_effort),
+        effective_reasoning_effort: asString(candidate.effective_reasoning_effort),
+        reasoning_effort_source: asString(candidate.reasoning_effort_source) ?? "runner-default",
       };
       const liveAdapter = createLiveAdapter({
         adapterId,
@@ -194,6 +200,9 @@ export function invokeStepAdapterForStep(options) {
         requested_model: asString(candidate.requested_model),
         effective_model: asString(candidate.effective_model),
         model_source: asString(candidate.model_source),
+        requested_reasoning_effort: asString(candidate.requested_reasoning_effort),
+        effective_reasoning_effort: asString(candidate.effective_reasoning_effort),
+        reasoning_effort_source: asString(candidate.reasoning_effort_source),
         status: adapterResponse.status,
         failure_kind: failureKind,
         failure_class: failureClass,

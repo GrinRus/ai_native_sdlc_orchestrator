@@ -16,6 +16,7 @@ Routing chooses how a step is executed without hard-coding provider behavior int
 - adapter
 - provider
 - model alias or concrete model
+- optional reasoning effort
 - wrapper profile reference
 - retry and repair profile references
 - constraints such as timeout, cost, and scope expansion rules
@@ -34,6 +35,11 @@ Routing chooses how a step is executed without hard-coding provider behavior int
 4. Fail deterministically when the resolved profile is missing or points to a different `step`.
 
 The route-resolution output should include selected source (`project-default` or `step-override`) so CLI/API surfaces can explain why a route was chosen.
+
+When `model` or `reasoning_effort` is omitted, external-process execution keeps
+the runner's native default. Explicit values are checked against the adapter
+capability profile and rendered only by adapter-owned argument mappings; the
+orchestrator core never embeds provider-specific flags.
 
 ## Route-to-policy handoff (W2-S03)
 Route resolution feeds policy resolution directly:

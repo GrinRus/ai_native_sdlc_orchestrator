@@ -96,9 +96,10 @@ export function buildRouteRegistry(options) {
  *     primary: {
  *       adapter: string | null,
  *       provider: string | null,
- *       model: string | null,
+     *       model: string | null,
+     *       reasoning_effort: string | null,
  *     },
- *     fallback: Array<{ adapter: string | null, provider: string | null, model: string | null }>,
+     *     fallback: Array<{ adapter: string | null, provider: string | null, model: string | null, reasoning_effort: string | null }>,
  *     retry_policy_ref: string | null,
  *     repair_policy_ref: string | null,
  *     requested_model: string | null,
@@ -186,6 +187,7 @@ export function resolveRouteForStep(options) {
             adapter: typeof candidate.adapter === "string" ? candidate.adapter : null,
             provider: typeof candidate.provider === "string" ? candidate.provider : null,
             model: typeof candidate.model === "string" ? candidate.model : null,
+            ...(typeof candidate.reasoning_effort === "string" ? { reasoning_effort: candidate.reasoning_effort } : {}),
           };
         })
     : [];
@@ -209,6 +211,7 @@ export function resolveRouteForStep(options) {
         adapter: typeof primary.adapter === "string" ? primary.adapter : null,
         provider: typeof primary.provider === "string" ? primary.provider : null,
         model: typeof primary.model === "string" ? primary.model : null,
+        ...(typeof primary.reasoning_effort === "string" ? { reasoning_effort: primary.reasoning_effort } : {}),
       },
       fallback,
       retry_policy_ref:

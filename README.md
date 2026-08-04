@@ -84,7 +84,8 @@ enterprise identity, credentialed provider certification, paid calls, default
 upstream writes, or automatic upstream publication of target-repository
 changes.
 
-W67 defines the breaking central-AOR-Home and intent-first onboarding cutover.
+W67 defines the breaking central-AOR-Home and intent-first onboarding cutover;
+W68 defines provider-neutral runtime model and reasoning-effort selection.
 Its implementation candidate is present, while formal slice completion remains
 backlog-blocked behind the active W66-S09 qualification closure.
 

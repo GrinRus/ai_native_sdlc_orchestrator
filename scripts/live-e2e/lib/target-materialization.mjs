@@ -266,6 +266,7 @@ export function materializeHostLiveE2eAssets(options) {
   const liveE2eAdapterDefaults = materializeSelectedAdapterLiveE2eDefaults({
     assetsRoot,
     providerVariant: asRecord(options.providerVariant),
+    runtimeSelection: resolveRuntimeSelection(options),
   });
   const providerVariantId = asNonEmptyString(options.providerVariantId);
   const providerRoutes = providerVariantId
@@ -274,6 +275,7 @@ export function materializeHostLiveE2eAssets(options) {
         providerVariant: asRecord(options.providerVariant),
         providerVariantId,
         profile: asRecord(options.profile),
+        runtimeSelection: resolveRuntimeSelection(options),
       })
     : { routeOverrides: {}, routeFiles: [] };
   const providerPolicies = providerVariantId
@@ -294,8 +296,17 @@ export function materializeHostLiveE2eAssets(options) {
   };
 }
 
+function resolveRuntimeSelection(options) {
+  const variantSelection = asRecord(asRecord(options.providerVariant).runtime_selection);
+  const profileSelection = asRecord(asRecord(options.profile).runtime_selection);
+  const selection = Object.keys(profileSelection).length > 0 ? profileSelection : variantSelection;
+  const model = asNonEmptyString(selection.model);
+  const reasoningEffort = asNonEmptyString(selection.reasoning_effort);
+  return model || reasoningEffort ? { model: model || null, reasoning_effort: reasoningEffort || null } : null;
+}
+
 /**
- * @param {{ assetsRoot: string, providerVariant: Record<string, unknown> }} options
+ * @param {{ assetsRoot: string, providerVariant: Record<string, unknown>, runtimeSelection?: Record<string, unknown> | null }} options
  */
 function materializeSelectedAdapterLiveE2eDefaults(options) {
   const adapterId = asNonEmptyString(options.providerVariant.primary_adapter);
@@ -321,6 +332,14 @@ function materializeSelectedAdapterLiveE2eDefaults(options) {
   const execution = asRecord(adapterProfile.execution);
   const externalRuntime = asRecord(execution.external_runtime);
   const defaultArgs = asStringArray(externalRuntime.default_args);
+  if (options.runtimeSelection && defaultArgs.length > 0) {
+    return {
+      adapter_id: adapterId,
+      applied_args: [],
+      suppressed_args: defaultArgs,
+      applied_permission_modes: [],
+    };
+  }
   if (defaultArgs.length === 0) {
     return {
       adapter_id: adapterId,
@@ -667,7 +686,9 @@ export function materializeGeneratedProjectProfile(options) {
   }
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
-  runtimeDefaults.runtime_root = ".aor";
+  // Runtime state is selected centrally by the isolated AOR_HOME launcher;
+  // project profiles must not carry the removed per-project runtime_root.
+  delete runtimeDefaults.runtime_root;
   runtimeDefaults.workspace_mode = resolveGeneratedWorkspaceMode(options.profile, asRecord(options.mission));
   const explicitVerificationTimeoutSec = resolveExplicitGeneratedProfileVerificationTimeoutSec(
     options.profile,
@@ -762,6 +783,7 @@ function clonePolicyDocument(policy) {
  *   providerVariant: Record<string, unknown>,
  *   providerVariantId: string,
  *   profile?: Record<string, unknown>,
+ *   runtimeSelection?: Record<string, unknown> | null,
  * }} options
  */
 export function materializeProviderPinnedRouteOverrides(options) {
@@ -801,6 +823,13 @@ export function materializeProviderPinnedRouteOverrides(options) {
     primary.provider = pinnedProvider;
     if (asNonEmptyString(primary.adapter) !== "none") {
       primary.adapter = pinnedAdapter;
+    }
+    const runtimeSelection = asRecord(options.runtimeSelection);
+    if (asNonEmptyString(runtimeSelection.model)) {
+      primary.model = asNonEmptyString(runtimeSelection.model);
+    }
+    if (asNonEmptyString(runtimeSelection.reasoning_effort)) {
+      primary.reasoning_effort = asNonEmptyString(runtimeSelection.reasoning_effort);
     }
     pinnedRoute.primary = primary;
     pinnedRoute.fallback = [];

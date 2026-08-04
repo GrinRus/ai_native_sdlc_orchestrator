@@ -83,7 +83,10 @@ terminal metadata.
 Resolved live evidence also preserves `requested_model`, `effective_model`,
 `model_source`, ordered `route_attempts[]`, and `fallback_transitions[]`. The
 effective model must equal the adapter-owned argv/config value captured for the
-attempt. `semantic_events[]` carries runner-neutral permission denial,
+attempt. When selected, `requested_reasoning_effort`,
+`effective_reasoning_effort`, and `reasoning_effort_source` are preserved using
+the same requested/effective convention; omitted effort remains runner-native.
+`semantic_events[]` carries runner-neutral permission denial,
 interaction request, timeout, and terminal-result semantics after
 adapter-specific parsing and before presentation redaction.
 If an external runtime returns a provider work-packet echo or packet summary instead of an implementation report, the adapter should classify the response with `failure_kind=provider_work_packet_not_executed`. The step result should preserve that failure class so Runtime Harness can distinguish prompt/packet execution failures from target repository failures.
