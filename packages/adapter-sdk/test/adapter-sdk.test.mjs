@@ -270,6 +270,55 @@ test("external-process route omission preserves runner-native model defaults", (
   });
 });
 
+test("live adapter replaces legacy model and effort args when route selects explicit values", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: (() => {
+      const profile = buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          "process.stdout.write(JSON.stringify({args:process.argv.slice(1)}));",
+          "--",
+          "--model",
+          "gpt-5.5",
+          "-c",
+          'model_reasoning_effort="xhigh"',
+        ],
+      });
+      profile.execution.external_runtime.model_argument = { flag: "--model" };
+      profile.execution.external_runtime.reasoning_effort_argument = {
+        prefix_args: ["-c"],
+        value_template: 'model_reasoning_effort="{value}"',
+      };
+      return profile;
+    })(),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-explicit-runtime-selection",
+    run_id: "run-explicit-runtime-selection",
+    step_id: "step-explicit-runtime-selection",
+    step_class: "implement",
+    route: {
+      resolved_route_id: "route.implement.explicit-runtime-selection",
+      effective_model: "gpt-5.6-luna",
+      effective_reasoning_effort: "high",
+    },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.deepEqual(response.output.runner_output.args, [
+    "--model",
+    "gpt-5.6-luna",
+    "-c",
+    'model_reasoning_effort="high"',
+  ]);
+});
+
 test("resolveAdapterForRoute blocks unsupported models before invocation", () => {
   withTempRepo((repoRoot) => {
     const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");

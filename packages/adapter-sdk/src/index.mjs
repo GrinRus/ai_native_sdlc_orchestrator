@@ -612,6 +612,49 @@ function appendArgsIfMissing(baseArgs, additionalArgs) {
 }
 
 /**
+ * Remove stale adapter-owned model or reasoning-effort arguments before the
+ * explicitly negotiated value is appended. Permission-policy args may still
+ * carry legacy defaults when a route selects a different runtime value.
+ *
+ * @param {string[]} baseArgs
+ * @param {{ prefixArgs: string[], flag?: string | null, valueTemplate?: string | null }} spec
+ * @returns {string[]}
+ */
+function removeConfiguredSelectionArgs(baseArgs, spec) {
+  const prefixArgs = spec.prefixArgs;
+  const flag = spec.flag ?? null;
+  const template = spec.valueTemplate ?? null;
+  const result = [];
+  for (let index = 0; index < baseArgs.length;) {
+    const prefixMatches = prefixArgs.every((value, offset) => baseArgs[index + offset] === value);
+    const flagIndex = index + prefixArgs.length;
+    const flagMatches = !flag || baseArgs[flagIndex] === flag;
+    const valueIndex = flagIndex + (flag ? 1 : 0);
+    const value = baseArgs[valueIndex];
+    const valueMatches = typeof value === "string" && (!template || templateMatchesValue(template, value));
+    if (prefixMatches && flagMatches && valueMatches) {
+      index = valueIndex + 1;
+      continue;
+    }
+    result.push(baseArgs[index]);
+    index += 1;
+  }
+  return result;
+}
+
+/**
+ * @param {string} template
+ * @param {string} value
+ * @returns {boolean}
+ */
+function templateMatchesValue(template, value) {
+  const parts = template.split("{value}");
+  if (parts.length !== 2) return false;
+  return value.startsWith(parts[0]) && value.endsWith(parts[1]) &&
+    value.length >= parts[0].length + parts[1].length;
+}
+
+/**
  * @param {{ externalRuntime: Record<string, unknown>, timeoutMs: number }} options
  * @returns {string[]}
  */
@@ -2943,6 +2986,20 @@ export function createLiveAdapter(options) {
       const serializedRunnerInput = `${JSON.stringify(runnerInput)}\n`;
       const modelArgs = resolveExternalRuntimeModelArgs(externalRuntime, route);
       const reasoningEffortArgs = resolveExternalRuntimeReasoningEffortArgs(externalRuntime, route);
+      if (modelArgs.length > 0) {
+        const modelArgument = asRecord(externalRuntime.model_argument);
+        runtimeArgs = removeConfiguredSelectionArgs(runtimeArgs, {
+          prefixArgs: asStringArray(modelArgument.prefix_args),
+          flag: asOptionalString(modelArgument.flag),
+        });
+      }
+      if (reasoningEffortArgs.length > 0) {
+        const reasoningEffortArgument = asRecord(externalRuntime.reasoning_effort_argument);
+        runtimeArgs = removeConfiguredSelectionArgs(runtimeArgs, {
+          prefixArgs: asStringArray(reasoningEffortArgument.prefix_args),
+          valueTemplate: asOptionalString(reasoningEffortArgument.value_template),
+        });
+      }
       runtimeArgs = [
         ...runtimeArgs,
         ...appendArgsIfMissing(runtimeArgs, modelArgs),
