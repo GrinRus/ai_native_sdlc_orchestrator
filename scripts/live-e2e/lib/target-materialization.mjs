@@ -686,7 +686,9 @@ export function materializeGeneratedProjectProfile(options) {
   }
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
-  runtimeDefaults.runtime_root = ".aor";
+  // Runtime state is selected centrally by the isolated AOR_HOME launcher;
+  // project profiles must not carry the removed per-project runtime_root.
+  delete runtimeDefaults.runtime_root;
   runtimeDefaults.workspace_mode = resolveGeneratedWorkspaceMode(options.profile, asRecord(options.mission));
   const explicitVerificationTimeoutSec = resolveExplicitGeneratedProfileVerificationTimeoutSec(
     options.profile,
