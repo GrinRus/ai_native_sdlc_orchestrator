@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "62eb1881a399cc5196a1d5049ae47b6b8930a6c3f641a35f40684cdd41c30abf",
+  "source_hash": "cef5e125aff81c599306f32594dd88e45460d7a3fbf7d17e2e3a82b5113b1f61",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -42,12 +42,12 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-D4c-UCEU.css",
-    "apps/web/dist/assets/index-Yont6Boc.js",
+    "apps/web/dist/assets/index-D8oWi0Jw.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
     "apps/web/dist/assets/index-D4c-UCEU.css": "1e295436400671d5b9e67140a81e2bc15edc5f7d52e22321194fffd2934eb260",
-    "apps/web/dist/assets/index-Yont6Boc.js": "662610b0fe045a09df5978422a9de0b52ef8f136989ecd3ac475b6657beab475",
-    "apps/web/dist/index.html": "3cdf3dbc8a2a995c310b1a942c1aa19be9976cef0396596d270bde88ee15bf36"
+    "apps/web/dist/assets/index-D8oWi0Jw.js": "f0b0d16dc5e5e984cd6c8e9730db4e5c288adcbab69f8074e4b0ddf628aa6231",
+    "apps/web/dist/index.html": "9004cd57c4f04ce53d0b4ca36fde107b9565c6d4b0a0b6b5061109baf97f86c8"
   }
 }

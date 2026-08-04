@@ -21,12 +21,14 @@ function StatusBadge({ value }) {
 
 function RouteSummary({ route }) {
   if (!route) return <div className="execution-setup-empty">No approved route is configured for this step.</div>;
+  const reasoningEffort = route.effective_reasoning_effort ?? route.requested_reasoning_effort ?? "Runner default";
   return (
     <div className="execution-route-summary">
       <section><span>Mode</span><strong>{route.mode === "simulation" ? "Simulation" : route.mode === "live" ? "Live execution" : "Unknown"}</strong></section>
       <section><span>Runner</span><strong>{route.runner ?? "Not resolved"}</strong></section>
       <section><span>Provider</span><strong>{route.provider ?? "Not resolved"}</strong></section>
       <section><span>Model</span><strong>{route.effective_model ?? route.requested_model ?? "Not resolved"}</strong><small>{route.model_source ?? "unresolved"}</small></section>
+      <section><span>Reasoning effort</span><strong>{reasoningEffort}</strong><small>{route.reasoning_effort_source ?? "unresolved"}</small></section>
       <section><span>Qualification</span><strong>{route.qualification ?? "unresolved"}</strong></section>
       <section><span>Readiness</span><StatusBadge value={route.readiness} /></section>
     </div>
@@ -93,6 +95,8 @@ export function ExecutionSetup({ profile, status, error, busy, onRefresh, onActi
             <summary>Advanced route details</summary>
             <dl>
               <div><dt>Requested model</dt><dd>{selected?.requested_model ?? "—"}</dd></div>
+              <div><dt>Requested reasoning effort</dt><dd>{selected?.requested_reasoning_effort ?? "Runner default"}</dd></div>
+              <div><dt>Effective reasoning effort</dt><dd>{selected?.effective_reasoning_effort ?? "Runner default"}</dd></div>
               <div><dt>Fallback routes</dt><dd>{selected?.fallback?.count ?? 0}</dd></div>
               <div><dt>Capabilities</dt><dd>{selected?.required_capabilities?.join(", ") || "None declared"}</dd></div>
               <div><dt>Evidence</dt><dd>{profile?.latest_readiness_ref ?? "Check setup to create readiness evidence"}</dd></div>
