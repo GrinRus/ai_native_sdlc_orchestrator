@@ -21,13 +21,16 @@ function StatusBadge({ value }) {
 
 function RouteSummary({ route }) {
   if (!route) return <div className="execution-setup-empty">No approved route is configured for this step.</div>;
+  const model = route.effective_model
+    ?? route.requested_model
+    ?? (route.model_source === "runner-default" ? "Runner default" : "Not resolved");
   const reasoningEffort = route.effective_reasoning_effort ?? route.requested_reasoning_effort ?? "Runner default";
   return (
     <div className="execution-route-summary">
       <section><span>Mode</span><strong>{route.mode === "simulation" ? "Simulation" : route.mode === "live" ? "Live execution" : "Unknown"}</strong></section>
       <section><span>Runner</span><strong>{route.runner ?? "Not resolved"}</strong></section>
       <section><span>Provider</span><strong>{route.provider ?? "Not resolved"}</strong></section>
-      <section><span>Model</span><strong>{route.effective_model ?? route.requested_model ?? "Not resolved"}</strong><small>{route.model_source ?? "unresolved"}</small></section>
+      <section><span>Model</span><strong>{model}</strong><small>{route.model_source ?? "unresolved"}</small></section>
       <section><span>Reasoning effort</span><strong>{reasoningEffort}</strong><small>{route.reasoning_effort_source ?? "unresolved"}</small></section>
       <section><span>Qualification</span><strong>{route.qualification ?? "unresolved"}</strong></section>
       <section><span>Readiness</span><StatusBadge value={route.readiness} /></section>

@@ -7,6 +7,8 @@ const source = fs.readFileSync(new URL("../src/execution-setup.jsx", import.meta
 test("Execution Setup uses approved route IDs and canonical readiness states", () => {
   assert.match(source, /approved_routes/u);
   assert.match(source, /Approved route preset/u);
+  assert.match(source, /route\.model_source === "runner-default"/u);
+  assert.match(source, /Runner default/u);
   assert.match(source, /Reasoning effort/u);
   assert.match(source, /effective_reasoning_effort/u);
   assert.doesNotMatch(source, /type=["']text["'][^>]*(provider|model)/iu);
