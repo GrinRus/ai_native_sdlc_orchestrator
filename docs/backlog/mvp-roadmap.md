@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-67-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-68-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -1451,6 +1451,18 @@ cutover cannot invalidate the active qualification baseline.
 - CLI, API, web, contracts, examples, and installed proof remain aligned.
 
 **Detailed slices:** `docs/backlog/wave-67-implementation-slices.md`
+
+## W68 - runtime model selection and provider-neutral effort
+
+**Goal:** Allow each runtime to use its native model/effort defaults unless a
+route or private live profile explicitly selects a supported value, with
+adapter-owned argument mapping and durable requested/effective evidence.
+
+**Entry condition:** W67-S05 remains the hard dependency for the shared
+backlog lane; W68 contract and focused implementation work may be prepared in
+parallel without changing the active W66 qualification baseline.
+
+**Detailed slices:** `docs/backlog/wave-68-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

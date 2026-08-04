@@ -87,7 +87,7 @@ function authReady(adapterId, input, environment) {
 
 function classifyResolutionError(error) {
   const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("model")) return { status: "model-unsupported", code: "execution.model-unsupported" };
+  if (message.includes("model") || message.includes("reasoning effort")) return { status: "model-unsupported", code: "execution.model-unsupported" };
   if (message.includes("capabilit")) return { status: "capability-mismatch", code: "execution.capability-mismatch" };
   return { status: "policy-denied", code: "execution.route-policy-denied" };
 }
@@ -109,6 +109,7 @@ function approvedRoutesForStep(roots, step) {
       risk_tier: route.risk_tier,
       provider: route.primary?.provider ?? null,
       requested_model: route.primary?.model ?? null,
+      requested_reasoning_effort: route.primary?.reasoning_effort ?? null,
       required_capabilities: route.required_adapter_capabilities ?? [],
       qualification: route.promotion_channel ?? "project-approved",
     }))
@@ -139,6 +140,9 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
         requested_model: adapter.requested_model,
         effective_model: adapter.effective_model,
         model_source: adapter.model_source,
+        requested_reasoning_effort: adapter.requested_reasoning_effort,
+        effective_reasoning_effort: adapter.effective_reasoning_effort,
+        reasoning_effort_source: adapter.reasoning_effort_source,
         required_capabilities: adapter.capability_check.required,
         fallback: { count: Math.max(0, adapter.execution_candidates.length - 1), route_ids: [] },
         mode: routeMode(route.route_profile),
@@ -164,6 +168,9 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
       requested_model: adapter.requested_model,
       effective_model: adapter.effective_model,
       model_source: adapter.model_source,
+      requested_reasoning_effort: adapter.requested_reasoning_effort,
+      effective_reasoning_effort: adapter.effective_reasoning_effort,
+      reasoning_effort_source: adapter.reasoning_effort_source,
       required_capabilities: adapter.capability_check.required,
       fallback: { count: Math.max(0, adapter.execution_candidates.length - 1), route_ids: [] },
       mode: routeMode(route.route_profile),
@@ -185,6 +192,9 @@ function resolveRouteRow({ context, registry, projectId, profile, step, environm
       requested_model: null,
       effective_model: null,
       model_source: "unresolved",
+      requested_reasoning_effort: null,
+      effective_reasoning_effort: null,
+      reasoning_effort_source: "unresolved",
       required_capabilities: [],
       fallback: { count: 0, route_ids: [] },
       mode: "unknown",
@@ -299,6 +309,9 @@ export function applyExecutionProfileAction({
         requested_model: row.requested_model,
         effective_model: row.effective_model,
         model_source: row.model_source,
+        requested_reasoning_effort: row.requested_reasoning_effort,
+        effective_reasoning_effort: row.effective_reasoning_effort,
+        reasoning_effort_source: row.reasoning_effort_source,
         status: row.readiness,
         blocker_codes: row.blocker_codes,
       })),

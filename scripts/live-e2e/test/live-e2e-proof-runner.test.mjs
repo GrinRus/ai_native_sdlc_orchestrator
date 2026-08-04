@@ -1404,6 +1404,35 @@ test("host assets pin Codex model defaults without changing other provider defau
   });
 });
 
+test("live profile selection materializes Codex Luna and high effort without legacy defaults", () => {
+  withTempRoot((tempRoot) => {
+    const loadedProfile = loadProofRunnerProfile({
+      hostRoot: repoRoot,
+      profileRef: "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex-luna.yaml",
+    });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const assets = materializeHostLiveE2eAssets({
+      examplesRoot: path.join(repoRoot, "examples"),
+      generatedAssetsRoot: path.join(tempRoot, "luna-assets"),
+      providerVariant: resolved.providerVariant,
+      providerVariantId: resolved.resolvedProfile.provider_variant_id,
+      profile: resolved.resolvedProfile,
+    });
+    const route = loadContractFile({
+      filePath: path.join(assets.routesRoot, "implement-openai-primary.yaml"),
+      family: "provider-route-profile",
+    });
+    assert.equal(route.ok, true);
+    assert.equal(route.document.primary.model, "gpt-5.6-luna");
+    assert.equal(route.document.primary.reasoning_effort, "high");
+    assert.deepEqual(assets.liveE2eAdapterDefaults.applied_args, []);
+    assert.ok(assets.liveE2eAdapterDefaults.suppressed_args.includes("gpt-5.5"));
+  });
+});
+
 test("full-journey host assets atomically restore provider routes on every resume segment", () => {
   withTempRoot((tempRoot) => {
     const profileRef = "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml";

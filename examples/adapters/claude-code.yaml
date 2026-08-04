@@ -4,6 +4,11 @@ version: 1
 default_model: claude-opus-4-6
 supported_models:
   - claude-opus-4-6
+supported_reasoning_efforts:
+  - low
+  - medium
+  - high
+  - max
 model_aliases:
   coding-primary: claude-opus-4-6
   coding-fallback: claude-opus-4-6
@@ -35,6 +40,10 @@ execution:
     command: claude
     model_argument:
       flag: --model
+    reasoning_effort_argument:
+      prefix_args:
+        - --effort
+      value_template: "{value}"
     session_budget:
       schema_version: 1
       warn_after_assistant_turns: 24

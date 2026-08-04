@@ -47,11 +47,13 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W65:** `W65-S01` Cutover contract, parity baseline, and migration ledger; `W65-S02` Reversible experience selector and navigation compatibility; `W65-S05` Default-on cutover and explicit rollback rehearsal; `W65-S06` Legacy console retirement and compatibility cleanup; `W65-S07` Post-cutover installed-console acceptance and story closure
 - **W66:** `W66-S01` Catalog identity and bootstrap remediation baseline; `W66-S02` Private/product boundary and contract parity; `W66-S03` Qualification verdict and evidence truth; `W66-S07` Installed browser proof and design acceptance integrity; `W66-S08` Deterministic remediation closure; `W66-S10` Non-repair review warning approval compatibility; `W66-S11` Bounded external-provider session convergence; `W66-S12` Resumable immutable browser-evidence reconciliation; `W66-S13` Stream auth telemetry classification; `W66-S14` Repair closure warning approval parity; `W66-S15` Structured stream failure-signal classification; `W66-S16` Provider work-packet command-role separation; `W66-S17` Environment-qualified provider command identity; `W66-S18` Guided diagnostic timeout alignment; `W66-S19` Provider verification-scope convergence; `W66-S09` Fresh four-cell live qualification closure
 - **W67:** `W67-S01` Storage and contract baseline; `W67-S05` Explicit materialization, export, and closure proof
+- **W68:** `W68-S01` Contract and migration baseline for runtime selection; `W68-S05` Cutover, certification, and docs closure
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
 **W67:** `W67-S01` Storage and contract baseline; `W67-S02` Project source connection and central runtime; `W67-S04` Intent-first installed console
+**W68:** `W68-S03` Runtime selection projection and presets
 
 **Slices by wave:**
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
@@ -79,6 +81,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
 **W67:** `W67-S01` Storage and contract baseline; `W67-S03` Durable intent preparation; `W67-S04` Intent-first installed console
+**W68:** `W68-S01` Contract and migration baseline for runtime selection
 
 **Slices by wave:**
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
@@ -96,6 +99,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
 
 **W67:** `W67-S03` Durable intent preparation
+**W68:** `W68-S02` Runtime resolution and adapter argument mapping
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
@@ -120,6 +124,8 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W66:** `W66-S04` Planner, controller, and provider outcome semantics; `W66-S05` Atomic jobs, attempts, run control, and live events; `W66-S06` Parent/child integration and coordinated delivery correctness
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
+
+**W68:** `W68-S02` Runtime resolution and adapter argument mapping; `W68-S04` Live E2E selection and Codex Luna/high rehearsal; `W68-S05` Cutover, certification, and docs closure
 
 **Slices by wave:**
 - **W1:** `W1-S04` Deterministic project validate flow
@@ -180,6 +186,8 @@ Support bounded delivery modes, manifests, and release evidence.
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
 
+**W68:** `W68-S03` Runtime selection projection and presets
+
 **Slices by wave:**
 - **W1:** `W1-S01` Bootstrap CLI shell and command contracts
 - **W5:** `W5-S01` Control plane API read surface; `W5-S02` Live run event stream; `W5-S03` CLI operator commands beyond bootstrap; `W5-S04` Detachable web UI baseline
@@ -226,6 +234,8 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W66:** `W66-S05` Atomic jobs, attempts, run control, and live events; `W66-S06` Parent/child integration and coordinated delivery correctness; `W66-S07` Installed browser proof and design acceptance integrity
 ## EPIC-7 Internal installed-user rehearsal
 Standardize internal installed-user rehearsal, scorecards, and learning-loop operations.
+
+**W68:** `W68-S04` Live E2E selection and Codex Luna/high rehearsal; `W68-S05` Cutover, certification, and docs closure
 
 **Slices by wave:**
 - **W0:** `W0-S05` Internal installed-user rehearsal profile registry and no-write preflight
@@ -282,3 +292,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W63:** `W63-S07` Installed-console UX/UI acceptance; `W63-S08` Browser-operable canonical lifecycle parity
 - **W65:** `W65-S07` Post-cutover installed-console acceptance and story closure
 - **W66:** `W66-S01` Catalog identity and bootstrap remediation baseline; `W66-S02` Private/product boundary and contract parity; `W66-S03` Qualification verdict and evidence truth; `W66-S04` Planner, controller, and provider outcome semantics; `W66-S05` Atomic jobs, attempts, run control, and live events; `W66-S06` Parent/child integration and coordinated delivery correctness; `W66-S07` Installed browser proof and design acceptance integrity; `W66-S08` Deterministic remediation closure; `W66-S10` Non-repair review warning approval compatibility; `W66-S11` Bounded external-provider session convergence; `W66-S12` Resumable immutable browser-evidence reconciliation; `W66-S13` Stream auth telemetry classification; `W66-S14` Repair closure warning approval parity; `W66-S15` Structured stream failure-signal classification; `W66-S16` Provider work-packet command-role separation; `W66-S17` Environment-qualified provider command identity; `W66-S18` Guided diagnostic timeout alignment; `W66-S19` Provider verification-scope convergence; `W66-S09` Fresh four-cell live qualification closure
+- **W68:** `W68-S02` Runtime resolution and adapter argument mapping; `W68-S03` Runtime selection projection and presets

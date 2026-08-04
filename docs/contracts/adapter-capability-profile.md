@@ -34,6 +34,13 @@ model and reasoning level. The source adapter profile and ordinary AOR runtime
 invocations remain unchanged; an adapter that omits this field uses the
 external CLI's own model defaults.
 
+For explicit route selection, `supported_models[]` and
+`supported_reasoning_efforts[]` declare accepted values. `model_argument`
+describes the adapter-owned model flag. `reasoning_effort_argument` optionally
+describes effort rendering with `prefix_args[]` and a `value_template` that
+contains `{value}`. These mappings are the only place provider-specific CLI
+syntax belongs; omitted route values remain runner-native defaults.
+
 `execution.external_runtime.env_from` is optional and maps target environment variable names to source host environment variable names. AOR applies each mapping only when the target variable is unset and the source variable exists, records only the variable names in evidence, and never records the secret value. Use this for runner-specific host auth aliases, for example `ANTHROPIC_API_KEY: ANTHROPIC_AUTH_TOKEN` when a local Qwen Code host setup stores the reusable credential under the Codex/Anthropic token name but Qwen requires the API-key variable name.
 
 `execution.external_runtime.execution_root_mode` is optional and defaults to direct execution from the canonical target checkout. Adapters whose native CLI derives local state paths from `cwd` may set `execution_root_mode: short-symlink`; AOR then invokes the external process from a run-scoped short symlink while preserving the canonical checkout in evidence as `canonical_execution_root`. This is intended for runner path-length limits only and must not change target checkout ownership, delivery guardrails, or no-upstream-write semantics.

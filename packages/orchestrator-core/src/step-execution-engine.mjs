@@ -1349,6 +1349,9 @@ function executeRoutedStepImplementation(options) {
         requested_model: asString(adapterResolution.requested_model),
         effective_model: asString(adapterResolution.effective_model),
         model_source: asString(adapterResolution.model_source) ?? "not-applicable",
+        requested_reasoning_effort: asString(adapterResolution.requested_reasoning_effort),
+        effective_reasoning_effort: asString(adapterResolution.effective_reasoning_effort),
+        reasoning_effort_source: asString(adapterResolution.reasoning_effort_source) ?? "runner-default",
         fallback_candidates: Array.isArray(adapterResolution.execution_candidates)
           ? adapterResolution.execution_candidates.slice(1).map((candidate) => {
               const record = asRecord(candidate);
@@ -1359,6 +1362,9 @@ function executeRoutedStepImplementation(options) {
                 requested_model: asString(record.requested_model),
                 effective_model: asString(record.effective_model),
                 model_source: asString(record.model_source),
+                requested_reasoning_effort: asString(record.requested_reasoning_effort),
+                effective_reasoning_effort: asString(record.effective_reasoning_effort),
+                reasoning_effort_source: asString(record.reasoning_effort_source),
                 capability_check: asRecord(record.capability_check),
               };
             })
@@ -1487,6 +1493,9 @@ function executeRoutedStepImplementation(options) {
         requested_model: asString(routeResolution.requested_model),
         effective_model: asString(routeResolution.effective_model),
         model_source: asString(routeResolution.model_source),
+        requested_reasoning_effort: asString(routeResolution.requested_reasoning_effort),
+        effective_reasoning_effort: asString(routeResolution.effective_reasoning_effort),
+        reasoning_effort_source: asString(routeResolution.reasoning_effort_source),
         step_id: stepId,
         status: "running",
         timeout_budget_ms: timeoutBudgetMs,

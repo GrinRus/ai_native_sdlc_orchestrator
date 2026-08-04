@@ -227,6 +227,49 @@ test("resolveAdapterForRoute passes when required capabilities are declared by s
   });
 });
 
+test("resolveAdapterForRoute maps explicit model and reasoning effort through adapter metadata", () => {
+  withTempRepo((repoRoot) => {
+    const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");
+    const routeText = fs.readFileSync(routePath, "utf8")
+      .replace("model: coding-primary", "model: gpt-5.6-luna\n  reasoning_effort: high");
+    fs.writeFileSync(routePath, routeText, "utf8");
+    const routeResolution = resolveRouteForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      stepClass: "implement",
+    });
+    const resolved = resolveAdapterForRoute({
+      routeResolution,
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+    assert.equal(resolved.requested_model, "gpt-5.6-luna");
+    assert.equal(resolved.effective_model, "gpt-5.6-luna");
+    assert.equal(resolved.requested_reasoning_effort, "high");
+    assert.equal(resolved.effective_reasoning_effort, "high");
+    assert.equal(resolved.reasoning_effort_source, "route-explicit");
+  });
+});
+
+test("external-process route omission preserves runner-native model defaults", () => {
+  withTempRepo((repoRoot) => {
+    const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");
+    const routeText = fs.readFileSync(routePath, "utf8").replace("  model: coding-primary\n", "");
+    fs.writeFileSync(routePath, routeText, "utf8");
+    const routeResolution = resolveRouteForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      stepClass: "implement",
+    });
+    const resolved = resolveAdapterForRoute({
+      routeResolution,
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+    assert.equal(resolved.requested_model, null);
+    assert.equal(resolved.effective_model, null);
+    assert.equal(resolved.model_source, "runner-default");
+  });
+});
+
 test("resolveAdapterForRoute blocks unsupported models before invocation", () => {
   withTempRepo((repoRoot) => {
     const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");

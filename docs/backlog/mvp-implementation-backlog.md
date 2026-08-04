@@ -626,6 +626,15 @@ This is the master index for the implementation slices across all defined waves.
 | W67-S04 | Intent-first installed console | EPIC-1, EPIC-2, EPIC-6 | blocked | web, control-plane client, browser tests | W67-S02, W67-S03 |
 | W67-S05 | Explicit materialization, export, and closure proof | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | blocked | core, CLI, API, web, docs, proof | W67-S04 |
 
+## W68 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W68-S01 | Contract and migration baseline for runtime selection | EPIC-0, EPIC-3, EPIC-4 | blocked | route/adapter/execution contracts, examples, focused tests | W67-S05 |
+| W68-S02 | Runtime resolution and adapter argument mapping | EPIC-3, EPIC-4 | blocked | provider-routing, adapter SDK, step-result evidence, tests | W68-S01 |
+| W68-S03 | Runtime selection projection and presets | EPIC-1, EPIC-3, EPIC-6 | blocked | execution profile/readiness projections, CLI/API/web fixtures | W68-S02 |
+| W68-S04 | Live E2E selection and Codex Luna/high rehearsal | EPIC-0, EPIC-4, EPIC-7 | blocked | private live profiles/materialization, runbook, proof tests | W68-S02 |
+| W68-S05 | Cutover, certification, and docs closure | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification ledger, runbooks, root gates | W68-S03, W68-S04 |
+
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work
 package. Agents should normally implement one slice at a time and refine only

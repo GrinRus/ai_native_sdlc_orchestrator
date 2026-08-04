@@ -245,8 +245,8 @@ Run summaries copy the latest Runtime Harness `runtime_permission_summary` and `
 This is required for Claude Code because `--permission-mode auto` can ask the operator to approve tool reads or writes when the compiled context links handoff/spec artifacts under `.aor/`. AOR invokes Claude through `--print` in non-interactive live E2E, so there is no interactive approval channel to answer those prompts during the run.
 
 Provider permission-mode analogues:
-- Codex full-bypass: `--model gpt-5.5 -c model_reasoning_effort="xhigh" --ask-for-approval never` plus `codex exec --ignore-user-config --ignore-rules` with the configured workspace sandbox.
-- Codex restricted: `--model gpt-5.5 -c model_reasoning_effort="xhigh"` plus `codex exec --ignore-user-config --ignore-rules` without the approval bypass.
+- Codex full-bypass: the selected route/profile model and reasoning effort are rendered by the Codex adapter, followed by `--ask-for-approval never` and `codex exec --ignore-user-config --ignore-rules` with the configured workspace sandbox.
+- Codex restricted: the same adapter-owned selection mapping plus `codex exec --ignore-user-config --ignore-rules` without the approval bypass.
 - Claude Code full-bypass: `--append-system-prompt <bounded AOR guardrail>` plus
   `--effort high` and `--dangerously-skip-permissions`.
 - Claude Code restricted: the same bounded guardrail and `--effort high` plus
@@ -256,10 +256,12 @@ Provider permission-mode analogues:
 - Qwen candidate full-bypass: `qwen --bare --auth-type anthropic --output-format stream-json --include-partial-messages --approval-mode yolo --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with `external_runtime.env_from` mapping `ANTHROPIC_AUTH_TOKEN` to `ANTHROPIC_API_KEY` when needed by the host setup.
 - Qwen candidate restricted: `qwen --bare --auth-type anthropic --output-format stream-json --include-partial-messages --approval-mode default --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the same auth env bridge.
 
-The Codex model and reasoning arguments are applied only to the run-scoped live
-E2E copy of the selected adapter profile. Claude Code and Qwen Code intentionally
-receive no `--model` argument and therefore use the model default supplied by
-their installed CLIs.
+Runtime model and reasoning selection is provider-neutral. A route or private
+profile may set `model` and `reasoning_effort`; the adapter validates and maps
+those values at spawn. When omitted, the installed CLI owns the native default.
+The Codex Luna/high rehearsal profile demonstrates this path without changing
+the active W66 qualification baseline. Legacy `default_args` are suppressed
+only in that explicitly selected run-scoped asset copy.
 
 Do not enable Claude `--bare` by default for live E2E Claude profiles while
 local runs rely on host Claude auth. Current Claude `--bare` skips OAuth/keychain

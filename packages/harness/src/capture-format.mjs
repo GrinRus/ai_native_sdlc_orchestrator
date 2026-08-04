@@ -41,6 +41,9 @@ export function extractHarnessCompatibility(stepResult, evaluationReport = null)
       requested_model: attempt.requested_model ?? null,
       effective_model: attempt.effective_model ?? null,
       model_source: attempt.model_source ?? null,
+      requested_reasoning_effort: attempt.requested_reasoning_effort ?? null,
+      effective_reasoning_effort: attempt.effective_reasoning_effort ?? null,
+      reasoning_effort_source: attempt.reasoning_effort_source ?? null,
       status: attempt.status ?? null,
       failure_kind: attempt.failure_kind ?? null,
     };
@@ -56,6 +59,9 @@ export function extractHarnessCompatibility(stepResult, evaluationReport = null)
     adapter_id: typeof adapter.adapter_id === "string" ? adapter.adapter_id : null,
     adapter_digest: digest(adapterResolution),
     effective_model: typeof routeResolution.effective_model === "string" ? routeResolution.effective_model : null,
+    requested_reasoning_effort: routeResolution.requested_reasoning_effort ?? null,
+    effective_reasoning_effort: routeResolution.effective_reasoning_effort ?? null,
+    reasoning_effort_source: routeResolution.reasoning_effort_source ?? null,
     invocation_digest: digest(invocation.length > 0 ? invocation : { adapter_id: adapter.adapter_id ?? null, effective_model: routeResolution.effective_model ?? null }),
     compiled_context_fingerprint: typeof compiledArtifact.fingerprint === "string" ? compiledArtifact.fingerprint : typeof contextDiagnostics.compiled_context_fingerprint === "string" ? contextDiagnostics.compiled_context_fingerprint : null,
     compiler_revision: compiledArtifact.compiler_revision ?? contextCompilation.compiler_revision ?? null,
@@ -100,7 +106,7 @@ export function compareHarnessCompatibility(options) {
   if (schemaVersion !== 2) {
     return { compatible: false, mismatches: [{ field: "schema_version", expected: 2, actual: schemaVersion, reason: "legacy_capture_requires_refresh" }], expected: captured, actual: current };
   }
-  const fields = ["step_class", "route_id", "route_digest", "wrapper_ref", "prompt_bundle_ref", "policy_id", "policy_digest", "adapter_id", "adapter_digest", "effective_model", "invocation_digest", "compiled_context_fingerprint", "compiler_revision"];
+  const fields = ["step_class", "route_id", "route_digest", "wrapper_ref", "prompt_bundle_ref", "policy_id", "policy_digest", "adapter_id", "adapter_digest", "effective_model", "requested_reasoning_effort", "effective_reasoning_effort", "reasoning_effort_source", "invocation_digest", "compiled_context_fingerprint", "compiler_revision"];
   if (options.currentEvaluationReport) fields.push("subject_digest", "suite_digest", "dataset_digest", "case_digests");
   const mismatches = [];
   for (const field of fields) {
