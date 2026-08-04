@@ -41,13 +41,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-CHnJqiDS.js",
     "apps/web/dist/assets/index-D4c-UCEU.css",
+    "apps/web/dist/assets/index-Yont6Boc.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-CHnJqiDS.js": "50549a001b8978be12a79bb72878c0a07ec26dbbeaad60156092ce58b4db1301",
     "apps/web/dist/assets/index-D4c-UCEU.css": "1e295436400671d5b9e67140a81e2bc15edc5f7d52e22321194fffd2934eb260",
-    "apps/web/dist/index.html": "6b1917070ac3da3230a508d0c2f6634c89c240b9e2dc967ac098e1627ccee8b2"
+    "apps/web/dist/assets/index-Yont6Boc.js": "662610b0fe045a09df5978422a9de0b52ef8f136989ecd3ac475b6657beab475",
+    "apps/web/dist/index.html": "3cdf3dbc8a2a995c310b1a942c1aa19be9976cef0396596d270bde88ee15bf36"
   }
 }
