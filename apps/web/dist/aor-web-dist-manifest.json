@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "84e45ebd1064e98b90a538f571fd725b80545f4a9f1a03ce2b18e8ac05660457",
+  "source_hash": "ee6df2d4d0f0b19a746a3ecaf5b46a20dc16e94e343f8adf7f6d61ad715f277a",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -15,12 +15,12 @@
     "apps/web/src/intent-onboarding.jsx",
     "apps/web/src/mission-builder.css",
     "apps/web/src/mission-builder.jsx",
-    "apps/web/src/mission-model.js",
     "apps/web/src/operator-control.js",
     "apps/web/src/operator-error-card.jsx",
     "apps/web/src/operator-operations.js",
     "apps/web/src/plan-workbench-views.jsx",
     "apps/web/src/plan-workbench.jsx",
+    "apps/web/src/project-home.jsx",
     "apps/web/src/project-snapshot.js",
     "apps/web/src/project-structure-model.js",
     "apps/web/src/project-structure.css",
@@ -41,13 +41,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-BPzgLt5-.js",
-    "apps/web/dist/assets/index-D4c-UCEU.css",
+    "apps/web/dist/assets/index-Bntbc5xJ.css",
+    "apps/web/dist/assets/index-CViqDEq5.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-BPzgLt5-.js": "190c1a87dffe9ec56ba6f53c02aa65c8cc8a58d572cfed917abce29b075dd344",
-    "apps/web/dist/assets/index-D4c-UCEU.css": "1e295436400671d5b9e67140a81e2bc15edc5f7d52e22321194fffd2934eb260",
-    "apps/web/dist/index.html": "7b844cd4c4e5c10b60f4b2b0d684680d30d342c7661a2998858fc2bc254a4226"
+    "apps/web/dist/assets/index-Bntbc5xJ.css": "135efa27e907104fa9f2bdab9e936ce8b452e1d0b16b8dd14a690e16f4cfebdd",
+    "apps/web/dist/assets/index-CViqDEq5.js": "4964b490aa2a11fcb64cad83451e2b64cd5c7bfc439001742f7f5487f2ce8b65",
+    "apps/web/dist/index.html": "6d5b34f8980d2b4b8468afecf4d9c32b375739a5e47e1fc92d319d10d3906f8e"
   }
 }

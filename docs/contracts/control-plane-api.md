@@ -24,11 +24,18 @@ W67 adds intent-first onboarding:
 
 - `POST /api/projects/:projectId/intent-submissions` stores text and bounded
   text attachments and queues read-only AI preparation;
+- `GET /api/projects/:projectId/intent-submissions` lists durable submissions
+  for resume after reload without initializing runtime state;
 - `GET /api/projects/:projectId/intent-submissions/:submissionId` reads the
   durable submission and latest normalization revision without initializing
   missing runtime state;
-- the submission action route supports `answer`, `revise`, `retry`,
-  `confirm-and-start`, `retry-start`, and `cancel`;
+- the submission action route supports `answer`, `revise`, `retry`, `confirm`,
+  `confirm-and-start` (legacy compatibility), `retry-start`, and `cancel`;
+- `confirm` creates the Mission and Flow but never starts a provider. Discovery
+  is a separate safe action from the Flow Cockpit;
+- a successful `confirm` response includes the stable `flow_id`, the Mission
+  result, the server-owned `next_action` (normally `discovery-run`), and the
+  durable `next_action_report_ref` used to open that read model;
 - `answer` requires a non-empty value for every current open question and
   cannot clear blockers with a partial answer map;
 - `GET /api/project-connection-jobs/:jobId` exposes asynchronous clone progress;

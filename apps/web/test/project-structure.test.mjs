@@ -38,7 +38,11 @@ test("Project Structure source owns setup steps, canonical actions, and responsi
     "Delete AOR data",
     'role="tablist"',
     'role="tabpanel"',
+    "readControlPlaneJson as readJson",
+    "folderPickerError",
+    'role="alert"',
   ]) assert.match(source, new RegExp(marker, "u"));
+  assert.doesNotMatch(source, /\bfetch\(/u, "Project Structure should use the shared control-plane client for folder picker requests");
   assert.match(css, /@media \(max-width: 860px\)/u);
   assert.match(css, /overflow-x: auto/u);
   assert.match(css, /min-width: 620px/u);

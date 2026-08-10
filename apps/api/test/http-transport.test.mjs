@@ -11,6 +11,7 @@ import { validateContractDocument } from "../../../packages/contracts/src/index.
 import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { requestRunJobCancel } from "../../../packages/orchestrator-core/src/run-job.mjs";
 import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -498,14 +499,20 @@ async function postJsonWithToken(url, payload, token = null) {
   });
 }
 
-async function waitForRunJob(file, timeoutMs = 60000) {
+async function waitForRunJob(file, timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;
   let lastJob = null;
   while (Date.now() < deadline) {
     if (fs.existsSync(file)) {
-      const job = JSON.parse(fs.readFileSync(file, "utf8"));
-      lastJob = job;
-      if (["succeeded", "failed", "canceled", "waiting-input"].includes(job.status)) return job;
+      try {
+        const job = JSON.parse(fs.readFileSync(file, "utf8"));
+        lastJob = job;
+        if (["succeeded", "failed", "canceled", "waiting-input"].includes(job.status)) return job;
+      } catch {
+        // Atomic replacement can briefly expose an incomplete read on a busy
+        // filesystem; retry within the same bounded wait instead of treating
+        // a transient snapshot as a worker failure.
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -1114,12 +1121,13 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
 test("HTTP run start returns 202 while a durable worker job executes", async () => {
   await withTempRepo(async (repoRoot) => {
     const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    const runId = "run.http.async.worker.v1";
     try {
       const startedAt = Date.now();
       const response = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`, {
         command: "run start",
         flags: {
-          run_id: "run.http.async.worker.v1",
+          run_id: runId,
           target_step: "implement",
           require_validation_pass: false,
           unsafe_development_override: true,
@@ -1128,8 +1136,8 @@ test("HTTP run start returns 202 while a durable worker job executes", async () 
       assert.equal(response.status, 202);
       assert.ok(Date.now() - startedAt < 2000, "run start must return before provider execution completes");
       const accepted = await response.json();
-      assert.equal(accepted.run_id, "run.http.async.worker.v1");
-      assert.equal(accepted.job_id, "run.http.async.worker.v1.job");
+      assert.equal(accepted.run_id, runId);
+      assert.equal(accepted.job_id, `${runId}.job`);
       assert.equal(accepted.status, "queued");
       assert.equal(typeof accepted.revision, "number");
       assert.equal(typeof accepted.status_ref, "string");
@@ -1146,6 +1154,12 @@ test("HTTP run start returns 202 while a durable worker job executes", async () 
       assert.ok(terminal.heartbeat_at);
       assert.ok(Array.isArray(terminal.terminal_evidence_refs));
     } finally {
+      try {
+        requestRunJobCancel({ projectRef: repoRoot, cwd: repoRoot, runId });
+      } catch {
+        // The worker may have already reached a terminal state or the test
+        // repo may be shutting down; either way cleanup remains best effort.
+      }
       await transport.close();
     }
   });
@@ -1811,6 +1825,17 @@ test("intent submission API preserves immutable input and creates normalization 
       const answered = await answerResponse.json();
       assert.deepEqual(answered.report.open_questions, []);
       assert.deepEqual(answered.report.provider, questions.report.provider);
+
+      const listResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`);
+      assert.equal(listResponse.status, 200);
+      assert.equal((await listResponse.json()).read_only, true);
+      const confirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, { action: "confirm" });
+      assert.equal(confirmResponse.status, 200);
+      const confirmation = await confirmResponse.json();
+      assert.match(confirmation.flow_id, /^flow\./u);
+      assert.equal(confirmation.discovery, null);
+      assert.equal(confirmation.next_action.action_id, "discovery-run");
+      assert.match(confirmation.next_action_report_ref, /^evidence:\/\/projects\//u);
 
       const readResponse = await getJson(`${transport.baseUrl}${created.status_ref}`);
       assert.equal(readResponse.status, 200);

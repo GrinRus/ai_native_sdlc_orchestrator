@@ -8,13 +8,12 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
 test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
-  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js", "mission-model.js", "mission-builder.jsx", "intent-onboarding.jsx", "operator-operations.js", "quiet-shell.jsx"]
+  const source = ["spa.jsx", "dialog.jsx", "project-structure.jsx", "project-structure-model.js", "mission-builder.jsx", "intent-onboarding.jsx", "operator-operations.js", "quiet-shell.jsx"]
     .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
     .join("\n");
   const css = ["spa.css", "quiet-cockpit-polish.css"]
     .map((file) => fs.readFileSync(path.join(webRoot, "src", file), "utf8"))
     .join("\n");
-  const stageSubtitleRule = css.match(/\.stage-copy em\s*\{[\s\S]*?\}/u)?.[0] ?? "";
 
   for (const stage of ["readiness", "mission", "discovery", "implement", "review", "delivery", "learning"]) {
     assert.match(source, new RegExp(`id: "${stage}"`, "u"));
@@ -35,8 +34,6 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /Ask AOR request readiness/u);
   assert.match(source, /Complete required fields first/u);
   assert.match(source, /Ready to create request evidence/u);
-  assert.match(source, /draftFollowUpHandoffRef/u);
-  assert.match(source, /follow-up-source-handoff-ref/u);
   assert.match(source, /Create follow-up from learning handoff/u);
   assert.match(source, /completed_read_only/u);
   assert.match(source, /target_flow_id/u);
@@ -50,12 +47,9 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /flowScopedInteractions/u);
   assert.match(source, /actionCommandLabel/u);
   assert.match(source, /topbar-ask-button/u);
-  assert.match(source, /draft: newFlowDraft/u);
   assert.match(source, /draftSurface/u);
   assert.match(source, /currentStage = draftSurface\s*\?\s*"mission"/u);
   assert.match(source, /Draft flow has no artifacts yet/u);
-  assert.match(source, /New Flow Preview/u);
-  assert.match(source, /Completeness Checklist/u);
   assert.match(source, /flowSelectionVersion/u);
   assert.match(source, /selectionApplied/u);
   assert.match(source, /refresh\(\{ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion \}\)/u);
@@ -73,7 +67,7 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /trace-timeline-strip/u);
   assert.doesNotMatch(source, /Initialize Project Runtime/u);
   assert.match(source, /Intent-first task onboarding/u);
-  assert.match(source, /Confirm and start/u);
+  assert.match(source, /Confirm and create Flow/u);
   assert.match(source, /firstRunFocusMode/u);
   assert.match(source, /AdvancedEvidenceDisclosure/u);
   assert.match(source, /Advanced evidence/u);
@@ -93,8 +87,6 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /CompactInlineValue/u);
   assert.match(source, /CompactDetailValue/u);
   assert.match(source, /topbar-status-strip/u);
-  assert.match(source, /stage-progress-strip/u);
-  assert.match(source, /compact-first-run/u);
   assert.match(source, /MissionDurableSummary/u);
   assert.match(source, /Intent-first onboarding/u);
   assert.match(source, /read-only task preview/u);
@@ -114,13 +106,11 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /Prepare task/u);
   assert.match(source, /Materialize project config/u);
   assert.match(source, /No active flow/u);
-  assert.match(source, /Readiness prepares the runtime before a flow is created/u);
   assert.match(source, /selectedStageRuntimeState/u);
   assert.match(source, /Upcoming stage\. The current recommended action remains scoped/u);
   assert.match(source, /Recommended action context/u);
   assert.match(source, /Command provenance/u);
   assert.match(source, /Flow inventory/u);
-  assert.match(source, /stage-status-badge/u);
   assert.match(source, /Interaction Detail/u);
   assert.match(source, /interactionRecoveryPlan/u);
   assert.match(source, /Interaction answer recovery path/u);
@@ -132,9 +122,7 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /htmlFor=\{answerFieldId\}/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);
   assert.match(source, /No upstream writes/u);
-  assert.match(source, /Create Flow & Resolve Next Action/u);
   assert.match(source, /Available after completed flow/u);
-  assert.match(source, /Requires selected active flow/u);
   assert.match(source, /Evidence & Documents/u);
   assert.match(source, /qualityClosurePlan/u);
   assert.match(source, /Quality closure path/u);
@@ -180,9 +168,6 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(css, /button:focus-visible/u);
   assert.match(css, /--control-height: var\(--aor-control-default\)/u);
   assert.match(css, /--touch-control-height: var\(--aor-control-touch\)/u);
-  assert.match(css, /\.flow-active-mode \.stage-rail \.stage-progress-strip/u);
-  assert.match(stageSubtitleRule, /white-space: normal/u);
-  assert.doesNotMatch(stageSubtitleRule, /text-overflow:\s*ellipsis/u);
   assert.match(css, /\.advanced-workbench-disclosure/u);
   assert.match(css, /\.advanced-workbench-tabs/u);
   assert.match(css, /\.request-readiness-path\s*\{/u);

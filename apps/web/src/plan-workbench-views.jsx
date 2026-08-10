@@ -1,5 +1,3 @@
-import React from "react";
-
 import { Dialog } from "./dialog.jsx";
 
 export function textList(values, fallback = "None") {

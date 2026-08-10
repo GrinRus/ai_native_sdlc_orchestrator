@@ -52,7 +52,7 @@ verification:
   lint: true
   tests: project-default
   setup_commands:
-    - npm install --prefer-offline --no-audit --no-fund
+    - npm install --prefer-online --no-audit --no-fund
   commands:
     - npx xo
     - npm run build

@@ -1,5 +1,3 @@
-import React from "react";
-
 export function ResourceErrorCard({ errors }) {
   if (Object.keys(errors).length === 0) return null;
   return (

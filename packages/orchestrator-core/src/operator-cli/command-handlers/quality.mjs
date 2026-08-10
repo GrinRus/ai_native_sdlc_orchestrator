@@ -98,6 +98,22 @@ export const QUALITY_COMMAND_GROUP = Object.freeze({
 });
 
 /**
+ * Quality repair requests are owned by the runtime project identity from the
+ * selected project profile. The workspace/storage identity is a separate key
+ * used only for AOR_HOME paths and evidence namespaces.
+ *
+ * @param {{ projectState: Record<string, unknown>, request: Record<string, unknown>, runId: string }} options
+ * @returns {boolean}
+ */
+export function qualityRepairRequestMatchesProjectRun(options) {
+  const runtimeProjectId =
+    typeof options.projectState.runtime_project_id === "string" && options.projectState.runtime_project_id.trim().length > 0
+      ? options.projectState.runtime_project_id
+      : options.projectState.project_id;
+  return options.request.project_id === runtimeProjectId && options.request.run_id === options.runId;
+}
+
+/**
  * @param {{ currentStatus: string, runId: string, closureRunId: string }} options
  * @returns {string | null}
  */
@@ -556,7 +572,7 @@ export function handleQualityCommand(context) {
     if (!matchingRequest) {
       throw new CliUsageError(`Quality repair request '${requestRef}' was not found for run '${runId}'.`);
     }
-    if (matchingRequest.document.project_id !== projectState.project_id || matchingRequest.document.run_id !== runId) {
+    if (!qualityRepairRequestMatchesProjectRun({ projectState, request: matchingRequest.document, runId })) {
       throw new CliUsageError("Quality repair request project/run ownership does not match the requested closure.");
     }
     const currentStatus = typeof matchingRequest.document.status === "string" ? matchingRequest.document.status : "unknown";

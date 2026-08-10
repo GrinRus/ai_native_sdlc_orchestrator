@@ -28,6 +28,7 @@ import {
   IntentServiceError,
   answerIntentQuestions,
   cancelIntentSubmission,
+  confirmIntent,
   confirmAndStartIntent,
   createIntentSubmission,
   prepareIntentSubmission,
@@ -345,6 +346,7 @@ export async function handleIntentSubmissionAction({ request, response, params, 
     else if (action === "revise") result = reviseIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId, normalization: payload.normalization });
     else if (action === "answer") result = answerIntentQuestions({ registry, projectId: params.projectId, submissionId: params.submissionId, answers: payload.answers });
     else if (action === "cancel") result = cancelIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId });
+    else if (action === "confirm") result = confirmIntent({ registry, projectId: params.projectId, submissionId: params.submissionId });
     else if (action === "confirm-and-start") result = confirmAndStartIntent({ registry, projectId: params.projectId, submissionId: params.submissionId });
     else if (action === "retry-start") result = retryIntentStart({ registry, projectId: params.projectId, submissionId: params.submissionId });
     else {

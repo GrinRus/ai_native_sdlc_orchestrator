@@ -8,6 +8,7 @@ import fs from "node:fs";
  *   payload: Record<string, unknown>,
  *   env: NodeJS.ProcessEnv,
  *   proofFile: string,
+ *   timeoutMs?: number,
  * }} options
  */
 export function runGuidedBrowserTaskCollector(options) {
@@ -17,7 +18,7 @@ export function runGuidedBrowserTaskCollector(options) {
     result = spawnSync(options.pythonBin, [options.collectorScriptFile, JSON.stringify(options.payload)], {
       encoding: "utf8",
       env: options.env,
-      timeout: 45_000,
+      timeout: Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 120_000,
     });
     attempts.push({
       attempt,

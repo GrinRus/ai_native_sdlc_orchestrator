@@ -36,35 +36,39 @@ def main():
             console_errors.append(message.text)
         page.on("console", record_console)
         page.on("request", lambda request: external_requests.append(request.url) if not request.url.startswith(app_origin) else None)
+        def wait_for_ready():
+            readiness = {"status": "not_pass", "observed_state": "timeout", "expected_state": "ready"}
+            deadline = time.monotonic() + timeout_ms / 1000
+            while time.monotonic() < deadline:
+                readiness_probe = page.evaluate("""async ({controlPlane, projectId}) => {
+                  const stateResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/state');
+                  const flowResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected');
+                  const bodyText = (document.body?.innerText || '').toLowerCase();
+                  return {
+                    stateStatus: stateResponse.status,
+                    flowStatus: flowResponse.status,
+                    state: stateResponse.ok ? await stateResponse.json() : null,
+                    flow: flowResponse.ok ? await flowResponse.json() : null,
+                    loading: bodyText.includes('loading') || bodyText.includes('syncing'),
+                  };
+                }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"]})
+                state_project = (readiness_probe.get("state") or {}).get("project_id")
+                selected_flow = readiness_probe.get("flow") or {}
+                if readiness_probe.get("stateStatus") == 200 and readiness_probe.get("flowStatus") == 200 and state_project == payload["project_id"] and selected_flow.get("flow_id") and not readiness_probe.get("loading"):
+                    readiness = {
+                        "status": "pass",
+                        "observed_state": selected_flow.get("status") or "ready",
+                        "expected_state": selected_flow.get("status") or "ready",
+                        "durable_precondition_ref": f"{payload['control_plane']}/api/projects/{payload['project_id']}/flows/selected",
+                        "flow_id": selected_flow.get("flow_id"),
+                    }
+                    break
+                readiness["observed_state"] = "loading" if readiness_probe.get("loading") else "partial"
+                page.wait_for_timeout(250)
+            return readiness
+
         page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
-        readiness = {"status": "not_pass", "observed_state": "timeout", "expected_state": "ready"}
-        deadline = time.monotonic() + timeout_ms / 1000
-        while time.monotonic() < deadline:
-            readiness_probe = page.evaluate("""async ({controlPlane, projectId}) => {
-              const stateResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/state');
-              const flowResponse = await fetch(controlPlane + '/api/projects/' + encodeURIComponent(projectId) + '/flows/selected');
-              const bodyText = (document.body?.innerText || '').toLowerCase();
-              return {
-                stateStatus: stateResponse.status,
-                flowStatus: flowResponse.status,
-                state: stateResponse.ok ? await stateResponse.json() : null,
-                flow: flowResponse.ok ? await flowResponse.json() : null,
-                loading: bodyText.includes('loading') || bodyText.includes('syncing'),
-              };
-            }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"]})
-            state_project = (readiness_probe.get("state") or {}).get("project_id")
-            selected_flow = readiness_probe.get("flow") or {}
-            if readiness_probe.get("stateStatus") == 200 and readiness_probe.get("flowStatus") == 200 and state_project == payload["project_id"] and selected_flow.get("flow_id") and not readiness_probe.get("loading"):
-                readiness = {
-                    "status": "pass",
-                    "observed_state": selected_flow.get("status") or "ready",
-                    "expected_state": selected_flow.get("status") or "ready",
-                    "durable_precondition_ref": f"{payload['control_plane']}/api/projects/{payload['project_id']}/flows/selected",
-                    "flow_id": selected_flow.get("flow_id"),
-                }
-                break
-            readiness["observed_state"] = "loading" if readiness_probe.get("loading") else "partial"
-            page.wait_for_timeout(250)
+        readiness = wait_for_ready()
         html = page.content()
         Path(payload["rendered_html_file"]).write_text(html, encoding="utf-8")
         screenshot_file = payload["screenshot_file"]
@@ -271,18 +275,45 @@ def main():
           return response.ok && JSON.stringify(payload).includes(responseId);
         }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"], "responseId": action_probe.get("response_id")})
 
+        post_reload_readiness = wait_for_ready()
+        cockpit_probe = {"status": "not_pass", "reason": "continue-flow-control-not-found"}
+        cockpit_screenshot = str(Path(screenshot_file).with_name(Path(screenshot_file).stem + "-cockpit.png"))
+        continue_flow = page.get_by_role("button", name="Continue Flow", exact=True)
+        if continue_flow.count() == 1 and continue_flow.is_enabled():
+            try:
+                continue_flow.click()
+                page.locator(".flow-cockpit").wait_for(state="visible", timeout=timeout_ms)
+                cockpit_ready = wait_for_ready()
+                primary_actions = page.locator(".flow-cockpit .cockpit-actions button.primary")
+                page.screenshot(path=cockpit_screenshot, full_page=True)
+                cockpit_probe = {
+                    "status": "pass" if cockpit_ready.get("status") == "pass" and primary_actions.count() == 1 else "not_pass",
+                    "surface": "flow",
+                    "url": page.url,
+                    "ready": cockpit_ready,
+                    "primary_action_count": primary_actions.count(),
+                    "screenshot_ref": cockpit_screenshot,
+                }
+            except Exception as error:
+                cockpit_probe = {"status": "not_pass", "reason": str(error)[:240]}
+        page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
+        home_readiness = wait_for_ready()
+
         viewport_matrix = []
-        screenshot_files = [screenshot_file]
+        screenshot_files = [screenshot_file, cockpit_screenshot]
         for viewport_id, width, height in [("desktop", 1280, 900), ("tablet", 768, 1024), ("mobile", 390, 844)]:
             page.set_viewport_size({"width": width, "height": height})
             page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
+            viewport_readiness = wait_for_ready()
             overflow = page.evaluate("() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1")
             viewport_screenshot = str(Path(screenshot_file).with_name(Path(screenshot_file).stem + "-" + viewport_id + ".png"))
             page.screenshot(path=viewport_screenshot, full_page=True)
             screenshot_files.append(viewport_screenshot)
-            viewport_matrix.append({"id": viewport_id, "status": "not_pass" if overflow else "pass", "screenshot_ref": viewport_screenshot})
+            viewport_matrix.append({"id": viewport_id, "status": "not_pass" if overflow or viewport_readiness.get("status") != "pass" else "pass", "readiness": viewport_readiness, "screenshot_ref": viewport_screenshot})
         page.set_viewport_size({"width": 1280, "height": 900})
+        page.wait_for_timeout(250)
         page.evaluate("() => { document.documentElement.style.zoom = '2'; }")
+        page.wait_for_timeout(250)
         zoom_overflow = page.evaluate("() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1")
         viewport_matrix.append({"id": "zoom-200", "status": "not_pass" if zoom_overflow else "pass"})
         page.evaluate("() => { document.documentElement.style.zoom = ''; }")
@@ -307,6 +338,7 @@ def main():
             offline_observed = True
         page.context.set_offline(False)
         page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
+        reconnect_readiness = wait_for_ready()
         reconnect_ok = page.evaluate("() => Boolean(document.querySelector('main,[role=\"main\"]'))")
 
         injected_error_observed = {"value": False}
@@ -314,8 +346,28 @@ def main():
             injected_error_observed["value"] = True
             route.abort()
         resource_url = f"{payload['control_plane']}/api/projects/{payload['project_id']}/execution-profile"
-        page.wait_for_timeout(1500)
-        refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
+        page.wait_for_timeout(250)
+        def resolve_refresh_button():
+            settings = page.locator("details.project-settings-disclosure")
+            if settings.count() == 1:
+                try:
+                    summary = settings.locator(":scope > summary")
+                    if summary.count() == 1 and settings.get_attribute("open") is None:
+                        summary.click()
+                except Exception:
+                    pass
+            setup_refresh = page.get_by_role("button", name="Refresh setup", exact=True)
+            if setup_refresh.count() == 1:
+                try:
+                    if not setup_refresh.is_visible():
+                        return page.get_by_role("button", name="Refresh", exact=True)
+                    if setup_refresh.is_visible():
+                        return setup_refresh
+                except Exception:
+                    pass
+            refresh = page.get_by_role("button", name="Refresh", exact=True)
+            return refresh if refresh.count() == 1 else setup_refresh
+        refresh_button = resolve_refresh_button()
         try:
             if refresh_button.count() == 1 and refresh_button.is_enabled():
                 injection_active["value"] = True
@@ -329,7 +381,7 @@ def main():
             page.unroute(resource_url)
         injection_active["value"] = False
         try:
-            refresh_button = page.get_by_role("button", name="Refresh setup", exact=True)
+            refresh_button = resolve_refresh_button()
             if refresh_button.count() == 1 and refresh_button.is_enabled():
                 refresh_button.click()
                 page.get_by_text("Some live resources are unavailable.", exact=True).wait_for(state="hidden", timeout=3000)
@@ -436,7 +488,7 @@ def main():
         {"id": "terminal-read-only", "status": "pass" if readiness["status"] == "pass" else "not_pass"},
     ]
     matrices = viewport_matrix + accessibility_matrix + recovery_matrix
-    proof_status = "pass" if readiness["status"] == "pass" and action_probe.get("status") == "pass" and reload_readback and all(entry["status"] == "pass" for entry in matrices) and not console_errors and not external_requests else "not_pass"
+    proof_status = "pass" if readiness["status"] == "pass" and post_reload_readiness["status"] == "pass" and home_readiness["status"] == "pass" and cockpit_probe.get("status") == "pass" and action_probe.get("status") == "pass" and reload_readback and all(entry["status"] == "pass" for entry in matrices) and not console_errors and not external_requests else "not_pass"
     proof = {
         "schema_version": 2,
         "kind": "installed-browser-proof",
@@ -452,6 +504,7 @@ def main():
         "visual_guardrail_file": payload["visual_guardrail_file"],
         "screenshot_files": screenshot_files,
         "screenshot_refs": screenshot_files,
+        "cockpit_probe": cockpit_probe,
         "scenarios": [{"id": "authoritative-project-readiness", **readiness}],
         "actions": [{
             "id": "ask-aor-no-write-request",

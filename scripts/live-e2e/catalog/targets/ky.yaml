@@ -7,7 +7,7 @@ repo:
 verification:
   execution_environment: ci
   setup_commands:
-    - npm install --prefer-offline --no-audit --no-fund
+    - npm install --prefer-online --no-audit --no-fund
     - npx playwright install
   commands:
     - npm test -- --match='!*totalTimeout bounds a never-ending successful response body*'

@@ -61,6 +61,7 @@ import {
   sourceInstallCacheMatches,
   shouldDeferGuidedWarnDiagnostic,
 } from "../lib/flows.mjs";
+import { deriveBrowserCacheKey, prepareBrowserCachePreflight } from "../lib/browser-cache.mjs";
 import { deriveGuidedFollowUpMissionId } from "../lib/guided-flow-identity.mjs";
 import { materializeBrowserEvidenceIndex } from "../lib/installed-browser-proof.mjs";
 import { prepareProviderWorkspaceDependencies } from "../lib/provider-workspace-setup.mjs";
@@ -1531,9 +1532,73 @@ test("generated ky small Codex profile uses bounded target setup and mission-sco
       "CI=1 npx ava test/headers.ts",
     ]);
     const readinessGroup = loaded.document.verification.command_groups.find((group) => group.phase === "readiness");
-    assert.deepEqual(readinessGroup.commands, ["CI=1 npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(readinessGroup.commands, ["CI=1 npm install --prefer-online --no-audit --no-fund"]);
     assert.equal(loaded.document.repos[0].lint_commands.some((command) => command.includes("npm install")), false);
     assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+  });
+});
+
+test("Playwright preflight reuses a stable content-addressed cache across run ids", () => {
+  withTempRoot((tempRoot) => {
+    const cacheRoot = path.join(tempRoot, "browser-cache");
+    const targetOne = path.join(tempRoot, "target-one");
+    const targetTwo = path.join(tempRoot, "target-two");
+    const manifest = JSON.stringify({ name: "ky", devDependencies: { playwright: "1.56.1" } });
+    for (const targetRoot of [targetOne, targetTwo]) {
+      fs.mkdirSync(targetRoot, { recursive: true });
+      fs.writeFileSync(path.join(targetRoot, "package.json"), `${manifest}\n`);
+      fs.writeFileSync(path.join(targetRoot, "package-lock.json"), `${manifest}\n`);
+    }
+
+    const firstEnv = { AOR_LIVE_E2E_BROWSER_CACHE_ROOT: cacheRoot };
+    const first = prepareBrowserCachePreflight({
+      targetCheckoutRoot: targetOne,
+      targetRepoId: "sindresorhus/ky",
+      reportsRoot: path.join(tempRoot, "reports-one"),
+      runId: "browser-cache-first-run",
+      commands: ["npx playwright install"],
+      env: firstEnv,
+    });
+    assert.equal(first.status, "pass");
+    assert.equal(first.report.cache_reused, false);
+    assert.equal(firstEnv.PLAYWRIGHT_BROWSERS_PATH, first.report.cache_root);
+
+    const cachedBrowser = path.join(first.report.cache_root, "chromium-1234");
+    fs.mkdirSync(cachedBrowser, { recursive: true });
+    const secondEnv = { AOR_LIVE_E2E_BROWSER_CACHE_ROOT: cacheRoot };
+    const second = prepareBrowserCachePreflight({
+      targetCheckoutRoot: targetTwo,
+      targetRepoId: "sindresorhus/ky",
+      reportsRoot: path.join(tempRoot, "reports-two"),
+      runId: "browser-cache-second-run",
+      commands: ["CI=1 npm test"],
+      env: secondEnv,
+    });
+    assert.equal(second.status, "skipped");
+    assert.equal(second.report.cache_key, first.report.cache_key);
+
+    const thirdEnv = { AOR_LIVE_E2E_BROWSER_CACHE_ROOT: cacheRoot };
+    const third = prepareBrowserCachePreflight({
+      targetCheckoutRoot: targetTwo,
+      targetRepoId: "sindresorhus/ky",
+      reportsRoot: path.join(tempRoot, "reports-three"),
+      runId: "browser-cache-third-run",
+      commands: ["npx playwright install"],
+      env: thirdEnv,
+    });
+    assert.equal(third.status, "pass");
+    assert.equal(third.report.cache_key, first.report.cache_key);
+    assert.equal(third.report.cache_root, first.report.cache_root);
+    assert.equal(third.report.cache_reused, true);
+    assert.deepEqual(third.report.cache_entries, ["chromium-1234"]);
+    assert.equal(thirdEnv.PLAYWRIGHT_BROWSERS_PATH, firstEnv.PLAYWRIGHT_BROWSERS_PATH);
+
+    const changed = JSON.stringify({ name: "ky", devDependencies: { playwright: "1.57.0" } });
+    fs.writeFileSync(path.join(targetTwo, "package-lock.json"), `${changed}\n`);
+    assert.notEqual(
+      deriveBrowserCacheKey({ targetCheckoutRoot: targetTwo, targetRepoId: "sindresorhus/ky" }).key,
+      first.report.cache_key,
+    );
   });
 });
 
@@ -3141,6 +3206,11 @@ test("guided flow identity accepts opaque public packet ids", () => {
       projectId: "github-sandbox.run.qualification",
       missionId: "header-regression-follow-up",
     });
+    assert.deepEqual(resolveFlowIdentityFromPacket(tempRoot, packetFile, path.join(tempRoot, "projects", "workspace-123")), {
+      flowId: "flow.workspace-123.header-regression-follow-up",
+      projectId: "workspace-123",
+      missionId: "header-regression-follow-up",
+    });
   });
 });
 
@@ -3995,6 +4065,7 @@ test("guided browser-task proof request points at a live app surface, not the sh
       fakeAor,
       [
         "const args = process.argv.slice(2);",
+        "if (args.includes('--runtime-root')) { console.error(\"Unknown app flag '--runtime-root'\"); process.exit(2); }",
         "if (args.includes('--smoke')) {",
         "  console.log(JSON.stringify({",
         "    command: 'app',",
@@ -4411,6 +4482,14 @@ test("guided flow loop prefers archived first-flow next-action evidence", () => 
     });
 
     assert.equal(archived, archivedReportFile);
+    const runtimeReportsRoot = path.join(tempRoot, "runtime-project", "reports");
+    fs.mkdirSync(runtimeReportsRoot, { recursive: true });
+    const runtimeArchivedReportFile = path.join(runtimeReportsRoot, "next-action-report-runtime-flow.json");
+    fs.writeFileSync(runtimeArchivedReportFile, "{}\n", "utf8");
+    assert.equal(
+      archivedNextActionReportForMission(tempRoot, { projectId: "runtime-project", missionId: "runtime-flow" }, path.join(tempRoot, "runtime-project")),
+      runtimeArchivedReportFile,
+    );
     assert.equal(nextActionReportClosesFlow(JSON.parse(fs.readFileSync(archivedReportFile, "utf8"))), true);
     assert.equal(
       nextActionReportClosesFlow({
@@ -5534,6 +5613,11 @@ test("full journey requests repair only for actionable review or QA findings bef
     flowsSource,
     /closeSatisfiedQualityRepairRequests\(\{[\s\S]*?executionRoot: latestExecutionRoot/gu,
     "repair closure must preserve the run-owned execution workspace lineage",
+  );
+  assert.match(
+    flowsSource,
+    /closeSatisfiedQualityRepairRequests\(\{[\s\S]*?runtimeRoot: options\.layout\.projectRuntimeRoot/gu,
+    "repair closure must resolve ownership from the canonical project runtime root",
   );
   const auditRunCommands = [...flowsSource.matchAll(/runCommand\("audit-runs", \[([\s\S]*?)\]\)/gu)];
   assert.equal(auditRunCommands.length, 2);

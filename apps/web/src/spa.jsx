@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"; import { createRoot } from "react-dom/client";
+import { useEffect, useMemo, useRef, useState } from "react"; import { createRoot } from "react-dom/client";
 import { createProjectGeneration, readControlPlaneJson as readJson, readProjectResourceSnapshot } from "./control-plane-client.js";
 import { Dialog } from "./dialog.jsx";
 import { ExecutionSetup } from "./execution-setup.jsx";
@@ -6,13 +6,13 @@ import { ExecutionOrchestration, executeOrchestrationCommand } from "./execution
 import { legacyConsoleRequested, resolveConsoleExperience, retiredConsoleSearch } from "./console-experience.js";
 import { MissionDurableSummary } from "./mission-builder.jsx";
 import { IntentOnboarding } from "./intent-onboarding.jsx";
+import { ProjectHome } from "./project-home.jsx";
 import { operatorControlTargetTab, resolveOperatorControl } from "./operator-control.js"; import { createOrResumeOperatorRequest, executeOperatorControl } from "./operator-operations.js";
-import { completedMissionOperation, createdMissionOperation, EMPTY_MISSION_TEMPLATE as EMPTY_TEMPLATE, missionFlagsFromDraft, SAFE_MISSION_TEMPLATE as SAFE_TEMPLATE, SAFE_MISSION_TEMPLATE_ID as SAFE_TEMPLATE_ID } from "./mission-model.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
-import { Alert } from "./ui/components.jsx";
+import { Alert, useRovingTabs } from "./ui/components.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css"; import "./quiet-cockpit-polish.css";
 
 const STAGES = [
@@ -24,6 +24,23 @@ const STAGES = [
   { id: "delivery", label: "Delivery / Release", command: "deliver prepare", hint: "Package and ship" },
   { id: "learning", label: "Learning", command: "learning handoff", hint: "Retro and improve" },
 ];
+
+function readConsoleSurface(search = "") {
+  const params = new URLSearchParams(search);
+  const surface = ["home", "intent", "prepared", "flow"].includes(params.get("surface")) ? params.get("surface") : null;
+  return { surface, flowId: params.get("flow"), intentId: params.get("intent") };
+}
+
+function writeConsoleSurface(surface, { projectId, flowId, intentId, mode } = {}) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  if (projectId) params.set("project", projectId); else params.delete("project");
+  if (surface) params.set("surface", surface); else params.delete("surface");
+  if (flowId) params.set("flow", flowId); else params.delete("flow");
+  if (intentId) params.set("intent", intentId); else params.delete("intent");
+  if (mode) params.set("mode", mode); else params.delete("mode");
+  window.history.replaceState({}, "", `${window.location.pathname}?${params}${window.location.hash}`);
+}
 
 const PROJECT_STAGE_TO_UI_STAGE = {
   bootstrap: "readiness",
@@ -686,11 +703,6 @@ function qualityClosurePlan(rows, context = {}) {
   };
 }
 
-function missionIdFromTitle(title) {
-  const base = String(title ?? "flow").toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
-  return `${base || "flow"}-${Date.now().toString(36)}`;
-}
-
 function interactionKey(interaction) {
   return `${interaction.run_id ?? "run"}:${interaction.interaction_id ?? "interaction"}`;
 }
@@ -781,7 +793,8 @@ function statusTone(state) {
     || normalized.includes("recovery")
     || normalized.includes("repair")
   ) return "danger";
-  return "warn";
+  if (["loading", "pending", "draft", "idle", "unknown", "0 attention"].includes(normalized)) return "neutral";
+  return "neutral";
 }
 
 function StatusPill({ state }) {
@@ -1634,18 +1647,6 @@ function projectRunEvidenceSelectorLabel(status, externalRunHealth = null) {
   return "No active flow";
 }
 
-function projectRunEvidenceStatus(status, externalRunHealth = null) {
-  if (isBlockingExternalRunHealth(externalRunHealth)) {
-    if (isStepQualityAssessmentPendingRunHealth(externalRunHealth)) return "Run assessment needed";
-    if (externalRunRecoveryPathActive(externalRunHealth)) return "Recovery needed";
-    if (acceptedExternalRunContinueDecision(externalRunHealth)) return "Run decision recorded";
-    return isControllerDecisionPendingRunHealth(externalRunHealth) ? "Run decision needed" : "Run evidence blocked";
-  }
-  if (externalRunHealth?.status) return `Run evidence ${externalRunHealth.status}`;
-  if (status?.status) return `Provider ${status.status}`;
-  return "No active flow";
-}
-
 function externalRunWorkbenchAction(health, hasOpenDecisionRequest = false) {
   if (isStepQualityAssessmentPendingRunHealth(health)) {
     return { label: "Assessment Evidence", icon: "target", tabId: "evidence" };
@@ -1690,18 +1691,6 @@ function externalRunAttentionLabel(health) {
   return isControllerDecisionPendingRunHealth(health) ? "Decision checks" : "Blockers";
 }
 
-function externalRunAttentionEmptyCopy(health) {
-  if (isStepQualityAssessmentPendingRunHealth(health)) {
-    return "No assessment checks for the visible next step.";
-  }
-  if (externalRunRecoveryPathActive(health)) {
-    return "No recovery checks for the visible next step.";
-  }
-  return isControllerDecisionPendingRunHealth(health)
-    ? "No decision checks for the visible next step."
-    : "No blockers for the visible next step.";
-}
-
 function externalRunDerivedEvidenceStatus(health, fallback = "blocked") {
   if (isStepQualityAssessmentPendingRunHealth(health)) return "awaiting-assessment";
   if (externalRunRecoveryPathActive(health)) return "repair-required";
@@ -1717,18 +1706,6 @@ function externalRunRiskLevel(health, blockers, deliveryMode) {
   }
   if (deliveryMode === "read-only") return "Read-only";
   return deliveryMode === "no-write" ? "Low" : "Gated";
-}
-
-function projectRunEvidenceIdentity(status, externalRunHealth = null) {
-  if (isBlockingExternalRunHealth(externalRunHealth)) {
-    return providerFocusTitle(status, externalRunHealth);
-  }
-  return (
-    status?.route_id ??
-    status?.step_id ??
-    externalRunHealth?.run_id ??
-    "run evidence"
-  );
 }
 
 function formatDurationMs(value) {
@@ -2198,50 +2175,21 @@ function Field({ label, children }) {
   );
 }
 
-function missionChecklistItems(form) {
-  return [
-    { label: "Mission Title", complete: String(form?.title ?? "").trim().length > 0 },
-    { label: "Mission Brief", complete: String(form?.brief ?? "").trim().length > 0 },
-    { label: "Goals", complete: splitLines(form?.goals ?? "").length > 0 },
-    { label: "KPI", complete: splitLines(form?.kpi ?? "").length > 0 },
-    { label: "Definition of Done", complete: splitLines(form?.dod ?? "").length > 0 },
-    { label: "Delivery Mode", complete: String(form?.deliveryMode ?? "").trim().length > 0 },
-  ];
-}
-
 function flowDisplayName(flow) {
   if (!flow) return "New flow draft";
-  return flow.mission_id ?? flow.flow_id ?? "selected flow";
+  const candidates = [
+    flow.display_title,
+    flow.mission_settings?.title,
+    flow.mission_title,
+    flow.title,
+    flow.mission_id,
+    flow.flow_id,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim() ?? "selected flow";
 }
 
 function isCompletedFlow(flow) {
   return flow?.completed_read_only === true || flow?.status === "completed";
-}
-
-function formatKpiForForm(kpi) {
-  if (!kpi || typeof kpi !== "object") return "";
-  return [kpi.kpi_id, kpi.name, kpi.target, kpi.measurement].filter(Boolean).join(":");
-}
-
-function formFromFlowSettings(flow, { followUp = false } = {}) {
-  const settings = flow?.mission_settings ?? {};
-  const title = settings.title ?? flowDisplayName(flow);
-  return {
-    templateId: followUp ? "follow-up-from-closure" : "duplicate-mission-settings",
-    title: followUp ? `${title} follow-up` : title,
-    brief:
-      settings.brief ??
-      (followUp ? `Continue from completed flow ${flowDisplayName(flow)}.` : "Duplicate mission settings into a fresh flow."),
-    goals: Array.isArray(settings.goals) ? settings.goals.join("\n") : "",
-    constraints: Array.isArray(settings.constraints) ? settings.constraints.join("\n") : "",
-    kpi: Array.isArray(settings.kpis) ? settings.kpis.map(formatKpiForForm).filter(Boolean).join("\n") : "",
-    dod: Array.isArray(settings.definition_of_done) ? settings.definition_of_done.join("\n") : "",
-    sourceRefs: Array.isArray(settings.source_refs) ? settings.source_refs.map((source) => ({ sourceKind: source.source_kind, ref: source.ref })) : [],
-    deliveryMode: followUp ? "no-write" : settings.delivery_mode ?? flow?.writeback_policy?.mode ?? "no-write",
-    allowedPaths: Array.isArray(settings.allowed_paths) ? settings.allowed_paths.join(",") : "",
-    forbiddenPaths: Array.isArray(settings.forbidden_paths) ? settings.forbidden_paths.join(",") : "",
-    acknowledgeIncomplete: false,
-  };
 }
 
 function toUiStageId(stageId) {
@@ -2304,7 +2252,12 @@ function externalRunStepContext(health) {
 }
 
 function flowStageId(flow, nextAction, projectState) {
-  if (flow?.selected_stage) return toUiStageId(flow.selected_stage);
+  if (flow?.selected_stage) {
+    const selectedStage = String(flow.selected_stage).trim();
+    const lifecycleSteps = Array.isArray(flow.lifecycle_path?.steps) ? flow.lifecycle_path.steps : [];
+    if (lifecycleSteps.some((step) => step?.id === selectedStage)) return selectedStage;
+    return toUiStageId(selectedStage);
+  }
   if (!flow) return "readiness";
   return resolveUiStageId(nextAction) ?? (projectState?.state_file ? "mission" : "readiness");
 }
@@ -2415,8 +2368,7 @@ function evidenceRowsForFlow(flow, rows, { draft = false } = {}) {
   return merged;
 }
 
-function latestRequestForFlow(operatorRequests, selectedFlow, { draft = false } = {}) {
-  if (draft) return null;
+function latestRequestForFlow(operatorRequests, selectedFlow) {
   if (!selectedFlow?.flow_id) return null;
   return operatorRequests.find((request) => request.document?.target_flow_id === selectedFlow.flow_id)?.document ?? null;
 }
@@ -2577,7 +2529,7 @@ function mergeOperatorDecisionRequests(...requestLists) {
 }
 
 function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false, newFlowDisabledReason = "", providerStepStatus = null, externalRunHealth = null }) {
-  const activeFlows = flows.filter((flow) => flow.status === "active");
+  const activeFlows = flows.filter((flow) => ["active", "blocked"].includes(flow.status));
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const value = newFlowDraft ? "__new__" : selectedFlowId ?? "";
   const projectLevelProviderFocus = !newFlowDraft && flows.length === 0 && Boolean(providerStepStatus || externalRunHealth);
@@ -2598,7 +2550,7 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
             <optgroup label="Active flows">
               {activeFlows.map((flow) => (
                 <option key={flow.flow_id} value={flow.flow_id}>
-                  {flowDisplayName(flow)} - Active
+                  {flowDisplayName(flow)} - {flow.status === "blocked" ? "Needs attention" : "Active"}
                 </option>
               ))}
             </optgroup>
@@ -2836,266 +2788,6 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
         <Icon name="folder" />Add AOR Project
       </button>
     </div>
-  );
-}
-
-function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null, externalRunHealth = null, repairCompletion = null, verificationPlan = null }) {
-  const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
-  const currentStageEntry = STAGES[currentIndex] ?? STAGES[0];
-  const completed = isCompletedFlow(flow);
-  const projectLevelProviderFocus = !flow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
-  const blockingExternalRun = isBlockingExternalRunHealth(externalRunHealth);
-  const firstRunFocus = (!flow && !projectLevelProviderFocus) || newFlowDraft;
-  const verificationPrimary = latestRequiredVerificationFailed(verificationPlan);
-  const railTitle = newFlowDraft
-    ? "New flow draft"
-    : flow
-      ? flowDisplayName(flow)
-      : projectLevelProviderFocus
-        ? providerFocusTitle(providerStepStatus, externalRunHealth)
-        : "No active flow";
-  const railDescription = newFlowDraft
-    ? "Draft mission settings are not durable evidence until submitted."
-    : completed
-      ? "Closed flow evidence is immutable and read-only."
-        : flow
-        ? "Navigation is scoped to the selected flow."
-        : projectLevelProviderFocus
-          ? providerFocusDescription(providerStepStatus, externalRunHealth, null, repairCompletion, verificationPlan)
-          : "Readiness prepares the runtime before a flow is created.";
-  return (
-    <aside className={`stage-rail ${firstRunFocus ? "compact-first-run" : ""}`}>
-      <div className="rail-title">
-        <span>Flow stages</span>
-        <strong>{newFlowDraft ? "Draft" : flow?.status ?? `${currentIndex + 1}/7`}</strong>
-      </div>
-      <div className="stage-progress-strip" aria-label="Compact stage progress">
-        <span>{newFlowDraft ? "2/7" : `${currentIndex + 1}/7`}</span>
-        <strong>Current lifecycle stage: {currentStageEntry.label}</strong>
-        <small>Viewing stage: {STAGES.find((stage) => stage.id === selectedStage)?.label ?? currentStageEntry.label}</small>
-        <em>{newFlowDraft ? "Mission draft" : currentStageEntry.hint}</em>
-      </div>
-      {providerStepStatus && !blockingExternalRun ? (
-        <div className="provider-heartbeat-rail" aria-label="Provider step heartbeat">
-          <div>
-            <span>{providerStepStatus.provider ?? "Provider"}</span>
-            <strong title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</strong>
-            <em>{providerStepStatus.adapter ?? providerStepStatus.route_id ?? "provider adapter"}</em>
-          </div>
-          <StatusPill state={providerStepStatus.status} />
-          <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</p>
-          <small>
-            {formatDurationMs(providerStepStatus.elapsed_ms)}
-            {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
-          </small>
-        </div>
-      ) : null}
-      <nav aria-label="AOR flow stages">
-        {STAGES.map((stage, index) => {
-          const active = selectedStage === stage.id;
-          const done = completed ? index <= currentIndex : index < currentIndex;
-          const current = currentStage === stage.id;
-          const statusLabel = newFlowDraft
-            ? current
-              ? "Current"
-              : done
-                ? "Complete"
-                : "Pending"
-            : !flow && current
-              ? "Current"
-            : completed
-              ? "Complete"
-              : current
-                ? "Active"
-                : done
-                  ? "Complete"
-                  : "Pending";
-          return (
-            <button
-              key={stage.id}
-              className={`stage-row ${active ? "active" : ""} ${done ? "done" : ""} ${current ? "current" : ""}`}
-              type="button"
-              aria-current={current ? "step" : undefined}
-              aria-pressed={active}
-              aria-label={`${index + 1}. ${stage.label}. ${stage.hint}. ${statusLabel}${active ? ". Selected view" : ""}`}
-              onClick={() => onSelect(stage.id)}
-            >
-              <span className="stage-index">{index + 1}</span>
-              <span className="stage-copy">
-                <strong>{stage.label}</strong>
-                <em>{stage.hint}</em>
-              </span>
-              <span className={`stage-status-badge ${statusLabel.toLowerCase()}`}>{statusLabel}</span>
-              <span className="stage-dot" />
-            </button>
-          );
-        })}
-      </nav>
-      <div className="rail-note">
-        <strong>{railTitle}</strong>
-        <p>{railDescription}</p>
-      </div>
-    </aside>
-  );
-}
-
-function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, onCancel = null, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
-  const selectedDeliveryMode = form.deliveryMode || "no-write";
-  const safeTemplateMode = form.templateId === SAFE_TEMPLATE_ID && !followUpSourceHandoffRef;
-  const missionSubmitLabel = followUpSourceHandoffRef ? "Create Follow-up Flow & Resolve Next Action" : "Create Flow & Resolve Next Action";
-  const askDisabledReason = "Ask AOR requires a selected active flow";
-  const learningHandoffReason = followUpSourceHandoffRef ? "Captured guidance attached" : "Available after completed flow";
-  const selectedEvidenceReason = "Requires selected active flow";
-  const missionDetailFields = (
-    <>
-      <Field label="Title">
-        <input name="mission-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-      </Field>
-      <Field label="Brief">
-        <textarea name="mission-brief" value={form.brief} onChange={(event) => setForm({ ...form, brief: event.target.value })} />
-      </Field>
-      <Field label="Goals">
-        <textarea name="mission-goals" value={form.goals} onChange={(event) => setForm({ ...form, goals: event.target.value })} />
-      </Field>
-      <Field label="Constraints">
-        <textarea name="mission-constraints" value={form.constraints} onChange={(event) => setForm({ ...form, constraints: event.target.value })} />
-      </Field>
-      <div className="form-grid">
-        <Field label="KPI">
-          <textarea name="mission-kpi" className="compact-textarea" value={form.kpi} onChange={(event) => setForm({ ...form, kpi: event.target.value })} />
-        </Field>
-        <Field label="Definition of Done">
-          <textarea name="mission-dod" className="compact-textarea" value={form.dod} onChange={(event) => setForm({ ...form, dod: event.target.value })} />
-        </Field>
-      </div>
-      <div className="form-grid compact">
-        <Field label="Allowed paths">
-          <input name="mission-allowed-paths" value={form.allowedPaths} placeholder="apps/web/**, docs/**" onChange={(event) => setForm({ ...form, allowedPaths: event.target.value })} />
-        </Field>
-      </div>
-      <div className="field">
-        <span>Delivery Mode</span>
-        <div className="delivery-mode-grid" role="radiogroup" aria-label="Delivery mode">
-          {DELIVERY_MODE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              className={`delivery-mode-card ${selectedDeliveryMode === option.value ? "selected" : ""}`}
-              type="button"
-              role="radio"
-              aria-checked={selectedDeliveryMode === option.value}
-              onClick={() => setForm({ ...form, deliveryMode: option.value })}
-              disabled={busy}
-            >
-              <Icon name={option.icon} />
-              <strong>{option.label}</strong>
-              <p>{option.summary}</p>
-              <span>Risk: {option.risk}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-
-  return (
-    <form className={`mission-form ${safeTemplateMode ? "summary-first" : ""}`} aria-label="Mission intake" onSubmit={submitMission}>
-      <div className="form-header">
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        <div className="form-actions">
-          {safeTemplateMode ? (
-            <button className="primary form-primary-action" type="submit" disabled={busy}>
-              {missionSubmitLabel}
-              <Icon name="target" />
-            </button>
-          ) : null}
-          {onCancel ? (
-            <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
-              Cancel New Flow
-            </button>
-          ) : null}
-          <button className="secondary" type="button" onClick={applyTemplate} disabled={busy}>
-            Load template
-          </button>
-          <button className="secondary" type="button" onClick={onAsk} disabled={busy || askDisabled} title={askDisabled ? askDisabledReason : "Ask AOR for selected flow"} aria-label="Ask AOR for selected flow">
-            <Icon name="target" />
-            Ask AOR
-          </button>
-          {askDisabled ? <p className="form-action-reason">{askDisabledReason}</p> : null}
-        </div>
-      </div>
-      <div className="template-grid" aria-label="New flow templates">
-        <button className={`template-card ${form.templateId === "blank-mission" ? "selected" : ""}`} type="button" onClick={() => setForm(EMPTY_TEMPLATE)} disabled={busy}>
-          <Icon name="plus" />
-          <span>Blank mission</span>
-          <p>Start from scratch</p>
-        </button>
-        <button className={`template-card ${form.templateId === SAFE_TEMPLATE_ID ? "selected" : ""}`} type="button" onClick={applyTemplate} disabled={busy}>
-          <Icon name="shield" />
-          <span>Safe walkthrough template</span>
-          <p>Guided, best-practice path</p>
-        </button>
-        <button className={`template-card ${followUpSourceHandoffRef ? "selected" : ""}`} type="button" title={learningHandoffReason} disabled>
-          <Icon name="lock" />
-          <span>From learning handoff</span>
-          <p>{followUpSourceHandoffRef ? "Captured guidance attached" : "Available after completed flow"}</p>
-          <p className="disabled-reason">{learningHandoffReason}</p>
-        </button>
-        <button className="template-card" type="button" title={selectedEvidenceReason} disabled>
-          <Icon name="target" />
-          <span>From selected evidence / ref</span>
-          <p>Attach evidence after a flow exists</p>
-          <p className="disabled-reason">{selectedEvidenceReason}</p>
-        </button>
-      </div>
-      {followUpSourceHandoffRef ? (
-        <div className="follow-up-lineage">
-          <Icon name="lock" />
-          <div>
-            <span>Follow-up source handoff</span>
-            <code>{followUpSourceHandoffRef}</code>
-          </div>
-        </div>
-      ) : null}
-      {safeTemplateMode ? (
-        <>
-          <section className="safe-template-summary" aria-label="Safe walkthrough summary">
-            <div>
-              <span>Prefilled title</span>
-              <strong>{form.title}</strong>
-              <p>{form.brief}</p>
-            </div>
-            <div>
-              <span>Safety</span>
-              <strong>{selectedDeliveryMode === "no-write" ? "No upstream writes" : selectedDeliveryMode}</strong>
-              <p>
-                <code>delivery-mode={selectedDeliveryMode}</code>
-                {form.constraints ? ` / ${form.constraints}` : " / Local evidence first; no upstream writes by default."}
-              </p>
-            </div>
-            <div>
-              <span>Definition of Done</span>
-              <strong>{splitLines(form.dod).length || 0} checks</strong>
-              <p>{splitLines(form.dod).slice(0, 2).join("; ") || "Confirm evidence and next-action readiness."}</p>
-            </div>
-          </section>
-          <details className="mission-detail-fields">
-            <summary>Edit mission details</summary>
-            <div className="mission-detail-grid">
-              {missionDetailFields}
-            </div>
-          </details>
-        </>
-      ) : missionDetailFields}
-      {!safeTemplateMode ? (
-        <button className="primary" type="submit" disabled={busy}>
-          {missionSubmitLabel}
-          <Icon name="target" />
-        </button>
-      ) : null}
-    </form>
   );
 }
 
@@ -3871,11 +3563,6 @@ function FlowCockpit({
   const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
   const cockpitVerificationFailureCopy = verificationFailureSummary(verificationPlan, verificationFailures);
-  const cockpitTitle = verificationPrimary
-    ? "Post-run verification failed"
-    : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
-    ? providerFocusTitle(providerStepStatus, externalRunHealth)
-    : completed ? "Learning / Closure" : stage.label;
   const cockpitStatus = verificationPrimary
     ? "failed"
     : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
@@ -3885,7 +3572,6 @@ function FlowCockpit({
     ?? (providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
     ? providerFocusDescription(providerStepStatus, externalRunHealth, nextAction, repairCompletion, verificationPlan)
     : stageRuntimeCopy);
-  const showCockpitStatus = !headingRepeatsStatus(cockpitTitle, cockpitStatus);
   const recommendedActionStatus = verificationPrimary
     ? "failed"
     : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
@@ -3896,6 +3582,13 @@ function FlowCockpit({
           ? "read-only"
           : "ready";
   const actionOutcome = actionOutcomeTitle(nextPrimary, actionStage, { completed, providerFocusActive });
+  const outcomeHeading = actionOutcome.replace(/^Materialize\s+/u, "Create ");
+  const cockpitTitle = verificationPrimary
+    ? "Post-run verification failed"
+    : providerFocusActive && isBlockingExternalRunHealth(externalRunHealth)
+    ? providerFocusTitle(providerStepStatus, externalRunHealth)
+    : completed ? "Learning / Closure" : outcomeHeading;
+  const showCockpitStatus = !headingRepeatsStatus(cockpitTitle, cockpitStatus);
   const actionDetail = actionOutcomeDetail(nextPrimary, { completed, providerFocusActive });
   const actionCommand = actionCommandTitle(nextPrimary);
   const actionCommandDisclosureLabel = `Show CLI command. Recommended command: ${compactVisibleValue(actionCommand, "command")}`;
@@ -4057,56 +3750,19 @@ function FlowCockpit({
   );
 }
 
-function DraftFlowRail({ form }) {
-  const checklist = missionChecklistItems(form ?? SAFE_TEMPLATE);
-  const completeCount = checklist.filter((item) => item.complete).length;
-  return (
-    <>
-      <section className="rail-card draft-preview-card">
-        <h3>New Flow Preview <span>{completeCount}/{checklist.length}</span></h3>
-        <ul>
-          <li><Icon name="folder" /> Mission/Intake Packet <span>Draft</span></li>
-          <li><Icon name="target" /> Next-Action Report <span>Planned</span></li>
-          <li><Icon name="target" /> Operator Request <span>If needed</span></li>
-          <li><Icon name="shield" /> Runtime-Harness Report <span>Planned</span></li>
-        </ul>
-      </section>
-      <section className="rail-card completeness-card">
-        <h3>Completeness Checklist <span>{checklist.length - completeCount} left</span></h3>
-        <ul>
-          {checklist.map((item) => (
-            <li key={item.label} className={item.complete ? "complete" : "missing"}>
-              <span className="check-dot" />
-              {item.label}
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section className="rail-card safety-preview-card">
-        <h3>Safety Preview</h3>
-        <ul>
-          <li className="complete"><span className="check-dot" /> No upstream writes <strong>Enforced</strong></li>
-          <li className="complete"><span className="check-dot" /> PII redaction <strong>Enabled</strong></li>
-          <li className="complete"><span className="check-dot" /> Explicit scope <strong>Required</strong></li>
-        </ul>
-      </section>
-    </>
-  );
-}
-
-function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [], providerStepStatus = null, externalRunHealth = null, providerFocus = false, repairCompletion = null }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], evidenceRows = [], providerStepStatus = null, externalRunHealth = null, providerFocus = false, repairCompletion = null }) {
   const completed = isCompletedFlow(selectedFlow);
-  const projectLevelProviderFocus = !selectedFlow && !newFlowDraft && Boolean(providerStepStatus || externalRunHealth);
-  const blockingExternalRunHealth = !completed && !newFlowDraft && isBlockingExternalRunHealth(externalRunHealth);
+  const projectLevelProviderFocus = !selectedFlow && Boolean(providerStepStatus || externalRunHealth);
+  const blockingExternalRunHealth = !completed && isBlockingExternalRunHealth(externalRunHealth);
   const providerFocusActive = providerFocus || projectLevelProviderFocus || blockingExternalRunHealth;
-  const activeFlows = flows.filter((flow) => flow.status === "active");
+  const activeFlows = flows.filter((flow) => ["active", "blocked"].includes(flow.status));
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
   const runtimeReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
   let nextPrimary = nextAction?.primary_action ?? {};
   if (providerFocusActive) {
     nextPrimary = providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction, repairCompletion);
-  } else if (!selectedFlow && !newFlowDraft) {
+  } else if (!selectedFlow) {
     nextPrimary = projectLevelProviderFocus
       ? providerFocusPrimaryAction(providerStepStatus, externalRunHealth, nextAction, repairCompletion)
       : runtimeReady
@@ -4120,12 +3776,6 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
         command: "aor project init",
         reason: "Prepare the local runtime and safety controls. This does not create a flow.",
       };
-  } else if (newFlowDraft) {
-    nextPrimary = {
-      low_level_command: "mission create",
-      command: "aor mission create",
-      reason: "Submit the mission form to create a new flow, then resolve the first next action.",
-    };
   } else if (completed && nextAction?.primary_action?.action_id !== "start-new-flow") {
     nextPrimary = { command: "read-only evidence inspection", reason: "Completed flow evidence remains inspectable." };
   }
@@ -4159,7 +3809,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
     ? evidenceRows
     : evidenceRefs.length > 0
     ? artifactRowsForRefs(evidenceRefs, evidenceRows, selectedFlow?.selected_stage ?? "artifact")
-    : (!selectedFlow && !newFlowDraft ? evidenceRows : []);
+    : (!selectedFlow ? evidenceRows : []);
   const deliveryMode =
     selectedFlow?.writeback_policy?.mode ??
     nextAction?.bounded_execution?.requested_delivery_mode ??
@@ -4168,18 +3818,17 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
   const artifactReadiness = nextAction?.artifact_readiness ?? null;
   const artifactReadinessStages = artifactReadiness?.stages ?? {};
   const latestRequest =
-    latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft }) ??
-    (providerFocusActive || (!selectedFlow && !newFlowDraft) ? latestDecisionRequestFromEvidence(evidenceRows) : null);
+    latestRequestForFlow(operatorRequests, selectedFlow) ??
+    (providerFocusActive || !selectedFlow ? latestDecisionRequestFromEvidence(evidenceRows) : null);
   const verificationGroups = Array.isArray(verificationPlan?.command_groups) ? verificationPlan.command_groups : [];
 
   return (
     <aside className="right-rail">
       <section className="rail-card next-card">
-        <h3>Next action <span>{newFlowDraft ? "draft" : completed ? "read-only" : "single step"}</span></h3>
+        <h3>Next action <span>{completed ? "read-only" : "single step"}</span></h3>
         <p className="command" title={actionCommandTitle(nextPrimary)}>{actionCommandLabel(nextPrimary)}</p>
         <p>{nextPrimary.reason ?? "No next-action report has been materialized yet."}</p>
       </section>
-      {newFlowDraft ? <DraftFlowRail form={missionDraft} /> : null}
       <section className="rail-card">
         <h3>{providerFocusActive && externalRunHealth ? externalRunAttentionLabel(externalRunHealth) : "Blockers"} <span>{blockers.length}</span></h3>
         <ul>
@@ -4257,16 +3906,10 @@ function RightRail({ nextAction, selectedFlow, projectState, config, activeProje
       </section>
       <section className="rail-card flow-inventory-card">
         <h3>Flow inventory <span>{flows.length}</span></h3>
-        {newFlowDraft ? (
-          <div className="flow-inventory-row selected">
-            <strong>New flow draft</strong>
-            <span>Draft</span>
-          </div>
-        ) : null}
         {selectedFlow ? (
           <div className="flow-inventory-row selected">
             <strong>{flowDisplayName(selectedFlow)}</strong>
-            <span>{completed ? "Completed" : "Active"}</span>
+            <span>{completed ? "Completed" : selectedFlow.status === "blocked" ? "Needs attention" : "Active"}</span>
           </div>
         ) : providerFocusActive ? (
           <div className="flow-inventory-row selected">
@@ -5479,6 +5122,7 @@ function FlowAdvancedWorkbench({
     { id: "interactions", label: "Interactions Inbox", count: interactions.length },
     { id: "decisions", label: decisionTabLabel, count: decisionTabCount },
   ];
+  const { getTabProps: getAdvancedTabProps } = useRovingTabs({ tabs, selected: selectedTab, onSelect: setSelectedTab });
   const selected = tabs.find((tab) => tab.id === selectedTab) ?? tabs[0];
   const panel =
     selected.id === "execution" ? (
@@ -5537,8 +5181,9 @@ function FlowAdvancedWorkbench({
         {expanded ? (
           <>
             <div className="advanced-workbench-tabs" role="tablist" aria-label="Advanced flow-scoped surfaces">
-              {tabs.map((tab) => (
+              {tabs.map((tab, index) => (
                 <button
+                  {...getAdvancedTabProps(tab, index)}
                   key={tab.id}
                   className={selected.id === tab.id ? "selected" : ""}
                   type="button"
@@ -5617,8 +5262,10 @@ function AdvancedEvidenceDisclosure({ newFlowDraft, evidenceCount, interactionCo
 }
 
 function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operation, onClose, onRun }) {
-  if (!open) return null;
   const completed = isCompletedFlow(flow);
+  const intentTabs = REQUEST_INTENT_OPTIONS.map((option) => ({ ...option, id: option.value, disabled: completed && !option.readOnly }));
+  const { getTabProps: getIntentTabProps } = useRovingTabs({ tabs: intentTabs, selected: form.intent, onSelect: (intent) => setForm({ ...form, intent }) });
+  if (!open) return null;
   const targetStep = form.targetStep || STAGE_TO_TARGET_STEP[stage.id] || "discovery";
   const scopeMissing = form.deliveryMode !== "no-write" && form.allowedPaths.trim().length === 0;
   const targetRefsMissing = splitRefs(form.targetRefs).length === 0;
@@ -5670,10 +5317,10 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operati
         <div className="field">
           <span>Intent</span>
           <div className="request-intent-segment segmented-control" role="tablist" aria-label="Request intent">
-            {REQUEST_INTENT_OPTIONS.map((option) => {
-              const disabled = completed && !option.readOnly;
+            {intentTabs.map((option, index) => {
               return (
                 <button
+                  {...getIntentTabProps(option, index)}
                   key={option.value}
                   className={form.intent === option.value ? "selected" : ""}
                   type="button"
@@ -5794,6 +5441,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, operati
 
 function App() {
   const initialPresentation = useMemo(() => readQuietPresentation(typeof window === "undefined" ? "" : window.location.search, STAGES.map(({ id }) => id)), []);
+  const initialConsolePresentation = useMemo(() => readConsoleSurface(typeof window === "undefined" ? "" : window.location.search), []);
   const consoleExperience = resolveConsoleExperience();
   const [legacyMigrationNotice, setLegacyMigrationNotice] = useState(() => legacyConsoleRequested(typeof window === "undefined" ? "" : window.location.search));
   const [config, setConfig] = useState(null);
@@ -5804,12 +5452,12 @@ function App() {
   const [flowList, setFlowList] = useState({ flows: [], selected_flow_id: null });
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [selectedFlowId, setSelectedFlowId] = useState(null);
+  const [consoleSurface, setConsoleSurface] = useState(initialConsolePresentation.surface);
+  const [intentSubmissions, setIntentSubmissions] = useState([]);
   const [newFlowDraft, setNewFlowDraft] = useState(false);
   const [projectSnapshotLoaded, setProjectSnapshotLoaded] = useState(false);
   const [connectionState, setConnectionState] = useState("loading");
   const [resourceErrors, setResourceErrors] = useState({});
-  const [draftSourceFlow, setDraftSourceFlow] = useState(null);
-  const [draftFollowUpHandoffRef, setDraftFollowUpHandoffRef] = useState(null);
   const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
   const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null); const [attentionState, setAttentionState] = useState({ scopeKey: "none", status: "idle", data: null, error: null });
   const [planWorkbenchState, setPlanWorkbenchState] = useState({
@@ -5827,8 +5475,7 @@ function App() {
   const [selectedStage, setSelectedStage] = useState(initialPresentation.stage ?? "readiness"); const [quietMode, setQuietMode] = useState(initialPresentation.mode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState(SAFE_TEMPLATE);
-  const [missionOperation, setMissionOperation] = useState(null); const [operatorActionResult, setOperatorActionResult] = useState(null);
+  const [operatorActionResult, setOperatorActionResult] = useState(null);
   const [requestDrawerOpen, setRequestDrawerOpen] = useState(false);
   const [addProjectDrawerOpen, setAddProjectDrawerOpen] = useState(false);
   const [addProjectForm, setAddProjectForm] = useState({ ...EMPTY_PROJECT_SETUP });
@@ -5879,6 +5526,10 @@ function App() {
     Boolean(projectState?.state_file)
     || activeProjectOnboarding.initialized === true
     || activeProjectOnboarding.state_exists === true;
+  const effectiveSurface = consoleSurface ?? (flowOptions.length > 0 ? "home" : "intent");
+  const homeSurface = effectiveSurface === "home";
+  const flowSurface = effectiveSurface === "flow" && Boolean(selectedFlow);
+  const resumedIntent = intentSubmissions.find((entry) => entry?.submission?.submission_id === readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).intentId) ?? null;
 
   const evidenceRows = useMemo(() => {
     const fromSummary = (summary, overrides = {}) => artifactRowFromSummary(summary, overrides);
@@ -6181,6 +5832,8 @@ function App() {
       setProjectState(null);
       setNextAction(null);
       setFlowList({ flows: [], selected_flow_id: null });
+      const pendingIntents = effectiveProjectId ? await readJson(`/api/projects/${encodeURIComponent(effectiveProjectId)}/intent-submissions`).catch(() => ({ submissions: [] })) : { submissions: [] };
+      setIntentSubmissions(Array.isArray(pendingIntents?.submissions) ? pendingIntents.submissions : []);
       setSelectedFlow(null);
       setSelectedFlowId(null);
       setPackets([]);
@@ -6214,6 +5867,7 @@ function App() {
       requestOptions,
       previous: {
         state: projectState, next: nextAction, flowPayload: flowList, selectedFlowPayload: selectedFlow,
+        intentList: { submissions: intentSubmissions },
         packetList: packets, stepList: stepResults, runList: runs, deliveryList: deliveryManifests, requestList: operatorRequests,
       },
     });
@@ -6227,6 +5881,7 @@ function App() {
       stepList,
       runList, deliveryList,
       requestList,
+      intentList,
     } = snapshot.data;
     setConnectionState(snapshot.status);
     setResourceErrors(snapshot.errors);
@@ -6239,16 +5894,25 @@ function App() {
         }
       : next;
     const flows = Array.isArray(flowPayload?.flows) ? flowPayload.flows : [];
+    setIntentSubmissions(Array.isArray(intentList?.submissions) ? intentList.submissions : []);
     const draftMode = typeof options.newFlowDraft === "boolean" ? options.newFlowDraft : newFlowDraft;
     const preferredSelectedFlowId = Object.prototype.hasOwnProperty.call(options, "selectedFlowId")
       ? options.selectedFlowId
       : selectedFlowId;
-    const preferredFlowId = draftMode ? null : preferredSelectedFlowId ?? flowPayload?.selected_flow_id ?? selectedFlowPayload?.flow_id ?? null;
+    const urlPresentation = readConsoleSurface(typeof window === "undefined" ? "" : window.location.search);
+    const explicitFlowSelection = Object.prototype.hasOwnProperty.call(options, "selectedFlowId")
+      || Boolean(urlPresentation.flowId)
+      || consoleSurface === "flow";
+    const preferredFlowId = draftMode
+      ? null
+      : explicitFlowSelection
+        ? preferredSelectedFlowId ?? urlPresentation.flowId ?? flowPayload?.selected_flow_id ?? selectedFlowPayload?.flow_id ?? null
+        : null;
     const refreshedSelectedFlow =
       flows.find((flow) => flow.flow_id === preferredFlowId) ??
-      flows.find((flow) => flow.flow_id === selectedFlowPayload?.flow_id) ??
-      selectedFlowPayload ??
-      flows[0] ??
+      (explicitFlowSelection ? flows.find((flow) => flow.flow_id === selectedFlowPayload?.flow_id) : null) ??
+      (urlPresentation.flowId ? flows.find((flow) => flow.flow_id === urlPresentation.flowId) : null) ??
+      (consoleSurface === "flow" ? selectedFlowPayload : null) ??
       null;
     const selectionStillCurrent = refreshSelectionVersion === flowSelectionVersion.current;
     setProjectState(state);
@@ -6268,6 +5932,9 @@ function App() {
       await loadFlowWorkbench(base, null);
     } else if (selectionStillCurrent) {
       setProjectSnapshotLoaded(true);
+    }
+    if (!options.silent && !consoleSurface) {
+      setConsoleSurface(flows.length > 0 ? "home" : "intent");
     }
     if (selectionStillCurrent && !didChooseStage.current) {
       setSelectedStage(draftMode ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
@@ -6379,8 +6046,6 @@ function App() {
     setSelectedFlow(null);
     setSelectedFlowId(null);
     setNewFlowDraft(false);
-    setDraftSourceFlow(null);
-    setDraftFollowUpHandoffRef(null);
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null); setAttentionState({ scopeKey: "none", status: "idle", data: null, error: null });
     setPlanWorkbenchState({ scopeKey: "none", status: "idle", plan: null, progress: null, error: "" });
@@ -6467,6 +6132,8 @@ function App() {
     resetProjectScopedState();
     setActiveProjectId(nextProjectId);
     setNewFlowDraft(true);
+    setConsoleSurface("intent");
+    writeConsoleSurface("intent", { projectId: nextProjectId });
     await refresh({ projectId: nextProjectId, newFlowDraft: true, selectionVersion: flowSelectionVersion.current });
   }
 
@@ -6556,12 +6223,12 @@ function App() {
     }
   }
   function startNewFlow({ sourceFlow = null, followUp = false, duplicate = false } = {}) {
-    if (!activeProjectRuntimeReady) {
+    if (sourceFlow && !activeProjectRuntimeReady) {
       setSelectedStage("readiness");
       pushActivity("flow.new-blocked", "Initialize the project runtime before starting a flow.");
       return;
     }
-    if (blockingExternalRunHealth) {
+    if (sourceFlow && blockingExternalRunHealth) {
       setSelectedStage(providerFocusStageId(providerStepStatus, externalRunHealth));
       focusAdvancedWorkbench(externalRunWorkbenchAction(
         externalRunHealth,
@@ -6570,7 +6237,7 @@ function App() {
       pushActivity("flow.new-blocked", newFlowBlockedByRunHealthReason || "Resolve the current run blocker before starting a new flow.");
       return;
     }
-    if (newFlowBlockedByVerificationReason) {
+    if (sourceFlow && newFlowBlockedByVerificationReason) {
       setSelectedStage(toUiStageId(nextAction?.project_state?.stage ?? selectedFlow?.selected_stage ?? "review"));
       focusAdvancedWorkbench("execution");
       pushActivity("flow.new-blocked", newFlowBlockedByVerificationReason);
@@ -6584,16 +6251,14 @@ function App() {
           null
         : null;
     setNewFlowDraft(true);
+    setConsoleSurface("intent");
+    writeConsoleSurface("intent", { projectId: activeProjectId });
     setSelectedFlow(null);
     setSelectedFlowId(null);
-    setDraftSourceFlow(sourceFlow);
-    setDraftFollowUpHandoffRef(sourceHandoffRef);
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null);
     setPlanWorkbenchState({ scopeKey: `${apiProjectBase ?? "project"}:draft`, status: "idle", plan: null, progress: null, error: "" });
     setSelectedStage("mission");
-    setForm(sourceFlow && (followUp || duplicate) ? formFromFlowSettings(sourceFlow, { followUp }) : SAFE_TEMPLATE);
-    setMissionOperation(null);
     setRequestOperation(null); setOperatorActionResult(null);
     setRequestDrawerOpen(false);
     pushActivity(
@@ -6603,19 +6268,18 @@ function App() {
   }
 
   async function cancelNewFlowDraft() {
-    const fallbackFlow = selectedFlow ?? flowOptions.find((candidate) => candidate.status === "active") ?? flowOptions[0] ?? null;
+    const fallbackFlow = selectedFlow ?? flowOptions.find((candidate) => ["active", "blocked"].includes(candidate.status)) ?? flowOptions[0] ?? null;
     const fallbackFlowId = fallbackFlow?.flow_id ?? selectedFlowId ?? null;
     const cancelSelectionVersion = flowSelectionVersion.current + 1;
     flowSelectionVersion.current = cancelSelectionVersion;
     setBusy(true);
     setError("");
     setNewFlowDraft(false);
-    setDraftSourceFlow(null);
-    setDraftFollowUpHandoffRef(null);
-    setMissionOperation(null);
     setRequestOperation(null); setOperatorActionResult(null);
     setSelectedFlow(fallbackFlow);
     setSelectedFlowId(fallbackFlow?.flow_id ?? null);
+    setConsoleSurface(fallbackFlow ? "home" : "intent");
+    writeConsoleSurface(fallbackFlow ? "home" : "intent", { projectId: activeProjectId });
     setSelectedStage(flowStageId(fallbackFlow, nextAction, projectState));
     setRequestDrawerOpen(false);
     try {
@@ -6645,11 +6309,10 @@ function App() {
     flowSelectionVersion.current += 1;
     const flow = flowOptions.find((candidate) => candidate.flow_id === flowId) ?? null;
     setNewFlowDraft(false);
-    setDraftSourceFlow(null);
-    setDraftFollowUpHandoffRef(null);
-    setMissionOperation(null);
     setSelectedFlow(flow);
     setSelectedFlowId(flow?.flow_id ?? null);
+    setConsoleSurface(flow ? "flow" : "home");
+    writeConsoleSurface(flow ? "flow" : "home", { projectId: activeProjectId, flowId: flow?.flow_id, mode: quietMode });
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null);
     setPlanWorkbenchState({ scopeKey: `${apiProjectBase ?? "project"}:${flow?.flow_id ?? "none"}`, status: flow ? "loading" : "idle", plan: null, progress: null, error: "" });
@@ -6737,60 +6400,6 @@ function App() {
     } finally {
       setBusy(false);
     }
-  }
-
-  async function initializeProject() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await runLifecycle("project init");
-      await runLifecycle("next", { json: true });
-      await refresh();
-      setSelectedStage("mission");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitMission(event) {
-    event.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    try {
-      const flags = missionFlagsFromDraft(form, { missionId: missionIdFromTitle(form.title), followUpSourceHandoffRef: draftFollowUpHandoffRef });
-      const created = await runLifecycle("mission create", flags);
-      const pendingOperation = createdMissionOperation(created, missionOperation);
-      setMissionOperation(pendingOperation);
-      const next = await runLifecycle("next", { json: true });
-      setSelectedStage("discovery");
-      setNewFlowDraft(false);
-      setDraftSourceFlow(null);
-      setDraftFollowUpHandoffRef(null);
-      setSelectedFlowId(null);
-      const refreshed = await refresh({ newFlowDraft: false, selectedFlowId: null });
-      setMissionOperation(completedMissionOperation(pendingOperation, next, refreshed?.selectedFlow));
-    } catch (err) {
-      setMissionOperation((current) => current?.phase === "next-pending" ? { ...current, error: err instanceof Error ? err.message : String(err) } : current);
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function resumeMissionNext() {
-    if (busy || missionOperation?.phase !== "next-pending") return;
-    setBusy(true); setError("");
-    try {
-      const next = await runLifecycle("next", { json: true });
-      const refreshed = await refresh({ newFlowDraft: false, selectedFlowId: null });
-      setMissionOperation(completedMissionOperation(missionOperation, next, refreshed?.selectedFlow));
-      setNewFlowDraft(false); setDraftSourceFlow(null); setDraftFollowUpHandoffRef(null); setSelectedFlowId(null); setSelectedStage("discovery");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setMissionOperation((current) => ({ ...current, error: message })); setError(message);
-    } finally { setBusy(false); }
   }
 
   async function resolveNextForSelectedFlow() {
@@ -6917,7 +6526,7 @@ function App() {
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const projectSnapshotPending = !projectSnapshotLoaded && !String(error ?? "").trim();
-  const intentIngress = !projectSnapshotPending && (draftSurface || (!selectedFlow && !providerWorkbenchFocus));
+  const intentIngress = !projectSnapshotPending && (effectiveSurface === "intent" || effectiveSurface === "prepared" || draftSurface || (!flowOptions.length && !providerWorkbenchFocus));
   const firstRunFocusMode = intentIngress;
   const topbarAskReason = projectSnapshotPending
     ? "Project state is loading."
@@ -6999,6 +6608,7 @@ function App() {
           <div className="brand-mark">A</div>
           <div>
             <strong>AOR Operator Console</strong>
+            {config?.version ? <span className="console-version">v{config.version}</span> : null}
           </div>
         </div>
         <ProjectSwitcher
@@ -7009,7 +6619,7 @@ function App() {
           busy={busy}
           activeRuntimeReady={activeProjectStatusRuntimeReady}
         />
-        <FlowSelector
+        {flowSurface ? <FlowSelector
           flows={flowOptions}
           selectedFlowId={selectedFlowId}
           newFlowDraft={draftSurface}
@@ -7019,7 +6629,7 @@ function App() {
           newFlowDisabledReason={newFlowDisabledReason}
           providerStepStatus={providerStepStatus}
           externalRunHealth={externalRunHealth}
-        />
+        /> : null}
         <div className="topbar-status-strip" aria-label="Console status">
           {providerStepStatus ? <StatusPill state={`Provider ${providerStepStatus.status}`} /> : null}
           <StatusPill state={connectionState} />
@@ -7060,13 +6670,32 @@ function App() {
       ) : null}
 
       <main className="main">
-        <QuietShell project={activeProjectDisplay} flow={selectedFlow} stages={STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode} runtimeRoot={runtimeRoot} version={config?.version}/>
-        <QuietModeSurface mode={quietMode} attention={attentionState.data} attentionStatus={attentionState.status} resourceErrors={resourceErrors} planState={planWorkbenchState} runs={runs} deliveryManifests={deliveryManifests} graph={selectedFlowEvidenceGraph} trace={selectedFlowRuntimeTrace} onResolve={(item) => runOperatorControl(item.operator_control)} onInspect={(item) => { setSelectedRef(item.source_ref); focusAdvancedWorkbench("evidence"); }}/>
+        {flowSurface ? <QuietShell project={activeProjectDisplay} flow={selectedFlow} stages={selectedFlow?.lifecycle_path?.steps ?? STAGES} currentStage={currentStage} viewingStage={selectedStage} mode={quietMode} onStage={chooseStage} onMode={chooseQuietMode} runtimeRoot={runtimeRoot} version={config?.version}/> : null}
+        {flowSurface ? <QuietModeSurface mode={quietMode} attention={attentionState.data} attentionStatus={attentionState.status} resourceErrors={resourceErrors} planState={planWorkbenchState} runs={runs} deliveryManifests={deliveryManifests} graph={selectedFlowEvidenceGraph} trace={selectedFlowRuntimeTrace} onResolve={(item) => runOperatorControl(item.operator_control)} onInspect={(item) => { setSelectedRef(item.source_ref); focusAdvancedWorkbench("evidence"); }}/> : null}
         {error ? <div className="alert" role="alert">{error}</div> : null}
         <ResourceErrorCard errors={resourceErrors} />
         {requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
+        ) : effectiveSurface === "flow" && !selectedFlow ? (
+          <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
+        ) : homeSurface ? (
+          <ProjectHome
+            project={activeProjectDisplay}
+            flows={flowOptions}
+            activeFlow={flowOptions.find((flow) => ["active", "blocked"].includes(flow.status)) ?? null}
+            resumableIntent={intentSubmissions.find((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status)) ?? null}
+            onOpenFlow={(flowId) => selectFlow(flowId)}
+            onNewIntent={() => startNewFlow()}
+            onResumeIntent={(entry) => {
+              setNewFlowDraft(true);
+              setConsoleSurface("prepared");
+              setSelectedFlow(null);
+              setSelectedFlowId(null);
+              writeConsoleSurface("prepared", { projectId: activeProjectId, intentId: entry?.submission?.submission_id });
+            }}
+            pending={connectionState === "loading"}
+          />
         ) : intentIngress ? (
           <IntentOnboarding
             projectId={activeProjectId}
@@ -7074,7 +6703,15 @@ function App() {
             busy={busy}
             setBusy={setBusy}
             onProjectConnected={activateIntentProject}
+            initialSubmission={resumedIntent}
             onStarted={() => refresh().catch((err) => setError(err.message))}
+            onConfirmed={async (confirmation) => {
+              setNewFlowDraft(false);
+              setConsoleSurface("flow");
+              setSelectedFlowId(confirmation?.flow_id ?? null);
+              writeConsoleSurface("flow", { projectId: activeProjectId, flowId: confirmation?.flow_id, mode: "cockpit" });
+              await refresh({ newFlowDraft: false, selectedFlowId: confirmation?.flow_id ?? null });
+            }}
             onCancel={cancelNewFlowDraft}
           />
         ) : (
@@ -7104,7 +6741,7 @@ function App() {
           </>
         )}
         {activeProjectDisplay ? (
-          <details className="project-settings-disclosure" open={firstRunFocusMode || undefined}>
+          <details className="project-settings-disclosure">
             <summary><span>Project settings</span><small>Repositories, components, and execution route</small></summary>
             <div className="project-settings-content">
               <ExecutionSetup

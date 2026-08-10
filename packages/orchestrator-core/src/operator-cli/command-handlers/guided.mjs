@@ -320,6 +320,7 @@ export function handleGuidedCommand(context) {
       resolveOptionalStringFlag("delivery-mode", flags["delivery-mode"]) ?? "no-write",
     );
     const missionId = resolveOptionalStringFlag("mission-id", flags["mission-id"]) ?? null;
+    const workType = resolveOptionalStringFlag("work-type", flags["work-type"]) ?? null;
     const goals = resolveOptionalStringListFlag("goal", flags.goal);
     const constraints = resolveOptionalStringListFlag("constraint", flags.constraint);
     const definitionOfDone = resolveOptionalStringListFlag("dod", flags.dod);
@@ -336,6 +337,7 @@ export function handleGuidedCommand(context) {
       runtimeLayout: missionInit.runtimeLayout,
       command: "aor mission create",
       missionId,
+      workType,
       requestTitle:
         resolveOptionalStringFlag("title", flags.title) ??
         (missionId ? `Guided mission ${missionId}` : "Guided mission request"),

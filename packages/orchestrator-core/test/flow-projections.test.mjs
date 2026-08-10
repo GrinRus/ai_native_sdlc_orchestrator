@@ -17,6 +17,43 @@ import { appendRunEvent } from "../src/control-plane/live-event-stream.mjs";
 import { resolveNextAction } from "../src/next-action.mjs";
 import { createOperatorRequest } from "../src/operator-request.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
+import { buildFlowPresentation, buildLifecyclePath } from "../src/control-plane/flow-path.mjs";
+
+test("flow presentation marks prior adaptive steps completed and keeps fallback titles readable", () => {
+  const path = buildLifecyclePath("code-change", "review", "active", ["evidence://review.json"]);
+  assert.deepEqual(path.steps.map((step) => step.state), ["completed", "completed", "completed", "completed", "current", "upcoming", "upcoming"]);
+  assert.deepEqual(path.steps.find((step) => step.state === "current")?.evidence_refs, ["evidence://review.json"]);
+
+  const presentation = buildFlowPresentation({
+    missionSettings: { title: "   ", work_type: "review" },
+    missionId: "mission.fallback",
+    selectedStage: "review",
+    status: "active",
+    evidenceRefs: [],
+    primaryAction: { command: "aor next", reason: "Inspect evidence." },
+    blockers: [],
+    updatedAt: null,
+  });
+  assert.equal(presentation.display_title, "mission.fallback");
+  assert.equal(presentation.current_step, "review");
+
+  const repairPath = buildLifecyclePath("code-change", "repair", "active", ["evidence://repair.json"]);
+  assert.equal(repairPath.steps.find((step) => step.state === "current")?.id, "review");
+  assert.deepEqual(repairPath.steps.slice(0, 4).map((step) => step.state), ["completed", "completed", "completed", "completed"]);
+
+  const safeFallback = buildFlowPresentation({
+    missionSettings: null,
+    missionId: "mission.safe-fallback",
+    selectedStage: "unknown-runtime-stage",
+    status: "active",
+    evidenceRefs: null,
+    primaryAction: null,
+    blockers: null,
+    updatedAt: null,
+  });
+  assert.equal(safeFallback.current_step, "discovery");
+  assert.equal(safeFallback.evidence_count, 0);
+});
 
 /**
  * @param {(repoRoot: string) => void} callback
@@ -61,7 +98,7 @@ function normalizeProjectionForRepeatRead(projection) {
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} missionId
  * @param {string} deliveryMode
- * @param {{ followUpSourceHandoffRef?: string }} options
+ * @param {{ followUpSourceHandoffRef?: string, workType?: string }} options
  */
 function writeMission(init, missionId, deliveryMode = "patch-only", options = {}) {
   return materializeIntakeArtifactPacket({
@@ -86,6 +123,7 @@ function writeMission(init, missionId, deliveryMode = "patch-only", options = {}
     allowedPaths: ["docs/**"],
     forbiddenPaths: ["secrets/**"],
     deliveryMode,
+    workType: options.workType ?? (deliveryMode === "no-write" ? "analyze" : "code-change"),
     sourceKind: "local-note",
     sourceRef: `docs/${missionId}.md`,
     followUpSourceHandoffRef: options.followUpSourceHandoffRef ?? null,
@@ -96,7 +134,7 @@ test("flow and next-action reads discover content-addressed intake packet filena
   withCleanRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
     const missionId = "bounded-follow-up";
-    const materialized = writeMission(init, missionId, "no-write");
+    const materialized = writeMission(init, missionId, "no-write", { workType: "analyze" });
     const contentAddressedPacketFile = path.join(
       init.runtimeLayout.artifactsRoot,
       "packet-0123456789abcdef0123456789abcdef.json",
@@ -107,6 +145,8 @@ test("flow and next-action reads discover content-addressed intake packet filena
     assert.equal(flowList.selected_flow_id, `flow.${init.workspaceProjectId}.${missionId}`);
     assert.equal(flowList.flows[0]?.mission_id, missionId);
     assert.equal(flowList.flows[0]?.intake_packet_ref.endsWith(path.basename(contentAddressedPacketFile)), true);
+    assert.equal(flowList.flows[0]?.work_type, "analyze");
+    assert.deepEqual(flowList.flows[0]?.lifecycle_path.steps.map((step) => step.label), ["Discover", "Verify", "Learn"]);
 
     const next = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
     assert.equal(next.nextActionReport.primary_action.action_id, "discovery-run");

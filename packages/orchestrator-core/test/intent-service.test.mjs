@@ -10,10 +10,12 @@ import { createLocalProjectRegistry } from "../src/control-plane/local-project-r
 import {
   IntentServiceError,
   answerIntentQuestions,
+  confirmIntent,
   confirmAndStartIntent,
   createIntentSubmission,
   prepareIntentSubmission,
   readIntentSubmission,
+  listIntentSubmissions,
   reviseIntentSubmission,
 } from "../src/intent-service.mjs";
 
@@ -148,6 +150,15 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       assert.deepEqual(prepared.report.open_questions, []);
       assert.match(prepared.report.assumptions.at(-1), /Installed AOR operators/u);
       assert.deepEqual(prepared.report.provider, needsInput.report.provider);
+      const confirmed = confirmIntent({ registry, projectId, submissionId: created.submission.submission_id });
+      assert.equal(confirmed.discovery, null);
+      assert.match(confirmed.flow_id, /^flow\./u);
+      assert.equal(confirmed.next_action.action_id, "discovery-run");
+      assert.match(confirmed.next_action_report_ref, /^evidence:\/\/projects\//u);
+      assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
+      const resumable = listIntentSubmissions({ registry, projectId });
+      assert.equal(resumable.read_only, true);
+      assert.equal(resumable.submissions[0].submission.submission_id, created.submission.submission_id);
       const first = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       const second = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       assert.equal(second.mission.command_output?.mission_id ?? second.mission.command, first.mission.command_output?.mission_id ?? first.mission.command);

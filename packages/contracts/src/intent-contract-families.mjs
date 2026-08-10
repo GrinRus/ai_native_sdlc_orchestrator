@@ -48,7 +48,7 @@ export const INTENT_CONTRACT_FAMILIES = Object.freeze([
     requiredFields: [
       "report_id", "submission_id", "workspace_project_id", "project_id", "revision",
       "status", "title", "outcome", "constraints", "acceptance", "scope", "work_type",
-      "delivery_mode", "assumptions", "open_questions", "confidence", "provider",
+      "delivery_mode", "planned_path", "assumptions", "open_questions", "confidence", "provider",
       "input_refs", "validation", "created_at",
     ],
     fieldTypes: {
@@ -65,6 +65,7 @@ export const INTENT_CONTRACT_FAMILIES = Object.freeze([
       scope: "array",
       work_type: "string",
       delivery_mode: "string",
+      planned_path: "object",
       assumptions: "array",
       open_questions: "array",
       confidence: "number",

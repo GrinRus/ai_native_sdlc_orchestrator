@@ -12,6 +12,8 @@ preview without modifying the immutable operator submission.
 - `title`, `outcome`, `constraints[]`, `acceptance[]`, `scope[]`
 - `work_type`: `analyze`, `explain`, `review`, `document-change`, or `code-change`
 - `delivery_mode`: `no-write` or `patch-only`
+- `planned_path`: runtime-owned path descriptor with `path_id`, ordered
+  `steps[]`, and a durable `reason` for any later skip decision
 - `assumptions[]`, `open_questions[]`, `confidence`
 - `provider`, `input_refs[]`, `validation`, `created_at`
 
@@ -39,4 +41,7 @@ characters per list item before contract validation succeeds.
 
 Confirmation compiles the latest prepared revision into the existing
 `intake-request-body`. Acceptance items become deterministic pass/fail KPI and
-Definition of Done entries. The operation is idempotent for one submission.
+Definition of Done entries. The additive `confirm` action is idempotent and
+creates Mission/Flow without starting a provider; the legacy
+`confirm-and-start` action remains compatible and may invoke the first
+Discovery action afterward.

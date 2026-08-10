@@ -1077,6 +1077,31 @@ export function createLiveE2eStepController(options) {
   }
 
   /**
+   * @param {string} step
+   * @returns {Record<string, unknown> | null}
+   */
+  function latestPersistedEntryForStep(step) {
+    return (
+      Object.values(entryByStep)
+        .filter((entry) => asNonEmptyString(entry.step_id) === step)
+        .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
+        .at(-1) ?? null
+    );
+  }
+
+  /**
+   * @param {string} step
+   * @returns {number}
+   */
+  function nextPersistedIterationForStep(step) {
+    return (
+      Object.values(entryByStep)
+        .filter((entry) => asNonEmptyString(entry.step_id) === step)
+        .reduce((maximum, entry) => Math.max(maximum, Number(entry.iteration) || 1), 0) + 1
+    );
+  }
+
+  /**
    * @param {Record<string, unknown>} entry
    * @param {Record<string, unknown>} artifacts
    * @returns {Record<string, unknown>}
@@ -1260,15 +1285,28 @@ export function createLiveE2eStepController(options) {
     if (!includedSteps.includes(step)) {
       return { action: "continue", decision: null };
     }
-    const iteration = Number(input.iteration) || 1;
-    const stepInstanceId = buildStepInstanceId(step, iteration);
-    const persistedEntry = entryByStep[stepInstanceId];
+    let iteration = Number(input.iteration) || 1;
+    let stepInstanceId = buildStepInstanceId(step, iteration);
+    let persistedEntry = entryByStep[stepInstanceId];
     if (persistedEntry) {
       const persistedAction = asNonEmptyString(asRecord(persistedEntry.decision).action);
       if (asNonEmptyString(persistedEntry.operator_decision_status) === "accepted") {
         const entry = applyStepQualityGate(persistedEntry, input.artifacts);
         const action = asNonEmptyString(asRecord(entry.decision).action);
-        if (["continue", "retry_public_step"].includes(action)) {
+        const isLatestRetry =
+          action === "retry_public_step" && latestPersistedEntryForStep(step)?.step_instance_id === stepInstanceId;
+        if (isLatestRetry) {
+          // A public retry is a new observation, not a replay of the failed
+          // decision. Move to a fresh step instance so a passing rerun can
+          // close the step and downstream terminal evidence can become
+          // complete.
+          iteration = nextPersistedIterationForStep(step);
+          stepInstanceId = buildStepInstanceId(step, iteration);
+          persistedEntry = null;
+        }
+        if (!persistedEntry) {
+          // Continue through the fresh-observation path below.
+        } else if (action === "continue" || action === "retry_public_step") {
           const semantic = asRecord(entry.semantic_analysis);
           entry.semantic_analysis = {
             ...semantic,
@@ -1278,15 +1316,17 @@ export function createLiveE2eStepController(options) {
           syncLiveE2eArtifactRefs(input.artifacts, input.commandResults);
           return { action: "continue", decision: asRecord(entry.decision) };
         }
-        persistStep(step, entry);
-        syncLiveE2eArtifactRefs(input.artifacts, input.commandResults);
-        throw new LiveE2eControllerStop({
-          reason: `Live E2E controller stopped at '${step}' with decision '${action || "block"}'.`,
-          state: cloneState(),
-          decision: asRecord(entry.decision),
-        });
+        if (persistedEntry) {
+          persistStep(step, entry);
+          syncLiveE2eArtifactRefs(input.artifacts, input.commandResults);
+          throw new LiveE2eControllerStop({
+            reason: `Live E2E controller stopped at '${step}' with decision '${action || "block"}'.`,
+            state: cloneState(),
+            decision: asRecord(entry.decision),
+          });
+        }
       }
-      if (["missing", "rejected"].includes(asNonEmptyString(persistedEntry.operator_decision_status))) {
+      if (persistedEntry && ["missing", "rejected"].includes(asNonEmptyString(persistedEntry.operator_decision_status))) {
         const files = operatorFilePaths({
           reportsRoot: options.reportsRoot,
           runId: options.runId,
@@ -1792,6 +1832,23 @@ export function createLiveE2eStepController(options) {
     return null;
   };
 
+  const canReuseCachedCommand = (label, iteration = 1) => {
+    const cached = findCachedCommandResult(label, iteration);
+    if (!cached) return false;
+    // Repair closure is a mutation against current runtime ownership and
+    // source code. Never replay a failed closure transcript after a fix: it
+    // would preserve a stale failure and prevent the same run from validating
+    // the repaired command.
+    const pendingAction = asNonEmptyString(asRecord(state.pending_decision).action);
+    if (
+      /^repair-close-[1-9][0-9]*$/u.test(label) ||
+      pendingAction === "retry_public_step"
+    ) {
+      return asNonEmptyString(cached.status) === "pass" && Number(cached.exit_code) === 0;
+    }
+    return true;
+  };
+
   return {
     mode,
     policy,
@@ -1840,26 +1897,26 @@ export function createLiveE2eStepController(options) {
       reconcilePendingStepQualityReports();
       const step = resolveLiveE2eCommandStep(label);
       if (!step) {
-        return mode === "auto" && asStringArray(state.completed_steps).length > 0 && findCachedCommandResult(label, iteration) !== null;
+        return mode === "auto" && asStringArray(state.completed_steps).length > 0 && canReuseCachedCommand(label, iteration);
       }
       const normalizedIteration = Number(iteration) || 1;
       const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
       if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) {
-        return findCachedCommandResult(label, normalizedIteration) !== null;
+        return canReuseCachedCommand(label, normalizedIteration);
       }
       if (mode === "evaluator" && observedStepInstances().includes(stepInstanceId)) {
-        return findCachedCommandResult(label, normalizedIteration) !== null;
+        return canReuseCachedCommand(label, normalizedIteration);
       }
       if (
         mode === "auto" &&
         asNonEmptyString(asRecord(asRecord(entryByStep[stepInstanceId]).decision).action) === "retry_public_step"
       ) {
-        return findCachedCommandResult(label, normalizedIteration) !== null;
+        return canReuseCachedCommand(label, normalizedIteration);
       }
       if (completedControllerStepInstances().includes(stepInstanceId)) {
-        return findCachedCommandResult(label, normalizedIteration) !== null;
+        return canReuseCachedCommand(label, normalizedIteration);
       }
-      return mode === "manual" && observedStepInstances().includes(stepInstanceId) && findCachedCommandResult(label, normalizedIteration) !== null;
+      return mode === "manual" && observedStepInstances().includes(stepInstanceId) && canReuseCachedCommand(label, normalizedIteration);
     },
     getStepJournal: () => {
       reconcilePendingStepQualityReports();

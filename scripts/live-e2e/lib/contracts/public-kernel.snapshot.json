@@ -1,11 +1,11 @@
 {
   "schema_version": 3,
-  "kernel_version": 11,
+  "kernel_version": 12,
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 22,
-    "source_manifest_sha256": "568e910bb8cfe41851e21545be2ca13bbdec45a82b4341d5a164b526680c9496"
+    "source_manifest_sha256": "0d423036604085cbd83f3e4124d44d9fb8e7a97728393325080aad174932ecca"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -19,8 +19,8 @@
     "index.d.ts": "1fba93263f1866ad99398bd1362d3f4c2589088e201430b531634b9874cd93fa",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
-    "intent-contract-families.mjs": "573574fcd854f3ee253ee5436a48ad602d2e75fbaafbc699545ab526c034b0bf",
-    "loader.mjs": "c1f800ab282e619676befcce9f1a41b64dcff187d5178af8c4ccd46c6610815b",
+    "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
+    "loader.mjs": "bf95e0384f01a938dfcbae9ed078d51e7f4486918916c0a7b71b1c52098cf6f9",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
     "reference-registry.mjs": "90e94fad7a8cc231ad14714cd885a3961ad3e8625a77e0aafc31538c3fa965b5",
@@ -117,6 +117,7 @@
         "scope",
         "work_type",
         "delivery_mode",
+        "planned_path",
         "assumptions",
         "open_questions",
         "confidence",
@@ -139,6 +140,7 @@
         "scope": "array",
         "work_type": "string",
         "delivery_mode": "string",
+        "planned_path": "object",
         "assumptions": "array",
         "open_questions": "array",
         "confidence": "number",

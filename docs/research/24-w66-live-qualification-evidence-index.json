@@ -19,7 +19,7 @@
     {
       "cell_id": "openai-primary.medium",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
-      "profile_sha256": "4c0c509f6af5211baab5744247301e7895484c1ffcfb3365b409247e26ee18dc",
+      "profile_sha256": "68ac0bb8b4b577876738f1a81700db33bd84afd8aeb5d534002baebb101637a4",
       "run_id": null,
       "status": "not-run",
       "run_health_status": "not-run",
@@ -31,7 +31,7 @@
     {
       "cell_id": "openai-primary.large",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
-      "profile_sha256": "09de0d97beab4a67b10b17741e1a1352dcd7d3ee8b5abc1507756cdc54ae246e",
+      "profile_sha256": "e55889bec9c41aaa5376995933da9a7d911f825b0e6804839c14dae3c634edbf",
       "run_id": null,
       "status": "not-run",
       "run_health_status": "not-run",
@@ -43,7 +43,7 @@
     {
       "cell_id": "anthropic-primary.medium",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
-      "profile_sha256": "2cbb39df912c26e6fb90267648f71c05ed09351e817a7550d6efd2000ac9ca6d",
+      "profile_sha256": "9dba10cb863e3412b3e0674aa8695654b3f48ff9a7e0147f14f710fc21972b8d",
       "run_id": null,
       "status": "not-run",
       "run_health_status": "not-run",
@@ -55,7 +55,7 @@
     {
       "cell_id": "anthropic-primary.large",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-anthropic.yaml",
-      "profile_sha256": "7bade07c69eeba9fdf74208e36bc688086dd80b8eb69796bebc564c27d42c31d",
+      "profile_sha256": "b6440905b727bb6219e81f85b2749cc39c4467bf0c1ef5483fc81a040705c8e9",
       "run_id": null,
       "status": "not-run",
       "run_health_status": "not-run",

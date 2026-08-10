@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DependencyView, RevisionView, TaskDetailDialog, TaskTable, TraceabilityView, taskStatus, textList } from "./plan-workbench-views.jsx";
+import { useRovingTabs } from "./ui/components.jsx";
 
 const TABS = ["Tasks", "Traceability", "Dependencies", "Revisions"];
 export function PlanWorkbench({ state, busy, onAction }) {
@@ -8,6 +9,8 @@ export function PlanWorkbench({ state, busy, onAction }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [revisionReason, setRevisionReason] = useState("");
   const [approvalRef, setApprovalRef] = useState("");
+  const tabs = useMemo(() => TABS.map((name) => ({ id: name, label: name })), []);
+  const { getTabProps } = useRovingTabs({ tabs, selected: tab, onSelect: setTab });
   const plan = state.plan?.plan ?? null;
   const progress = state.progress?.task_progress ?? null;
   const tasks = Array.isArray(plan?.local_tasks) ? plan.local_tasks : [];
@@ -67,7 +70,7 @@ export function PlanWorkbench({ state, busy, onAction }) {
           ) : null}
 
           <div className="plan-tabs" role="tablist" aria-label="Plan views">
-            {TABS.map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} className={tab === name ? "active" : ""} onClick={() => setTab(name)}>{name}</button>)}
+            {tabs.map((tabOption, index) => <button {...getTabProps(tabOption, index)} key={tabOption.id} type="button" role="tab" aria-selected={tab === tabOption.id} className={tab === tabOption.id ? "active" : ""} onClick={() => setTab(tabOption.id)}>{tabOption.label}</button>)}
           </div>
 
           {tab === "Tasks" ? <TaskTable tasks={tasks} progress={progress} onSelect={setSelectedTaskId} /> : null}

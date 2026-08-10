@@ -92,6 +92,15 @@ async function waitForFollowTerminal(args, options) {
   const projectRef = flagValue(args, "project-ref");
   const runId = flagValue(args, "run-id");
   if (!projectRef || !runId) return;
+  // Install the signal guard before project/runtime initialization. A CLI
+  // child can receive SIGINT during the synchronous read-context bootstrap;
+  // without this early listener the default signal action terminates the
+  // process before the follow subscription can release itself cleanly.
+  let interruptedBeforeSubscription = false;
+  const onEarlySigint = () => {
+    interruptedBeforeSubscription = true;
+  };
+  process.once("SIGINT", onEarlySigint);
   const maxReplayRaw = Number(flagValue(args, "max-replay"));
   const stream = openRunEventStream({
     cwd: options.cwd ?? process.cwd(),
@@ -101,18 +110,26 @@ async function waitForFollowTerminal(args, options) {
     afterEventId: flagValue(args, "after-event-id"),
     maxReplay: Number.isInteger(maxReplayRaw) && maxReplayRaw >= 0 ? maxReplayRaw : undefined,
   });
-  if (stream.cursor_terminal || stream.replay_events.some((event) => event.event_type === "run.terminal")) return;
+  if (stream.cursor_terminal || stream.replay_events.some((event) => event.event_type === "run.terminal")) {
+    process.off("SIGINT", onEarlySigint);
+    return;
+  }
   await new Promise((resolve) => {
     let unsubscribe = () => {};
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       unsubscribe();
       process.off("SIGINT", finish);
+      process.off("SIGINT", onEarlySigint);
       resolve(undefined);
     };
     unsubscribe = stream.subscribe((event) => {
       if (event.event_type === "run.terminal") finish();
     });
     process.once("SIGINT", finish);
+    if (interruptedBeforeSubscription) finish();
   });
 }
 

@@ -403,6 +403,7 @@ export function runLifecycleCommand(options) {
   const commandParts = command.split(" ");
   const executionFlags = {
     "project-ref": options.projectRef,
+    ...(options.runtimeRoot ? { "runtime-root": options.runtimeRoot } : {}),
     ...(command === "next" && flagResult.cliFlags.json === undefined ? { json: true } : {}),
     ...flagResult.cliFlags,
   };

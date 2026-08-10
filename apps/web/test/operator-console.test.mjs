@@ -21,7 +21,7 @@ function withTempProject(callback) {
   }
 }
 
-test("packaging-only marker smoke exposes installed-user guided mission controls", () => {
+test("packaging-only marker smoke exposes installed-user flow-first controls", () => {
   const source = [
     "spa.jsx",
     "control-plane-client.js",
@@ -30,7 +30,6 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "operator-error-card.jsx",
     "project-structure.jsx",
     "project-structure-model.js",
-    "mission-model.js",
     "mission-builder.jsx",
     "intent-onboarding.jsx",
     "quiet-shell.jsx",
@@ -40,10 +39,6 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     .join("\n");
 
   for (const required of [
-    "safe-walkthrough",
-    "Create Flow & Resolve Next Action",
-    "Create Follow-up Flow & Resolve Next Action",
-    "Mission intake",
     "Flow selector",
     "ProjectSnapshotLoading",
     "Syncing project state",
@@ -54,12 +49,8 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Inspect Evidence",
     "Inspect locked evidence before starting follow-up work",
     "Completed evidence locked",
-    "Create Follow-up",
     "Start New Flow",
     "Create follow-up from learning handoff",
-    "Duplicate mission settings",
-    "follow-up-source-handoff-ref",
-    "deliveryMode: followUp ? \"no-write\"",
     "Evidence Graph",
     "Runtime Trace",
     "EvidenceReadinessPath",
@@ -103,14 +94,9 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Show CLI command",
     "Materialize discovery evidence",
     "topbar-ask-button",
-    "draft: newFlowDraft",
     "draftSurface",
     "currentStage = draftSurface",
     "providerFocusStageId(providerStepStatus, externalRunHealth)",
-    "spec: \"discovery\"",
-    "handoff: \"discovery\"",
-    "eval: \"review\"",
-    "harness: \"review\"",
     "EXTERNAL_RUN_STEP_CONTEXT",
     "externalRunStepContext(externalRunHealth)",
     "Execution handoff readiness",
@@ -126,9 +112,6 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "CompactDetailValue",
     "shellQuoteCommandArg",
     "appendCommandFlag",
-    "New Flow Preview",
-    "Completeness Checklist",
-    "Cancel New Flow",
     "flow.new-draft-cancelled",
     "flowSelectionVersion",
     "projectSnapshotLoaded",
@@ -136,7 +119,6 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "selectionVersion",
     "selectionApplied",
     "selectionStillCurrent && !didChooseStage.current",
-    "setSelectedStage(\"discovery\");",
     "refresh({ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion })",
     "ADVANCED_WORKBENCH_FOCUS_EVENT",
     "ADVANCED_WORKBENCH_TAB_IDS",
@@ -292,12 +274,9 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Decision Evidence",
     "Review Blocker",
     "Recovery Path",
-    "Run assessment needed",
     "Assessment checks",
     "awaiting-assessment",
-    "Run decision recorded",
     "Decision evidence",
-    "Recovery needed",
     "Recovery checks",
     "repair-required",
     "externalRunNewFlowBlockedReason",
@@ -305,15 +284,11 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "newFlowBlockedByRunHealthReason",
     "newFlowDisabledReason",
     "Review blocker",
-    "Run decision needed",
     "Decision checks",
     "awaiting-decision",
     "Open ${stepLabel} blocker",
     "projectRunEvidenceSelectorLabel",
-    "projectRunEvidenceStatus",
-    "projectRunEvidenceIdentity",
     "blocker evidence",
-    "Run evidence blocked",
     "Refresh Run Status",
     "Ask AOR needs a selectable flow",
     "Ask AOR needs a flow",
@@ -386,13 +361,10 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Copy raw ref for",
     "Attach as request target:",
     "topbar-status-strip",
-    "stage-progress-strip",
-    "compact-first-run",
     "MissionDurableSummary",
     "Ask AOR for selected flow",
     "Ask AOR requires a selected active flow",
     "Available after completed flow",
-    "Requires selected active flow",
     "Project switcher",
     'htmlFor="project-switcher-control"',
     'id="project-switcher-control"',
@@ -421,7 +393,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Loading",
     "if (!flow) return \"readiness\"",
     "newFlowDisabled",
-    "Confirm and start",
+    "Confirm and create Flow",
     "flow.new-blocked",
     "setAddProjectDrawerOpen(false)",
     "AOR Home",
@@ -431,18 +403,13 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     'htmlFor="flow-selector-control"',
     'id="flow-selector-control"',
     'name="flow-selector"',
-    "Readiness prepares the runtime before a flow is created",
     "selectedStageRuntimeState",
     "Upcoming stage. The current recommended action remains scoped",
     "Recommended action context",
-    "aria-current={current ? \"step\" : undefined}",
-    "aria-pressed={active}",
-    "Selected view",
     "Expected outputs",
     "Command provenance",
     "Dry-run preview",
     "Flow inventory",
-    "stage-status-badge",
     "operator-request.completed",
     "mission create",
     "next",
@@ -542,7 +509,6 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Next public control",
     "aor run cancel",
     "aor run status --run-id",
-    "delivery-mode={selectedDeliveryMode}",
     "syncExpandedToViewport",
   ]) {
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
@@ -552,14 +518,12 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
   assert.ok(css.includes("--touch-control-height: var(--aor-control-touch)"), "SPA CSS should use the semantic mobile touch target token");
   assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
-  assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
   assert.ok(css.includes(".provider-heartbeat-card"), "SPA CSS should define provider heartbeat cockpit layout");
   assert.ok(css.includes(".first-run-wizard"), "SPA CSS should define first-run wizard layout");
   assert.ok(css.includes(".project-switcher"), "SPA CSS should define project switcher layout");
   assert.match(css, /\.topbar\s*\{[\s\S]*?flex-wrap: wrap;/u, "SPA topbar should wrap instead of overlapping project and flow controls");
   assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 350px;/u, "Project switcher should keep a stable compact width");
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 320px;/u, "Flow selector should keep a stable compact width");
-  assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
   assert.ok(css.includes(".provider-heartbeat-action small"), "Provider heartbeat should demote raw runner labels to secondary debug copy");
   assert.ok(css.includes(".quality-gate-card"), "SPA CSS should define active quality gate layout");
   assert.ok(css.includes(".quality-gate-card.operator-hold"), "SPA CSS should distinguish exhausted repair budgets");
@@ -647,11 +611,7 @@ test("packaging-only marker smoke exposes installed-user guided mission controls
     "Active Activity / Events support tables should follow the advanced workbench on desktop",
   );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
-  assert.ok(css.includes(".stage-rail.compact-first-run .stage-progress-strip"), "SPA CSS should show a compact first-run stage progress strip on mobile");
-  assert.ok(css.includes(".stage-rail.compact-first-run nav"), "SPA CSS should collapse the full stage rail behind the compact first-run strip on mobile");
-  assert.ok(css.includes(".flow-active-mode .stage-rail .stage-progress-strip"), "SPA CSS should show a compact active-flow stage progress strip on tablet and mobile");
   assert.ok(css.includes(".flow-active-mode .topbar-ask-button .action-label"), "SPA CSS should collapse long active-flow topbar button copy on mobile");
-  assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
   assert.match(
     css,
     /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher\s*\{[\s\S]*?grid-template-columns: 1fr;[\s\S]*?min-width: 0;/u,

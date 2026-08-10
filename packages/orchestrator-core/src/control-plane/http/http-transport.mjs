@@ -33,7 +33,7 @@ import {
 } from "./http-utils.mjs";
 import { createLocalProjectRegistry, summarizeProjectContext } from "../local-project-registry.mjs";
 import { readProjectConnectionJob } from "../project-source.mjs";
-import { readIntentSubmission } from "../../intent-service.mjs";
+import { listIntentSubmissions, readIntentSubmission } from "../../intent-service.mjs";
 
 const LOCAL_TRUSTED_HOSTS = new Set(["127.0.0.1", "::1"]);
 
@@ -247,6 +247,10 @@ export function createControlPlaneHttpServer(options) {
         }
         if (route.id === "intent-submission") {
           sendJson(response, 200, readIntentSubmission({ registry, projectId: routeProjectId, submissionId: params.submissionId }));
+          return;
+        }
+        if (route.id === "intent-submission-list") {
+          sendJson(response, 200, listIntentSubmissions({ registry, projectId: routeProjectId }));
           return;
         }
         if (route.id === "execution-profile") {

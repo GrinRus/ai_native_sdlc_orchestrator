@@ -50,6 +50,11 @@ Runtime Harness product acceptance, which remains expressed through goals,
 constraints, KPIs, Definition of Done, expected evidence, and verification
 commands.
 
+`mission_traceability.work_type` is an optional intent classification with one
+of `analyze`, `explain`, `review`, `document-change`, or `code-change`. When
+present it is copied from the prepared Intent into the Mission and Flow read
+models; it never changes write-back authorization by itself.
+
 ## Notes
 The artifact packet owns packet identity and lifecycle status. This body owns product acceptance evidence and source-material traceability.
 

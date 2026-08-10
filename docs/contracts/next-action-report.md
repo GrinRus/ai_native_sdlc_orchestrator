@@ -47,7 +47,7 @@ without this object may use only a bounded compatibility registry keyed by
 Only one primary action is allowed. Additional suggestions belong in guided UI copy or future reports, not this contract.
 
 ## Mission state and bounded execution
-`mission_state` links the latest `intake-request` packet and body when present. It must preserve completeness status, missing fields, mission id, delivery mode, allowed paths, and forbidden paths.
+`mission_state` links the latest `intake-request` packet and body when present. It must preserve completeness status, missing fields, mission id, work type, delivery mode, allowed paths, and forbidden paths.
 
 `bounded_execution` makes the selected delivery mode explicit before any delivery-capable recommendation. Installed-user guided flows must keep `upstream_writes_default=false`; delivery-capable modes must require review before write-back.
 

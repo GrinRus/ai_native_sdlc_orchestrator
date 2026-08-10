@@ -22,8 +22,6 @@ const DIMENSION_KEYS = Object.freeze([
 export const REQUIRED_QUALIFICATION_CELLS = Object.freeze([
   Object.freeze({ cell_id: "openai-primary.medium", provider_variant_id: "openai-primary", feature_size: "medium" }),
   Object.freeze({ cell_id: "openai-primary.large", provider_variant_id: "openai-primary", feature_size: "large" }),
-  Object.freeze({ cell_id: "anthropic-primary.medium", provider_variant_id: "anthropic-primary", feature_size: "medium" }),
-  Object.freeze({ cell_id: "anthropic-primary.large", provider_variant_id: "anthropic-primary", feature_size: "large" }),
 ]);
 
 function digestFile(file) {

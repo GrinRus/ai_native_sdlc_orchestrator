@@ -3113,8 +3113,9 @@ test("live adapter preserves Qwen stream progress when run-control interrupts pr
     "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
     "}",
     "process.stdout.write(JSON.stringify({type:'tool_call',name:'read_file'}) + '\\n');",
-    "recordCancel();",
-    "setInterval(recordCancel, 10);",
+    // Let the adapter's stdout reader observe the emitted tool event before
+    // the cancellation poll changes the public run-control state.
+    "setTimeout(() => { recordCancel(); setInterval(recordCancel, 10); }, 50);",
     "setTimeout(() => {}, 5000);",
   ].join("");
   const adapter = createLiveAdapter({

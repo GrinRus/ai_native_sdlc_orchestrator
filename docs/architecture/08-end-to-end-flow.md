@@ -71,6 +71,12 @@ control-plane mutations. Completed flows are read-only evidence chains. Starting
 follow-up, it cites the completed source flow's learning handoff instead of
 reopening or editing the completed flow.
 
+The web ingress is intent-first: Project Home selects a Flow explicitly or
+opens New Intent; preparation remains read-only; `confirm` creates Mission and
+Flow without invoking a provider; Discovery is a separate runtime-owned safe
+action from Cockpit. The Flow projection carries `work_type`, an adaptive
+`lifecycle_path`, human-readable summary fields, and evidence counts for Home.
+
 ## Why bootstrap is a first-class stage
 AOR cannot safely run against a repository until it knows:
 - its topology,
