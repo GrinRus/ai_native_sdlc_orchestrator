@@ -38,11 +38,12 @@ const CHANGE_PATH = Object.freeze([
 ]);
 
 export class IntentServiceError extends Error {
-  constructor(code, message, statusCode = 400) {
+  constructor(code, message, statusCode = 400, details = {}) {
     super(message);
     this.name = "IntentServiceError";
     this.code = code;
     this.statusCode = statusCode;
+    this.details = details;
   }
 }
 
@@ -435,7 +436,7 @@ export function retryIntentStart({ registry, projectId, submissionId }) {
   return startConfirmedIntent({ registry, projectId, loaded });
 }
 
-function confirmIntentRecord({ registry, projectId, submissionId }) {
+function confirmIntentRecord({ registry, projectId, submissionId, expectedRevision }) {
   const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
   if (loaded.submission.confirmation) {
     if (loaded.submission.confirmation.next_action) return { confirmation: loaded.submission.confirmation, loaded };
@@ -457,6 +458,23 @@ function confirmIntentRecord({ registry, projectId, submissionId }) {
   const current = readIntentSubmission({ registry, projectId, submissionId });
   const report = current.normalization;
   if (!report || report.status !== "prepared") throw new IntentServiceError("intent_submission.not_prepared", "Prepare and resolve the task preview before confirmation.", 409);
+  if (expectedRevision !== undefined && report.revision !== expectedRevision) {
+    throw new IntentServiceError(
+      "intent_submission.stale_revision",
+      `Prepared task revision ${expectedRevision} is stale; the server currently has revision ${report.revision}. Refresh before confirming.`,
+      409,
+      {
+        current_revision: report.revision,
+        recovery_actions: [{
+          action: "refresh",
+          payload: {
+            resource: `intent-submission://${submissionId}`,
+            current_revision: report.revision,
+          },
+        }],
+      },
+    );
+  }
   const missionId = derivePublicId(["mission", submissionId], "mission");
   const mission = runLifecycleCommand({
     cwd: loaded.context.projectRoot,
@@ -489,10 +507,11 @@ function confirmIntentRecord({ registry, projectId, submissionId }) {
     mission,
     flow_id: flowId,
     discovery: null,
+    normalization_revision: report.revision,
     next_action: next.nextActionReport.primary_action,
     next_action_report_ref: `evidence://projects/${loaded.init.workspaceProjectId}/reports/${path.basename(next.nextActionReportFile)}`,
     confirmed_at: now(),
-    retryable_start: true,
+    retryable_start: false,
   };
   loaded.submission.status = "confirmed";
   loaded.submission.confirmation = confirmation;
@@ -501,8 +520,8 @@ function confirmIntentRecord({ registry, projectId, submissionId }) {
   return { confirmation, loaded };
 }
 
-export function confirmIntent({ registry, projectId, submissionId }) {
-  return confirmIntentRecord({ registry, projectId, submissionId }).confirmation;
+export function confirmIntent({ registry, projectId, submissionId, expectedRevision }) {
+  return confirmIntentRecord({ registry, projectId, submissionId, expectedRevision }).confirmation;
 }
 
 export function confirmAndStartIntent({ registry, projectId, submissionId }) {

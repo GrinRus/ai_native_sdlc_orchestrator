@@ -360,6 +360,13 @@ graph TD
   W68S03[W68-S03 Runtime selection projection and presets]
   W68S04[W68-S04 Live E2E selection and Codex Luna/high rehearsal]
   W68S05[W68-S05 Cutover, certification, and docs closure]
+  W69S01[W69-S01 Intent confirmation CAS and contract parity]
+  W69S02[W69-S02 Runtime-owned Flow projection and adaptive lifecycle]
+  W69S03[W69-S03 Project Home resume-safe navigation]
+  W69S04[W69-S04 Review-first Prepared Task]
+  W69S05[W69-S05 Flow Cockpit context and runtime path presentation]
+  W69S06[W69-S06 Incremental SPA decomposition and semantic visual cleanup]
+  W69S07[W69-S07 Visual proof, story traceability, and closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -881,6 +888,16 @@ graph TD
   W68S02 --> W68S04
   W68S03 --> W68S05
   W68S04 --> W68S05
+  W68S05 --> W69S01
+  W69S01 --> W69S02
+  W69S02 --> W69S03
+  W69S01 --> W69S04
+  W69S03 --> W69S04
+  W69S02 --> W69S05
+  W69S03 --> W69S05
+  W69S04 --> W69S05
+  W69S05 --> W69S06
+  W69S06 --> W69S07
 ```
 
 ## W0 hard dependencies
@@ -1515,6 +1532,13 @@ own the stricter terminal control proof evidence for this lane.
 | W68-S03 | W68-S02 |
 | W68-S04 | W68-S02 |
 | W68-S05 | W68-S03, W68-S04 |
+| W69-S01 | W68-S05 |
+| W69-S02 | W69-S01 |
+| W69-S03 | W69-S02 |
+| W69-S04 | W69-S01, W69-S03 |
+| W69-S05 | W69-S02, W69-S03, W69-S04 |
+| W69-S06 | W69-S05 |
+| W69-S07 | W69-S06 |
 
 ## Topological order
 1. W0-S01
@@ -1878,6 +1902,13 @@ own the stricter terminal control proof evidence for this lane.
 359. W68-S03
 360. W68-S04
 361. W68-S05
+362. W69-S01
+363. W69-S02
+364. W69-S03
+365. W69-S04
+366. W69-S05
+367. W69-S06
+368. W69-S07
 
 W67 dependency edges:
 
@@ -1900,7 +1931,23 @@ graph TD
   W68S02 --> W68S03[W68-S03 Runtime selection projection and presets]
   W68S02 --> W68S04[W68-S04 Live E2E selection and Codex Luna/high rehearsal]
   W68S03 --> W68S05[W68-S05 Cutover, certification, and docs closure]
-  W68S04 --> W68S05
+W68S04 --> W68S05
+```
+
+W69 dependency edges:
+
+```mermaid
+graph TD
+  W68S05[W68-S05 Cutover, certification, and docs closure] --> W69S01[W69-S01 Intent confirmation CAS and contract parity]
+  W69S01 --> W69S02[W69-S02 Runtime-owned Flow projection and adaptive lifecycle]
+  W69S02 --> W69S03[W69-S03 Project Home resume-safe navigation]
+  W69S01 --> W69S04[W69-S04 Review-first Prepared Task]
+  W69S03 --> W69S04
+  W69S02 --> W69S05[W69-S05 Flow Cockpit context and runtime path presentation]
+  W69S03 --> W69S05
+  W69S04 --> W69S05
+  W69S05 --> W69S06[W69-S06 Incremental SPA decomposition and semantic visual cleanup]
+  W69S06 --> W69S07[W69-S07 Visual proof, story traceability, and closure]
 ```
 
 ## Planning rule

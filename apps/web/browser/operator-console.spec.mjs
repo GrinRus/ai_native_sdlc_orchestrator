@@ -187,7 +187,7 @@ test.describe.serial("installed local operator console", () => {
     const actions = [];
     const submission = { submission_id: submissionId, status: "prepared", attachments: [{ original_name: "requirements.md" }] };
     let report = {
-      status: "prepared", title: "Fix timeout handling", outcome: "Make authorization timeout behavior deterministic.",
+      status: "prepared", revision: 1, title: "Fix timeout handling", outcome: "Make authorization timeout behavior deterministic.",
       constraints: ["Do not change authentication semantics."], acceptance: ["Timeout behavior is covered by tests."],
       scope: ["src/auth/**"], work_type: "code-change", delivery_mode: "patch-only", open_questions: [],
       provider: { adapter_id: "claude-code" }, confidence: 0.91,
@@ -207,10 +207,11 @@ test.describe.serial("installed local operator console", () => {
       const payload = route.request().postDataJSON();
       actions.push(payload.action);
       if (payload.action === "revise") {
-        report = payload.normalization;
+        report = { ...payload.normalization, revision: (report.revision ?? 0) + 1 };
         await route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission, report }) });
       } else if (payload.action === "confirm") {
-        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ retryable_start: true, flow_id: "flow.browser-proof" }) });
+        expect(payload.expected_revision).toBe(report.revision);
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ retryable_start: false, flow_id: "flow.browser-proof", normalization_revision: report.revision, discovery: null, next_action: { action_id: "discovery-run" } }) });
       } else {
         await route.fulfill({ contentType: "application/json", body: JSON.stringify({ retryable_start: false, flow_id: "flow.browser-proof" }) });
       }
@@ -222,6 +223,7 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByLabel("Task title")).toHaveValue("Fix timeout handling");
     await expect(page.getByText("patch-only", { exact: true })).toBeVisible();
     await expect(page.getByText("claude-code", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Edit task" }).click();
     await page.getByLabel("Task title").fill("Fix authorization timeout handling");
     await expect(page.getByRole("button", { name: "Confirm and create Flow" })).toBeDisabled();
     await page.getByRole("button", { name: "Save revision" }).click();
@@ -229,6 +231,7 @@ test.describe.serial("installed local operator console", () => {
     await page.getByRole("button", { name: "Confirm and create Flow" }).click();
     await expect.poll(() => actions).toEqual(["revise", "confirm"]);
     expect(actions.filter((action) => action === "confirm")).toHaveLength(1);
+    expect(report.revision).toBe(2);
     expect(fs.existsSync(state.runtime_root)).toBe(false);
   });
 
@@ -259,6 +262,47 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByText("qwen-code", { exact: true })).toBeVisible();
   });
 
+  test("stale confirm shows the durable revision recovery", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    const submissionId = "intent.browser-stale";
+    const submission = { submission_id: submissionId, status: "prepared", attachments: [] };
+    let report = {
+      status: "prepared", revision: 1, title: "Review stale authorization", outcome: "Keep the displayed task contract safe.",
+      constraints: [], acceptance: ["The stale revision is recoverable."], scope: ["src/auth/**"],
+      work_type: "review", delivery_mode: "no-write", assumptions: [], open_questions: [],
+      provider: { adapter_id: "qwen-code" }, confidence: 0.8,
+    };
+    const base = new RegExp(`/api/projects/${state.project_id}/intent-submissions$`, "u");
+    const item = new RegExp(`/api/projects/${state.project_id}/intent-submissions/${submissionId}$`, "u");
+    const actionRoute = new RegExp(`/api/projects/${state.project_id}/intent-submissions/${submissionId}/actions$`, "u");
+    await page.route(base, (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, submissions: [{ submission, normalization: report }], read_only: true }) }));
+    await page.route(item, (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission, normalization: report }) }));
+    await page.route(actionRoute, async (route) => {
+      const payload = route.request().postDataJSON();
+      expect(payload.action).toBe("confirm");
+      expect(payload.expected_revision).toBe(1);
+      report = { ...report, revision: 2, title: "Review refreshed authorization" };
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "intent_submission.stale_revision",
+            detail: "Prepared task revision 1 is stale; refresh before confirming.",
+            recovery_actions: [{ action: "refresh", payload: { current_revision: 2 } }],
+          },
+        }),
+      });
+    });
+    await page.goto(`${state.app_url}?surface=prepared&intent=${submissionId}`);
+    await expect(page.getByLabel("Task title")).toHaveValue("Review stale authorization");
+    await page.getByRole("button", { name: "Confirm and create Flow" }).click();
+    await expect(page.locator("[data-server-revision='2']")).toBeVisible();
+    await expect(page.getByLabel("Task title")).toHaveValue("Review refreshed authorization");
+    await expect(page.getByRole("alert").filter({ hasText: /stale/u })).toBeVisible();
+  });
+
   test("Project Home resumes the saved intent identified in the URL", async ({ page }) => {
     const state = readHarnessState();
     await blockExternalNetwork(page, state.app_url);
@@ -273,7 +317,7 @@ test.describe.serial("installed local operator console", () => {
       if (route.request().method() === "GET") return route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, submissions: [{ submission, normalization }], read_only: true }) });
       return route.continue();
     });
-    await page.goto(`${state.app_url}?surface=home`);
+    await page.goto(state.app_url);
     await expect(page.getByText("Project Home", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Resume" }).click();
     await expect(page).toHaveURL(/surface=prepared/u);

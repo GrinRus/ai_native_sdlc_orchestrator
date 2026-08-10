@@ -41,7 +41,10 @@ characters per list item before contract validation succeeds.
 
 Confirmation compiles the latest prepared revision into the existing
 `intake-request-body`. Acceptance items become deterministic pass/fail KPI and
-Definition of Done entries. The additive `confirm` action is idempotent and
-creates Mission/Flow without starting a provider; the legacy
+Definition of Done entries. The UI sends `expected_revision` as a non-negative
+integer CAS guard. A stale value returns HTTP `409` with code
+`intent_submission.stale_revision`, the current revision in the refresh
+recovery action, and no Mission/Flow mutation. The additive `confirm` action is
+idempotent and creates Mission/Flow without starting a provider; the legacy
 `confirm-and-start` action remains compatible and may invoke the first
 Discovery action afterward.

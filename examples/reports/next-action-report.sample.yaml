@@ -19,6 +19,7 @@ mission_state:
   completeness_status: complete
   missing_fields: []
   mission_id: checkout-risk
+  work_type: code-change
   delivery_mode: patch-only
   allowed_paths:
     - apps/web/**
@@ -77,6 +78,46 @@ artifact_readiness:
       stale_reasons: []
       required_evidence_refs: []
       soft_decision: null
+lifecycle_path:
+  path_id: change
+  owner: runtime
+  steps:
+    - id: discovery
+      label: Discover
+      state: current
+      reason: Mission intake is complete; discovery evidence should be refreshed.
+      evidence_refs:
+        - evidence://projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+    - id: spec
+      label: Define
+      state: upcoming
+      reason: null
+      evidence_refs: []
+    - id: planning
+      label: Plan
+      state: upcoming
+      reason: null
+      evidence_refs: []
+    - id: implement
+      label: Execute
+      state: upcoming
+      reason: null
+      evidence_refs: []
+    - id: review
+      label: Verify
+      state: upcoming
+      reason: null
+      evidence_refs: []
+    - id: delivery
+      label: Deliver
+      state: upcoming
+      reason: null
+      evidence_refs: []
+    - id: learning
+      label: Learn
+      state: upcoming
+      reason: null
+      evidence_refs: []
 closure_state:
   run_id: null
   review:

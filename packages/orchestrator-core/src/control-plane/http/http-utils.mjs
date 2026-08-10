@@ -79,10 +79,11 @@ export function sendJson(response, statusCode, payload) {
  * @param {number} statusCode
  * @param {string} code
  * @param {string} message
+ * @param {Record<string, unknown>} [options]
  */
-export function sendError(response, statusCode, code, message) {
+export function sendError(response, statusCode, code, message, options = {}) {
   sendJson(response, statusCode, {
-    error: createOperatorError({ code, detail: message }),
+    error: createOperatorError({ code, detail: message, ...options }),
   });
 }
 

@@ -35,6 +35,8 @@ const LIFECYCLE_STAGE_ALIASES = Object.freeze({
   release: "delivery",
 });
 
+const STEP_STATES = new Set(["completed", "current", "upcoming", "blocked", "skipped"]);
+
 function normalizedLifecycleStage(selectedStage, path) {
   const normalized = typeof selectedStage === "string" ? selectedStage.trim().toLowerCase() : "";
   if (path.some((step) => step.id === normalized)) return normalized;
@@ -42,19 +44,41 @@ function normalizedLifecycleStage(selectedStage, path) {
   return path.some((step) => step.id === alias) ? alias : path[0]?.id ?? null;
 }
 
-export function buildLifecyclePath(workType, selectedStage, status, evidenceRefs = []) {
+function normalizedRuntimePath(runtimePath, path, fallbackState, fallbackRefs) {
+  const runtimeSteps = Array.isArray(runtimePath?.steps) ? runtimePath.steps : [];
+  if (runtimeSteps.length === 0) return null;
+  const byId = new Map(runtimeSteps.map((step) => [String(step?.id ?? "").trim(), step]));
+  return path.map((step) => {
+    const runtimeStep = byId.get(step.id);
+    if (!runtimeStep) return { ...step, state: "upcoming", reason: null, evidence_refs: [] };
+    const state = STEP_STATES.has(runtimeStep.state) ? runtimeStep.state : fallbackState;
+    return {
+      ...step,
+      ...(typeof runtimeStep.label === "string" && runtimeStep.label.trim() ? { label: runtimeStep.label.trim() } : {}),
+      state,
+      reason: typeof runtimeStep.reason === "string" && runtimeStep.reason.trim() ? runtimeStep.reason.trim() : null,
+      evidence_refs: Array.isArray(runtimeStep.evidence_refs)
+        ? runtimeStep.evidence_refs.filter((ref) => typeof ref === "string" && ref.trim()).slice(0, 5)
+        : fallbackRefs,
+    };
+  });
+}
+
+export function buildLifecyclePath(workType, selectedStage, status, evidenceRefs = [], runtimePath = null, blockers = []) {
   const readOnly = ["analyze", "explain", "review"].includes(workType);
   const path = readOnly ? READ_ONLY_PATH : CHANGE_PATH;
   const currentStage = normalizedLifecycleStage(selectedStage, path);
   const currentIndex = Math.max(0, path.findIndex((step) => step.id === currentStage));
   const refs = Array.isArray(evidenceRefs) ? evidenceRefs.filter((ref) => typeof ref === "string" && ref.trim()) : [];
-  const steps = path.map((step, index) => ({
+  const fallbackState = status === "blocked" || (Array.isArray(blockers) && blockers.length > 0) ? "blocked" : "current";
+  const runtimeSteps = normalizedRuntimePath(runtimePath, path, fallbackState, refs.slice(0, 5));
+  const steps = runtimeSteps ?? path.map((step, index) => ({
     ...step,
     state: status === "completed"
       ? "completed"
       : index < currentIndex
         ? "completed"
-        : index === currentIndex ? "current" : "upcoming",
+        : index === currentIndex ? fallbackState : "upcoming",
     reason: null,
     evidence_refs: index === currentIndex ? refs.slice(0, 5) : [],
   }));
@@ -63,17 +87,19 @@ export function buildLifecyclePath(workType, selectedStage, status, evidenceRefs
 
 const text = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 
-export function buildFlowPresentation({ missionSettings, missionId, selectedStage, status, evidenceRefs, primaryAction, blockers, updatedAt }) {
+export function buildFlowPresentation({ missionSettings, missionId, selectedStage, status, evidenceRefs, primaryAction, blockers, attentionCount, runtimeLifecyclePath, updatedAt }) {
   const settings = missionSettings && typeof missionSettings === "object" ? missionSettings : {};
   const action = primaryAction && typeof primaryAction === "object" ? primaryAction : {};
   const blockerList = Array.isArray(blockers) ? blockers : [];
-  const lifecyclePath = buildLifecyclePath(settings.work_type, selectedStage, status, evidenceRefs);
+  const lifecyclePath = buildLifecyclePath(settings.work_type, selectedStage, status, evidenceRefs, runtimeLifecyclePath, blockerList);
+  const currentStep = lifecyclePath.steps.find((step) => ["current", "blocked"].includes(step.state)) ?? lifecyclePath.steps.find((step) => step.state === "upcoming") ?? lifecyclePath.steps.at(-1);
   return {
     display_title: text(settings.title) ?? missionId,
     work_type: text(settings.work_type),
-    current_step: lifecyclePath.steps.find((step) => step.state === "current")?.id ?? lifecyclePath.steps.at(-1)?.id ?? null,
+    current_step: currentStep?.id ?? null,
+    current_step_label: currentStep?.label ?? null,
     next_action_summary: text(action.reason) ?? text(action.command),
-    attention_count: blockerList.length,
+    attention_count: Number.isInteger(attentionCount) && attentionCount >= 0 ? attentionCount : blockerList.length,
     blocker_count: blockerList.length,
     evidence_count: Array.isArray(evidenceRefs) ? evidenceRefs.length : 0,
     updated_at: updatedAt,

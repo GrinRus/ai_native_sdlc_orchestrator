@@ -52,7 +52,7 @@ function asStringArray(value) {
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
 }
-
+function blockerLabel(value) { if (typeof value === "string" && value.trim().length > 0) return value.trim(); const blocker = asRecord(value); return asString(blocker.summary) ?? asString(blocker.code) ?? asString(blocker.message); } function blockerLabels(value) { return Array.isArray(value) ? value.map(blockerLabel).filter(Boolean) : []; }
 /**
  * @param {unknown[]} values
  * @returns {string[]}
@@ -264,7 +264,7 @@ function reportClosureBelongsToFlow(report, flowSeed) {
 /**
  * @param {Record<string, unknown> | null} report
  * @param {{ missionKey: string }} flowSeed
- * @returns {"active" | "completed"}
+ * @returns {"active" | "blocked" | "completed"}
  */
 function resolveFlowStatus(report, flowSeed) {
   if (!report) return "active";
@@ -276,8 +276,8 @@ function resolveFlowStatus(report, flowSeed) {
   if (learningStatus === "handoff-complete" || asString(primaryAction.action_id) === "closure-complete") {
     return "completed";
   }
-  return "active";
-}
+  const projectState = asRecord(report.project_state); if (report.status === "blocked" || report.blocked === true || projectState.status === "blocked" || projectState.blocked === true) return "blocked";
+  return "active"; }
 
 /**
  * @param {Record<string, unknown>} body
@@ -473,8 +473,8 @@ function buildActiveQualityGateProjection(options) {
     ...asStringArray(qualityRepair.evidence_refs),
   ]);
   const blockers = uniqueStrings([
-    ...asStringArray(qualityRepair.blockers),
-    ...asStringArray(delivery.blocked_reasons),
+    ...blockerLabels(qualityRepair.blockers),
+    ...blockerLabels(delivery.blocked_reasons),
   ]);
 
   return {
@@ -529,7 +529,7 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
         ? asString(projectState.stage) ?? resolveInitialSelectedStage(seed.body)
         : resolveInitialSelectedStage(seed.body);
   const missionSettings = buildMissionSettingsProjection(seed.body), primaryAction = asRecord(report?.primary_action);
-  const blockers = uniqueStrings([...asStringArray(report?.blockers), ...asStringArray(asRecord(report?.project_state).blockers)]), updatedMs = Math.max(seed.updatedMs ?? 0, reportEntry?.updatedMs ?? 0), updatedAt = report?.updated_at ?? report?.created_at ?? (updatedMs > 0 ? new Date(updatedMs).toISOString() : null);
+  const blockers = uniqueStrings([...blockerLabels(report?.blockers), ...blockerLabels(asRecord(report?.project_state).blockers)]), attentionItems = Array.isArray(report?.attention_items) ? report.attention_items : [], attentionCount = Number.isInteger(report?.attention_count) ? report.attention_count : attentionItems.length, updatedMs = Math.max(seed.updatedMs ?? 0, reportEntry?.updatedMs ?? 0), updatedAt = report?.updated_at ?? report?.created_at ?? (updatedMs > 0 ? new Date(updatedMs).toISOString() : null);
   return {
     flow_id: flowId,
     status,
@@ -547,7 +547,7 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
     completed_read_only: status === "completed",
     follow_up_source_handoff_ref: followUpSourceHandoffRef,
     updated_at_ref: reportEntry?.artifactRef ?? seed.packetRef,
-    ...buildFlowPresentation({ missionSettings, missionId: seed.missionKey, selectedStage, status, evidenceRefs, primaryAction, blockers, updatedAt }),
+    ...buildFlowPresentation({ missionSettings, missionId: seed.missionKey, selectedStage, status, evidenceRefs, primaryAction, blockers, attentionCount, runtimeLifecyclePath: asRecord(report?.lifecycle_path), updatedAt }),
   };
 }
 

@@ -781,10 +781,10 @@ function resolveUiStageId(nextAction) {
 
 function statusTone(state) {
   const normalized = String(state ?? "").toLowerCase();
-  if (["connected", "ready", "pass", "complete", "completed", "active", "isolated", "no-write", "detached", "enforced", "read-only"].includes(normalized)) return "safe";
+  if (["connected", "ready", "pass", "complete", "completed", "active", "isolated", "no-write", "no-write safety: on", "detached", "enforced", "read-only"].includes(normalized)) return "safe";
   if (normalized.includes("connected") || normalized.includes("active") || normalized.includes("safe")) return "safe";
   if (normalized.includes("completed") || normalized.includes("enforced")) return "safe";
-  if (["blocked", "fail", "failed", "error", "critical", "interrupted", "recovery-needed", "repair-required"].includes(normalized)) return "danger";
+  if (["blocked", "fail", "failed", "error", "critical", "interrupted", "recovery-needed", "repair-required", "rejected", "not_pass", "cancelled", "canceled"].includes(normalized)) return "danger";
   if (
     normalized.includes("blocked")
     || normalized.includes("failed")
@@ -792,8 +792,10 @@ function statusTone(state) {
     || normalized.includes("critical")
     || normalized.includes("recovery")
     || normalized.includes("repair")
+    || normalized.includes("rejected")
   ) return "danger";
-  if (["loading", "pending", "draft", "idle", "unknown", "0 attention"].includes(normalized)) return "neutral";
+  if (/^[1-9]\d*\s+attention$/u.test(normalized) || ["warning", "attention", "needs-attention", "incomplete", "stale", "requested", "waiting", "in-progress", "running", "awaiting answer", "draft"].includes(normalized)) return "warn";
+  if (["loading", "pending", "idle", "unknown", "0 attention", "no request", "none"].includes(normalized)) return "neutral";
   return "neutral";
 }
 
@@ -2252,6 +2254,8 @@ function externalRunStepContext(health) {
 }
 
 function flowStageId(flow, nextAction, projectState) {
+  const runtimeCurrent = flow?.lifecycle_path?.steps?.find((step) => ["current", "blocked"].includes(step?.state));
+  if (runtimeCurrent?.id) return runtimeCurrent.id;
   if (flow?.selected_stage) {
     const selectedStage = String(flow.selected_stage).trim();
     const lifecycleSteps = Array.isArray(flow.lifecycle_path?.steps) ? flow.lifecycle_path.steps : [];
@@ -3559,8 +3563,12 @@ function FlowCockpit({
       onClick: onResolveNext,
       disabled: busy,
   };
-  const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
-  const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
+  const uiCurrentStage = toUiStageId(currentStage);
+  const actionStage = STAGES.find((candidate) => candidate.id === uiCurrentStage) ?? stage;
+  const flowContextTitle = flowDisplayName(flow);
+  const flowContextStep = flow?.current_step_label ?? flow?.lifecycle_path?.steps?.find((step) => ["current", "blocked"].includes(step.state))?.label ?? actionStage?.label ?? "Starting";
+  const flowContextStatus = completed ? "Completed" : flow?.status === "blocked" || blockers.length > 0 ? "Needs attention" : "Active";
+  const stageRuntimeState = selectedStageRuntimeState(stage, uiCurrentStage, completed);
   const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
   const cockpitVerificationFailureCopy = verificationFailureSummary(verificationPlan, verificationFailures);
   const cockpitStatus = verificationPrimary
@@ -3620,7 +3628,7 @@ function FlowCockpit({
         </div>
         <StatusPill state={providerStepStatus.status} />
       </div>
-      <p>{providerStatusCopy(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</p>
+      <p>{providerStatusCopy(providerStepStatus, uiCurrentStage, verificationPrimary, externalRunHealth)}</p>
       <details className="provider-telemetry-details">
         <summary>Show provider telemetry</summary>
         <div className="provider-heartbeat-grid">
@@ -3636,7 +3644,7 @@ function FlowCockpit({
         </div>
         <div className="provider-heartbeat-action">
           <span title={providerStepStatus.current_command_label ?? ""}>{providerCommandDisplayLabel(providerStepStatus)}</span>
-          <strong>{providerCommandDetail(providerStepStatus, currentStage, verificationPrimary, externalRunHealth)}</strong>
+          <strong>{providerCommandDetail(providerStepStatus, uiCurrentStage, verificationPrimary, externalRunHealth)}</strong>
           {isGenericProviderCommandLabel(providerStepStatus.current_command_label) ? <small>Raw runner label: external-provider-runner</small> : null}
         </div>
       </details>
@@ -3645,6 +3653,10 @@ function FlowCockpit({
 
   return (
     <section className={`work-card flow-cockpit ${completed ? "read-only" : "active"}`}>
+      {flow ? <div className="flow-context-header">
+        <div><span className="flow-context-eyebrow">Flow Cockpit</span><h2>{flowContextTitle}</h2></div>
+        <div className="flow-context-meta"><span>{flow.work_type || "work"}</span><span>{flowContextStep}</span><StatusPill state={flowContextStatus} /></div>
+      </div> : null}
       <div className="work-heading">
         <div>
           <div className="heading-line">
@@ -5498,7 +5510,7 @@ function App() {
     return `/api/projects/${encodeURIComponent(projectId)}`;
   }, [activeProjectId, config]);
 
-  const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES[1];
+  const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES.find((stage) => stage.id === toUiStageId(selectedStage)) ?? STAGES[1];
   const draftSurface = newFlowDraft;
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
   const projectOptions = Array.isArray(projectIndex?.projects) && projectIndex.projects.length > 0
@@ -5526,10 +5538,13 @@ function App() {
     Boolean(projectState?.state_file)
     || activeProjectOnboarding.initialized === true
     || activeProjectOnboarding.state_exists === true;
-  const effectiveSurface = consoleSurface ?? (flowOptions.length > 0 ? "home" : "intent");
+  const hasResumableIntent = intentSubmissions.some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
+  const effectiveSurface = consoleSurface ?? (flowOptions.length > 0 || hasResumableIntent ? "home" : "intent");
   const homeSurface = effectiveSurface === "home";
   const flowSurface = effectiveSurface === "flow" && Boolean(selectedFlow);
   const resumedIntent = intentSubmissions.find((entry) => entry?.submission?.submission_id === readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).intentId) ?? null;
+  const invalidSavedSurface = projectSnapshotLoaded && ((effectiveSurface === "flow" && !selectedFlow) || (effectiveSurface === "prepared" && !resumedIntent));
+  const showHomeSurface = homeSurface || invalidSavedSurface;
 
   const evidenceRows = useMemo(() => {
     const fromSummary = (summary, overrides = {}) => artifactRowFromSummary(summary, overrides);
@@ -5833,7 +5848,13 @@ function App() {
       setNextAction(null);
       setFlowList({ flows: [], selected_flow_id: null });
       const pendingIntents = effectiveProjectId ? await readJson(`/api/projects/${encodeURIComponent(effectiveProjectId)}/intent-submissions`).catch(() => ({ submissions: [] })) : { submissions: [] };
-      setIntentSubmissions(Array.isArray(pendingIntents?.submissions) ? pendingIntents.submissions : []);
+      const pendingSubmissionList = Array.isArray(pendingIntents?.submissions) ? pendingIntents.submissions : [];
+      setIntentSubmissions(pendingSubmissionList);
+      if (!options.silent && !consoleSurface) {
+        const hasResumableSubmission = pendingSubmissionList.some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
+        setConsoleSurface(hasResumableSubmission ? "home" : "intent");
+        writeConsoleSurface(hasResumableSubmission ? "home" : "intent", { projectId: effectiveProjectId });
+      }
       setSelectedFlow(null);
       setSelectedFlowId(null);
       setPackets([]);
@@ -5934,7 +5955,11 @@ function App() {
       setProjectSnapshotLoaded(true);
     }
     if (!options.silent && !consoleSurface) {
-      setConsoleSurface(flows.length > 0 ? "home" : "intent");
+      const hasResumableSubmission = (Array.isArray(intentList?.submissions) ? intentList.submissions : [])
+        .some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
+      const defaultSurface = flows.length > 0 || hasResumableSubmission ? "home" : "intent";
+      setConsoleSurface(defaultSurface);
+      writeConsoleSurface(defaultSurface, { projectId: effectiveProjectId });
     }
     if (selectionStillCurrent && !didChooseStage.current) {
       setSelectedStage(draftMode ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
@@ -5956,6 +5981,12 @@ function App() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
+
+  useEffect(() => {
+    if (!invalidSavedSurface || !activeProjectId) return;
+    setConsoleSurface("home");
+    writeConsoleSurface("home", { projectId: activeProjectId });
+  }, [invalidSavedSurface, activeProjectId]);
 
   useEffect(() => {
     if ((!projectLevelProviderFocus && !blockingExternalRunHealth) || didChooseStage.current) return;
@@ -6677,9 +6708,9 @@ function App() {
         {requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
-        ) : effectiveSurface === "flow" && !selectedFlow ? (
+        ) : effectiveSurface === "flow" && !selectedFlow && !projectSnapshotLoaded ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
-        ) : homeSurface ? (
+        ) : showHomeSurface ? (
           <ProjectHome
             project={activeProjectDisplay}
             flows={flowOptions}
@@ -6734,7 +6765,7 @@ function App() {
             repairCompletion={qualityRepairCompletion}
             quietCockpit onOperatorControl={runOperatorControl} operatorActionResult={operatorActionResult}
           />
-          {selectedStage === "discovery" && selectedFlow ? (
+          {toUiStageId(selectedStage) === "discovery" && selectedFlow ? (
             <PlanWorkbench state={planWorkbenchState} busy={busy} onAction={runPlanAction} />
           ) : null}
           <ExecutionOrchestration runs={runs} deliveryManifests={deliveryManifests} flowId={selectedFlow?.flow_id ?? null} busy={busy} onCommand={(request) => executeOrchestrationCommand({ request, busy, runLifecycle, refresh, setBusy, setError })} />

@@ -86,6 +86,9 @@ changes.
 
 W67 defines the breaking central-AOR-Home and intent-first onboarding cutover;
 W68 defines provider-neutral runtime model and reasoning-effort selection.
+W69 defines intent-first confirmation CAS, runtime-owned adaptive Flow
+projections, resume-safe Project Home navigation, review-first Prepared Task,
+and Flow Cockpit UI parity without changing the historical W66 provider hold.
 Its implementation candidate is present, while formal slice completion remains
 backlog-blocked behind the active W66-S09 qualification closure.
 

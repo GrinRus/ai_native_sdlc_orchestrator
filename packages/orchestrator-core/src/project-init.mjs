@@ -34,8 +34,6 @@ const DEFAULT_REGISTRY_ROOTS = Object.freeze({
  * @returns {string}
  */
 function deriveGeneratedProjectId(projectRoot) {
-  const projectName = path.basename(projectRoot);
-  if (validatePublicId(projectName).ok) return projectName;
   const canonicalRoot = fs.realpathSync.native(projectRoot);
   const digest = crypto.createHash("sha256").update(canonicalRoot).digest("hex").slice(0, 16);
   return `project-${digest}`;

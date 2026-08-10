@@ -592,6 +592,7 @@ test("OpenAPI 3.1 validates the canonical typed operator error envelope", () => 
       project_ref: null,
       flow_ref: null,
       run_ref: null,
+      current_revision: null,
       field_errors: [],
       evidence_refs: [],
       recovery_actions: [{ action: "inspect", payload: { resource: null } }],

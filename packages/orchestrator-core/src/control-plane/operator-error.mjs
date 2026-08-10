@@ -9,7 +9,7 @@ export const RECOVERY_ACTION_CATALOG = Object.freeze([
   "continue_in_terminal",
 ]);
 
-const RETRYABLE_CODES = new Set(["transport_internal_error", "request_timeout", "run_job_conflict"]);
+const RETRYABLE_CODES = new Set(["transport_internal_error", "request_timeout", "run_job_conflict", "intent_submission.stale_revision"]);
 
 function titleFromCode(code) {
   return code.replace(/[._-]+/gu, " ").replace(/^\w/u, (value) => value.toUpperCase());
@@ -35,6 +35,7 @@ export function createOperatorError(options) {
     project_ref: options.project_ref ?? null,
     flow_ref: options.flow_ref ?? null,
     run_ref: options.run_ref ?? null,
+    current_revision: Number.isInteger(options.current_revision) ? options.current_revision : null,
     field_errors: Array.isArray(options.field_errors) ? options.field_errors : [],
     evidence_refs: Array.isArray(options.evidence_refs) ? options.evidence_refs : [],
     recovery_actions: recoveryActions,

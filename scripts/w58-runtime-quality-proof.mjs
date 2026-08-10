@@ -60,6 +60,20 @@ async function waitForJob(file, statuses, timeoutMs = 30000) {
   throw new Error(`Timed out waiting for W58 proof job '${file}'.`);
 }
 
+async function waitForApiRun(url, runId, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await proofFetch("runs parity", url);
+    if (response.status === 200) {
+      const runs = await response.json();
+      const entry = Array.isArray(runs) ? runs.find((run) => run?.run_id === runId) : null;
+      if (entry) return entry;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Timed out waiting for W58 API run '${runId}' to become readable.`);
+}
+
 async function readOneSseEvent(url) {
   const controller = new AbortController();
   const response = await proofFetch("SSE replay", url, { signal: controller.signal });
@@ -142,9 +156,7 @@ const report = await withTempRepo({ prefix: "aor-w58-proof-", workspaceRoot: roo
     }
     const terminalJob = await waitForJob(jobFile, ["succeeded", "failed", "canceled", "waiting-input"]);
 
-    const runsResponse = await proofFetch("runs", `${transport.baseUrl}/api/projects/${transport.projectId}/runs`);
-    const runs = await runsResponse.json();
-    const apiRun = runs.find((entry) => entry.run_id === runId);
+    const apiRun = await waitForApiRun(`${transport.baseUrl}/api/projects/${transport.projectId}/runs`, runId);
     const historyResponse = await proofFetch("event history", `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history`);
     const history = await historyResponse.json();
     const sseEvent = await readOneSseEvent(`${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?max_replay=1`);

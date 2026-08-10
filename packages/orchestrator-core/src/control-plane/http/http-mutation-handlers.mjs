@@ -346,7 +346,12 @@ export async function handleIntentSubmissionAction({ request, response, params, 
     else if (action === "revise") result = reviseIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId, normalization: payload.normalization });
     else if (action === "answer") result = answerIntentQuestions({ registry, projectId: params.projectId, submissionId: params.submissionId, answers: payload.answers });
     else if (action === "cancel") result = cancelIntentSubmission({ registry, projectId: params.projectId, submissionId: params.submissionId });
-    else if (action === "confirm") result = confirmIntent({ registry, projectId: params.projectId, submissionId: params.submissionId });
+    else if (action === "confirm") result = confirmIntent({
+      registry,
+      projectId: params.projectId,
+      submissionId: params.submissionId,
+      expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+    });
     else if (action === "confirm-and-start") result = confirmAndStartIntent({ registry, projectId: params.projectId, submissionId: params.submissionId });
     else if (action === "retry-start") result = retryIntentStart({ registry, projectId: params.projectId, submissionId: params.submissionId });
     else {
@@ -355,7 +360,7 @@ export async function handleIntentSubmissionAction({ request, response, params, 
     }
     sendJson(response, action === "confirm-and-start" ? 202 : 200, result);
   } catch (error) {
-    if (error instanceof IntentServiceError) sendError(response, error.statusCode, error.code, error.message);
+    if (error instanceof IntentServiceError) sendError(response, error.statusCode, error.code, error.message, error.details);
     else throw error;
   }
 }
