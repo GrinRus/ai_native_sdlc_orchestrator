@@ -7,6 +7,18 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.19] - 2026-08-10
+
+- Added intent-first Project Home, resumable Intent navigation, review-first
+  Prepared Task editing, and the Flow Cockpit adaptive lifecycle experience.
+- Added CAS-safe confirmation with stale-revision recovery while keeping
+  confirmation separate from the first Discovery action.
+- Propagated work type, runtime-owned lifecycle steps, Flow summaries, and
+  independent attention/blocker counts through the control-plane contracts and
+  projections.
+- Updated OpenAPI examples, backlog traceability, browser acceptance, and
+  packaged web assets for the W69 release.
+
 ## [0.1.0-alpha.18] - 2026-08-04
 
 - Moved mutable AOR state into the central `~/.aor` home with collision-safe
