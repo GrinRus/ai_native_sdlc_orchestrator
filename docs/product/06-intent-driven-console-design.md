@@ -54,3 +54,10 @@ computes a safe next action or decides to skip a step.
 - Returning users can resume an unfinished Intent after a reload.
 - Project Home summaries expose title, work type, current step, next action,
   attention/blocker counts, evidence count, and a stable updated timestamp.
+
+W69 implementation binding: `W69-S01` owns confirmation CAS and contract parity;
+`W69-S02` owns runtime lifecycle/read-model projection; `W69-S03` and
+`W69-S04` own Home recovery and review-first Prepared Task; `W69-S05` owns
+Cockpit context/path presentation; `W69-S06`/`W69-S07` own incremental web
+cleanup and proof. The historical W66 provider qualification policy remains
+unchanged.

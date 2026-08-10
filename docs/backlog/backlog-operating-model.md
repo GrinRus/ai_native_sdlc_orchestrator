@@ -1,7 +1,8 @@
 # Backlog operating model
 
-The latest defined wave is W68. It is registered behind active W66-S09 and
-does not change the single-active-slice rule.
+The latest defined wave is W69. It is registered behind W68-S05 and the
+active W66-S09 qualification hold; it does not change the single-active-slice
+rule.
 
 ## Purpose
 
@@ -174,7 +175,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W68`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W69`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, project-context anchoring, and concurrent
 evidence integrity. W58 continues with non-materializing reads, effective
@@ -223,6 +224,12 @@ reasoning-effort selection. It keeps runner-native defaults when no explicit
 value is supplied, maps explicit values only at adapter boundaries, and
 introduces an isolated Codex Luna/high live profile without rewriting W66
 qualification evidence.
+
+W69 is the blocked successor lane for intent-first correctness and UI read-model
+parity. It adds confirmation CAS, runtime-owned adaptive lifecycle states,
+resume-safe Project Home navigation, review-first Prepared Task editing,
+human-readable Flow Cockpit context, and incremental web cleanup without
+changing the historical W66 provider matrix policy.
 
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for

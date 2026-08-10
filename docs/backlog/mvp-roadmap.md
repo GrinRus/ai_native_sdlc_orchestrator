@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-68-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-69-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -78,8 +78,10 @@ The authoritative planning model for implementation lives in:
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
 | W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Claude closure. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 | W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
+| W68 | Add provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
+| W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
 
-The current roadmap contains **342 slices across 67 waves**.
+The current roadmap contains **368 slices across 70 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -1463,6 +1465,30 @@ backlog lane; W68 contract and focused implementation work may be prepared in
 parallel without changing the active W66 qualification baseline.
 
 **Detailed slices:** `docs/backlog/wave-68-implementation-slices.md`
+
+## W69 - intent-first correctness and UI read-model parity
+
+**Goal:** Align confirmation, Flow projections, navigation, Prepared Task, and
+Cockpit presentation with the intent-driven console contract while keeping
+runtime ownership headless-first and the W66 qualification hold unchanged.
+
+**Entry condition:** W68-S05 remains the hard dependency for the shared
+backlog lane. W69 work is recorded as a blocked successor and does not alter
+the single-active-slice rule or historical W66 evidence.
+
+**Exit criteria:**
+
+- stale confirmation cannot create a Mission/Flow from an older normalization;
+- Flow projections provide runtime-owned adaptive states, reasons, evidence,
+  human-readable summaries, and independent attention/blocker counts;
+- reload restores Project Home, resumable Intent, or explicit Flow surface;
+- Prepared Task is review-first and confirmation sends the reviewed revision;
+- Cockpit shows Flow context and one server-owned next action across supported
+  responsive/accessibility states;
+- docs, contracts, examples, browser proof, and Codex qualification evidence
+  agree without changing the Anthropic/W66 hold.
+
+**Detailed slices:** `docs/backlog/wave-69-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

@@ -635,6 +635,17 @@ This is the master index for the implementation slices across all defined waves.
 | W68-S04 | Live E2E selection and Codex Luna/high rehearsal | EPIC-0, EPIC-4, EPIC-7 | blocked | private live profiles/materialization, runbook, proof tests | W68-S02 |
 | W68-S05 | Cutover, certification, and docs closure | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification ledger, runbooks, root gates | W68-S03, W68-S04 |
 
+## W69 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W69-S01 | Intent confirmation CAS and contract parity | EPIC-0, EPIC-1, EPIC-2, EPIC-6 | blocked | intent contracts, control-plane API/OpenAPI, intent service, HTTP handlers | W68-S05 |
+| W69-S02 | Runtime-owned Flow projection and adaptive lifecycle | EPIC-0, EPIC-1, EPIC-6 | blocked | flow path/projection, next-action read model, OpenAPI, projection tests | W69-S01 |
+| W69-S03 | Project Home resume-safe navigation | EPIC-1, EPIC-6 | blocked | SPA surface state, Project Home, control-plane client, browser tests | W69-S02 |
+| W69-S04 | Review-first Prepared Task | EPIC-1, EPIC-2, EPIC-6 | blocked | intent onboarding, UI primitives/tokens, browser tests | W69-S01, W69-S03 |
+| W69-S05 | Flow Cockpit context and runtime path presentation | EPIC-1, EPIC-3, EPIC-6, EPIC-7 | blocked | Flow Cockpit, QuietShell, quiet modes, responsive styles, browser tests | W69-S02, W69-S03, W69-S04 |
+| W69-S06 | Incremental SPA decomposition and semantic visual cleanup | EPIC-0, EPIC-6, EPIC-7 | blocked | SPA surface composition, UI tokens/components, CSS, parity tests | W69-S05 |
+| W69-S07 | Visual proof, story traceability, and closure | EPIC-0, EPIC-4, EPIC-7 | blocked | browser/reference tests, product/backlog docs, qualification runbook | W69-S06 |
+
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work
 package. Agents should normally implement one slice at a time and refine only

@@ -19,6 +19,7 @@ mission_state:
   completeness_status: complete
   missing_fields: []
   mission_id: checkout-risk
+  work_type: code-change
   delivery_mode: patch-only
   allowed_paths:
     - apps/web/**

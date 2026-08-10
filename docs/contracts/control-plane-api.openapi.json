@@ -164,7 +164,7 @@
         "x-aor-permission": "mutate",
         "x-aor-kind": "mutation",
         "parameters": [{ "$ref": "#/components/parameters/projectId" }, { "name": "submissionId", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["answer", "revise", "retry", "confirm", "confirm-and-start", "retry-start", "cancel"] }, "normalization": { "type": "object" }, "answers": { "type": "object" } } } } } },
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["answer", "revise", "retry", "confirm", "confirm-and-start", "retry-start", "cancel"] }, "normalization": { "type": "object" }, "answers": { "type": "object" }, "expected_revision": { "type": "integer", "minimum": 0, "description": "UI confirm requests must send the displayed server revision as a CAS guard; stale revisions return 409 without creating a Mission or Flow. The field remains optional for legacy confirm callers." } } } } } },
         "responses": { "200": { "$ref": "#/components/responses/JsonObject" }, "202": { "$ref": "#/components/responses/JsonObject" }, "400": { "$ref": "#/components/responses/JsonError" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "408": { "$ref": "#/components/responses/RequestTimeout" }, "409": { "$ref": "#/components/responses/JsonError" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "415": { "$ref": "#/components/responses/UnsupportedMediaType" } }
       }
     },
@@ -2800,7 +2800,17 @@
           "writeback_policy",
           "mission_settings",
           "closure_state",
-          "completed_read_only"
+          "completed_read_only",
+          "display_title",
+          "work_type",
+          "current_step",
+          "current_step_label",
+          "next_action_summary",
+          "attention_count",
+          "blocker_count",
+          "evidence_count",
+          "updated_at",
+          "lifecycle_path"
         ],
         "properties": {
           "flow_id": {
@@ -2810,6 +2820,7 @@
             "type": "string",
             "enum": [
               "active",
+              "blocked",
               "completed"
             ]
           },
@@ -2858,6 +2869,40 @@
           "completed_read_only": {
             "type": "boolean"
           },
+          "display_title": {
+            "type": "string"
+          },
+          "work_type": {
+            "type": ["string", "null"]
+          },
+          "current_step": {
+            "type": ["string", "null"]
+          },
+          "current_step_label": {
+            "type": ["string", "null"]
+          },
+          "next_action_summary": {
+            "type": ["string", "null"]
+          },
+          "attention_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocker_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidence_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updated_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "lifecycle_path": {
+            "$ref": "#/components/schemas/LifecyclePath"
+          },
           "follow_up_source_handoff_ref": {
             "type": [
               "string",
@@ -2867,6 +2912,28 @@
           "updated_at_ref": {
             "type": "string"
           }
+        },
+        "additionalProperties": true
+      },
+      "LifecyclePath": {
+        "type": "object",
+        "required": ["path_id", "owner", "steps"],
+        "properties": {
+          "path_id": { "type": "string" },
+          "owner": { "type": "string", "const": "runtime" },
+          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/LifecyclePathStep" } }
+        },
+        "additionalProperties": true
+      },
+      "LifecyclePathStep": {
+        "type": "object",
+        "required": ["id", "label", "state", "reason", "evidence_refs"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "state": { "type": "string", "enum": ["completed", "current", "upcoming", "blocked", "skipped"] },
+          "reason": { "type": ["string", "null"] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } }
         },
         "additionalProperties": true
       },
@@ -2884,6 +2951,13 @@
               "string",
               "null"
             ]
+          },
+          "work_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": ["analyze", "explain", "review", "document-change", "code-change", null]
           },
           "goals": {
             "type": "array",
@@ -4354,6 +4428,7 @@
           "project_ref",
           "flow_ref",
           "run_ref",
+          "current_revision",
           "field_errors",
           "evidence_refs",
           "recovery_actions"
@@ -4379,6 +4454,7 @@
           "project_ref": { "type": ["string", "null"] },
           "flow_ref": { "type": ["string", "null"] },
           "run_ref": { "type": ["string", "null"] },
+          "current_revision": { "type": ["integer", "null"], "minimum": 0, "description": "Current server revision for compare-and-swap conflicts when available." },
           "field_errors": { "type": "array", "items": { "type": "object" } },
           "evidence_refs": { "type": "array", "items": { "type": "string" } },
           "recovery_actions": {

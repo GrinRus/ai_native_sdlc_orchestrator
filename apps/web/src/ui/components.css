@@ -6,6 +6,8 @@
 .aor-button[data-variant="primary"] { border-color: var(--aor-color-action-primary); background: var(--aor-color-action-primary); color: var(--aor-color-text-inverse); }
 .aor-button[data-variant="primary"]:hover:not(:disabled) { background: var(--aor-color-action-hover); }
 .aor-button[data-variant="primary"]:active:not(:disabled) { background: var(--aor-color-action-active); }
+.aor-button[data-variant="destructive"] { border-color: var(--aor-color-danger-fg); background: var(--aor-color-danger-bg); color: var(--aor-color-danger-fg); }
+.aor-button[data-variant="destructive"]:hover:not(:disabled) { background: color-mix(in srgb, var(--aor-color-danger-bg) 78%, var(--aor-color-danger-fg)); }
 .aor-button[data-size="compact"] { min-height: var(--aor-control-compact); padding-inline: var(--aor-space-3); }
 .aor-button[data-size="touch"] { min-height: var(--aor-control-touch); }
 .aor-button:disabled, .aor-button[aria-busy="true"] { cursor: not-allowed; opacity: 0.58; }

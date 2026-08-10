@@ -77,6 +77,12 @@ Flow without invoking a provider; Discovery is a separate runtime-owned safe
 action from Cockpit. The Flow projection carries `work_type`, an adaptive
 `lifecycle_path`, human-readable summary fields, and evidence counts for Home.
 
+W69 makes the read-model boundary explicit: lifecycle steps are runtime-owned
+records with state, reason, and evidence refs; the browser only renders them
+and invokes the server-provided primary action. Confirmation uses the latest
+normalization revision as a CAS guard, so a stale Prepared Task cannot compile
+different Mission scope or acceptance than the operator reviewed.
+
 ## Why bootstrap is a first-class stage
 AOR cannot safely run against a repository until it knows:
 - its topology,

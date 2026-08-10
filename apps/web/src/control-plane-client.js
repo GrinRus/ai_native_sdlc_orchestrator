@@ -11,6 +11,7 @@ export class OperatorError extends Error {
     this.phase = payload.phase ?? null;
     this.resource = payload.resource ?? null;
     this.consequence = payload.consequence ?? null;
+    this.currentRevision = Number.isInteger(payload.current_revision) ? payload.current_revision : null;
     this.retryable = payload.retryable === true;
     this.fieldErrors = Array.isArray(payload.field_errors) ? payload.field_errors : [];
     this.evidenceRefs = Array.isArray(payload.evidence_refs) ? payload.evidence_refs : [];

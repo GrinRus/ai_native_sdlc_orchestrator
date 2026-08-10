@@ -36,6 +36,21 @@ test("flow presentation marks prior adaptive steps completed and keeps fallback 
   });
   assert.equal(presentation.display_title, "mission.fallback");
   assert.equal(presentation.current_step, "review");
+  assert.equal(presentation.current_step_label, "Verify");
+
+  const runtimeOwned = buildLifecyclePath("code-change", "review", "active", [], {
+    path_id: "change",
+    owner: "runtime",
+    steps: [
+      { id: "discovery", state: "completed", reason: "Discovery evidence is durable.", evidence_refs: ["evidence://discovery.json"] },
+      { id: "spec", state: "skipped", reason: "No specification boundary is required for this bounded change.", evidence_refs: ["evidence://skip.json"] },
+      { id: "planning", state: "completed", reason: null, evidence_refs: [] },
+      { id: "implement", state: "blocked", reason: "Awaiting operator approval.", evidence_refs: ["evidence://approval.json"] },
+    ],
+  });
+  assert.equal(runtimeOwned.steps.find((step) => step.id === "spec")?.state, "skipped");
+  assert.equal(runtimeOwned.steps.find((step) => step.id === "spec")?.reason, "No specification boundary is required for this bounded change.");
+  assert.equal(runtimeOwned.steps.find((step) => step.id === "implement")?.state, "blocked");
 
   const repairPath = buildLifecyclePath("code-change", "repair", "active", ["evidence://repair.json"]);
   assert.equal(repairPath.steps.find((step) => step.state === "current")?.id, "review");
@@ -53,6 +68,13 @@ test("flow presentation marks prior adaptive steps completed and keeps fallback 
   });
   assert.equal(safeFallback.current_step, "discovery");
   assert.equal(safeFallback.evidence_count, 0);
+
+  const counts = buildFlowPresentation({
+    missionSettings: { title: "Counts", work_type: "review" }, missionId: "mission.counts", selectedStage: "review", status: "active",
+    evidenceRefs: [], primaryAction: null, blockers: [{ summary: "one" }], attentionCount: 3, updatedAt: "2026-08-10T00:00:00.000Z",
+  });
+  assert.equal(counts.attention_count, 3);
+  assert.equal(counts.blocker_count, 1);
 });
 
 /**

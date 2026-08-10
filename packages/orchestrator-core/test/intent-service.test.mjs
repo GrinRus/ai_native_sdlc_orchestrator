@@ -152,6 +152,7 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       assert.deepEqual(prepared.report.provider, needsInput.report.provider);
       const confirmed = confirmIntent({ registry, projectId, submissionId: created.submission.submission_id });
       assert.equal(confirmed.discovery, null);
+      assert.equal(confirmed.normalization_revision, 2);
       assert.match(confirmed.flow_id, /^flow\./u);
       assert.equal(confirmed.next_action.action_id, "discovery-run");
       assert.match(confirmed.next_action_report_ref, /^evidence:\/\/projects\//u);
@@ -164,6 +165,48 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       assert.equal(second.mission.command_output?.mission_id ?? second.mission.command, first.mission.command_output?.mission_id ?? first.mission.command);
       assert.equal(readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission.status, "confirmed");
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
+  });
+});
+
+test("confirm rejects a stale prepared revision before creating a Mission", async () => {
+  await withTempRepo({ prefix: "aor-intent-stale-", workspaceRoot }, (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-stale-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      const created = createIntentSubmission({ registry, projectId, requestText: "Review the timeout boundary.", autoPrepare: false });
+      const first = reviseIntentSubmission({
+        registry,
+        projectId,
+        submissionId: created.submission.submission_id,
+        normalization: {
+          title: "Review timeout boundary",
+          outcome: "Document the timeout behavior.",
+          constraints: [], acceptance: ["The timeout behavior is explicit."], scope: ["src/**"],
+          work_type: "review", assumptions: [], open_questions: [], confidence: 0.8,
+        },
+      });
+      const second = reviseIntentSubmission({
+        registry,
+        projectId,
+        submissionId: created.submission.submission_id,
+        normalization: { ...first.report, title: "Review authorization timeout boundary" },
+      });
+      assert.equal(second.report.revision, 2);
+      assert.throws(
+        () => confirmIntent({ registry, projectId, submissionId: created.submission.submission_id, expectedRevision: 1 }),
+        (error) => error instanceof IntentServiceError
+          && error.code === "intent_submission.stale_revision"
+          && error.statusCode === 409
+          && error.details.current_revision === 2
+          && error.details.recovery_actions?.[0]?.payload?.current_revision === 2,
+      );
+      assert.equal(readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission.confirmation, undefined);
+      const confirmed = confirmIntent({ registry, projectId, submissionId: created.submission.submission_id, expectedRevision: 2 });
+      assert.equal(confirmed.normalization_revision, 2);
+    } finally {
+      fs.rmSync(aorHome, { recursive: true, force: true });
+    }
   });
 });
 

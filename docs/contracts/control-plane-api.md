@@ -36,6 +36,11 @@ W67 adds intent-first onboarding:
 - a successful `confirm` response includes the stable `flow_id`, the Mission
   result, the server-owned `next_action` (normally `discovery-run`), and the
   durable `next_action_report_ref` used to open that read model;
+- the UI `confirm` request must include the displayed `expected_revision`
+  non-negative integer CAS guard. A stale guard returns `409
+  intent_submission.stale_revision` with a refresh recovery action and never
+  creates a Mission/Flow from stale data. The field remains optional for
+  legacy non-UI callers during the additive compatibility window;
 - `answer` requires a non-empty value for every current open question and
   cannot clear blockers with a partial answer map;
 - `GET /api/project-connection-jobs/:jobId` exposes asynchronous clone progress;
@@ -232,8 +237,9 @@ Flow projections are additive read models over existing durable artifacts:
 - `flow_id` is stable for one mission/intake lineage.
 - intake lineage is discovered from validated `artifact-packet` content with
   `packet_type=intake-request`; filenames are not lifecycle authority.
-- `status` is `active` for mutable in-progress flows or `completed` for
-  read-only evidence chains.
+- `status` is `active` for mutable in-progress flows, `blocked` when a durable
+  runtime blocker prevents the safe next action, or `completed` for read-only
+  evidence chains.
 - `selected_stage` is derived from the latest `next-action-report` and closure
   artifacts.
 - `mission_id`, `intake_packet_ref`, and `intake_body_ref` point to existing
@@ -250,6 +256,14 @@ Flow projections are additive read models over existing durable artifacts:
 - `completed_read_only=true` is required for completed flows.
 - `follow_up_source_handoff_ref` may cite a learning handoff from a completed
   source flow when a new follow-up flow is created.
+
+Flow projections also expose the Project Home summary fields `display_title`,
+`work_type`, `current_step`, `current_step_label`, `next_action_summary`,
+`attention_count`, `blocker_count`, `evidence_count`, `updated_at`, and the
+runtime-owned `lifecycle_path`. Each lifecycle step has `id`, `label`, `state`
+(`completed|current|upcoming|blocked|skipped`), `reason`, and `evidence_refs`.
+The browser renders these values and never computes safe actions or skip
+decisions.
 
 Implemented detached read routes:
 - `GET /api/projects/:projectId/flows` returns the bounded flow list with

@@ -13,7 +13,10 @@ import {
 } from "./test-discovery.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const standardTimeoutMs = Number(process.env.AOR_TEST_GROUP_TIMEOUT_MS ?? 8 * 60 * 1000);
+// The CLI group is intentionally process-isolated and now contains the full
+// W6/W13/W67 command matrix; keep the default above its observed cold-run time
+// while retaining AOR_TEST_GROUP_TIMEOUT_MS for slower CI hosts.
+const standardTimeoutMs = Number(process.env.AOR_TEST_GROUP_TIMEOUT_MS ?? 12 * 60 * 1000);
 const privateTimeoutMs = Number(process.env.AOR_LIVE_E2E_TEST_SUITE_TIMEOUT_MS ?? 20 * 60 * 1000);
 const privateContextFile = path.join(os.tmpdir(), `aor-live-e2e-test-context-${process.pid}`);
 const testAorHome = fs.mkdtempSync(path.join(os.tmpdir(), `aor-test-home-${process.pid}-`));

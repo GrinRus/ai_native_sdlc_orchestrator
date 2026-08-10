@@ -1825,23 +1825,62 @@ test("intent submission API preserves immutable input and creates normalization 
       const answered = await answerResponse.json();
       assert.deepEqual(answered.report.open_questions, []);
       assert.deepEqual(answered.report.provider, questions.report.provider);
+      assert.equal(answered.report.work_type, "review");
+
+      const staleRevision = answered.report.revision;
+      const latestRevisionResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "revise",
+        normalization: { ...answered.report, title: "Review authorization timeout handling" },
+      });
+      assert.equal(latestRevisionResponse.status, 200);
+      const latestRevision = await latestRevisionResponse.json();
+      assert.equal(latestRevision.report.revision, staleRevision + 1);
 
       const listResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`);
       assert.equal(listResponse.status, 200);
       assert.equal((await listResponse.json()).read_only, true);
-      const confirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, { action: "confirm" });
+      const staleConfirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "confirm",
+        expected_revision: staleRevision,
+      });
+      assert.equal(staleConfirmResponse.status, 409);
+      const staleConfirm = await staleConfirmResponse.json();
+      assert.equal(staleConfirm.error.code, "intent_submission.stale_revision");
+      assert.equal(staleConfirm.error.current_revision, latestRevision.report.revision);
+      assert.equal(staleConfirm.error.recovery_actions[0].payload.current_revision, latestRevision.report.revision);
+      assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
+
+      const confirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "confirm",
+        expected_revision: latestRevision.report.revision,
+      });
       assert.equal(confirmResponse.status, 200);
       const confirmation = await confirmResponse.json();
       assert.match(confirmation.flow_id, /^flow\./u);
       assert.equal(confirmation.discovery, null);
+      assert.equal(confirmation.normalization_revision, latestRevision.report.revision);
       assert.equal(confirmation.next_action.action_id, "discovery-run");
       assert.match(confirmation.next_action_report_ref, /^evidence:\/\/projects\//u);
+
+      const repeatedConfirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
+        action: "confirm",
+        expected_revision: staleRevision,
+      });
+      assert.equal(repeatedConfirmResponse.status, 200);
+      assert.equal((await repeatedConfirmResponse.json()).flow_id, confirmation.flow_id);
+
+      const nextActionResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`);
+      assert.equal((await nextActionResponse.json()).document.mission_state.work_type, "review");
+      const flowListResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/flows`);
+      const flowList = await flowListResponse.json();
+      assert.equal(flowList.flows[0].work_type, "review");
+      assert.equal(flowList.flows[0].mission_settings.work_type, "review");
 
       const readResponse = await getJson(`${transport.baseUrl}${created.status_ref}`);
       assert.equal(readResponse.status, 200);
       const current = await readResponse.json();
       assert.equal(current.submission.request_text, "Review timeout handling.");
-      assert.equal(current.normalization.title, "Review timeout handling");
+      assert.equal(current.normalization.title, "Review authorization timeout handling");
       assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
     } finally {
       await transport.close();
