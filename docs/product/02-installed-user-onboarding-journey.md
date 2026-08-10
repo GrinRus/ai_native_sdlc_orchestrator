@@ -89,10 +89,10 @@ primary no-settings UI onboarding path:
 - `GET /api/projects` returns explicit local project summaries without scanning the filesystem or initializing `.aor/`;
 - `/api/projects/:projectId/**` remains the control-plane route family used by CLI/API/headless flows;
 - `aor app --smoke true --open false --json` validates the real SPA, config, project index, state routes, first-run wizard marker, project switcher marker, flow selector marker, and `New Flow` marker for release and internal maintainer guardrail evidence;
-- if no project is connected, the intent-first surface asks for a local Git folder or Git URL plus text and/or attachments; it never creates Flow evidence until normalization is confirmed.
+- if no project is connected, the intent-first surface asks for a local Git folder or Git URL plus text and/or attachments; it never creates Flow evidence until normalization is confirmed;
+- returning users land on Project Home, where they can continue an active Flow or start a new Intent; unfinished Intent submissions are resumable after reload.
 
-The optional web console keeps the seven guided stages, but W34 scopes them to
-the selected flow:
+The optional web console keeps the lifecycle only after a Flow is selected:
 - readiness;
 - mission;
 - discovery/spec/plan;
@@ -100,6 +100,11 @@ the selected flow:
 - review/QA;
 - delivery/release;
 - learning.
+
+Project Home and New Intent have no lifecycle rail. Prepared Task is a review
+surface; local edits are dirty until saved, and `Confirm and create Flow`
+creates Mission/Flow without starting Discovery. The first safe action in the
+new Flow Cockpit is `Run discovery`.
 
 Each flow-scoped stage exposes durable evidence refs, blocker codes,
 selected-run policy history counts, event/log counts, and the exact current

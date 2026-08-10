@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Dialog } from "./dialog.jsx";
+import { readControlPlaneJson as readJson } from "./control-plane-client.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { EMPTY_PROJECT_SETUP, parseSetupRows } from "./project-structure-model.js";
+import { useRovingTabs } from "./ui/components.jsx";
 import "./project-structure.css";
 
 const STRUCTURE_TABS = ["Overview", "Repositories", "Components", "Dependencies", "Validation"];
@@ -80,7 +82,10 @@ function EntityTable({ rows, columns, empty }) {
 export function ProjectStructure({ topology, status, error, busy, onRefresh, onAction, onProjectAction, projectId }) {
   const [tab, setTab] = useState("Overview");
   const [repoDraft, setRepoDraft] = useState({ sourceKind: "local", path: "", url: "", label: "" });
+  const [folderPickerError, setFolderPickerError] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const structureTabs = useMemo(() => STRUCTURE_TABS.map((label) => ({ id: label, label })), []);
+  const { getTabProps } = useRovingTabs({ tabs: structureTabs, selected: tab, onSelect: setTab });
   const validation = topology?.latest_validation;
   const bindingsByRepo = useMemo(() => new Map((topology?.bindings ?? []).map((binding) => [binding.repo_id, binding])), [topology]);
   const requestDisable = (family, id) => setPendingAction({
@@ -95,13 +100,21 @@ export function ProjectStructure({ topology, status, error, busy, onRefresh, onA
     if (action) await onAction(action.family, action.action, action.payload);
   };
   const pickAdditionalRepository = async () => {
-    const response = await fetch("/api/workspace/folder-picker/actions", {
-      method: "POST",
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ action: "open" }),
-    });
-    const result = await response.json();
-    if (response.ok && result.path) setRepoDraft((current) => ({ ...current, sourceKind: "local", path: result.path }));
+    setFolderPickerError(null);
+    try {
+      const result = await readJson("/api/workspace/folder-picker/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action: "open" }),
+      });
+      if (result.path) {
+        setRepoDraft((current) => ({ ...current, sourceKind: "local", path: result.path }));
+      } else {
+        setFolderPickerError(result.recovery || "Native folder picker is unavailable; enter an absolute path manually.");
+      }
+    } catch (pickerError) {
+      setFolderPickerError(pickerError instanceof Error ? pickerError.message : String(pickerError));
+    }
   };
   return (
     <section id="project-structure" className="work-card project-structure" aria-labelledby="project-structure-title">
@@ -110,7 +123,7 @@ export function ProjectStructure({ topology, status, error, busy, onRefresh, onA
         <button className="secondary compact" type="button" onClick={onRefresh} disabled={busy}>Refresh structure</button>
       </div>
       <div className="project-structure-tabs" role="tablist" aria-label="Project Structure views">
-        {STRUCTURE_TABS.map((label) => <button key={label} type="button" role="tab" aria-selected={tab === label} className={tab === label ? "selected" : ""} onClick={() => setTab(label)}>{label}</button>)}
+        {structureTabs.map((tabOption, index) => <button {...getTabProps(tabOption, index)} key={tabOption.id} type="button" role="tab" aria-selected={tab === tabOption.id} className={tab === tabOption.id ? "selected" : ""} onClick={() => setTab(tabOption.id)}>{tabOption.label}</button>)}
       </div>
       <div role="tabpanel" aria-label={tab}>
       {error ? <ResourceErrorCard errors={{ topology: error }} /> : null}
@@ -141,6 +154,7 @@ export function ProjectStructure({ topology, status, error, busy, onRefresh, onA
             <label>Repository label<input value={repoDraft.label} onChange={(event) => setRepoDraft({ ...repoDraft, label: event.target.value })} placeholder="Optional name" /></label>
             <button className="secondary" type="button" disabled={busy || !(repoDraft.sourceKind === "git" ? repoDraft.url.trim() : repoDraft.path.trim())} onClick={() => onProjectAction?.("connect-repository", { source: repoDraft.sourceKind === "git" ? { kind: "git", url: repoDraft.url.trim() } : { kind: "local", path: repoDraft.path.trim() }, label: repoDraft.label.trim() || undefined })}>Connect repository</button>
           </div>
+          {folderPickerError ? <p className="field-help" role="alert">{folderPickerError}</p> : null}
           <EntityTable rows={topology?.repositories} empty="No approved repositories." columns={[
             { key: "repo_id", label: "Repository" },
             { key: "workspace_mount", label: "Portable mount" },

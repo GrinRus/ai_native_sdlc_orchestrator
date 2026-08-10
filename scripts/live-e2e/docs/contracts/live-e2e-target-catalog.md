@@ -96,7 +96,9 @@ Catalog target `verification` keeps the existing command shape:
 - `commands` are target quality checks. They remain the full target diagnostic signal unless a mission declares a narrower post-run gate.
 - Persistent setup artifacts needed by later verification should live under the
   profile runtime root, normally `.aor/`, so readiness tooling does not pollute
-  target source-change evidence.
+  target source-change evidence. Playwright binaries are the exception: the
+  runner places them in a content-addressed cache keyed by the target manifest
+  and platform so a new run id does not trigger a full browser download.
 
 Feature missions may add `post_run_quality`:
 - `primary_commands` are the deterministic mission-blocking post-run quality gate for that mission.

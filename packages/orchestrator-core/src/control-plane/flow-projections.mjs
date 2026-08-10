@@ -20,6 +20,7 @@ import {
 import { readRunEvents } from "./live-event-stream.mjs";
 import { loadValidatedIntakePacket } from "../intake-packet-discovery.mjs";
 import { resolveLogicalEvidenceRef } from "../aor-home.mjs";
+import { buildFlowPresentation } from "./flow-path.mjs";
 
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/u;
 const READ_ONLY_INSPECTION_INTENTS = new Set(["analyze", "explain", "review", "validate"]);
@@ -341,10 +342,12 @@ function resolveFollowUpSourceHandoffRef(body) {
 function buildMissionSettingsProjection(body) {
   const featureRequest = asRecord(body.feature_request);
   const productIntake = asRecord(body.product_intake);
+  const missionTraceability = asRecord(body.mission_traceability);
   const writebackPolicy = resolveWritebackPolicy(body, null);
   return {
     title: asString(featureRequest.title),
     brief: asString(featureRequest.brief),
+    work_type: asString(missionTraceability.work_type) ?? asString(missionTraceability.mission_type),
     goals: asStringArray(productIntake.goals),
     constraints: asStringArray(productIntake.constraints),
     kpis: Array.isArray(productIntake.kpis) ? productIntake.kpis.filter((entry) => typeof entry === "object" && entry !== null) : [],
@@ -509,13 +512,9 @@ function buildActiveQualityGateProjection(options) {
  * }} options
  */
 function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) {
-  const report = reportEntry?.document ?? null;
-  const flowId = `flow.${init.projectId}.${normalizeForId(seed.missionKey) || "flow"}`;
-  const projectState = asRecord(report?.project_state);
-  const closureState = asRecord(report?.closure_state);
-  const closureBelongsToFlow = reportClosureBelongsToFlow(report, seed);
-  const status = resolveFlowStatus(report, seed);
-  const followUpSourceHandoffRef = resolveFollowUpSourceHandoffRef(seed.body);
+  const report = reportEntry?.document ?? null, flowId = `flow.${init.projectId}.${normalizeForId(seed.missionKey) || "flow"}`;
+  const projectState = asRecord(report?.project_state), closureState = asRecord(report?.closure_state), closureBelongsToFlow = reportClosureBelongsToFlow(report, seed);
+  const status = resolveFlowStatus(report, seed), followUpSourceHandoffRef = resolveFollowUpSourceHandoffRef(seed.body);
   const evidenceRefs = uniqueStrings([
     seed.packetRef,
     seed.bodyRef,
@@ -529,6 +528,8 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
       : closureBelongsToFlow
         ? asString(projectState.stage) ?? resolveInitialSelectedStage(seed.body)
         : resolveInitialSelectedStage(seed.body);
+  const missionSettings = buildMissionSettingsProjection(seed.body), primaryAction = asRecord(report?.primary_action);
+  const blockers = uniqueStrings([...asStringArray(report?.blockers), ...asStringArray(asRecord(report?.project_state).blockers)]), updatedMs = Math.max(seed.updatedMs ?? 0, reportEntry?.updatedMs ?? 0), updatedAt = report?.updated_at ?? report?.created_at ?? (updatedMs > 0 ? new Date(updatedMs).toISOString() : null);
   return {
     flow_id: flowId,
     status,
@@ -540,12 +541,13 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
     evidence_refs: evidenceRefs,
     artifact_display_summaries: artifactDisplaySummariesForRefs(evidenceRefs, artifactSummaryByRef, selectedStage),
     writeback_policy: resolveWritebackPolicy(seed.body, report),
-    mission_settings: buildMissionSettingsProjection(seed.body),
+    mission_settings: missionSettings,
     closure_state: buildClosureProjection({ report, status, followUpSourceHandoffRef }),
     active_quality_gate: buildActiveQualityGateProjection({ report, artifactSummaryByRef, selectedStage }),
     completed_read_only: status === "completed",
     follow_up_source_handoff_ref: followUpSourceHandoffRef,
     updated_at_ref: reportEntry?.artifactRef ?? seed.packetRef,
+    ...buildFlowPresentation({ missionSettings, missionId: seed.missionKey, selectedStage, status, evidenceRefs, primaryAction, blockers, updatedAt }),
   };
 }
 

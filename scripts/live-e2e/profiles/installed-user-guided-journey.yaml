@@ -36,6 +36,9 @@ target_catalog_id: ky
 feature_mission_id: ky-header-regression
 scenario_family: regress
 provider_variant_id: openai-primary
+runtime_selection:
+  model: gpt-5.6-luna
+  reasoning_effort: high
 bootstrap_template: github-default
 guided_journey:
   enabled: true
@@ -144,7 +147,7 @@ verification:
   lint: true
   tests: project-default
   setup_commands:
-    - npm install --prefer-offline --no-audit --no-fund
+    - npm install --prefer-online --no-audit --no-fund
   eval_suites:
     - suite.regress.short@v1
   harness:

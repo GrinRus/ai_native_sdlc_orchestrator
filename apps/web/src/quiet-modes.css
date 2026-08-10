@@ -45,7 +45,7 @@
   color: var(--aor-color-text-primary);
 }
 .quiet-attention-groups button:hover { background: var(--aor-color-bg-subtle); }
-.quiet-attention-groups button[aria-current="true"] { background: var(--aor-color-bg-selected); box-shadow: inset 3px 0 0 var(--aor-color-action-primary); }
+.quiet-attention-groups button[aria-pressed="true"] { background: var(--aor-color-bg-selected); box-shadow: inset 3px 0 0 var(--aor-color-action-primary); }
 .quiet-attention-groups button > span:last-child { grid-column: 2; color: var(--aor-color-text-secondary); }
 
 .quiet-attention-detail {

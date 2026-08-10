@@ -32,9 +32,9 @@
     "packages/orchestrator-core/src/step-execution-engine.mjs": 2214,
     "scripts/live-e2e/lib/contracts/families.mjs": 1895,
     "scripts/live-e2e/lib/contracts/loader.mjs": 5738,
-    "scripts/live-e2e/run-profile.mjs": 4473,
-    "scripts/live-e2e/lib/flows.mjs": 7715,
-    "scripts/live-e2e/lib/step-controller.mjs": 1875,
+    "scripts/live-e2e/run-profile.mjs": 4498,
+    "scripts/live-e2e/lib/flows.mjs": 7766,
+    "scripts/live-e2e/lib/step-controller.mjs": 1927,
     "scripts/live-e2e/quality-assessment.mjs": 1306,
     "scripts/production-readiness.mjs": 1085
   }

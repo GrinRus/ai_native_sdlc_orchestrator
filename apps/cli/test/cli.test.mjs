@@ -12,7 +12,10 @@ import { appendRunEvent, applyRunControlAction, listQualityArtifacts } from "../
 import { validateContractDocument, validatePublicId } from "../../../packages/contracts/src/index.mjs";
 import { buildCliOutput } from "../src/cli-output.mjs";
 import { invokeCli as invokeCliRuntime } from "../src/index.mjs";
-import { resolveRepairClosureStatusBlocker } from "../../../packages/orchestrator-core/src/operator-cli/command-handlers/quality.mjs";
+import {
+  qualityRepairRequestMatchesProjectRun,
+  resolveRepairClosureStatusBlocker,
+} from "../../../packages/orchestrator-core/src/operator-cli/command-handlers/quality.mjs";
 import { getCommandDefinition } from "../../../packages/orchestrator-core/src/operator-cli/command-catalog.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -67,6 +70,37 @@ test("repair closure reconciles requested external-runner attempts only through 
     runId: "run-1",
     closureRunId: "run-1.repair-2",
   }), /cannot be closed/u);
+});
+
+test("repair closure ownership uses runtime project identity, not workspace storage identity", () => {
+  assert.equal(
+    qualityRepairRequestMatchesProjectRun({
+      projectState: {
+        project_id: "ky-ui-codex-luna-20260805-r9-c97b0f40",
+        runtime_project_id: "github-sandbox.run.ui-codex-luna-20260805-r9",
+      },
+      request: {
+        project_id: "github-sandbox.run.ui-codex-luna-20260805-r9",
+        run_id: "ui-codex-luna-20260805-r9",
+      },
+      runId: "ui-codex-luna-20260805-r9",
+    }),
+    true,
+  );
+  assert.equal(
+    qualityRepairRequestMatchesProjectRun({
+      projectState: {
+        project_id: "ky-ui-codex-luna-20260805-r9-c97b0f40",
+        runtime_project_id: "github-sandbox.run.ui-codex-luna-20260805-r9",
+      },
+      request: {
+        project_id: "ky-ui-codex-luna-20260805-r9-c97b0f40",
+        run_id: "ui-codex-luna-20260805-r9",
+      },
+      runId: "ui-codex-luna-20260805-r9",
+    }),
+    false,
+  );
 });
 
 /**

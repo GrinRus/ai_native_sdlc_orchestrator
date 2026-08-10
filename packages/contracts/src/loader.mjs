@@ -6,7 +6,7 @@ import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } f
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs"; import { validateExternalRunnerSessionBudget, validateExternalRuntimeSessionBudget } from "./session-budget-validation.mjs";
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
 import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs"; import { validateOperatorControl } from "./operator-control-validation.mjs";
-const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
+const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"], WORK_TYPE_VALUES = ["analyze", "explain", "review", "document-change", "code-change"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
 const LEARNING_LOOP_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
@@ -3470,6 +3470,7 @@ function validateIntakeRequestBody(document, source) {
   const productIntake = isPlainObject(document.product_intake) ? document.product_intake : {};
   const completeness = isPlainObject(document.product_intake_completeness) ? document.product_intake_completeness : {};
   const missionScope = isPlainObject(document.mission_scope) ? document.mission_scope : {};
+  const missionTraceability = isPlainObject(document.mission_traceability) ? document.mission_traceability : {};
 
   for (const field of ["goals", "constraints", "kpis", "definition_of_done", "source_refs"]) {
     validateNestedArrayField({
@@ -3512,7 +3513,7 @@ function validateIntakeRequestBody(document, source) {
     issues,
     required: true,
   });
-
+  validateNestedEnumStringField({ record: missionTraceability, source, field: "mission_traceability.work_type", allowedValues: WORK_TYPE_VALUES, issues });
   validateStringArrayItems({
     values: productIntake.goals,
     source,

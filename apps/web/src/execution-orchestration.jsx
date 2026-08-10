@@ -1,5 +1,3 @@
-import React from "react";
-
 import { deliveryTransactionRows, integrationCommand, parentRunRows } from "./execution-orchestration-model.js";
 export { executeOrchestrationCommand } from "./execution-orchestration-model.js";
 import "./execution-orchestration.css";

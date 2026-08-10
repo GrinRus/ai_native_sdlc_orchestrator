@@ -89,5 +89,6 @@ export function readProjectResourceSnapshot({ base, statePreview, previous, requ
     runList: () => readControlPlaneJson(`${base}/runs`, requestOptions),
     deliveryList: () => readControlPlaneJson(`${base}/delivery-manifests`, requestOptions),
     requestList: () => readControlPlaneJson(`${base}/operator-requests`, requestOptions),
+    intentList: () => readControlPlaneJson(`${base}/intent-submissions`, requestOptions),
   }, previous);
 }

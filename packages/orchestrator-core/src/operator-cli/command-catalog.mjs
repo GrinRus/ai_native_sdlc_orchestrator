@@ -160,6 +160,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path> (optional, defaults to cwd)",
       "--project-profile <path> (optional)",
       "--mission-id <id> (optional)",
+      "--work-type <analyze|explain|review|document-change|code-change> (optional)",
       "--title <text> (optional)",
       "--brief <text> (optional)",
       "--goal <text> (optional, repeatable)",

@@ -2241,6 +2241,43 @@ test("live E2E delivery certification does not reuse review cached evidence", ()
   });
 });
 
+test("live E2E reruns a failed repair closure instead of replaying stale failure", () => {
+  withTempRoot((reportsRoot) => {
+    const repairCloseTranscript = path.join(reportsRoot, "16-repair-close-1.json");
+    fs.writeFileSync(repairCloseTranscript, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-close-retry",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+
+    controller.planCommand({ label: "repair-close-1", commandSurface: "aor repair close", iteration: 1 });
+    writeSkillAgentDecision(reportsRoot, "controller-repair-close-retry", 1, "review", {
+      nextStep: "qa",
+      inspectedEvidenceRefs: [repairCloseTranscript],
+    });
+    controller.observeStage({
+      stage: "review",
+      iteration: 1,
+      stageResult: { stage: "review", status: "pass", evidence_refs: [repairCloseTranscript], summary: "stale closure transcript observed" },
+      commandResults: [
+        {
+          label: "repair-close-1",
+          command_surface: "aor repair close",
+          status: "pass",
+          transcript_file: repairCloseTranscript,
+          artifact_refs: [repairCloseTranscript],
+          exit_code: 1,
+        },
+      ],
+      artifacts: {},
+    });
+
+    assert.equal(controller.shouldUseCachedCommand("repair-close-1", 1), false);
+  });
+});
+
 test("live E2E command selection prefers latest repeated label", () => {
   const firstRunStart = { label: "run-start", transcript_file: "11-run-start.json" };
   const secondRunStart = { label: "run-start", transcript_file: "15-run-start.json" };

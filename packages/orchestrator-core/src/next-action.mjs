@@ -1568,7 +1568,7 @@ function createArtifactReadinessBlocker(options) {
 
 /**
  * @param {Record<string, unknown> | null} body
- * @returns {{ deliveryMode: string, allowedPaths: string[], forbiddenPaths: string[], missingFields: string[], missionId: string | null, completenessStatus: string }}
+ * @returns {{ deliveryMode: string, allowedPaths: string[], forbiddenPaths: string[], missingFields: string[], missionId: string | null, workType: string | null, completenessStatus: string }}
  */
 function resolveMissionState(body) {
   const missionTraceability = asRecord(body?.mission_traceability);
@@ -1596,6 +1596,7 @@ function resolveMissionState(body) {
         : asStringArray(requestDocument.forbidden_paths),
     missingFields: asStringArray(completeness.missing_fields),
     missionId: asString(missionTraceability.mission_id),
+    workType: asString(missionTraceability.work_type),
     completenessStatus: asString(completeness.status) ?? "incomplete",
   };
 }
@@ -1640,6 +1641,7 @@ function executeNextActionProjection(options = {}) {
     missing_fields: ["intake-request"],
     mission_id: null,
     delivery_mode: "no-write",
+    work_type: null,
     allowed_paths: [],
     forbidden_paths: [],
   };
@@ -1733,6 +1735,7 @@ function executeNextActionProjection(options = {}) {
           missing_fields: resolvedMissionState.missingFields,
           mission_id: resolvedMissionState.missionId,
           delivery_mode: resolvedMissionState.deliveryMode,
+          work_type: resolvedMissionState.workType,
           allowed_paths: resolvedMissionState.allowedPaths,
           forbidden_paths: resolvedMissionState.forbiddenPaths,
         };

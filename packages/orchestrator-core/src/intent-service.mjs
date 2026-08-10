@@ -7,6 +7,7 @@ import { derivePublicId, validateContractDocument } from "../../contracts/src/in
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { runLifecycleCommand } from "./control-plane/lifecycle-command.mjs";
+import { resolveNextAction } from "./next-action.mjs";
 import { inspectGitIdentity } from "./aor-home.mjs";
 
 const EXTENSIONS = new Map([
@@ -20,6 +21,21 @@ const MAX_NORMALIZATION_BYTES = 128 * 1024;
 const MAX_NORMALIZATION_ITEMS = 50;
 const MAX_NORMALIZATION_ITEM_CHARS = 4_000;
 const WORK_TYPES = new Set(["analyze", "explain", "review", "document-change", "code-change"]);
+const DEFAULT_INTENT_CONSTRAINT = "Respect the approved scope and AOR safety policy; no upstream writes before explicit delivery approval.";
+const READ_ONLY_PATH = Object.freeze([
+  { id: "discovery", label: "Discover" },
+  { id: "review", label: "Verify" },
+  { id: "learning", label: "Learn" },
+]);
+const CHANGE_PATH = Object.freeze([
+  { id: "discovery", label: "Discover" },
+  { id: "spec", label: "Define" },
+  { id: "planning", label: "Plan" },
+  { id: "implement", label: "Execute" },
+  { id: "review", label: "Verify" },
+  { id: "delivery", label: "Deliver" },
+  { id: "learning", label: "Learn" },
+]);
 
 export class IntentServiceError extends Error {
   constructor(code, message, statusCode = 400) {
@@ -113,6 +129,7 @@ function awaitableSpawn(command, args) {
 function validateNormalization(value, base) {
   const input = asRecord(value);
   const workType = String(input.work_type ?? "");
+  const constraints = asStrings(input.constraints);
   const deliveryMode = ["analyze", "explain", "review"].includes(workType) ? "no-write" : "patch-only";
   const report = {
     report_id: `${base.submission_id}.normalization.v${base.revision}`,
@@ -123,11 +140,16 @@ function validateNormalization(value, base) {
     status: asStrings(input.open_questions).length ? "needs-input" : "prepared",
     title: String(input.title ?? "").trim(),
     outcome: String(input.outcome ?? "").trim(),
-    constraints: asStrings(input.constraints),
+    constraints: constraints.length > 0 ? constraints : [DEFAULT_INTENT_CONSTRAINT],
     acceptance: asStrings(input.acceptance),
     scope: asStrings(input.scope),
     work_type: workType,
     delivery_mode: deliveryMode,
+    planned_path: {
+      path_id: ["analyze", "explain", "review"].includes(workType) ? "read-only" : "change",
+      steps: (["analyze", "explain", "review"].includes(workType) ? READ_ONLY_PATH : CHANGE_PATH).map((step) => ({ ...step })),
+      reason: "Derived from work_type; runtime evidence may mark a step skipped with a durable reason.",
+    },
     assumptions: asStrings(input.assumptions),
     open_questions: asStrings(input.open_questions),
     confidence: Number(input.confidence),
@@ -304,6 +326,35 @@ export function readIntentSubmission({ registry, projectId, submissionId }) {
   };
 }
 
+export function listIntentSubmissions({ registry, projectId }) {
+  const { context, init } = resolveProject(registry, projectId, { initialize: false });
+  const root = init.runtimeLayout.inputsRoot;
+  if (!fs.existsSync(root)) {
+    return { project_id: context.projectId, submissions: [], read_only: true };
+  }
+  const submissions = fs.readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const file = path.join(root, entry.name, "submission.json");
+      if (!fs.existsSync(file)) return null;
+      try {
+        const submission = JSON.parse(fs.readFileSync(file, "utf8"));
+        const latestRef = submission.normalization_refs?.at(-1);
+        const reportName = latestRef?.split("/").at(-1);
+        const reportFile = reportName ? path.join(init.runtimeLayout.reportsRoot, reportName) : null;
+        const normalization = reportFile && fs.existsSync(reportFile)
+          ? JSON.parse(fs.readFileSync(reportFile, "utf8"))
+          : null;
+        return { submission, normalization };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((left, right) => String(right.submission.updated_at ?? "").localeCompare(String(left.submission.updated_at ?? "")));
+  return { project_id: context.projectId, submissions, read_only: true };
+}
+
 export function findIntentSubmissionProject({ registry, submissionId }) {
   for (const context of registry.listContexts()) {
     const preview = previewProjectRuntime(context.runtimeOptions);
@@ -384,9 +435,25 @@ export function retryIntentStart({ registry, projectId, submissionId }) {
   return startConfirmedIntent({ registry, projectId, loaded });
 }
 
-export function confirmAndStartIntent({ registry, projectId, submissionId }) {
+function confirmIntentRecord({ registry, projectId, submissionId }) {
   const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
-  if (loaded.submission.confirmation) return loaded.submission.confirmation;
+  if (loaded.submission.confirmation) {
+    if (loaded.submission.confirmation.next_action) return { confirmation: loaded.submission.confirmation, loaded };
+    const next = resolveNextAction({
+      cwd: loaded.context.projectRoot,
+      projectRef: loaded.context.projectRoot,
+      runtimeRoot: loaded.context.runtimeRoot,
+    });
+    const confirmation = {
+      ...loaded.submission.confirmation,
+      next_action: next.nextActionReport.primary_action,
+      next_action_report_ref: `evidence://projects/${loaded.init.workspaceProjectId}/reports/${path.basename(next.nextActionReportFile)}`,
+    };
+    loaded.submission.confirmation = confirmation;
+    loaded.submission.updated_at = now();
+    atomicJson(loaded.file, loaded.submission);
+    return { confirmation, loaded };
+  }
   const current = readIntentSubmission({ registry, projectId, submissionId });
   const report = current.normalization;
   if (!report || report.status !== "prepared") throw new IntentServiceError("intent_submission.not_prepared", "Prepare and resolve the task preview before confirmation.", 409);
@@ -405,16 +472,44 @@ export function confirmAndStartIntent({ registry, projectId, submissionId }) {
       kpi: report.acceptance.map((item, index) => `acceptance-${index + 1}:${item}:pass:status`),
       dod: report.acceptance,
       "delivery-mode": report.delivery_mode,
+      "work-type": report.work_type,
       ...(report.scope.length > 0 ? { "allowed-path": report.scope } : {}),
       "source-kind": "local-note",
       "source-ref": `intent-submission://${submissionId}`,
     },
   });
   if (!mission.ok) throw new IntentServiceError("intent_confirmation.failed", mission.error?.detail ?? "Mission creation failed.", mission.statusCode ?? 409);
-  const confirmation = { mission, discovery: null, confirmed_at: now(), retryable_start: true };
+  const flowId = `flow.${loaded.init.projectId}.${String(missionId).replace(/[^a-zA-Z0-9._-]/gu, "-")}`;
+  const next = resolveNextAction({
+    cwd: loaded.context.projectRoot,
+    projectRef: loaded.context.projectRoot,
+    runtimeRoot: loaded.context.runtimeRoot,
+  });
+  const confirmation = {
+    mission,
+    flow_id: flowId,
+    discovery: null,
+    next_action: next.nextActionReport.primary_action,
+    next_action_report_ref: `evidence://projects/${loaded.init.workspaceProjectId}/reports/${path.basename(next.nextActionReportFile)}`,
+    confirmed_at: now(),
+    retryable_start: true,
+  };
   loaded.submission.status = "confirmed";
   loaded.submission.confirmation = confirmation;
   loaded.submission.updated_at = now();
   atomicJson(loaded.file, loaded.submission);
-  return startConfirmedIntent({ registry, projectId, loaded });
+  return { confirmation, loaded };
+}
+
+export function confirmIntent({ registry, projectId, submissionId }) {
+  return confirmIntentRecord({ registry, projectId, submissionId }).confirmation;
+}
+
+export function confirmAndStartIntent({ registry, projectId, submissionId }) {
+  const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+  if (loaded.submission.confirmation?.discovery) return loaded.submission.confirmation;
+  const record = loaded.submission.confirmation
+    ? { confirmation: loaded.submission.confirmation, loaded }
+    : confirmIntentRecord({ registry, projectId, submissionId });
+  return startConfirmedIntent({ registry, projectId, loaded: record.loaded });
 }

@@ -633,10 +633,13 @@ for real runtime work, but target verification commands stay bounded. The guided
 proof exists to produce AOR operator UI/UX and accessibility evidence; target
 full-suite diagnostic commands are supporting facts and must not leave the
 manual runner waiting on an unbounded repository test process. Ky guided proof
-profiles therefore override catalog setup with only
-`npm install --prefer-offline --no-audit --no-fund`; Playwright browser
-installation remains diagnostic evidence from the mission policy instead of a
-pre-execution readiness blocker.
+profiles therefore use
+`npm install --prefer-online --no-audit --no-fund`; the runner assigns the
+target commit and dependency manifests a stable SHA-256 snapshot hash and
+isolates npm's cache under that hash. This prevents stale host metadata from
+crossing runs while allowing a resumed run to reuse the same dependency
+namespace. Playwright browser installation remains diagnostic evidence from
+the mission policy instead of a pre-execution readiness blocker.
 When a warning-mode diagnostic times out or hangs after writing terminal output,
 the transcript remains evidence and run-health records
 `diagnostic_intent=post-run-diagnostic`,
@@ -795,8 +798,12 @@ remains blocked as UI validation evidence rather than being accepted from web
 smoke alone.
 The collector must not inherit target verification `PLAYWRIGHT_BROWSERS_PATH`
 by default, because browser-task proof checks AOR operator UI rather than the
-target repository. Use `AOR_LIVE_E2E_BROWSER_PROOF_BROWSERS_PATH` when the proof
-runner needs an explicit browser cache; set
+target repository. Target verification uses a content-addressed cache keyed by
+the target manifest, repository id, platform, and architecture, so repeated
+runs do not start with a fresh run-id-specific browser directory. Override its
+base with `AOR_LIVE_E2E_BROWSER_CACHE_ROOT` when an operator needs an explicit
+cache location. Use `AOR_LIVE_E2E_BROWSER_PROOF_BROWSERS_PATH` when the proof
+runner needs a separate explicit browser cache; set
 `AOR_LIVE_E2E_BROWSER_PROOF_USE_TARGET_CACHE=true` only for an intentionally
 prepared shared cache.
 

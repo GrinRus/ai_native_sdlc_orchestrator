@@ -36,7 +36,7 @@ test("operator scenario catalog loads through the disposable installed SPA", asy
   expect(externalRequests).toEqual([]);
 });
 
-test("installed Quiet Cockpit passes the blocking shell acceptance matrix", async ({ page }) => {
+test("Project Home keeps the pre-Flow surface free of lifecycle chrome", async ({ page }) => {
   const state = readHarnessState();
   const manifest = loadOperatorAcceptanceFixtures();
   expect(state.installed_bin).toContain("node_modules/@grinrus/aor/apps/cli/bin/aor.mjs");
@@ -49,7 +49,8 @@ test("installed Quiet Cockpit passes the blocking shell acceptance matrix", asyn
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto(state.app_url);
     await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
-    await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Project Home|What should AOR do\?/u })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).toBeVisible();
@@ -73,7 +74,7 @@ test("retired legacy link preserves context and normalizes to the single rendere
   await expect(page).toHaveURL(/console=quiet-cockpit/u);
   await expect(page).toHaveURL(/mode=attention/u);
   const projectId = await page.locator("#project-switcher-control").inputValue();
-  await expect(page.getByRole("tab", { name: "Attention" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "Quiet Cockpit navigation" })).toHaveCount(0);
   await page.reload();
   await expect(page.locator("#project-switcher-control")).toHaveValue(projectId);
   await expect(page.locator('[data-console-experience="quiet-cockpit"]')).toBeVisible();
@@ -123,7 +124,7 @@ test("installed Quiet Cockpit executes the canonical no-write lifecycle with dur
     return json(route, { lifecycle_command: { command: transition.command, blocked: false, artifact_refs: [ref], evidence_refs: [] } });
   });
 
-  await page.goto(state.app_url);
+  await page.goto(`${state.app_url}?surface=flow&flow=${encodeURIComponent(flow.flow_id)}`);
   for (const [index, transition] of journey.transitions.entries()) {
     const action = page.getByRole("button", { name: transition.label, exact: true });
     await expect(action).toBeVisible();

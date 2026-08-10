@@ -125,6 +125,15 @@
       }
     },
     "/api/projects/{projectId}/intent-submissions": {
+      "get": {
+        "operationId": "listIntentSubmissions",
+        "tags": ["read"],
+        "x-aor-route-id": "intent-submission-list",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": { "200": { "$ref": "#/components/responses/JsonObject" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" } }
+      },
       "post": {
         "operationId": "createIntentSubmission",
         "tags": ["mutation"],
@@ -155,7 +164,7 @@
         "x-aor-permission": "mutate",
         "x-aor-kind": "mutation",
         "parameters": [{ "$ref": "#/components/parameters/projectId" }, { "name": "submissionId", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["answer", "revise", "retry", "confirm-and-start", "retry-start", "cancel"] }, "normalization": { "type": "object" }, "answers": { "type": "object" } } } } } },
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["action"], "properties": { "action": { "type": "string", "enum": ["answer", "revise", "retry", "confirm", "confirm-and-start", "retry-start", "cancel"] }, "normalization": { "type": "object" }, "answers": { "type": "object" } } } } } },
         "responses": { "200": { "$ref": "#/components/responses/JsonObject" }, "202": { "$ref": "#/components/responses/JsonObject" }, "400": { "$ref": "#/components/responses/JsonError" }, "401": { "$ref": "#/components/responses/AuthError" }, "403": { "$ref": "#/components/responses/AuthError" }, "408": { "$ref": "#/components/responses/RequestTimeout" }, "409": { "$ref": "#/components/responses/JsonError" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "415": { "$ref": "#/components/responses/UnsupportedMediaType" } }
       }
     },

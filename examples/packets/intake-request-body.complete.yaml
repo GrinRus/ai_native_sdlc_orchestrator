@@ -10,6 +10,7 @@ mission_traceability:
   scenario_family: null
   provider_variant_id: null
   feature_size: small
+  work_type: code-change
   matrix_cell: null
   coverage_follow_up: null
 product_intake:

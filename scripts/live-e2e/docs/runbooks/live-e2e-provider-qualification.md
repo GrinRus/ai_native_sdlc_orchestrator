@@ -1,18 +1,18 @@
 # Live E2E provider qualification matrix
 
-## W66 release qualification
+## Current Codex qualification
 
-W66 release qualification uses the versioned
+The current qualification loop uses the versioned
 `live-e2e-qualification-cell-report.v1` on top of the provider-path matrix.
-The release set is exactly:
+The required set is exactly:
 
 - `openai-primary.medium`
 - `openai-primary.large`
-- `anthropic-primary.medium`
-- `anthropic-primary.large`
 
-All four cells must pass on one commit. OpenCode and Qwen remain useful
-diagnostic/extended provider paths, but do not participate in W66 closure.
+Both cells must pass on one commit. Anthropic, OpenCode, and Qwen remain
+available as extended provider paths, but do not block the current Codex
+qualification result. The historical W66 freeze contract remains separate and
+still documents its original four-cell release hold.
 Each cell keeps public lifecycle, run health, diagnostic verification, final
 assessment, changed paths, checkout integrity, and delivery safety as separate
 dimensions. A missing or non-all-pass final assessment always blocks the cell.
@@ -37,9 +37,9 @@ node ./scripts/live-e2e/qualification-loop.mjs \
   --qualification-set-file /tmp/aor-w66-qualification-set.json
 ```
 
-The resulting set uses schema version 2 and embeds the four versioned cell
-reports plus the single-commit closure verdict. Any code change after the first
-cell invalidates that set for release clearance.
+The resulting set uses the Codex qualification schema and embeds the two
+versioned cell reports plus the single-commit verdict. Any code change after
+the first cell invalidates that set for the current qualification result.
 
 ## Purpose
 
@@ -154,7 +154,7 @@ node ./scripts/live-e2e/qualification-loop.mjs \
 ```
 
 The generated qualification set includes `provider_qualification_matrix` and
-the W66 `required_qualification_matrix`.
+the current Codex-only `required_qualification_matrix`.
 Short/small diagnostic runs may be cited as blocker or candidate evidence, but
 they do not replace medium-or-larger qualification-loop evidence.
 

@@ -16,6 +16,24 @@ scope:
   - test/auth/**
 work_type: code-change
 delivery_mode: patch-only
+planned_path:
+  path_id: change
+  steps:
+    - id: discovery
+      label: Discover
+    - id: spec
+      label: Define
+    - id: planning
+      label: Plan
+    - id: implement
+      label: Execute
+    - id: review
+      label: Verify
+    - id: delivery
+      label: Deliver
+    - id: learning
+      label: Learn
+  reason: Derived from work_type.
 assumptions: []
 open_questions: []
 confidence: 0.91

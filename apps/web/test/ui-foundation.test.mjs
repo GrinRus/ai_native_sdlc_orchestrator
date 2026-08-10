@@ -30,6 +30,8 @@ test("component contracts include keyboard, state, and responsive behavior", () 
   assert.deepEqual(COMPONENT_CONTRACTS.dialog.keyboard, ["Tab", "Shift+Tab", "Escape"]);
   assert.equal(COMPONENT_CONTRACTS.dataList.responsive, true);
   for (const marker of ["Button", "IconButton", "Field", "Drawer", "StatusBadge", "CountBadge", "Alert", "Card", "Section", "EmptyState", "Disclosure", "Tabs", "ProgressPath", "ResponsiveActions"]) assert.match(components, new RegExp(`function ${marker}`, "u"));
+  assert.match(components, /useRovingTabs/u);
+  for (const key of ["ArrowLeft", "ArrowRight", "Home", "End"]) assert.match(components, new RegExp(`event\\.key === "${key}"`, "u"));
   assert.match(styles, /min-height: var\(--aor-control-touch\)/u);
   assert.match(styles, /focus-visible/u);
 });

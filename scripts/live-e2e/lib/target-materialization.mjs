@@ -7,6 +7,7 @@ import process from "node:process";
 
 import { stringify as stringifyYaml } from "yaml";
 import { loadContractFile, validateContractDocument } from "./contracts/index.mjs";
+import { stabilizeDependencySetupCommands } from "./dependency-snapshot.mjs";
 
 import {
   asNonEmptyString,
@@ -560,7 +561,9 @@ function resolveGeneratedProfileVerification(options) {
   return {
     ...options.catalogVerification,
     ...options.profileVerification,
-    setup_commands: profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+    setup_commands: stabilizeDependencySetupCommands(
+      profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+    ),
     commands:
       profileVerificationCommands.length > 0
         ? profileVerificationCommands

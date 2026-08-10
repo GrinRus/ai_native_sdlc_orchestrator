@@ -169,28 +169,27 @@ function worstObservationStatus(left, right) {
 }
 
 /**
- * Public implementation repair loops preserve every execution/review iteration
- * in the step journal. Final quality is judged from the latest observed loop
- * iteration so a repaired earlier review finding does not poison the final run.
+ * Public retries preserve every step observation in the journal. Final quality
+ * is judged from the latest observed iteration for each step so a repaired
+ * delivery/learning retry (or an earlier review finding) does not poison the
+ * final run.
  *
  * @param {Array<Record<string, unknown>>} stepJournal
  * @returns {Array<Record<string, unknown>>}
  */
 function getQualityRelevantStepJournal(stepJournal) {
-  const loopSteps = new Set(["execution", "review"]);
   const latestIterationByStep = new Map();
   for (const rawEntry of stepJournal) {
     const entry = asRecord(rawEntry);
     const step = asNonEmptyString(entry.step_id);
-    if (!loopSteps.has(step)) continue;
+    if (!step) continue;
     const iteration = Number(entry.iteration) || 1;
     latestIterationByStep.set(step, Math.max(latestIterationByStep.get(step) ?? 0, iteration));
   }
   return stepJournal.filter((rawEntry) => {
     const entry = asRecord(rawEntry);
     const step = asNonEmptyString(entry.step_id);
-    if (!loopSteps.has(step)) return true;
-    return (Number(entry.iteration) || 1) === (latestIterationByStep.get(step) ?? 1);
+    return !step || (Number(entry.iteration) || 1) === (latestIterationByStep.get(step) ?? 1);
   });
 }
 
@@ -641,11 +640,42 @@ function loadExistingTerminalProofRunnerArtifacts(options) {
 }
 
 /**
+ * Reconcile terminal artifacts written by an older runner revision before
+ * returning the cached terminal result. A completed retry can leave an older
+ * blocked step marker in a persisted summary even though the observation
+ * journal now has a passing latest iteration. Terminal reuse must not keep
+ * serving that stale lifecycle projection.
+ *
+ * @param {{ existing: Record<string, unknown> }} options
+ * @returns {{ summary: Record<string, unknown>, runHealthReport: Record<string, unknown> }}
+ */
+function reconcileExistingTerminalLifecycle(options) {
+  const summary = { ...asRecord(options.existing.summary) };
+  const runHealthReport = { ...asRecord(options.existing.runHealthReport) };
+  const lifecycleCompletion = buildLifecycleCompletenessSummary(asRecord(options.existing.observationReport));
+  summary.continuation_status = lifecycleCompletion.continuation_status;
+  summary.blocked_step_id = lifecycleCompletion.blocked_step_id;
+  summary.blocked_step_instance_id = lifecycleCompletion.blocked_step_instance_id;
+  summary.lifecycle_completeness = lifecycleCompletion;
+  summary.run_health = {
+    ...asRecord(summary.run_health),
+    lifecycle_completion: lifecycleCompletion,
+  };
+  runHealthReport.lifecycle_completion = lifecycleCompletion;
+  const summaryFile = asNonEmptyString(options.existing.summaryFile);
+  const runHealthReportFile = asNonEmptyString(options.existing.runHealthReportFile);
+  if (summaryFile) writeJson(summaryFile, summary);
+  if (runHealthReportFile) writeJson(runHealthReportFile, runHealthReport);
+  return { summary, runHealthReport };
+}
+
+/**
  * @param {{ runId: string, existing: Record<string, unknown> }} options
  */
 function writeExistingProofRunnerOutput(options) {
-  const summary = asRecord(options.existing.summary);
-  const runHealthReport = asRecord(options.existing.runHealthReport);
+  const reconciled = reconcileExistingTerminalLifecycle({ existing: options.existing });
+  const summary = reconciled.summary;
+  const runHealthReport = reconciled.runHealthReport;
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -1939,6 +1969,9 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
 
   for (const key of [
     "target_checkout_root",
+    "target_dependency_snapshot_hash",
+    "target_dependency_snapshot_file",
+    "target_dependency_cache_root",
     "target_pre_execution_status_file",
     "target_pre_execution_status",
     "target_toolchain_preflight_file",
@@ -2483,9 +2516,11 @@ function buildObservationReport(options) {
  */
 function buildLifecycleCompletenessSummary(observationReport) {
   const includedSteps = asStringArray(asRecord(observationReport.flow_range).included_steps);
-  const stepJournal = Array.isArray(observationReport.step_journal)
-    ? observationReport.step_journal.map((entry) => asRecord(entry))
-    : [];
+  const stepJournal = getQualityRelevantStepJournal(
+    Array.isArray(observationReport.step_journal)
+      ? observationReport.step_journal.map((entry) => asRecord(entry))
+      : [],
+  );
   const acceptedStepIds = new Set(
     stepJournal
       .filter((entry) => asNonEmptyString(entry.operator_decision_status) === "accepted")
@@ -3747,6 +3782,18 @@ function writeProofRunnerArtifactsImplementation(options) {
     target_checkout_root:
       typeof options.flowResult.artifacts.target_checkout_root === "string"
         ? options.flowResult.artifacts.target_checkout_root
+        : null,
+    target_dependency_snapshot_hash:
+      typeof options.flowResult.artifacts.target_dependency_snapshot_hash === "string"
+        ? options.flowResult.artifacts.target_dependency_snapshot_hash
+        : null,
+    target_dependency_snapshot_file:
+      typeof options.flowResult.artifacts.target_dependency_snapshot_file === "string"
+        ? options.flowResult.artifacts.target_dependency_snapshot_file
+        : null,
+    target_dependency_cache_root:
+      typeof options.flowResult.artifacts.target_dependency_cache_root === "string"
+        ? options.flowResult.artifacts.target_dependency_cache_root
         : null,
     generated_project_profile_file:
       typeof options.flowResult.artifacts.generated_project_profile_file === "string"

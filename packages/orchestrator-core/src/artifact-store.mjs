@@ -230,6 +230,7 @@ function dedupeSourceRefs(sourceRefs) {
  *   goals?: string[],
  *   kpis?: Array<{ kpi_id: string, name: string, target: string, measurement?: string }>,
  *   definitionOfDone?: string[],
+ *   workType?: string | null,
  *   requestFile: string | null,
  *   sourceKind?: string | null,
  *   sourceRef?: string | null,
@@ -458,6 +459,7 @@ export function materializeIntakeArtifactPacket(options) {
     goals: options.goals,
     kpis: options.kpis,
     definitionOfDone: options.definitionOfDone,
+    workType: options.workType,
     requestFile,
     sourceKind: options.sourceKind ?? null,
     sourceRef: options.sourceRef ?? null,
@@ -514,6 +516,11 @@ export function materializeIntakeArtifactPacket(options) {
         typeof requestDocument.provider_variant_id === "string" ? requestDocument.provider_variant_id : null,
       feature_size: typeof requestDocument.feature_size === "string" ? requestDocument.feature_size : null,
       mission_type: typeof requestDocument.mission_type === "string" ? requestDocument.mission_type : null,
+      work_type: typeof options.workType === "string" && options.workType.trim().length > 0
+        ? options.workType.trim()
+        : (typeof requestDocument.work_type === "string"
+          ? requestDocument.work_type
+          : (deliveryMode === "no-write" ? "analyze" : "code-change")),
       delivery_mode: deliveryMode,
       matrix_cell:
         typeof requestDocument.matrix_cell === "object" &&

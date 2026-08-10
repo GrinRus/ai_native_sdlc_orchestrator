@@ -15,7 +15,13 @@ test("guided browser collector injects and recovers a real public resource failu
   assert.match(source, /resource_url = f"\{payload\['control_plane'\]\}\/api\/projects/u);
   assert.match(source, /execution-profile/u);
   assert.match(source, /page\.route\(resource_url, abort_resource, times=1\)/u);
+  assert.match(source, /name="Refresh", exact=True/u);
   assert.match(source, /name="Refresh setup", exact=True/u);
+  assert.match(source, /def resolve_refresh_button\(\):/u);
+  assert.match(source, /details\.project-settings-disclosure/u);
+  assert.match(source, /:scope > summary/u);
+  assert.match(source, /settings\.get_attribute\("open"\)/u);
+  assert.match(source, /reconnect_readiness = wait_for_ready\(\)/u);
   assert.match(source, /error_feedback_observed/u);
   assert.match(source, /"recovered": error_recovered/u);
   assert.ok(
@@ -29,4 +35,27 @@ test("guided browser collector separates handled optional 404 noise from unexpec
   const source = guidedBrowserTaskCollectorPythonSource();
   assert.match(source, /observed_optional_404_console/u);
   assert.match(source, /if injection_active\["value"\]/u);
+});
+
+test("guided browser collector waits for ready project state before every viewport screenshot", () => {
+  const source = guidedBrowserTaskCollectorPythonSource();
+  assert.match(source, /def wait_for_ready\(\):/u);
+  const viewportReload = source.indexOf('page.reload(wait_until="domcontentloaded", timeout=timeout_ms)\n            viewport_readiness = wait_for_ready()');
+  const viewportCapture = source.indexOf('page.screenshot(path=viewport_screenshot, full_page=True)');
+  assert.ok(viewportReload >= 0, "viewport reload should wait for durable project readiness");
+  assert.ok(viewportReload < viewportCapture, "readiness must be checked before the viewport screenshot");
+  assert.match(source, /viewport_readiness\.get\("status"\) != "pass"/u);
+});
+
+test("guided browser collector proves the Active Flow Cockpit before responsive captures", () => {
+  const source = guidedBrowserTaskCollectorPythonSource();
+  const cockpitProbe = source.indexOf('page.get_by_role("button", name="Continue Flow", exact=True)');
+  const cockpitCapture = source.indexOf('page.screenshot(path=cockpit_screenshot, full_page=True)');
+  const viewportReload = source.indexOf('page.reload(wait_until="domcontentloaded", timeout=timeout_ms)\n            viewport_readiness = wait_for_ready()');
+  assert.ok(cockpitProbe >= 0, "collector should enter the active Flow from Project Home");
+  assert.ok(cockpitCapture > cockpitProbe, "collector should capture the Cockpit after entering it");
+  assert.ok(viewportReload > cockpitCapture, "responsive captures should run after the Cockpit assertion");
+  assert.match(source, /post_reload_readiness = wait_for_ready\(\)/u);
+  assert.match(source, /\.flow-cockpit \.cockpit-actions button\.primary/u);
+  assert.match(source, /"cockpit_probe": cockpit_probe/u);
 });

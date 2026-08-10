@@ -36,6 +36,8 @@ import {
   materializeTargetCheckout,
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
+import { materializeAndAttachDependencySnapshot, resolveStabilizedSetupCommands } from "./dependency-snapshot.mjs";
+import { deriveBrowserCacheKey, prepareBrowserCachePreflight } from "./browser-cache.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
@@ -453,6 +455,28 @@ function toProjectEvidenceRef(projectRoot, filePath) {
   return `evidence://${path
     .relative(canonicalEvidencePath(projectRoot), canonicalEvidencePath(filePath))
     .replace(/\\/g, "/")}`;
+}
+
+/**
+ * Convert a central AOR runtime artifact to a logical evidence ref that the
+ * public operator-request surface can resolve back into the project runtime.
+ * Absolute central-runtime paths are rejected as target refs by design.
+ *
+ * @param {string} projectRuntimeRoot
+ * @param {string | null | undefined} filePath
+ * @returns {string | null}
+ */
+function toProjectRuntimeEvidenceRef(projectRuntimeRoot, filePath) {
+  const concreteFilePath = asNonEmptyString(filePath);
+  if (!concreteFilePath) return null;
+  const relative = path.relative(
+    canonicalEvidencePath(projectRuntimeRoot),
+    canonicalEvidencePath(concreteFilePath),
+  ).replace(/\\/g, "/");
+  if (!relative || relative.startsWith("../") || path.isAbsolute(relative)) {
+    return concreteFilePath;
+  }
+  return `evidence://projects/${path.basename(canonicalEvidencePath(projectRuntimeRoot))}/${relative}`;
 }
 
 /**
@@ -1577,9 +1601,10 @@ function resolveTargetEvidencePath(targetCheckoutRoot, value) {
 /**
  * @param {string} targetCheckoutRoot
  * @param {string | null | undefined} packetFile
+ * @param {string | null | undefined} projectRuntimeRoot
  * @returns {{ flowId: string | null, projectId: string | null, missionId: string | null }}
  */
-export function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile) {
+export function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile, projectRuntimeRoot = null) {
   const resolvedPacketFile = resolveTargetEvidencePath(targetCheckoutRoot, packetFile);
   if (!resolvedPacketFile || !fileExists(resolvedPacketFile)) {
     return { flowId: null, projectId: null, missionId: null };
@@ -1594,9 +1619,17 @@ export function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile) {
     asNonEmptyString(invocationContext.mission_id) ||
     (markerIndex > 0 ? packetId.slice(markerIndex + marker.length).replace(/\.v\d+$/u, "") : "");
   const normalizedMissionId = normalizeId(packetMissionId);
+  // Packets carry the runtime project id, while control-plane flow projections
+  // key flows by the workspace/storage project id. When the central runtime
+  // root is available, use its project directory name so follow-up operator
+  // requests address the same flow the public control plane can read.
+  const workspaceProjectId = asNonEmptyString(projectRuntimeRoot)
+    ? path.basename(path.resolve(projectRuntimeRoot))
+    : null;
+  const flowProjectId = workspaceProjectId || projectId;
   return {
-    flowId: projectId && normalizedMissionId ? `flow.${projectId}.${normalizedMissionId}` : null,
-    projectId,
+    flowId: flowProjectId && normalizedMissionId ? `flow.${flowProjectId}.${normalizedMissionId}` : null,
+    projectId: flowProjectId,
     missionId: packetMissionId || null,
   };
 }
@@ -1614,14 +1647,20 @@ function readReportDocument(reportFile) {
 /**
  * @param {string} targetRoot
  * @param {{ projectId: string | null, missionId: string | null }} identity
+ * @param {string | null | undefined} projectRuntimeRoot
  * @returns {string | null}
  */
-export function archivedNextActionReportForMission(targetRoot, identity) {
+export function archivedNextActionReportForMission(targetRoot, identity, projectRuntimeRoot = null) {
   const projectId = asNonEmptyString(identity.projectId);
   const missionId = normalizeId(asNonEmptyString(identity.missionId) || "");
   if (!projectId || !missionId) return null;
-  const reportFile = path.join(targetRoot, ".aor", "projects", projectId, "reports", `next-action-report-${missionId}.json`);
-  return fileExists(reportFile) ? reportFile : null;
+  const candidates = [
+    path.join(targetRoot, ".aor", "projects", projectId, "reports", `next-action-report-${missionId}.json`),
+    asNonEmptyString(projectRuntimeRoot)
+      ? path.join(projectRuntimeRoot, "reports", `next-action-report-${missionId}.json`)
+      : null,
+  ].filter(Boolean);
+  return candidates.find((reportFile) => fileExists(reportFile)) ?? null;
 }
 
 /**
@@ -1710,8 +1749,6 @@ function startGuidedBrowserTaskAppSurface(options) {
         ...(asNonEmptyString(options.projectProfileFile)
           ? ["--project-profile", asNonEmptyString(options.projectProfileFile)]
           : []),
-        "--runtime-root",
-        ".aor",
         "--open",
         "false",
         "--json",
@@ -2012,10 +2049,11 @@ export function collectGuidedBrowserTaskProof(options) {
     accessibility_summary_file: options.accessibilitySummaryFile,
     visual_guardrail_file: options.visualSnapshotFile,
     screenshot_file: screenshotFile,
-    timeout_ms: 30_000,
+    timeout_ms: 20_000,
   };
   const { result, attempts } = runGuidedBrowserTaskCollector({
     pythonBin, collectorScriptFile, payload, env: collectorEnv,
+    timeoutMs: 120_000,
     proofFile: options.browserTaskProofFile,
   });
   const stdout = asNonEmptyString(result.stdout);
@@ -2164,8 +2202,6 @@ export function runGuidedWebSmoke(options) {
       ...(asNonEmptyString(options.projectProfileFile)
         ? ["--project-profile", asNonEmptyString(options.projectProfileFile)]
         : []),
-      "--runtime-root",
-      ".aor",
       "--smoke",
       "true",
       "--open",
@@ -2779,6 +2815,7 @@ export function evaluateRepairProofExpectations(options) {
  *   projectProfileFile: string,
  *   requestRunIdFallback: string,
  *   closureRunId: string,
+ *   runtimeRoot: string,
  *   executionRoot: string,
  *   evidenceRefs: string[],
  * }} options
@@ -2808,7 +2845,7 @@ function closeSatisfiedQualityRepairRequests(options) {
       "repair", "close",
       "--project-ref", ".",
       "--project-profile", options.projectProfileFile,
-      "--runtime-root", ".aor",
+      "--runtime-root", options.runtimeRoot,
       "--run-id", requestRunId,
       "--closure-run-id", options.closureRunId,
       "--request-ref", requestRef,
@@ -3974,74 +4011,6 @@ function writeExecutionReadinessDecision(options) {
 }
 
 /**
- * @param {string[]} commands
- * @returns {boolean}
- */
-function commandsRequirePlaywrightCache(commands) {
-  return commands.some((command) => /\bplaywright\b|ms-playwright|browserType\.launch/iu.test(command));
-}
-
-/**
- * @param {{ targetCheckoutRoot: string, reportsRoot: string, runId: string, commands: string[], env: NodeJS.ProcessEnv, forceFailure?: boolean }}
- */
-function prepareBrowserCachePreflight(options) {
-  const reportFile = path.join(
-    options.reportsRoot,
-    `live-e2e-browser-cache-preflight-${normalizeId(options.runId)}.json`,
-  );
-  const required = commandsRequirePlaywrightCache(options.commands);
-  const cacheRoot = path.join(options.targetCheckoutRoot, ".aor", "cache", "ms-playwright");
-  if (!required) {
-    const report = {
-      run_id: options.runId,
-      status: "skipped",
-      required: false,
-      cache_root: cacheRoot,
-      env_var: "PLAYWRIGHT_BROWSERS_PATH",
-      summary: "No Playwright/browser cache preflight was required by declared target commands.",
-      checked_at: nowIso(),
-    };
-    writeJson(reportFile, report);
-    return { status: "skipped", report, reportFile };
-  }
-
-  try {
-    if (options.forceFailure === true) {
-      throw new Error("forced browser cache preflight failure");
-    }
-    fs.mkdirSync(cacheRoot, { recursive: true });
-    const markerFile = path.join(cacheRoot, `.aor-cache-write-${normalizeId(options.runId)}.txt`);
-    fs.writeFileSync(markerFile, `browser-cache-preflight:${options.runId}\n`, "utf8");
-    fs.rmSync(markerFile, { force: true });
-    options.env.PLAYWRIGHT_BROWSERS_PATH = cacheRoot;
-    const report = {
-      run_id: options.runId,
-      status: "pass",
-      required: true,
-      cache_root: cacheRoot,
-      env_var: "PLAYWRIGHT_BROWSERS_PATH",
-      summary: "Playwright/browser cache path is target-local and writable before provider execution.",
-      checked_at: nowIso(),
-    };
-    writeJson(reportFile, report);
-    return { status: "pass", report, reportFile };
-  } catch (error) {
-    const summary = `Playwright/browser cache path is not writable: ${error instanceof Error ? error.message : String(error)}`;
-    const report = {
-      run_id: options.runId,
-      status: "fail",
-      required: true,
-      cache_root: cacheRoot,
-      env_var: "PLAYWRIGHT_BROWSERS_PATH",
-      summary,
-      checked_at: nowIso(),
-    };
-    writeJson(reportFile, report);
-    return { status: "fail", report, reportFile };
-  }
-}
-
-/**
  * @param {{
  *   scenarioPolicy: Record<string, unknown>,
  *   stageResults: Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>,
@@ -4417,8 +4386,19 @@ export function executeInstalledUserFlow(options) {
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
     artifacts.target_commit_sha = targetCheckout.targetCommitSha;
+    materializeAndAttachDependencySnapshot({
+      targetCheckout,
+      setupCommands: asStringArray(asRecord(options.profile.verification).setup_commands),
+      verificationCommands: asStringArray(asRecord(options.profile.verification).commands),
+      runtimeRoot: options.layout.projectRuntimeRoot,
+      reportsRoot: options.layout.reportsRoot,
+      runId: options.runId,
+      env,
+      artifacts,
+    });
     const installedBrowserCachePreflight = prepareBrowserCachePreflight({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      targetRepoId: targetCheckout.targetRepoId,
       reportsRoot: options.layout.reportsRoot,
       runId: options.runId,
       commands: uniqueStrings([
@@ -5140,6 +5120,10 @@ function executeFullJourneyFlowImplementation(options) {
     const resolvedVerification = {
       ...catalogVerification,
       ...asRecord(options.profile.verification),
+      setup_commands: resolveStabilizedSetupCommands(
+        asStringArray(asRecord(options.profile.verification).setup_commands),
+        asStringArray(catalogVerification.setup_commands),
+      ),
     };
     const targetEnvironmentMode = asNonEmptyString(catalogVerification.execution_environment) || "default";
     const applyTargetEnvironment = (commands) => targetEnvironmentMode === "ci"
@@ -5154,8 +5138,19 @@ function executeFullJourneyFlowImplementation(options) {
       diagnosticCommands: applyTargetEnvironment(rawPostRunQualityPolicy.diagnosticCommands),
     };
     artifacts.post_run_quality_policy = postRunQualityPolicy;
+    materializeAndAttachDependencySnapshot({
+      targetCheckout,
+      setupCommands: repoLintCommands,
+      verificationCommands: repoVerificationCommands.concat(
+        postRunQualityPolicy.primaryCommands,
+        postRunQualityPolicy.diagnosticCommands,
+      ),
+      runtimeRoot: options.layout.projectRuntimeRoot, reportsRoot: options.layout.reportsRoot,
+      runId: options.runId, env, artifacts,
+    });
     const browserCachePreflight = prepareBrowserCachePreflight({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      targetRepoId: targetCheckout.targetRepoId,
       reportsRoot: options.layout.reportsRoot,
       runId: options.runId,
       commands: uniqueStrings([
@@ -6919,6 +6914,7 @@ function executeFullJourneyFlowImplementation(options) {
         projectProfileFile: generatedProfile.generatedProjectProfileFile,
         requestRunIdFallback: latestImplementationRunId,
         closureRunId: latestImplementationRunId,
+        runtimeRoot: options.layout.projectRuntimeRoot,
         executionRoot: latestExecutionRoot,
         evidenceRefs: uniqueStrings([
           asNonEmptyString(artifacts.review_report_file),
@@ -7316,9 +7312,16 @@ function executeFullJourneyFlowImplementation(options) {
       const firstFlowIdentity = resolveFlowIdentityFromPacket(
         targetCheckout.targetCheckoutRoot,
         artifacts.intake_artifact_packet_file,
+        path.dirname(path.dirname(artifacts.intake_artifact_packet_file)),
       );
       const completedFlowArchiveFile =
-        archivedNextActionReportForMission(targetCheckout.targetCheckoutRoot, firstFlowIdentity);
+        archivedNextActionReportForMission(
+          targetCheckout.targetCheckoutRoot,
+          firstFlowIdentity,
+          artifacts.next_action_report_file
+            ? path.dirname(path.dirname(artifacts.next_action_report_file))
+            : null,
+        );
       const genericCompletedFlowReportFile = asNonEmptyString(artifacts.next_action_report_file);
       const archivedCompletedFlowReport = readReportDocument(completedFlowArchiveFile);
       const genericCompletedFlowReport = readReportDocument(genericCompletedFlowReportFile);
@@ -7360,6 +7363,7 @@ function executeFullJourneyFlowImplementation(options) {
       const secondFlowIdentity = resolveFlowIdentityFromPacket(
         targetCheckout.targetCheckoutRoot,
         artifacts.new_flow_mission_artifact_packet_file,
+        path.dirname(path.dirname(artifacts.new_flow_mission_artifact_packet_file)),
       );
       artifacts.second_flow_id = secondFlowIdentity.flowId;
       if (!asNonEmptyString(artifacts.second_flow_id)) {
@@ -7403,9 +7407,15 @@ function executeFullJourneyFlowImplementation(options) {
         "--target-flow-id",
         asNonEmptyString(artifacts.second_flow_id),
         "--target-ref",
-        asNonEmptyString(artifacts.new_flow_mission_artifact_packet_file),
+        toProjectRuntimeEvidenceRef(
+          options.layout.projectRuntimeRoot,
+          artifacts.new_flow_mission_artifact_packet_file,
+        ),
         "--target-ref",
-        asNonEmptyString(artifacts.new_flow_next_action_report_file),
+        toProjectRuntimeEvidenceRef(
+          options.layout.projectRuntimeRoot,
+          artifacts.new_flow_next_action_report_file,
+        ),
         "--delivery-mode",
         "no-write",
       ]);
@@ -7687,5 +7697,4 @@ function executeFullJourneyFlowImplementation(options) {
     };
   }
 }
-
 export function executeFullJourneyFlow(options) { return executeFullJourneyFlowImplementation(options); }
