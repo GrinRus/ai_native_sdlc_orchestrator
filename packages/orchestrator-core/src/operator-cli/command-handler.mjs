@@ -79,6 +79,7 @@ const TOP_LEVEL_HELP_GROUPS = Object.freeze([
       "compiler revision",
       "review run",
       "review decide",
+      "repair retry",
       "repair close",
     ],
   },
@@ -358,6 +359,8 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in review shell (W13-S05)"
         : definition.command === "review decide"
           ? "Status: implemented in review decision shell (W19-S05)"
+        : definition.command === "repair retry"
+          ? "Status: implemented in quality repair shell (W66-S23)"
         : definition.command === "repair close"
           ? "Status: implemented in quality repair shell (W66-S01)"
         : definition.command === "learning handoff"

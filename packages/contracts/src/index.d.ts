@@ -34,6 +34,7 @@ export type ContractFamily =
   | "review-report"
   | "review-decision"
   | "quality-repair-request"
+  | "quality-repair-attempt"
   | "runtime-harness-report"
   | "multirepo-coordination-status"
   | "planner-metrics-snapshot"

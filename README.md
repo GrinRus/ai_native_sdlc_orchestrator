@@ -363,7 +363,7 @@ production certification.
 
 ## Command surface status
 
-The CLI command surface currently includes **72 implemented** commands and **0 planned** commands. See the [CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags, outputs, and contract families.
+The CLI command surface currently includes **73 implemented** commands and **0 planned** commands. See the [CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags, outputs, and contract families.
 
 ## Readiness evidence
 

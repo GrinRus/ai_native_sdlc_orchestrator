@@ -475,6 +475,35 @@ export async function handleLifecycleCommandAction({ request, response, runtimeO
 }
 
 /**
+ * Explicit API parity surface for the quality-repair retry mutation. The
+ * lifecycle command remains the canonical implementation; this route only
+ * supplies a typed action envelope for API clients.
+ */
+export async function handleQualityRepairAction({ request, response, runtimeOptions }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+  if (asString(payload.action) !== "retry") {
+    sendError(response, 400, "quality_repair.invalid_action", "Quality repair action must be 'retry'.");
+    return;
+  }
+  const flags = { ...payload };
+  delete flags.action;
+  const result = runLifecycleCommand({
+    ...runtimeOptions,
+    command: "repair retry",
+    flags,
+  });
+  if (!result.ok) {
+    sendJson(response, result.statusCode, {
+      error: result.error,
+      ...(result.result ? { lifecycle_command: toLifecycleCommandResponse(result.result) } : {}),
+    });
+    return;
+  }
+  sendJson(response, 200, { quality_repair: toLifecycleCommandResponse(result.result) });
+}
+
+/**
  * @param {unknown} value
  * @returns {string[]}
  */

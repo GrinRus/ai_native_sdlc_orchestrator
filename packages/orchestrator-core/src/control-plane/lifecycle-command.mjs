@@ -32,6 +32,7 @@ const LIFECYCLE_COMMANDS = new Set([
   "run retry",
   "review run",
   "review decide",
+  "repair retry",
   "repair close",
   "deliver prepare",
   "release prepare",

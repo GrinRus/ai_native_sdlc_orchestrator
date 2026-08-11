@@ -440,6 +440,16 @@ const ROUTES = Object.freeze([
     kind: "mutation",
   },
   {
+    id: "quality-repair-actions",
+    pattern: /^\/api\/projects\/([^/]+)\/quality-repair\/actions$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "Quality-repair mutation route supports only POST.",
+    params: ["projectId"],
+    kind: "mutation",
+  },
+  {
     id: "interaction-answers",
     pattern: /^\/api\/projects\/([^/]+)\/interactions\/answers$/u,
     method: "POST",
@@ -496,6 +506,7 @@ const ROUTE_OPENAPI_PATHS = Object.freeze({
   "operator-request-actions": "/api/projects/{projectId}/operator-requests/{requestId}/actions",
   "ui-lifecycle-actions": "/api/projects/{projectId}/ui-lifecycle/actions",
   "lifecycle-command-actions": "/api/projects/{projectId}/lifecycle-command/actions",
+  "quality-repair-actions": "/api/projects/{projectId}/quality-repair/actions",
   "interaction-answers": "/api/projects/{projectId}/interactions/answers",
 });
 

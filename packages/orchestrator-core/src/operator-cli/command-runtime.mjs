@@ -36,6 +36,7 @@ export {
   InteractionAnswerError,
   submitInteractionAnswer,
 } from "../control-plane/interaction-answer.mjs";
+export { retryQualityRepair } from "../../../observability/src/index.mjs";
 export {
   attachUiLifecycle,
   detachUiLifecycle,

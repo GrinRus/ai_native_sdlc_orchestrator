@@ -7,6 +7,7 @@ import {
   handleInteractionAnswer,
   handleFlowPlanAction,
   handleLifecycleCommandAction,
+  handleQualityRepairAction,
   handleOperatorRequestAction,
   handleOperatorRequestCreate,
   handleProjectAction,
@@ -339,6 +340,11 @@ export function createControlPlaneHttpServer(options) {
 
       if (route.id === "lifecycle-command-actions") {
         await handleLifecycleCommandAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
+        return;
+      }
+
+      if (route.id === "quality-repair-actions") {
+        await handleQualityRepairAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
 

@@ -1261,6 +1261,27 @@
         }
       }
     },
+    "/api/projects/{projectId}/quality-repair/actions": {
+      "post": {
+        "operationId": "qualityRepairAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "quality-repair-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": { "$ref": "#/components/requestBodies/QualityRepairAction" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
     "/api/projects/{projectId}/interactions/answers": {
       "post": {
         "operationId": "submitInteractionAnswer",
@@ -1405,6 +1426,14 @@
           "application/*+json": {
             "schema": { "$ref": "#/components/schemas/LifecycleCommandActionRequest" }
           }
+        }
+      },
+      "QualityRepairAction": {
+        "required": true,
+        "description": "CAS-protected, idempotent quality-repair retry mutation.",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/QualityRepairActionRequest" } },
+          "application/*+json": { "schema": { "$ref": "#/components/schemas/QualityRepairActionRequest" } }
         }
       },
       "RunJobAccepted": {
@@ -4116,6 +4145,33 @@
           }
         },
         "additionalProperties": true
+      },
+      "QualityRepairActionRequest": {
+        "type": "object",
+        "required": ["action", "command_id", "expected_revision", "request_ref", "workspace_ref"],
+        "properties": {
+          "action": { "type": "string", "enum": ["retry"] },
+          "command_id": { "type": "string" },
+          "expected_revision": { "type": "integer", "minimum": 0 },
+          "request_ref": { "type": "string" },
+          "request_id": { "type": "string" },
+          "workspace_ref": { "type": "string" },
+          "workspace_owner": { "type": "string" },
+          "execution_root": { "type": "string" },
+          "repair_run_id": { "type": "string" },
+          "input_fingerprint": { "type": "string" },
+          "finding_fingerprint": { "type": "string" },
+          "failure_fingerprint": { "type": "string" },
+          "diff_fingerprint": { "type": "string" },
+          "verification_fingerprint": { "type": "string" },
+          "validation_fingerprint": { "type": "string" },
+          "route_ref": { "type": "string" },
+          "model": { "type": "string" },
+          "failure_class": { "type": "string" },
+          "evidence_ref": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "reason": { "type": "string" }
+        },
+        "additionalProperties": false
       },
       "LifecycleCommandActionResponse": {
         "type": "object",

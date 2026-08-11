@@ -27,6 +27,7 @@ const QUALITY_REPAIR_STATUS_VALUES = [
   "budget-exhausted",
   "closed",
 ];
+const QUALITY_REPAIR_ATTEMPT_STATUS_VALUES = ["reserved", "running", "completed", "failed", "blocked", "canceled"];
 const RUNTIME_HARNESS_DECISION_VALUES = ["pass", "retry", "repair", "escalate", "block", "fail"];
 const RUNTIME_HARNESS_RUN_CONTROLLER_STATUS_VALUES = ["running", "closed", "blocked", "failed"];
 const RUNTIME_HARNESS_RUN_TRANSITION_STAGE_VALUES = [
@@ -307,6 +308,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "quality-repair-request") {
     issues.push(...validateQualityRepairRequest(document, source));
+  }
+
+  if (family === "quality-repair-attempt") {
+    issues.push(...validateQualityRepairAttempt(document, source));
   }
 
   if (family === "live-run-event") {
@@ -2574,6 +2579,46 @@ function validateQualityRepairRequest(document, source) {
     });
   }
 
+  return issues;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateQualityRepairAttempt(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  validateOptionalStringArrayField({ record: document, source, field: "evidence_refs", issues });
+  for (const field of ["parent_attempt_ref", "route_ref", "failure_class", "workspace_owner", "base_commit", "diff_fingerprint"]) {
+    validateNestedNullableStringField({ record: document, source, field, issues, required: false });
+  }
+  for (const field of ["owned_workspace", "budget", "lineage", "review", "qa"]) {
+    validateOptionalObjectField({ record: document, source, field, issues });
+  }
+  const attemptIndex = document.attempt_index;
+  if (typeof attemptIndex === "number" && (!Number.isInteger(attemptIndex) || attemptIndex < 1)) {
+    issues.push(issue({
+      code: "field_type_mismatch",
+      source,
+      field: "attempt_index",
+      expected: "positive integer",
+      actual: String(attemptIndex),
+      message: "Field 'attempt_index' must be a positive integer.",
+    }));
+  }
+  const status = document.status;
+  if (typeof status === "string" && !QUALITY_REPAIR_ATTEMPT_STATUS_VALUES.includes(status)) {
+    issues.push(issue({
+      code: "enum_value_invalid",
+      source,
+      field: "status",
+      expected: QUALITY_REPAIR_ATTEMPT_STATUS_VALUES.join("|"),
+      actual: status,
+      message: `Field 'status' must be one of ${QUALITY_REPAIR_ATTEMPT_STATUS_VALUES.join(", ")}.`,
+    }));
+  }
   return issues;
 }
 

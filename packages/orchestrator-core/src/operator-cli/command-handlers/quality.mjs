@@ -36,6 +36,7 @@ import {
   reviewReportAllowsApproval,
   closeQualityRepairRequest,
   listQualityRepairRequests,
+  retryQualityRepair,
   resolveNextAction,
   resolveStepPolicyForStep,
   analyzeProjectRuntime,
@@ -88,6 +89,7 @@ export const QUALITY_COMMANDS = Object.freeze([
   "harness certify",
   "review run",
   "review decide",
+  "repair retry",
   "repair close",
   "learning handoff"
 ]);
@@ -664,6 +666,67 @@ export function handleQualityCommand(context) {
     outputState.qualityRepairNextActionStage = nextAction.nextActionReport.project_state.stage;
     outputState.qualityRepairNextActionPrimary = nextAction.nextActionReport.primary_action;
     outputState.qualityRepairNextActionReportFile = nextAction.nextActionReportFile;
+    outputState.readOnly = false;
+  } else if (command === "repair retry") {
+    ensureRequiredFlags(command, flags);
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
+    const runtimeRoot = resolveOptionalStringFlag("runtime-root", flags["runtime-root"]);
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
+      runtimeRoot,
+    });
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const requestRef = resolveOptionalStringFlag("request-ref", flags["request-ref"]);
+    const requestId = resolveOptionalStringFlag("request-id", flags["request-id"]);
+    const requestMatch = listQualityRepairRequests({
+      projectRoot: projectState.project_root,
+      runtimeLayout: { reportsRoot: projectState.runtime_layout.reports_root },
+      runId,
+    }).find((entry) => (requestRef && (entry.artifact_ref === requestRef || entry.document.request_id === requestRef)) || (requestId && entry.document.request_id === requestId));
+    if (!requestMatch) throw new CliUsageError("Quality repair retry requires a matching '--request-ref' or '--request-id'.");
+    const retry = retryQualityRepair({
+      projectId: projectState.runtime_project_id ?? projectState.project_id,
+      projectRoot: projectState.project_root,
+      runtimeLayout: {
+        reportsRoot: projectState.runtime_layout.reports_root,
+        stateRoot: projectState.runtime_layout.state_root,
+      },
+      requestFile: requestMatch.file,
+      commandId: /** @type {string} */ (resolveOptionalStringFlag("command-id", flags["command-id"])),
+      expectedRevision: /** @type {number} */ (resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 })),
+      reason: resolveOptionalStringFlag("reason", flags.reason),
+      workspaceRef: /** @type {string} */ (resolveOptionalStringFlag("workspace-ref", flags["workspace-ref"])),
+      workspaceOwner: resolveOptionalStringFlag("workspace-owner", flags["workspace-owner"]),
+      executionRoot: resolveOptionalStringFlag("execution-root", flags["execution-root"]),
+      workspacesRoot: projectState.runtime_layout.workspaces_root,
+      repairRunId: resolveOptionalStringFlag("repair-run-id", flags["repair-run-id"]),
+      inputFingerprint: resolveOptionalStringFlag("input-fingerprint", flags["input-fingerprint"]),
+      findingFingerprint: resolveOptionalStringFlag("finding-fingerprint", flags["finding-fingerprint"]),
+      failureFingerprint: resolveOptionalStringFlag("failure-fingerprint", flags["failure-fingerprint"]),
+      diffFingerprint: resolveOptionalStringFlag("diff-fingerprint", flags["diff-fingerprint"]),
+      verificationFingerprint: resolveOptionalStringFlag("verification-fingerprint", flags["verification-fingerprint"]),
+      validationFingerprint: resolveOptionalStringFlag("validation-fingerprint", flags["validation-fingerprint"]),
+      routeRef: resolveOptionalStringFlag("route-ref", flags["route-ref"]),
+      model: resolveOptionalStringFlag("model", flags.model),
+      failureClass: resolveOptionalStringFlag("failure-class", flags["failure-class"]),
+      evidenceRefs: resolveOptionalStringListFlag("evidence-ref", flags["evidence-ref"]),
+    });
+    outputState.resolvedProjectRef = projectState.project_root;
+    outputState.resolvedRuntimeRoot = projectState.runtime_root;
+    outputState.qualityRepairRequestRef = retry.request_ref;
+    outputState.qualityRepairRequestFile = retry.request_file;
+    outputState.qualityRepairRequestStatus = retry.request.status;
+    outputState.qualityRepairRequestRevision = retry.request_revision;
+    outputState.qualityRepairAttemptId = retry.attempt.attempt_id;
+    outputState.qualityRepairAttemptRef = retry.attempt_ref;
+    outputState.qualityRepairAttemptFile = retry.attempt_file;
+    outputState.qualityRepairAttemptIndex = retry.attempt.attempt_index;
+    outputState.qualityRepairAttemptStatus = retry.attempt.status;
+    outputState.qualityRepairAttemptBudget = retry.attempt.budget;
+    outputState.qualityRepairNextAction = retry.next_action;
+    outputState.qualityRepairReplay = retry.replay;
     outputState.readOnly = false;
   } else if (command === "learning handoff") {
     ensureRequiredFlags(command, flags);

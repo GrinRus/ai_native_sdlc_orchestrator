@@ -1,11 +1,11 @@
 {
   "schema_version": 3,
-  "kernel_version": 12,
+  "kernel_version": 13,
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 25,
-    "source_manifest_sha256": "3603e53d93582803a508c02381be91a833448c28dfd80279470e2d3edf685530"
+    "source_manifest_sha256": "022f5f84de8400ca9be2adb78fdac90ca90c9fbf45ab1e2ad77f2c15abdb27f2"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -16,12 +16,12 @@
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "d7d19e19a264b0da05a347115dcc58d98759965fc9e74b18784c05d0c78f3160",
-    "index.d.ts": "a16f5722018280ceda9a2d6788b130dc1305a184b0d8e0b0a6f8a803153d3b24",
+    "families.mjs": "312855fc5de5c75573ccd76ea3883c377816477aa5947c14e90734c0f3de55dc",
+    "index.d.ts": "90c57e99d25b9dae87ed6e15ea8012322b0099639c9089153319f957538a2c26",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
-    "loader.mjs": "1e2ac7729ed40311581b0c67c90475c1b16049446285f5713f89b4e8b9724a08",
+    "loader.mjs": "089a787ef78d418fd13ce00a60daf2f5c124ec09b63776619a2840e651093b06",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
@@ -1594,6 +1594,58 @@
       ]
     },
     {
+      "family": "quality-repair-attempt",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/quality-repair-attempt.md",
+      "exampleGlob": "examples/reports/quality-repair-attempt*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "attempt_id",
+        "request_id",
+        "cycle_id",
+        "attempt_index",
+        "trigger",
+        "repair_run_id",
+        "status",
+        "workspace_ref",
+        "input_fingerprint",
+        "finding_fingerprint",
+        "failure_fingerprint",
+        "created_at",
+        "updated_at",
+        "evidence_refs"
+      ],
+      "fieldTypes": {
+        "attempt_id": "string",
+        "request_id": "string",
+        "cycle_id": "string",
+        "attempt_index": "number",
+        "trigger": "string",
+        "repair_run_id": "string",
+        "status": "string",
+        "workspace_ref": "string",
+        "input_fingerprint": "string",
+        "finding_fingerprint": "string",
+        "failure_fingerprint": "string",
+        "created_at": "string",
+        "updated_at": "string",
+        "evidence_refs": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "reserved",
+            "running",
+            "completed",
+            "failed",
+            "blocked",
+            "canceled"
+          ]
+        }
+      ]
+    },
+    {
       "family": "runtime-harness-report",
       "familyGroup": "execution-and-quality",
       "sourceContract": "docs/contracts/runtime-harness-report.md",
@@ -2715,6 +2767,11 @@
       "regex_source": "^examples\\/reports\\/quality-repair-request[^/]*\\.ya?ml$",
       "regex_flags": "",
       "family": "quality-repair-request"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/quality-repair-attempt[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "quality-repair-attempt"
     },
     {
       "regex_source": "^examples\\/reports\\/live-run-event[^/]*\\.ya?ml$",
