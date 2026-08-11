@@ -49,6 +49,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W67:** `W67-S01` Storage and contract baseline; `W67-S05` Explicit materialization, export, and closure proof
 - **W68:** `W68-S01` Contract and migration baseline for runtime selection; `W68-S05` Cutover, certification, and docs closure
 - **W69:** `W69-S01` Intent confirmation CAS and contract parity; `W69-S02` Runtime-owned Flow projection and adaptive lifecycle; `W69-S06` Incremental SPA decomposition and semantic visual cleanup; `W69-S07` Visual proof, story traceability, and closure
+- **W70:** `W70-S01` Task Workspace product, screen, and migration baseline; `W70-S02` Task runner override and Markdown source contracts; `W70-S07` Design-system implementation and legacy UI retirement; `W70-S08` Installed Task Workspace proof and story closure
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -56,6 +57,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 **W67:** `W67-S01` Storage and contract baseline; `W67-S02` Project source connection and central runtime; `W67-S04` Intent-first installed console
 **W68:** `W68-S03` Runtime selection projection and presets
 **W69:** `W69-S01` Intent confirmation CAS and contract parity; `W69-S02` Runtime-owned Flow projection and adaptive lifecycle; `W69-S03` Project Home resume-safe navigation; `W69-S04` Review-first Prepared Task; `W69-S05` Flow Cockpit context and runtime path presentation
+**W70:** `W70-S01` Task Workspace product, screen, and migration baseline; `W70-S02` Task runner override and Markdown source contracts; `W70-S03` Task shell, Home, and resumable task list; `W70-S04` New Task, Markdown Sources, and Prepared Task
 
 **Slices by wave:**
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
@@ -85,6 +87,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 **W67:** `W67-S01` Storage and contract baseline; `W67-S03` Durable intent preparation; `W67-S04` Intent-first installed console
 **W68:** `W68-S01` Contract and migration baseline for runtime selection
 **W69:** `W69-S01` Intent confirmation CAS and contract parity; `W69-S04` Review-first Prepared Task
+**W70:** `W70-S02` Task runner override and Markdown source contracts; `W70-S04` New Task, Markdown Sources, and Prepared Task
 
 **Slices by wave:**
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
@@ -104,6 +107,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 **W67:** `W67-S03` Durable intent preparation
 **W68:** `W68-S02` Runtime resolution and adapter argument mapping
 **W69:** `W69-S05` Flow Cockpit context and runtime path presentation
+**W70:** `W70-S02` Task runner override and Markdown source contracts; `W70-S05` Active Task Workspace and durable guidance
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
@@ -131,6 +135,7 @@ Implement validation, eval, harness, certification, and promotion.
 
 **W68:** `W68-S02` Runtime resolution and adapter argument mapping; `W68-S04` Live E2E selection and Codex Luna/high rehearsal; `W68-S05` Cutover, certification, and docs closure
 **W69:** `W69-S07` Visual proof, story traceability, and closure
+**W70:** `W70-S05` Active Task Workspace and durable guidance; `W70-S06` Attention, change review, and completion evidence; `W70-S08` Installed Task Workspace proof and story closure
 
 **Slices by wave:**
 - **W1:** `W1-S04` Deterministic project validate flow
@@ -193,6 +198,7 @@ Expose CLI, API, live events, and detachable UI flows.
 
 **W68:** `W68-S03` Runtime selection projection and presets
 **W69:** `W69-S03` Project Home resume-safe navigation; `W69-S04` Review-first Prepared Task; `W69-S05` Flow Cockpit context and runtime path presentation; `W69-S06` Incremental SPA decomposition and semantic visual cleanup
+**W70:** `W70-S01` Task Workspace product, screen, and migration baseline; `W70-S03` Task shell, Home, and resumable task list; `W70-S04` New Task, Markdown Sources, and Prepared Task; `W70-S05` Active Task Workspace and durable guidance; `W70-S06` Attention, change review, and completion evidence; `W70-S07` Design-system implementation and legacy UI retirement; `W70-S08` Installed Task Workspace proof and story closure
 
 **Slices by wave:**
 - **W1:** `W1-S01` Bootstrap CLI shell and command contracts

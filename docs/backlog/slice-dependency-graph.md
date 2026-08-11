@@ -367,6 +367,14 @@ graph TD
   W69S05[W69-S05 Flow Cockpit context and runtime path presentation]
   W69S06[W69-S06 Incremental SPA decomposition and semantic visual cleanup]
   W69S07[W69-S07 Visual proof, story traceability, and closure]
+  W70S01[W70-S01 Task Workspace product screen and migration baseline]
+  W70S02[W70-S02 Task runner override and Markdown source contracts]
+  W70S03[W70-S03 Task shell Home and resumable task list]
+  W70S04[W70-S04 New Task Markdown Sources and Prepared Task]
+  W70S05[W70-S05 Active Task Workspace and durable guidance]
+  W70S06[W70-S06 Attention change review and completion evidence]
+  W70S07[W70-S07 Design-system implementation and legacy UI retirement]
+  W70S08[W70-S08 Installed Task Workspace proof and story closure]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -1539,6 +1547,14 @@ own the stricter terminal control proof evidence for this lane.
 | W69-S05 | W69-S02, W69-S03, W69-S04 |
 | W69-S06 | W69-S05 |
 | W69-S07 | W69-S06 |
+| W70-S01 | W69-S07 |
+| W70-S02 | W70-S01 |
+| W70-S03 | W70-S02 |
+| W70-S04 | W70-S02, W70-S03 |
+| W70-S05 | W70-S04 |
+| W70-S06 | W70-S05 |
+| W70-S07 | W70-S06 |
+| W70-S08 | W70-S07 |
 
 ## Topological order
 1. W0-S01
@@ -1909,6 +1925,14 @@ own the stricter terminal control proof evidence for this lane.
 366. W69-S05
 367. W69-S06
 368. W69-S07
+369. W70-S01
+370. W70-S02
+371. W70-S03
+372. W70-S04
+373. W70-S05
+374. W70-S06
+375. W70-S07
+376. W70-S08
 
 W67 dependency edges:
 
@@ -1948,6 +1972,21 @@ graph TD
   W69S04 --> W69S05
   W69S05 --> W69S06[W69-S06 Incremental SPA decomposition and semantic visual cleanup]
   W69S06 --> W69S07[W69-S07 Visual proof, story traceability, and closure]
+```
+
+W70 dependency edges:
+
+```mermaid
+graph TD
+  W69S07[W69-S07 Visual proof story traceability and closure] --> W70S01[W70-S01 Task Workspace product screen and migration baseline]
+  W70S01 --> W70S02[W70-S02 Task runner override and Markdown source contracts]
+  W70S02 --> W70S03[W70-S03 Task shell Home and resumable task list]
+  W70S02 --> W70S04[W70-S04 New Task Markdown Sources and Prepared Task]
+  W70S03 --> W70S04
+  W70S04 --> W70S05[W70-S05 Active Task Workspace and durable guidance]
+  W70S05 --> W70S06[W70-S06 Attention change review and completion evidence]
+  W70S06 --> W70S07[W70-S07 Design-system implementation and legacy UI retirement]
+  W70S07 --> W70S08[W70-S08 Installed Task Workspace proof and story closure]
 ```
 
 ## Planning rule

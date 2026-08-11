@@ -92,6 +92,12 @@ and Flow Cockpit UI parity without changing the historical W66 provider hold.
 Its implementation candidate is present, while formal slice completion remains
 backlog-blocked behind the active W66-S09 qualification closure.
 
+W70 defines the blocked successor design and implementation lane for a
+Task-first installed workspace: Tasks Home, safe Markdown sources, truthful
+task runner selection, active work, Attention, change review, and completion
+evidence. It starts only after W69 closes and does not change the W66 provider
+qualification hold.
+
 Mutable AOR data lives in `~/.aor`; `AOR_HOME` is reserved for isolated tests
 and rehearsals. Runner forks can be selected without shell aliases:
 

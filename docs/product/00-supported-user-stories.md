@@ -167,6 +167,13 @@ bounded text file, receives a read-only normalized preview, and confirms one
 durable Flow without learning repository IDs, mounts, KPI syntax, or runtime
 paths.
 
+W70 targets the next presentation layer over those durable contracts: Tasks is
+the default home, New Task accepts plain-language intent plus immutable or
+revision-pinned Markdown sources, Prepared Task exposes Runner and write
+effects, and one Task workspace carries execution, attention, review, and
+completion. Runner remains an approved route selection, Markdown remains inert
+source material, and all mutations retain runtime-owned durable readback.
+
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.
 - Produce a delivery manifest that links execution to actual write-back artifacts.

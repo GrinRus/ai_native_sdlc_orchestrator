@@ -13,6 +13,8 @@
   `03-flow-centric-console-design.md`.
 - **Primary surface:** the packaged responsive local console launched through
   `aor app`.
+- **Target successor:** W70 Task Workspace in
+  `08-task-workspace-console-design.md`.
 
 This document defines the shipped successor to the W34 visual and interaction
 model. W63 established the behavior and W65 completed the single-renderer
@@ -613,9 +615,11 @@ where applicable.
 The references illustrate the target direction and are not screenshots of the
 implemented package.
 
-### 1. Guided Mission intake, desktop
+The original W63 PNG set was retired when W70 established the current visual
+acceptance target. The scenario descriptions remain as historical behavioral
+evidence, and the images are recoverable from Git history.
 
-![Guided Mission intake](assets/w63-quiet-cockpit-console/01-guided-mission-intake-desktop.png)
+### 1. Guided Mission intake, desktop
 
 - Scenario: initialized Project without an active Flow.
 - Primary object: structured Mission draft.
@@ -623,8 +627,6 @@ implemented package.
 - Required evidence: intake fields, scope, delivery mode, and operation preview.
 
 ### 2. Active Quiet Cockpit, desktop
-
-![Active Quiet Cockpit](assets/w63-quiet-cockpit-console/02-active-quiet-cockpit-desktop.png)
 
 - Scenario: active Discovery stage with no blocker.
 - Primary object: one safe next outcome.
@@ -634,8 +636,6 @@ implemented package.
 
 ### 3. Attention queue, desktop
 
-![Attention queue](assets/w63-quiet-cockpit-console/03-attention-queue-desktop.png)
-
 - Scenario: several pending items with a plan approval selected.
 - Primary object: selected durable attention item.
 - Primary action: **Approve plan v3** or another selected-item outcome.
@@ -644,16 +644,12 @@ implemented package.
 
 ### 4. Journey workbench, desktop
 
-![Journey workbench](assets/w63-quiet-cockpit-console/04-journey-workbench-desktop.png)
-
 - Scenario: active execution with a review-origin repair loop.
 - Primary object: selected lifecycle/task node.
 - Primary action: inspect the active run or supported recovery.
 - Required alternative: equivalent list/table dependencies and statuses.
 
 ### 5. Evidence ledger, desktop
-
-![Evidence ledger](assets/w63-quiet-cockpit-console/05-evidence-ledger-desktop.png)
 
 - Scenario: completed read-only Flow.
 - Primary object: immutable decision and artifact lineage.
@@ -662,8 +658,6 @@ implemented package.
   learning refs.
 
 ### 6. Blocked recovery, mobile
-
-![Blocked recovery on mobile](assets/w63-quiet-cockpit-console/06-blocked-recovery-mobile.png)
 
 - Scenario: failed required verification at 390x844.
 - Primary object: blocked recovery outcome.

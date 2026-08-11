@@ -73,18 +73,14 @@ are visual targets, not contracts or proof of implementation.
 - [Machine-checkable story coverage](../product/user-story-coverage-matrix.md)
 - [External console benchmark synthesis](../research/07-quiet-cockpit-console-benchmarks.md)
 
-### Quiet Cockpit target screens
+### Quiet Cockpit historical target screens
 
-- [Guided Mission intake](../product/assets/w63-quiet-cockpit-console/01-guided-mission-intake-desktop.png)
-- [Active Quiet Cockpit](../product/assets/w63-quiet-cockpit-console/02-active-quiet-cockpit-desktop.png)
-- [Attention queue](../product/assets/w63-quiet-cockpit-console/03-attention-queue-desktop.png)
-- [Journey workbench](../product/assets/w63-quiet-cockpit-console/04-journey-workbench-desktop.png)
-- [Evidence ledger](../product/assets/w63-quiet-cockpit-console/05-evidence-ledger-desktop.png)
-- [Blocked recovery on mobile](../product/assets/w63-quiet-cockpit-console/06-blocked-recovery-mobile.png)
+The Guided Mission, Active Cockpit, Attention, Journey, Evidence, and mobile
+recovery scenarios remain specified in the Quiet Cockpit product document. The
+W63 PNG set was retired by W70 and is available in Git history.
 
 ### Current implemented before-state
 
-- [W34 screen set](../product/assets/w34-flow-centric-console/)
 - [W34 implementation plan](wave-34-implementation-slices.md)
 - [Current SPA](../../apps/web/src/spa.jsx)
 - [Current styles](../../apps/web/src/spa.css)

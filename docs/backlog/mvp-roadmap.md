@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-69-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-70-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -80,8 +80,9 @@ The authoritative planning model for implementation lives in:
 | W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
 | W68 | Add provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
+| W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
 
-The current roadmap contains **368 slices across 70 waves**.
+The current roadmap contains **376 slices across 71 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -1489,6 +1490,32 @@ the single-active-slice rule or historical W66 evidence.
   agree without changing the Anthropic/W66 hold.
 
 **Detailed slices:** `docs/backlog/wave-69-implementation-slices.md`
+
+## W70 - Task Workspace console
+
+**Goal:** Make Task the primary installed-console object, expose runner and
+write-back choices before execution, treat Markdown as immutable or pinned
+source material, and integrate activity, attention, review, and evidence into
+one coherent workspace.
+
+**Entry condition:** W69-S07 closes. W70 remains a blocked successor while the
+W66 qualification and W67-W69 dependency chain is open.
+
+**Exit criteria:**
+
+- the eight-screen target and semantic component system are implemented without
+  browser-owned lifecycle decisions;
+- task runner override is canonical, provider-neutral, readiness-checked, and
+  distinct from the project default;
+- uploaded and repository Markdown sources are bounded, immutable/pinned,
+  sanitized, stale-aware, and reviewable;
+- Tasks Home, active work, Attention, changes, checks, Evidence, and completion
+  are keyboard/responsive/reload/offline safe;
+- obsolete Quiet Cockpit UI paths and screenshots are retired only after
+  installed-package parity passes;
+- product, contracts, examples, stories, browser proof, and runbooks agree.
+
+**Detailed slices:** `docs/backlog/wave-70-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

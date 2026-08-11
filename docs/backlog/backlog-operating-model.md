@@ -1,6 +1,6 @@
 # Backlog operating model
 
-The latest defined wave is W69. It is registered behind W68-S05 and the
+The latest defined wave is W70. It is registered behind W69-S07 and the
 active W66-S09 qualification hold; it does not change the single-active-slice
 rule.
 
@@ -230,6 +230,11 @@ parity. It adds confirmation CAS, runtime-owned adaptive lifecycle states,
 resume-safe Project Home navigation, review-first Prepared Task editing,
 human-readable Flow Cockpit context, and incremental web cleanup without
 changing the historical W66 provider matrix policy.
+
+W70 is the blocked successor lane for the Task Workspace console. It replaces
+internal-object-first navigation with Tasks, adds truthful task runner override
+and Markdown source handling, unifies active work/review/evidence, and requires
+installed visual/accessibility proof before retiring the Quiet Cockpit surface.
 
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for

@@ -18,13 +18,9 @@ orchestration state.
 This document is the historical W34 before-state and preserves the history
 needed to explain the previous packaged console. It is not a current renderer.
 
-The adopted W63 target successor is
-`05-quiet-cockpit-console-design.md`: Quiet Cockpit is the installed
-default shell, with flow-scoped Attention, Journey, and Evidence modes. That target keeps the Flow
-semantics in this document, but changes information hierarchy, action
-semantics, responsive navigation, and the visual system. W63 supplied the
-executable journey/action baseline and W65 completed cutover, rollback rehearsal,
-legacy removal, and installed-package acceptance.
+W63/W65 adopted `05-quiet-cockpit-console-design.md` as the installed successor.
+W70 now defines the next target in `08-task-workspace-console-design.md`, while
+keeping the runtime-owned Flow semantics recorded here.
 
 ## Baseline
 
@@ -76,20 +72,12 @@ Creating a new flow always creates fresh mission/intake evidence and then
 refreshes `next-action-report`. A follow-up flow may cite a completed source
 flow's learning handoff, but the completed source flow remains read-only.
 
-## Screen references
+## Historical visual references
 
-| Screen | Reference |
-|---|---|
-| Readiness / first launch | ![Readiness / first launch](assets/w34-flow-centric-console/01-readiness-first-launch.png) |
-| Flow selector / new flow | ![Flow selector / new flow](assets/w34-flow-centric-console/02-flow-selector-new-flow.png) |
-| Active flow cockpit | ![Active flow cockpit](assets/w34-flow-centric-console/03-active-flow-cockpit.png) |
-| Ask AOR with flow target | ![Ask AOR with flow target](assets/w34-flow-centric-console/04-ask-aor-flow-target.png) |
-| Evidence graph with multi-flow context | ![Evidence graph with multi-flow context](assets/w34-flow-centric-console/05-evidence-graph-multi-flow.png) |
-| Runtime trace by flow | ![Runtime trace by flow](assets/w34-flow-centric-console/06-runtime-trace-by-flow.png) |
-| Interactions inbox with flow boundary | ![Interactions inbox with flow boundary](assets/w34-flow-centric-console/07-interactions-inbox-flow-boundary.png) |
-| Review / QA flow gate | ![Review / QA flow gate](assets/w34-flow-centric-console/08-review-qa-flow-gate.png) |
-| Delivery / release finalization | ![Delivery / release finalization](assets/w34-flow-centric-console/09-delivery-release-finalization.png) |
-| Learning closure / start new flow | ![Learning closure / start new flow](assets/w34-flow-centric-console/10-learning-closure-start-new-flow.png) |
+The W34 PNG set was retired when W70 established a single current visual
+acceptance target. This document preserves the behavioral baseline; the old
+images remain recoverable from Git history when historical comparison is
+required.
 
 ## Required implementation qualities
 
