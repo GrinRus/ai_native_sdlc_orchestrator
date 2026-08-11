@@ -2,6 +2,8 @@ route_id: route.repair.default
 step: repair
 route_class: repair
 risk_tier: medium
+required_output_schema_ref: runner-final-report@v1
+required_output_mode: structured-json
 primary:
   adapter: codex-cli
   provider: openai

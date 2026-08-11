@@ -27,6 +27,9 @@ reference-base rules](canonical-identifiers-and-paths.md).
 
 ## Execution and quality
 - `step-result.md`
+- `runner-output-envelope.md`
+- `runner-final-report.md`
+- `provider-work-packet.md`
 - `validation-report.md`
 - `evaluation-case-input.md`
 - `evaluation-case-expected.md`

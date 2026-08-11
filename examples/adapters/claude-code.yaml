@@ -19,6 +19,10 @@ model_aliases:
 launch_modes:
   - interactive
   - non-interactive
+supported_schema_refs:
+  - runner-final-report@v1
+supported_output_modes:
+  - structured-json
 capabilities:
   repo_read: true
   repo_write: true

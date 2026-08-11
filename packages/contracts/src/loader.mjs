@@ -6,6 +6,8 @@ import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } f
 import { validateStructuredTaskPlan } from "./structured-task-plan.mjs"; import { validateExternalRunnerSessionBudget, validateExternalRuntimeSessionBudget } from "./session-budget-validation.mjs";
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
 import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs"; import { validateOperatorControl } from "./operator-control-validation.mjs";
+import { RUNNER_OUTPUT_MODE_VALUES, validateExecutionOutcome, validateProviderWorkPacket, validateRunnerFinalReport, validateRunnerOutputEnvelope } from "./runner-output-validation.mjs";
+import { validateContextBudgetEstimate, validateContextSizeSources } from "./context-size-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"], WORK_TYPE_VALUES = ["analyze", "explain", "review", "document-change", "code-change"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
@@ -273,6 +275,18 @@ export function validateContractDocument({ family, document, source = "<in-memor
 
   if (family === "step-result") {
     issues.push(...validateStepResult(document, source));
+  }
+
+  if (family === "runner-output-envelope") {
+    issues.push(...validateRunnerOutputEnvelope(document, source));
+  }
+
+  if (family === "runner-final-report") {
+    issues.push(...validateRunnerFinalReport(document, source));
+  }
+
+  if (family === "provider-work-packet") {
+    issues.push(...validateProviderWorkPacket(document, source));
   }
 
   if (family === "validation-report") {
@@ -1195,6 +1209,30 @@ function validateArtifactPacket(document, source) {
  */
 function validateProviderRouteProfile(document, source) {
   const issues = [];
+  validateNestedStringField({ record: document, source, field: "required_output_schema_ref", issues, required: false });
+  if (
+    document.required_output_schema_ref !== undefined &&
+    (typeof document.required_output_schema_ref !== "string" || !/^[A-Za-z0-9._-]+@v\d+$/u.test(document.required_output_schema_ref))
+  ) {
+    issues.push(issue({
+      code: "field_type_mismatch",
+      source,
+      field: "required_output_schema_ref",
+      expected: "<family>@v<integer>",
+      actual: describeActualType(document.required_output_schema_ref),
+      message: "required_output_schema_ref must identify one versioned strict candidate schema.",
+    }));
+  }
+  if (document.required_output_mode !== undefined) {
+    validateNestedEnumStringField({
+      record: document,
+      source,
+      field: "required_output_mode",
+      allowedValues: RUNNER_OUTPUT_MODE_VALUES,
+      issues,
+      required: true,
+    });
+  }
   const validateCandidate = (candidate, field) => {
     if (candidate === undefined || candidate === null) return;
     if (!isPlainObject(candidate)) {
@@ -1242,6 +1280,39 @@ function validateAdapterCapabilityProfile(document, source) {
   validateNestedStringField({ record: document, source, field: "default_model", issues, required: false });
   validateOptionalStringArrayField({ record: document, source, field: "supported_models", issues });
   validateOptionalStringArrayField({ record: document, source, field: "supported_reasoning_efforts", issues });
+  const supportedSchemaRefs = validateOptionalStringArrayField({ record: document, source, field: "supported_schema_refs", issues });
+  if (supportedSchemaRefs) {
+    supportedSchemaRefs.forEach((schemaRef, index) => {
+      if (/^[A-Za-z0-9._-]+@v\d+$/u.test(schemaRef)) return;
+      issues.push(issue({
+        code: "field_type_mismatch",
+        source,
+        field: `supported_schema_refs[${index}]`,
+        expected: "<family>@v<integer>",
+        actual: schemaRef,
+        message: `Field 'supported_schema_refs[${index}]' must identify one versioned output schema.`,
+      }));
+    });
+  }
+  const supportedOutputModes = validateOptionalStringArrayField({
+    record: document,
+    source,
+    field: "supported_output_modes",
+    issues,
+  });
+  if (supportedOutputModes) {
+    supportedOutputModes.forEach((mode, index) => {
+      if (RUNNER_OUTPUT_MODE_VALUES.includes(mode)) return;
+      issues.push(issue({
+        code: "enum_value_invalid",
+        source,
+        field: `supported_output_modes[${index}]`,
+        expected: RUNNER_OUTPUT_MODE_VALUES.join("|"),
+        actual: mode,
+        message: `Field 'supported_output_modes[${index}]' has unsupported output mode '${mode}'.`,
+      }));
+    });
+  }
   if (document.model_aliases !== undefined) {
     if (!isPlainObject(document.model_aliases)) {
       issues.push(issue({ code: "field_type_mismatch", source, field: "model_aliases", expected: "object", actual: describeActualType(document.model_aliases), message: "model_aliases must be an object." }));
@@ -1364,86 +1435,6 @@ function validateAdapterCapabilityProfile(document, source) {
 }
 
 /**
- * @param {Record<string, unknown>} estimate
- * @param {string} source
- * @param {string} parentField
- * @param {import("./index.d.ts").ContractValidationIssue[]} issues
- * @param {{ requireBudgetLimit?: boolean }} [options]
- */
-function validateContextBudgetEstimate(estimate, source, parentField, issues, options = {}) {
-  for (const field of ["bytes", "chars", "estimated_tokens"]) {
-    validateNestedNumberField({
-      record: estimate,
-      source,
-      field: `${parentField}.${field}`,
-      issues,
-      required: true,
-    });
-  }
-  validateNestedNumberField({
-    record: estimate,
-    source,
-    field: `${parentField}.budget_limit_tokens`,
-    issues,
-    required: options.requireBudgetLimit === true,
-    allowNull: true,
-  });
-}
-
-/**
- * @param {unknown} value
- * @param {string} source
- * @param {string} field
- * @param {import("./index.d.ts").ContractValidationIssue[]} issues
- */
-function validateContextSizeSources(value, source, field, issues) {
-  if (!Array.isArray(value)) {
-    issues.push(
-      issue({
-        code: value === undefined ? "required_field_missing" : "field_type_mismatch",
-        source,
-        field,
-        expected: "array",
-        actual: value === undefined ? "missing" : describeActualType(value),
-        message: `Field '${field}' must be an array of context size source entries.`,
-      }),
-    );
-    return;
-  }
-  value.forEach((entry, index) => {
-    if (!isPlainObject(entry)) {
-      issues.push(
-        issue({
-          code: "field_type_mismatch",
-          source,
-          field: `${field}[${index}]`,
-          expected: "object",
-          actual: describeActualType(entry),
-          message: `Field '${field}[${index}]' must be 'object'.`,
-        }),
-      );
-      return;
-    }
-    validateNestedStringField({
-      record: entry,
-      source,
-      field: `${field}[${index}].source`,
-      issues,
-      required: true,
-    });
-    for (const sizeField of ["bytes", "chars", "estimated_tokens"]) {
-      validateNestedNumberField({
-        record: entry,
-        source,
-        field: `${field}[${index}].${sizeField}`,
-        issues,
-        required: true,
-      });
-    }
-  });
-}
-
-/**
  * @param {Record<string, unknown>} document
  * @param {string} source
  * @returns {import("./index.d.ts").ContractValidationIssue[]}
@@ -1522,6 +1513,8 @@ function validateCompiledContextArtifact(document, source) {
 function validateStepResult(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+
+  issues.push(...validateExecutionOutcome(document.execution_outcome, source));
 
   validateStringArrayItems({ values: document.evidence_refs, source, field: "evidence_refs", issues });
   validateQualityRepairLineage({

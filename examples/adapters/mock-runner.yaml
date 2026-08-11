@@ -3,6 +3,10 @@ runner_family: mock
 version: 1
 launch_modes:
   - non-interactive
+supported_schema_refs:
+  - runner-final-report@v1
+supported_output_modes:
+  - structured-json
 capabilities:
   repo_read: true
   repo_write: true

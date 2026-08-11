@@ -4,26 +4,29 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 22,
-    "source_manifest_sha256": "0d423036604085cbd83f3e4124d44d9fb8e7a97728393325080aad174932ecca"
+    "source_file_count": 25,
+    "source_manifest_sha256": "cdf954f7ad62cd1c374b7271a93f062d4c9170f9584d4e6fc4b258cb2be76007"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
+    "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
-    "example-reference-validation.mjs": "5b7777c6bd6f90903474eb603b6fc66b02aa503d7fb25885746fd06d3b7f7670",
+    "example-reference-validation.mjs": "2e392196356e875248078cea3d2ef4c1ffc909eea21411be636654a62a26365d",
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "32febfcc4a257abc05c72321182bee2d604f02376ebcd127f235641e57e30d9e",
-    "index.d.ts": "1fba93263f1866ad99398bd1362d3f4c2589088e201430b531634b9874cd93fa",
+    "families.mjs": "d7d19e19a264b0da05a347115dcc58d98759965fc9e74b18784c05d0c78f3160",
+    "index.d.ts": "a16f5722018280ceda9a2d6788b130dc1305a184b0d8e0b0a6f8a803153d3b24",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
-    "loader.mjs": "bf95e0384f01a938dfcbae9ed078d51e7f4486918916c0a7b71b1c52098cf6f9",
+    "loader.mjs": "1e2ac7729ed40311581b0c67c90475c1b16049446285f5713f89b4e8b9724a08",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
-    "reference-registry.mjs": "90e94fad7a8cc231ad14714cd885a3961ad3e8625a77e0aafc31538c3fa965b5",
+    "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
+    "runner-output-contract-families.mjs": "734d4dcf4d0bcbf6810ce0e69435ee191eea6dc238d853c3168c41c293fc76fc",
+    "runner-output-validation.mjs": "f0d54d2ea84d229068e9448e92ce208b1d449885a47c24df729bc21f77f9e9fa",
     "runtime-harness-validation.mjs": "75cd2ee07e4f72ebb36261160e97eeb16e99b0d4d3a8075d0136bd65e44189df",
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
@@ -1176,6 +1179,138 @@
       ]
     },
     {
+      "family": "runner-output-envelope",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/runner-output-envelope.md",
+      "exampleGlob": "examples/reports/runner-output-envelope*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "requested_schema_ref",
+        "parse_status",
+        "candidate",
+        "normalized_issues",
+        "raw_evidence_ref",
+        "query_safe"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "requested_schema_ref": "string",
+        "parse_status": "string",
+        "normalized_issues": "array",
+        "raw_evidence_ref": "string",
+        "query_safe": "boolean"
+      },
+      "enumChecks": [
+        {
+          "field": "parse_status",
+          "allowedValues": [
+            "valid",
+            "missing",
+            "malformed",
+            "ambiguous",
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "runner-final-report",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/runner-final-report.md",
+      "exampleGlob": "examples/reports/runner-final-report*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "status",
+        "summary",
+        "changed_files",
+        "command_result_claims",
+        "verification",
+        "risks",
+        "repair_closure"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "status": "string",
+        "summary": "string",
+        "changed_files": "array",
+        "command_result_claims": "array",
+        "verification": "object",
+        "risks": "array"
+      },
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "completed",
+            "partial",
+            "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "provider-work-packet",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/provider-work-packet.md",
+      "exampleGlob": "examples/packets/provider-work-packet-v3*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "packet_kind",
+        "version",
+        "request_id",
+        "run_id",
+        "step_id",
+        "step_class",
+        "dry_run",
+        "adapter_id",
+        "route",
+        "asset_refs",
+        "policy",
+        "input_packet_refs",
+        "resolved_local_refs",
+        "execution_contract",
+        "context",
+        "evidence_refs",
+        "full_request_artifact_ref",
+        "output_contract"
+      ],
+      "fieldTypes": {
+        "packet_kind": "string",
+        "version": "number",
+        "request_id": "string",
+        "run_id": "string",
+        "step_id": "string",
+        "step_class": "string",
+        "dry_run": "boolean",
+        "adapter_id": "string",
+        "route": "object",
+        "asset_refs": "object",
+        "policy": "object",
+        "input_packet_refs": "array",
+        "resolved_local_refs": "array",
+        "execution_contract": "object",
+        "context": "object",
+        "evidence_refs": "array",
+        "full_request_artifact_ref": "string",
+        "output_contract": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "step_class",
+          "allowedValues": [
+            "artifact",
+            "planner",
+            "runner",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      ]
+    },
+    {
       "family": "validation-report",
       "familyGroup": "execution-and-quality",
       "sourceContract": "docs/contracts/validation-report.md",
@@ -1834,7 +1969,9 @@
         "step": "string",
         "route_class": "string",
         "risk_tier": "string",
-        "primary": "object"
+        "primary": "object",
+        "required_output_schema_ref": "string",
+        "required_output_mode": "string"
       },
       "enumChecks": []
     },
@@ -2548,6 +2685,21 @@
       "regex_source": "^examples\\/reports\\/step-result[^/]*\\.ya?ml$",
       "regex_flags": "",
       "family": "step-result"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/runner-output-envelope[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "runner-output-envelope"
+    },
+    {
+      "regex_source": "^examples\\/reports\\/runner-final-report[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "runner-final-report"
+    },
+    {
+      "regex_source": "^examples\\/packets\\/provider-work-packet-v3[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "provider-work-packet"
     },
     {
       "regex_source": "^examples\\/reports\\/validation-report[^/]*\\.ya?ml$",

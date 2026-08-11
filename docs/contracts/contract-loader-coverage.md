@@ -31,6 +31,9 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Core packets and profiles | `incident-report.md` | `incident-report` | `examples/reports/incident-report*.yaml` | implemented | Required fields plus nested validation for linkage arrays and recertification/platform rollback metadata. |
 | Execution and quality | `incident-backfill-proposal.md` | `incident-backfill-proposal` | `examples/reports/incident-backfill-proposal*.yaml` | implemented | Required fields + closed proposal-state vocabulary; runtime validation prevents proposal creation without incident, asset, suite, and dataset refs. |
 | Execution and quality | `step-result.md` | `step-result` | `examples/reports/step-result*.yaml` | implemented | Includes closed-set enum check for `step_class` plus nested validation for Runtime Harness decisions, interaction audit refs/state history, repair attempts, external runner evidence, and meaningful changed-path arrays. |
+| Execution and quality | `runner-output-envelope.md` | `runner-output-envelope` | `examples/reports/runner-output-envelope*.yaml` | implemented | Strict parse-status, exactly-one-candidate, 65,536-byte candidate, 64-issue, query-safe, and failure-kind/class mapping validation. |
+| Execution and quality | `runner-final-report.md` | `runner-final-report` | `examples/reports/runner-final-report*.yaml` | implemented | Model-authored candidate validation with AOR-owned identity, evidence, timestamps, validation, and aggregate fields rejected. |
+| Execution and quality | `provider-work-packet.md` | `provider-work-packet` | `examples/packets/provider-work-packet-v3*.yaml` | implemented | v3 output contract, exact candidate schema/mode, bounded status vocabulary, and one-to-one AOR command identity validation; v1/v2 remain replay-only. |
 | Execution and quality | `validation-report.md` | `validation-report` | `examples/reports/validation-report*.yaml` | implemented | Required fields plus closed validation statuses and nested validator object/evidence-ref checks. |
 | Execution and quality | `evaluation-case-input.md` | `evaluation-case-input` | `examples/eval/cases/**/input.yaml` | implemented | Immutable case identity, version, subject family, and content. |
 | Execution and quality | `evaluation-case-expected.md` | `evaluation-case-expected` | `examples/eval/cases/**/expected.yaml` | implemented | Bounded deterministic assertion vocabulary and JSON Pointer validation. |
@@ -45,7 +48,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Execution and quality | `promotion-decision.md` | `promotion-decision` | `examples/packets/promotion-decision-*.yaml` | implemented | Includes closed-set enum checks for promotion channels and certification status (`pass|hold|fail`). |
 | Execution and quality | `compiled-context-artifact.md` | `compiled-context-artifact` | `examples/context/compiled/*.yaml` | implemented | Required fields + top-level type checks for compiled prompt, context, skill refs, packet, hash, and provenance lineage. |
 | Execution and quality | `operator-request.md` | `operator-request` | `examples/reports/operator-request*.yaml` | implemented | Required fields + closed target-stage, intent, delivery-mode, and status values for runtime-owned operator interventions. |
-| Platform assets | `provider-route-profile.md` | `provider-route-profile` | `examples/routes/*.yaml` | implemented | Required fields + top-level type checks. |
+| Platform assets | `provider-route-profile.md` | `provider-route-profile` | `examples/routes/*.yaml` | implemented | Required fields + top-level type checks and optional strict output schema/mode declarations. |
 | Platform assets | `wrapper-profile.md` | `wrapper-profile` | `examples/wrappers/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `prompt-bundle.md` | `prompt-bundle` | `examples/prompts/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `context-doc.md` | `context-doc` | `examples/context/docs/*.yaml` | implemented | Required fields + top-level type checks for metadata, source, and applicability. |
@@ -53,7 +56,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `context-skill.md` | `context-skill` | `examples/context/skills/*.yaml` | implemented | Required fields + top-level type checks for workflow, source refs, and applicability. |
 | Platform assets | `context-bundle.md` | `context-bundle` | `examples/context/bundles/*.yaml` | implemented | Required fields + top-level type checks for context refs, source refs, and selection policy. |
 | Platform assets | `step-policy-profile.md` | `step-policy-profile` | `examples/policies/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
-| Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
+| Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including optional explicit schema/output-mode support and deterministic `mock-runner` baseline profile. |
 | Platform assets | `skill-profile.md` | `skill-profile` | `examples/skills/*.yaml` | implemented | Includes closed-set enum check for `step_class` and required workflow shape. |
 | Operations | `run-job.md` | `run-job` | `examples/reports/run-job*.yaml` | implemented | Durable asynchronous worker ownership, revision, heartbeat, lifecycle status, cursor refs, and terminal evidence. |
 | Operations | `live-run-event.md` | `live-run-event` | `examples/reports/live-run-event*.yaml` | implemented | Closed-set `event_type` validation plus nested `payload.sequence`, interaction status, continuation metadata, answer-audit refs, and raw-answer rejection. |
@@ -92,6 +95,7 @@ The validator also enforces deterministic asset-graph compatibility after refere
 - wrapper `step_class` must match referenced prompt-bundle `step_class`;
 - suite `subject_type` must match referenced dataset `subject_type`;
 - route adapters must satisfy `required_adapter_capabilities[]`;
+- strict routes with `required_output_schema_ref`/`required_output_mode` must use adapters that declare both values explicitly;
 - project `allowed_adapters[]` must include adapters used by referenced default routes.
 
 ### Reference failure shapes

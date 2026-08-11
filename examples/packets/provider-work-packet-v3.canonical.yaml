@@ -1,0 +1,66 @@
+packet_kind: aor-provider-work-packet
+version: 3
+request_id: request.canonical
+run_id: run.canonical
+step_id: step.runner.1
+step_class: runner
+dry_run: false
+adapter_id: codex-cli
+route:
+  route_id: route.implement.default
+  route_class: runner
+  provider: openai
+asset_refs:
+  wrapper_ref: wrapper-implement-default@v1
+  prompt_bundle_ref: prompt-bundle://implement-default@v1
+  context_bundle_refs: []
+policy:
+  policy_id: policy.runner.default
+  resolved_bounds:
+    budget:
+      max_cost_usd: 25
+    writeback_mode:
+      mode: patch-only
+    command_constraints:
+      allow_unlisted_commands: false
+input_packet_refs:
+  - evidence://contracts/w66-s20/input-packet
+resolved_local_refs:
+  - role: provider_work_packet
+    evidence_ref: evidence://contracts/w66-s20/provider-work-packet
+    local_path: .aor/replay/provider-work-packet.json
+    required: true
+    kind: provider-work-packet
+execution_contract:
+  mode: write-capable
+  required_commands:
+    - pnpm test
+  target_write_allowed: true
+  upstream_write_allowed: false
+context:
+  compiled_context_ref: evidence://contracts/w66-s20/compiled-context
+  effective_assets: []
+  required_inputs_resolved: {}
+evidence_refs:
+  - evidence://contracts/w66-s20/provider-work-packet
+full_request_artifact_ref: evidence://contracts/w66-s20/request-artifact
+output_contract:
+  schema_ref: runner-final-report@v1
+  output_mode: structured-json
+  candidate_rule: exactly-one-candidate
+  required_sections:
+    - status
+    - summary
+    - changed_files
+    - command_result_claims
+    - verification
+    - risks
+    - repair_closure
+  status_vocabulary:
+    - completed
+    - partial
+    - blocked
+  max_candidate_bytes: 65536
+  required_commands:
+    - command_id: aor.command.target.post-change-test
+      command: pnpm test

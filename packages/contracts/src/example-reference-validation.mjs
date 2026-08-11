@@ -475,6 +475,35 @@ export function validateExampleReferences(options = {}) {
           );
         }
       }
+
+      const requiredOutputSchemaRef = document.required_output_schema_ref;
+      const requiredOutputMode = document.required_output_mode;
+      if (requiredOutputSchemaRef || requiredOutputMode) {
+        const routeAdapterRefs = extractRouteAdapterRefs(document);
+        for (const adapterRef of routeAdapterRefs) {
+          const adapterProfile = registry.adapterProfilesById.get(adapterRef.adapterId);
+          if (!adapterProfile) continue;
+          checkedCompatibility += 1;
+          const missingSchema = requiredOutputSchemaRef && !adapterProfile.supportedSchemaRefs.has(requiredOutputSchemaRef);
+          const missingMode = requiredOutputMode && !adapterProfile.supportedOutputModes.has(requiredOutputMode);
+          if (!missingSchema && !missingMode) continue;
+          const missing = [
+            missingSchema ? `schema ${requiredOutputSchemaRef}` : null,
+            missingMode ? `output mode ${requiredOutputMode}` : null,
+          ].filter(Boolean).join(", ");
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field: adapterRef.field,
+              reference: adapterRef.adapterId,
+              expected: "adapter with explicit strict output support",
+              actual: `missing ${missing}`,
+              message: `Adapter '${adapterRef.adapterId}' cannot qualify strict route output: missing ${missing}.`,
+            }),
+          );
+        }
+      }
     }
 
     if (result.family === "evaluation-suite") {

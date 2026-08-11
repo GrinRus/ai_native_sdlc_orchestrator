@@ -227,6 +227,28 @@ test("route required capabilities mismatch fails with reference_target_incompati
   });
 });
 
+test("strict route output support fails when an adapter only has the legacy structured-output boolean", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/adapters/codex-cli.yaml", (document) => {
+      delete document.supported_schema_refs;
+      delete document.supported_output_modes;
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+    assert.ok(
+      result.issues.some(
+        (issue) =>
+          issue.code === "reference_target_incompatible" &&
+          issue.field === "primary.adapter" &&
+          issue.reference === "codex-cli" &&
+          /strict route output/u.test(issue.message),
+      ),
+      "expected strict route output capability incompatibility",
+    );
+  });
+});
+
 test("project default route using non-allowed adapter fails with reference_target_incompatible", () => {
   withTempWorkspace((tempRoot) => {
     mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
