@@ -1,0 +1,13 @@
+schema_version: 1
+status: completed
+summary: Implemented the requested bounded change and ran the declared checks.
+changed_files:
+  - packages/example/src/index.mjs
+command_result_claims:
+  - command: pnpm test
+    status: passed
+    summary: Focused tests completed successfully.
+verification:
+  summary: The runner observed a clean focused verification result.
+risks: []
+repair_closure: null

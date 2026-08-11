@@ -2,8 +2,7 @@ import { TOPOLOGY_CONTRACT_FAMILIES, TOPOLOGY_EXAMPLE_RULES } from "./topology-c
 import { EXECUTION_READINESS_CONTRACT_FAMILIES, EXECUTION_READINESS_EXAMPLE_RULES } from "./execution-readiness-contract-families.mjs";
 import { INTEGRATION_CONTRACT_FAMILIES, INTEGRATION_EXAMPLE_RULES } from "./integration-contract-family.mjs";
 import { EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES, EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES } from "./external-run-projection-contract-family.mjs";
-import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs";
-const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
+import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs"; import { RUNNER_OUTPUT_CONTRACT_FAMILIES, RUNNER_OUTPUT_EXAMPLE_RULES } from "./runner-output-contract-families.mjs"; const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
 const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
@@ -654,7 +653,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     },
     enumChecks: [{ field: "step_class", allowedValues: STEP_CLASS_VALUES }],
   },
-  {
+  ...RUNNER_OUTPUT_CONTRACT_FAMILIES, {
     family: "validation-report",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/validation-report.md",
@@ -1124,6 +1123,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       route_class: "string",
       risk_tier: "string",
       primary: "object",
+      required_output_schema_ref: "string", required_output_mode: "string",
     },
     enumChecks: [],
   },
@@ -1578,7 +1578,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/reports\/incident-report[^/]*\.ya?ml$/, family: "incident-report" },
   { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
   { regex: /^examples\/reports\/step-result[^/]*\.ya?ml$/, family: "step-result" },
-  { regex: /^examples\/reports\/validation-report[^/]*\.ya?ml$/, family: "validation-report" },
+  ...RUNNER_OUTPUT_EXAMPLE_RULES, { regex: /^examples\/reports\/validation-report[^/]*\.ya?ml$/, family: "validation-report" },
   { regex: /^examples\/reports\/review-report[^/]*\.ya?ml$/, family: "review-report" },
   { regex: /^examples\/reports\/quality-repair-request[^/]*\.ya?ml$/, family: "quality-repair-request" },
   { regex: /^examples\/reports\/live-run-event[^/]*\.ya?ml$/, family: "live-run-event" },

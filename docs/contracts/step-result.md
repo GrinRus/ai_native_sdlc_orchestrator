@@ -72,10 +72,15 @@ blocker and remains distinct from timeout, cancellation,
 `compiled_context_budget_exceeded`, and
 `provider_context_window_exceeded`.
 Adapter output may additionally carry `execution_outcome` with
-`schema_version: 1`. Its `process`, `transport`, `provider`, and `verification`
-members are independent: process exit zero and completed transport do not imply
-provider or verification success. Consumers must fail closed on explicit
-`partial`, `incomplete`, `failed`, `blocked`, or `not_pass` provider outcomes.
+`schema_version: 1`. Its `process`, `transport`, `provider`, `parsing`,
+`candidate`, `validation`, `verification`, and `mission` members are
+independent: process exit zero and completed transport do not imply provider,
+candidate, validation, verification, or mission success. Consumers must fail
+closed on explicit `partial`, `incomplete`, `failed`, `blocked`, or `not_pass`
+outcomes at any layer. `candidate` describes acceptance of the one requested
+schema-bound candidate; `validation` describes deterministic validators;
+`mission` describes the semantic result after authoritative evidence is
+joined.
 Unknown provider vocabulary remains `provider.status=unknown` and cannot be
 promoted to verified completion. Provider-specific stream parsing stays inside
 the adapter; shared surfaces receive only normalized, redacted progress and

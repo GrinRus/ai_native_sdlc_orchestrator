@@ -1267,7 +1267,7 @@ installed-console gates are trustworthy.
 ## W66-S20 — Runner output contract and failure taxonomy
 
 - **Epic:** EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** Every adapter-backed step declares one expected structured-output
   family before provider spawn, and public contracts distinguish process,
   transport, provider, parsing, validation, verification, and mission outcomes.
@@ -1399,7 +1399,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S21 — Adapter output normalization and acceptance
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** External-process adapters normalize native output into the shared
   envelope and reject empty, malformed, ambiguous, unsupported, or partial
   candidates even when the provider process exits zero.

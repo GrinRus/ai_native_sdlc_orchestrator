@@ -188,7 +188,7 @@ export function extractRouteAdapterRefs(routeProfile) {
  *   contextBundlesByRef: Map<string, { source: string, steps: Set<string>, contextDocRefs: string[], contextRuleRefs: string[], contextSkillRefs: string[] }>,
  *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
- *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
+ *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string>, supportedSchemaRefs: Set<string>, supportedOutputModes: Set<string> }>,
  *   knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>>,
  * }}
  */
@@ -217,7 +217,7 @@ export function buildReferenceRegistry(results, workspaceRoot) {
   const promptBundlesByRef = new Map();
   /** @type {Map<string, { source: string, subjectType: string | null }>} */
   const datasetsByRef = new Map();
-  /** @type {Map<string, { source: string, capabilities: Set<string> }>} */
+  /** @type {Map<string, { source: string, capabilities: Set<string>, supportedSchemaRefs: Set<string>, supportedOutputModes: Set<string> }>} */
   const adapterProfilesById = new Map();
   /** @type {Map<string, Set<import("./index.d.ts").ContractFamily>>} */
   const knownReferenceFamilies = new Map();
@@ -376,6 +376,16 @@ export function buildReferenceRegistry(results, workspaceRoot) {
           adapterProfilesById.set(adapterId, {
             source: result.source,
             capabilities,
+            supportedSchemaRefs: new Set(
+              Array.isArray(document.supported_schema_refs)
+                ? document.supported_schema_refs.filter((value) => typeof value === "string")
+                : [],
+            ),
+            supportedOutputModes: new Set(
+              Array.isArray(document.supported_output_modes)
+                ? document.supported_output_modes.filter((value) => typeof value === "string")
+                : [],
+            ),
           });
         }
         break;

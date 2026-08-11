@@ -13,6 +13,14 @@ Capability matrix for a runner adapter such as repo write support, shell access,
 Routing should depend on declared capabilities rather than assumptions.
 Capability negotiation must happen before adapter invocation; missing required capabilities are deterministic pre-execution failures.
 `mock-runner` is the deterministic dry-run baseline profile for rehearsals and tests.
+Adapters that can satisfy a strict structured-output route may declare
+`supported_schema_refs[]` and `supported_output_modes[]`. The schema refs use
+the exact `<family>@v<integer>` form and output modes are adapter-neutral
+values such as `structured-json`, `stream-json`, and
+`jsonl-terminal-event`. The legacy `capabilities.structured_output` boolean
+remains readable for compatibility, but it is not sufficient to qualify a
+strict route. A strict route must find the requested schema and output mode in
+these declarations or in durable qualification evidence before spawn.
 External-process adapter baselines can add optional execution metadata without changing required fields. `execution` remains optional for dry-run, candidate, and interactive-only adapters. When a required provider route points at an external-process adapter, that adapter must be runnable and declare:
 - `execution.live_baseline: true`
 - `execution.runtime_mode: external-process`

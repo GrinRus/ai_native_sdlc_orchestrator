@@ -90,6 +90,120 @@ test("loads all examples through the shared contracts path", () => {
   assert.equal(loaded.ok, true, "batch example loading should pass");
 });
 
+test("W66-S20 runner contracts enforce strict candidate and command boundaries", () => {
+  const envelope = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/runner-output-envelope.canonical.yaml"),
+    family: "runner-output-envelope",
+  });
+  const finalReport = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/runner-final-report.canonical.yaml"),
+    family: "runner-final-report",
+  });
+  const packet = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/packets/provider-work-packet-v3.canonical.yaml"),
+    family: "provider-work-packet",
+  });
+  assert.equal(envelope.ok, true);
+  assert.equal(finalReport.ok, true);
+  assert.equal(packet.ok, true);
+
+  const missingCandidate = structuredClone(envelope.document);
+  missingCandidate.parse_status = "missing";
+  missingCandidate.candidate = null;
+  assert.equal(validateContractDocument({ family: "runner-output-envelope", document: missingCandidate }).ok, true);
+
+  const malformedCandidate = structuredClone(envelope.document);
+  malformedCandidate.parse_status = "malformed";
+  malformedCandidate.candidate = null;
+  assert.equal(validateContractDocument({ family: "runner-output-envelope", document: malformedCandidate }).ok, true);
+
+  const invalidCandidate = structuredClone(envelope.document);
+  invalidCandidate.candidate = null;
+  assertValidationIssue(
+    validateContractDocument({ family: "runner-output-envelope", document: invalidCandidate }),
+    "field_type_mismatch",
+    "candidate",
+  );
+
+  const forbiddenCandidate = structuredClone(envelope.document);
+  forbiddenCandidate.candidate.prompt = "secret-canary";
+  assertValidationIssue(
+    validateContractDocument({ family: "runner-output-envelope", document: forbiddenCandidate }),
+    "unsupported_field_present",
+    "candidate.prompt",
+  );
+
+  const unsafeEnvelope = structuredClone(envelope.document);
+  unsafeEnvelope.query_safe = false;
+  assertValidationIssue(
+    validateContractDocument({ family: "runner-output-envelope", document: unsafeEnvelope }),
+    "enum_value_invalid",
+    "query_safe",
+  );
+
+  const invalidIssue = structuredClone(envelope.document);
+  invalidIssue.normalized_issues = [
+    {
+      issue_code: "runner-output",
+      failure_kind: "runner-output-missing",
+      failure_class: "incomplete-result",
+      summary: "Candidate was absent.",
+    },
+  ];
+  assertValidationIssue(
+    validateContractDocument({ family: "runner-output-envelope", document: invalidIssue }),
+    "enum_value_invalid",
+    "normalized_issues[0].failure_class",
+  );
+
+  const modelOwnedIdentity = structuredClone(finalReport.document);
+  modelOwnedIdentity.run_id = "run.model-owned";
+  assertValidationIssue(
+    validateContractDocument({ family: "runner-final-report", document: modelOwnedIdentity }),
+    "unsupported_field_present",
+    "run_id",
+  );
+
+  const legacyPacket = structuredClone(packet.document);
+  legacyPacket.version = 2;
+  assertValidationIssue(
+    validateContractDocument({ family: "provider-work-packet", document: legacyPacket }),
+    "enum_value_invalid",
+    "version",
+  );
+
+  const mismatchedCommandPacket = structuredClone(packet.document);
+  mismatchedCommandPacket.output_contract.required_commands[0].command = "pnpm lint";
+  assertValidationIssue(
+    validateContractDocument({ family: "provider-work-packet", document: mismatchedCommandPacket }),
+    "field_type_mismatch",
+    "output_contract.required_commands",
+  );
+
+  const incompleteOutputContract = structuredClone(packet.document);
+  delete incompleteOutputContract.output_contract.required_sections;
+  assertValidationIssue(
+    validateContractDocument({ family: "provider-work-packet", document: incompleteOutputContract }),
+    "required_field_missing",
+    "output_contract.required_sections",
+  );
+});
+
+test("step result keeps execution outcome dimensions independent", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"),
+    family: "step-result",
+  });
+  assert.equal(loaded.ok, true);
+  const invalid = structuredClone(loaded.document);
+  delete invalid.execution_outcome.validation;
+  assertValidationIssue(
+    validateContractDocument({ family: "step-result", document: invalid }),
+    "required_field_missing",
+    "execution_outcome.validation",
+  );
+});
+
 test("canonical public identifiers reject traversal, separators, controls, Unicode, and lossy normalization", () => {
   for (const value of ["a", "aor-core", "run.canonical_1", `a${"b".repeat(126)}c`]) {
     assert.equal(validatePublicId(value).ok, true, value);

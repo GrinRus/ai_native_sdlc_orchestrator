@@ -29,6 +29,12 @@ Each primary or fallback candidate may optionally declare `model` and
 `reasoning_effort`. When omitted, the selected external runtime owns its native
 default; provider-specific flags must remain inside the adapter profile.
 
+Strict live or write-capable routes may add `required_output_schema_ref` and
+`required_output_mode`. When present, the selected adapter must explicitly
+declare the schema ref in `supported_schema_refs[]` and the mode in
+`supported_output_modes[]`; the legacy `structured_output` boolean alone does
+not qualify the route.
+
 Each fallback candidate may execute at most once, in declared order, only when
 its adapter satisfies the same capability requirements and the canonical
 failure class is listed by the resolved retry policy. Exhaustion and skipped

@@ -23,6 +23,25 @@ external_runner:
   raw_evidence_ref: evidence://contracts/w23-s01/external-runner-raw
   exit_code: 0
   timed_out: false
+execution_outcome:
+  schema_version: 1
+  process:
+    status: completed
+    exit_code: 0
+  transport:
+    status: completed
+  provider:
+    status: completed
+  parsing:
+    status: valid
+  candidate:
+    status: accepted
+  validation:
+    status: pass
+  verification:
+    status: pass
+  mission:
+    status: satisfied
 requested_interaction:
   requested: true
   interaction_id: interaction.canonical.1
