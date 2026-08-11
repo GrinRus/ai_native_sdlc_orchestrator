@@ -41,6 +41,7 @@ const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
 const QUALIFYING_FEATURE_SIZES = new Set(["medium", "large"]);
 const REQUIRED_PROVIDER_COUNTS = Object.freeze({
   "openai-primary": 2,
+  "anthropic-primary": 2,
 });
 
 /**
@@ -393,7 +394,7 @@ function updateQualificationSet(options) {
   const requiredQualificationMatrix = evaluateQualificationMatrix(qualification_cell_reports);
   const qualification_status = requiredQualificationMatrix.status === "pass" ? "passed" : "incomplete";
   const document = {
-    qualification_report_id: "live-e2e.codex-qualification.v1",
+    qualification_report_id: "live-e2e.w66-qualification.v1",
     schema_version: 2,
     required_cells: REQUIRED_QUALIFICATION_CELLS,
     required_provider_counts: REQUIRED_PROVIDER_COUNTS,

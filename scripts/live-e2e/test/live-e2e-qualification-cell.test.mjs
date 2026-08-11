@@ -118,12 +118,14 @@ test("qualification cell blocks missing final assessment and partial diagnostic 
   }
 });
 
-test("required qualification matrix is exactly Codex medium/large cells on one commit", () => {
+test("required qualification matrix is exactly Codex and Anthropic medium/large cells on one commit", () => {
   assert.deepEqual(
     REQUIRED_QUALIFICATION_CELLS.map((entry) => entry.cell_id),
     [
       "openai-primary.medium",
       "openai-primary.large",
+      "anthropic-primary.medium",
+      "anthropic-primary.large",
     ],
   );
   const commit = "abcdef0123456789abcdef0123456789abcdef01";
