@@ -181,6 +181,92 @@ export function checkW66QualificationClosure({
     };
   }
 
+  if (closure.status === "blocked" && index.status === "blocked") {
+    if (
+      closure.release_disposition !== "audit-hold" ||
+      closure.release_clearance !== false ||
+      closure.required_cell_count !== 4 ||
+      closure.same_commit_matrix !== true ||
+      closure.no_upstream_write !== true ||
+      closure.installed_baseline_status !== "pass" ||
+      !Number.isInteger(closure.passing_cell_count) ||
+      closure.passing_cell_count < 0 ||
+      closure.passing_cell_count >= closure.required_cell_count
+    ) {
+      findings.push(
+        "blocked W66 closure must preserve audit hold, same-commit/no-write proof, a passing installed baseline, and a partial passing count",
+      );
+    }
+    if (
+      index.installed_baseline?.status !== "pass" ||
+      index.installed_baseline?.commit_sha !== closure.qualification_commit ||
+      index.installed_baseline?.ui_ux_status !== "pass" ||
+      index.installed_baseline?.accessibility_status !== "pass" ||
+      index.installed_baseline?.no_source_write !== true
+    ) {
+      findings.push("blocked evidence index must retain one passing installed baseline");
+    } else {
+      validateArtifactDigests(
+        index.installed_baseline.artifact_digests,
+        REQUIRED_INSTALLED_ARTIFACTS,
+        "installed baseline",
+        findings,
+      );
+    }
+    for (const cell of cells) {
+      if (cell.status === "pass") {
+        if (
+          !cell.run_id ||
+          cell.commit_sha !== closure.qualification_commit ||
+          cell.run_health_status !== "pass" ||
+          cell.production_proof_status !== "pass" ||
+          cell.final_assessment_status !== "pass" ||
+          cell.no_upstream_write_status !== "pass"
+        ) {
+          findings.push(`passing blocked-closure cell '${cell.cell_id}' is incomplete`);
+        }
+        validateArtifactDigests(cell.artifact_digests, REQUIRED_CELL_ARTIFACTS, `cell '${cell.cell_id}'`, findings);
+      } else if (cell.status === "blocked") {
+        if (
+          !cell.run_id ||
+          cell.commit_sha !== closure.qualification_commit ||
+          cell.run_health_status !== "blocked" ||
+          cell.production_proof_status !== "blocked" ||
+          cell.final_assessment_status !== "not-run" ||
+          cell.no_upstream_write_status !== "pass" ||
+          !cell.blocker_reason
+        ) {
+          findings.push(`blocked-closure cell '${cell.cell_id}' must record a bounded blocker and no-write status`);
+        }
+        validateArtifactDigests(
+          cell.artifact_digests,
+          ["run_summary", "observation_report", "run_health_report", "qualification_cell_report"],
+          `blocked cell '${cell.cell_id}'`,
+          findings,
+        );
+        if (Object.hasOwn(cell.artifact_digests ?? {}, "final_assessment")) {
+          findings.push(`blocked cell '${cell.cell_id}' must not claim a final assessment digest`);
+        }
+      } else {
+        findings.push(`blocked closure cell '${cell.cell_id}' must be pass or blocked`);
+      }
+    }
+    if (closure.passing_cell_count !== cells.filter((cell) => cell.status === "pass").length) {
+      findings.push("blocked closure passing_cell_count must match the evidence index");
+    }
+    return {
+      id: "w66-qualification-closure",
+      status: findings.length === 0 ? "pass" : "fail",
+      qualified: false,
+      summary:
+        findings.length === 0
+          ? "W66 qualification is explicitly blocked by one or more required provider cells under audit hold."
+          : "Blocked W66 qualification closure evidence is invalid.",
+      findings,
+      evidence: [closureReportPath, evidenceIndexPath],
+    };
+  }
+
   if (closure.status !== "passed" || index.status !== "passed") {
     findings.push("closure report and evidence index statuses must both be pending or passed");
   }

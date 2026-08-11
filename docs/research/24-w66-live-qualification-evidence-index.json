@@ -1,68 +1,134 @@
 {
   "schema_version": 1,
   "kind": "w66-live-qualification-evidence-index",
-  "status": "pending",
-  "qualification_commit": null,
+  "status": "blocked",
+  "qualification_commit": "a329477c8dee616450d3732874155e8b4cfa34af",
   "target_repository": "https://github.com/sindresorhus/ky.git",
   "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
   "path_policy": "path-neutral-content-addressed",
   "installed_baseline": {
-    "run_id": null,
-    "commit_sha": null,
-    "status": "not-run",
-    "ui_ux_status": "not-run",
-    "accessibility_status": "not-run",
-    "no_source_write": false,
-    "artifact_digests": {}
+    "run_id": "w66-s09-installed-a329477c",
+    "commit_sha": "a329477c8dee616450d3732874155e8b4cfa34af",
+    "status": "pass",
+    "ui_ux_status": "pass",
+    "accessibility_status": "pass",
+    "no_source_write": true,
+    "artifact_digests": {
+      "run_summary": "3cc115a84772927adbb92efbd1448b70158dffb6cf08035b30d5db162decead1",
+      "observation_report": "0e496a52e7ff9002d440e5bd9ceb0ad0dad3cb77845c680df28ea88096823700",
+      "run_health_report": "04cd8a08a1cf799a2c1e3e6486c994c970a12c9ecb2b071458b995e3b9b34f87",
+      "final_assessment": "bdfac18b3f1d44f7018f9dd0363a615b6fb967871fcd305969d2b1c59ef6455e",
+      "browser_proof": "b4fe2d1cf6ee8deb42cbb37c11896067de0b94a530912ea7fe76f2c6273de386"
+    }
   },
   "cells": [
     {
       "cell_id": "openai-primary.medium",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml",
       "profile_sha256": "68ac0bb8b4b577876738f1a81700db33bd84afd8aeb5d534002baebb101637a4",
-      "run_id": null,
-      "status": "not-run",
-      "run_health_status": "not-run",
-      "production_proof_status": "not-run",
-      "final_assessment_status": "not-run",
-      "no_upstream_write_status": "not-run",
-      "artifact_digests": {}
+      "run_id": "w66-s09-medium-codex-a329477c",
+      "commit_sha": "a329477c8dee616450d3732874155e8b4cfa34af",
+      "status": "pass",
+      "run_health_status": "pass",
+      "production_proof_status": "pass",
+      "final_assessment_status": "pass",
+      "no_upstream_write_status": "pass",
+      "artifact_digests": {
+        "run_summary": "e39c0934f68f0f09f29cc0885c0e548f688df684a5a48345ae53ebf62c183b10",
+        "observation_report": "442fecb4efed5a90d747c04fba32f8d8a30abae04b7e1d95c3f0132e7950bcbc",
+        "run_health_report": "fe1917478c46a3f1ced51f29e247182f73322b03ac2c10673cc7fde5747674c0",
+        "qualification_cell_report": "b5ebf689f3cbbb138e85de1518a2f0b62207d04a35e1bc1580960ba55ea72ecc",
+        "final_assessment": "80f7bef7a4d6d0aed60ae856125fbd625dd8160f4328c30697d687bc9a7e200a"
+      },
+      "evidence_refs": {
+        "run_summary": "evidence://w66/openai-primary.medium/run-summary",
+        "observation_report": "evidence://w66/openai-primary.medium/observation-report",
+        "run_health_report": "evidence://w66/openai-primary.medium/run-health-report",
+        "qualification_cell_report": "evidence://w66/openai-primary.medium/qualification-cell-report",
+        "final_assessment": "evidence://w66/openai-primary.medium/final-assessment"
+      }
     },
     {
       "cell_id": "openai-primary.large",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-codex.yaml",
       "profile_sha256": "e55889bec9c41aaa5376995933da9a7d911f825b0e6804839c14dae3c634edbf",
-      "run_id": null,
-      "status": "not-run",
-      "run_health_status": "not-run",
-      "production_proof_status": "not-run",
-      "final_assessment_status": "not-run",
-      "no_upstream_write_status": "not-run",
-      "artifact_digests": {}
+      "run_id": "w66-s09-large-codex-a329477c",
+      "commit_sha": "a329477c8dee616450d3732874155e8b4cfa34af",
+      "status": "pass",
+      "run_health_status": "pass",
+      "production_proof_status": "pass",
+      "final_assessment_status": "pass",
+      "no_upstream_write_status": "pass",
+      "artifact_digests": {
+        "run_summary": "6f9570d3318c28e4fc12bb460336844fc71c51658c5e8d0e17fcd18b6c0aee77",
+        "observation_report": "790be96b511367b12db235e67dc5baf9c43d04d72fca9915e03e26b14d8a389f",
+        "run_health_report": "85eaf26ddd69371a1a9b6cf748466e949c5ab3180654852c91e257fe84485e38",
+        "qualification_cell_report": "48134529400d2ca6b4b556c2cd9407386c102c6c7640a55e08dff0b43a69b36f",
+        "final_assessment": "70fd8d1c6c015b62038c07aabf2f1fb9a0c7b2920eea3a288960ee60afb8d581"
+      },
+      "evidence_refs": {
+        "run_summary": "evidence://w66/openai-primary.large/run-summary",
+        "observation_report": "evidence://w66/openai-primary.large/observation-report",
+        "run_health_report": "evidence://w66/openai-primary.large/run-health-report",
+        "qualification_cell_report": "evidence://w66/openai-primary.large/qualification-cell-report",
+        "final_assessment": "evidence://w66/openai-primary.large/final-assessment"
+      }
     },
     {
       "cell_id": "anthropic-primary.medium",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-regress-ky-medium-anthropic.yaml",
       "profile_sha256": "9dba10cb863e3412b3e0674aa8695654b3f48ff9a7e0147f14f710fc21972b8d",
-      "run_id": null,
-      "status": "not-run",
-      "run_health_status": "not-run",
-      "production_proof_status": "not-run",
+      "run_id": "w66-s09-medium-anthropic-a329477c",
+      "commit_sha": "a329477c8dee616450d3732874155e8b4cfa34af",
+      "status": "blocked",
+      "run_health_status": "blocked",
+      "production_proof_status": "blocked",
       "final_assessment_status": "not-run",
-      "no_upstream_write_status": "not-run",
-      "artifact_digests": {}
+      "no_upstream_write_status": "pass",
+      "blocker_reason": "claude-code adapter preflight failed twice with external runner authentication/quota exhaustion (403); provider execution was not attempted.",
+      "artifact_digests": {
+        "run_summary": "f7b7f228c4dde00530b14088daba45632345e1063cd21b20bea0fe182cc9da1a",
+        "observation_report": "29a0622e1aa40b68390129856859e27f575d75cbf918e76237c46d948dae0fdb",
+        "run_health_report": "9f00ce4d5109f8aeb3f8534c81f8d2eaddfd0a9bd4a2eece520ddeabc88a603b",
+        "qualification_cell_report": "c9a5a4cd698cce9ab5952eea625eb0b13de1eab988b133ca9271e78218323306"
+      },
+      "evidence_refs": {
+        "run_summary": "evidence://w66/anthropic-primary.medium/run-summary",
+        "observation_report": "evidence://w66/anthropic-primary.medium/observation-report",
+        "run_health_report": "evidence://w66/anthropic-primary.medium/run-health-report",
+        "qualification_cell_report": "evidence://w66/anthropic-primary.medium/qualification-cell-report"
+      }
     },
     {
       "cell_id": "anthropic-primary.large",
       "profile_ref": "scripts/live-e2e/profiles/full-journey-governance-ky-large-anthropic.yaml",
       "profile_sha256": "b6440905b727bb6219e81f85b2749cc39c4467bf0c1ef5483fc81a040705c8e9",
-      "run_id": null,
-      "status": "not-run",
-      "run_health_status": "not-run",
-      "production_proof_status": "not-run",
+      "run_id": "w66-s09-large-anthropic-a329477c",
+      "commit_sha": "a329477c8dee616450d3732874155e8b4cfa34af",
+      "status": "blocked",
+      "run_health_status": "blocked",
+      "production_proof_status": "blocked",
       "final_assessment_status": "not-run",
-      "no_upstream_write_status": "not-run",
-      "artifact_digests": {}
+      "no_upstream_write_status": "pass",
+      "blocker_reason": "claude-code adapter preflight failed twice with external runner authentication/quota exhaustion (403); provider execution was not attempted.",
+      "artifact_digests": {
+        "run_summary": "e0ff6b53db4608bc2a5b243c2588895d5b907df4a0adb5ca396c5f1d5e57d404",
+        "observation_report": "ebc63cfd1c6b99a20cf49344dac08a569ccdac3d05f5a54107a65fc0b6cc1920",
+        "run_health_report": "1b981b3be3a806274e1f6c2b3f0c6f80ff5828bfd1f98b2c291884977bb0e195",
+        "qualification_cell_report": "6356c7ee115b4c8d0f5f177f728469e0ef93e6215cd41938286aa6b5e458664c"
+      },
+      "evidence_refs": {
+        "run_summary": "evidence://w66/anthropic-primary.large/run-summary",
+        "observation_report": "evidence://w66/anthropic-primary.large/observation-report",
+        "run_health_report": "evidence://w66/anthropic-primary.large/run-health-report",
+        "qualification_cell_report": "evidence://w66/anthropic-primary.large/qualification-cell-report"
+      }
     }
-  ]
+  ],
+  "blocking_cells": [
+    "anthropic-primary.medium",
+    "anthropic-primary.large"
+  ],
+  "blocker_summary": "Required Anthropic provider cells are blocked at adapter preflight because the host claude runner is Kimi-backed and its billing-cycle quota is exhausted. No provider execution or target mutation occurred.",
+  "generated_at": "2026-08-11T18:13:50.309Z"
 }

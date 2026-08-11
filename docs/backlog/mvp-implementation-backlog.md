@@ -619,7 +619,7 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S23 | Explicit quality-repair retry and attempt lineage | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | done | repair request/attempt contracts, observability service, CLI/API/OpenAPI, next-action/Flow projections, workspace/concurrency tests | W66-S22 |
 | W66-S24 | Structured artifact and evaluator hardening | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-7 | done | intent normalization, planner decomposition, semantic evaluation, live assessment projection, tests | W66-S23 |
 | W66-S25 | Weak-runner adversarial proof and qualification reset | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | done | adversarial fixtures, schema/provider parity, repair concurrency proof, deterministic gates, qualification manifest | W66-S24 |
-| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | ready | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S25 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | blocked | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S25 |
 
 ## Planning note
 
