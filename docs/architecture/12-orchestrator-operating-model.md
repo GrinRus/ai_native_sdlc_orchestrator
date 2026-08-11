@@ -127,6 +127,16 @@ Quality boundaries are explicit:
 - learning-loop quality is owned by learning scorecard and handoff artifacts;
 - asset lifecycle quality is owned by certification evidence and `promotion-decision`.
 
+Strict adapter-backed execution additionally follows ADR 0022. Every new live
+or write-capable step resolves one exact versioned candidate schema before
+provider spawn. Provider-native output is normalized by the adapter into a
+bounded query-safe envelope; deterministic schema, evidence, and command
+validation must pass before semantic evaluation or Runtime Harness mission
+pass. Process exit, transport completion, provider outcome, parsing, candidate
+status, validation, authoritative verification, and mission status remain
+independent evidence dimensions. Raw provider output is referenced as private
+evidence and never becomes an ordinary CLI/API/web projection.
+
 ## Canonical operating units
 - **Project profile** — persistent project defaults.
 - **Project analysis report** — repeatable onboarding knowledge.

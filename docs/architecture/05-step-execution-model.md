@@ -52,12 +52,22 @@ For routed adapter-backed steps, AOR uses a prepare-first lifecycle:
 1. load context and required packets;
 2. resolve route, wrappers, prompt bundle, context docs/rules/skills, and policy;
 3. compile and persist the `compiled-context` artifact;
-4. execute the step through the adapter request/response envelope;
-5. classify the adapter/runtime outcome;
-6. validate mission semantics such as changed paths, allowed scope, expected evidence, and delivery lineage;
-7. decide `pass`, `retry`, `repair`, `escalate`, `block`, or `fail`;
-8. run deterministic verification or eval when policy requires it;
-9. persist `step-result` decision metadata and update run-level Runtime Harness evidence.
+4. for strict execution, resolve one exact candidate schema and adapter schema
+   capability before spawn;
+5. execute the step through the adapter request/response envelope;
+6. normalize provider-native output and classify process, transport, provider,
+   and parsing outcomes independently;
+7. run `output-schema`, `evidence-complete`, and `validation-commands`
+   post-validation in order;
+8. validate mission semantics such as changed paths, allowed scope, expected evidence, and delivery lineage;
+9. run semantic evaluation only after structural validation passes;
+10. decide `pass`, `retry`, `repair`, `escalate`, `block`, or `fail`;
+11. persist `step-result` decision metadata and update run-level Runtime Harness evidence.
+
+ADR 0022 defines strict execution, the bounded runner-output envelope,
+provider work-packet v3 compatibility, authoritative ownership, canonical
+failure classes, and the separation between no-write output repair, no-write
+evidence reconciliation, and write-capable work-product repair.
 
 Simple read, list, and approval commands may participate in run evidence without compiling prompt/context artifacts.
 

@@ -16,6 +16,7 @@ not by themselves claim that the target stack is active.
 | `0005-operator-requests-runtime-interventions.md` | Accepted | Operator-initiated interventions are durable runtime-owned `operator-request` artifacts, not direct runner chat. | Ask AOR, request CLI/API, context compilation, proposal/patch evidence |
 | `0020-project-topology-and-local-bindings.md` | Accepted | Portable topology is separate from machine-local bindings. | Project, repository, component, and workspace-set identity |
 | `0021-central-aor-home-and-portable-project-config.md` | Accepted | Mutable runtime state lives under `~/.aor`; repository `.aor` is explicit portable output only. | Storage, onboarding, evidence, config export |
+| `0022-runner-output-acceptance-boundary.md` | Accepted | Strict adapter-backed execution resolves one schema before spawn and keeps process, parsing, validation, verification, and mission outcomes independent. | Runner output, provider work packet v3, adapter capability, Runtime Harness acceptance, repair |
 
 ## Target-architecture relationship
 
