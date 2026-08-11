@@ -118,6 +118,16 @@ export function validateRunnerOutputEnvelope(document, source) {
 export function validateRunnerFinalReport(document, source) {
   const issues = [];
   if (document.schema_version !== 1) issues.push(issue({ code: "enum_value_invalid", source, field: "schema_version", expected: "1", actual: String(document.schema_version), message: "runner-final-report must use schema_version=1." }));
+  nestedEnum(document, "status", ["blocked", "completed", "partial"], source, issues, true);
+  nestedString(document, "summary", source, issues, true);
+  if (!("changed_files" in document)) issues.push(issue({ code: "required_field_missing", source, field: "changed_files", expected: "array", actual: "missing", message: "Missing required field 'changed_files'." }));
+  else if (!Array.isArray(document.changed_files)) issues.push(issue({ code: "field_type_mismatch", source, field: "changed_files", expected: "array", actual: describeActualType(document.changed_files), message: "Field 'changed_files' must be 'array'." }));
+  if (!("command_result_claims" in document)) issues.push(issue({ code: "required_field_missing", source, field: "command_result_claims", expected: "array", actual: "missing", message: "Missing required field 'command_result_claims'." }));
+  else if (!Array.isArray(document.command_result_claims)) issues.push(issue({ code: "field_type_mismatch", source, field: "command_result_claims", expected: "array", actual: describeActualType(document.command_result_claims), message: "Field 'command_result_claims' must be 'array'." }));
+  if (!("verification" in document)) issues.push(issue({ code: "required_field_missing", source, field: "verification", expected: "object", actual: "missing", message: "Missing required field 'verification'." }));
+  else if (!isPlainObject(document.verification)) issues.push(issue({ code: "field_type_mismatch", source, field: "verification", expected: "object", actual: describeActualType(document.verification), message: "Field 'verification' must be 'object'." }));
+  if (!("risks" in document)) issues.push(issue({ code: "required_field_missing", source, field: "risks", expected: "array", actual: "missing", message: "Missing required field 'risks'." }));
+  else if (!Array.isArray(document.risks)) issues.push(issue({ code: "field_type_mismatch", source, field: "risks", expected: "array", actual: describeActualType(document.risks), message: "Field 'risks' must be 'array'." }));
   if (document.repair_closure === undefined) issues.push(issue({ code: "required_field_missing", source, field: "repair_closure", expected: "object|null", actual: "missing", message: "repair_closure must be present, even when null." }));
   else if (document.repair_closure !== null && !isPlainObject(document.repair_closure)) issues.push(issue({ code: "field_type_mismatch", source, field: "repair_closure", expected: "object|null", actual: describeActualType(document.repair_closure), message: "repair_closure must be an object or null." }));
   for (const field of ["public_ids", "report_id", "run_id", "step_id", "timestamp", "timestamps", "created_at", "updated_at", "evidence_refs", "validation_status", "aggregate_status", "qualification_verdict"]) {

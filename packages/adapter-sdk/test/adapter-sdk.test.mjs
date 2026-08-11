@@ -22,6 +22,7 @@ import {
 import { materializeProviderInputSnapshot } from "../src/packet-transport.mjs";
 import { resolveProviderCommandRoles } from "../src/provider-work-packet.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
+import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -58,6 +59,8 @@ function withTempRepo(callback) {
  *   nativeTimeoutArg?: Record<string, unknown>,
  *   contextBudget?: Record<string, unknown>,
  *   sessionBudget?: Record<string, unknown>,
+ *   supportedSchemaRefs?: string[],
+ *   supportedOutputModes?: string[],
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -109,7 +112,55 @@ function buildExternalRunnerProfile(options) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
   }
   return {
+    ...(options.supportedSchemaRefs ? { supported_schema_refs: options.supportedSchemaRefs } : {}),
+    ...(options.supportedOutputModes ? { supported_output_modes: options.supportedOutputModes } : {}),
     execution,
+  };
+}
+
+function strictRoute() {
+  return {
+    resolved_route_id: "route.implement.strict",
+    route_profile: {
+      required_output_schema_ref: "runner-final-report@v1",
+      required_output_mode: "structured-json",
+    },
+  };
+}
+
+function strictFinalReport(overrides = {}) {
+  return {
+    schema_version: 1,
+    status: "completed",
+    summary: "The bounded implementation pass completed.",
+    changed_files: [],
+    command_result_claims: [],
+    verification: { summary: "Focused verification completed." },
+    risks: [],
+    repair_closure: null,
+    ...overrides,
+  };
+}
+
+function strictAdapterProfile(options) {
+  return buildExternalRunnerProfile({
+    ...options,
+    supportedSchemaRefs: ["runner-final-report@v1"],
+    supportedOutputModes: ["structured-json"],
+  });
+}
+
+function liveRequest(route = strictRoute()) {
+  return {
+    request_id: "req-strict-output",
+    run_id: "run-strict-output",
+    step_id: "step-strict-output",
+    step_class: "implement",
+    route,
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+    context: { compiled_context_ref: "compiled-context://strict-output" },
   };
 }
 
@@ -915,9 +966,164 @@ test("exit zero preserves transport completion but rejects explicit partial prov
     assert.equal(response.output.execution_outcome.process.exit_code, 0);
     assert.equal(response.output.execution_outcome.transport.status, "completed");
     assert.equal(response.output.execution_outcome.provider.status, "partial");
-    assert.equal(response.output.execution_outcome.verification.status, "partial");
+    assert.equal(response.output.execution_outcome.verification.status, "warn");
+    assert.equal(response.output.execution_outcome.verification.raw_status, "partial");
     assert.equal(response.status, "failed");
     assert.equal(response.output.failure_kind, "provider-partial-outcome");
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("strict live adapter accepts one canonical candidate and exposes only the query-safe envelope", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-strict-output-success-"));
+  const candidate = strictFinalReport();
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: strictAdapterProfile({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write(${JSON.stringify(JSON.stringify(candidate))});`],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute(liveRequest());
+    assert.equal(response.status, "success");
+    assert.equal(response.output.runner_output.schema_version, 1);
+    assert.equal(response.output.runner_output.parse_status, "valid");
+    assert.deepEqual(response.output.runner_output.candidate, candidate);
+    assert.equal(response.output.runner_output.raw_evidence_ref.startsWith("evidence://"), true);
+    assert.equal(response.output.execution_outcome.process.status, "completed");
+    assert.equal(response.output.execution_outcome.transport.status, "completed");
+    assert.equal(response.output.execution_outcome.parsing.status, "valid");
+    assert.equal(response.output.execution_outcome.candidate.status, "accepted");
+    assert.equal(response.output.execution_outcome.validation.status, "pass");
+    assert.equal(response.output.execution_outcome.mission.status, "unknown");
+    assert.equal("stdout" in response.output.runner_output, false);
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("strict output normalization is consistent across provider-format encodings", () => {
+  const candidate = strictFinalReport();
+  const encodings = [
+    ["codex-cli", JSON.stringify(candidate)],
+    ["claude-code", JSON.stringify({ result: JSON.stringify(candidate) })],
+    ["qwen-code", `${JSON.stringify({ type: "progress", message: "working" })}\n${JSON.stringify({ result: JSON.stringify(candidate) })}`],
+    ["open-code", JSON.stringify({ final_report: candidate })],
+    ["custom-process", JSON.stringify(candidate)],
+  ];
+  for (const [adapterId, output] of encodings) {
+    const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), `aor-strict-${adapterId}-`));
+    try {
+      const adapter = createLiveAdapter({
+        adapterId,
+        adapterProfile: strictAdapterProfile({
+          command: process.execPath,
+          args: ["-e", `process.stdout.write(${JSON.stringify(output)});`],
+        }),
+        runtimeEvidenceRoot: evidenceRoot,
+        projectRoot: evidenceRoot,
+        executionRoot: evidenceRoot,
+      });
+      const response = adapter.execute(liveRequest());
+      assert.equal(response.status, "success", adapterId);
+      assert.equal(response.output.runner_output.parse_status, "valid", adapterId);
+      assert.deepEqual(response.output.runner_output.candidate, candidate, adapterId);
+    } finally {
+      fs.rmSync(evidenceRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("strict live adapter fails closed for weak or contradictory zero-exit output", () => {
+  const candidate = strictFinalReport();
+  const cases = [
+    ["empty", "", "runner-output-missing", "missing"],
+    ["prose", "provider-secret-prose", "runner-output-missing", "missing"],
+    ["malformed", "{not-json", "runner-output-malformed", "malformed"],
+    ["ambiguous", `${JSON.stringify(candidate)}\n${JSON.stringify(candidate)}`, "runner-output-ambiguous", "ambiguous"],
+    ["unknown-status", JSON.stringify(strictFinalReport({ status: "succeeded" })), "runner-output-unsupported", "unsupported"],
+    ["partial", JSON.stringify(strictFinalReport({ status: "partial" })), "runner-result-partial", "valid"],
+  ];
+  for (const [name, output, expectedFailure, expectedParseStatus] of cases) {
+    const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), `aor-strict-negative-${name}-`));
+    try {
+      const adapter = createLiveAdapter({
+        adapterId: "codex-cli",
+        adapterProfile: strictAdapterProfile({
+          command: process.execPath,
+          args: ["-e", `process.stdout.write(${JSON.stringify(output)});`],
+        }),
+        runtimeEvidenceRoot: evidenceRoot,
+        projectRoot: evidenceRoot,
+        executionRoot: evidenceRoot,
+      });
+      const response = adapter.execute(liveRequest());
+      assert.notEqual(response.status, "success", name);
+      assert.equal(response.output.failure_kind, expectedFailure, name);
+      assert.equal(response.output.runner_output.parse_status, expectedParseStatus, name);
+      assert.equal(response.output.execution_outcome.parsing.status, expectedParseStatus, name);
+      assert.equal("stdout" in response.output.runner_output, false, name);
+      assert.doesNotMatch(JSON.stringify(response.output.runner_output), /provider-secret-prose/u, name);
+    } finally {
+      fs.rmSync(evidenceRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("strict output capability preflight blocks before provider spawn", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-strict-preflight-"));
+  const marker = path.join(evidenceRoot, "spawned.marker");
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'spawned')`],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute(liveRequest());
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "runner-output-unsupported");
+    assert.equal(response.output.execution_outcome.process.status, "unknown");
+    assert.equal(fs.existsSync(marker), false);
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("strict routes materialize provider work-packet v3 with controller-owned command identities", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-strict-packet-v3-"));
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: strictAdapterProfile({
+        command: process.execPath,
+        args: ["-e", `process.stdout.write(${JSON.stringify(JSON.stringify(strictFinalReport()))});`],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+    const response = adapter.execute(liveRequest());
+    assert.equal(response.status, "success");
+    const packetRef = response.output.external_runner.provider_work_packet_ref;
+    const packetFile = path.join(evidenceRoot, packetRef.replace(/^evidence:\/\//u, ""));
+    const packet = JSON.parse(fs.readFileSync(packetFile, "utf8"));
+    assert.equal(packet.version, 3);
+    assert.equal(packet.output_contract.schema_ref, "runner-final-report@v1");
+    assert.equal(packet.output_contract.output_mode, "structured-json");
+    assert.equal(packet.output_contract.candidate_rule, "exactly-one-candidate");
+    assert.ok(packet.output_contract.required_commands.every((entry) => /^aor\.command\.[a-z0-9][a-z0-9._-]*$/u.test(entry.command_id)));
+    const validation = validateContractDocument({ family: "provider-work-packet", document: packet, source: packetFile });
+    assert.equal(validation.ok, true, validation.issues.map((entry) => entry.message).join("; "));
   } finally {
     fs.rmSync(evidenceRoot, { recursive: true, force: true });
   }
