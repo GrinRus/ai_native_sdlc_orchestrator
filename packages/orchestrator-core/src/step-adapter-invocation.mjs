@@ -3,6 +3,7 @@ import {
   createLiveAdapter,
   createMockAdapter,
 } from "../../adapter-sdk/src/index.mjs";
+import { executePostValidators, resolvePostValidatorPlan } from "./post-validation.mjs";
 
 /**
  * @param {unknown} value
@@ -160,6 +161,44 @@ export function invokeStepAdapterForStep(options) {
         }];
     const policyProfile = asRecord(asRecord(asRecord(options.adapterRequest.policy_bundle).policy).profile);
     const retryOn = asStringArray(asRecord(policyProfile.retry).on);
+    const postValidatorPlan = resolvePostValidatorPlan(policyProfile.post_validators);
+    if (!postValidatorPlan.ok) {
+      const validation = executePostValidators({
+        adapterRequest: options.adapterRequest,
+        adapterResponse: createAdapterResponseEnvelope({
+          request_id: String(options.adapterRequest.request_id),
+          adapter_id: selectedAdapterId,
+          status: "blocked",
+          summary: "Post-validator policy is not executable.",
+          output: { mode: "execute", blocked: true },
+          evidence_refs: [],
+        }),
+        plan: postValidatorPlan,
+        runId: asString(options.adapterRequest.run_id),
+        stepId: asString(options.adapterRequest.step_id),
+      });
+      const response = createAdapterResponseEnvelope({
+        request_id: String(options.adapterRequest.request_id),
+        adapter_id: selectedAdapterId,
+        status: "blocked",
+        summary: "Post-validator policy is not executable; live provider spawn was prevented.",
+        output: {
+          mode: "execute",
+          blocked: true,
+          failure_kind: validation.failureClass,
+          validation_status: validation.status,
+          validation_report: validation.report,
+          repair_kind: validation.repairKind,
+        },
+        evidence_refs: [],
+      });
+      return {
+        adapterResponse: response,
+        status: "failed",
+        summary: response.summary,
+        blockedNextStep: "Fix the post-validator policy before live execution.",
+      };
+    }
     const attempts = [];
     const transitions = [];
     let adapterResponse = null;
@@ -188,6 +227,36 @@ export function invokeStepAdapterForStep(options) {
         executionRoot: options.executionRoot,
       });
       adapterResponse = liveAdapter.execute(/** @type {any} */ ({ ...options.adapterRequest, route }));
+      const validation = executePostValidators({
+        adapterRequest: { ...options.adapterRequest, route },
+        adapterResponse,
+        plan: postValidatorPlan,
+        runId: asString(options.adapterRequest.run_id),
+        stepId: asString(options.adapterRequest.step_id),
+      });
+      const providerStatus = adapterResponse.status;
+      const adapterOutput = asRecord(adapterResponse.output);
+      const validatedOutput = {
+        ...adapterOutput,
+        // A process/transport failure is not a schema failure. Preserve its
+        // primary failure class so retry policy can still handle timeouts,
+        // auth failures, and runner crashes independently of validation.
+        validation_status: providerStatus === "success" ? validation.status : "not_evaluated",
+        validation_report: validation.report,
+        ...(providerStatus === "success" && validation.failureClass ? { failure_kind: validation.failureClass } : {}),
+        ...(providerStatus === "success" && validation.repairKind ? { repair_kind: validation.repairKind } : {}),
+      };
+      if (providerStatus === "success" && !validation.accepted) {
+        adapterResponse = {
+          ...adapterResponse,
+          status: validation.status === "blocked" ? "blocked" : "failed",
+          summary: validation.report.validators.find((entry) => entry.status === "fail" || entry.status === "blocked")?.summary
+            ?? "Post-validation rejected the adapter response.",
+          output: validatedOutput,
+        };
+      } else {
+        adapterResponse = { ...adapterResponse, output: validatedOutput };
+      }
       const output = asRecord(adapterResponse.output);
       const failureKind = asString(output.failure_kind);
       const failureClass = adapterResponse.status === "success" ? "none" : canonicalFailureClass(failureKind);
