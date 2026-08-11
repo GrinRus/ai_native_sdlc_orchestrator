@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "kind": "w66-adversarial-output-corpus",
+  "contract": "w66-adversarial-proof@v1",
+  "policy": {
+    "provider_calls": false,
+    "upstream_writes": false,
+    "raw_payloads": false,
+    "runtime_state": false
+  },
+  "families": [
+    "intent-normalization",
+    "structured-wave-ticket",
+    "runner-final-report",
+    "repair-closure",
+    "semantic-evaluation",
+    "live-quality-assessment"
+  ],
+  "provider_formats": [
+    "codex-stream-json",
+    "claude-buffered-json",
+    "qwen-jsonl",
+    "opencode-json",
+    "custom-process-json"
+  ],
+  "cases": [
+    {
+      "id": "empty-output",
+      "family": "runner-final-report",
+      "kind": "missing",
+      "stdout": "",
+      "expected": {
+        "parse_status": "missing",
+        "failure_kind": "runner-output-missing",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "prose-only-output",
+      "family": "runner-final-report",
+      "kind": "missing",
+      "stdout": "I completed the work and everything looks good.",
+      "expected": {
+        "parse_status": "missing",
+        "failure_kind": "runner-output-missing",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "truncated-json",
+      "family": "runner-final-report",
+      "kind": "malformed",
+      "stdout": "{\"status\":\"completed\",\"summary\":\"done\"",
+      "expected": {
+        "parse_status": "malformed",
+        "failure_kind": "runner-output-malformed",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "malformed-jsonl",
+      "family": "runner-final-report",
+      "kind": "malformed",
+      "stdout": "{\"event\":\"progress\"}\n{not-json}",
+      "expected": {
+        "parse_status": "malformed",
+        "failure_kind": "runner-output-malformed",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "missing-terminal-event",
+      "family": "runner-final-report",
+      "kind": "missing",
+      "stdout": "{\"event\":\"progress\"}\n{\"event\":\"tool\",\"name\":\"pnpm test\"}",
+      "expected": {
+        "parse_status": "missing",
+        "failure_kind": "runner-output-missing",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "conflicting-candidates",
+      "family": "runner-final-report",
+      "kind": "ambiguous",
+      "stdout": "{\"candidate\":{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"one\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{},\"risks\":[],\"repair_closure\":null}}\n{\"candidate\":{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"two\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{},\"risks\":[],\"repair_closure\":null}}",
+      "expected": {
+        "parse_status": "ambiguous",
+        "failure_kind": "runner-output-ambiguous",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "unknown-schema",
+      "family": "runner-final-report",
+      "kind": "unsupported",
+      "stdout": "{\"schema_version\":1,\"requested_schema_ref\":\"unknown-family@v9\",\"parse_status\":\"valid\",\"candidate\":{\"status\":\"completed\"}}",
+      "expected": {
+        "parse_status": "unsupported",
+        "failure_kind": "runner-output-unsupported",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "missing-required-section",
+      "family": "runner-final-report",
+      "kind": "unsupported",
+      "stdout": "{\"schema_version\":1,\"requested_schema_ref\":\"runner-final-report@v1\",\"parse_status\":\"valid\",\"candidate\":{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"missing verification\",\"changed_files\":[],\"command_result_claims\":[],\"risks\":[],\"repair_closure\":null}}",
+      "expected": {
+        "parse_status": "unsupported",
+        "failure_kind": "runner-output-unsupported",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-output-contract"
+      }
+    },
+    {
+      "id": "partial-result",
+      "family": "runner-final-report",
+      "kind": "partial",
+      "stdout": "{\"schema_version\":1,\"status\":\"partial\",\"summary\":\"command interrupted\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{},\"risks\":[],\"repair_closure\":null}",
+      "expected": {
+        "parse_status": "valid",
+        "failure_kind": "runner-result-partial",
+        "failure_class": "incomplete-result",
+        "validator_results": ["runner-output-envelope:pass"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-work-product"
+      }
+    },
+    {
+      "id": "missing-evidence",
+      "family": "live-quality-assessment",
+      "kind": "evidence-missing",
+      "stdout": "{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"claimed pass\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{},\"risks\":[],\"repair_closure\":null}",
+      "policy": {"evidence_status": "missing"},
+      "expected": {
+        "parse_status": "valid",
+        "failure_kind": null,
+        "failure_class": "missing-evidence",
+        "validator_results": ["runner-output-envelope:pass", "evidence-complete:fail"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "reconcile-evidence"
+      }
+    },
+    {
+      "id": "invented-command",
+      "family": "runner-final-report",
+      "kind": "verification-missing",
+      "stdout": "{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"claimed unknown command\",\"changed_files\":[],\"command_result_claims\":[{\"command\":\"pnpm imaginary-command\",\"status\":\"passed\"}],\"verification\":{},\"risks\":[],\"repair_closure\":null}",
+      "policy": {"verification_status": "invented-command"},
+      "expected": {
+        "parse_status": "valid",
+        "failure_kind": null,
+        "failure_class": "verification-missing",
+        "validator_results": ["runner-output-envelope:pass", "validation-commands:fail"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "reconcile-evidence"
+      }
+    },
+    {
+      "id": "stale-cross-run-evidence",
+      "family": "repair-closure",
+      "kind": "evidence-stale",
+      "stdout": "{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"claimed repaired\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{},\"risks\":[],\"repair_closure\":null}",
+      "policy": {"evidence_status": "cross-run-stale"},
+      "expected": {
+        "parse_status": "valid",
+        "failure_kind": null,
+        "failure_class": "missing-evidence",
+        "validator_results": ["runner-output-envelope:pass", "evidence-complete:fail"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "reconcile-evidence"
+      }
+    },
+    {
+      "id": "model-pass-controller-fail",
+      "family": "semantic-evaluation",
+      "kind": "contradictory-verification",
+      "stdout": "{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"model says pass\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{},\"risks\":[],\"repair_closure\":null}",
+      "policy": {"model_status": "pass", "controller_status": "fail"},
+      "expected": {
+        "parse_status": "valid",
+        "failure_kind": null,
+        "failure_class": "verification-contradiction",
+        "validator_results": ["runner-output-envelope:pass", "verification-consistency:fail"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "repair-work-product"
+      }
+    },
+    {
+      "id": "output-repair-exhausted",
+      "family": "runner-final-report",
+      "kind": "repair-exhausted",
+      "stdout": "",
+      "policy": {"repair_status": "exhausted"},
+      "expected": {
+        "parse_status": "missing",
+        "failure_kind": "runner-output-missing",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass", "repair-budget:exhausted"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "hold-exhausted-repair"
+      }
+    },
+    {
+      "id": "repeated-identical-failure",
+      "family": "repair-closure",
+      "kind": "convergence-blocked",
+      "stdout": "I completed the work but cannot provide the required report.",
+      "policy": {"repair_status": "repeated-identical-failure"},
+      "expected": {
+        "parse_status": "missing",
+        "failure_kind": "runner-output-missing",
+        "failure_class": "schema-mismatch",
+        "validator_results": ["runner-output-envelope:pass", "convergence:blocked"],
+        "runtime_harness_decision": "blocked",
+        "next_safe_action": "hold-convergence-blocked"
+      }
+    },
+    {
+      "id": "positive-completed",
+      "family": "runner-final-report",
+      "kind": "positive",
+      "stdout": "{\"schema_version\":1,\"status\":\"completed\",\"summary\":\"completed deterministically\",\"changed_files\":[],\"command_result_claims\":[],\"verification\":{\"summary\":\"controller evidence available\"},\"risks\":[],\"repair_closure\":null}",
+      "policy": {"evidence_status": "complete", "verification_status": "pass"},
+      "expected": {
+        "parse_status": "valid",
+        "failure_kind": null,
+        "failure_class": null,
+        "validator_results": ["runner-output-envelope:pass", "evidence-complete:pass", "validation-commands:pass", "verification-consistency:pass"],
+        "runtime_harness_decision": "completed",
+        "next_safe_action": "none"
+      }
+    }
+  ]
+}

@@ -47,6 +47,17 @@ export function validateW66QualificationManifest(document, options = {}) {
       }
     }
   }
+  const proof = document?.adversarial_proof;
+  if (options.requireAdversarialProof && (!proof || proof.status !== "pass")) {
+    findings.push("S25 replacement manifest must bind a passing adversarial proof");
+  }
+  if (proof) {
+    if (proof.status !== "pass") findings.push("adversarial proof must have status=pass");
+    if (proof.source_commit !== document?.aor_commit) findings.push("adversarial proof must bind the frozen AOR commit");
+    if (!/^sha256:[a-f0-9]{64}$/u.test(proof.sha256 ?? "")) findings.push("adversarial proof must include a content digest");
+    if (proof.historical_evidence_disposition !== "diagnostic-only") findings.push("pre-S20 evidence must remain diagnostic-only");
+    if (proof.fresh_qualification_required !== true) findings.push("replacement manifest must require a fresh qualification matrix");
+  }
   return { ok: findings.length === 0, findings };
 }
 

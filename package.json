@@ -73,6 +73,7 @@
     "w61:proof": "node ./scripts/w61-topology-onboarding-proof.mjs",
     "w62:proof": "node ./scripts/w62-full-flow-proof.mjs",
     "w66:freeze": "node ./scripts/w66-qualification-manifest.mjs",
+    "w66:proof": "node ./scripts/w66-adversarial-proof.mjs",
     "audit:prod:bulk": "node ./scripts/dependency-audit-bulk.mjs",
     "release:verify": "node ./scripts/release-verify.mjs",
     "release:pack": "node ./scripts/release-pack.mjs",
