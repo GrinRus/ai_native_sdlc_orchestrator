@@ -9,6 +9,7 @@ import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { runLifecycleCommand } from "./control-plane/lifecycle-command.mjs";
 import { resolveNextAction } from "./next-action.mjs";
 import { inspectGitIdentity } from "./aor-home.mjs";
+import { buildCorrectionGuidance, extractStructuredCandidate } from "./structured-candidate.mjs";
 
 const EXTENSIONS = new Map([
   [".txt", "text/plain"], [".md", "text/markdown"], [".json", "application/json"],
@@ -127,7 +128,7 @@ function awaitableSpawn(command, args) {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
-function validateNormalization(value, base) {
+function validateNormalization(value, base, extraction = null) {
   const input = asRecord(value);
   const workType = String(input.work_type ?? "");
   const constraints = asStrings(input.constraints);
@@ -157,10 +158,13 @@ function validateNormalization(value, base) {
     provider: asRecord(base.provider),
     input_refs: [`intent-submission://${base.submission_id}`],
     previous_revision_ref: base.previous_revision_ref ?? null,
-    validation: { status: "pass", findings: [] },
+    validation: { status: "pass", findings: [], correction_guidance: [] },
     created_at: now(),
   };
   const findings = [];
+  if (extraction && extraction.status !== "valid") {
+    findings.push(...(extraction.issues ?? []).map((entry) => String(entry.summary ?? "Structured candidate was not accepted.")));
+  }
   if (Buffer.byteLength(JSON.stringify(input), "utf8") > MAX_NORMALIZATION_BYTES) findings.push("structured output exceeds 128 KiB");
   if (!report.title) findings.push("title is required");
   if (!report.outcome) findings.push("outcome is required");
@@ -175,35 +179,50 @@ function validateNormalization(value, base) {
   }
   if (findings.length) {
     report.status = "invalid";
-    report.validation = { status: "fail", findings };
+    report.validation = {
+      status: "fail",
+      findings,
+      correction_guidance: buildCorrectionGuidance(extraction?.issues ?? [], { repairKind: "output-contract" }),
+    };
   }
   const contract = validateContractDocument({ family: "intent-normalization-report", document: report, source: "runtime://intent-normalization-report" });
   if (!contract.ok) {
     report.status = "invalid";
-    report.validation = { status: "fail", findings: [...findings, ...contract.issues.map((issue) => issue.message)] };
+    const contractFindings = contract.issues.map((issue) => issue.message);
+    report.validation = {
+      status: "fail",
+      findings: [...findings, ...contractFindings],
+      correction_guidance: buildCorrectionGuidance([
+        ...(extraction?.issues ?? []),
+        ...contract.issues.map((entry) => ({
+          code: entry.code,
+          field: entry.field,
+          summary: entry.message,
+          retryable: true,
+          suggested_repair_kind: "output-contract",
+        })),
+      ]),
+    };
   }
   return report;
 }
 
 function findNormalization(value) {
   const record = asRecord(value);
-  if (record.intent_normalization) return asRecord(record.intent_normalization);
-  for (const candidate of Object.values(record)) {
-    if (typeof candidate === "object" && candidate !== null) {
-      const found = findNormalization(candidate);
-      if (Object.keys(found).length) return found;
-    }
-    if (typeof candidate === "string") {
-      const match = candidate.match(/\{[\s\S]*\}/u);
-      if (match) {
-        try {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.intent_normalization) return asRecord(parsed.intent_normalization);
-        } catch { /* invalid provider JSON */ }
-      }
-    }
-  }
-  return {};
+  const runnerEnvelope = asRecord(record.runner_output);
+  const input = Object.keys(runnerEnvelope).length > 0 ? runnerEnvelope : value;
+  return extractStructuredCandidate({
+    value: input,
+    candidateKeys: ["intent_normalization", "result"],
+    requestedSchemaRef: "intent-normalization-report@v1",
+    isCandidate: (candidate) => Object.keys(candidate).some((key) => [
+      "title", "outcome", "constraints", "acceptance", "scope", "work_type", "confidence",
+    ].includes(key)),
+  });
+}
+
+export function normalizeIntentProviderOutput(value) {
+  return findNormalization(value);
 }
 
 function providerReadiness(registry, projectId) {
@@ -272,6 +291,7 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
     ? previousNormalization?.provider?.route_id ?? "route.intake-normalize.default"
     : "route.intake-normalize.default";
   let candidate = normalization ? asRecord(normalization) : {};
+  let extraction = null;
   try {
     if (!normalization) {
       if (!provider) throw new IntentServiceError("intent_provider.not_ready", "Configure and authenticate Codex, Claude, or Qwen before preparing this task.", 409);
@@ -288,7 +308,8 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
         forceReadOnly: true,
         runtimeEvidenceRefs: [file, ...submission.attachments.map((entry) => path.join(init.runtimeLayout.projectRuntimeRoot, entry.storage_ref))],
       });
-      candidate = findNormalization(routed.stepResult?.routed_execution?.adapter_response?.output);
+      extraction = findNormalization(routed.stepResult?.routed_execution?.adapter_response?.output);
+      candidate = extraction.candidate ?? {};
       provider = routed.stepResult?.routed_execution?.adapter_resolution?.selected?.adapter ?? provider;
     }
     const revision = submission.normalization_refs.length + 1;
@@ -299,7 +320,7 @@ export function prepareIntentSubmission({ registry, projectId, submissionId, nor
       revision,
       previous_revision_ref: submission.normalization_refs.at(-1) ?? null,
       provider: { route_id: selectedRouteId, adapter_id: provider },
-    });
+    }, normalization ? null : extraction);
     const reportFile = path.join(init.runtimeLayout.reportsRoot, `intent-normalization-report-${submissionId}-v${revision}.json`);
     atomicJson(reportFile, report);
     submission.normalization_refs.push(`evidence://projects/${context.projectId}/reports/${path.basename(reportFile)}`);

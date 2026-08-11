@@ -1,3 +1,5 @@
+import { buildCorrectionGuidance, extractStructuredCandidate } from "./structured-candidate.mjs";
+
 function asRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
 }
@@ -20,14 +22,41 @@ export function buildPlanningInputManifest(refs) {
 }
 
 export function selectPlannerCandidate({ explicitCandidate, adapterOutput }) {
+  const isPlannerCandidate = (candidate) => {
+    const record = asRecord(candidate);
+    return ["local_tasks", "task_plan", "plan_size", "criteria_catalog"].some((field) => field in record);
+  };
   const explicit = asRecord(explicitCandidate);
-  if (Object.keys(explicit).length > 0) return { candidate: explicit, source: "explicit-candidate" };
+  if (Object.keys(explicit).length > 0) {
+    const extracted = extractStructuredCandidate({ value: explicit, isCandidate: isPlannerCandidate });
+    return {
+      candidate: extracted.candidate ?? {},
+      source: "explicit-candidate",
+      normalization: extracted,
+      correction_guidance: buildCorrectionGuidance(extracted.issues),
+    };
+  }
   const output = asRecord(adapterOutput);
-  const waveTicket = asRecord(output.wave_ticket_candidate);
-  if (Object.keys(waveTicket).length > 0) return { candidate: waveTicket, source: "runner-wave-ticket" };
-  const structuredPlan = asRecord(output.structured_plan);
-  if (Object.keys(structuredPlan).length > 0) return { candidate: structuredPlan, source: "runner-structured-plan" };
-  return { candidate: {}, source: "mission-derived-fallback" };
+  const extracted = extractStructuredCandidate({
+    value: output,
+    candidateKeys: ["wave_ticket_candidate", "structured_plan", "candidate", "result"],
+    requestedSchemaRef: "planner-candidate@v1",
+    isCandidate: isPlannerCandidate,
+  });
+  if (extracted.status === "missing" || (extracted.status === "unsupported" && !["wave_ticket_candidate", "structured_plan", "candidate", "result"].some((key) => key in output))) {
+    return {
+      candidate: {},
+      source: "mission-derived-fallback",
+      normalization: { ...extracted, status: "missing", issues: [] },
+      correction_guidance: [],
+    };
+  }
+  return {
+    candidate: extracted.candidate ?? {},
+    source: extracted.source === "wave_ticket_candidate" ? "runner-wave-ticket" : extracted.source === "structured_plan" ? "runner-structured-plan" : extracted.source ?? "runner-candidate",
+    normalization: extracted,
+    correction_guidance: buildCorrectionGuidance(extracted.issues),
+  };
 }
 
 export function validateMissionSpecificPlannerCandidate({ candidate, featureSize, source }) {

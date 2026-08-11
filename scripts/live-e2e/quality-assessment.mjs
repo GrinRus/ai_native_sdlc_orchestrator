@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { validateContractDocument } from "./lib/contracts/index.mjs";
+import { projectQualityAssessment } from "./lib/quality-assessment-projection.mjs";
 import {
   UsageError,
   asNonEmptyString,
@@ -285,6 +286,10 @@ const DRAFT_DIMENSION_FINDING_CATEGORY = Object.freeze({
   evidence_strength: "evidence-gap",
   acceptance_criteria_traceability: "acceptance-traceability",
 });
+
+export function projectQualityAssessmentReport(assessment, options = {}) {
+  return projectQualityAssessment(assessment, { ...options, requiredDimensions: REQUIRED_DIMENSIONS });
+}
 
 /**
  * @param {string} filePath
@@ -1193,10 +1198,11 @@ function validateCli(rawArgs) {
   const assessment = readDocument(assessmentReportFile);
   const validation = validateContractDocument({
     family: "live-e2e-quality-assessment-report",
-    document: assessment,
+    document: projectQualityAssessmentReport(assessment),
     source: assessmentReportFile,
   });
-  const refValidation = validateLocalRefs(assessment, path.dirname(assessmentReportFile));
+  const projected = projectQualityAssessmentReport(assessment);
+  const refValidation = validateLocalRefs(projected, path.dirname(assessmentReportFile));
   const ok = validation.ok && refValidation.missing.length === 0;
   process.stdout.write(
     `${JSON.stringify(
@@ -1207,6 +1213,10 @@ function validateCli(rawArgs) {
         contract_validation_ok: validation.ok,
         contract_issue_count: validation.issues.length,
         contract_issues: validation.issues,
+        projected_overall_status: projected.overall_status,
+        qualification_verdict: projected.qualification_verdict,
+        correction_guidance: projected.correction_guidance,
+        projection_issues: projected.projection_issues,
         checked_local_ref_count: refValidation.checked.length,
         skipped_external_ref_count: refValidation.skipped.length,
         missing_local_refs: refValidation.missing,
@@ -1237,13 +1247,14 @@ function gateCli(rawArgs) {
     throw new UsageError(`Assessment report file '${assessmentReportFile}' was not found.`);
   }
   const assessment = readDocument(assessmentReportFile);
+  const projected = projectQualityAssessmentReport(assessment);
   const validation = validateContractDocument({
     family: "live-e2e-quality-assessment-report",
-    document: assessment,
+    document: projected,
     source: assessmentReportFile,
   });
-  const refValidation = validateLocalRefs(assessment, path.dirname(assessmentReportFile));
-  const gate = evaluateAllPassGate(assessment, path.dirname(assessmentReportFile));
+  const refValidation = validateLocalRefs(projected, path.dirname(assessmentReportFile));
+  const gate = evaluateAllPassGate(projected, path.dirname(assessmentReportFile));
   const ok = validation.ok && refValidation.missing.length === 0 && gate.ok;
   process.stdout.write(
     `${JSON.stringify(
@@ -1255,6 +1266,10 @@ function gateCli(rawArgs) {
         contract_validation_ok: validation.ok,
         contract_issue_count: validation.issues.length,
         contract_issues: validation.issues,
+        projected_overall_status: projected.overall_status,
+        qualification_verdict: projected.qualification_verdict,
+        correction_guidance: projected.correction_guidance,
+        projection_issues: projected.projection_issues,
         checked_local_ref_count: refValidation.checked.length,
         skipped_external_ref_count: refValidation.skipped.length,
         missing_local_refs: refValidation.missing,

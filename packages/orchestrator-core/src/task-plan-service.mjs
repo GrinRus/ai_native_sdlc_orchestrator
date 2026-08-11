@@ -12,6 +12,7 @@ import { enrichExecutionDag, executionDagDigest, validateExecutionDagCoverage } 
 import { resolveExecutionUnitWorkspace } from "./execution-unit-workspace.mjs";
 import { resolveOverallTaskProgressStatus, resolveTaskProgressStatus } from "./task-progress-projection.mjs";
 import { deriveWorkspaceProjectId, resolveLogicalEvidenceRef, toLogicalEvidenceRef } from "./aor-home.mjs";
+import { normalizeSemanticEvaluation } from "./semantic-evaluation.mjs";
 
 function asRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
@@ -87,17 +88,12 @@ function materializePlanSemanticEvaluation(options, result) {
   });
   const semanticRunRef = evidenceRef(result.projectRoot, semanticRun.stepResultPath);
   const adapterOutput = asRecord(asRecord(asRecord(semanticRun.stepResult.routed_execution).adapter_response).output);
-  const semantic = Object.keys(asRecord(options.semanticEvaluation)).length > 0
-    ? asRecord(options.semanticEvaluation)
-    : asRecord(adapterOutput.semantic_evaluation);
-  const warnings = asStringArray(semantic.warnings);
-  const findings = Array.isArray(semantic.findings) ? semantic.findings : [];
-  const requestedStatus = String(semantic.status ?? "").toLowerCase();
-  const evaluationStatus = semanticRun.stepResult.status !== "passed" || ["fail", "failed", "block", "blocked"].includes(requestedStatus)
-    ? "fail"
-    : warnings.length > 0 || findings.length > 0 || requestedStatus === "warn"
-      ? "warn"
-      : "pass";
+  const semanticEvaluation = normalizeSemanticEvaluation({
+    semanticRunStatus: semanticRun.stepResult.status,
+    suppliedSemantic: options.semanticEvaluation,
+    adapterOutput,
+  });
+  const { semantic, warnings, findings, status: evaluationStatus, correctionGuidance } = semanticEvaluation;
 
   const loadedProfile = loadContractFile({ filePath: result.projectProfilePath, family: "project-profile" });
   const profile = loadedProfile.ok ? asRecord(loadedProfile.document) : {};
@@ -139,6 +135,7 @@ function materializePlanSemanticEvaluation(options, result) {
         warnings,
         findings,
         evaluator_step_ref: semanticRunRef,
+        correction_guidance: correctionGuidance,
       },
     },
     summary_metrics: {
@@ -146,11 +143,13 @@ function materializePlanSemanticEvaluation(options, result) {
       passed_cases: evaluationStatus === "pass" ? 1 : 0,
       failed_cases: evaluationStatus === "fail" ? 1 : 0,
       warning_cases: evaluationStatus === "warn" ? 1 : 0,
+      blocked_cases: ["blocked", "not_evaluated"].includes(evaluationStatus) ? 1 : 0,
       aggregate_pass_rate: evaluationStatus === "pass" ? 1 : 0,
       blocking,
     },
     status: evaluationStatus,
     evidence_refs: [planRef, validationRef, semanticRunRef],
+    correction_guidance: correctionGuidance,
   };
   const evaluationValidation = validateContractDocument({
     family: "evaluation-report",
@@ -175,6 +174,7 @@ function materializePlanSemanticEvaluation(options, result) {
     warnings,
     finding_count: findings.length,
     report_ref: evaluationRef,
+    correction_guidance: correctionGuidance,
   };
   result.waveTicket.source_refs = { ...asRecord(result.waveTicket.source_refs), evaluation_report_ref: evaluationRef };
   result.handoffPacket.source_refs = { ...asRecord(result.handoffPacket.source_refs), evaluation_report_ref: evaluationRef };
@@ -634,6 +634,15 @@ export function createTaskPlan(options = {}) {
     explicitCandidate: options.plannerCandidate,
     adapterOutput,
   });
+  if (["ambiguous", "malformed", "unsupported"].includes(candidateSelection.normalization?.status)) {
+    const error = new Error(
+      candidateSelection.normalization.issues?.[0]?.summary ??
+        "Planner did not emit one accepted structured candidate.",
+    );
+    error.code = `planner-candidate-${candidateSelection.normalization.status}`;
+    error.correctionGuidance = candidateSelection.correction_guidance ?? [];
+    throw error;
+  }
   const planningRunRef = evidenceRef(planningRun.projectRoot, planningRun.stepResultPath);
   const result = prepareHandoffArtifacts({
     ...options,

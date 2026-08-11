@@ -1693,7 +1693,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S24 — Structured artifact and evaluator hardening
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** Intent normalization, planning, semantic evaluation, and live
   quality assessment consume one normalized candidate mechanism and never infer
   pass from missing or malformed weak-model output.
@@ -1789,7 +1789,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S25 — Weak-runner adversarial proof and qualification reset
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Deterministic adversarial proof demonstrates that weak-runner
   output, evidence, verification, and repair failures cannot false-pass across
   supported schema families or adapter formats, then freezes the only commit

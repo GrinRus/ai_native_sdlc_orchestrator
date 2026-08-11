@@ -17,9 +17,24 @@ import {
   readIntentSubmission,
   listIntentSubmissions,
   reviseIntentSubmission,
+  normalizeIntentProviderOutput,
 } from "../src/intent-service.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+test("intent provider extraction rejects arbitrary nested JSON and preserves bounded parse status", () => {
+  const candidate = {
+    title: "Review API",
+    outcome: "Produce a read-only review.",
+    acceptance: ["The review is actionable."],
+    work_type: "review",
+    confidence: 0.8,
+  };
+  assert.equal(normalizeIntentProviderOutput({ intent_normalization: candidate }).status, "valid");
+  assert.equal(normalizeIntentProviderOutput({ wrapper: { intent_normalization: candidate } }).status, "unsupported");
+  assert.equal(normalizeIntentProviderOutput({ intent_normalization: candidate, result: JSON.stringify(candidate) }).status, "ambiguous");
+  assert.equal(normalizeIntentProviderOutput("{not-json").status, "malformed");
+});
 
 test("intent submission stores bounded text inputs under central AOR Home", async () => {
   await withTempRepo({ prefix: "aor-intent-", workspaceRoot }, (projectRoot) => {
