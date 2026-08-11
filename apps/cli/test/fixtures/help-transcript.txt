@@ -73,6 +73,7 @@ Review and QA:
   - aor compiler revision
   - aor review run
   - aor review decide
+  - aor repair retry
   - aor repair close
 
 Delivery:

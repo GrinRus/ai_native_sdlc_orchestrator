@@ -37,6 +37,7 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `review-report.md`
 - `review-decision.md`
 - `quality-repair-request.md`
+- `quality-repair-attempt.md`
 - `runtime-harness-report.md`
 - `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`

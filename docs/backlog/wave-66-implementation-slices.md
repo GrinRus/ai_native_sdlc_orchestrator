@@ -1588,7 +1588,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S23 — Explicit quality-repair retry and attempt lineage
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** Operators can retry only the active quality repair through a
   public idempotent mutation that preserves request, cycle, finding, workspace,
   attempt, review, QA, and budget lineage without rerunning the whole flow.
@@ -1693,7 +1693,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S24 — Structured artifact and evaluator hardening
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Intent normalization, planning, semantic evaluation, and live
   quality assessment consume one normalized candidate mechanism and never infer
   pass from missing or malformed weak-model output.

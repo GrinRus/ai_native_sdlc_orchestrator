@@ -18,6 +18,7 @@ const QUALITY_REPAIR_STATUS_VALUES = [
   "budget-exhausted",
   "closed",
 ];
+const QUALITY_REPAIR_ATTEMPT_STATUS_VALUES = ["reserved", "running", "completed", "failed", "blocked", "canceled"];
 const PLANNER_METRICS_STATUS_VALUES = ["no-data", "partial", "ready"];
 const FINANCE_MONITORING_STATUS_VALUES = ["no-data", "partial", "ready"];
 const MULTIREPO_COORDINATION_STATUS_VALUES = ["ready", "blocked", "released"];
@@ -866,6 +867,46 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
   },
   {
+    family: "quality-repair-attempt",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/quality-repair-attempt.md",
+    exampleGlob: "examples/reports/quality-repair-attempt*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "attempt_id",
+      "request_id",
+      "cycle_id",
+      "attempt_index",
+      "trigger",
+      "repair_run_id",
+      "status",
+      "workspace_ref",
+      "input_fingerprint",
+      "finding_fingerprint",
+      "failure_fingerprint",
+      "created_at",
+      "updated_at",
+      "evidence_refs",
+    ],
+    fieldTypes: {
+      attempt_id: "string",
+      request_id: "string",
+      cycle_id: "string",
+      attempt_index: "number",
+      trigger: "string",
+      repair_run_id: "string",
+      status: "string",
+      workspace_ref: "string",
+      input_fingerprint: "string",
+      finding_fingerprint: "string",
+      failure_fingerprint: "string",
+      created_at: "string",
+      updated_at: "string",
+      evidence_refs: "array",
+    },
+    enumChecks: [{ field: "status", allowedValues: QUALITY_REPAIR_ATTEMPT_STATUS_VALUES }],
+  },
+  {
     family: "runtime-harness-report",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/runtime-harness-report.md",
@@ -1581,6 +1622,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   ...RUNNER_OUTPUT_EXAMPLE_RULES, { regex: /^examples\/reports\/validation-report[^/]*\.ya?ml$/, family: "validation-report" },
   { regex: /^examples\/reports\/review-report[^/]*\.ya?ml$/, family: "review-report" },
   { regex: /^examples\/reports\/quality-repair-request[^/]*\.ya?ml$/, family: "quality-repair-request" },
+  { regex: /^examples\/reports\/quality-repair-attempt[^/]*\.ya?ml$/, family: "quality-repair-attempt" },
   { regex: /^examples\/reports\/live-run-event[^/]*\.ya?ml$/, family: "live-run-event" },
   { regex: /^examples\/reports\/run-job[^/]*\.ya?ml$/, family: "run-job" },
   { regex: /^examples\/reports\/learning-loop-scorecard[^/]*\.ya?ml$/, family: "learning-loop-scorecard" },

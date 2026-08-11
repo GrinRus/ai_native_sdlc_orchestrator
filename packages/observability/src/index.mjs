@@ -18,6 +18,11 @@ export {
   updateQualityRepairRequest,
 } from "./quality-repair-request.mjs";
 export {
+  acknowledgeQualityRepairLaunch,
+  retryQualityRepair,
+  transitionQualityRepairAttempt,
+} from "./quality-repair-attempt.mjs";
+export {
   listReviewDecisions,
   materializeReviewDecision,
   reviewReportAllowsApproval,

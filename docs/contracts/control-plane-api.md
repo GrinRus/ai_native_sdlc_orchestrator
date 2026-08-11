@@ -817,6 +817,7 @@ trigger an automatic renderer fallback after a rendering or read failure.
 - `POST /api/projects/:projectId/run-control/actions`
 - `POST /api/projects/:projectId/ui-lifecycle/actions`
 - `POST /api/projects/:projectId/lifecycle-command/actions`
+- `POST /api/projects/:projectId/quality-repair/actions`
 - `POST /api/projects/:projectId/interactions/answers`
 - `POST /api/projects/actions` for source connection, refresh, disconnect,
   explicitly confirmed AOR-data deletion, portable-config materialization, and
@@ -855,6 +856,14 @@ Detached mutation payload baseline:
 - ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.
 - lifecycle-command payload fields: `command`, `flags`;
 - lifecycle-command response reuses CLI command output fields under `command_output` and adds transport-level `artifact_refs`, `evidence_refs`, `blocked`, and `blocked_reason`;
+- quality-repair retry payloads use `action=retry`, `request_ref` (or `request_id`),
+  `command_id`, non-negative `expected_revision`, `workspace_ref`, optional
+  owned `execution_root`, fingerprints, route/model context, and repeatable
+  `evidence_ref`; the mutation returns the immutable attempt ref, request
+  revision, budget state, and one server-owned next action. Replays with the
+  same command id are idempotent; stale revisions, active attempts, blocked
+  lifecycle states, foreign workspaces, and identical failures without new
+  evidence return `409`.
 - `run integration` lifecycle commands use the same endpoint. `show` is read-only;
   `apply`, `verify`, `repair`, `hold`, and `resume` require parent ownership,
   `command_id`, and `expected_revision`. Run reads expose the additive

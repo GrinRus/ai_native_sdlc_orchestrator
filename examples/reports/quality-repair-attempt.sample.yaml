@@ -1,0 +1,38 @@
+attempt_id: run-123.quality-repair-attempt.2.v1
+request_id: run-123.quality-repair-request.review.v1
+cycle_id: run-123.quality-cycle.review.1
+attempt_index: 2
+trigger: operator-retry
+repair_run_id: run-123.repair.2
+parent_attempt_ref: evidence://projects/demo/reports/quality-repair-attempt-1.json
+status: reserved
+workspace_ref: workspace://projects/demo/repair/run-123-2
+workspace_owner: project://demo
+owned_workspace:
+  disposable: true
+  project_id: demo
+  execution_root_ref: evidence://projects/demo/workspaces/run-123-2.json
+  base_commit: abcdef1234567890
+input_fingerprint: sha256:input-2
+finding_fingerprint: sha256:finding-2
+failure_fingerprint: sha256:failure-2
+diff_fingerprint: sha256:diff-2
+route_ref: route://repair/default
+failure_class: output-contract
+budget:
+  max_attempts: 3
+  reserved: true
+  debited: false
+  debit_state: pending-launch
+lineage:
+  request_ref: evidence://projects/demo/reports/quality-repair-request-review.json
+  previous_attempt_refs:
+    - evidence://projects/demo/reports/quality-repair-attempt-1.json
+review:
+  status: pending
+qa:
+  status: pending
+evidence_refs:
+  - evidence://projects/demo/reports/quality-repair-request-review.json
+created_at: 2026-08-11T10:00:00.000Z
+updated_at: 2026-08-11T10:00:00.000Z
