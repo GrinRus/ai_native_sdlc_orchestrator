@@ -664,7 +664,8 @@ predating this chain remains diagnostic-only for final wave closure.
 |---|---|---|---|---|---|
 | W70-S01 | Task Workspace product, screen, and migration baseline | EPIC-0, EPIC-1, EPIC-6 | blocked | product design, screen assets, migration map, story matrix | W69-S07 |
 | W70-S02 | Task runner override and Markdown source contracts | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | intent/execution/Flow contracts, API/OpenAPI, examples, validators | W70-S01 |
-| W70-S03 | Task shell, Home, and resumable task list | EPIC-1, EPIC-6 | blocked | web shell/routing, task projections, client, list components, browser tests | W70-S02 |
+| W70-S09 | Task Workspace live E2E proof harness baseline | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | blocked | private proof contract, browser scenario collector, guided profiles, proof tests/runbooks | W70-S02 |
+| W70-S03 | Task shell, Home, and resumable task list | EPIC-1, EPIC-6 | blocked | web shell/routing, task projections, client, list components, browser tests | W70-S09 |
 | W70-S04 | New Task, Markdown Sources, and Prepared Task | EPIC-1, EPIC-2, EPIC-6 | blocked | task composer, Markdown picker/preview, prepared review, runner picker | W70-S02, W70-S03 |
 | W70-S05 | Active Task Workspace and durable guidance | EPIC-3, EPIC-4, EPIC-6 | blocked | task workspace, live events, controls, operator requests, task tabs | W70-S04 |
 | W70-S06 | Attention, change review, and completion evidence | EPIC-4, EPIC-5, EPIC-6 | blocked | attention, diff/Markdown review, delivery/evidence completion, browser tests | W70-S05 |

@@ -76,13 +76,13 @@ The authoritative planning model for implementation lives in:
 | W63 | Consolidate the installed operator console around safe Mission intake, truthful next actions, adaptive navigation, evidence work, a reusable visual system, and browser-operable safe lifecycle parity. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-63-implementation-slices.md` |
 | W64 | Close post-audit release recovery and the remaining independently acceptable verification, delivery, and operator-projection refactor boundaries. | 3 | EPIC-0, EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-64-implementation-slices.md` |
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
-| W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Claude closure. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
+| W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Claude closure. | 25 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 | W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
 | W68 | Add provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
-| W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 8 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
+| W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
 
-The current roadmap contains **376 slices across 71 waves**.
+The current roadmap contains **383 slices across 71 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -1532,6 +1532,9 @@ W66 qualification and W67-W69 dependency chain is open.
   sanitized, stale-aware, and reviewable;
 - Tasks Home, active work, Attention, changes, checks, Evidence, and completion
   are keyboard/responsive/reload/offline safe;
+- the installed browser-proof harness validates the Task-first journey through
+  real UI interactions and durable readback without obsolete Flow/Cockpit
+  selectors or synthetic recovery passes;
 - obsolete Quiet Cockpit UI paths and screenshots are retired only after
   installed-package parity passes;
 - product, contracts, examples, stories, browser proof, and runbooks agree.
