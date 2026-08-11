@@ -50,6 +50,20 @@ test("W66 qualification manifest rejects dirty, changed, duplicate, and prematur
   }
 });
 
+test("S25 replacement manifest binds one passing proof and keeps historical evidence diagnostic-only", () => {
+  const document = fixture();
+  document.adversarial_proof = {
+    status: "pass",
+    source_commit: SHA,
+    sha256: `sha256:${DIGEST}`,
+    historical_evidence_disposition: "diagnostic-only",
+    fresh_qualification_required: true,
+  };
+  assert.deepEqual(validateW66QualificationManifest(document, { requireAdversarialProof: true }), { ok: true, findings: [] });
+  document.adversarial_proof.source_commit = "c".repeat(40);
+  assert.equal(validateW66QualificationManifest(document, { requireAdversarialProof: true }).ok, false);
+});
+
 test("W66 finding ledger maps every blocking remediation exactly once", () => {
   const ledger = JSON.parse(fs.readFileSync("docs/research/18-w66-deterministic-finding-ledger.json", "utf8"));
   assert.deepEqual(validateW66FindingLedger(ledger), { ok: true, findings: [] });

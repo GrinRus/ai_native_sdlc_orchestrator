@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { createHash } from "node:crypto";
 
 import {
   W66_QUALIFICATION_CELLS,
@@ -23,10 +24,23 @@ function git(args) {
 
 const outputFile = path.resolve(argument("--output") ?? ".aor/w66/qualification-manifest.json");
 const targetCommit = argument("--target-commit");
+const proofFile = argument("--proof-file");
 if (!/^[a-f0-9]{40}$/u.test(targetCommit ?? "")) {
   throw new Error("--target-commit must be the full pinned target commit SHA.");
 }
 const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+let adversarialProof = null;
+if (proofFile) {
+  const proofPath = path.resolve(proofFile);
+  const proof = JSON.parse(fs.readFileSync(proofPath, "utf8"));
+  adversarialProof = {
+    status: proof.status,
+    source_commit: proof.source_commit,
+    sha256: `sha256:${createHash("sha256").update(fs.readFileSync(proofPath)).digest("hex")}`,
+    historical_evidence_disposition: proof.historical_evidence?.pre_s20_status ?? null,
+    fresh_qualification_required: proof.historical_evidence?.final_qualification_requires === "fresh-same-commit-four-cell-matrix",
+  };
+}
 const manifest = {
   schema_version: 1,
   kind: "w66-qualification-manifest",
@@ -38,6 +52,9 @@ const manifest = {
   network_policy: "provider-calls-prohibited",
   write_policy: "no-upstream-write",
   invalidate_on_source_change: true,
+  qualification_commit: git(["rev-parse", "HEAD"]),
+  historical_evidence_disposition: "diagnostic-only",
+  fresh_qualification_required: true,
   stop_conditions: [
     "source commit or profile digest changes",
     "target commit changes",
@@ -51,8 +68,9 @@ const manifest = {
     profile_sha256: sha256File(path.resolve(profileRef)),
     status: "not-run",
   })),
+  ...(adversarialProof ? { adversarial_proof: adversarialProof } : {}),
 };
-const validation = validateW66QualificationManifest(manifest, { aorCommit: manifest.aor_commit, targetCommit });
+const validation = validateW66QualificationManifest(manifest, { aorCommit: manifest.aor_commit, targetCommit, requireAdversarialProof: Boolean(proofFile) });
 if (!validation.ok) {
   process.stderr.write(`W66 qualification manifest was not frozen:\n- ${validation.findings.join("\n- ")}\n`);
   process.exit(1);

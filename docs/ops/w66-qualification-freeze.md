@@ -7,7 +7,12 @@ After the implementation is merged to one clean commit, pin the exact `ky`
 target commit and create the runtime-owned manifest:
 
 ```bash
-pnpm w66:freeze -- --target-commit <40-character-ky-commit>
+node ./scripts/w66-adversarial-proof.mjs \
+  --source-commit <40-character-s25-commit> \
+  --output .aor/w66/s25-adversarial-proof.json
+pnpm w66:freeze -- \
+  --target-commit <40-character-ky-commit> \
+  --proof-file .aor/w66/s25-adversarial-proof.json
 ```
 
 The command writes `.aor/w66/qualification-manifest.json` exclusively. It
@@ -17,6 +22,11 @@ The manifest records SHA-256 digests for:
 
 - OpenAI medium and large profiles;
 - Anthropic medium and large profiles.
+
+When `--proof-file` is supplied, the replacement manifest also binds the
+passing W66-S25 adversarial proof digest to the frozen AOR commit. All evidence
+from before S20 remains diagnostic-only; S09 can select only a fresh
+same-commit four-cell matrix after this proof.
 
 S09 must validate the manifest again before the installed baseline and before
 each sequential cell. Any source commit, target commit, or profile digest

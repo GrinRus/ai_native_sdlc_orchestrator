@@ -1789,7 +1789,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S25 — Weak-runner adversarial proof and qualification reset
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** Deterministic adversarial proof demonstrates that weak-runner
   output, evidence, verification, and repair failures cannot false-pass across
   supported schema families or adapter formats, then freezes the only commit
@@ -1892,7 +1892,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** One clean merged AOR commit completes the requested medium/large
   Codex and Claude matrix against one pinned target commit, with validated final
   quality and no primary-checkout or upstream mutation.
