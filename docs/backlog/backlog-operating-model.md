@@ -1,8 +1,9 @@
 # Backlog operating model
 
-The latest defined wave is W70. It is registered behind W69-S07 and the
-active W66-S09 qualification hold; it does not change the single-active-slice
-rule.
+The latest defined wave is W70. It is registered behind W69-S07 and the W66
+runner-output remediation plus qualification hold; it does not change the
+single-active-slice rule. W66-S20 is the next ready slice and W66-S09 remains
+blocked until the S20-S25 deterministic chain closes.
 
 ## Purpose
 
@@ -210,9 +211,11 @@ W66 is the active learning-loop remediation lane. It first freezes the original
 catalog/bootstrap fixes, then restores the product/private contract boundary,
 qualification truth, planner/controller/provider outcomes, runtime atomicity,
 parent/integration/delivery correctness, and installed browser-proof integrity.
-Deterministic closure precedes the final same-commit medium/large Codex and
-Claude matrix; backlog state does not replace the ledger-derived production
-readiness decision.
+Its S20-S25 successor chain now closes weak-runner output contracts, adapter
+normalization, executable post-validation, bounded output repair, explicit
+quality-repair retry, structured artifact/evaluator consumers, and adversarial
+proof before the final same-commit medium/large Codex and Claude matrix.
+Backlog state does not replace the ledger-derived production readiness decision.
 
 W67 is the blocked successor planning lane for the breaking central AOR Home,
 source connection, durable intent preparation, intent-first console, and

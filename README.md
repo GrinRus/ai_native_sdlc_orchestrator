@@ -90,7 +90,8 @@ W69 defines intent-first confirmation CAS, runtime-owned adaptive Flow
 projections, resume-safe Project Home navigation, review-first Prepared Task,
 and Flow Cockpit UI parity without changing the historical W66 provider hold.
 Its implementation candidate is present, while formal slice completion remains
-backlog-blocked behind the active W66-S09 qualification closure.
+backlog-blocked behind the W66-S20-S25 runner-output remediation chain and the
+subsequent W66-S09 qualification closure.
 
 W70 defines the blocked successor design and implementation lane for a
 Task-first installed workspace: Tasks Home, safe Markdown sources, truthful
