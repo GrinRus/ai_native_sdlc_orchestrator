@@ -41,8 +41,8 @@ terminal verdict artifact.
   evidence without adding UI-owned orchestration state.
 - Runtime/control-plane read models expose flow list, selected flow,
   flow-scoped evidence, and completed-flow read-only projections.
-- The local React/Vite console implements the accepted design references under
-  `docs/product/assets/w34-flow-centric-console/`.
+- The local React/Vite console implements the accepted historical W34 behavior;
+  its superseded PNG references were retired by W70 and remain in Git history.
 - App smoke proves the packaged flow-centric bundle exposes the flow selector
   and `New Flow` markers in addition to SPA/config/state route health.
 - Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery,
@@ -130,7 +130,7 @@ terminal verdict artifact.
 - **Epic:** EPIC-6 Operator surface
 - **State:** done
 - **Outcome:** The packaged local SPA implements the accepted flow-centric shell with project/runtime context, flow selector, active cockpit, stage rail, and safety/evidence right rail.
-- **Primary modules:** `apps/web/**`, `apps/cli/**`, `docs/product/assets/w34-flow-centric-console/**`, tests
+- **Primary modules:** `apps/web/**`, `apps/cli/**`, `docs/product/03-flow-centric-console-design.md`, tests
 - **Hard dependencies:** W34-S02
 - **Primary user story surfaces:** PBO-09, OPS-01, OPS-10.
 

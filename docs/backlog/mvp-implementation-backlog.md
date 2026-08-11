@@ -316,7 +316,7 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W34-S01 | Flow product and contract baseline | EPIC-6 | done | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/**`, `docs/backlog/**` | W33-S10, W32-S01, W21-S07 |
 | W34-S02 | Runtime and control-plane flow projections | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `docs/contracts/**`, `examples/control-plane-api/**`, tests | W34-S01 |
-| W34-S03 | Flow-first local web shell | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `docs/product/assets/w34-flow-centric-console/**`, tests | W34-S02 |
+| W34-S03 | Flow-first local web shell | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `docs/product/03-flow-centric-console-design.md`, tests | W34-S02 |
 | W34-S04 | Flow-scoped evidence, trace, and interaction workbench | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, tests | W34-S02 |
 | W34-S05 | Closure-to-new-flow UX | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/contracts/**`, tests | W34-S02 |
 | W34-S06 | Installed-user browser-task flow-loop proof | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests | W34-S03, W34-S04, W34-S05 |
@@ -645,6 +645,18 @@ This is the master index for the implementation slices across all defined waves.
 | W69-S05 | Flow Cockpit context and runtime path presentation | EPIC-1, EPIC-3, EPIC-6, EPIC-7 | blocked | Flow Cockpit, QuietShell, quiet modes, responsive styles, browser tests | W69-S02, W69-S03, W69-S04 |
 | W69-S06 | Incremental SPA decomposition and semantic visual cleanup | EPIC-0, EPIC-6, EPIC-7 | blocked | SPA surface composition, UI tokens/components, CSS, parity tests | W69-S05 |
 | W69-S07 | Visual proof, story traceability, and closure | EPIC-0, EPIC-4, EPIC-7 | blocked | browser/reference tests, product/backlog docs, qualification runbook | W69-S06 |
+
+## W70 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W70-S01 | Task Workspace product, screen, and migration baseline | EPIC-0, EPIC-1, EPIC-6 | blocked | product design, screen assets, migration map, story matrix | W69-S07 |
+| W70-S02 | Task runner override and Markdown source contracts | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | intent/execution/Flow contracts, API/OpenAPI, examples, validators | W70-S01 |
+| W70-S03 | Task shell, Home, and resumable task list | EPIC-1, EPIC-6 | blocked | web shell/routing, task projections, client, list components, browser tests | W70-S02 |
+| W70-S04 | New Task, Markdown Sources, and Prepared Task | EPIC-1, EPIC-2, EPIC-6 | blocked | task composer, Markdown picker/preview, prepared review, runner picker | W70-S02, W70-S03 |
+| W70-S05 | Active Task Workspace and durable guidance | EPIC-3, EPIC-4, EPIC-6 | blocked | task workspace, live events, controls, operator requests, task tabs | W70-S04 |
+| W70-S06 | Attention, change review, and completion evidence | EPIC-4, EPIC-5, EPIC-6 | blocked | attention, diff/Markdown review, delivery/evidence completion, browser tests | W70-S05 |
+| W70-S07 | Design-system implementation and legacy UI retirement | EPIC-0, EPIC-6 | blocked | UI tokens/components, responsive CSS, legacy sources/assets, ratchets | W70-S06 |
+| W70-S08 | Installed Task Workspace proof and story closure | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | blocked | installed browser scenarios, product/story docs, runbooks, package proof | W70-S07 |
 
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work
