@@ -101,7 +101,7 @@ CAS; backward-compatible attachment and route-default behavior.
 
 - **State:** blocked
 - **Epic:** EPIC-1, EPIC-6
-- **Hard dependencies:** W70-S02
+- **Hard dependencies:** W70-S09
 - **Primary modules:** web routing/shell, task projections, control-plane client, list components, browser tests
 
 **Purpose:** Make Tasks the default project home and keep drafts, attention,
@@ -140,6 +140,95 @@ states, and a compact Project destination.
 ### Out of scope
 
 - Cross-project portfolio orchestration.
+
+## W70-S09 — Task Workspace live E2E proof harness baseline
+
+- **State:** blocked
+- **Epic:** EPIC-0, EPIC-4, EPIC-6, EPIC-7
+- **Hard dependencies:** W70-S02
+- **Outcome:** The private installed browser-proof harness can express and
+  fail-closed validate the complete Task-first journey before product screen
+  slices add their scenario evidence.
+- **Primary modules:** `scripts/live-e2e/**`, installed-browser-proof contract,
+  guided journey profiles, browser scenario collector, proof tests and runbooks
+- **Primary user-story surfaces:** PBO-09, PBO-10, OPS-01, OPS-04,
+  OPS-06, OPS-07, OPS-11, OPS-12
+
+**Purpose:** Make the private installed-user proof harness capable of proving
+the Task-first journey before W70 screen implementation depends on obsolete
+Flow/Cockpit selectors or weak proxy assertions.
+
+**Changes:** Introduce a versioned Task Workspace browser-proof scenario model
+for `Project -> Task -> Prepare -> Start -> Work -> Review -> Complete`; split
+the monolithic collector into screen/action scenario packs; require real UI
+interaction plus durable public-route readback; preserve historical v2 proof
+hydration while preventing v2 evidence from satisfying W70 acceptance.
+
+### Local tasks
+
+1. **Define the Task Workspace proof contract.**
+   - Purpose: make the eight screens, critical transitions, state branches, and
+     evidence requirements fail closed.
+   - Changes: add a versioned private proof contract, canonical scenario IDs,
+     screen/action identities, compatibility rules, and positive/negative
+     fixtures.
+   - Validation: contract tests reject missing screens, synthetic pass cells,
+     stale identities, missing UI actions, and missing durable readback.
+2. **Build a screen-aware scenario collector.**
+   - Purpose: replace the old selected-Flow/Cockpit-specific browser probe with
+     reusable Task Workspace journeys.
+   - Changes: add semantic screen/action drivers for onboarding, Tasks Home,
+     preparation, active work, Attention, review, completion, recovery,
+     accessibility, and viewports; reserve direct API use for fixture setup and
+     durable readback rather than substituting for claimed UI interaction.
+   - Validation: collector tests no longer require `Continue Flow`,
+     `.flow-cockpit`, or `Ask AOR for selected flow`, and fail when a required
+     visible interaction is skipped.
+3. **Separate deterministic breadth from live-provider depth.**
+   - Purpose: cover all negative and responsive branches without multiplying
+     paid live-provider runs.
+   - Changes: add deterministic browser scenario packs for text, uploaded and
+     repository Markdown, stale sources, unavailable runner, Attention,
+     failure, review, completion, reload, offline, and accessibility; add one
+     catalog-backed canonical installed journey and one repair/attention path.
+   - Validation: profile and proof-runner tests show deterministic branch
+     coverage plus paired headless provider evidence without upstream writes.
+4. **Map incremental ownership and cutover.**
+   - Purpose: let W70-S03 through W70-S07 add their scenarios while W70-S08
+     remains the final installed acceptance run.
+   - Changes: update live E2E runbooks, scenario coverage matrix, profile
+     guidance, and the retirement rule for historical v2 selectors/evidence.
+   - Validation: reference checks and slice plans expose an explicit owner for
+     every W70 screen, action, state, and closure artifact.
+
+### Acceptance criteria
+
+1. The current proof schema fails closed unless all eight Task Workspace
+   screens and the canonical lifecycle transitions have immutable evidence.
+2. A claimed browser action is performed through the installed UI and linked
+   to its canonical mutation identity, returned durable ID, evidence refs, and
+   post-reload public readback.
+3. The active collector has no hard dependency on selected-Flow readiness,
+   `.flow-cockpit`, `Continue Flow`, or `Ask AOR for selected flow`.
+4. Deterministic scenarios cover the W70 negative/state matrix, while bounded
+   live profiles prove the canonical journey and repair/attention path without
+   expanding the provider qualification matrix.
+5. Historical v2 proof remains readable for audit, but cannot satisfy W70
+   installed acceptance or silently pass synthetic recovery cells.
+
+### Done evidence
+
+- Versioned private proof contract and compatibility fixtures
+- Screen/action scenario coverage matrix
+- Collector and proof-runner test output
+- Canonical and repair/attention guided profile snapshots
+- Updated live E2E runbook and reference-check output
+
+### Out of scope
+
+- Implementing the W70 product screens themselves
+- Expanding the required provider qualification matrix
+- Paid qualification runs or upstream target-repository writes
 
 ## W70-S04 — New Task, Markdown Sources, and Prepared Task
 

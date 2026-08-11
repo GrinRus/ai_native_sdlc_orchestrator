@@ -375,6 +375,7 @@ graph TD
   W69S07[W69-S07 Visual proof, story traceability, and closure]
   W70S01[W70-S01 Task Workspace product screen and migration baseline]
   W70S02[W70-S02 Task runner override and Markdown source contracts]
+  W70S09[W70-S09 Task Workspace live E2E proof harness baseline]
   W70S03[W70-S03 Task shell Home and resumable task list]
   W70S04[W70-S04 New Task Markdown Sources and Prepared Task]
   W70S05[W70-S05 Active Task Workspace and durable guidance]
@@ -1567,7 +1568,8 @@ own the stricter terminal control proof evidence for this lane.
 | W69-S07 | W69-S06 |
 | W70-S01 | W69-S07 |
 | W70-S02 | W70-S01 |
-| W70-S03 | W70-S02 |
+| W70-S09 | W70-S02 |
+| W70-S03 | W70-S09 |
 | W70-S04 | W70-S02, W70-S03 |
 | W70-S05 | W70-S04 |
 | W70-S06 | W70-S05 |
@@ -1951,12 +1953,13 @@ own the stricter terminal control proof evidence for this lane.
 374. W69-S07
 375. W70-S01
 376. W70-S02
-377. W70-S03
-378. W70-S04
-379. W70-S05
-380. W70-S06
-381. W70-S07
-382. W70-S08
+377. W70-S09
+378. W70-S03
+379. W70-S04
+380. W70-S05
+381. W70-S06
+382. W70-S07
+383. W70-S08
 
 W66 weak-runner remediation edges:
 
@@ -2017,7 +2020,8 @@ W70 dependency edges:
 graph TD
   W69S07[W69-S07 Visual proof story traceability and closure] --> W70S01[W70-S01 Task Workspace product screen and migration baseline]
   W70S01 --> W70S02[W70-S02 Task runner override and Markdown source contracts]
-  W70S02 --> W70S03[W70-S03 Task shell Home and resumable task list]
+  W70S02 --> W70S09[W70-S09 Task Workspace live E2E proof harness baseline]
+  W70S09 --> W70S03[W70-S03 Task shell Home and resumable task list]
   W70S02 --> W70S04[W70-S04 New Task Markdown Sources and Prepared Task]
   W70S03 --> W70S04
   W70S04 --> W70S05[W70-S05 Active Task Workspace and durable guidance]
