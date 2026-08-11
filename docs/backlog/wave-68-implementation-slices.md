@@ -2,11 +2,30 @@
 
 ## Purpose
 
-Add provider-neutral runtime selection for model and reasoning effort. A route
-may omit either value and let the selected runtime choose its native default;
-an explicit value is validated by the adapter and mapped to adapter-owned
-process arguments. Live E2E profiles may opt into an isolated model/effort
-selection without changing the active W66 qualification baseline.
+Reconcile, complete, and certify provider-neutral runtime selection for model
+and reasoning effort. A route may omit either value and let the selected runtime
+choose its native default; an explicit value is validated by the adapter and
+mapped to adapter-owned process arguments. Live E2E profiles may opt into an
+isolated model/effort selection without changing the active W66 qualification
+baseline.
+
+## Existing baseline and decision boundary
+
+W68 is a reconciliation, completion, and certification wave rather than a
+greenfield implementation. Current route and adapter contracts, provider
+routing, adapter negotiation, step-result evidence, execution-profile
+projections, and examples already carry parts of requested/effective
+model/reasoning-effort behavior. W68 must inventory that behavior, make one
+contract authoritative, close missing compatibility and projection paths, and
+qualify the cutover without rewriting historical W66 evidence.
+
+Model and reasoning-effort values remain adapter-owned opaque stable strings;
+AOR does not invent a cross-provider quality scale. Provider-neutral presets
+select approved route candidates instead of translating one provider's effort
+name into another provider's value. When a value is omitted, requested and
+effective fields remain `null` unless the runner reports a trustworthy
+effective value, and the source records `runner-default`. An explicit
+unsupported value blocks before spawn.
 
 ## W68-S01 — Contract and migration baseline for runtime selection
 
@@ -32,20 +51,52 @@ without changing the required W66 matrix cells.
 
 ### Local tasks
 
-1. **Define and validate the selection contract.** Purpose: establish optional
-   model and effort fields. Changes: update contract docs, loaders, and
-   fixtures. Validation: focused contract tests and example loading.
-   - Purpose: Establish optional model and effort fields.
-   - Changes: Update contract docs, loaders, and fixtures.
-   - Validation: Run focused contract tests and example loading.
+1. **Inventory and freeze the partial baseline.**
+   - Purpose: Distinguish already implemented behavior from missing W68 work.
+   - Changes: Record current route, adapter, routing, invocation, evidence, and
+     projection fields plus legacy hidden live defaults in one compatibility
+     matrix.
+   - Validation: Source/reference checks prove every documented field has one
+     owner and every existing behavior has an explicit keep/change disposition.
+2. **Define the authoritative selection contract.**
+   - Purpose: Keep explicit selection provider-neutral without inventing a
+     cross-provider effort scale.
+   - Changes: Define optional requested/effective model and effort, source
+     vocabulary, adapter-owned opaque values, omitted-value semantics, and
+     qualification-key linkage to ADR 0022 schema capability.
+   - Validation: Contract fixtures cover explicit, omitted, alias-resolved,
+     unsupported, and runner-reported effective values.
+3. **Define legacy-default migration.**
+   - Purpose: Prevent duplicate model/effort arguments while historical live
+     profiles remain readable.
+   - Changes: Classify adapter `default_args`, route-explicit values, private
+     live-profile overrides, historical evidence, and rollback behavior.
+   - Validation: Compatibility fixtures prove old profiles load without
+     qualifying or silently changing new strict execution.
+4. **Align docs, loaders, and examples.**
+   - Purpose: Make the contract reviewable before runtime changes depend on it.
+   - Changes: Update route, adapter, execution-profile, step-result, examples,
+     and validation notes together.
+   - Validation: Focused contract, example-loader, and reference checks pass.
 
 ### Acceptance criteria
 
-- Existing route and adapter examples remain loadable.
+1. Existing route and adapter examples remain loadable with documented legacy
+   semantics.
+2. Omitted model/effort produces no provider-specific process argument and
+   records `runner-default` rather than fabricating an effective value.
+3. Explicit values remain adapter-owned strings and require declared adapter
+   support plus argument mapping.
+4. The current partial implementation has an evidence-backed keep/change
+   disposition with no second competing contract.
+5. Qualification identity joins adapter digest, runtime selection, output mode,
+   and exact output schema without altering historical W66 cells.
 
 ### Done evidence
 
-- Contract test output and example-load report.
+- Current-baseline compatibility matrix.
+- Contract test output and example-load/reference report.
+- Legacy-default migration and rollback table.
 
 ### Out of scope
 
@@ -75,20 +126,51 @@ unsupported, and omitted values plus argv mapping; root checks remain green.
 
 ### Local tasks
 
-1. **Implement deterministic resolution.** Purpose: resolve values before
-   spawn. Changes: update adapter negotiation and argv mapping. Validation:
-   explicit, omitted, and unsupported focused tests.
-   - Purpose: Resolve values before spawn.
-   - Changes: Update adapter negotiation and argv mapping.
-   - Validation: Cover explicit, omitted, and unsupported values.
+1. **Reconcile deterministic resolution.**
+   - Purpose: Make one route-to-adapter path authoritative across existing
+     partial implementations.
+   - Changes: Normalize requested/effective/source resolution for primary and
+     fallback candidates, aliases, omitted values, and runner-reported values.
+   - Validation: Provider-routing and adapter fixtures produce identical
+     resolution evidence for equivalent candidates.
+2. **Enforce capability before spawn.**
+   - Purpose: Avoid paid or write-capable execution with unsupported explicit
+     selections.
+   - Changes: Join model, effort, output-mode, and ADR 0022 schema capability
+     during adapter negotiation; retain exact blocker reasons for skipped
+     fallback candidates.
+   - Validation: Unsupported and unqualified explicit values never spawn;
+     policy-eligible compatible fallback remains bounded and ordered.
+3. **Render adapter-owned arguments.**
+   - Purpose: Keep provider-specific CLI syntax outside orchestrator core.
+   - Changes: Render model and effort through adapter profile mappings, suppress
+     duplicate legacy defaults, and retain sanitized invocation identity.
+   - Validation: Codex, Claude, mock, and negative custom-adapter argv fixtures
+     contain exactly one applicable mapping and no secret values.
+4. **Persist truthful execution evidence.**
+   - Purpose: Let qualification and operators distinguish requested, effective,
+     and native-default behavior.
+   - Changes: Align route resolution, adapter response, step-result, Harness
+     capture, and attempt evidence.
+   - Validation: Reload/replay fixtures preserve the same selection lineage and
+     do not infer an unknown runner-native effective value.
 
 ### Acceptance criteria
 
-- No external process starts with an unsupported explicit value.
+1. No external process starts with an unsupported or schema-unqualified
+   explicit selection.
+2. Omitted values add no model/effort flags and preserve runner-native behavior.
+3. Provider-specific argument syntax exists only in adapter-owned mappings.
+4. Primary and fallback candidates record independent requested/effective/source
+   evidence and remain policy-bounded.
+5. Existing compatible routes retain their documented behavior and no hidden
+   default is applied twice.
 
 ### Done evidence
 
-- Adapter and provider-routing focused test output.
+- Adapter/provider-routing semantic matrix.
+- No-spawn capability and bounded-fallback regressions.
+- Sanitized invocation and step-result evidence fixtures.
 
 ### Out of scope
 
@@ -113,20 +195,50 @@ backward-compatible nulls when no explicit selection is present.
 
 ### Local tasks
 
-1. **Project runtime selection.** Purpose: expose read-only effort metadata.
-   Changes: update execution/readiness and attempt projections. Validation:
-   projection fixtures and contract checks.
-   - Purpose: Expose read-only effort metadata.
-   - Changes: Update execution/readiness and attempt projections.
-   - Validation: Run projection fixtures and contract checks.
+1. **Project runtime selection.**
+   - Purpose: Expose requested/effective/source evidence without leaking CLI
+     syntax or inventing native defaults.
+   - Changes: Align execution-profile, readiness, route-attempt, Flow/Task, and
+     control-plane projections.
+   - Validation: Projection fixtures cover explicit, omitted, unavailable,
+     unqualified, fallback, and legacy-null states.
+2. **Define provider-neutral presets.**
+   - Purpose: Give operators reusable choices without translating provider
+     effort vocabularies in core.
+   - Changes: Define coding, planning, judge, and live-diagnostic presets as
+     approved route selections with capability/readiness summaries.
+   - Validation: Presets resolve only registered routes and never inject raw
+     model/effort values outside route contracts.
+3. **Align CLI, API, OpenAPI, and web reads.**
+   - Purpose: Keep headless and installed surfaces on the same source of truth.
+   - Changes: Add additive fields, stable unavailable reasons, recovery actions,
+     and backward-compatible null behavior.
+   - Validation: Contract drift, serialization, reload, and control-plane client
+     fixtures pass.
+4. **Prove query safety.**
+   - Purpose: Keep runner arguments, credentials, and private paths out of
+     operator projections.
+   - Changes: Add provider flag, secret, auth-home, and local-path canaries.
+   - Validation: CLI/API/web snapshots expose only approved route and sanitized
+     selection metadata.
 
 ### Acceptance criteria
 
-- Projection rows preserve route identity and null compatibility.
+1. Projection rows preserve route identity and backward-compatible nulls.
+2. Requested, effective, and source fields are consistent across CLI, API,
+   OpenAPI, web, step-result, and Harness evidence.
+3. Presets select approved routes and never normalize one provider's effort
+   vocabulary into another provider's value.
+4. Unavailable or unqualified selections remain visible with a stable reason
+   and cannot be started.
+5. Query surfaces contain no provider flags, secrets, raw auth paths, or
+   private live-profile details.
 
 ### Done evidence
 
-- Execution-profile/readiness projection fixtures.
+- Execution-profile/readiness/attempt projection matrix.
+- CLI/API/OpenAPI/web parity output.
+- Query-safety canary results.
 
 ### Out of scope
 
@@ -152,20 +264,51 @@ model defaults, and other provider variants remain unchanged.
 
 ### Local tasks
 
-1. **Materialize a selected live profile.** Purpose: prove isolated Codex
-   selection. Changes: add profile and route/materialization assertions.
-   Validation: focused private proof-runner test.
-   - Purpose: Prove isolated Codex selection.
-   - Changes: Add profile and route/materialization assertions.
-   - Validation: Run the focused private proof-runner test.
+1. **Define the isolated live profile.**
+   - Purpose: Prove one explicit selection without changing shared or historical
+     qualification inputs.
+   - Changes: Add a private Codex Luna/high profile with pinned target, scenario,
+     output schema, no-write boundary, and unique evidence identity.
+   - Validation: Catalog/profile checks reject missing selection, schema,
+     isolation, or no-write fields.
+2. **Materialize selected routes safely.**
+   - Purpose: Avoid duplicate legacy defaults and source-profile mutation.
+   - Changes: Generate run-scoped routes and adapter assets, suppress applicable
+     copied `default_args`, and preserve source digests.
+   - Validation: Snapshot tests show exactly one Luna/high mapping and unchanged
+     non-selected providers.
+3. **Prove deterministic preflight and browser readiness.**
+   - Purpose: Fail before paid execution when selection, capability, or installed
+     UI projection is inconsistent.
+   - Changes: Extend private proof-runner and guided-profile fixtures for
+     selection/readiness/readback.
+   - Validation: Unsupported, unavailable, duplicate-argument, stale, and
+     secret/path canary scenarios fail closed.
+4. **Run one bounded isolated rehearsal.**
+   - Purpose: Establish real evidence for the selected runtime path before
+     cutover certification.
+   - Changes: Execute the approved no-upstream-write profile from an isolated
+     install and retain path-neutral evidence.
+   - Validation: Actual requested/effective/source selection, schema acceptance,
+     terminal health, and unchanged primary/upstream state are proven.
 
 ### Acceptance criteria
 
-- Generated assets carry Luna/high and never write upstream.
+1. Generated assets carry the selected Luna/high values exactly once and never
+   mutate source profiles.
+2. The selected route is schema-qualified under ADR 0022 before spawn.
+3. Other provider variants and historical W66 evidence remain byte-for-byte
+   unchanged.
+4. The installed journey exposes truthful selected/default/readiness state and
+   durable readback.
+5. The bounded rehearsal writes neither primary source nor upstream and retains
+   no credential or private runtime path in committed evidence.
 
 ### Done evidence
 
-- Isolated live-E2E materialization evidence and route snapshot.
+- Isolated live-E2E materialization and route snapshots.
+- Deterministic preflight/browser matrix.
+- Path-neutral bounded rehearsal evidence index.
 
 ### Out of scope
 
@@ -191,20 +334,48 @@ cutover decision. No upstream writes or mutation of historical evidence.
 
 ### Local tasks
 
-1. **Certify and decide cutover.** Purpose: close the migration with evidence.
-   Changes: run qualification and update the ledger/runbook. Validation: root
-   gates plus fresh isolated medium/large evidence.
-   - Purpose: Close the migration with evidence.
-   - Changes: Run qualification and update the ledger/runbook.
-   - Validation: Run root gates plus fresh isolated evidence.
+1. **Freeze the certification manifest.**
+   - Purpose: Make every final cell attributable to one accepted behavior
+     commit and target revision.
+   - Changes: Pin AOR/target commits, profile and adapter digests, selected
+     schema, model/effort, output mode, scenarios, and no-write policy.
+   - Validation: Manifest validation rejects drift or mixed-commit evidence.
+2. **Run the bounded Codex certification cells.**
+   - Purpose: Compare medium and large behavior before default cutover.
+   - Changes: Execute isolated installed profiles sequentially with fresh IDs
+     and full selection/output/health evidence.
+   - Validation: Both cells meet the frozen manifest and ADR 0022 acceptance;
+     any product fix restarts the affected certification set.
+3. **Record the reversible cutover decision.**
+   - Purpose: Remove hidden defaults only when evidence supports the new path.
+   - Changes: Update the qualification ledger with promote/hold decision,
+     rationale, compatibility limits, rollback profile, and evidence refs.
+   - Validation: The decision is mechanically derivable from accepted cells and
+     rollback restores the prior route/default without rewriting history.
+4. **Close docs and deterministic gates.**
+   - Purpose: Keep README, runbooks, examples, backlog, and release claims
+     aligned with the selected policy.
+   - Changes: Update owning docs and run focused, root, reference, package, and
+     slice gates.
+   - Validation: All gates pass and committed evidence is path-neutral,
+     credential-free, and contains no runtime state.
 
 ### Acceptance criteria
 
-- Cutover is ledger-linked and reversible.
+1. Certification uses one frozen AOR/target/profile/schema manifest.
+2. Medium and large Codex evidence carries truthful requested/effective/source
+   selection and accepted output contracts.
+3. Hidden defaults are removed only after a ledger-linked promote decision.
+4. Hold leaves the prior default intact and records an explicit next action.
+5. Cutover is reversible without changing historical W66 evidence or writing
+   upstream.
+6. Focused, root, package, reference, and slice gates pass.
 
 ### Done evidence
 
-- Qualification ledger decision and root-gate output.
+- Frozen certification manifest and two accepted cell indexes.
+- Qualification ledger promote/hold and rollback decision.
+- Root, package, reference, and slice-gate output.
 
 ### Out of scope
 

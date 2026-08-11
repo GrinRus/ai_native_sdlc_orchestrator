@@ -176,7 +176,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W69`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W70`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, project-context anchoring, and concurrent
 evidence integrity. W58 continues with non-materializing reads, effective
@@ -223,7 +223,8 @@ explicit portable write-back cutover. Its first slice depends on W66-S09, so
 describing or implementing the lane does not make it the active slice.
 
 W68 is the blocked successor lane for provider-neutral runtime model and
-reasoning-effort selection. It keeps runner-native defaults when no explicit
+reasoning-effort selection. It reconciles the existing partial contract/runtime
+baseline before completing it, keeps runner-native defaults when no explicit
 value is supplied, maps explicit values only at adapter boundaries, and
 introduces an isolated Codex Luna/high live profile without rewriting W66
 qualification evidence.

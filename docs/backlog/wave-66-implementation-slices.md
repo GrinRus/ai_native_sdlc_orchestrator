@@ -1278,6 +1278,33 @@ installed-console gates are trustworthy.
 - **Hard dependencies:** W66-S19
 - **Primary user story surfaces:** DEV-01, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07
 
+### Accepted pre-implementation decisions
+
+ADR 0022 is the normative decision baseline for this slice and its W66-S21
+through W66-S25 consumers. In particular:
+
+- every newly emitted live or write-capable adapter-backed step is strict and
+  resolves one exact `<family>@v<integer>` candidate schema before spawn;
+- a query-safe candidate is limited to 65,536 UTF-8 bytes, normalized issues
+  are limited to 64 entries, and raw provider output remains evidence-only;
+- only `parse_status=valid` may enter schema validation, while ambiguous output
+  never selects a preferred object;
+- process, transport, provider, parsing, candidate, validation, verification,
+  and mission outcomes remain independently owned;
+- required command IDs use AOR-owned environment-qualified command identity;
+- v1/v2 provider work packets remain immutable replay evidence, while strict
+  execution emits v3 and v1/v2 cannot satisfy the new qualification policy;
+- structural validators run in the fixed order `output-schema`,
+  `evidence-complete`, and `validation-commands` before semantic evaluation;
+- schema qualification is bound to adapter digest, runtime selection, output
+  mode, schema ref, and immutable evidence rather than the legacy
+  `structured_output` boolean.
+
+See `docs/architecture/adr/0022-runner-output-acceptance-boundary.md` for the
+failure-action table, repair boundaries, compatibility policy, and ownership
+matrix. W66-S20 materializes the accepted decisions in contracts and fixtures;
+it does not reopen them inside adapter implementation.
+
 ### Local tasks
 
 1. **Normalized runner-output envelope**

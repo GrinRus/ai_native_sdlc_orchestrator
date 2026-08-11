@@ -78,7 +78,7 @@ The authoritative planning model for implementation lives in:
 | W65 | Migrate the installed console to Quiet Cockpit through reversible parity pilots, default-on cutover, rollback proof, legacy retirement, and post-cutover acceptance. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-65-implementation-slices.md` |
 | W66 | Restore trustworthy installed live qualification through canonical bootstrap identity, strict private/product separation, truthful outcome gates, atomic orchestration, exact coordinated delivery, executable browser acceptance, bounded provider-session convergence, and same-commit Codex/Claude closure. | 25 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-66-implementation-slices.md` |
 | W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
-| W68 | Add provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
+| W68 | Reconcile, complete, and certify provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
 | W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
 
@@ -1478,13 +1478,21 @@ cutover cannot invalidate the active qualification baseline.
 
 ## W68 - runtime model selection and provider-neutral effort
 
-**Goal:** Allow each runtime to use its native model/effort defaults unless a
-route or private live profile explicitly selects a supported value, with
-adapter-owned argument mapping and durable requested/effective evidence.
+**Goal:** Reconcile the existing partial model/effort contract and runtime
+baseline, then allow each runtime to use its native defaults unless a route or
+private live profile explicitly selects a supported value, with adapter-owned
+argument mapping, durable requested/effective/source evidence, and a reversible
+qualification-backed cutover.
 
 **Entry condition:** W67-S05 remains the hard dependency for the shared
 backlog lane; W68 contract and focused implementation work may be prepared in
 parallel without changing the active W66 qualification baseline.
+
+**Decision boundary:** W68 is not a greenfield route implementation. Existing
+route, adapter, SDK, evidence, and projection fields must receive an explicit
+keep/change disposition before new behavior lands. Model and effort values
+remain adapter-owned; provider-neutral presets select approved routes rather
+than translating effort vocabularies across providers.
 
 **Detailed slices:** `docs/backlog/wave-68-implementation-slices.md`
 
