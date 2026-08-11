@@ -613,9 +613,22 @@ This is the master index for the implementation slices across all defined waves.
 | W66-S17 | Environment-qualified provider command identity | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet command identity, environment-qualified allowlist parity, adapter regressions | W66-S16 |
 | W66-S18 | Guided diagnostic timeout alignment | EPIC-0, EPIC-4, EPIC-7 | done | private guided profile timeout policy, diagnostic timeout and cleanup regressions | W66-S17 |
 | W66-S19 | Provider verification-scope convergence | EPIC-0, EPIC-4, EPIC-7 | done | provider work-packet scope guardrail, review-owner fidelity, guided regressions | W66-S18 |
-| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | active | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S19 |
+| W66-S20 | Runner output contract and failure taxonomy | EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-7 | ready | output/step/adapter/policy contracts, provider work-packet v3, contract registry, examples/kernel parity | W66-S19 |
+| W66-S21 | Adapter output normalization and acceptance | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | blocked | adapter SDK parsing, provider stream extractors, acceptance evidence, capability preflight, tests | W66-S20 |
+| W66-S22 | Executable post-validation and output repair | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | blocked | validator registry, policy/runtime execution, Runtime Harness classify/verify, output/evidence repair, tests | W66-S21 |
+| W66-S23 | Explicit quality-repair retry and attempt lineage | EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | blocked | repair request/attempt contracts, observability service, CLI/API/OpenAPI, next-action/Flow projections, workspace/concurrency tests | W66-S22 |
+| W66-S24 | Structured artifact and evaluator hardening | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-7 | blocked | intent normalization, planner decomposition, semantic evaluation, live assessment projection, tests | W66-S23 |
+| W66-S25 | Weak-runner adversarial proof and qualification reset | EPIC-0, EPIC-3, EPIC-4, EPIC-7 | blocked | adversarial fixtures, schema/provider parity, repair concurrency proof, deterministic gates, qualification manifest | W66-S24 |
+| W66-S09 | Fresh four-cell live qualification closure | EPIC-0, EPIC-1, EPIC-4, EPIC-7 | blocked | private live profiles/operator loop, qualification reports, evidence indexes, backlog/readiness closure | W66-S25 |
 
 ## Planning note
+
+W66-S20 through W66-S25 are deterministic remediation required before another
+final live qualification attempt. They close the weak-runner false-pass surface
+across output parsing, schema/evidence/command validation, Runtime Harness
+acceptance, bounded output repair, explicit quality-repair retry, structured
+artifact/evaluator consumers, and adversarial replay proof. All W66-S09 evidence
+predating this chain remains diagnostic-only for final wave closure.
 
 ## W67 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

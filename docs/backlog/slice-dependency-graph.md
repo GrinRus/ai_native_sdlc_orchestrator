@@ -354,6 +354,12 @@ graph TD
   W66S17[W66-S17 Environment-qualified provider command identity]
   W66S18[W66-S18 Guided diagnostic timeout alignment]
   W66S19[W66-S19 Provider verification-scope convergence]
+  W66S20[W66-S20 Runner output contract and failure taxonomy]
+  W66S21[W66-S21 Adapter output normalization and acceptance]
+  W66S22[W66-S22 Executable post-validation and output repair]
+  W66S23[W66-S23 Explicit quality-repair retry and attempt lineage]
+  W66S24[W66-S24 Structured artifact and evaluator hardening]
+  W66S25[W66-S25 Weak-runner adversarial proof and qualification reset]
   W66S09[W66-S09 Fresh four-cell live qualification closure]
   W68S01[W68-S01 Contract and migration baseline for runtime selection]
   W68S02[W68-S02 Runtime resolution and adapter argument mapping]
@@ -889,7 +895,13 @@ graph TD
   W66S16 --> W66S17
   W66S17 --> W66S18
   W66S18 --> W66S19
-  W66S19 --> W66S09
+  W66S19 --> W66S20
+  W66S20 --> W66S21
+  W66S21 --> W66S22
+  W66S22 --> W66S23
+  W66S23 --> W66S24
+  W66S24 --> W66S25
+  W66S25 --> W66S09
   W66S09 --> W68S01
   W68S01 --> W68S02
   W68S02 --> W68S03
@@ -1529,7 +1541,13 @@ own the stricter terminal control proof evidence for this lane.
 | W66-S17 | W66-S16 |
 | W66-S18 | W66-S17 |
 | W66-S19 | W66-S18 |
-| W66-S09 | W66-S19 |
+| W66-S20 | W66-S19 |
+| W66-S21 | W66-S20 |
+| W66-S22 | W66-S21 |
+| W66-S23 | W66-S22 |
+| W66-S24 | W66-S23 |
+| W66-S25 | W66-S24 |
+| W66-S09 | W66-S25 |
 | W67-S01 | W66-S09 |
 | W67-S02 | W67-S01 |
 | W67-S03 | W67-S01 |
@@ -1907,32 +1925,51 @@ own the stricter terminal control proof evidence for this lane.
 348. W66-S17
 349. W66-S18
 350. W66-S19
-351. W66-S09
-352. W67-S01
-353. W67-S02
-354. W67-S03
-355. W67-S04
-356. W67-S05
-357. W68-S01
-358. W68-S02
-359. W68-S03
-360. W68-S04
-361. W68-S05
-362. W69-S01
-363. W69-S02
-364. W69-S03
-365. W69-S04
-366. W69-S05
-367. W69-S06
-368. W69-S07
-369. W70-S01
-370. W70-S02
-371. W70-S03
-372. W70-S04
-373. W70-S05
-374. W70-S06
-375. W70-S07
-376. W70-S08
+351. W66-S20
+352. W66-S21
+353. W66-S22
+354. W66-S23
+355. W66-S24
+356. W66-S25
+357. W66-S09
+358. W67-S01
+359. W67-S02
+360. W67-S03
+361. W67-S04
+362. W67-S05
+363. W68-S01
+364. W68-S02
+365. W68-S03
+366. W68-S04
+367. W68-S05
+368. W69-S01
+369. W69-S02
+370. W69-S03
+371. W69-S04
+372. W69-S05
+373. W69-S06
+374. W69-S07
+375. W70-S01
+376. W70-S02
+377. W70-S03
+378. W70-S04
+379. W70-S05
+380. W70-S06
+381. W70-S07
+382. W70-S08
+
+W66 weak-runner remediation edges:
+
+```mermaid
+graph TD
+  W66S19[W66-S19 Provider verification-scope convergence] --> W66S20[W66-S20 Runner output contract and failure taxonomy]
+  W66S20 --> W66S21[W66-S21 Adapter output normalization and acceptance]
+  W66S21 --> W66S22[W66-S22 Executable post-validation and output repair]
+  W66S22 --> W66S23[W66-S23 Explicit quality-repair retry and attempt lineage]
+  W66S23 --> W66S24[W66-S24 Structured artifact and evaluator hardening]
+  W66S24 --> W66S25[W66-S25 Weak-runner adversarial proof and qualification reset]
+  W66S25 --> W66S09[W66-S09 Fresh four-cell live qualification closure]
+```
 
 W67 dependency edges:
 

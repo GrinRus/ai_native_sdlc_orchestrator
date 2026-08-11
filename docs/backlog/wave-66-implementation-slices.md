@@ -38,6 +38,12 @@ installed-console gates are trustworthy.
   changed-path evidence, and no-upstream-write proof.
 - Medium and larger plans fail closed when mission-specific structured output is
   missing; provider transport success cannot hide partial semantic completion.
+- Every live adapter-backed step resolves one expected output schema before
+  spawn, normalizes provider output at the adapter boundary, and executes all
+  selected deterministic post-validators before Runtime Harness can pass.
+- Output-format repair, evidence reconciliation, and write-capable work repair
+  are distinct bounded actions; quality repair retries preserve request,
+  workspace, finding, attempt, and budget lineage.
 - Jobs, attempts, run control, events, parent/child scheduling, integration, and
   coordinated delivery are atomic, replay-safe, and evidence-backed.
 - Installed browser proof exercises durable action outcomes across responsive,
@@ -48,7 +54,7 @@ installed-console gates are trustworthy.
 
 ## Delivery order
 
-`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S17 -> W66-S18 -> W66-S19 -> W66-S09`
+`W66-S01 -> W66-S02 -> W66-S03 -> W66-S04 -> W66-S05 -> W66-S06 -> W66-S07 -> W66-S08 -> W66-S10 -> W66-S11 -> W66-S12 -> W66-S13 -> W66-S14 -> W66-S15 -> W66-S16 -> W66-S17 -> W66-S18 -> W66-S19 -> W66-S20 -> W66-S21 -> W66-S22 -> W66-S23 -> W66-S24 -> W66-S25 -> W66-S09`
 
 ## W66-S01 — Catalog identity and bootstrap remediation baseline
 
@@ -1258,10 +1264,608 @@ installed-console gates are trustworthy.
   commands, target-source repair, provider timeout changes, large provider
   execution, four-cell closure, or production clearance.
 
+## W66-S20 — Runner output contract and failure taxonomy
+
+- **Epic:** EPIC-0, EPIC-2, EPIC-3, EPIC-4, EPIC-7
+- **State:** ready
+- **Outcome:** Every adapter-backed step declares one expected structured-output
+  family before provider spawn, and public contracts distinguish process,
+  transport, provider, parsing, validation, verification, and mission outcomes.
+- **Delivery priority:** P0
+- **Estimated effort:** M
+- **Primary modules:** output/step/adapter/policy contracts, provider work-packet
+  contract, contract registry, examples, public/private kernel parity
+- **Hard dependencies:** W66-S19
+- **Primary user story surfaces:** DEV-01, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Normalized runner-output envelope**
+   - Purpose: Give every adapter one provider-neutral handoff into deterministic
+     validation without asking core to understand native provider streams.
+   - Changes: Define `runner-output-envelope@v1` with requested schema ref,
+     parse status (`valid|missing|malformed|ambiguous|unsupported`), one bounded
+     candidate payload, normalized issues, and raw evidence ref. Define which
+     fields are query-safe and forbid prompts, credentials, tool arguments,
+     transcripts, and local runner-home paths.
+   - Validation: Contract fixtures cover each parse status, exactly-one-candidate
+     semantics, bounded sizes, forbidden raw fields, and canonical evidence refs.
+2. **Runner final-report candidate and AOR-owned report**
+   - Purpose: Keep model-authored judgment separate from authoritative artifact
+     identity and aggregation.
+   - Changes: Define a minimal `runner-final-report@v1` candidate with
+     `completed|partial|blocked`, summary, changed files, command-result claims,
+     verification, risks, and optional repair closure. Require AOR to add public
+     IDs, run/step identity, timestamps, verified evidence refs, and validation
+     status when materializing the durable report.
+   - Validation: Pass, partial, blocked, no-write, write-capable, and repair
+     examples load; model-authored public IDs or authoritative aggregate status
+     fail contract validation.
+3. **Provider work-packet v3 output contract**
+   - Purpose: Tell the runtime exactly which candidate schema and command IDs it
+     must return instead of relying on `return_json=true` and prose instructions.
+   - Changes: Define packet v3 `output_contract` with schema ref/version,
+     exactly-one-candidate rule, required sections, status vocabulary, output
+     size bound, and stable `required_command_id` references. Keep v1/v2
+     immutable and readable as replay evidence but stop emitting them for new
+     strict live execution.
+   - Validation: Packet fixtures prove command IDs are unique and map one-to-one
+     to required commands; legacy packets remain loadable but cannot satisfy the
+     new strict qualification policy.
+4. **Canonical failure taxonomy and policy mapping**
+   - Purpose: Let retry, repair, fallback, escalation, and operator guidance act
+     on stable runner-neutral classes.
+   - Changes: Define detailed failure kinds for missing, malformed, ambiguous,
+     unsupported, partial, missing-evidence, missing-verification, and
+     verification-contradiction cases. Map them to policy-facing classes such as
+     `schema-mismatch`, `missing-evidence`, `verification-missing`,
+     `validation-commands-failed`, and `incomplete-result`.
+   - Validation: A table-driven contract fixture proves every detailed kind has
+     exactly one class and that unknown kinds fail closed rather than inheriting
+     a broad repair default.
+5. **Schema-aware adapter capability and migration policy**
+   - Purpose: Stop treating one `structured_output: true` boolean as proof that
+     every runner/model can satisfy every schema family.
+   - Changes: Add supported schema refs and supported output modes to adapter
+     capability profiles; document compatibility for legacy booleans and the
+     later W68 model/effort qualification join. Strict routes require explicit
+     schema support or durable qualification evidence before spawn.
+   - Validation: Existing examples still load; strict route fixtures reject an
+     adapter that only declares the legacy boolean or a different schema family.
+6. **Contract examples and kernel parity**
+   - Purpose: Keep public product contracts and the private live-E2E snapshot
+     behaviorally identical before implementation depends on them.
+   - Changes: Update the contracts index, examples, reference routing, contract
+     families, live-E2E public-kernel snapshot, and validation notes together.
+   - Validation: Contract loader, reference integrity, and public/private kernel
+     parity pass without provider calls.
+
+### Acceptance criteria
+
+1. Every strict adapter-backed step can resolve one expected output schema
+   before provider spawn.
+2. Process, transport, provider, parsing, validation, verification, and mission
+   outcomes have independent contract fields and vocabularies.
+3. Empty, malformed, ambiguous, unsupported, partial, missing-evidence, and
+   verification-contradiction outcomes have stable failure kinds and classes.
+4. Models do not own public IDs, run identity, timestamps, verified evidence
+   refs, or aggregate pass status.
+5. New strict live execution emits provider work-packet v3; v1/v2 remain
+   readable immutable replay evidence.
+6. Schema-family support is explicit; `structured_output: true` alone cannot
+   qualify a strict route.
+7. Contract loader, examples, reference integrity, and kernel parity pass.
+8. No runtime behavior or provider call is introduced in this contract slice.
+
+### Done evidence
+
+- Runner-output envelope and final-report contracts with pass/non-pass fixtures.
+- Provider work-packet v3 and compatibility fixtures.
+- Failure taxonomy and schema-capability validation matrix.
+- Contract loader, reference, and public/private kernel parity output.
+
+### Out of scope
+
+- Adapter parsing implementation, post-validator execution, repair retry,
+  provider qualification, live calls, or W66 closure.
+
+## W66-S21 — Adapter output normalization and acceptance
+
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
+- **State:** blocked
+- **Outcome:** External-process adapters normalize native output into the shared
+  envelope and reject empty, malformed, ambiguous, unsupported, or partial
+  candidates even when the provider process exits zero.
+- **Delivery priority:** P0
+- **Estimated effort:** L
+- **Primary modules:** adapter SDK external-process parsing, provider stream
+  extractors, adapter response evidence, capability preflight, focused tests
+- **Hard dependencies:** W66-S20
+- **Primary user story surfaces:** DEV-01, DEV-05, AIP-12, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Separate extraction from acceptance**
+   - Purpose: Prevent parsing convenience from silently deciding mission
+     success.
+   - Changes: Refactor external stdout handling into provider-format extraction,
+     provider-neutral envelope construction, and deterministic acceptance.
+     Return one envelope plus evidence/tool traces; never return raw prose as an
+     accepted structured candidate.
+   - Validation: Focused unit tests prove parsing alone cannot produce
+     `adapter.status=success` before the requested schema accepts the candidate.
+2. **Provider-owned terminal candidate extractors**
+   - Purpose: Preserve runner-agnostic core while supporting real Codex,
+     Claude, Qwen, OpenCode, and custom output modes.
+   - Changes: Normalize supported native JSON, buffered JSON, stream JSON, and
+     JSONL terminal events inside the adapter boundary. Require an explicit
+     terminal report signal or exact candidate envelope rather than assuming
+     the last stream event is the final report.
+   - Validation: Provider-like fixtures map different native events to the same
+     envelope without native event names leaking into core-visible fields.
+3. **Fail-closed zero-exit acceptance**
+   - Purpose: Close the current path where process success can hide invalid or
+     absent final output.
+   - Changes: Classify empty stdout, prose only, truncated JSON, malformed JSONL,
+     missing terminal result, conflicting candidates, packet echo, unknown
+     status/schema, and explicit partial as rejected adapter outcomes. Preserve
+     existing permission, interaction, auth, timeout, cancellation, context,
+     and session-budget classifications.
+   - Validation: Every negative fixture exits through its exact failure kind;
+     no negative case returns accepted success even with `exit_code=0`.
+4. **Independent execution-outcome evidence**
+   - Purpose: Retain truthful facts without conflating a rejected report with a
+     failed process launch.
+   - Changes: Preserve process exit, transport completion, provider outcome,
+     parse status, output-validation status, and accepted-result status as
+     independent evidence. Keep raw provider output only behind evidence refs.
+   - Validation: Query-safe adapter and step-result fixtures expose all status
+     dimensions but contain no prompt, credential, transcript, or runner-home
+     content.
+5. **Schema capability preflight**
+   - Purpose: Block incompatible routes before they incur provider cost or touch
+     a disposable target.
+   - Changes: Resolve the wrapper/requested schema against adapter capability
+     metadata before external spawn; report supported, unqualified, and
+     unsupported states with stable blocker evidence.
+   - Validation: Unsupported strict routes do not spawn; compatible legacy dry
+     runs and explicitly soft profiles retain documented compatibility.
+6. **Cross-adapter output matrix**
+   - Purpose: Prevent fixes for one provider stream from drifting across other
+     adapters.
+   - Changes: Add one shared semantic fixture matrix projected through Codex,
+     Claude, Qwen, OpenCode, and custom external-process encodings.
+   - Validation: All adapters produce identical provider-neutral envelopes and
+     failure classes for equivalent semantic outcomes.
+
+### Acceptance criteria
+
+1. `exit_code=0` plus empty, prose-only, malformed, ambiguous, unsupported, or
+   partial output cannot return accepted adapter success.
+2. Exactly one candidate satisfying the requested schema is required.
+3. Provider-native parsing remains inside adapter modules.
+4. Raw provider output is evidence-only and absent from query-safe projections.
+5. Existing permission, interaction, timeout, auth, context, and session-budget
+   behavior remains compatible.
+6. Unsupported schema capability blocks before spawn.
+7. The cross-adapter fixture matrix passes without live provider calls.
+
+### Done evidence
+
+- Adapter extraction/acceptance unit matrix.
+- Query-safe process/transport/provider/parsing status fixtures.
+- No-spawn capability-preflight regressions.
+- Codex/Claude/Qwen/OpenCode/custom semantic parity results.
+
+### Out of scope
+
+- Core post-validator registry, controller repair policy, public repair retry,
+  live provider qualification, or route model/effort selection.
+
+## W66-S22 — Executable post-validation and output repair
+
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
+- **State:** blocked
+- **Outcome:** Runtime Harness executes every selected deterministic
+  post-validator before pass and separates no-write output repair, evidence
+  reconciliation, and write-capable work repair under explicit budgets.
+- **Delivery priority:** P0
+- **Estimated effort:** L
+- **Primary modules:** validator registry, policy resolution, routed adapter
+  invocation, step execution engine, Runtime Harness classify/verify evidence,
+  failure policy, tests
+- **Hard dependencies:** W66-S21
+- **Primary user story surfaces:** DEV-01, DEV-05, RQA-05, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Validator registry and pre-spawn policy validation**
+   - Purpose: Turn policy validator names into executable behavior and prevent
+     misspelled or unsupported validators from becoming silent no-ops.
+   - Changes: Add a provider-neutral registry for `output-schema`,
+     `evidence-complete`, and `validation-commands`; resolve the ordered list
+     during policy preparation and block unknown IDs before provider spawn.
+   - Validation: Known validators resolve in policy order; unknown, duplicate,
+     or incompatible validator declarations produce deterministic blockers.
+2. **Output-schema execution**
+   - Purpose: Require the normalized candidate to satisfy the requested family
+     before any step can pass.
+   - Changes: Validate envelope parse status, schema ref/version, required and
+     conditional fields, status vocabulary, size bounds, and forbidden raw
+     fields. Materialize one deterministic `validation-report` entry with exact
+     field findings and revision advice.
+   - Validation: Pass, warn, fail, and blocked fixtures produce stable reports;
+     structural failure prevents semantic evaluation and mission pass.
+3. **Evidence and command validation**
+   - Purpose: Stop model claims from substituting for run-owned facts.
+   - Changes: Implement run/attempt ownership, stale/cross-run detection,
+     required evidence coverage, diff/no-write proof, repair-finding coverage,
+     and one-to-one `required_command_id` matching against controller-owned
+     command results. Treat missing, invented, duplicated, failed, timed-out,
+     or warning-failing command evidence according to policy.
+   - Validation: Forged refs, stale refs, unknown commands, missing commands,
+     and model-pass/controller-fail contradictions all fail closed.
+4. **Acceptance-aware fallback and Runtime Harness classification**
+   - Purpose: Let retry/fallback policy react to validation failure instead of
+     stopping at transport success.
+   - Changes: Feed validation outcome into route-attempt evidence and
+     `classifyRuntimeStepOutcome`; stop fallback only on an accepted response;
+     apply retry, repair, escalation, and block lists to canonical failure
+     classes with no broad default.
+   - Validation: Schema-qualified fallback runs only when policy permits; an
+     unlisted failure class blocks without consuming another action budget.
+5. **Truthful controller verify transition**
+   - Purpose: Replace unconditional verify success with evidence-derived run
+     truth.
+   - Changes: Derive the controller `verify` transition from validation report,
+     authoritative verification, mission semantics, unresolved findings, and
+     repair state. Use `blocked` or `skipped` when verification is absent or
+     intentionally inapplicable.
+   - Validation: No controller report can claim verify pass without referenced
+     passing validation/verification evidence.
+6. **Bounded output and evidence repair**
+   - Purpose: Correct weak-model formatting without repeating target edits.
+   - Changes: Add `repair_kind=output-contract|evidence-reconciliation|work-product`.
+     Output-contract repair receives raw evidence, expected schema, and
+     findings under no-write permissions and a separate one-attempt budget.
+     Evidence reconciliation derives facts from controller-owned evidence.
+     Only work-product repair may write to the owned disposable workspace.
+   - Validation: Format repair never changes the target; repeated malformed
+     output exhausts its own budget and blocks; incomplete work enters normal
+     review/repair policy instead of being hidden as formatting repair.
+
+### Acceptance criteria
+
+1. Every declared post-validator is resolved and executed in policy order.
+2. Unknown validators block before provider spawn.
+3. Validation fail or block makes `step_result.status=passed` impossible.
+4. Model command/evidence claims never override controller-owned facts.
+5. Route fallback stops only on an accepted result and remains policy-bounded.
+6. Controller verify pass always cites actual passing evidence.
+7. Output-contract and evidence repair cannot write to the target checkout.
+8. Work-product repair retains existing disposable-workspace, review, and
+   budget invariants.
+
+### Done evidence
+
+- Validator registry and ordered execution fixtures.
+- Output/evidence/command validation reports for positive and adversarial cases.
+- Acceptance-aware fallback and Runtime Harness decision regressions.
+- No-write output-repair and evidence-reconciliation proof.
+
+### Out of scope
+
+- Public quality-repair retry, operator UI controls, model/effort cutover,
+  paid provider calls, or four-cell qualification.
+
+## W66-S23 — Explicit quality-repair retry and attempt lineage
+
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7
+- **State:** blocked
+- **Outcome:** Operators can retry only the active quality repair through a
+  public idempotent mutation that preserves request, cycle, finding, workspace,
+  attempt, review, QA, and budget lineage without rerunning the whole flow.
+- **Delivery priority:** P0
+- **Estimated effort:** L
+- **Primary modules:** quality-repair request/attempt contracts, observability
+  service, CLI/API/OpenAPI mutation, lifecycle command, next-action and Flow
+  projections, owned-workspace checks, tests
+- **Hard dependencies:** W66-S22
+- **Primary user story surfaces:** DEV-05, RQA-02, RQA-05, RQA-06, OPS-01, OPS-04, OPS-10
+
+### Local tasks
+
+1. **Quality-repair attempt contract**
+   - Purpose: Preserve immutable identity for each execution without turning
+     the mutable request projection into an unbounded history blob.
+   - Changes: Define `quality-repair-attempt` with request/cycle refs, attempt
+     index, parent attempt, trigger, repair run ID, status, owned workspace ref,
+     input/finding fingerprints, route ref, failure class, timestamps, and
+     evidence refs. Add active/latest attempt refs and revision to the request.
+   - Validation: Contract fixtures cover reserved, running, completed, failed,
+     blocked, canceled, and legacy request compatibility.
+2. **Atomic attempt reservation and idempotency**
+   - Purpose: Prevent duplicate retries and double budget consumption across
+     CLI, API, reload, and concurrent operators.
+   - Changes: Add a shared `retryQualityRepair` service with `command_id` and
+     expected-revision CAS, one active-attempt lease, exclusive attempt index,
+     atomic request/attempt write, and idempotent replay of a completed command.
+   - Validation: Same command ID returns the same attempt; stale revision and
+     concurrent distinct commands yield one winner and one readable conflict.
+3. **Owned-workspace continuation**
+   - Purpose: Retry the actual repair tree rather than a clean primary or
+     unrelated checkout.
+   - Changes: Resolve execution root from prior attempt/run lineage instead of
+     accepting an arbitrary user path; verify project ownership, retained
+     workspace identity, base/diff continuity, and input fingerprint before
+     spawn. Block missing, primary, external, stale, or wrong-project roots.
+   - Validation: Positive fixtures preserve accumulated changes; all workspace
+     escape and substitution cases fail before provider execution.
+4. **Budget debit and allowed state transitions**
+   - Purpose: Keep retries bounded without charging deterministic pre-spawn
+     failures or letting an operator bypass review/QA.
+   - Changes: Reserve without debit, debit after launch acknowledgment, and
+     retain the debit once provider execution begins. Allow retry only for a
+     requested cycle with a terminal failed/blocked prior attempt and remaining
+     budget. Reject active, review-required, QA-required, exhausted, and closed
+     requests; require a distinct operator budget decision to extend an
+     exhausted cycle.
+   - Validation: State-table tests prove exactly-once debit, correct remaining
+     attempts, no retry between repair and mandatory review, and no silent
+     budget reset.
+5. **Public CLI/API and next-action surface**
+   - Purpose: Expose one truthful repair-only action without overloading parent
+     scheduler `run retry`.
+   - Changes: Add `aor repair retry` and the matching control-plane mutation
+     with request ref, command ID, expected revision, and optional reason.
+     Return attempt/run/job/status/next-action refs. Project Flow/Task reads show
+     attempt N of M and offer Retry only when the server-owned state permits it.
+   - Validation: CLI/API/OpenAPI parity, project scoping, readback, reload, and
+     no-duplicate browser/control-plane fixtures pass.
+6. **Repeated-failure convergence guard**
+   - Purpose: Prevent a weak model from consuming every attempt on an identical
+     repair with no new evidence.
+   - Changes: Compare finding, workspace/diff, verification, validation,
+     route/model, and evidence fingerprints. Block
+     `repeated-repair-without-new-evidence` when policy threshold is reached;
+     require new evidence, approved route change, budget decision, or operator
+     hold before another attempt.
+   - Validation: Same-fingerprint fixtures block deterministically while a
+     materially changed finding/evidence context may consume the next approved
+     attempt.
+
+### Acceptance criteria
+
+1. `repair retry` creates a new immutable attempt under the same request and
+   cycle without rerunning intake, planning, or initial implementation.
+2. One request has at most one active attempt.
+3. Command ID and revision CAS make retry exactly-once across CLI/API/reload.
+4. Attempt budget debits exactly once after launch acknowledgment and never
+   resets implicitly.
+5. Retry continues only the owner-marked disposable workspace.
+6. Review-required, QA-required, exhausted, closed, and genuinely active states
+   cannot retry.
+7. Every completed write-capable retry returns through review and QA when
+   required; delivery/release remain blocked until public repair closure.
+8. Repeated identical failure without new evidence blocks instead of looping.
+
+### Done evidence
+
+- Quality-repair attempt contract and lifecycle fixtures.
+- Atomic CAS/idempotency/concurrency test output.
+- Owned-workspace continuation and escape-rejection matrix.
+- CLI/API/OpenAPI/next-action parity evidence.
+- Repeated-failure convergence regressions.
+
+### Out of scope
+
+- Resetting repair budgets, retrying closed requests, browser-owned lifecycle
+  decisions, direct runner chat, arbitrary checkout selection, or upstream
+  writes.
+
+## W66-S24 — Structured artifact and evaluator hardening
+
+- **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-7
+- **State:** blocked
+- **Outcome:** Intent normalization, planning, semantic evaluation, and live
+  quality assessment consume one normalized candidate mechanism and never infer
+  pass from missing or malformed weak-model output.
+- **Delivery priority:** P1
+- **Estimated effort:** L
+- **Primary modules:** intent service, planner decomposition, task-plan service,
+  prompt/wrapper schema refs, live-E2E quality assessment projection, tests
+- **Hard dependencies:** W66-S23
+- **Primary user story surfaces:** EMP-01, EMP-02, DEV-01, DEV-05, RQA-05, OPS-06
+
+### Local tasks
+
+1. **Intent normalization extraction**
+   - Purpose: Stop recursive greedy JSON discovery from selecting an accidental
+     or conflicting object in weak-model prose.
+   - Changes: Accept only the requested envelope or one explicitly delimited
+     candidate; classify multiple objects as ambiguous and invalid JSON as
+     malformed. Preserve field-level findings and one bounded no-write format
+     repair. Do not create a confirmable preview from an invalid candidate.
+   - Validation: Prose, fenced JSON, two objects, truncated JSON, unsupported
+     work type, missing acceptance, invalid confidence, and size-limit fixtures
+     follow exact prepared/needs-input/invalid branches.
+2. **Planner candidate normalization**
+   - Purpose: Keep medium+ mission-specific fail-closed semantics while removing
+     dependence on arbitrary top-level or nested adapter output placement.
+   - Changes: Read planner candidates only from the normalized envelope selected
+     by the wrapper schema; preserve small-only compact fallback; emit exact
+     structural findings and revision advice before semantic evaluation.
+   - Validation: Small, medium, large, malformed, ambiguous, dependency-cycle,
+     traceability, verification, evidence, and multirepo fixtures follow the
+     documented branches with no generic medium+ plan.
+3. **Semantic evaluator absence and contradiction**
+   - Purpose: Remove the path where a successful routed eval with no evaluator
+     payload becomes semantic pass.
+   - Changes: Map missing evaluator output to `blocked/not_evaluated`, malformed
+     output to fail, explicit findings/warnings to their validated statuses, and
+     explicit valid pass only to pass. Skip evaluation entirely after structural
+     plan failure and retain blocking-policy evidence separately.
+   - Validation: Missing, malformed, warn, fail, blocked, and pass fixtures prove
+     transport success alone cannot satisfy evaluation.
+4. **AOR-owned live quality assessment projection**
+   - Purpose: Reduce cross-field schema work for weak evaluators and prevent the
+     evaluator from authoring its own authoritative qualification verdict.
+   - Changes: Limit model-authored content to dimension judgments, findings,
+     risks, decision, and repair recommendation. Derive IDs, refs, timestamps,
+     missing dimensions, gap arrays, all-pass, status, and qualification-cell
+     verdict deterministically from the accepted candidate and run evidence.
+   - Validation: Missing dimension, contradictory decision, stale evidence,
+     malformed judgment, and valid assessment fixtures yield deterministic
+     reports and correction guidance.
+5. **Shared correction and repair guidance**
+   - Purpose: Give operators and automatic output repair actionable field-level
+     instructions without raw JSON editing.
+   - Changes: Standardize validation issue codes, field paths, summaries,
+     retryability, suggested repair kind, and evidence refs across intent,
+     planner, evaluator, and assessment families.
+   - Validation: CLI/API/live-E2E consumers render the same bounded guidance and
+     never expose raw provider transcripts or private paths.
+6. **Focused cross-flow regression suite**
+   - Purpose: Prove one normalization rule applies consistently across public
+     artifact-producing flows.
+   - Changes: Add shared fixtures plus intent, planner, eval, and live-assessment
+     integration tests that cover accepted output, output repair, block, and
+     exhaustion.
+   - Validation: All focused suites pass and no family contains a local
+     transport-success fallback to pass.
+
+### Acceptance criteria
+
+1. Intent, planner, semantic evaluation, and live assessment consume normalized
+   schema-bound candidates rather than arbitrary adapter fields or prose.
+2. Missing evaluator output never becomes pass.
+3. Medium+ planning remains mission-specific and fail closed.
+4. Invalid normalization cannot be confirmed into write-capable execution.
+5. AOR owns public IDs, refs, timestamps, aggregate status, gaps, and
+   qualification verdicts.
+6. Every validation failure has query-safe field-level correction guidance and
+   an explicit repair/block disposition.
+7. Cross-flow regression suites pass without provider calls.
+
+### Done evidence
+
+- Intent extraction and validation fixture matrix.
+- Planner structural-before-semantic regression output.
+- Semantic evaluator missing/malformed/explicit-status matrix.
+- Deterministic live-assessment projection and correction-guidance fixtures.
+
+### Out of scope
+
+- New product intent fields, broader planning features, judge-model promotion,
+  model/effort selection UI, paid evaluations, or live qualification.
+
+## W66-S25 — Weak-runner adversarial proof and qualification reset
+
+- **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
+- **State:** blocked
+- **Outcome:** Deterministic adversarial proof demonstrates that weak-runner
+  output, evidence, verification, and repair failures cannot false-pass across
+  supported schema families or adapter formats, then freezes the only commit
+  eligible for a fresh W66-S09 matrix.
+- **Delivery priority:** P0
+- **Estimated effort:** M
+- **Primary modules:** contract/adapter/core/observability focused tests,
+  live-E2E fixtures and quality assessment, qualification manifest, backlog and
+  readiness evidence
+- **Hard dependencies:** W66-S24
+- **Primary user story surfaces:** DEV-01, DEV-04, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07
+
+### Local tasks
+
+1. **Adversarial output and evidence corpus**
+   - Purpose: Encode the weak-model failure surface as replayable deterministic
+     evidence rather than relying on one live provider transcript.
+   - Changes: Add empty, prose-only, truncated, malformed JSONL, missing
+     terminal, conflicting candidate, unknown schema/status, missing section,
+     missing/invented command, missing/invented/stale/cross-run evidence,
+     partial, model-pass/controller-fail, output-repair exhaustion, and
+     repeated-repair fixtures.
+   - Validation: Every fixture declares exact envelope status, failure kind,
+     failure class, validator results, Runtime Harness decision, and next safe
+     action.
+2. **Schema-family coverage matrix**
+   - Purpose: Prove hardening applies to every weak-model boundary in the flow.
+   - Changes: Run the corpus against intent normalization, structured wave
+     ticket, runner final report, repair closure, semantic evaluation, and live
+     quality assessment families, with positive completed/blocked/no-write and
+     repaired cases for each applicable family.
+   - Validation: No negative family case passes; positive cases preserve exact
+     contract and evidence lineage.
+3. **Provider-format parity matrix**
+   - Purpose: Detect encoding-specific regressions before live Codex/Claude
+     qualification.
+   - Changes: Project equivalent semantic outcomes through Codex-like stream
+     JSON, Claude-like buffered JSON, Qwen-like JSONL, OpenCode, and custom raw
+     external-process formats.
+   - Validation: Equivalent outcomes produce identical provider-neutral
+     envelopes, failure classes, validator results, and policy decisions.
+4. **Repair and concurrency proof**
+   - Purpose: Prove format repair and explicit quality retry remain bounded
+     under duplicate, stale, concurrent, exhausted, interrupted, and repeated
+     failure conditions.
+   - Changes: Exercise no-write output repair, evidence reconciliation,
+     write-capable retry, mandatory review/QA return, command replay, revision
+     conflict, workspace loss, budget exhaustion, and convergence blocking.
+   - Validation: Attempts and debits remain exactly-once; no repair path writes
+     primary/upstream or bypasses review, QA, delivery, or release gates.
+5. **Deterministic gates and qualification freeze**
+   - Purpose: Establish a clean evidence-backed commit before any paid provider
+     call.
+   - Changes: Run focused contract, adapter, core, observability, and live-E2E
+     suites followed by quality ratchet, root check, browser/package/install
+     gates as applicable. Record compatibility limitations, close S25, sync
+     readiness, and freeze a replacement W66 qualification manifest.
+   - Validation: `pnpm slice:gate -- W66-S25` passes with no provider call and
+     W66-S09 becomes active only against the frozen behavior commit.
+6. **Historical evidence disposition**
+   - Purpose: Prevent earlier green runs from satisfying a materially stronger
+     acceptance contract.
+   - Changes: Mark every W66-S09 provider/guided result predating S20-S25 as
+     diagnostic-only for final closure while retaining immutable hashes and
+     factual findings. Require a fresh same-commit four-cell matrix after S25.
+   - Validation: Qualification comparison and readiness ledger cannot select a
+     pre-S20 result as a final passing cell.
+
+### Acceptance criteria
+
+1. Every negative weak-output fixture ends failed or blocked, never passed.
+2. Failure classes and validator decisions are stable across supported adapter
+   encodings.
+3. Every supported structured-output family has positive and adversarial
+   coverage.
+4. Output repair, evidence reconciliation, and quality-repair retry remain
+   bounded, exactly-once, workspace-safe, and review/QA preserving.
+5. Raw provider payloads, credentials, private paths, and runtime state do not
+   enter public fixtures or the commit.
+6. Focused suites, quality ratchet, root check, and slice gate pass without paid
+   provider calls.
+7. All pre-S20 qualification runs are diagnostic-only for final W66 closure.
+8. A replacement immutable qualification manifest points at the only commit
+   eligible for W66-S09 execution.
+
+### Done evidence
+
+- Weak-output/evidence/verification adversarial corpus and expected-outcome map.
+- Schema-family and provider-format parity reports.
+- Repair concurrency, budget, and convergence regression output.
+- Root/slice gate results and frozen W66-S09 qualification manifest.
+- Historical-evidence disposition and synchronized backlog state.
+
+### Out of scope
+
+- Paid live provider calls, final four-cell results, provider/model promotion,
+  W68 selection cutover, hosted execution, upstream delivery, or production
+  clearance.
+
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
-- **State:** active
+- **State:** blocked
 - **Outcome:** One clean merged AOR commit completes the requested medium/large
   Codex and Claude matrix against one pinned target commit, with validated final
   quality and no primary-checkout or upstream mutation.
@@ -1269,10 +1873,15 @@ installed-console gates are trustworthy.
 - **Estimated effort:** L
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
-- **Hard dependencies:** W66-S19
+- **Hard dependencies:** W66-S25
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
+
+Planning reset on 2026-08-11: S20-S25 strengthen the accepted runner-output,
+post-validation, structured-artifact, and repair-retry contracts. Every guided
+or provider result predating that behavior chain remains immutable diagnostic
+evidence but cannot satisfy the final W66-S09 four-cell closure.
 
 1. **Installed guided proof baseline**
    - Purpose: Establish UI/UX and accessibility dimensions on the exact AOR commit used by all cells.

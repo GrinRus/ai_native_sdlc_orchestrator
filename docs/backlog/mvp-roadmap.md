@@ -321,6 +321,12 @@ The current roadmap contains **376 slices across 71 waves**.
 | W66-S17 | environment-qualified provider command identity target: DEV-04, AIP-12, OPS-06 |
 | W66-S18 | guided diagnostic timeout alignment target: DEV-04, OPS-06, OPS-07 |
 | W66-S19 | provider verification-scope convergence target: DEV-04, AIP-12, OPS-06, OPS-07 |
+| W66-S20 | runner output contract and failure taxonomy target: DEV-01, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07 |
+| W66-S21 | adapter output normalization and acceptance target: DEV-01, DEV-05, AIP-12, OPS-06, OPS-07 |
+| W66-S22 | executable post-validation and output repair target: DEV-01, DEV-05, RQA-05, OPS-06, OPS-07 |
+| W66-S23 | explicit quality-repair retry and attempt lineage target: DEV-05, RQA-02, RQA-05, RQA-06, OPS-01, OPS-04, OPS-10 |
+| W66-S24 | structured artifact and evaluator hardening target: EMP-01, EMP-02, DEV-01, DEV-05, RQA-05, OPS-06 |
+| W66-S25 | weak-runner adversarial proof and qualification reset target: DEV-01, DEV-04, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07 |
 | W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation
@@ -1427,12 +1433,27 @@ before same-commit Codex/Claude runs.
 - qualification cannot pass without terminal lifecycle, passing run health and
   diagnostics, final validated all-pass quality, exact changed paths, and
   no-upstream-write evidence;
+- strict adapter-backed steps declare one output schema before spawn, normalize
+  provider output at the adapter boundary, and execute schema, evidence, and
+  command post-validation before Runtime Harness pass;
+- empty, malformed, ambiguous, unsupported, partial, missing-evidence, and
+  verification-contradiction outcomes fail closed even when the provider exits
+  zero;
+- no-write output repair, evidence reconciliation, and write-capable quality
+  repair remain distinct and bounded, while explicit repair retry preserves the
+  same request, cycle, findings, owned workspace, attempt budget, review, and QA
+  lineage;
 - atomic jobs, attempts, control, events, parent scheduling, integration, and
   per-repository delivery pass deterministic stress and recovery fixtures;
 - installed browser acceptance proves durable actions across responsive,
   accessibility, reload, reconnect, partial, and offline scenarios;
 - medium/large Codex and Claude cells pass from isolated installs against one
   AOR commit and one pinned target commit with no upstream writes.
+
+**Current entry reset:** W66-S20 through W66-S25 are the deterministic
+remediation chain before W66-S09. Earlier guided and provider results remain
+diagnostic-only for final qualification after the accepted runner-output and
+repair contracts change.
 
 **Detailed slices:** `docs/backlog/wave-66-implementation-slices.md`
 
