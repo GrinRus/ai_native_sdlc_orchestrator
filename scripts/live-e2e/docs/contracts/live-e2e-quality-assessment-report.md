@@ -216,3 +216,11 @@ Quality assessment reports must not include old runner aggregation fields:
 - `ui_ux_quality`
 - `accessibility_quality`
 - `target_ui_ux_quality`
+
+The submitted evaluator document is a candidate, not the authoritative
+qualification report. AOR projects it through the required dimension schema:
+IDs, timestamps, evidence refs, aggregate status, gap arrays, and the
+qualification verdict are controller-owned. Missing or contradictory
+dimensions become `not_evaluated`/`fail` with bounded field-level
+`correction_guidance`; a transport-success or evaluator-declared overall pass
+cannot override the derived dimension aggregate.

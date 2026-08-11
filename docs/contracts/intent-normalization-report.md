@@ -37,6 +37,14 @@ The structured provider candidate is limited to 128 KiB, 50 items per list,
 200 characters for the title, 8,000 characters for the outcome, and 4,000
 characters per list item before contract validation succeeds.
 
+Provider output is accepted only when it contains the requested
+`intent_normalization` candidate, one explicitly delimited JSON candidate, or
+one `runner-output-envelope@v1` candidate with the requested schema. AOR never
+searches arbitrary nested objects or greedy JSON substrings. Missing,
+malformed, ambiguous, and unsupported candidates remain blocked and expose
+bounded `validation.correction_guidance[]` entries with a field, issue code,
+retryability, repair kind, and query-safe evidence refs.
+
 ## Confirmation
 
 Confirmation compiles the latest prepared revision into the existing

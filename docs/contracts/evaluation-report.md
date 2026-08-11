@@ -31,6 +31,15 @@ records input/expected family, version, digest, and resolution status for every
 dataset case. Scorer outcomes must be derived from these resolved bytes; the
 presence of a reference alone is never a passing assertion.
 
+Semantic evaluation is fail-closed: an accepted transport with no evaluator
+candidate yields `status=not_evaluated` (and a blocking consumer may expose it
+as `blocked`), malformed or contradictory evaluator output yields `fail`, and
+only an explicit valid `status=pass` candidate can produce pass. Evaluation
+reports may include bounded `correction_guidance[]` entries. AOR owns report
+identity, timestamps, evidence refs, aggregate metrics, gap arrays, and the
+qualification verdict; evaluator output supplies only judgments, findings,
+risks, decisions, and repair recommendations.
+
 When a suite evaluates a compiler revision, `subject_ref` may use `compiler-revision://...` and `subject_type` should identify the compiler/revision family. `compiler-revision-status.compatibility.evaluation_refs` is the queryable lifecycle link back to those reports.
 
 ## Example

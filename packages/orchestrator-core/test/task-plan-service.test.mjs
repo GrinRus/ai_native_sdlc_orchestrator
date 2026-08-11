@@ -388,6 +388,38 @@ test("project policy can make semantic plan evaluation blocking", () => {
   });
 });
 
+test("semantic evaluation is fail-closed when transport succeeds without an evaluator candidate", () => {
+  withTempRepo((repoRoot) => {
+    const missing = createTaskPlan({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      planningRunId: "plan.test.semantic-missing",
+      plannerCandidate: missionPlannerCandidate("task.semantic-missing"),
+    });
+    assert.equal(missing.planEvaluationReport.status, "not_evaluated");
+    assert.equal(missing.plan.semantic_evaluation.status, "not_evaluated");
+    assert.notEqual(missing.plan.semantic_evaluation.status, "pass");
+
+    const malformed = createTaskPlan({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      planningRunId: "plan.test.semantic-malformed",
+      plannerCandidate: missionPlannerCandidate("task.semantic-malformed"),
+      semanticEvaluation: { result: "{not-json" },
+    });
+    assert.equal(malformed.planEvaluationReport.status, "fail");
+
+    const explicitPass = createTaskPlan({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      planningRunId: "plan.test.semantic-pass",
+      plannerCandidate: missionPlannerCandidate("task.semantic-pass"),
+      semanticEvaluation: { status: "pass", findings: [], warnings: [] },
+    });
+    assert.equal(explicitPass.planEvaluationReport.status, "pass");
+  });
+});
+
 test("medium plan revision proof preserves task identity across failed attempt, retry, verification, and completion", () => {
   withTempRepo((repoRoot) => {
     const rejected = createTaskPlan({

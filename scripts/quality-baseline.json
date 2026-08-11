@@ -35,7 +35,7 @@
     "scripts/live-e2e/run-profile.mjs": 4498,
     "scripts/live-e2e/lib/flows.mjs": 7766,
     "scripts/live-e2e/lib/step-controller.mjs": 1927,
-    "scripts/live-e2e/quality-assessment.mjs": 1306,
+    "scripts/live-e2e/quality-assessment.mjs": 1321,
     "scripts/production-readiness.mjs": 1085
   }
 }
