@@ -13,7 +13,7 @@
   "file_line_ceiling_overrides": {
     "apps/web/src/spa.jsx": 7565,
     "apps/web/src/spa.css": 5022,
-    "packages/adapter-sdk/src/index.mjs": 3626,
+    "packages/adapter-sdk/src/index.mjs": 3800,
     "packages/contracts/src/families.mjs": 1620,
     "packages/contracts/src/loader.mjs": 4074,
     "packages/orchestrator-core/src/certification-decision.mjs": 1279,

@@ -40,23 +40,47 @@ export function buildExternalExecutionOutcome(options) {
   const verificationStatus = ["pass", "passed", "success"].includes(rawVerificationStatus)
     ? "pass"
     : ["partial", "warn", "incomplete"].includes(rawVerificationStatus)
-      ? "partial"
+      ? "warn"
       : ["fail", "failed", "blocked"].includes(rawVerificationStatus)
         ? "fail"
-        : "not-run";
+        : "missing";
+  const processStatus = options.processStatus ?? (
+    options.invocationFailed
+      ? "failed"
+      : options.exitCode === 0
+        ? "completed"
+        : options.exitCode === null || options.exitCode === undefined
+          ? "unknown"
+          : "failed"
+  );
+  const transportStatus = options.transportStatus ?? (
+    options.interrupted || options.timedOut
+      ? "blocked"
+      : options.invocationFailed
+        ? "failed"
+        : options.exitCode === null || options.exitCode === undefined
+          ? "unknown"
+          : "completed"
+  );
+  const parsingStatus = options.parsingStatus ?? (Object.keys(runnerPayload).length > 0 ? "valid" : "missing");
+  const candidateStatus = options.candidateStatus ?? (Object.keys(runnerPayload).length > 0 ? "accepted" : "missing");
+  const validationStatus = options.validationStatus ?? (
+    options.invocationFailed || providerStatus === "failed" ? "fail" : "pass"
+  );
+  const missionStatus = options.missionStatus ?? "unknown";
   return {
     schema_version: 1,
-    process: { exit_code: options.exitCode, signal: options.signal, timed_out: options.timedOut },
+    process: { status: processStatus, exit_code: options.exitCode, signal: options.signal, timed_out: options.timedOut },
     transport: {
-      status: options.interrupted
-        ? "interrupted"
-        : options.timedOut
-          ? "timed-out"
-          : options.invocationFailed
-            ? "failed"
-            : "completed",
+      status: transportStatus,
+      ...(options.interrupted ? { raw_status: "interrupted" } : {}),
+      ...(options.timedOut ? { raw_status: "timed-out" } : {}),
     },
     provider: { status: providerStatus, raw_status: rawStatus || null },
+    parsing: { status: parsingStatus },
+    candidate: { status: candidateStatus },
+    validation: { status: validationStatus },
     verification: { status: verificationStatus, raw_status: rawVerificationStatus || null },
+    mission: { status: missionStatus },
   };
 }

@@ -1399,7 +1399,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S21 — Adapter output normalization and acceptance
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** External-process adapters normalize native output into the shared
   envelope and reject empty, malformed, ambiguous, unsupported, or partial
   candidates even when the provider process exits zero.
@@ -1492,7 +1492,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S22 — Executable post-validation and output repair
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Runtime Harness executes every selected deterministic
   post-validator before pass and separates no-write output repair, evidence
   reconciliation, and write-capable work repair under explicit budgets.

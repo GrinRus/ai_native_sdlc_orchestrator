@@ -10,6 +10,7 @@ import { buildExternalExecutionOutcome, classifyProviderSemanticFailure } from "
 import { isSupportedRequestTransport, materializeProviderInputSnapshot, resolveRequestTransport } from "./packet-transport.mjs";
 import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 import { resolveProviderCommandRoles } from "./provider-work-packet.mjs";
+import { normalizeStrictRunnerOutput, resolveStrictOutputCapability } from "./runner-output-normalization.mjs";
 import { PROCESS_TREE_SUPERVISION_SOURCE } from "./process-tree-supervision.mjs";
 import { PROVIDER_STEP_STATUS_SUPERVISION_SOURCE } from "./provider-step-status-supervision.mjs";
 import { SESSION_BUDGET_SUPERVISION_SOURCE } from "./session-budget-supervision.mjs";
@@ -1894,14 +1895,21 @@ function buildProviderWorkPacket(envelope, options) {
     ...options,
     resolvedLocalRefs,
   });
+  const strictOutputSchemaRef = asOptionalString(routeProfile.required_output_schema_ref);
+  const strictOutputMode = asOptionalString(routeProfile.required_output_mode);
+  const strictOutput = Boolean(strictOutputSchemaRef || strictOutputMode);
+  const strictRequiredCommands = executionContract.required_commands.map((command, index) => ({
+    command_id: `aor.command.target.${String(command).toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "") || `command-${index + 1}`}`,
+    command,
+  }));
 
   return {
     packet_kind: "aor-provider-work-packet",
-    version: 2,
+    version: strictOutput ? 3 : 2,
     request_id: envelope.request_id,
     run_id: envelope.run_id,
     step_id: envelope.step_id,
-    step_class: envelope.step_class,
+    step_class: strictOutput ? "runner" : envelope.step_class,
     dry_run: envelope.dry_run,
     adapter_id: options.adapterId,
     route: {
@@ -1967,10 +1975,20 @@ function buildProviderWorkPacket(envelope, options) {
     },
     evidence_refs: [...new Set(adapterRequestRefs)],
     full_request_artifact_ref: options.requestArtifactRef,
-    output_contract: {
-      return_json: true,
-      preserve_evidence_refs: true,
-    },
+    output_contract: strictOutput
+      ? {
+          schema_ref: strictOutputSchemaRef ?? "runner-final-report@v1",
+          output_mode: strictOutputMode ?? "structured-json",
+          candidate_rule: "exactly-one-candidate",
+          required_sections: ["status", "summary", "changed_files", "command_result_claims", "verification", "risks", "repair_closure"],
+          status_vocabulary: ["blocked", "completed", "partial"],
+          max_candidate_bytes: 65536,
+          required_commands: strictRequiredCommands,
+        }
+      : {
+          return_json: true,
+          preserve_evidence_refs: true,
+        },
   };
 }
 
@@ -2328,7 +2346,7 @@ function resolveReasoningEffortForAdapter(candidate, adapterProfile) {
   };
 }
 
-function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterRegistry, adaptersRoot, requiredCapabilities }) {
+function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterRegistry, adaptersRoot, requiredCapabilities, requiredOutputSchemaRef = null, requiredOutputMode = null }) {
   const adapterId = asOptionalString(candidate.adapter) ?? "none";
   const provider = asOptionalString(candidate.provider);
   if (adapterId === "none") {
@@ -2358,6 +2376,17 @@ function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterReg
   if (missing.length > 0) {
     throw new Error(
       `Adapter negotiation failed: ${kind} adapter '${adapterId}' is missing capabilities [${missing.join(", ")}].`,
+    );
+  }
+  const supportedSchemaRefs = asStringArray(adapterEntry.profile.supported_schema_refs);
+  const supportedOutputModes = asStringArray(adapterEntry.profile.supported_output_modes);
+  const outputMissing = [
+    requiredOutputSchemaRef && !supportedSchemaRefs.includes(requiredOutputSchemaRef) ? `schema ${requiredOutputSchemaRef}` : null,
+    requiredOutputMode && !supportedOutputModes.includes(requiredOutputMode) ? `output mode ${requiredOutputMode}` : null,
+  ].filter(Boolean);
+  if (outputMissing.length > 0) {
+    throw new Error(
+      `Adapter negotiation failed: ${kind} adapter '${adapterId}' cannot satisfy strict route output (${outputMissing.join(", ")}).`,
     );
   }
   const execution = asRecord(adapterEntry.profile.execution);
@@ -2392,9 +2421,18 @@ function resolveExecutionCandidate({ candidate, candidateIndex, kind, adapterReg
       supported_models: asStringArray(adapterEntry.profile.supported_models),
       default_model: asOptionalString(adapterEntry.profile.default_model),
       supported_reasoning_efforts: asStringArray(adapterEntry.profile.supported_reasoning_efforts),
+      supported_schema_refs: supportedSchemaRefs,
+      supported_output_modes: supportedOutputModes,
       execution,
     },
-    capability_check: { required: requiredCapabilities, satisfied: requiredCapabilities, missing: [], status: "pass" },
+    capability_check: {
+      required: requiredCapabilities,
+      satisfied: requiredCapabilities,
+      missing: [],
+      status: "pass",
+      output_schema_ref: requiredOutputSchemaRef,
+      output_mode: requiredOutputMode,
+    },
   };
 }
 
@@ -2415,6 +2453,8 @@ function resolveAdapterForRouteWithRegistry(options) {
   const routeProfile = asRecord(options.routeResolution.route_profile);
   const primary = asRecord(routeProfile.primary);
   const requiredCapabilities = asStringArray(routeProfile.required_adapter_capabilities);
+  const requiredOutputSchemaRef = asOptionalString(routeProfile.required_output_schema_ref);
+  const requiredOutputMode = asOptionalString(routeProfile.required_output_mode);
 
   const rawOverrides = asRecord(options.adapterOverrides ?? {});
   for (const key of Object.keys(rawOverrides)) {
@@ -2446,6 +2486,8 @@ function resolveAdapterForRouteWithRegistry(options) {
       adapterRegistry: options.adapterRegistry,
       adaptersRoot: options.adaptersRoot,
       requiredCapabilities,
+      requiredOutputSchemaRef,
+      requiredOutputMode,
     }),
     ...fallback.map((candidate, index) => resolveExecutionCandidate({
       candidate,
@@ -2454,16 +2496,18 @@ function resolveAdapterForRouteWithRegistry(options) {
       adapterRegistry: options.adapterRegistry,
       adaptersRoot: options.adaptersRoot,
       requiredCapabilities,
+      requiredOutputSchemaRef,
+      requiredOutputMode,
     })),
   ];
   const selectedCandidate = executionCandidates[0];
 
   if (!resolvedAdapterId || resolvedAdapterId === "none") {
-    if (requiredCapabilities.length > 0) {
+    if (requiredCapabilities.length > 0 || requiredOutputSchemaRef || requiredOutputMode) {
       throw new Error(
-        `Adapter negotiation failed for step '${options.routeResolution.step_class}': route '${options.routeResolution.resolved_route_id}' requires capabilities [${requiredCapabilities.join(
-          ", ",
-        )}] but adapter source resolved to '${resolvedAdapterId ?? "none"}'.`,
+        `Adapter negotiation failed for step '${options.routeResolution.step_class}': route '${options.routeResolution.resolved_route_id}' requires ${
+          requiredCapabilities.length > 0 ? `capabilities [${requiredCapabilities.join(", ")}]` : `strict output ${requiredOutputSchemaRef ?? "<schema>"}/${requiredOutputMode ?? "<mode>"}`
+        } but adapter source resolved to '${resolvedAdapterId ?? "none"}'.`,
       );
     }
 
@@ -2493,6 +2537,8 @@ function resolveAdapterForRouteWithRegistry(options) {
         satisfied: [],
         missing: [],
         status: "not-required",
+        output_schema_ref: requiredOutputSchemaRef,
+        output_mode: requiredOutputMode,
       },
       lifecycle_hooks: STEP_LIFECYCLE_HOOKS,
       provenance: {
@@ -2542,6 +2588,8 @@ function resolveAdapterForRouteWithRegistry(options) {
         supported_models: asStringArray(adapterEntry.profile.supported_models),
         default_model: asOptionalString(adapterEntry.profile.default_model),
         supported_reasoning_efforts: asStringArray(adapterEntry.profile.supported_reasoning_efforts),
+        supported_schema_refs: asStringArray(adapterEntry.profile.supported_schema_refs),
+        supported_output_modes: asStringArray(adapterEntry.profile.supported_output_modes),
         execution: asRecord(adapterEntry.profile.execution),
       },
     },
@@ -2557,6 +2605,8 @@ function resolveAdapterForRouteWithRegistry(options) {
       satisfied: requiredCapabilities,
       missing: [],
       status: "pass",
+      output_schema_ref: requiredOutputSchemaRef,
+      output_mode: requiredOutputMode,
     },
     lifecycle_hooks: STEP_LIFECYCLE_HOOKS,
     provenance: {
@@ -2955,6 +3005,51 @@ export function createLiveAdapter(options) {
               phase: "invoke_adapter",
               kind: handlerKind,
               detail: `request_transport=${requestTransport} invalid`,
+            },
+          ],
+        });
+      }
+
+      const strictOutputCapability = resolveStrictOutputCapability({ route, adapterProfile });
+      if (!strictOutputCapability.supported) {
+        const missingOutputRequirements = strictOutputCapability.missing.join(", ");
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `Adapter '${adapterId}' cannot satisfy strict route output requirements: ${missingOutputRequirements}.`,
+          output: {
+            mode: "execute",
+            blocked: true,
+            route_id: routeId,
+            provider_adapter: adapterId,
+            compiled_context_ref: compiledContextRef,
+            failure_kind: "runner-output-unsupported",
+            capability_check: {
+              status: "blocked",
+              required_schema_ref: strictOutputCapability.schemaRef,
+              required_output_mode: strictOutputCapability.outputMode,
+              missing: strictOutputCapability.missing,
+            },
+            execution_outcome: buildExternalExecutionOutcome({
+              exitCode: null,
+              signal: null,
+              timedOut: false,
+              interrupted: false,
+              invocationFailed: false,
+              runnerPayload: {},
+              parsingStatus: "unsupported",
+              candidateStatus: "missing",
+              validationStatus: "blocked",
+              missionStatus: "unknown",
+            }),
+          },
+          evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
+          tool_traces: [
+            {
+              phase: "preflight",
+              kind: handlerKind,
+              detail: `strict output capability unsupported; provider spawn skipped (${missingOutputRequirements})`,
             },
           ],
         });
@@ -3363,6 +3458,15 @@ export function createLiveAdapter(options) {
         sanitizeJsonlEvents: ["stream-json", "jsonl"].includes(outputMode),
         providerProgressEvents,
       });
+      const strictNormalization = strictOutputCapability.strict
+        ? normalizeStrictRunnerOutput({
+            stdout,
+            requestedSchemaRef: strictOutputCapability.schemaRef ?? "runner-final-report@v1",
+            rawEvidenceRef,
+            outputMode: strictOutputCapability.outputMode,
+          })
+        : null;
+      const visibleRunnerOutput = strictNormalization?.envelope ?? runnerPayload;
 
       const baseOutput = {
         mode: "execute",
@@ -3419,9 +3523,20 @@ export function createLiveAdapter(options) {
           budget_report: contextBudgetReports.budget_report,
           compaction_report: contextBudgetReports.compaction_report,
         },
-        runner_output: runnerPayload,
+        runner_output: visibleRunnerOutput,
         execution_outcome: buildExternalExecutionOutcome(
-          { exitCode: invocation.status, signal: invocation.signal, timedOut: invocationTimedOut, interrupted: invocationInterrupted, invocationFailed, runnerPayload },
+          {
+            exitCode: invocation.status,
+            signal: invocation.signal,
+            timedOut: invocationTimedOut,
+            interrupted: invocationInterrupted,
+            invocationFailed,
+            runnerPayload,
+            parsingStatus: strictNormalization?.envelope.parse_status,
+            candidateStatus: strictNormalization ? (strictNormalization.accepted ? "accepted" : strictNormalization.envelope.parse_status === "ambiguous" ? "ambiguous" : strictNormalization.candidate ? "rejected" : "missing") : undefined,
+            validationStatus: strictNormalization ? (strictNormalization.accepted ? "pass" : "blocked") : undefined,
+            missionStatus: strictNormalization?.accepted ? "unknown" : undefined,
+          },
         ),
       };
 
@@ -3576,6 +3691,7 @@ export function createLiveAdapter(options) {
 
       const semanticFailureKind =
         (isProviderWorkPacketEcho({ runnerPayload, stdout }) ? "provider_work_packet_not_executed" : "") ||
+        strictNormalization?.failureKind ||
         classifyStructuredRunnerFailure({ runnerPayload, runnerToolTraces }) ||
         classifyExternalRunnerFailure({
           stdout,
@@ -3604,6 +3720,23 @@ export function createLiveAdapter(options) {
               : baseOutput),
             blocked,
             failure_kind: semanticFailureKind,
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: toolTraces,
+        });
+      }
+
+      if (strictNormalization && !strictNormalization.accepted) {
+        const failureKind = strictNormalization.failureKind ?? "runner-output-unsupported";
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "failed",
+          summary: `External runner command '${runtimeCommand}' completed but did not produce an accepted ${strictOutputCapability.schemaRef ?? "strict"} candidate for adapter '${adapterId}'.`,
+          output: {
+            ...baseOutput,
+            blocked: false,
+            failure_kind: failureKind,
           },
           evidence_refs: evidenceRefs,
           tool_traces: toolTraces,

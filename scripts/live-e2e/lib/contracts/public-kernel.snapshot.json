@@ -5,7 +5,7 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 25,
-    "source_manifest_sha256": "cdf954f7ad62cd1c374b7271a93f062d4c9170f9584d4e6fc4b258cb2be76007"
+    "source_manifest_sha256": "3603e53d93582803a508c02381be91a833448c28dfd80279470e2d3edf685530"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -26,7 +26,7 @@
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
     "runner-output-contract-families.mjs": "734d4dcf4d0bcbf6810ce0e69435ee191eea6dc238d853c3168c41c293fc76fc",
-    "runner-output-validation.mjs": "f0d54d2ea84d229068e9448e92ce208b1d449885a47c24df729bc21f77f9e9fa",
+    "runner-output-validation.mjs": "0c7c6331858b277dcd3cb8785e9e1a308eb4f0f55a56cdb6064cb7e15b36e5d3",
     "runtime-harness-validation.mjs": "75cd2ee07e4f72ebb36261160e97eeb16e99b0d4d3a8075d0136bd65e44189df",
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",

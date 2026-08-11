@@ -11,8 +11,9 @@ AOR-owned command identities must be returned.
 
 Packet v1 and v2 remain readable immutable replay evidence. They are not
 eligible for new strict qualification and are not rewritten in place. Runtime
-emission of v3 is introduced by the adapter implementation slice after this
-contract baseline is accepted.
+emission of v3 is implemented by the W66-S21 adapter normalization slice; until
+a route declares strict output, v1/v2 remain replay-readable compatibility
+surfaces only.
 
 ## `output_contract`
 
