@@ -1898,10 +1898,28 @@ function buildProviderWorkPacket(envelope, options) {
   const strictOutputSchemaRef = asOptionalString(routeProfile.required_output_schema_ref);
   const strictOutputMode = asOptionalString(routeProfile.required_output_mode);
   const strictOutput = Boolean(strictOutputSchemaRef || strictOutputMode);
-  const strictRequiredCommands = executionContract.required_commands.map((command, index) => ({
-    command_id: `aor.command.target.${String(command).toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "") || `command-${index + 1}`}`,
-    command,
-  }));
+  const strictRequiredCommands = executionContract.required_commands.map((command, index) => {
+    const source = String(command).toLowerCase();
+    let slug = "";
+    let pendingSeparator = false;
+    for (const character of source) {
+      const code = character.charCodeAt(0);
+      const alphaNumeric =
+        (code >= 48 && code <= 57) ||
+        (code >= 97 && code <= 122);
+      if (alphaNumeric) {
+        if (pendingSeparator && slug.length > 0) slug += "-";
+        slug += character;
+        pendingSeparator = false;
+      } else if (slug.length > 0) {
+        pendingSeparator = true;
+      }
+    }
+    return {
+      command_id: `aor.command.target.${slug || `command-${index + 1}`}`,
+      command,
+    };
+  });
 
   return {
     packet_kind: "aor-provider-work-packet",
