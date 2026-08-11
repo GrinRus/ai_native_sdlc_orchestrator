@@ -28,7 +28,7 @@
     "packages/orchestrator-core/src/project-init.mjs": 1587,
     "packages/orchestrator-core/src/project-verify.mjs": 2116,
     "packages/orchestrator-core/src/review-run.mjs": 1338,
-    "packages/orchestrator-core/src/runtime-harness-report.mjs": 1387,
+    "packages/orchestrator-core/src/runtime-harness-report.mjs": 1420,
     "packages/orchestrator-core/src/step-execution-engine.mjs": 2214,
     "scripts/live-e2e/lib/contracts/families.mjs": 1895,
     "scripts/live-e2e/lib/contracts/loader.mjs": 5738,

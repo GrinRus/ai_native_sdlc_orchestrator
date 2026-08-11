@@ -561,6 +561,25 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
     return { failureClass: "no-op", decision: "repair", missionOutcome: "not_satisfied" };
   }
 
+  // Only an explicit adapter validation status is actionable. A report may be
+  // attached to process/transport failures for evidence, but those outcomes
+  // must retain their own retry/block taxonomy.
+  const validationStatus = asString(adapterOutput.validation_status);
+  if (validationStatus === "blocked") {
+    return {
+      failureClass: failureKind ?? "validator-policy-invalid",
+      decision: "block",
+      missionOutcome: "not_satisfied",
+    };
+  }
+  if (validationStatus === "fail") {
+    return {
+      failureClass: failureKind ?? "validator-failed",
+      decision: "repair",
+      missionOutcome: "not_satisfied",
+    };
+  }
+
   if (existingDecision || existingOutcome || asString(stepResult.failure_class)) {
     const fallbackDecision = stepStatus === "passed" ? "pass" : adapterStatus === "blocked" ? "block" : "repair";
     return {

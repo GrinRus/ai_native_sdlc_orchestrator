@@ -1492,7 +1492,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S22 — Executable post-validation and output repair
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** done
 - **Outcome:** Runtime Harness executes every selected deterministic
   post-validator before pass and separates no-write output repair, evidence
   reconciliation, and write-capable work repair under explicit budgets.
@@ -1588,7 +1588,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S23 — Explicit quality-repair retry and attempt lineage
 
 - **Epic:** EPIC-0, EPIC-3, EPIC-4, EPIC-6, EPIC-7
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Operators can retry only the active quality repair through a
   public idempotent mutation that preserves request, cycle, finding, workspace,
   attempt, review, QA, and budget lineage without rerunning the whole flow.
