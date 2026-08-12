@@ -2,8 +2,10 @@
 
 The latest defined wave is W70. It is registered behind W69-S07 and the W66
 runner-output remediation plus qualification hold; it does not change the
-single-active-slice rule. W66-S20 is the next ready slice and W66-S09 remains
-blocked until the S20-S25 deterministic chain closes.
+single-active-slice rule. The S20-S25 deterministic chain is closed, but W66-S09
+is now explicitly blocked by the required Anthropic provider cells' external
+runner quota failure; W67-W70 remain gated until the four-cell qualification
+closes.
 
 ## Purpose
 

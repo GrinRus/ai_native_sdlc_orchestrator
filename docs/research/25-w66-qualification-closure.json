@@ -2,21 +2,27 @@
   "schema_version": 1,
   "kind": "w66-qualification-closure",
   "wave": "W66",
-  "status": "pending",
-  "qualification_commit": null,
+  "status": "blocked",
+  "qualification_commit": "a329477c8dee616450d3732874155e8b4cfa34af",
   "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
   "evidence_index": "docs/research/24-w66-live-qualification-evidence-index.json",
   "required_cell_count": 4,
-  "passing_cell_count": 0,
-  "same_commit_matrix": false,
-  "installed_baseline_status": "not-run",
+  "passing_cell_count": 2,
+  "same_commit_matrix": true,
+  "installed_baseline_status": "pass",
   "final_assessment_policy": "all-pass",
-  "no_upstream_write": false,
+  "no_upstream_write": true,
   "release_disposition": "audit-hold",
   "release_clearance": false,
   "clearance_scope": "bounded-self-hosted-node22-loopback-and-hardened-headless",
+  "blocking_cells": [
+    "anthropic-primary.medium",
+    "anthropic-primary.large"
+  ],
+  "blocker_summary": "W66-S09 cannot close until both required Anthropic qualification cells pass. The current host claude runner is Kimi-backed and returned HTTP 403 usage-limit exhaustion during both preflight attempts; this is an external provider/quota blocker, not an AOR pass.",
   "residual_limitations": [
     "Hosted SaaS, enterprise identity, managed multi-tenant operations, and upstream publication remain out of scope.",
-    "OpenCode and Qwen remain extended, non-required provider coverage."
+    "OpenCode and Qwen remain extended, non-required provider coverage.",
+    "W67-W70 remain gated behind W66-S09 closure under the single-active-slice rule."
   ]
 }

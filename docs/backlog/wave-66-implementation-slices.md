@@ -1892,7 +1892,7 @@ it does not reopen them inside adapter implementation.
 ## W66-S09 — Fresh four-cell live qualification closure
 
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-7
-- **State:** ready
+- **State:** blocked
 - **Outcome:** One clean merged AOR commit completes the requested medium/large
   Codex and Claude matrix against one pinned target commit, with validated final
   quality and no primary-checkout or upstream mutation.
@@ -1901,6 +1901,11 @@ it does not reopen them inside adapter implementation.
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
 - **Hard dependencies:** W66-S25
+- **External blocker:** The required Anthropic medium and large cells are blocked
+  at claude-code adapter preflight because the host runner is Kimi-backed and
+  its billing-cycle quota returned HTTP 403. Provider execution was not
+  attempted, so W66-S09 cannot close or grant release clearance until an
+  authorized runner with available quota is restored.
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
@@ -2046,9 +2051,37 @@ four-cell W66 matrix because Anthropic medium and both large cells were not run.
   `7eb5a844bbdf056cdfc34fe30d0626e94cfa4d9cc33a82b084bd6960ab0acedd`;
   its required matrix is blocked only by the three intentionally missing
   cells.
-- The committed closure index remains pending, W66-S09 remains `active`, and
-  the release disposition remains `audit-hold` with
-  `release_clearance=false`.
+- At that checkpoint, the committed closure index remained pending, W66-S09
+  remained `active`, and the release disposition remained `audit-hold` with
+  `release_clearance=false`; the current checkpoint below supersedes it.
+
+### Current four-cell qualification checkpoint — 2026-08-11
+
+The S20-S25 remediation chain is now merged and the fresh matrix ran against
+one AOR commit and one pinned `ky` commit. Two Codex cells passed; both required
+Anthropic cells are explicitly blocked at adapter preflight by the external
+Kimi-backed runner quota. This checkpoint is honest blocked evidence, not a
+partial W66 pass, and it does not authorize W67 entry.
+
+- Qualification commit: `a329477c8dee616450d3732874155e8b4cfa34af`.
+- Pinned `ky` target commit: `3419113b48e034fdcf8fa6bd3be3da7b3d0d758f`.
+- Installed baseline `w66-s09-installed-a329477c`: `pass`, UI/UX `pass`,
+  accessibility `pass`, and no-source-write `true`.
+- `openai-primary.medium` and `openai-primary.large`: `pass`, with terminal
+  health, production proof, final all-pass assessment, and no-upstream-write
+  evidence.
+- `anthropic-primary.medium` and `anthropic-primary.large`: `blocked`, with
+  `run_health=blocked`, `production_proof=blocked`, `final_assessment=not-run`,
+  and no-upstream-write `pass`. Both preflight attempts returned HTTP 403 for
+  the host Kimi billing-cycle usage limit; provider execution and target
+  mutation were not attempted.
+- Path-neutral content-addressed evidence is committed in
+  `docs/research/24-w66-live-qualification-evidence-index.json`, and the
+  machine-readable closure is in
+  `docs/research/25-w66-qualification-closure.json`.
+- Readiness remains `status=blocked`, `gate_execution_status=pass`,
+  `release_disposition=audit-hold`, and `release_clearance=false`. W67-W70
+  remain blocked by the single-active-slice rule until W66-S09 closes.
 
 ### Acceptance criteria
 
