@@ -8,6 +8,7 @@ import process from "node:process";
 import { stringify as stringifyYaml } from "yaml";
 import { loadContractFile, validateContractDocument } from "./contracts/index.mjs";
 import { stabilizeDependencySetupCommands } from "./dependency-snapshot.mjs";
+import { resolveRuntimeSelection } from "./runtime-selection.mjs";
 
 import {
   asNonEmptyString,
@@ -264,11 +265,25 @@ export function materializeHostLiveE2eAssets(options) {
   fs.rmSync(assetsRoot, { recursive: true, force: true });
   fs.mkdirSync(assetsRoot, { recursive: true });
   fs.cpSync(options.examplesRoot, assetsRoot, { recursive: true });
+  const runtimeSelection = resolveRuntimeSelection(options);
   const liveE2eAdapterDefaults = materializeSelectedAdapterLiveE2eDefaults({
     assetsRoot,
     providerVariant: asRecord(options.providerVariant),
-    runtimeSelection: resolveRuntimeSelection(options),
+    runtimeSelection,
   });
+  const selectedAdapterId = asNonEmptyString(asRecord(options.providerVariant).primary_adapter);
+  if (selectedAdapterId) {
+    const sourceAdapterPath = path.join(options.examplesRoot, "adapters", `${normalizeId(selectedAdapterId)}.yaml`);
+    const generatedAdapterPath = path.join(assetsRoot, "adapters", path.basename(sourceAdapterPath));
+    if (fileExists(sourceAdapterPath) && fileExists(generatedAdapterPath)) {
+      liveE2eAdapterDefaults.source_digest = createHash("sha256").update(fs.readFileSync(sourceAdapterPath)).digest("hex");
+      liveE2eAdapterDefaults.source_ref = path.join("adapters", path.basename(sourceAdapterPath));
+      liveE2eAdapterDefaults.generated_digest = createHash("sha256")
+        .update(fs.readFileSync(generatedAdapterPath))
+        .digest("hex");
+      liveE2eAdapterDefaults.generated_ref = path.join("adapters", path.basename(generatedAdapterPath));
+    }
+  }
   const providerVariantId = asNonEmptyString(options.providerVariantId);
   const providerRoutes = providerVariantId
     ? materializeProviderPinnedRouteOverrides({
@@ -276,9 +291,9 @@ export function materializeHostLiveE2eAssets(options) {
         providerVariant: asRecord(options.providerVariant),
         providerVariantId,
         profile: asRecord(options.profile),
-        runtimeSelection: resolveRuntimeSelection(options),
+        runtimeSelection,
       })
-    : { routeOverrides: {}, routeFiles: [] };
+    : { routeOverrides: {}, routeFiles: [], route_digests: {}, runtime_selection: { requested_model: null, requested_reasoning_effort: null, source: "runner-default" } };
   const providerPolicies = providerVariantId
     ? materializeProviderPinnedPolicyOverrides({
         policiesRoot: path.join(assetsRoot, "policies"),
@@ -294,17 +309,11 @@ export function materializeHostLiveE2eAssets(options) {
     liveE2eAdapterDefaults,
     providerRoutes,
     providerPolicies,
+    runtimeSelection,
   };
 }
 
-function resolveRuntimeSelection(options) {
-  const variantSelection = asRecord(asRecord(options.providerVariant).runtime_selection);
-  const profileSelection = asRecord(asRecord(options.profile).runtime_selection);
-  const selection = Object.keys(profileSelection).length > 0 ? profileSelection : variantSelection;
-  const model = asNonEmptyString(selection.model);
-  const reasoningEffort = asNonEmptyString(selection.reasoning_effort);
-  return model || reasoningEffort ? { model: model || null, reasoning_effort: reasoningEffort || null } : null;
-}
+export { resolveRuntimeSelection } from "./runtime-selection.mjs";
 
 /**
  * @param {{ assetsRoot: string, providerVariant: Record<string, unknown>, runtimeSelection?: Record<string, unknown> | null }} options
@@ -805,6 +814,8 @@ export function materializeProviderPinnedRouteOverrides(options) {
   const routeOverrides = {};
   /** @type {string[]} */
   const routeFiles = [];
+  /** @type {Record<string, { source_ref: string, source_digest: string, generated_digest: string }>} */
+  const routeDigests = {};
   const routeSources = fs
     .readdirSync(routesRoot)
     .filter((entry) => entry.endsWith(".yaml") || entry.endsWith(".yml"))
@@ -856,7 +867,13 @@ export function materializeProviderPinnedRouteOverrides(options) {
     }
 
     const routeFile = path.join(routesRoot, `${step}-${normalizeId(options.providerVariantId)}.yaml`);
+    const sourceDigest = createHash("sha256").update(fs.readFileSync(routePath)).digest("hex");
     fs.writeFileSync(routeFile, stringifyYaml(pinnedRoute), "utf8");
+    routeDigests[step] = {
+      source_ref: path.basename(routePath),
+      source_digest: sourceDigest,
+      generated_digest: createHash("sha256").update(fs.readFileSync(routeFile)).digest("hex"),
+    };
     routeOverrides[step] = /** @type {string} */ (pinnedRoute.route_id);
     routeFiles.push(routeFile);
   }
@@ -864,6 +881,18 @@ export function materializeProviderPinnedRouteOverrides(options) {
   return {
     routeOverrides,
     routeFiles,
+    route_digests: routeDigests,
+    runtime_selection: options.runtimeSelection
+      ? {
+          requested_model: asNonEmptyString(options.runtimeSelection.model) || null,
+          requested_reasoning_effort: asNonEmptyString(options.runtimeSelection.reasoning_effort) || null,
+          source: asNonEmptyString(options.runtimeSelection.source) || "profile",
+        }
+      : {
+          requested_model: null,
+          requested_reasoning_effort: null,
+          source: "runner-default",
+        },
   };
 }
 

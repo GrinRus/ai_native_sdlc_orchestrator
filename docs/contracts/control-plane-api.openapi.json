@@ -601,6 +601,43 @@
         }
       }
     },
+    "/api/projects/{projectId}/tasks": {
+      "get": {
+        "operationId": "listTasks",
+        "tags": ["read"],
+        "x-aor-route-id": "tasks",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "$ref": "#/components/parameters/readModelLimit" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/TaskList" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/tasks/{taskId}": {
+      "get": {
+        "operationId": "getTask",
+        "tags": ["read"],
+        "x-aor-route-id": "task-detail",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/TaskDetail" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
     "/api/projects/{projectId}/flows/selected": {
       "get": {
         "operationId": "getSelectedFlow",
@@ -1549,6 +1586,22 @@
             "schema": {
               "$ref": "#/components/schemas/FlowListResponse"
             }
+          }
+        }
+      },
+      "TaskList": {
+        "description": "Read-only Task Workspace projection list derived from runtime-owned intent and Flow lineage.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/TaskListResponse" }
+          }
+        }
+      },
+      "TaskDetail": {
+        "description": "Read-only server-owned Task projection; lifecycle mutations remain on the existing intent and Flow boundaries.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/TaskProjection" }
           }
         }
       },
@@ -2764,6 +2817,81 @@
         },
         "additionalProperties": true
       },
+      "TaskListResponse": {
+        "type": "object",
+        "required": ["project_id", "selected_task_id", "active_task_ids", "completed_task_ids", "tasks", "read_only"],
+        "properties": {
+          "project_id": { "type": "string" },
+          "selected_task_id": { "type": ["string", "null"] },
+          "active_task_ids": { "type": "array", "items": { "type": "string" } },
+          "completed_task_ids": { "type": "array", "items": { "type": "string" } },
+          "tasks": { "type": "array", "items": { "$ref": "#/components/schemas/TaskProjection" } },
+          "generated_from": { "$ref": "#/components/schemas/JsonObject" },
+          "read_only": { "type": "boolean", "const": true }
+        },
+        "additionalProperties": true
+      },
+      "TaskProjection": {
+        "type": "object",
+        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "lineage", "source_items", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
+        "properties": {
+          "task_id": { "type": "string" },
+          "project_id": { "type": "string" },
+          "display_title": { "type": "string" },
+          "work_type": { "type": ["string", "null"] },
+          "status": { "type": "string", "enum": ["active", "attention", "completed"] },
+          "status_detail": { "type": "string" },
+          "intent_submission_ref": { "type": "string" },
+          "mission_id": { "type": "string" },
+          "flow_id": { "type": "string" },
+          "lineage": { "$ref": "#/components/schemas/JsonObject" },
+          "source_items": { "type": "array", "items": { "$ref": "#/components/schemas/TaskSourceItem" } },
+          "lifecycle_path": { "$ref": "#/components/schemas/JsonObject" },
+          "current_step": { "type": ["string", "null"] },
+          "current_step_label": { "type": ["string", "null"] },
+          "attention_count": { "type": "integer", "minimum": 0 },
+          "blocker_count": { "type": "integer", "minimum": 0 },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "primary_action": { "$ref": "#/components/schemas/JsonObject" },
+          "runner_selection": { "$ref": "#/components/schemas/TaskRunnerSelection" },
+          "updated_at": { "type": ["string", "null"], "format": "date-time" },
+          "completed_read_only": { "type": "boolean" },
+          "read_only": { "type": "boolean", "const": true }
+        },
+        "additionalProperties": true
+      },
+      "TaskSourceItem": {
+        "type": "object",
+        "required": ["schema_version", "source_id", "kind", "immutable", "stale", "digest", "preview"],
+        "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
+          "source_id": { "type": "string" },
+          "kind": { "type": "string", "enum": ["upload-snapshot", "repository-markdown", "inline-text"] },
+          "ref": { "type": ["string", "null"] },
+          "immutable": { "type": "boolean", "const": true },
+          "stale": { "type": "boolean" },
+          "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "preview": { "$ref": "#/components/schemas/JsonObject" }
+        },
+        "additionalProperties": true
+      },
+      "TaskRunnerSelection": {
+        "type": "object",
+        "required": ["schema_version", "source", "route_id", "readiness", "requested_model", "effective_model", "requested_reasoning_effort", "effective_reasoning_effort", "unavailable_reason", "recovery_action"],
+        "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
+          "source": { "type": "string", "enum": ["project-default", "task-override"] },
+          "route_id": { "type": ["string", "null"] },
+          "readiness": { "type": "string", "enum": ["ready", "unknown", "stale", "unavailable", "blocked"] },
+          "requested_model": { "type": ["string", "null"] },
+          "effective_model": { "type": ["string", "null"] },
+          "requested_reasoning_effort": { "type": ["string", "null"] },
+          "effective_reasoning_effort": { "type": ["string", "null"] },
+          "unavailable_reason": { "type": ["string", "null"] },
+          "recovery_action": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
       "FlowListResponse": {
         "type": "object",
         "required": [
@@ -2839,7 +2967,8 @@
           "blocker_count",
           "evidence_count",
           "updated_at",
-          "lifecycle_path"
+          "lifecycle_path",
+          "primary_action"
         ],
         "properties": {
           "flow_id": {
@@ -2931,6 +3060,9 @@
           },
           "lifecycle_path": {
             "$ref": "#/components/schemas/LifecyclePath"
+          },
+          "primary_action": {
+            "$ref": "#/components/schemas/JsonObject"
           },
           "follow_up_source_handoff_ref": {
             "type": [

@@ -1,5 +1,10 @@
 # Task Workspace console target design
 
+This document is the normative UI source of truth for W70. Product, API,
+browser-proof, and migration work must use Task-first vocabulary and the
+server-owned projection rules below; screenshots and legacy Quiet Cockpit
+renderers are compatibility evidence only.
+
 Status: W70 target product and visual contract; successor to the shipped Quiet
 Cockpit presentation after W69 closes.
 

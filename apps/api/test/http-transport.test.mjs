@@ -975,6 +975,27 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.ok(flowsPayload.active_flow_ids.includes(`flow.${transport.projectId}.web-guided-flow`));
       assert.equal(flowsPayload.completed_flow_ids.length, 0);
 
+      const tasksResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks`);
+      assert.equal(tasksResponse.status, 200);
+      const tasksPayload = await tasksResponse.json();
+      assert.equal(tasksPayload.read_only, true);
+      const guidedTask = tasksPayload.tasks.find((task) => task.flow_id === `flow.${transport.projectId}.web-guided-flow`);
+      assert.ok(guidedTask);
+      assert.equal(guidedTask.lineage.mission_id, "web-guided-flow");
+      assert.equal(guidedTask.primary_action.available, true);
+
+      const taskDetailResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(guidedTask.task_id)}`,
+      );
+      assert.equal(taskDetailResponse.status, 200);
+      const taskDetailPayload = await taskDetailResponse.json();
+      assert.equal(taskDetailPayload.task_id, guidedTask.task_id);
+      assert.equal(taskDetailPayload.read_only, true);
+
+      const missingTaskResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks/task.missing`);
+      assert.equal(missingTaskResponse.status, 404);
+      assert.equal((await missingTaskResponse.json()).error.code, "task.not_found");
+
       const selectedFlowResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows/selected`);
       assert.equal(selectedFlowResponse.status, 200);
       const selectedFlowPayload = await selectedFlowResponse.json();

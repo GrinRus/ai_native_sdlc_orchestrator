@@ -1,0 +1,10 @@
+schema_version: 1
+source: project-default
+route_id: route.implement.default
+readiness: unknown
+requested_model: null
+effective_model: null
+requested_reasoning_effort: null
+effective_reasoning_effort: null
+unavailable_reason: null
+recovery_action: Configure an approved project route and refresh readiness.

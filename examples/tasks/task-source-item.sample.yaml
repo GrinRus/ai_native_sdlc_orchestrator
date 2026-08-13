@@ -1,0 +1,12 @@
+schema_version: 1
+source_id: task-source.demo.readme
+kind: repository-markdown
+immutable: true
+stale: false
+digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+preview:
+  project_relative_path: docs/README.md
+  pinned_base_revision: 0123456789abcdef0123456789abcdef01234567
+  media_type: text/markdown
+  byte_length: 128
+  sanitized_markdown: "# Readme\n"

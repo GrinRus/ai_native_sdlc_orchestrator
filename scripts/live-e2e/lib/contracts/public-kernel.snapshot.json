@@ -4,8 +4,8 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 25,
-    "source_manifest_sha256": "022f5f84de8400ca9be2adb78fdac90ca90c9fbf45ab1e2ad77f2c15abdb27f2"
+    "source_file_count": 26,
+    "source_manifest_sha256": "f4425bde8da27a95851bac3104d524d582ddd9853946ef36ca02a532a594e2e2"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -16,7 +16,7 @@
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "312855fc5de5c75573ccd76ea3883c377816477aa5947c14e90734c0f3de55dc",
+    "families.mjs": "78da2f0abb318019165a4f36e950f4bf5335c5e44f8fa15fc82556c5836c8729",
     "index.d.ts": "90c57e99d25b9dae87ed6e15ea8012322b0099639c9089153319f957538a2c26",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
@@ -31,6 +31,7 @@
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
+    "task-contract-families.mjs": "2f93efc2cf5636f2fdb72e03a2c70235b1f42cfb8f23f97167826219825f138c",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
   },
@@ -206,6 +207,85 @@
         "created_at": "string"
       },
       "enumChecks": []
+    },
+    {
+      "family": "task-source-item",
+      "familyGroup": "core-packets-and-profiles",
+      "sourceContract": "docs/contracts/task-source-item.md",
+      "exampleGlob": "examples/tasks/task-source-item*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "source_id",
+        "kind",
+        "immutable",
+        "stale",
+        "digest",
+        "preview"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "source_id": "string",
+        "kind": "string",
+        "immutable": "boolean",
+        "stale": "boolean",
+        "digest": "string",
+        "preview": "object"
+      },
+      "enumChecks": [
+        {
+          "field": "kind",
+          "allowedValues": [
+            "upload-snapshot",
+            "repository-markdown",
+            "inline-text"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "task-runner-selection",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/task-runner-selection.md",
+      "exampleGlob": "examples/tasks/task-runner-selection*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "source",
+        "route_id",
+        "readiness",
+        "requested_model",
+        "effective_model",
+        "requested_reasoning_effort",
+        "effective_reasoning_effort",
+        "unavailable_reason",
+        "recovery_action"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "source": "string",
+        "readiness": "string",
+        "recovery_action": "string"
+      },
+      "enumChecks": [
+        {
+          "field": "source",
+          "allowedValues": [
+            "project-default",
+            "task-override"
+          ]
+        },
+        {
+          "field": "readiness",
+          "allowedValues": [
+            "ready",
+            "unknown",
+            "stale",
+            "unavailable",
+            "blocked"
+          ]
+        }
+      ]
     },
     {
       "family": "project-profile",
@@ -2952,6 +3032,16 @@
       "regex_source": "^examples\\/reports\\/evidence-export-manifest[^/]*\\.ya?ml$",
       "regex_flags": "",
       "family": "evidence-export-manifest"
+    },
+    {
+      "regex_source": "^examples\\/tasks\\/task-source-item[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-source-item"
+    },
+    {
+      "regex_source": "^examples\\/tasks\\/task-runner-selection[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-runner-selection"
     },
     {
       "regex_source": "^examples\\/prompts\\/[^/]+\\.ya?ml$",

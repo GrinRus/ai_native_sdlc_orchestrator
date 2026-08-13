@@ -24,6 +24,8 @@ import {
   readRunPolicyHistory,
   readSelectedFlowProjection,
   readStrategicSnapshot,
+  listTaskProjections,
+  readTaskProjection,
 } from "../read-surface.mjs";
 
 /**
@@ -103,6 +105,18 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
     case "flows":
       sendJson(response, 200, listFlowProjections(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
       return;
+    case "tasks":
+      sendJson(response, 200, listTaskProjections(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
+      return;
+    case "task-detail": {
+      const task = readTaskProjection({ ...runtimeOptions, taskId: params.taskId });
+      if (!task) {
+        sendError(response, 404, "task.not_found", `Task '${params.taskId}' was not found.`);
+        return;
+      }
+      sendJson(response, 200, task);
+      return;
+    }
     case "selected-flow":
       sendJson(response, 200, readSelectedFlowProjection(runtimeOptions));
       return;

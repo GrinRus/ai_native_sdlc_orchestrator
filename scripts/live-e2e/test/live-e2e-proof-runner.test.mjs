@@ -26,6 +26,7 @@ import {
   materializeProviderPinnedRouteOverrides,
   materializeTargetCheckout,
 } from "../lib/target-materialization.mjs";
+import { resolveRuntimeSelection } from "../lib/runtime-selection.mjs";
 import { runLiveAdapterPreflight } from "../lib/preflight.mjs";
 import { buildProviderQualificationMatrix } from "../lib/provider-qualification-matrix.mjs";
 import { applyProductionProofEvidence } from "../lib/production-proof.mjs";
@@ -1448,7 +1449,39 @@ test("live profile selection materializes Codex Luna and high effort without leg
     assert.equal(route.document.primary.reasoning_effort, "high");
     assert.deepEqual(assets.liveE2eAdapterDefaults.applied_args, []);
     assert.ok(assets.liveE2eAdapterDefaults.suppressed_args.includes("gpt-5.5"));
+    assert.deepEqual(assets.runtimeSelection, {
+      model: "gpt-5.6-luna",
+      reasoning_effort: "high",
+      source: "profile",
+    });
+    assert.deepEqual(assets.providerRoutes.runtime_selection, {
+      requested_model: "gpt-5.6-luna",
+      requested_reasoning_effort: "high",
+      source: "profile",
+    });
+    assert.equal(assets.liveE2eAdapterDefaults.source_ref, "adapters/codex-cli.yaml");
+    assert.match(assets.liveE2eAdapterDefaults.source_digest, /^[a-f0-9]{64}$/u);
+    assert.equal(assets.liveE2eAdapterDefaults.generated_ref, "adapters/codex-cli.yaml");
+    assert.match(assets.liveE2eAdapterDefaults.generated_digest, /^[a-f0-9]{64}$/u);
+    assert.equal(assets.providerRoutes.route_digests.implement.source_ref, "implement-default.yaml");
+    assert.match(assets.providerRoutes.route_digests.implement.source_digest, /^[a-f0-9]{64}$/u);
+    assert.match(assets.providerRoutes.route_digests.implement.generated_digest, /^[a-f0-9]{64}$/u);
   });
+});
+
+test("runtime selection materialization fails closed for malformed or secret-bearing values", () => {
+  assert.throws(
+    () => resolveRuntimeSelection({ profile: { runtime_selection: "gpt-5.6-luna" }, providerVariant: {} }),
+    /profile\.runtime_selection must be an object/u,
+  );
+  assert.throws(
+    () => resolveRuntimeSelection({ profile: { runtime_selection: { model: "gpt-5.6-luna", token: "secret" } }, providerVariant: {} }),
+    /contains unsupported fields: token/u,
+  );
+  assert.throws(
+    () => resolveRuntimeSelection({ profile: { runtime_selection: { model: "gpt-5.6-luna\n--api-key=secret" } }, providerVariant: {} }),
+    /control-character-free string/u,
+  );
 });
 
 test("full-journey host assets atomically restore provider routes on every resume segment", () => {

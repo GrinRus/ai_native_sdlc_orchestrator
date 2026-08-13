@@ -99,6 +99,7 @@ export function buildFlowPresentation({ missionSettings, missionId, selectedStag
     current_step: currentStep?.id ?? null,
     current_step_label: currentStep?.label ?? null,
     next_action_summary: text(action.reason) ?? text(action.command),
+    primary_action: { action_id: text(action.action_id), operator_control: text(action.operator_control) ?? text(action.command), reason: text(action.reason), available: status !== "completed" && Boolean(text(action.action_id) || text(action.command)) },
     attention_count: Number.isInteger(attentionCount) && attentionCount >= 0 ? attentionCount : blockerList.length,
     blocker_count: blockerList.length,
     evidence_count: Array.isArray(evidenceRefs) ? evidenceRefs.length : 0,
