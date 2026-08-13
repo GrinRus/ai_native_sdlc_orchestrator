@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "task-workspace-local-closure-matrix",
+  "acceptance_mode": "development-local-browser",
+  "provider_execution": "prohibited",
+  "upstream_write": "prohibited",
+  "screens": [
+    "tasks-home",
+    "new-task",
+    "markdown-sources",
+    "prepared-task",
+    "active-task-workspace",
+    "attention",
+    "review-changes",
+    "completion-evidence"
+  ],
+  "scenarios": [
+    { "id": "text-only", "source_kind": "inline-text", "expected_state": "draft" },
+    { "id": "upload-markdown", "source_kind": "upload-snapshot", "expected_state": "prepared" },
+    { "id": "repository-markdown", "source_kind": "repository-markdown", "expected_state": "prepared" },
+    { "id": "stale-source", "source_kind": "repository-markdown", "expected_state": "attention" },
+    { "id": "runner-unavailable", "source_kind": "inline-text", "expected_state": "attention" },
+    { "id": "attention", "source_kind": "inline-text", "expected_state": "attention" },
+    { "id": "failure", "source_kind": "inline-text", "expected_state": "attention" },
+    { "id": "review", "source_kind": "repository-markdown", "expected_state": "active" },
+    { "id": "completion", "source_kind": "inline-text", "expected_state": "completed" },
+    { "id": "reload", "source_kind": "inline-text", "expected_state": "prepared" },
+    { "id": "offline", "source_kind": "inline-text", "expected_state": "unknown" },
+    { "id": "accessibility", "source_kind": "inline-text", "expected_state": "active" }
+  ],
+  "viewports": ["desktop", "tablet", "mobile", "zoom-200"],
+  "accessibility": ["keyboard-only", "focus-visible", "semantic-tree", "contrast-aa", "reduced-motion"],
+  "recovery": ["reload", "reconnect", "offline-read", "injected-error", "terminal-read-only"],
+  "closure_requirements": {
+    "no_runtime_state_commit": true,
+    "no_credentials": true,
+    "no_private_paths": true,
+    "no_upstream_write": true,
+    "historical_v2_counts_for_acceptance": false
+  }
+}
