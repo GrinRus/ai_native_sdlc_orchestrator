@@ -28,6 +28,104 @@ function taskStatus(flow) {
   return "active";
 }
 
+function intentTaskRef(projectId, submissionId) {
+  return `evidence://projects/${projectId}/inputs/${submissionId}/submission.json`;
+}
+
+function projectIntentTask({ projectId, entry }) {
+  const submission = entry?.submission ?? {};
+  const normalization = entry?.normalization ?? {};
+  const submissionId = asString(submission.submission_id);
+  if (!submissionId) return null;
+  const status = submission.status === "blocked"
+    ? "attention"
+    : submission.status === "prepared"
+      ? "prepared"
+      : "draft";
+  const title = asString(normalization.title) ?? asString(submission.request_text) ?? "Untitled task";
+  const sourceItems = asStringArray(submission.attachments?.map((attachment) => attachment?.sha256)).map((digest, index) => {
+    const attachment = submission.attachments[index] ?? {};
+    return {
+      schema_version: 1,
+      source_id: `${submissionId}.source.${index + 1}`,
+      kind: "upload-snapshot",
+      ref: null,
+      immutable: true,
+      stale: false,
+      digest,
+      preview: {
+        kind: "markdown-source",
+        filename: asString(attachment.original_name),
+        media_type: asString(attachment.media_type),
+        byte_length: Number.isInteger(attachment.byte_length) ? attachment.byte_length : null,
+      },
+    };
+  });
+  if (submission.request_text && sourceItems.length === 0) {
+    sourceItems.push({
+      schema_version: 1,
+      source_id: `${submissionId}.source.inline`,
+      kind: "inline-text",
+      ref: null,
+      immutable: true,
+      stale: false,
+      digest: crypto.createHash("sha256").update(String(submission.request_text), "utf8").digest("hex"),
+      preview: { kind: "inline-text", text: String(submission.request_text).slice(0, 500) },
+    });
+  }
+  const intentRef = intentTaskRef(projectId, submissionId);
+  return {
+    task_id: taskId(projectId, `intent.${submissionId}`),
+    project_id: projectId,
+    display_title: title,
+    work_type: asString(normalization.work_type),
+    status,
+    status_detail: asString(submission.status) ?? "submitted",
+    intent_submission_ref: intentRef,
+    mission_id: null,
+    flow_id: null,
+    lineage: {
+      intent_submission_ref: intentRef,
+      intent_submission_id: submissionId,
+      mission_id: null,
+      flow_id: null,
+    },
+    source_items: sourceItems,
+    lifecycle_path: {
+      path_id: "intent",
+      owner: "runtime",
+      steps: [{ id: "prepare", label: "Prepare", state: status === "prepared" ? "completed" : "current" }],
+    },
+    current_step: status === "prepared" ? "confirm" : "prepare",
+    current_step_label: status === "prepared" ? "Ready for review" : "Draft",
+    attention_count: status === "attention" ? 1 : 0,
+    blocker_count: status === "attention" ? 1 : 0,
+    evidence_refs: asStringArray(submission.normalization_refs),
+    primary_action: {
+      action_id: status === "prepared" ? "intent.review" : "intent.resume",
+      operator_control: status === "prepared" ? "Review prepared task" : "Resume task preparation",
+      reason: status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
+      available: true,
+    },
+    runner_selection: {
+      schema_version: 1,
+      source: "project-default",
+      route_id: asString(normalization.provider?.route_id),
+      readiness: status === "attention" ? "blocked" : status === "prepared" ? "ready" : "unknown",
+      requested_model: null,
+      effective_model: null,
+      requested_reasoning_effort: null,
+      effective_reasoning_effort: null,
+      unavailable_reason: status === "attention" ? "Intent preparation is blocked." : null,
+      recovery_action: status === "attention" ? "Revise or retry the intent preparation." : "Review the prepared task before confirmation.",
+    },
+    updated_at: asString(submission.updated_at) ?? asString(submission.created_at),
+    completed_read_only: false,
+    read_only: true,
+    draft: status !== "prepared",
+  };
+}
+
 function taskSourceItems(flow) {
   return asStringArray([flow.intake_packet_ref, flow.intake_body_ref]).map((ref, index) => ({
     schema_version: 1,
@@ -97,11 +195,16 @@ export function projectTaskFromFlow({ projectId, flow }) {
 
 export function listTaskProjections(options = {}) {
   const flows = listFlowProjections(options);
-  const tasks = flows.flows.map((flow) => projectTaskFromFlow({ projectId: flows.project_id, flow }));
+  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({ projectId: flows.project_id, flow }));
+  const intentTasks = Array.isArray(options.intentSubmissions)
+    ? options.intentSubmissions.map((entry) => projectIntentTask({ projectId: flows.project_id, entry })).filter(Boolean)
+    : [];
+  const tasks = [...intentTasks, ...flowTasks];
   return {
     project_id: flows.project_id,
     selected_task_id: tasks.find((task) => task.flow_id === flows.selected_flow_id)?.task_id ?? tasks[0]?.task_id ?? null,
-    active_task_ids: tasks.filter((task) => ["active", "attention"].includes(task.status)).map((task) => task.task_id),
+    active_task_ids: tasks.filter((task) => ["draft", "prepared", "active", "attention"].includes(task.status)).map((task) => task.task_id),
+    prepared_task_ids: tasks.filter((task) => task.status === "prepared").map((task) => task.task_id),
     completed_task_ids: tasks.filter((task) => task.status === "completed").map((task) => task.task_id),
     tasks,
     generated_from: {

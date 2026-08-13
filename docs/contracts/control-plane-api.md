@@ -61,7 +61,7 @@ W70 adds a server-owned Task Workspace projection over existing intent and
 Flow lineage:
 
 - `GET /api/projects/:projectId/tasks` returns stable public `task_id` values,
-  source refs, runtime lifecycle path, attention/blocker counts,
+  draft/prepared/active/attention/completed status projections, source refs, runtime lifecycle path, attention/blocker counts,
   runner-readiness metadata, and one server-owned primary action;
 - `GET /api/projects/:projectId/tasks/:taskId` returns one projection or a
   structured `task.not_found` error;
@@ -70,7 +70,8 @@ Flow lineage:
   and idempotency semantics; Task is not a second lifecycle owner;
 - browser surfaces render the server-owned `lifecycle_path` and
   `primary_action` instead of deriving lifecycle or next action from raw
-  fields. Completed tasks remain immutable.
+  fields. Draft and prepared Tasks retain their intent-submission lineage;
+  completed tasks remain immutable.
 
 All operator failures use one `OperatorError`: `code`, `title`, `detail`, the compatibility alias `message`, operation/phase/resource/consequence/retryability, scoped refs, field errors, evidence refs, and typed recovery actions. Recovery identifiers come only from the canonical catalog and are never inferred from provider text, stack traces, or shell commands.
 

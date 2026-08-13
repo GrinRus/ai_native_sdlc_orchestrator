@@ -263,6 +263,7 @@ export function createControlPlaneHttpServer(options) {
           params,
           requestUrl,
           response,
+          registry,
           runtimeOptions: runtimeOptionsWithSecurity,
         });
         return;

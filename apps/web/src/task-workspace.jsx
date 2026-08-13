@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, StatusBadge } from "./ui/components.jsx";
 
 const SCREENS = [
@@ -13,6 +13,8 @@ const SCREENS = [
 ];
 
 function taskStatusLabel(task) {
+  if (task?.status === "draft") return "Draft";
+  if (task?.status === "prepared") return "Ready";
   if (task?.status === "completed") return "Completed";
   if (task?.status === "attention") return "Needs attention";
   return "Active";
@@ -20,6 +22,8 @@ function taskStatusLabel(task) {
 
 function taskStatusTone(task) {
   if (task?.status === "completed") return "neutral";
+  if (task?.status === "draft") return "neutral";
+  if (task?.status === "prepared") return "success";
   if (task?.status === "attention") return "warning";
   return "success";
 }
@@ -59,13 +63,18 @@ function EmptyTaskState({ onNewTask }) {
   return <Card><EmptyState title="No tasks yet">Start with a plain-language outcome and review the prepared task before it can write.</EmptyState><Button variant="primary" onClick={onNewTask}>New Task</Button></Card>;
 }
 
-export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSelectTask, onNewTask, pending = false }) {
+export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSelectTask, onNewTask, onRefresh, connectionState = "connected", resourceError = null, pending = false }) {
   const [screen, setScreen] = useState("home");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [outcome, setOutcome] = useState("");
   const [markdown, setMarkdown] = useState("");
-  const selectedTask = tasks.find((task) => task.task_id === selectedTaskId) ?? tasks[0] ?? null;
+  const [focusedTaskId, setFocusedTaskId] = useState(selectedTaskId);
+  const selectedTask = (focusedTaskId ? tasks.find((task) => task.task_id === focusedTaskId) : tasks[0]) ?? null;
+  useEffect(() => {
+    setFocusedTaskId(selectedTaskId);
+    if (selectedTaskId) setScreen("prepared");
+  }, [selectedTaskId]);
   const visibleTasks = useMemo(() => tasks.filter((task) => {
     const matchesQuery = !query.trim() || `${taskTitle(task)} ${task.work_type ?? ""}`.toLowerCase().includes(query.trim().toLowerCase());
     const matchesFilter = filter === "all" || task.status === filter;
@@ -73,6 +82,7 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
   }), [tasks, query, filter]);
 
   function chooseTask(task) {
+    setFocusedTaskId(task.task_id);
     onSelectTask?.(task);
     setScreen("prepared");
   }
@@ -85,9 +95,10 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
     <nav className="task-workspace__nav" aria-label="Task screens">
       {SCREENS.map(([id, label]) => <button type="button" className={screen === id ? "selected" : ""} key={id} onClick={() => setScreen(id)}>{label}</button>)}
     </nav>
+    {connectionState !== "connected" ? <Card role="alert"><strong>{connectionState === "offline" ? "Tasks are temporarily unavailable." : "Task data is partially available."}</strong><p>{resourceError?.detail || "AOR will not infer lifecycle or next action from stale data."}</p>{onRefresh ? <Button onClick={onRefresh}>Retry</Button> : null}</Card> : null}
     {screen === "home" ? <>
-      <div className="task-workspace__toolbar"><div><h2>Tasks</h2><p>{tasks.length ? `${tasks.length} task${tasks.length === 1 ? "" : "s"}` : "No tasks yet"}</p></div><div><input aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /><select aria-label="Filter tasks" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All</option><option value="active">Active</option><option value="attention">Attention</option><option value="completed">Completed</option></select></div></div>
-      {pending ? <Card><p>Loading tasks…</p></Card> : visibleTasks.length ? <div className="task-workspace__grid">{visibleTasks.map((task) => <button type="button" className="task-workspace__card" key={task.task_id} onClick={() => chooseTask(task)}><div><strong>{taskTitle(task)}</strong><StatusBadge tone={taskStatusTone(task)}>{taskStatusLabel(task)}</StatusBadge></div><span>{task.work_type || "work"} · {task.current_step_label || "Ready"}</span><p>{task.primary_action?.reason || "Open the server-owned task read model."}</p><small>{task.attention_count ?? 0} attention · {task.blocker_count ?? 0} blockers · {task.evidence_refs?.length ?? 0} evidence</small></button>)}</div> : <EmptyTaskState onNewTask={() => { setScreen("new"); onNewTask?.(); }} />}
+      <div className="task-workspace__toolbar"><div><h2>Tasks</h2><p>{tasks.length ? `${tasks.length} task${tasks.length === 1 ? "" : "s"}` : "No tasks yet"}</p></div><div><input aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /><select aria-label="Filter tasks" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All</option><option value="draft">Draft</option><option value="prepared">Ready</option><option value="active">Active</option><option value="attention">Attention</option><option value="completed">Completed</option></select></div></div>
+      {pending ? <Card><p>Loading tasks…</p></Card> : visibleTasks.length ? <div className="task-workspace__grid">{visibleTasks.map((task) => <button type="button" className="task-workspace__card" key={task.task_id} onClick={() => chooseTask(task)}><div><strong>{taskTitle(task)}</strong><StatusBadge tone={taskStatusTone(task)}>{taskStatusLabel(task)}</StatusBadge></div><span>{task.work_type || "work"} · {task.current_step_label || "Ready"}</span><p>{task.primary_action?.reason || "Open the server-owned task read model."}</p><small>{task.attention_count ?? 0} attention · {task.blocker_count ?? 0} blockers · {task.evidence_refs?.length ?? 0} evidence{task.updated_at ? ` · Updated ${new Date(task.updated_at).toLocaleString()}` : ""}</small></button>)}</div> : <EmptyTaskState onNewTask={() => { setScreen("new"); onNewTask?.(); }} />}
     </> : null}
     {screen === "new" ? <Card><h2>New Task</h2><p>Describe the outcome in plain language. Nothing writes until review and explicit confirmation.</p><label htmlFor="task-outcome">Outcome</label><textarea id="task-outcome" rows="5" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="What should be true when this task is complete?" /><div className="task-workspace__actions"><Button onClick={() => setScreen("sources")} disabled={!outcome.trim()}>Add Markdown sources</Button><Button variant="secondary" onClick={() => setScreen("home")}>Cancel</Button></div></Card> : null}
     {screen === "sources" ? <Card><h2>Markdown Sources</h2><p>Sources are immutable snapshots. Previews are sanitized text and never execute HTML, scripts, embeds, or remote loads.</p><label htmlFor="task-markdown">Paste Markdown</label><textarea id="task-markdown" rows="8" value={markdown} onChange={(event) => setMarkdown(event.target.value)} placeholder="# Context" /><div className="task-workspace__source-preview"><strong>Sanitized preview</strong><pre>{sanitizeMarkdown(markdown)}</pre></div><div className="task-workspace__actions"><Button variant="primary" onClick={() => setScreen("prepared")}>Prepare Task</Button><Button variant="secondary" onClick={() => setScreen("new")}>Back</Button></div></Card> : null}
