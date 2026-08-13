@@ -633,19 +633,19 @@ predating this chain remains diagnostic-only for final wave closure.
 ## W67 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W67-S01 | Storage and contract baseline | EPIC-0, EPIC-1, EPIC-2, EPIC-6 | blocked | product, architecture, contracts, examples, backlog | W66-S09 |
-| W67-S02 | Project source connection and central runtime | EPIC-1, EPIC-6 | blocked | core, CLI, API, source connection tests | W67-S01 |
-| W67-S03 | Durable intent preparation | EPIC-2, EPIC-3, EPIC-6 | blocked | contracts, core, routes, CLI, API | W67-S01 |
-| W67-S04 | Intent-first installed console | EPIC-1, EPIC-2, EPIC-6 | blocked | web, control-plane client, browser tests | W67-S02, W67-S03 |
-| W67-S05 | Explicit materialization, export, and closure proof | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | blocked | core, CLI, API, web, docs, proof | W67-S04 |
+| W67-S01 | Storage and contract baseline | EPIC-0, EPIC-1, EPIC-2, EPIC-6 | done | product, architecture, contracts, examples, backlog | W66-S09 |
+| W67-S02 | Project source connection and central runtime | EPIC-1, EPIC-6 | done | core, CLI, API, source connection tests | W67-S01 |
+| W67-S03 | Durable intent preparation | EPIC-2, EPIC-3, EPIC-6 | done | contracts, core, routes, CLI, API | W67-S01 |
+| W67-S04 | Intent-first installed console | EPIC-1, EPIC-2, EPIC-6 | done | web, control-plane client, browser tests | W67-S02, W67-S03 |
+| W67-S05 | Explicit materialization, export, and closure proof | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | done | core, CLI, API, web, docs, proof | W67-S04 |
 
 ## W68 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W68-S01 | Contract and migration baseline for runtime selection | EPIC-0, EPIC-3, EPIC-4 | blocked | route/adapter/execution contracts, examples, focused tests | W67-S05 |
-| W68-S02 | Runtime resolution and adapter argument mapping | EPIC-3, EPIC-4 | blocked | provider-routing, adapter SDK, step-result evidence, tests | W68-S01 |
-| W68-S03 | Runtime selection projection and presets | EPIC-1, EPIC-3, EPIC-6 | blocked | execution profile/readiness projections, CLI/API/web fixtures | W68-S02 |
-| W68-S04 | Live E2E selection and Codex Luna/high rehearsal | EPIC-0, EPIC-4, EPIC-7 | blocked | private live profiles/materialization, runbook, proof tests | W68-S02 |
+| W68-S01 | Contract and migration baseline for runtime selection | EPIC-0, EPIC-3, EPIC-4 | done | route/adapter/execution contracts, examples, focused tests | W67-S05 |
+| W68-S02 | Runtime resolution and adapter argument mapping | EPIC-3, EPIC-4 | done | provider-routing, adapter SDK, step-result evidence, tests | W68-S01 |
+| W68-S03 | Runtime selection projection and presets | EPIC-1, EPIC-3, EPIC-6 | done | execution profile/readiness projections, CLI/API/web fixtures | W68-S02 |
+| W68-S04 | Live E2E selection and Codex Luna/high rehearsal | EPIC-0, EPIC-4, EPIC-7 | ready | private live profiles/materialization, runbook, proof tests | W68-S02 |
 | W68-S05 | Cutover, certification, and docs closure | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification ledger, runbooks, root gates | W68-S03, W68-S04 |
 
 ## W69 slices

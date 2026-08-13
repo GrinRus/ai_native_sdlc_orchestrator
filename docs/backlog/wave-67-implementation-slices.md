@@ -12,9 +12,10 @@ write-capable execution.
 
 ## W67-S01 — Storage and contract baseline
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-6
 - **Hard dependencies:** W66-S09
+- **Qualification gate:** mode=release-only; refs=W66-S09
 - **Outcome:** `~/.aor` becomes the only default mutable state root and the
   breaking project, evidence, intent, and export contracts are reviewable.
 - **Primary modules:** product, architecture, contracts, examples, backlog
@@ -36,7 +37,8 @@ write-capable execution.
 3. **Register W67.**
    - Purpose: Keep the breaking initiative out of the active W66 qualification.
    - Changes: Update roadmap, backlog, epic map, dependency graph, and stories.
-   - Validation: Slice tools report W67 blocked behind W66-S09.
+   - Validation: Slice tools allow W67-S01 to complete through the release-only
+     gate while readiness still reports the W66-S09 qualification hold.
 
 ### Acceptance criteria
 
@@ -59,7 +61,7 @@ write-capable execution.
 
 ## W67-S02 — Project source connection and central runtime
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-6
 - **Hard dependencies:** W67-S01
 - **Outcome:** Local Git folders and Git URLs connect to collision-safe projects
@@ -106,7 +108,7 @@ write-capable execution.
 
 ## W67-S03 — Durable intent preparation
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W67-S01
 - **Outcome:** Text and bounded text attachments become immutable submissions
@@ -152,7 +154,7 @@ write-capable execution.
 
 ## W67-S04 — Intent-first installed console
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
 - **Hard dependencies:** W67-S02, W67-S03
 - **Outcome:** The installed console starts from code plus intent, shows a short
@@ -197,7 +199,7 @@ write-capable execution.
 
 ## W67-S05 — Explicit materialization, export, and closure proof
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W67-S04
 - **Outcome:** Operators explicitly materialize portable configuration or a

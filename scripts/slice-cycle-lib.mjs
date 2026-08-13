@@ -3,6 +3,9 @@ import path from "node:path";
 
 export const VALID_STATES = new Set(["ready", "blocked", "active", "done"]);
 
+const RELEASE_ONLY_GATE_MODE = "release-only";
+const QUALIFICATION_GATE_OWNERS = new Set(["W67-S01"]);
+
 export const DEFAULT_PATHS = {
   masterBacklog: "docs/backlog/mvp-implementation-backlog.md",
   dependencyGraph: "docs/backlog/slice-dependency-graph.md",
@@ -102,6 +105,34 @@ function parseBulletList(sectionContent, heading) {
   const block = extractSectionBlock(sectionContent, heading);
   if (!block) return [];
   return [...block.matchAll(/^-\s+(.+)$/gm)].map((match) => match[1].trim());
+}
+
+function parseQualificationGate(section, sliceId) {
+  const inlineMatch = section.match(/^-[ \t]+\*\*Qualification gate:\*\*[ \t]*(.+)$/m);
+  const blockMatch = section.match(
+    /^-[ \t]+\*\*Qualification gate:\*\*[ \t]*\n((?:[ \t]+-[ \t]+[^\n]+\n?)+)/m,
+  );
+  const raw = inlineMatch?.[1]?.trim() ?? blockMatch?.[1]?.trim() ?? null;
+  if (!raw) return null;
+  const normalizedRaw = raw.replace(/^\s*-[ \t]*/gmu, "").trim();
+
+  const modeMatch = normalizedRaw.match(/(?:^|[;\n,])[ \t]*mode[ \t]*[:=][ \t]*([a-z-]+)/i);
+  const refsMatch = normalizedRaw.match(/(?:^|[;\n,])[ \t]*refs[ \t]*[:=][ \t]*([^;\n]+)/i);
+  const mode = modeMatch?.[1]?.trim().toLowerCase() ?? null;
+  const refs = refsMatch
+    ? refsMatch[1]
+        .split(/[\s,]+/u)
+        .map((ref) => ref.trim())
+        .filter(Boolean)
+    : [];
+
+  if (!mode || refs.length === 0) {
+    throw new Error(
+      `${sliceId} has an invalid qualification gate. Expected 'mode=release-only; refs=Wxx-Syy'.`,
+    );
+  }
+
+  return { mode, refs };
 }
 
 function extractSectionBlock(content, heading) {
@@ -227,6 +258,7 @@ export function parseWaveSlices(content, waveFile) {
     const state = stateMatch[1].trim();
     ensureState(state, `${waveFile} section '${sliceId}'`);
     const externalBlockerMatch = section.match(/^-\s+\*\*External blocker:\*\*\s*(.+)\s*$/m);
+    const qualificationGate = parseQualificationGate(section, sliceId);
     const epicMatch = section.match(/^-\s+\*\*Epic:\*\*\s*([\s\S]*?)(?=^-\s+\*\*|^###|^##|(?![\s\S]))/m);
 
     slices.set(sliceId, {
@@ -235,6 +267,7 @@ export function parseWaveSlices(content, waveFile) {
       state,
       hardDependencies: normalizeDeps(depsMatch[1]),
       externalBlocker: externalBlockerMatch ? externalBlockerMatch[1].trim() : null,
+      qualificationGate,
       epicIds: epicMatch ? [...epicMatch[1].matchAll(/EPIC-\d+/gu)].map((match) => match[0]) : [],
       waveFile,
       localTasks: parseDetailedNumberedList(section, "Local tasks"),
@@ -281,6 +314,27 @@ export function loadBacklogModel(rootDir) {
 
     const waveSlice = waveSlices.get(sliceId);
 
+    if (waveSlice.qualificationGate) {
+      if (waveSlice.qualificationGate.mode !== RELEASE_ONLY_GATE_MODE) {
+        throw new Error(
+          `Unsupported qualification gate mode '${waveSlice.qualificationGate.mode}' for ${sliceId}.`,
+        );
+      }
+      if (!QUALIFICATION_GATE_OWNERS.has(sliceId)) {
+        throw new Error(
+          `Qualification gate is only allowed on ${[...QUALIFICATION_GATE_OWNERS].join(", ")}; found ${sliceId}.`,
+        );
+      }
+      const unknownRefs = waveSlice.qualificationGate.refs.filter(
+        (ref) => !masterSlice.hardDependencies.includes(ref),
+      );
+      if (unknownRefs.length > 0) {
+        throw new Error(
+          `Qualification gate refs for ${sliceId} must be hard dependencies; unknown refs: ${unknownRefs.join(", ")}.`,
+        );
+      }
+    }
+
     if (masterSlice.state !== "done" && masterSlice.title !== waveSlice.title) {
       throw new Error(
         `Title mismatch for ${sliceId}: master backlog has '${masterSlice.title}', wave doc has '${waveSlice.title}'.`,
@@ -324,6 +378,7 @@ export function loadBacklogModel(rootDir) {
       state: masterSlice.state,
       hardDependencies: masterSlice.hardDependencies,
       externalBlocker: waveSlice.externalBlocker,
+      qualificationGate: waveSlice.qualificationGate,
       waveFile: waveSlice.waveFile,
       localTasks: waveSlice.localTasks,
       acceptanceCriteria: waveSlice.acceptanceCriteria,
@@ -397,6 +452,24 @@ export function dependenciesDone(model, sliceId) {
   return slice.hardDependencies.every((depId) => model.slices.get(depId)?.state === "done");
 }
 
+export function dependenciesSatisfied(model, sliceId) {
+  const slice = model.slices.get(sliceId);
+  if (!slice) throw new Error(`Unknown slice '${sliceId}'.`);
+
+  return slice.hardDependencies.every((depId) => {
+    const dependency = model.slices.get(depId);
+    if (!dependency) throw new Error(`Slice '${sliceId}' depends on unknown slice '${depId}'.`);
+    if (dependency.state === "done") return true;
+
+    return Boolean(
+      slice.qualificationGate?.mode === RELEASE_ONLY_GATE_MODE
+      && slice.qualificationGate.refs.includes(depId)
+      && dependency.state === "blocked"
+      && dependency.externalBlocker,
+    );
+  });
+}
+
 function collectUnfinishedDependencies(model, sliceId, visited = new Set()) {
   if (visited.has(sliceId)) return [];
   visited.add(sliceId);
@@ -435,7 +508,7 @@ export function computeStateSyncChanges(model) {
       continue;
     }
 
-    const nextState = dependenciesDone(model, slice.sliceId) ? "ready" : "blocked";
+    const nextState = dependenciesSatisfied(model, slice.sliceId) ? "ready" : "blocked";
     if (nextState !== slice.state) {
       changes.push({
         sliceId: slice.sliceId,
@@ -549,6 +622,7 @@ export function getSlicePlan(model, sliceId) {
     state: slice.state,
     hardDependencies: slice.hardDependencies,
     externalBlocker: slice.externalBlocker,
+    qualificationGate: slice.qualificationGate,
     waveFile: slice.waveFile,
     localTasks: slice.localTasks,
     acceptanceCriteria: slice.acceptanceCriteria,
@@ -611,8 +685,16 @@ export function applySliceStateTransition(model, sliceId, nextState, options = {
     );
   }
 
-  if (!force && nextState === "done" && !dependenciesDone(model, sliceId)) {
-    const missing = slice.hardDependencies.filter((depId) => model.slices.get(depId)?.state !== "done");
+  if (!force && nextState === "done" && !dependenciesSatisfied(model, sliceId)) {
+    const missing = slice.hardDependencies.filter((depId) => {
+      const dependency = model.slices.get(depId);
+      return dependency?.state !== "done" && !(
+        slice.qualificationGate?.mode === RELEASE_ONLY_GATE_MODE
+        && slice.qualificationGate.refs.includes(depId)
+        && dependency?.state === "blocked"
+        && dependency.externalBlocker
+      );
+    });
     throw new Error(`Cannot mark ${sliceId} as done: unresolved hard dependencies: ${missing.join(", ")}.`);
   }
 

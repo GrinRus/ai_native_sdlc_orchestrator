@@ -19,6 +19,16 @@ model/reasoning-effort behavior. W68 must inventory that behavior, make one
 contract authoritative, close missing compatibility and projection paths, and
 qualify the cutover without rewriting historical W66 evidence.
 
+## Current deterministic checkpoint
+
+W68-S01 through W68-S03 are complete on the current source baseline. W68-S04
+is the next ready slice for an isolated Codex `gpt-5.6-luna`/`high` rehearsal;
+Claude and Qwen live or paid runs remain intentionally deferred. Deterministic
+Claude/Qwen format, malformed-output, capability, and no-spawn fixtures remain
+part of the completed contract and adapter gates. W66-S09 stays blocked and
+production readiness remains `audit-hold` until the fresh four-cell W66 matrix
+is rerun after the Anthropic quota blocker is removed.
+
 Model and reasoning-effort values remain adapter-owned opaque stable strings;
 AOR does not invent a cross-provider quality scale. Provider-neutral presets
 select approved route candidates instead of translating one provider's effort
@@ -29,7 +39,7 @@ unsupported value blocks before spawn.
 
 ## W68-S01 — Contract and migration baseline for runtime selection
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-3, EPIC-4
 - **Hard dependencies:** W67-S05
 - **Primary modules:** route/adapter/execution contracts, examples, focused tests
@@ -104,7 +114,7 @@ without changing the required W66 matrix cells.
 
 ## W68-S02 — Runtime resolution and adapter argument mapping
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-3, EPIC-4
 - **Hard dependencies:** W68-S01
 - **Primary modules:** provider-routing, adapter SDK, step-result evidence, tests
@@ -178,7 +188,7 @@ unsupported, and omitted values plus argv mapping; root checks remain green.
 
 ## W68-S03 — Runtime selection projection and presets
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-3, EPIC-6
 - **Hard dependencies:** W68-S02
 - **Primary modules:** execution profile/readiness projections, CLI/API/web fixtures
@@ -246,7 +256,7 @@ backward-compatible nulls when no explicit selection is present.
 
 ## W68-S04 — Live E2E selection and Codex Luna/high rehearsal
 
-- **State:** blocked
+- **State:** ready
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W68-S02
 - **Primary modules:** private live profiles/materialization, runbook, proof tests

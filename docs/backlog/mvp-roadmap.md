@@ -1463,8 +1463,11 @@ repair contracts change.
 folder or Git URL, and prepare free-form text/file intent before any
 write-capable execution.
 
-**Entry condition:** W66-S09 closes so the breaking storage and onboarding
-cutover cannot invalidate the active qualification baseline.
+**Entry condition:** W66-S09 normally closes before the breaking storage and
+onboarding cutover. While the Anthropic runner quota is externally blocked,
+W67-S01 entered through an explicit release-only qualification gate for
+deterministic contract work; this did not change the W66 audit hold or permit
+live qualification.
 
 **Exit criteria:**
 
@@ -1484,9 +1487,10 @@ private live profile explicitly selects a supported value, with adapter-owned
 argument mapping, durable requested/effective/source evidence, and a reversible
 qualification-backed cutover.
 
-**Entry condition:** W67-S05 remains the hard dependency for the shared
-backlog lane; W68 contract and focused implementation work may be prepared in
-parallel without changing the active W66 qualification baseline.
+**Entry condition:** W67-S05 is complete. W68-S01 through W68-S03 are
+deterministic and complete; W68-S04 is ready for the bounded Codex-only
+rehearsal. No Claude/Qwen live run or provider waiver changes the active W66
+qualification baseline.
 
 **Decision boundary:** W68 is not a greenfield route implementation. Existing
 route, adapter, SDK, evidence, and projection fields must receive an explicit

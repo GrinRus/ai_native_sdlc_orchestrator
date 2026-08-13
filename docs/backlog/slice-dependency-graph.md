@@ -1576,6 +1576,23 @@ own the stricter terminal control proof evidence for this lane.
 | W70-S07 | W70-S06 |
 | W70-S08 | W70-S07 |
 
+## Qualification gates
+
+The hard dependency graph remains unchanged. `W67-S01` carries the only
+explicit qualification exception:
+
+```yaml
+qualification_gate:
+  mode: release-only
+  refs:
+    - W66-S09
+```
+
+The gate is valid only while `W66-S09` is `blocked` with its recorded external
+Anthropic runner-quota blocker. It permits deterministic W67 entry and
+completion; it never marks `W66-S09` done, clears production `audit-hold`, or
+waives dependencies for W69/W70.
+
 ## Topological order
 1. W0-S01
 2. W0-S02
