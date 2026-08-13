@@ -120,6 +120,33 @@ test("intent attachment validation covers empty input, traversal names, UTF-8 re
   });
 });
 
+test("repository Markdown sources are pinned, sanitized, and fail closed on unsafe paths", async () => {
+  await withTempRepo({ prefix: "aor-intent-markdown-", workspaceRoot }, (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-markdown-home-"));
+    try {
+      fs.mkdirSync(path.join(projectRoot, "docs"), { recursive: true });
+      fs.writeFileSync(path.join(projectRoot, "docs", "requirements.md"), "# Requirements\n<script>alert(1)</script>\n![remote](https://example.com/x.png)\n", "utf8");
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const created = createIntentSubmission({
+        registry,
+        projectId: registry.defaultProjectId,
+        markdownSources: [{ project_relative_path: "docs/requirements.md" }],
+        autoPrepare: false,
+      });
+      const source = created.submission.markdown_sources[0];
+      assert.equal(source.project_relative_path, "docs/requirements.md");
+      assert.match(source.pinned_base_revision, /^[0-9a-f]{40}$/u);
+      assert.match(source.digest, /^sha256:[0-9a-f]{64}$/u);
+      assert.doesNotMatch(source.preview.sanitized_markdown, /<script|https:\/\//iu);
+      assert.equal(source.stale, false);
+      fs.appendFileSync(path.join(projectRoot, "docs", "requirements.md"), "\nChanged after pin.\n", "utf8");
+      assert.equal(readIntentSubmission({ registry, projectId: registry.defaultProjectId, submissionId: created.submission.submission_id }).submission.markdown_sources[0].stale, true);
+      assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "../outside.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_path");
+      assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "missing.md" }], autoPrepare: false }), (error) => error.code === "intent_source.not_found");
+    } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
+  });
+});
+
 test("normalization blockers remain retryable and confirmation is idempotent", async () => {
   await withTempRepo({ prefix: "aor-intent-lifecycle-", workspaceRoot }, (projectRoot) => {
     const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-lifecycle-home-"));

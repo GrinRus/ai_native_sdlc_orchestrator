@@ -114,6 +114,98 @@ function attachmentRecords(init, submissionId, attachments) {
   });
 }
 
+function sanitizeMarkdownPreview(value) {
+  const input = String(value ?? "");
+  let output = "";
+  let index = 0;
+  while (index < input.length) {
+    if (input[index] !== "<") {
+      output += input[index];
+      index += 1;
+      continue;
+    }
+    const remainder = input.slice(index).toLowerCase();
+    if (remainder.startsWith("<script")) {
+      const closingStart = remainder.indexOf("</script");
+      if (closingStart < 0) break;
+      const closingEnd = input.indexOf(">", index + closingStart + 2);
+      index = closingEnd < 0 ? input.length : closingEnd + 1;
+      continue;
+    }
+    const tagEnd = input.indexOf(">", index + 1);
+    if (tagEnd < 0) break;
+    index = tagEnd + 1;
+  }
+  return output.replace(/!\[[^\]]*\]\(https?:\/\/[^)]+\)/giu, "[remote embed omitted]");
+}
+
+function repositoryMarkdownRecords(context, markdownSources) {
+  if (!Array.isArray(markdownSources) || markdownSources.length === 0) return [];
+  if (markdownSources.length > MAX_FILES) throw new IntentServiceError("intent_source.count_exceeded", `At most ${MAX_FILES} Markdown sources are allowed.`);
+  const head = awaitableSpawn("git", ["-C", context.projectRoot, "rev-parse", "HEAD"]);
+  return markdownSources.map((source, index) => {
+    const relativePath = String(source?.project_relative_path ?? source?.path ?? "").trim().replaceAll("\\", "/");
+    if (!relativePath || path.posix.isAbsolute(relativePath) || relativePath.split("/").includes("..")) {
+      throw new IntentServiceError("intent_source.invalid_path", "Repository Markdown paths must be project-relative and cannot traverse outside the project.");
+    }
+    if (path.extname(relativePath).toLowerCase() !== ".md") {
+      throw new IntentServiceError("intent_source.unsupported", `Repository source '${relativePath}' must be a Markdown file.`);
+    }
+    const absolutePath = path.resolve(context.projectRoot, relativePath);
+    const projectRoot = path.resolve(context.projectRoot);
+    if (absolutePath !== projectRoot && !absolutePath.startsWith(`${projectRoot}${path.sep}`)) {
+      throw new IntentServiceError("intent_source.invalid_path", "Repository Markdown paths must stay inside the connected project.");
+    }
+    if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
+      throw new IntentServiceError("intent_source.not_found", `Repository Markdown source '${relativePath}' was not found.`);
+    }
+    const content = fs.readFileSync(absolutePath);
+    if (content.length > MAX_FILE_BYTES) throw new IntentServiceError("intent_source.too_large", `Repository Markdown source '${relativePath}' exceeds 1 MiB.`);
+    const text = content.toString("utf8");
+    if (text.includes("\uFFFD")) throw new IntentServiceError("intent_source.invalid_utf8", `Repository Markdown source '${relativePath}' is not valid UTF-8.`);
+    const digest = crypto.createHash("sha256").update(content).digest("hex");
+    const pinnedRevision = String(source?.pinned_base_revision ?? head ?? "").trim();
+    if (pinnedRevision && !/^[0-9a-f]{40}$/iu.test(pinnedRevision)) {
+      throw new IntentServiceError("intent_source.invalid_revision", "Pinned Markdown base revision must be a full Git commit id.");
+    }
+    return {
+      source_id: `source.${index + 1}.${digest.slice(0, 12)}`,
+      project_relative_path: relativePath,
+      pinned_base_revision: pinnedRevision || null,
+      digest: `sha256:${digest}`,
+      media_type: "text/markdown",
+      byte_length: content.length,
+      stale: false,
+      preview: {
+        project_relative_path: relativePath,
+        pinned_base_revision: pinnedRevision || null,
+        media_type: "text/markdown",
+        byte_length: content.length,
+        sanitized_markdown: sanitizeMarkdownPreview(text).slice(0, MAX_NORMALIZATION_BYTES),
+      },
+    };
+  });
+}
+
+function currentMarkdownSourceStatus(context, sources) {
+  if (!Array.isArray(sources) || sources.length === 0) return [];
+  const head = awaitableSpawn("git", ["-C", context.projectRoot, "rev-parse", "HEAD"]);
+  return sources.map((source) => {
+    const relativePath = String(source?.project_relative_path ?? "").trim().replaceAll("\\", "/");
+    const absolutePath = relativePath ? path.resolve(context.projectRoot, relativePath) : null;
+    const projectRoot = path.resolve(context.projectRoot);
+    const safe = absolutePath && (absolutePath === projectRoot || absolutePath.startsWith(`${projectRoot}${path.sep}`));
+    let currentDigest = null;
+    if (safe && fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
+      currentDigest = `sha256:${crypto.createHash("sha256").update(fs.readFileSync(absolutePath)).digest("hex")}`;
+    }
+    return {
+      ...source,
+      stale: source.stale === true || !safe || currentDigest !== source.digest || (source.pinned_base_revision && head !== source.pinned_base_revision),
+    };
+  });
+}
+
 function repositorySnapshot(context) {
   const commit = String((awaitableSpawn("git", ["-C", context.projectRoot, "rev-parse", "HEAD"]) ?? ""));
   return [{
@@ -242,13 +334,16 @@ function providerReadiness(registry, projectId) {
   return ready?.[0] ?? null;
 }
 
-export function createIntentSubmission({ registry, projectId, requestText = "", attachments = [], autoPrepare = true, normalization }) {
+export function createIntentSubmission({ registry, projectId, requestText = "", attachments = [], markdownSources = [], autoPrepare = true, normalization }) {
   const { context, init } = resolveProject(registry, projectId);
   const text = String(requestText ?? "").trim();
-  if (!text && (!Array.isArray(attachments) || attachments.length === 0)) {
+  if (!text && (!Array.isArray(attachments) || attachments.length === 0) && (!Array.isArray(markdownSources) || markdownSources.length === 0)) {
     throw new IntentServiceError("intent_submission.empty", "Enter request text or attach at least one text file.");
   }
-  const seed = crypto.createHash("sha256").update(`${text}\0${JSON.stringify(attachments.map((entry) => entry?.name))}\0${Date.now()}`).digest("hex").slice(0, 16);
+  if (Array.isArray(attachments) && attachments.length > MAX_FILES) throw new IntentServiceError("intent_attachment.count_exceeded", `At most ${MAX_FILES} attachments are allowed.`);
+  const repositorySources = repositoryMarkdownRecords(context, markdownSources);
+  if (attachments.length + repositorySources.length > MAX_FILES) throw new IntentServiceError("intent_source.count_exceeded", `At most ${MAX_FILES} total Markdown sources and attachments are allowed.`);
+  const seed = crypto.createHash("sha256").update(`${text}\0${JSON.stringify(attachments.map((entry) => entry?.name))}\0${JSON.stringify(repositorySources.map((entry) => entry.digest))}\0${Date.now()}`).digest("hex").slice(0, 16);
   const submissionId = derivePublicId(["intent-submission", init.projectId, seed], "intent-submission");
   const createdAt = now();
   const submission = {
@@ -259,6 +354,7 @@ export function createIntentSubmission({ registry, projectId, requestText = "", 
     status: "submitted",
     request_text: text,
     attachments: attachmentRecords(init, submissionId, attachments),
+    markdown_sources: repositorySources,
     repository_snapshot: repositorySnapshot(context),
     normalization_refs: [],
     created_at: createdAt,
@@ -343,7 +439,7 @@ export function readIntentSubmission({ registry, projectId, submissionId }) {
   const reportName = latestRef?.split("/").at(-1);
   const reportFile = reportName ? path.join(loaded.init.runtimeLayout.reportsRoot, reportName) : null;
   return {
-    submission: loaded.submission,
+    submission: { ...loaded.submission, markdown_sources: currentMarkdownSourceStatus(loaded.context, loaded.submission.markdown_sources) },
     normalization: reportFile && fs.existsSync(reportFile) ? JSON.parse(fs.readFileSync(reportFile, "utf8")) : null,
   };
 }
@@ -367,7 +463,7 @@ export function listIntentSubmissions({ registry, projectId }) {
         const normalization = reportFile && fs.existsSync(reportFile)
           ? JSON.parse(fs.readFileSync(reportFile, "utf8"))
           : null;
-        return { submission, normalization };
+        return { submission: { ...submission, markdown_sources: currentMarkdownSourceStatus(context, submission.markdown_sources) }, normalization };
       } catch {
         return null;
       }

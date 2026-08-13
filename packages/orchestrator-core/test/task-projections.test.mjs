@@ -68,6 +68,16 @@ test("intent submissions project into draft, prepared, and attention Task states
         created_at: "2026-08-13T10:00:00.000Z",
         updated_at: "2026-08-13T10:01:00.000Z",
         attachments: [],
+        markdown_sources: [{
+          source_id: "source.readme",
+          project_relative_path: "docs/README.md",
+          pinned_base_revision: "a".repeat(40),
+          digest: `sha256:${"b".repeat(64)}`,
+          media_type: "text/markdown",
+          byte_length: 24,
+          stale: true,
+          preview: { sanitized_markdown: "# Readme" },
+        }],
         normalization_refs: ["evidence://projects/project-alpha/reports/intent-normalization-report-intent-prepared-v1.json"],
       },
       normalization: { title: "Prepared task", work_type: "code-change", provider: { route_id: "route.intake-normalize.default" } },
@@ -90,4 +100,6 @@ test("intent submissions project into draft, prepared, and attention Task states
   assert.equal(projection.prepared_task_ids.length, 1);
   assert.equal(projection.tasks[1].lineage.flow_id, null);
   assert.equal(projection.tasks[2].runner_selection.readiness, "blocked");
+  const repositorySource = projection.tasks[1].source_items.find((source) => source.kind === "repository-markdown");
+  assert.equal(repositorySource.stale, true);
 });

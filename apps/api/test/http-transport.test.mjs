@@ -1909,6 +1909,28 @@ test("intent submission API preserves immutable input and creates normalization 
   });
 });
 
+test("intent submission API exposes pinned repository Markdown metadata without fetching remote content", async () => {
+  await withTempRepo(async (projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "docs", "requirements.md"), "# Requirements\n<script>blocked</script>\n", "utf8");
+    const transport = await createControlPlaneHttpServer({ cwd: projectRoot, projectRef: projectRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const response = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/intent-submissions`, {
+        markdown_sources: [{ project_relative_path: "docs/requirements.md" }],
+        auto_prepare: false,
+      });
+      assert.equal(response.status, 202);
+      const body = await response.json();
+      const source = body.submission.markdown_sources[0];
+      assert.equal(source.project_relative_path, "docs/requirements.md");
+      assert.match(source.pinned_base_revision, /^[0-9a-f]{40}$/u);
+      assert.match(source.digest, /^sha256:[0-9a-f]{64}$/u);
+      assert.doesNotMatch(source.preview.sanitized_markdown, /<script/iu);
+      assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
+    } finally { await transport.close(); }
+  });
+});
+
 test("production-hardened transport enforces authz and redacts configured secrets from denials and logs", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.production-hardening.v1";

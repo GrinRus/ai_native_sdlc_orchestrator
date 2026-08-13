@@ -22,8 +22,9 @@ runtime-root override.
 
 W67 adds intent-first onboarding:
 
-- `POST /api/projects/:projectId/intent-submissions` stores text and bounded
-  text attachments and queues read-only AI preparation;
+- `POST /api/projects/:projectId/intent-submissions` stores text, bounded text
+  attachments, and optional pinned repository-Markdown sources, then queues
+  read-only AI preparation;
 - `GET /api/projects/:projectId/intent-submissions` lists durable submissions
   for resume after reload without initializing runtime state;
 - `GET /api/projects/:projectId/intent-submissions/:submissionId` reads the

@@ -185,7 +185,7 @@ test.describe.serial("installed local operator console", () => {
     await blockExternalNetwork(page, state.app_url);
     const submissionId = "intent.browser-proof";
     const actions = [];
-    const submission = { submission_id: submissionId, status: "prepared", attachments: [{ original_name: "requirements.md" }] };
+    const submission = { submission_id: submissionId, status: "prepared", attachments: [{ original_name: "requirements.md" }], markdown_sources: [{ project_relative_path: "docs/requirements.md", stale: false }] };
     let report = {
       status: "prepared", revision: 1, title: "Fix timeout handling", outcome: "Make authorization timeout behavior deterministic.",
       constraints: ["Do not change authentication semantics."], acceptance: ["Timeout behavior is covered by tests."],
@@ -200,6 +200,7 @@ test.describe.serial("installed local operator console", () => {
       const payload = route.request().postDataJSON();
       expect(payload.request_text).toContain("timeout");
       expect(payload.attachments).toEqual([{ name: "requirements.md", content: "Acceptance from file" }]);
+      expect(payload.markdown_sources).toEqual([{ project_relative_path: "docs/requirements.md" }]);
       await route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission: { ...submission, status: "submitted" }, status_ref: `/api/projects/${state.project_id}/intent-submissions/${submissionId}` }) });
     });
     await page.route(item, (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ submission, normalization: report }) }));
@@ -218,6 +219,7 @@ test.describe.serial("installed local operator console", () => {
     });
     await page.goto(`${state.app_url}?surface=intent`);
     await page.getByLabel("Request").fill("Fix the authorization timeout.");
+    await page.getByLabel("Repository Markdown path").fill("docs/requirements.md");
     await page.getByLabel("Text attachments").setInputFiles({ name: "requirements.md", mimeType: "text/markdown", buffer: Buffer.from("Acceptance from file") });
     await page.getByRole("button", { name: "Prepare task" }).click();
     await expect(page.getByLabel("Task title")).toHaveValue("Fix timeout handling");
