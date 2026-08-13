@@ -29,7 +29,30 @@ function taskTitle(task) {
 }
 
 function sanitizeMarkdown(value) {
-  return String(value ?? "").replace(/<script[\s\S]*?>[\s\S]*?<\/script>/giu, "").replace(/<[^>]*>/gu, "");
+  const input = String(value ?? "");
+  let output = "";
+  let index = 0;
+  while (index < input.length) {
+    if (input[index] !== "<") {
+      output += input[index];
+      index += 1;
+      continue;
+    }
+
+    const remainder = input.slice(index).toLowerCase();
+    if (remainder.startsWith("<script")) {
+      const closingStart = remainder.indexOf("</script");
+      if (closingStart < 0) break;
+      const closingEnd = input.indexOf(">", index + closingStart + 2);
+      index = closingEnd < 0 ? input.length : closingEnd + 1;
+      continue;
+    }
+
+    const tagEnd = input.indexOf(">", index + 1);
+    if (tagEnd < 0) break;
+    index = tagEnd + 1;
+  }
+  return output;
 }
 
 function EmptyTaskState({ onNewTask }) {

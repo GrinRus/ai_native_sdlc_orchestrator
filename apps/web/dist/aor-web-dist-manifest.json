@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "c5dbfdd620ebf1a2e4c9a329da4a40e0dea62f2b9d96dfc85b3126cb46501c84",
+  "source_hash": "db25fe2ae8abcbbe1b58b723991dca1547a3a7ebaaa4e59a5796a0ee556739f7",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -44,12 +44,12 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-D9SCWDY4.css",
-    "apps/web/dist/assets/index-DuwramQH.js",
+    "apps/web/dist/assets/index-DSYmHBeC.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
     "apps/web/dist/assets/index-D9SCWDY4.css": "ec7182890e751e6a900f9f0506a4d43a5b21426628f3b74974f4d8c40eeae0ce",
-    "apps/web/dist/assets/index-DuwramQH.js": "d5b6b6a23ecdd2ac15b8f5604e8d223124175f3dc99496899eb41a58d1a69327",
-    "apps/web/dist/index.html": "9ea8293a683c5c5c85e6f239479e67a5e55182fb44ea79a8ae6883a1b5ed4f2e"
+    "apps/web/dist/assets/index-DSYmHBeC.js": "87b95c0d6e74e910b62c884bd662fd96643edd390b9da06c5537227881e8b49e",
+    "apps/web/dist/index.html": "0997bdfbac0e337768798841487f94d3a37616e2612a5940ead59b03e04a8390"
   }
 }
