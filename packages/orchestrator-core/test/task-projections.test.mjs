@@ -40,11 +40,24 @@ test("completed Flow projects to immutable completed Task without inventing a ne
   const task = projectTaskFromFlow({ projectId: "project-alpha", flow: {
     ...baseFlow,
     status: "completed",
+    closure_state: { review_status: "approved", verification_status: "passed", delivery_status: "complete", evidence_chain: ["evidence://closure/pass"] },
     primary_action: { action_id: "closure-complete", operator_control: null, reason: "Closed", available: false },
   } });
   assert.equal(task.status, "completed");
   assert.equal(task.completed_read_only, true);
   assert.equal(task.primary_action.available, false);
+  assert.equal(task.completion.status, "complete");
+  assert.equal(task.completion.immutable, true);
+});
+
+test("partial completion evidence remains blocked instead of rendering success", () => {
+  const task = projectTaskFromFlow({ projectId: "project-alpha", flow: {
+    ...baseFlow,
+    status: "completed",
+    closure_state: { review_status: "approved", verification_status: "partial", delivery_status: "complete" },
+  } });
+  assert.equal(task.completion.status, "blocked");
+  assert.equal(task.completion.verification_status, "partial");
 });
 
 test("intent submissions project into draft, prepared, and attention Task states", () => {

@@ -371,7 +371,7 @@ export async function handleTaskAction({ request, response, params, registry, ru
   const payload = await readMutationPayload(request, response);
   if (!payload) return;
   const action = asString(payload.action);
-  if (!["confirm", "start", "pause", "resume", "cancel", "retry", "request"].includes(action)) {
+  if (!["confirm", "start", "pause", "resume", "cancel", "retry", "request", "follow-up"].includes(action)) {
     sendError(response, 400, "task.invalid_action", `Unsupported Task action '${action ?? "missing"}'.`);
     return;
   }
@@ -384,6 +384,36 @@ export async function handleTaskAction({ request, response, params, registry, ru
     return;
   }
   try {
+    if (task.completed_read_only === true && action !== "follow-up") {
+      sendError(response, 409, "task.completed_read_only", "Completed Tasks are immutable; create a follow-up Intent instead.");
+      return;
+    }
+    if (action === "follow-up") {
+      if (task.completed_read_only !== true) {
+        sendError(response, 409, "task.follow_up_requires_completion", "Follow-up Tasks can only be created from a completed Task.");
+        return;
+      }
+      const requestText = asString(payload.request_text);
+      if (!requestText) {
+        sendError(response, 400, "task.follow_up_text_required", "A follow-up Task requires request_text.");
+        return;
+      }
+      const result = createIntentSubmission({
+        registry,
+        projectId: params.projectId,
+        requestText,
+        attachments: [],
+        markdownSources: [],
+        autoPrepare: true,
+      });
+      sendJson(response, 202, {
+        task_id: task.task_id,
+        action,
+        intent_submission: result.submission,
+        readback: { durable: true, task_id: task.task_id, new_intent_submission_id: result.submission.submission_id, follow_up: true },
+      });
+      return;
+    }
     if (["confirm", "start"].includes(action)) {
       const submissionId = asString(task.lineage?.intent_submission_id);
       if (!submissionId) {
@@ -424,10 +454,6 @@ export async function handleTaskAction({ request, response, params, registry, ru
         },
         readback: { durable: true, task_id: task.task_id, flow_id: task.flow_id },
       });
-      return;
-    }
-    if (task.completed_read_only === true) {
-      sendError(response, 409, "task.completed_read_only", "Completed Tasks are immutable; create a follow-up Intent instead.");
       return;
     }
     const runId = task.run_ids?.[0];

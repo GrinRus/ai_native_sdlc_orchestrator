@@ -371,7 +371,6 @@ function resolveSourceLearningHandoffRefs(report) {
     ...collectNestedRefs(closureState).filter((ref) => ref.includes("learning-loop-handoff")),
   ]);
 }
-
 /**
  * @param {{
  *   cwd?: string,
@@ -435,6 +434,7 @@ function buildClosureProjection(options) {
     status: options.status,
     completed: options.status === "completed",
     completed_read_only: options.status === "completed",
+    review_status: asString(asRecord(closureState.review).status), verification_status: asString(asRecord(closureState.verification).status), delivery_status: asString(asRecord(closureState.delivery).status),
     follow_up_eligible: options.status === "completed" && sourceLearningHandoffRefs.length > 0,
     learning_status: asString(learning.status),
     source_run_id: asString(closureState.run_id),
@@ -538,7 +538,7 @@ function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) 
     intake_packet_ref: seed.packetRef,
     intake_body_ref: seed.bodyRef,
     latest_next_action_report_ref: reportEntry?.artifactRef ?? null,
-    evidence_refs: evidenceRefs,
+    evidence_refs: evidenceRefs, blockers,
     artifact_display_summaries: artifactDisplaySummariesForRefs(evidenceRefs, artifactSummaryByRef, selectedStage),
     writeback_policy: resolveWritebackPolicy(seed.body, report),
     mission_settings: missionSettings,
