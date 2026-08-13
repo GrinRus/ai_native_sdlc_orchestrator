@@ -4,8 +4,10 @@ The latest defined wave is W70. It is registered behind W69-S07 and the W66
 runner-output remediation plus qualification hold; it does not change the
 single-active-slice rule. The S20-S25 deterministic chain is closed, but W66-S09
 is now explicitly blocked by the required Anthropic provider cells' external
-runner quota failure; W67-W70 remain gated until the four-cell qualification
-closes.
+runner quota failure. W67-S01 entered through its explicit release-only
+qualification gate and the deterministic W67 lane plus W68-S01 through S03 are
+now complete. W68-S04 is the next Codex-only rehearsal slice; this does not
+close W66-S09, clear the audit hold, or open W69/W70.
 
 ## Purpose
 
@@ -70,6 +72,7 @@ Every slice in the shared backlog must include:
 - `primary_modules`
 - `hard_dependencies`
 - `external_blocker` when a non-dependency prerequisite intentionally keeps a slice blocked
+- `qualification_gate` when a narrowly scoped release-only exception permits deterministic work while a blocked qualification dependency remains open
 - `primary_user_story_surfaces`
 - `local_tasks`
 - `acceptance_criteria`
@@ -88,6 +91,10 @@ Use these states in the backlog docs:
 ## Dependency rules
 
 - Use **hard dependencies** when the slice cannot be accepted without another slice landing first.
+- A `qualification_gate` never changes the dependency graph. It only permits the
+  named slice to become ready or complete when every referenced hard dependency
+  is explicitly `blocked` with an external blocker. Release readiness, paid/live
+  qualification, and successor waves still require the dependency to be `done`.
 - Keep the shared backlog biased toward hard dependencies. Soft dependencies can live in local notes.
 - If a change modifies a contract and runtime behavior, put the contract-bearing slice first.
 - Keep development guidance and runtime context separate. Changes to `AGENTS.md` or `.agents/**` do not satisfy runtime-context work unless the matching AOR-owned runtime assets and contracts change too.

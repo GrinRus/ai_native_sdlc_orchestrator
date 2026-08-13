@@ -7,6 +7,8 @@ import test from "node:test";
 import {
   applySliceStateTransition,
   computeStateSyncChanges,
+  dependenciesDone,
+  dependenciesSatisfied,
   getSlicePlan,
   loadBacklogModel,
   parseMasterBacklog,
@@ -25,6 +27,7 @@ function buildSyntheticModel(defs, order) {
       state: def.state,
       hardDependencies: def.hardDependencies ?? [],
       externalBlocker: def.externalBlocker ?? null,
+      qualificationGate: def.qualificationGate ?? null,
       waveFile: def.waveFile ?? "docs/backlog/wave-0-implementation-slices.md",
       localTasks: [],
       acceptanceCriteria: [],
@@ -136,6 +139,62 @@ test("computeStateSyncChanges preserves blocked slices with explicit external bl
   assert.deepEqual(computeStateSyncChanges(model), []);
 });
 
+test("release-only qualification gate satisfies only a blocked external dependency", () => {
+  const model = buildSyntheticModel(
+    [
+      {
+        sliceId: "W66-S09",
+        state: "blocked",
+        externalBlocker: "Anthropic runner quota is unavailable.",
+      },
+      {
+        sliceId: "W67-S01",
+        state: "blocked",
+        hardDependencies: ["W66-S09"],
+        qualificationGate: { mode: "release-only", refs: ["W66-S09"] },
+      },
+      {
+        sliceId: "W67-S02",
+        state: "blocked",
+        hardDependencies: ["W67-S01"],
+      },
+    ],
+    ["W66-S09", "W67-S01", "W67-S02"],
+  );
+
+  assert.equal(dependenciesDone(model, "W67-S01"), false);
+  assert.equal(dependenciesSatisfied(model, "W67-S01"), true);
+  assert.equal(dependenciesSatisfied(model, "W67-S02"), false);
+  assert.deepEqual(
+    computeStateSyncChanges(model).map((change) => ({ sliceId: change.sliceId, nextState: change.nextState })),
+    [{ sliceId: "W67-S01", nextState: "ready" }],
+  );
+});
+
+test("qualification gate does not satisfy a dependency without an external blocker", () => {
+  const model = buildSyntheticModel(
+    [
+      {
+        sliceId: "W66-S09",
+        state: "blocked",
+      },
+      {
+        sliceId: "W67-S01",
+        state: "blocked",
+        hardDependencies: ["W66-S09"],
+        qualificationGate: { mode: "release-only", refs: ["W66-S09"] },
+      },
+    ],
+    ["W66-S09", "W67-S01"],
+  );
+
+  assert.equal(dependenciesSatisfied(model, "W67-S01"), false);
+  assert.equal(
+    computeStateSyncChanges(model).some((change) => change.sliceId === "W67-S01"),
+    false,
+  );
+});
+
 test("computeStateSyncChanges degrades ready slices with explicit external blockers", () => {
   const model = buildSyntheticModel(
     [
@@ -175,6 +234,50 @@ test("applySliceStateTransition requires force to bypass an explicit external bl
     () => applySliceStateTransition(model, "W0-S01", "done"),
     /Cannot set W0-S01 to done: external blocker remains:/,
   );
+});
+
+test("release-only qualification gate permits completion without marking dependency done", () => {
+  const rootDir = fs.mkdtempSync(path.join("/tmp", "aor-slice-cycle-"));
+  fs.mkdirSync(path.join(rootDir, "docs/backlog"), { recursive: true });
+  fs.writeFileSync(
+    path.join(rootDir, "docs/backlog/mvp-implementation-backlog.md"),
+    "| W66-S09 | Qualification | EPIC-0 | blocked | tests | none |\n| W67-S01 | Baseline | EPIC-0 | ready | docs | W66-S09 |\n",
+  );
+  fs.writeFileSync(
+    path.join(rootDir, "docs/backlog/wave-67-implementation-slices.md"),
+    "## W67-S01 — Baseline\n\n- **State:** ready\n- **Hard dependencies:** W66-S09\n",
+  );
+
+  const model = buildSyntheticModel(
+    [
+      {
+        sliceId: "W66-S09",
+        state: "blocked",
+        externalBlocker: "Anthropic runner quota is unavailable.",
+      },
+      {
+        sliceId: "W67-S01",
+        state: "ready",
+        hardDependencies: ["W66-S09"],
+        qualificationGate: { mode: "release-only", refs: ["W66-S09"] },
+        waveFile: "docs/backlog/wave-67-implementation-slices.md",
+      },
+    ],
+    ["W66-S09", "W67-S01"],
+  );
+  model.rootDir = rootDir;
+
+  assert.doesNotThrow(() => applySliceStateTransition(model, "W67-S01", "done"));
+  assert.match(
+    fs.readFileSync(path.join(rootDir, "docs/backlog/mvp-implementation-backlog.md"), "utf8"),
+    /\| W67-S01 \| Baseline \| EPIC-0 \| done \|/u,
+  );
+});
+
+test("loaded plan exposes the release-only qualification gate", () => {
+  const model = loadBacklogModel(process.cwd());
+  const plan = getSlicePlan(model, "W67-S01");
+  assert.deepEqual(plan.qualificationGate, { mode: "release-only", refs: ["W66-S09"] });
 });
 
 test("getSlicePlan returns local tasks and acceptance criteria for documented slice", () => {
@@ -222,6 +325,23 @@ test("slice plan preserves multiline Purpose, Changes, and Validation detail los
   assert.equal(task.changes, "Preserve nested detail, including wrapped lines.");
   assert.equal(task.validation, "Prove the parsed output is complete.");
   assert.match(task.markdown, /including wrapped lines\./u);
+});
+
+test("qualification gate parser accepts the documented YAML-shaped block", () => {
+  const content = `## W67-S01 — Gate fixture
+
+- **Epic:** EPIC-0
+- **State:** ready
+- **Hard dependencies:** W66-S09
+- **Qualification gate:**
+  - mode: release-only
+  - refs: W66-S09
+`;
+  const parsed = parseWaveSlices(content, "docs/backlog/wave-67-implementation-slices.md");
+  assert.deepEqual(parsed.get("W67-S01").qualificationGate, {
+    mode: "release-only",
+    refs: ["W66-S09"],
+  });
 });
 
 test("backlog model rejects title and epic drift with an actionable source", () => {

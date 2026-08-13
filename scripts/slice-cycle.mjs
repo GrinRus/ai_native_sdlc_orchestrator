@@ -75,6 +75,11 @@ function printPlan(plan) {
   if (plan.externalBlocker) {
     console.log(`External blocker: ${plan.externalBlocker}`);
   }
+  if (plan.qualificationGate) {
+    console.log(
+      `Qualification gate: mode=${plan.qualificationGate.mode}; refs=${plan.qualificationGate.refs.join(", ")}`,
+    );
+  }
 
   console.log("\nLocal tasks:");
   if (plan.localTasks.length === 0) {
@@ -115,13 +120,21 @@ function runPnpmScript(scriptName) {
 }
 
 function runGate() {
+  const sliceId = process.argv.slice(3).find((item) => /^W\d+-S\d+$/u.test(item)) ?? null;
+  if (sliceId) {
+    const model = loadBacklogModel(process.cwd());
+    const plan = getSlicePlan(model, sliceId);
+    console.log(`Running canonical gate for ${plan.sliceId} — ${plan.title}`);
+  }
   runPnpmScript("check");
-  console.log("Check gate passed: the canonical check pipeline completed each quality stage once.");
+  console.log(
+    `${sliceId ? `Slice gate passed for ${sliceId}` : "Check gate passed"}: the canonical check pipeline completed each quality stage once.`,
+  );
 }
 
 function executeTransition(args) {
-  const sliceId = args[0];
-  const nextState = args[1];
+  const sliceId = args.find((item) => /^W\d+-S\d+$/u.test(item));
+  const nextState = args.find((item) => VALID_STATES.has(item));
 
   if (!sliceId || !nextState) {
     throw new Error("transition requires SLICE_ID and STATE arguments.");
@@ -194,6 +207,7 @@ function executeNext(args) {
             wave_file: selection.slice.waveFile,
             hard_dependencies: selection.slice.hardDependencies,
             external_blocker: selection.slice.externalBlocker ?? null,
+            qualification_gate: selection.slice.qualificationGate ?? null,
           }
         : null,
       ready_candidates: selection.readyCandidates,
@@ -242,6 +256,7 @@ function executePlan(args) {
           wave_file: plan.waveFile,
           hard_dependencies: plan.hardDependencies,
           external_blocker: plan.externalBlocker ?? null,
+          qualification_gate: plan.qualificationGate ?? null,
           local_tasks: plan.localTasks,
           acceptance_criteria: plan.acceptanceCriteria,
           done_evidence: plan.doneEvidence,
@@ -287,10 +302,11 @@ function main() {
       return;
     }
     case "complete": {
-      if (args.length === 0) {
+      const sliceId = args.find((item) => /^W\d+-S\d+$/u.test(item));
+      if (!sliceId) {
         throw new Error("complete requires SLICE_ID argument.");
       }
-      executeTransition([args[0], "done", ...args.slice(1)]);
+      executeTransition([sliceId, "done", ...args.filter((item) => item !== sliceId)]);
       return;
     }
     case "sync-ready": {
