@@ -30,6 +30,10 @@
 .aor-alert[data-tone="warning"] { background: var(--aor-color-warning-bg); color: var(--aor-color-warning-fg); }
 .aor-alert[data-tone="danger"] { background: var(--aor-color-danger-bg); color: var(--aor-color-danger-fg); }
 .aor-card { border: 1px solid var(--aor-color-border-default); border-radius: var(--aor-radius-card); background: var(--aor-color-bg-surface); box-shadow: var(--aor-elevation-card); padding: var(--aor-space-4); }
+.aor-surface { min-width: 0; background: var(--aor-color-bg-surface); color: var(--aor-color-text-primary); }
+.aor-inspector { min-width: 0; border-inline-start: 1px solid var(--aor-color-border-default); padding-inline-start: var(--aor-space-4); }
+.aor-density-compact { gap: var(--aor-density-compact-gap); }
+.aor-density-relaxed { gap: var(--aor-density-relaxed-gap); }
 .aor-section { display: grid; gap: var(--aor-space-3); }
 .aor-section__heading { margin: 0; font-size: var(--aor-type-section-size); line-height: var(--aor-type-section-line); }
 .aor-empty { display: grid; gap: var(--aor-space-1); padding: var(--aor-space-5); text-align: center; color: var(--aor-color-text-secondary); }
