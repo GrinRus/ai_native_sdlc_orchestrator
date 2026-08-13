@@ -6416,6 +6416,26 @@ function App() {
     return payload;
   }
 
+  async function runTaskAction(task, action, payload = {}) {
+    if (!apiProjectBase || !task?.task_id || busy) return null;
+    setBusy(true); setError("");
+    try {
+      const result = await readJson(`${apiProjectBase}/tasks/${encodeURIComponent(task.task_id)}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      pushActivity(`task.${action}`, result.readback?.operator_request_ref ?? result.readback?.run_id ?? task.task_id);
+      await refresh({ silent: true });
+      return result;
+    } catch (taskError) {
+      setError(taskError instanceof Error ? taskError.message : String(taskError));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runPlanAction(action, payload = {}) {
     if (!apiProjectBase || !selectedFlow?.flow_id || busy) return;
     const scopeKey = `${apiProjectBase}:${selectedFlow.flow_id}`;
@@ -6727,6 +6747,9 @@ function App() {
             selectedTaskId={selectedTaskId}
             onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
             onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
+            onTaskAction={runTaskAction}
+            actionBusy={busy}
+            actionError={error}
             onRefresh={() => refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)))}
             connectionState={connectionState}
             resourceError={resourceErrors.taskPayload}

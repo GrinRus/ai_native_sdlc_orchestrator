@@ -992,6 +992,20 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(taskDetailPayload.task_id, guidedTask.task_id);
       assert.equal(taskDetailPayload.read_only, true);
 
+      const taskRequestResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(guidedTask.task_id)}/actions`,
+        {
+          action: "request",
+          request_text: "Inspect the bounded discovery blocker without writing to the checkout.",
+        },
+      );
+      assert.equal(taskRequestResponse.status, 201);
+      const taskRequestPayload = await taskRequestResponse.json();
+      assert.equal(taskRequestPayload.readback.durable, true);
+      assert.equal(taskRequestPayload.readback.task_id, guidedTask.task_id);
+      assert.equal(taskRequestPayload.operator_request.document.target_flow_id, guidedTask.flow_id);
+      assert.equal(Object.hasOwn(taskRequestPayload.operator_request.document, "request_text"), false);
+
       const missingTaskResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks/task.missing`);
       assert.equal(missingTaskResponse.status, 404);
       assert.equal((await missingTaskResponse.json()).error.code, "task.not_found");

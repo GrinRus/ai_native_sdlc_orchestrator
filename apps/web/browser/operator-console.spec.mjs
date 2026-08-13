@@ -351,7 +351,7 @@ test.describe.serial("installed local operator console", () => {
       source_items: [], lifecycle_path: { owner: "runtime", steps: [{ id: "discovery", state: "current" }] }, current_step: "discovery", current_step_label: "Discover",
       attention_count: 0, blocker_count: 0, evidence_refs: ["evidence://intent/task-fixture"],
       primary_action: { action_id: "task.prepare", operator_control: "Prepare", reason: "Ready", available: true },
-      runner_selection: { source: "project-default", route_id: "route.implement.simulation", readiness: "ready" }, updated_at: "2026-08-13T00:00:00.000Z", completed_read_only: false, read_only: true,
+      runner_selection: { source: "project-default", route_id: "route.implement.simulation", readiness: "ready" }, run_ids: [], updated_at: "2026-08-13T00:00:00.000Z", completed_read_only: false, read_only: true,
     };
     const taskVariants = [
       task,
@@ -362,18 +362,29 @@ test.describe.serial("installed local operator console", () => {
     ];
     await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true } }) }));
     await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, selected_task_id: task.task_id, active_task_ids: taskVariants.filter((entry) => entry.status !== "completed").map((entry) => entry.task_id), prepared_task_ids: [taskVariants[2].task_id], completed_task_ids: [taskVariants[4].task_id], tasks: taskVariants, read_only: true }) }));
+    let taskActionPayload = null;
+    await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/actions$`, "u"), async (route) => {
+      const request = route.request();
+      const payload = JSON.parse(request.postData() || "{}");
+      taskActionPayload = payload;
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ task_id: task.task_id, action: payload.action, operator_request: { request_id: "request.task-workspace.fixture", operator_request_ref: "evidence://operator-requests/task-workspace.fixture", status: "queued", document: { target_flow_id: task.flow_id } }, readback: { durable: true, task_id: task.task_id, flow_id: task.flow_id } }) });
+    });
     await page.goto(state.app_url);
     await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Prepare a safe Task Workspace/u })).toBeVisible();
     await expect(page.locator(".task-workspace__card").filter({ hasText: "Draft task" }).locator(".aor-status")).toHaveText("Draft");
     await expect(page.locator(".task-workspace__card").filter({ hasText: "Ready task" }).locator(".aor-status")).toHaveText("Ready");
     await expect(page.locator(".task-workspace__card").filter({ hasText: "Completed task" }).locator(".aor-status")).toHaveText("Completed");
+    const taskScreenNav = page.getByLabel("Task screens");
     await page.getByRole("button", { name: /Prepare a safe Task Workspace/u }).click();
     await expect(page.getByRole("heading", { name: "Prepared Task" })).toBeVisible();
+    await taskScreenNav.getByRole("button", { name: "Active Task Workspace", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
+    await page.getByRole("button", { name: "Request retry", exact: true }).click();
+    await expect.poll(() => taskActionPayload?.action).toBe("retry");
     await page.reload();
     await expect(page).toHaveURL(/surface=tasks/u);
     await expect(page.getByRole("heading", { name: "Prepared Task" })).toBeVisible();
-    const taskScreenNav = page.getByLabel("Task screens");
     for (const screen of ["New Task", "Markdown Sources", "Prepared Task", "Active Task Workspace", "Attention", "Review Changes", "Completion & Evidence"]) {
       await taskScreenNav.getByRole("button", { name: screen, exact: true }).click();
       await expect(page.getByRole("heading", { name: screen })).toBeVisible();

@@ -16,7 +16,7 @@ const baseFlow = {
   current_step_label: "Discover",
   attention_count: 2,
   blocker_count: 1,
-  evidence_refs: ["evidence://projects/project-alpha/packets/intent.json"],
+  evidence_refs: ["evidence://projects/project-alpha/packets/intent.json", "run://run.task-projection.v1", "run.task-projection.v1"],
   primary_action: { action_id: "discovery-run", operator_control: "Run discovery", reason: "Ready", available: true },
   updated_at: "2026-08-13T10:00:00.000Z",
 };
@@ -32,6 +32,7 @@ test("Task projection has stable lineage identity and delegates lifecycle to Flo
   });
   assert.equal(task.lifecycle_path.owner, "runtime");
   assert.equal(task.primary_action.operator_control, "Run discovery");
+  assert.deepEqual(task.run_ids, ["run.task-projection.v1"]);
   assert.equal(task.read_only, true);
 });
 

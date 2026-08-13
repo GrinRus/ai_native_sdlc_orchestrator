@@ -14,6 +14,7 @@ import {
   handleFolderPickerAction,
   handleIntentSubmissionAction,
   handleIntentSubmissionCreate,
+  handleTaskAction,
   handleProjectTopologyAction,
   handleExecutionProfileAction,
   handleRunControlAction,
@@ -287,6 +288,10 @@ export function createControlPlaneHttpServer(options) {
       }
       if (route.id === "intent-submission-actions") {
         await handleIntentSubmissionAction({ request, response, params, registry });
+        return;
+      }
+      if (route.id === "task-actions") {
+        await handleTaskAction({ request, response, params, registry, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
       if (route.id === "project-topology-actions") {
