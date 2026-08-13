@@ -29,6 +29,13 @@ Each primary or fallback candidate may optionally declare `model` and
 `reasoning_effort`. When omitted, the selected external runtime owns its native
 default; provider-specific flags must remain inside the adapter profile.
 
+Isolated rehearsal materialization records a query-safe selection readback
+beside the generated route assets. The readback carries `requested_model`,
+`requested_reasoning_effort`, and a source (`profile`, `provider-variant`, or
+`runner-default`), plus SHA-256 digests for the source and generated route
+files. These digests prove that run-scoped route generation did not mutate the
+source profile or silently change an unselected provider variant.
+
 Strict live or write-capable routes may add `required_output_schema_ref` and
 `required_output_mode`. When present, the selected adapter must explicitly
 declare the schema ref in `supported_schema_refs[]` and the mode in

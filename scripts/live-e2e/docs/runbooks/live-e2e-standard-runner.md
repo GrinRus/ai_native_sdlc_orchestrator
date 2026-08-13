@@ -263,6 +263,13 @@ The Codex Luna/high rehearsal profile demonstrates this path without changing
 the active W66 qualification baseline. Legacy `default_args` are suppressed
 only in that explicitly selected run-scoped asset copy.
 
+Run-scoped materialization also writes a query-safe selection readback into the
+public run artifact projection. It contains requested model/effort, source
+(`profile`, `provider-variant`, or `runner-default`), and SHA-256 digests for
+source/generated adapter and route assets. The readback is deterministic
+preflight evidence, not provider qualification evidence; it must not expose
+raw commands, credentials, auth homes, or private absolute paths.
+
 Do not enable Claude `--bare` by default for live E2E Claude profiles while
 local runs rely on host Claude auth. Current Claude `--bare` skips OAuth/keychain
 auth and requires `ANTHROPIC_API_KEY` or explicit settings, while the local

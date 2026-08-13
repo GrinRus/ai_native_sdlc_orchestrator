@@ -4425,6 +4425,22 @@ export function executeInstalledUserFlow(options) {
       generatedAssetsRoot: path.join(options.layout.stateRoot, "live-e2e-assets", normalizeId(options.runId)),
     });
     artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
+    artifacts.live_e2e_runtime_selection = hostAssets.runtimeSelection;
+    artifacts.live_e2e_selection_readback = {
+      selection: hostAssets.runtimeSelection
+        ? {
+            requested_model: hostAssets.runtimeSelection.model,
+            requested_reasoning_effort: hostAssets.runtimeSelection.reasoning_effort,
+            source: hostAssets.runtimeSelection.source,
+          }
+        : {
+            requested_model: null,
+            requested_reasoning_effort: null,
+            source: "runner-default",
+          },
+      adapter: hostAssets.liveE2eAdapterDefaults,
+      routes: hostAssets.providerRoutes.route_digests ?? {},
+    };
 
     const generatedProfile = materializeGeneratedProjectProfile({
       hostRoot: options.hostRoot,
@@ -5423,10 +5439,16 @@ function executeFullJourneyFlowImplementation(options) {
     });
     artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
     artifacts.live_e2e_adapter_defaults = hostAssets.liveE2eAdapterDefaults;
+    artifacts.live_e2e_runtime_selection = hostAssets.runtimeSelection;
 
     const providerRoutes = hostAssets.providerRoutes;
     artifacts.provider_route_override_files = providerRoutes.routeFiles;
     artifacts.provider_route_overrides = providerRoutes.routeOverrides;
+    artifacts.live_e2e_selection_readback = {
+      selection: providerRoutes.runtime_selection,
+      adapter: hostAssets.liveE2eAdapterDefaults,
+      routes: providerRoutes.route_digests ?? {},
+    };
     const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
     const providerPolicies = hostAssets.providerPolicies;
     artifacts.provider_policy_override_files = providerPolicies.policyFiles;

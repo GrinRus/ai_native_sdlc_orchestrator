@@ -630,6 +630,11 @@ acceptance, bounded output repair, explicit quality-repair retry, structured
 artifact/evaluator consumers, and adversarial replay proof. All W66-S09 evidence
 predating this chain remains diagnostic-only for final wave closure.
 
+W68-W70 use a separate development-acceptance lane: deterministic contracts,
+fixtures, static/API parity, and local browser proof may close these slices
+without provider execution. `W66-S09` remains a release-only blocker and its
+hold/readiness state is not changed by code-only completion.
+
 ## W67 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
@@ -645,32 +650,32 @@ predating this chain remains diagnostic-only for final wave closure.
 | W68-S01 | Contract and migration baseline for runtime selection | EPIC-0, EPIC-3, EPIC-4 | done | route/adapter/execution contracts, examples, focused tests | W67-S05 |
 | W68-S02 | Runtime resolution and adapter argument mapping | EPIC-3, EPIC-4 | done | provider-routing, adapter SDK, step-result evidence, tests | W68-S01 |
 | W68-S03 | Runtime selection projection and presets | EPIC-1, EPIC-3, EPIC-6 | done | execution profile/readiness projections, CLI/API/web fixtures | W68-S02 |
-| W68-S04 | Live E2E selection and Codex Luna/high rehearsal | EPIC-0, EPIC-4, EPIC-7 | ready | private live profiles/materialization, runbook, proof tests | W68-S02 |
-| W68-S05 | Cutover, certification, and docs closure | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification ledger, runbooks, root gates | W68-S03, W68-S04 |
+| W68-S04 | Deterministic runtime-selection materialization | EPIC-0, EPIC-4, EPIC-7 | done | run-scoped profiles/materialization, query-safe readback, deterministic proof tests | W68-S02 |
+| W68-S05 | Code-only certification hold and docs closure | EPIC-0, EPIC-4, EPIC-7 | done | frozen fixture matrix, reversible hold ledger, runbooks, root gates | W68-S03, W68-S04 |
 
 ## W69 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W69-S01 | Intent confirmation CAS and contract parity | EPIC-0, EPIC-1, EPIC-2, EPIC-6 | blocked | intent contracts, control-plane API/OpenAPI, intent service, HTTP handlers | W68-S05 |
-| W69-S02 | Runtime-owned Flow projection and adaptive lifecycle | EPIC-0, EPIC-1, EPIC-6 | blocked | flow path/projection, next-action read model, OpenAPI, projection tests | W69-S01 |
-| W69-S03 | Project Home resume-safe navigation | EPIC-1, EPIC-6 | blocked | SPA surface state, Project Home, control-plane client, browser tests | W69-S02 |
-| W69-S04 | Review-first Prepared Task | EPIC-1, EPIC-2, EPIC-6 | blocked | intent onboarding, UI primitives/tokens, browser tests | W69-S01, W69-S03 |
-| W69-S05 | Flow Cockpit context and runtime path presentation | EPIC-1, EPIC-3, EPIC-6, EPIC-7 | blocked | Flow Cockpit, QuietShell, quiet modes, responsive styles, browser tests | W69-S02, W69-S03, W69-S04 |
-| W69-S06 | Incremental SPA decomposition and semantic visual cleanup | EPIC-0, EPIC-6, EPIC-7 | blocked | SPA surface composition, UI tokens/components, CSS, parity tests | W69-S05 |
-| W69-S07 | Visual proof, story traceability, and closure | EPIC-0, EPIC-4, EPIC-7 | blocked | browser/reference tests, product/backlog docs, qualification runbook | W69-S06 |
+| W69-S01 | Intent confirmation CAS and contract parity | EPIC-0, EPIC-1, EPIC-2, EPIC-6 | done | intent contracts, control-plane API/OpenAPI, intent service, HTTP handlers | W68-S05 |
+| W69-S02 | Runtime-owned Flow projection and adaptive lifecycle | EPIC-0, EPIC-1, EPIC-6 | done | flow path/projection, next-action read model, OpenAPI, projection tests | W69-S01 |
+| W69-S03 | Project Home resume-safe navigation | EPIC-1, EPIC-6 | done | SPA surface state, Project Home, control-plane client, browser tests | W69-S02 |
+| W69-S04 | Review-first Prepared Task | EPIC-1, EPIC-2, EPIC-6 | done | intent onboarding, UI primitives/tokens, browser tests | W69-S01, W69-S03 |
+| W69-S05 | Flow Cockpit context and runtime path presentation | EPIC-1, EPIC-3, EPIC-6, EPIC-7 | done | Flow Cockpit, QuietShell, quiet modes, responsive styles, browser tests | W69-S02, W69-S03, W69-S04 |
+| W69-S06 | Incremental SPA decomposition and semantic visual cleanup | EPIC-0, EPIC-6, EPIC-7 | done | SPA surface composition, UI tokens/components, CSS, parity tests | W69-S05 |
+| W69-S07 | Visual proof, story traceability, and closure | EPIC-0, EPIC-4, EPIC-7 | done | browser/reference tests, product/backlog docs, qualification runbook | W69-S06 |
 
 ## W70 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W70-S01 | Task Workspace product, screen, and migration baseline | EPIC-0, EPIC-1, EPIC-6 | blocked | product design, screen assets, migration map, story matrix | W69-S07 |
-| W70-S02 | Task runner override and Markdown source contracts | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | intent/execution/Flow contracts, API/OpenAPI, examples, validators | W70-S01 |
-| W70-S09 | Task Workspace live E2E proof harness baseline | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | blocked | private proof contract, browser scenario collector, guided profiles, proof tests/runbooks | W70-S02 |
-| W70-S03 | Task shell, Home, and resumable task list | EPIC-1, EPIC-6 | blocked | web shell/routing, task projections, client, list components, browser tests | W70-S09 |
-| W70-S04 | New Task, Markdown Sources, and Prepared Task | EPIC-1, EPIC-2, EPIC-6 | blocked | task composer, Markdown picker/preview, prepared review, runner picker | W70-S02, W70-S03 |
-| W70-S05 | Active Task Workspace and durable guidance | EPIC-3, EPIC-4, EPIC-6 | blocked | task workspace, live events, controls, operator requests, task tabs | W70-S04 |
-| W70-S06 | Attention, change review, and completion evidence | EPIC-4, EPIC-5, EPIC-6 | blocked | attention, diff/Markdown review, delivery/evidence completion, browser tests | W70-S05 |
-| W70-S07 | Design-system implementation and legacy UI retirement | EPIC-0, EPIC-6 | blocked | UI tokens/components, responsive CSS, legacy sources/assets, ratchets | W70-S06 |
-| W70-S08 | Installed Task Workspace proof and story closure | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | blocked | installed browser scenarios, product/story docs, runbooks, package proof | W70-S07 |
+| W70-S01 | Task Workspace product, screen, and migration baseline | EPIC-0, EPIC-1, EPIC-6 | done | product design, screen assets, migration map, story matrix | W69-S07 |
+| W70-S02 | Task runner override and Markdown source contracts | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | done | intent/execution/Flow contracts, API/OpenAPI, examples, validators | W70-S01 |
+| W70-S09 | Task Workspace deterministic browser proof harness baseline | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | done | private proof contract, fixture server, browser scenario collector, proof tests/runbooks | W70-S02 |
+| W70-S03 | Task shell, Home, and resumable task list | EPIC-1, EPIC-6 | done | web shell/routing, task projections, client, list components, browser tests | W70-S09 |
+| W70-S04 | New Task, Markdown Sources, and Prepared Task | EPIC-1, EPIC-2, EPIC-6 | done | task composer, Markdown picker/preview, prepared review, runner picker | W70-S02, W70-S03 |
+| W70-S05 | Active Task Workspace and durable guidance | EPIC-3, EPIC-4, EPIC-6 | done | task workspace, live events, controls, operator requests, task tabs | W70-S04 |
+| W70-S06 | Attention, change review, and completion evidence | EPIC-4, EPIC-5, EPIC-6 | done | attention, diff/Markdown review, delivery/evidence completion, browser tests | W70-S05 |
+| W70-S07 | Design-system implementation and legacy UI retirement | EPIC-0, EPIC-6 | done | UI tokens/components, responsive CSS, legacy sources/assets, ratchets | W70-S06 |
+| W70-S08 | Installed Task Workspace proof and story closure | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | done | installed browser scenarios, product/story docs, runbooks, package proof | W70-S07 |
 
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work

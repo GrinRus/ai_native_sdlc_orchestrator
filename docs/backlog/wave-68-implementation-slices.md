@@ -21,13 +21,19 @@ qualify the cutover without rewriting historical W66 evidence.
 
 ## Current deterministic checkpoint
 
-W68-S01 through W68-S03 are complete on the current source baseline. W68-S04
-is the next ready slice for an isolated Codex `gpt-5.6-luna`/`high` rehearsal;
-Claude and Qwen live or paid runs remain intentionally deferred. Deterministic
-Claude/Qwen format, malformed-output, capability, and no-spawn fixtures remain
-part of the completed contract and adapter gates. W66-S09 stays blocked and
-production readiness remains `audit-hold` until the fresh four-cell W66 matrix
-is rerun after the Anthropic quota blocker is removed.
+W68-S01 through W68-S05 are complete on the current source baseline through
+deterministic materialization and a reversible code-only hold; Claude, Qwen,
+and Codex live or paid runs remain intentionally deferred. Deterministic
+provider-format, malformed-output, capability, and no-spawn fixtures remain
+part of the contract and adapter gates. W66-S09 stays blocked and production
+readiness remains `audit-hold` until the fresh four-cell W66 matrix is rerun
+after the Anthropic quota blocker is removed.
+
+The deterministic W68-S04 implementation also emits a query-safe selection
+readback for each generated asset set. It records the selected model/effort,
+selection source, source adapter digest, and source/generated route digests;
+the remaining rehearsal evidence is explicitly deferred until a provider run
+is authorized.
 
 Model and reasoning-effort values remain adapter-owned opaque stable strings;
 AOR does not invent a cross-provider quality scale. Provider-neutral presets
@@ -254,15 +260,16 @@ backward-compatible nulls when no explicit selection is present.
 
 - New runtime stores or provider-specific flags in core.
 
-## W68-S04 — Live E2E selection and Codex Luna/high rehearsal
+## W68-S04 — Deterministic runtime-selection materialization
 
-- **State:** ready
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W68-S02
 - **Primary modules:** private live profiles/materialization, runbook, proof tests
 
-**Purpose:** Let a live profile select a concrete model and effort while keeping
-  generated assets isolated and no-write by default.
+**Purpose:** Materialize and prove a concrete model and effort selection
+  deterministically while keeping generated assets isolated and no-write by
+  default. Provider execution is not part of development acceptance.
 
 **Changes:** materialize profile/provider runtime selection into pinned routes;
   suppress legacy adapter `default_args` only for an explicitly selected live
@@ -294,13 +301,12 @@ model defaults, and other provider variants remain unchanged.
      selection/readiness/readback.
    - Validation: Unsupported, unavailable, duplicate-argument, stale, and
      secret/path canary scenarios fail closed.
-4. **Run one bounded isolated rehearsal.**
-   - Purpose: Establish real evidence for the selected runtime path before
-     cutover certification.
-   - Changes: Execute the approved no-upstream-write profile from an isolated
-     install and retain path-neutral evidence.
-   - Validation: Actual requested/effective/source selection, schema acceptance,
-     terminal health, and unchanged primary/upstream state are proven.
+4. **Freeze the deterministic rehearsal substitute.**
+   - Purpose: Keep development acceptance independent from provider availability.
+   - Changes: Record fixture-only materialization/readback evidence and the
+     explicit release-qualification follow-up without invoking a provider.
+   - Validation: Static, contract, and local browser gates prove selection,
+     schema/readiness, no-write, and query-safety behavior.
 
 ### Acceptance criteria
 
@@ -311,36 +317,37 @@ model defaults, and other provider variants remain unchanged.
    unchanged.
 4. The installed journey exposes truthful selected/default/readiness state and
    durable readback.
-5. The bounded rehearsal writes neither primary source nor upstream and retains
-   no credential or private runtime path in committed evidence.
+5. Deterministic fixtures and local browser proof contain no credential, private
+   runtime path, or provider execution claim.
 
 ### Done evidence
 
 - Isolated live-E2E materialization and route snapshots.
 - Deterministic preflight/browser matrix.
-- Path-neutral bounded rehearsal evidence index.
+- Path-neutral deterministic materialization evidence index and release
+  qualification follow-up.
 
 ### Out of scope
 
 - Promoting the profile to the required W66 qualification matrix.
 
-## W68-S05 — Cutover, certification, and docs closure
+## W68-S05 — Code-only certification hold and docs closure
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W68-S03, W68-S04
 - **Primary modules:** qualification ledger, runbooks, root gates
 
-**Purpose:** Certify the new selection path and decide whether the default
-  Codex live profile can move from the legacy pinned model to the runtime-native
-  policy.
+**Purpose:** Close deterministic implementation and record a reversible hold;
+  provider certification and default cutover remain a separate release lane.
 
-**Changes:** run isolated medium/large Codex rehearsals, record qualification
-  evidence, remove migrated hidden defaults only after evidence closure, and
-  update runbooks/README/backlog status.
+**Changes:** freeze a deterministic compatibility manifest, record a hold
+  decision with rollback metadata, and update runbooks/README/backlog status
+  without removing legacy defaults or running a provider.
 
-**Validation:** deterministic gates, focused live-E2E proof, and a ledger-linked
-cutover decision. No upstream writes or mutation of historical evidence.
+**Validation:** deterministic fixtures, local browser proof, and a
+ledger-linked reversible hold decision. No provider execution, upstream writes,
+or mutation of historical evidence.
 
 ### Local tasks
 
@@ -350,12 +357,13 @@ cutover decision. No upstream writes or mutation of historical evidence.
    - Changes: Pin AOR/target commits, profile and adapter digests, selected
      schema, model/effort, output mode, scenarios, and no-write policy.
    - Validation: Manifest validation rejects drift or mixed-commit evidence.
-2. **Run the bounded Codex certification cells.**
-   - Purpose: Compare medium and large behavior before default cutover.
-   - Changes: Execute isolated installed profiles sequentially with fresh IDs
-     and full selection/output/health evidence.
-   - Validation: Both cells meet the frozen manifest and ADR 0022 acceptance;
-     any product fix restarts the affected certification set.
+2. **Run deterministic compatibility cells.**
+   - Purpose: Compare explicit, omitted, unsupported, and mismatched selection
+     behavior before any release cutover.
+   - Changes: Execute fixture-only cells for Codex, Claude, Qwen, mock, and
+     custom adapters with no provider invocation.
+   - Validation: Every cell meets the frozen manifest and ADR 0022 preflight
+     acceptance; any product fix restarts the affected cell set.
 3. **Record the reversible cutover decision.**
    - Purpose: Remove hidden defaults only when evidence supports the new path.
    - Changes: Update the qualification ledger with promote/hold decision,
@@ -372,19 +380,22 @@ cutover decision. No upstream writes or mutation of historical evidence.
 
 ### Acceptance criteria
 
-1. Certification uses one frozen AOR/target/profile/schema manifest.
-2. Medium and large Codex evidence carries truthful requested/effective/source
-   selection and accepted output contracts.
-3. Hidden defaults are removed only after a ledger-linked promote decision.
-4. Hold leaves the prior default intact and records an explicit next action.
-5. Cutover is reversible without changing historical W66 evidence or writing
+1. Deterministic certification uses one frozen AOR/profile/schema manifest.
+2. Matrix evidence carries truthful requested/effective/source selection and
+   accepted output contracts without provider execution.
+3. Hidden defaults remain intact until a future ledger-linked live promote
+   decision.
+4. Hold leaves the prior default intact and records an explicit release next
+   action.
+5. The future cutover is reversible without changing historical W66 evidence or writing
    upstream.
 6. Focused, root, package, reference, and slice gates pass.
 
 ### Done evidence
 
-- Frozen certification manifest and two accepted cell indexes.
-- Qualification ledger promote/hold and rollback decision.
+- Frozen deterministic certification manifest and complete compatibility-cell
+  index (all cells are fixture-only and not-run against providers).
+- Qualification ledger hold and rollback decision preserving the prior default.
 - Root, package, reference, and slice-gate output.
 
 ### Out of scope

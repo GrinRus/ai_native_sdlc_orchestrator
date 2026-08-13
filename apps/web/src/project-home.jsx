@@ -25,7 +25,7 @@ function statusTone(flow) {
   return "success";
 }
 
-export function ProjectHome({ project, flows = [], activeFlow, resumableIntent, onOpenFlow, onNewIntent, onResumeIntent, pending = false }) {
+export function ProjectHome({ project, flows = [], activeFlow, resumableIntent, onOpenFlow, onNewIntent, onResumeIntent, onOpenTasks, pending = false }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const visibleFlows = useMemo(() => flows.filter((flow) => {
@@ -36,7 +36,7 @@ export function ProjectHome({ project, flows = [], activeFlow, resumableIntent, 
   return <section className="project-home aor-ui" aria-label="Project Home">
     <header className="project-home__header">
       <div><p className="mission-eyebrow">Project Home</p><h1>{project?.display_name || project?.project_id || "Your project"}</h1><p>Continue an active Flow or start with a new user intent.</p></div>
-      <Button variant="primary" onClick={onNewIntent}>New intent</Button>
+      <div><Button variant="secondary" onClick={onOpenTasks}>Tasks</Button> <Button variant="primary" onClick={onNewIntent}>New intent</Button></div>
     </header>
     {resumableIntent ? <Card className="project-home__recovery"><div><strong>Resume prepared intent</strong><p>{resumableIntent.normalization?.title || resumableIntent.submission?.request_text || "A saved task is waiting for review."}</p></div><Button onClick={() => onResumeIntent(resumableIntent)}>Resume</Button></Card> : null}
     {activeFlow ? <Card className="project-home__active"><div><span className="project-home__eyebrow">{statusLabel(activeFlow) === "Active" ? "Active Flow" : "Flow needs attention"}</span><h2>{flowTitle(activeFlow)}</h2><p>{activeFlow.next_action_summary || "Review the next safe action in the Cockpit."}</p><div className="project-home__meta"><StatusBadge tone={statusTone(activeFlow)}>{statusLabel(activeFlow)}</StatusBadge><span>{activeFlow.work_type || "work"}</span><span>{stepLabel(activeFlow)}</span></div></div><Button variant="primary" onClick={() => onOpenFlow(activeFlow.flow_id)}>Continue Flow</Button></Card> : null}

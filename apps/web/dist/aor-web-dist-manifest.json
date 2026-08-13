@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "1c3870dcdfd2672f0e63d55f04f7b07fa86f768cc1ba6ac463fa13efc5405c49",
+  "source_hash": "c5dbfdd620ebf1a2e4c9a329da4a40e0dea62f2b9d96dfc85b3126cb46501c84",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -34,6 +34,8 @@
     "apps/web/src/quiet-shell.jsx",
     "apps/web/src/spa.css",
     "apps/web/src/spa.jsx",
+    "apps/web/src/task-workspace.css",
+    "apps/web/src/task-workspace.jsx",
     "apps/web/src/ui/components.css",
     "apps/web/src/ui/components.jsx",
     "apps/web/src/ui/semantics.js",
@@ -41,13 +43,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-BegNuobp.css",
-    "apps/web/dist/assets/index-rAiyHqOY.js",
+    "apps/web/dist/assets/index-D9SCWDY4.css",
+    "apps/web/dist/assets/index-DuwramQH.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-BegNuobp.css": "50cbfcdba0eaf0c7fc89578a9ab540b7f2a1925fe75c707aff51ff7720fac852",
-    "apps/web/dist/assets/index-rAiyHqOY.js": "0d98477fc612dcc37c7b6d3c1b6e6290d857cf0056f9b751c88cc24774087c58",
-    "apps/web/dist/index.html": "a7ae7fea19251932641edf2beabc82475b3425ceb452ce5990e4c980fb25801c"
+    "apps/web/dist/assets/index-D9SCWDY4.css": "ec7182890e751e6a900f9f0506a4d43a5b21426628f3b74974f4d8c40eeae0ce",
+    "apps/web/dist/assets/index-DuwramQH.js": "d5b6b6a23ecdd2ac15b8f5604e8d223124175f3dc99496899eb41a58d1a69327",
+    "apps/web/dist/index.html": "9ea8293a683c5c5c85e6f239479e67a5e55182fb44ea79a8ae6883a1b5ed4f2e"
   }
 }

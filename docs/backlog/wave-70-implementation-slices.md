@@ -5,11 +5,12 @@
 Replace the internal-object-first console presentation with the Task Workspace
 target in `docs/product/08-task-workspace-console-design.md`. W70 begins after
 W69 closure, remains headless-first, and preserves runtime-owned actions,
-evidence, safety, and completed-history immutability.
+evidence, safety, and completed-history immutability. Development acceptance is
+deterministic and local-browser only; it does not claim provider qualification.
 
 ## W70-S01 — Task Workspace product, screen, and migration baseline
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-6
 - **Hard dependencies:** W69-S07
 - **Primary modules:** product design, screen assets, migration map, story matrix
@@ -52,7 +53,7 @@ Quiet Cockpit surfaces to Task Workspace; retire obsolete screenshot assets.
 
 ## W70-S02 — Task runner override and Markdown source contracts
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W70-S01
 - **Primary modules:** intent submission/normalization, execution profile, Flow projection, control-plane API/OpenAPI, examples, validators
@@ -99,7 +100,7 @@ CAS; backward-compatible attachment and route-default behavior.
 
 ## W70-S03 — Task shell, Home, and resumable task list
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-6
 - **Hard dependencies:** W70-S09
 - **Primary modules:** web routing/shell, task projections, control-plane client, list components, browser tests
@@ -141,9 +142,9 @@ states, and a compact Project destination.
 
 - Cross-project portfolio orchestration.
 
-## W70-S09 — Task Workspace live E2E proof harness baseline
+## W70-S09 — Task Workspace deterministic browser proof harness baseline
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-6, EPIC-7
 - **Hard dependencies:** W70-S02
 - **Outcome:** The private installed browser-proof harness can express and
@@ -184,15 +185,15 @@ hydration while preventing v2 evidence from satisfying W70 acceptance.
    - Validation: collector tests no longer require `Continue Flow`,
      `.flow-cockpit`, or `Ask AOR for selected flow`, and fail when a required
      visible interaction is skipped.
-3. **Separate deterministic breadth from live-provider depth.**
-   - Purpose: cover all negative and responsive branches without multiplying
-     paid live-provider runs.
+3. **Separate deterministic breadth from release-provider depth.**
+   - Purpose: cover all negative and responsive branches without invoking paid
+     providers.
    - Changes: add deterministic browser scenario packs for text, uploaded and
      repository Markdown, stale sources, unavailable runner, Attention,
-     failure, review, completion, reload, offline, and accessibility; add one
-     catalog-backed canonical installed journey and one repair/attention path.
-   - Validation: profile and proof-runner tests show deterministic branch
-     coverage plus paired headless provider evidence without upstream writes.
+     failure, review, completion, reload, offline, and accessibility; record
+     the future release-provider follow-up without a catalog-backed run.
+   - Validation: fixture server and proof-runner tests show deterministic branch
+     coverage without provider execution or upstream writes.
 4. **Map incremental ownership and cutover.**
    - Purpose: let W70-S03 through W70-S07 add their scenarios while W70-S08
      remains the final installed acceptance run.
@@ -210,9 +211,8 @@ hydration while preventing v2 evidence from satisfying W70 acceptance.
    post-reload public readback.
 3. The active collector has no hard dependency on selected-Flow readiness,
    `.flow-cockpit`, `Continue Flow`, or `Ask AOR for selected flow`.
-4. Deterministic scenarios cover the W70 negative/state matrix, while bounded
-   live profiles prove the canonical journey and repair/attention path without
-   expanding the provider qualification matrix.
+4. Deterministic scenarios cover the W70 negative/state matrix and canonical
+   journey without provider execution or expansion of the qualification matrix.
 5. Historical v2 proof remains readable for audit, but cannot satisfy W70
    installed acceptance or silently pass synthetic recovery cells.
 
@@ -221,7 +221,7 @@ hydration while preventing v2 evidence from satisfying W70 acceptance.
 - Versioned private proof contract and compatibility fixtures
 - Screen/action scenario coverage matrix
 - Collector and proof-runner test output
-- Canonical and repair/attention guided profile snapshots
+- Canonical and repair/attention deterministic fixture snapshots
 - Updated live E2E runbook and reference-check output
 
 ### Out of scope
@@ -232,7 +232,7 @@ hydration while preventing v2 evidence from satisfying W70 acceptance.
 
 ## W70-S04 — New Task, Markdown Sources, and Prepared Task
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
 - **Hard dependencies:** W70-S02, W70-S03
 - **Primary modules:** task composer, Markdown source picker/preview, prepared review, runner picker, browser tests
@@ -276,7 +276,7 @@ runner/readiness selection, write-effect summary, dirty/CAS/stale recovery.
 
 ## W70-S05 — Active Task Workspace and durable guidance
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-3, EPIC-4, EPIC-6
 - **Hard dependencies:** W70-S04
 - **Primary modules:** task workspace, live events, run controls, operator requests, changes/check/evidence tabs
@@ -320,7 +320,7 @@ creates a durable operator request with explicit effect and readback.
 
 ## W70-S06 — Attention, change review, and completion evidence
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W70-S05
 - **Primary modules:** attention queue, review/diff, Markdown renderer, delivery/evidence completion, browser tests
@@ -365,7 +365,7 @@ lineage, and follow-up Task.
 
 ## W70-S07 — Design-system implementation and legacy UI retirement
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-6
 - **Hard dependencies:** W70-S06
 - **Primary modules:** semantic tokens/components, responsive CSS, legacy web sources/assets, quality ratchets
@@ -410,7 +410,7 @@ SPA/CSS size ratchets.
 
 ## W70-S08 — Installed Task Workspace proof and story closure
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-6, EPIC-7
 - **Hard dependencies:** W70-S07
 - **Primary modules:** installed browser scenarios, product/backlog/story docs, runbooks, package proof
@@ -440,15 +440,15 @@ states; update stories/docs/runbooks; run package and repository gates.
 ### Acceptance criteria
 
 1. Installed users complete the canonical lifecycle without terminal handoff or
-  internal-object vocabulary.
+  internal-object vocabulary in the local fixture proof.
 2. Text-only, uploaded Markdown, repository Markdown, stale source, unavailable
   runner, attention, review, failure, and completion scenarios have evidence.
 3. No runtime state, secrets, generated AOR Home data, or upstream writes enter the commit.
 
 ### Done evidence
 
-- Installed browser artifacts, screenshots, accessibility report, story matrix,
-  package smoke, and root gate logs.
+- Local installed browser artifacts, screenshots, accessibility report, story
+  matrix, package smoke, and root gate logs.
 
 ### Out of scope
 

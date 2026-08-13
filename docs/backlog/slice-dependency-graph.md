@@ -364,7 +364,7 @@ graph TD
   W68S01[W68-S01 Contract and migration baseline for runtime selection]
   W68S02[W68-S02 Runtime resolution and adapter argument mapping]
   W68S03[W68-S03 Runtime selection projection and presets]
-  W68S04[W68-S04 Live E2E selection and Codex Luna/high rehearsal]
+  W68S04[W68-S04 Deterministic runtime-selection materialization]
   W68S05[W68-S05 Cutover, certification, and docs closure]
   W69S01[W69-S01 Intent confirmation CAS and contract parity]
   W69S02[W69-S02 Runtime-owned Flow projection and adaptive lifecycle]
@@ -375,7 +375,7 @@ graph TD
   W69S07[W69-S07 Visual proof, story traceability, and closure]
   W70S01[W70-S01 Task Workspace product screen and migration baseline]
   W70S02[W70-S02 Task runner override and Markdown source contracts]
-  W70S09[W70-S09 Task Workspace live E2E proof harness baseline]
+  W70S09[W70-S09 Task Workspace deterministic browser proof harness baseline]
   W70S03[W70-S03 Task shell Home and resumable task list]
   W70S04[W70-S04 New Task Markdown Sources and Prepared Task]
   W70S05[W70-S05 Active Task Workspace and durable guidance]
@@ -1578,8 +1578,9 @@ own the stricter terminal control proof evidence for this lane.
 
 ## Qualification gates
 
-The hard dependency graph remains unchanged. `W67-S01` carries the only
-explicit qualification exception:
+The development dependency graph keeps `W66-S09` as a release-only blocker.
+`W67-S01` carries the explicit qualification exception used for its already
+completed deterministic baseline:
 
 ```yaml
 qualification_gate:
@@ -1591,7 +1592,9 @@ qualification_gate:
 The gate is valid only while `W66-S09` is `blocked` with its recorded external
 Anthropic runner-quota blocker. It permits deterministic W67 entry and
 completion; it never marks `W66-S09` done, clears production `audit-hold`, or
-waives dependencies for W69/W70.
+creates provider qualification evidence. W68-W70 development closure uses
+deterministic and local-browser acceptance; release qualification remains
+external.
 
 ## Topological order
 1. W0-S01
@@ -2010,7 +2013,7 @@ graph TD
   W67S05[W67-S05 Explicit materialization, export, and closure proof] --> W68S01[W68-S01 Contract and migration baseline]
   W68S01 --> W68S02[W68-S02 Runtime resolution and adapter argument mapping]
   W68S02 --> W68S03[W68-S03 Runtime selection projection and presets]
-  W68S02 --> W68S04[W68-S04 Live E2E selection and Codex Luna/high rehearsal]
+  W68S02 --> W68S04[W68-S04 Deterministic runtime-selection materialization]
   W68S03 --> W68S05[W68-S05 Cutover, certification, and docs closure]
 W68S04 --> W68S05
 ```
@@ -2037,7 +2040,7 @@ W70 dependency edges:
 graph TD
   W69S07[W69-S07 Visual proof story traceability and closure] --> W70S01[W70-S01 Task Workspace product screen and migration baseline]
   W70S01 --> W70S02[W70-S02 Task runner override and Markdown source contracts]
-  W70S02 --> W70S09[W70-S09 Task Workspace live E2E proof harness baseline]
+  W70S02 --> W70S09[W70-S09 Task Workspace deterministic browser proof harness baseline]
   W70S09 --> W70S03[W70-S03 Task shell Home and resumable task list]
   W70S02 --> W70S04[W70-S04 New Task Markdown Sources and Prepared Task]
   W70S03 --> W70S04

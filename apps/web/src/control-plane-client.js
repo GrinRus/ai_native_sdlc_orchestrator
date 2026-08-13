@@ -84,6 +84,7 @@ export function readProjectResourceSnapshot({ base, statePreview, previous, requ
     state: () => statePreview ? Promise.resolve(statePreview) : readControlPlaneJson(`${base}/state`, requestOptions),
     next: () => optionalRead(`${base}/next-action-report`),
     flowPayload: () => readControlPlaneJson(`${base}/flows`, requestOptions),
+    taskPayload: () => readControlPlaneJson(`${base}/tasks`, requestOptions),
     selectedFlowPayload: () => optionalRead(`${base}/flows/selected`),
     packetList: () => readControlPlaneJson(`${base}/packets`, requestOptions),
     stepList: () => readControlPlaneJson(`${base}/step-results`, requestOptions),

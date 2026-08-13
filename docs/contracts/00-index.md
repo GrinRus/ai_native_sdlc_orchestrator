@@ -16,6 +16,8 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `intake-request-body.md`
 - `intent-submission.md`
 - `intent-normalization-report.md`
+- `task-source-item.md`
+- `task-runner-selection.md`
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `execution-plan.md`

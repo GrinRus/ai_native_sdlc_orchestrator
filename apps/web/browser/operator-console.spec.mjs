@@ -338,6 +338,36 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByRole("button", { name: /Blocked authorization Flow/u })).toBeVisible();
   });
 
+  test("Task Workspace local proof covers server-owned screens and safe Markdown preview", async ({ page }) => {
+    const state = readHarnessState();
+    await blockExternalNetwork(page, state.app_url);
+    const task = {
+      task_id: `task.${state.project_id}.fixture`, project_id: state.project_id,
+      display_title: "Prepare a safe Task Workspace", work_type: "code-change", status: "active", status_detail: "active",
+      intent_submission_ref: "evidence://intent/task-fixture", mission_id: "mission.task-fixture", flow_id: "flow.task-fixture",
+      lineage: { intent_submission_ref: "evidence://intent/task-fixture", mission_id: "mission.task-fixture", flow_id: "flow.task-fixture" },
+      source_items: [], lifecycle_path: { owner: "runtime", steps: [{ id: "discovery", state: "current" }] }, current_step: "discovery", current_step_label: "Discover",
+      attention_count: 0, blocker_count: 0, evidence_refs: ["evidence://intent/task-fixture"],
+      primary_action: { action_id: "task.prepare", operator_control: "Prepare", reason: "Ready", available: true },
+      runner_selection: { source: "project-default", route_id: "route.implement.simulation", readiness: "ready" }, updated_at: "2026-08-13T00:00:00.000Z", completed_read_only: false, read_only: true,
+    };
+    await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true } }) }));
+    await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, selected_task_id: task.task_id, active_task_ids: [task.task_id], completed_task_ids: [], tasks: [task], read_only: true }) }));
+    await page.goto(`${state.app_url}?surface=tasks`);
+    await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Prepare a safe Task Workspace/u })).toBeVisible();
+    const taskScreenNav = page.getByLabel("Task screens");
+    for (const screen of ["New Task", "Markdown Sources", "Prepared Task", "Active Task Workspace", "Attention", "Review Changes", "Completion & Evidence"]) {
+      await taskScreenNav.getByRole("button", { name: screen, exact: true }).click();
+      await expect(page.getByRole("heading", { name: screen })).toBeVisible();
+    }
+    await taskScreenNav.getByRole("button", { name: "Markdown Sources", exact: true }).click();
+    await page.getByLabel("Paste Markdown").fill("# Safe\n<script>alert('no')</script>");
+    await expect(page.locator(".task-workspace__source-preview")).toContainText("# Safe");
+    await expect(page.locator(".task-workspace__source-preview")).not.toContainText("alert");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  });
+
   test("pre-Flow surfaces remain responsive without lifecycle chrome", async ({ page }) => {
     test.setTimeout(90_000);
     const state = readHarnessState(); await blockExternalNetwork(page, state.app_url);

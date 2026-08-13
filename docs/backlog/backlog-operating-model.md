@@ -1,13 +1,12 @@
 # Backlog operating model
 
-The latest defined wave is W70. It is registered behind W69-S07 and the W66
-runner-output remediation plus qualification hold; it does not change the
-single-active-slice rule. The S20-S25 deterministic chain is closed, but W66-S09
-is now explicitly blocked by the required Anthropic provider cells' external
-runner quota failure. W67-S01 entered through its explicit release-only
-qualification gate and the deterministic W67 lane plus W68-S01 through S03 are
-now complete. W68-S04 is the next Codex-only rehearsal slice; this does not
-close W66-S09, clear the audit hold, or open W69/W70.
+The latest defined wave is W70. It is registered behind W69-S07 and preserves
+the single-active-slice rule. The S20-S25 deterministic chain is closed, but
+W66-S09 remains explicitly blocked by the required Anthropic provider cells'
+external runner quota failure. W67-S01 entered through its explicit
+release-only qualification gate. W68-W70 development slices are now complete
+through deterministic code, contracts, and local browser proof; this does not
+close W66-S09, clear the audit hold, or create provider qualification evidence.
 
 ## Purpose
 
@@ -31,6 +30,22 @@ Runtime planning uses separate identities:
 
 Backlog slices and local tasks are repository planning records; they are not
 runtime plan tasks and must not be reused as run or attempt identifiers.
+
+## Development acceptance and release qualification
+
+Every wave may carry two independent statuses:
+
+- **development acceptance** — deterministic contracts, implementation,
+  fixtures, static/API parity, and local browser proof;
+- **release qualification** — provider/live evidence, paid-run policy, and the
+  release ledger.
+
+Development acceptance may close W68-S04 through W70-S08 without running Codex,
+Claude, or Qwen. Code-only completion is not provider qualification evidence.
+W66-S09 remains the separate release blocker; production readiness stays
+`blocked` with `release_disposition=audit-hold` and `release_clearance=false`
+until its fresh four-cell matrix is completed. Historical W66 evidence and the
+qualification matrix must not be rewritten by development work.
 
 ## Source of truth rule
 
@@ -231,20 +246,20 @@ source connection, durable intent preparation, intent-first console, and
 explicit portable write-back cutover. Its first slice depends on W66-S09, so
 describing or implementing the lane does not make it the active slice.
 
-W68 is the blocked successor lane for provider-neutral runtime model and
+W68 is the provider-neutral runtime model and
 reasoning-effort selection. It reconciles the existing partial contract/runtime
 baseline before completing it, keeps runner-native defaults when no explicit
 value is supplied, maps explicit values only at adapter boundaries, and
 introduces an isolated Codex Luna/high live profile without rewriting W66
 qualification evidence.
 
-W69 is the blocked successor lane for intent-first correctness and UI read-model
+W69 is the intent-first correctness and UI read-model
 parity. It adds confirmation CAS, runtime-owned adaptive lifecycle states,
 resume-safe Project Home navigation, review-first Prepared Task editing,
 human-readable Flow Cockpit context, and incremental web cleanup without
 changing the historical W66 provider matrix policy.
 
-W70 is the blocked successor lane for the Task Workspace console. It replaces
+W70 is the Task Workspace console lane. It replaces
 internal-object-first navigation with Tasks, adds truthful task runner override
 and Markdown source handling, unifies active work/review/evidence, and requires
 installed visual/accessibility proof before retiring the Quiet Cockpit surface.
@@ -254,4 +269,7 @@ Because W57-W59 are audit remediation, their owning wave documents also record
 sequencing and capacity; acceptance still depends on executable evidence, not an
 estimate or severity label.
 
-The implementation order is still constrained by hard dependencies and explicit external blockers. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close or required real-runner proof prerequisites become available.
+The implementation order remains constrained by hard dependencies and the
+single-active-slice rule. Provider/live prerequisites are release concerns, not
+development blockers for W68-W70. A later-wave slice can be implemented after
+its code dependencies close while W66-S09 continues to hold release readiness.

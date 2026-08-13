@@ -7,13 +7,14 @@ import { legacyConsoleRequested, resolveConsoleExperience, retiredConsoleSearch 
 import { MissionDurableSummary } from "./mission-builder.jsx";
 import { IntentOnboarding } from "./intent-onboarding.jsx";
 import { ProjectHome } from "./project-home.jsx";
+import { TaskWorkspace } from "./task-workspace.jsx";
 import { operatorControlTargetTab, resolveOperatorControl } from "./operator-control.js"; import { createOrResumeOperatorRequest, executeOperatorControl } from "./operator-operations.js";
 import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
 import { Alert, useRovingTabs } from "./ui/components.jsx";
-import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css"; import "./quiet-cockpit-polish.css";
+import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css"; import "./quiet-cockpit-polish.css"; import "./task-workspace.css";
 
 const STAGES = [
   { id: "readiness", label: "Readiness", command: "project init", hint: "Environment and guardrails" },
@@ -27,17 +28,18 @@ const STAGES = [
 
 function readConsoleSurface(search = "") {
   const params = new URLSearchParams(search);
-  const surface = ["home", "intent", "prepared", "flow"].includes(params.get("surface")) ? params.get("surface") : null;
-  return { surface, flowId: params.get("flow"), intentId: params.get("intent") };
+  const surface = ["home", "intent", "prepared", "flow", "tasks"].includes(params.get("surface")) ? params.get("surface") : null;
+  return { surface, flowId: params.get("flow"), intentId: params.get("intent"), taskId: params.get("task") };
 }
 
-function writeConsoleSurface(surface, { projectId, flowId, intentId, mode } = {}) {
+function writeConsoleSurface(surface, { projectId, flowId, intentId, taskId, mode } = {}) {
   if (typeof window === "undefined") return;
   const params = new URLSearchParams(window.location.search);
   if (projectId) params.set("project", projectId); else params.delete("project");
   if (surface) params.set("surface", surface); else params.delete("surface");
   if (flowId) params.set("flow", flowId); else params.delete("flow");
   if (intentId) params.set("intent", intentId); else params.delete("intent");
+  if (taskId) params.set("task", taskId); else params.delete("task");
   if (mode) params.set("mode", mode); else params.delete("mode");
   window.history.replaceState({}, "", `${window.location.pathname}?${params}${window.location.hash}`);
 }
@@ -5462,6 +5464,7 @@ function App() {
   const [projectState, setProjectState] = useState(null);
   const [nextAction, setNextAction] = useState(null);
   const [flowList, setFlowList] = useState({ flows: [], selected_flow_id: null });
+  const [taskPayload, setTaskPayload] = useState({ tasks: [], selected_task_id: null });
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const [consoleSurface, setConsoleSurface] = useState(initialConsolePresentation.surface);
@@ -5513,6 +5516,7 @@ function App() {
   const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES.find((stage) => stage.id === toUiStageId(selectedStage)) ?? STAGES[1];
   const draftSurface = newFlowDraft;
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
+  const taskOptions = Array.isArray(taskPayload?.tasks) ? taskPayload.tasks : [];
   const projectOptions = Array.isArray(projectIndex?.projects) && projectIndex.projects.length > 0
     ? projectIndex.projects
     : Array.isArray(config?.projects)
@@ -5541,6 +5545,8 @@ function App() {
   const hasResumableIntent = intentSubmissions.some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
   const effectiveSurface = consoleSurface ?? (flowOptions.length > 0 || hasResumableIntent ? "home" : "intent");
   const homeSurface = effectiveSurface === "home";
+  const taskSurface = effectiveSurface === "tasks";
+  const selectedTaskId = readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).taskId ?? taskPayload.selected_task_id ?? null;
   const flowSurface = effectiveSurface === "flow" && Boolean(selectedFlow);
   const resumedIntent = intentSubmissions.find((entry) => entry?.submission?.submission_id === readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).intentId) ?? null;
   const invalidSavedSurface = projectSnapshotLoaded && ((effectiveSurface === "flow" && !selectedFlow) || (effectiveSurface === "prepared" && !resumedIntent));
@@ -5847,6 +5853,7 @@ function App() {
       setProjectState(null);
       setNextAction(null);
       setFlowList({ flows: [], selected_flow_id: null });
+      setTaskPayload({ tasks: [], selected_task_id: null });
       const pendingIntents = effectiveProjectId ? await readJson(`/api/projects/${encodeURIComponent(effectiveProjectId)}/intent-submissions`).catch(() => ({ submissions: [] })) : { submissions: [] };
       const pendingSubmissionList = Array.isArray(pendingIntents?.submissions) ? pendingIntents.submissions : [];
       setIntentSubmissions(pendingSubmissionList);
@@ -5888,6 +5895,7 @@ function App() {
       requestOptions,
       previous: {
         state: projectState, next: nextAction, flowPayload: flowList, selectedFlowPayload: selectedFlow,
+        taskPayload,
         intentList: { submissions: intentSubmissions },
         packetList: packets, stepList: stepResults, runList: runs, deliveryList: deliveryManifests, requestList: operatorRequests,
       },
@@ -5897,6 +5905,7 @@ function App() {
       state,
       next,
       flowPayload,
+      taskPayload: refreshedTaskPayload,
       selectedFlowPayload,
       packetList,
       stepList,
@@ -5939,6 +5948,7 @@ function App() {
     setProjectState(state);
     setNextAction(nextReport?.primary_action ? nextReport : null);
     setFlowList({ ...flowPayload, flows });
+    setTaskPayload(refreshedTaskPayload ?? { tasks: [], selected_task_id: null });
     setPackets(Array.isArray(packetList) ? packetList : []);
     setStepResults(Array.isArray(stepList) ? stepList : []);
     setRuns(Array.isArray(runList) ? runList : []); setDeliveryManifests(Array.isArray(deliveryList) ? deliveryList : []);
@@ -5957,7 +5967,8 @@ function App() {
     if (!options.silent && !consoleSurface) {
       const hasResumableSubmission = (Array.isArray(intentList?.submissions) ? intentList.submissions : [])
         .some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
-      const defaultSurface = flows.length > 0 || hasResumableSubmission ? "home" : "intent";
+      const hasTasks = Array.isArray(refreshedTaskPayload?.tasks) && refreshedTaskPayload.tasks.length > 0;
+      const defaultSurface = hasTasks ? "tasks" : flows.length > 0 || hasResumableSubmission ? "home" : "intent";
       setConsoleSurface(defaultSurface);
       writeConsoleSurface(defaultSurface, { projectId: effectiveProjectId });
     }
@@ -6074,6 +6085,7 @@ function App() {
     setProjectState(null);
     setNextAction(null);
     setFlowList({ flows: [], selected_flow_id: null });
+    setTaskPayload({ tasks: [], selected_task_id: null });
     setSelectedFlow(null);
     setSelectedFlowId(null);
     setNewFlowDraft(false);
@@ -6708,6 +6720,15 @@ function App() {
         {requestOperation?.phase === "complete" ? <Alert tone="success"><strong>Ask AOR result is durable.</strong><span> Request {requestOperation.request?.request_id} completed and remains available after the drawer closes.</span></Alert> : null}
         {projectSnapshotPending ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
+        ) : taskSurface ? (
+          <TaskWorkspace
+            project={activeProjectDisplay}
+            tasks={taskOptions}
+            selectedTaskId={selectedTaskId}
+            onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
+            onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
+            pending={connectionState === "loading"}
+          />
         ) : effectiveSurface === "flow" && !selectedFlow && !projectSnapshotLoaded ? (
           <ProjectSnapshotLoading runtimeRoot={runtimeRoot} />
         ) : showHomeSurface ? (
@@ -6717,6 +6738,7 @@ function App() {
             activeFlow={flowOptions.find((flow) => ["active", "blocked"].includes(flow.status)) ?? null}
             resumableIntent={intentSubmissions.find((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status)) ?? null}
             onOpenFlow={(flowId) => selectFlow(flowId)}
+            onOpenTasks={() => { setConsoleSurface("tasks"); writeConsoleSurface("tasks", { projectId: activeProjectId }); }}
             onNewIntent={() => startNewFlow()}
             onResumeIntent={(entry) => {
               setNewFlowDraft(true);

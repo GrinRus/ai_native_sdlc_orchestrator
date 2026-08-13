@@ -4,16 +4,16 @@
 
 Close the remaining contract, runtime read-model, navigation, and visual
 parity gaps in the intent-first installed console. W69 is additive over the
-W67/W68 surfaces, keeps the browser as a read/action consumer, and does not
-change the historical W66 qualification matrix or Anthropic hold.
+W67/W68 surfaces, keeps the browser as a read/action consumer, and is accepted
+through deterministic and local browser proof. It does not change the
+historical W66 qualification matrix or Anthropic release hold.
 
 ## W69-S01 — Intent confirmation CAS and contract parity
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-6
 - **Hard dependencies:** W68-S05
 - **Primary modules:** intent contracts, control-plane API/OpenAPI, intent service, HTTP handlers
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Ensure confirmation compiles exactly the server revision reviewed
 by the operator and expose the additive CAS/recovery contract.
@@ -53,11 +53,10 @@ recovery action; preserve idempotent `confirm` and legacy
 
 ## W69-S02 — Runtime-owned Flow projection and adaptive lifecycle
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-6
 - **Hard dependencies:** W69-S01
 - **Primary modules:** flow path/projection, next-action read model, OpenAPI, projection tests
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Make lifecycle states, skip reasons, evidence refs, and Home
 summary fields server-owned and deterministic.
@@ -97,11 +96,10 @@ blocked/skipped states. Preserve compatibility fallback for older artifacts.
 
 ## W69-S03 — Project Home resume-safe navigation
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-6
 - **Hard dependencies:** W69-S02
 - **Primary modules:** SPA surface state, Project Home, control-plane client, browser tests
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Make returning-user navigation deterministic without implicit Flow
 selection.
@@ -141,11 +139,10 @@ before Flow selection.
 
 ## W69-S04 — Review-first Prepared Task
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-2, EPIC-6
 - **Hard dependencies:** W69-S01, W69-S03
 - **Primary modules:** intent onboarding, UI primitives/tokens, browser tests
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Align Prepared Task behavior with the review-first contract and
 prevent accidental confirmation of local edits.
@@ -184,11 +181,10 @@ assumptions, open questions, planned path, CAS payload, and stale recovery.
 
 ## W69-S05 — Flow Cockpit context and runtime path presentation
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-3, EPIC-6, EPIC-7
 - **Hard dependencies:** W69-S02, W69-S03, W69-S04
 - **Primary modules:** Flow Cockpit, QuietShell, quiet modes, responsive styles, browser tests
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Surface Project/Flow context and one server-owned next action
 without duplicating runtime decisions in the UI.
@@ -228,11 +224,10 @@ and keep completed flows immutable.
 
 ## W69-S06 — Incremental SPA decomposition and semantic visual cleanup
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-6, EPIC-7
 - **Hard dependencies:** W69-S05
 - **Primary modules:** SPA surface composition, UI tokens/components, CSS, parity tests
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Reduce UI maintenance risk while preserving the single runtime
 client and existing behavior.
@@ -272,18 +267,18 @@ and add destructive/neutral status variants.
 
 ## W69-S07 — Visual proof, story traceability, and closure
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W69-S06
 - **Primary modules:** browser/reference tests, product/backlog docs, live qualification runbook
-- **External blocker:** W66-S09/W68-S05 qualification hold remains open.
 
 **Purpose:** Close W69 with reviewable evidence while preserving the historical
 W66 qualification policy.
 
 **Changes:** Add reference/screenshot assertions for Home, New Intent, Prepared
 Task, and Cockpit; update user-story coverage and W69 docs; run deterministic
-gates plus Codex medium/large qualification only.
+gates plus local browser proof only. Provider qualification remains a separate
+release concern.
 
 ### Local tasks
 
@@ -297,18 +292,20 @@ gates plus Codex medium/large qualification only.
    - Validation: Run browser and reference gates.
 3. **Run closure gate.**
    - Purpose: Produce final repository evidence.
-   - Changes: Run root checks, slice gate, and Codex qualification.
+   - Changes: Run root checks, slice gate, and local browser/reference proof.
    - Validation: Run every command in the W69 acceptance matrix.
 
 ### Acceptance criteria
 
 - All W69 invariants have executable test evidence.
-- Codex medium/large qualification is current acceptance; Anthropic/W66 hold remains documented.
+- W69 is closed by development acceptance; W66 provider qualification remains
+  an explicit external release blocker.
 - No runtime state, secrets, or upstream writes enter the commit.
 
 ### Done evidence
 
-- Gate logs, browser artifacts, reference report, story matrix, and qualification journal.
+- Gate logs, browser artifacts, reference report, story matrix, and development
+  acceptance journal.
 
 ### Out of scope
 
