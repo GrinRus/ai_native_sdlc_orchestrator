@@ -12,10 +12,12 @@ Mission, acceptance criteria, scope, or execution recommendation.
 - `request_text`
 - `attachments[]`
 - `repository_snapshot[]`
+- optional `markdown_sources[]` repository-relative, pinned Markdown snapshots
 - `normalization_refs[]`
 - `created_at` and `updated_at`
 
-At least one of trimmed `request_text` or `attachments[]` must be present.
+At least one of trimmed `request_text`, `attachments[]`, or `markdown_sources[]`
+must be present.
 Submissions are immutable except for status, normalization lineage, and
 timestamps. Operator changes create a new submission or normalization revision.
 
@@ -34,3 +36,9 @@ models. Files are mode `0600` where supported.
 Creating a submission does not create a Flow, invoke a write-capable route, or
 mutate connected repositories. Preparation may only use the read-only
 `intake-normalize` route.
+
+`markdown_sources[]` entries contain a project-relative `.md` path, a pinned
+full Git revision, a SHA-256 digest, bounded byte metadata, and a sanitized
+preview. Creation reads only the connected local checkout; it never fetches a
+remote URL. A later refresh compares the current checkout revision/digest and
+marks the source stale instead of silently changing the pinned snapshot.

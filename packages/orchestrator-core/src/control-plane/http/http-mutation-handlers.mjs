@@ -327,6 +327,7 @@ export async function handleIntentSubmissionCreate({ request, response, params, 
       projectId: params.projectId,
       requestText: typeof payload.request_text === "string" ? payload.request_text : "",
       attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+      markdownSources: Array.isArray(payload.markdown_sources) ? payload.markdown_sources : [],
       autoPrepare: payload.auto_prepare !== false,
     });
     sendJson(response, 202, { ...result, status_ref: `/api/projects/${encodeURIComponent(params.projectId)}/intent-submissions/${encodeURIComponent(result.submission.submission_id)}` });

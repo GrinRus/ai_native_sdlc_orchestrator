@@ -10,6 +10,7 @@ export function IntentOnboarding({ projectId, project, busy, setBusy, onProjectC
   const [source, setSource] = useState(EMPTY_SOURCE);
   const [requestText, setRequestText] = useState("");
   const [attachments, setAttachments] = useState([]);
+  const [markdownPath, setMarkdownPath] = useState("");
   const [submission, setSubmission] = useState(initialSubmission?.submission ?? null);
   const [normalization, setNormalization] = useState(initialSubmission?.normalization ?? null);
   const [savedNormalization, setSavedNormalization] = useState(initialSubmission?.normalization ?? null);
@@ -96,7 +97,11 @@ export function IntentOnboarding({ projectId, project, busy, setBusy, onProjectC
       const selectedProjectId = connectedProjectId || await connectCode();
       const created = await readJson(submissionBase(selectedProjectId), {
         method: "POST", headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ request_text: requestText, attachments }),
+        body: JSON.stringify({
+          request_text: requestText,
+          attachments,
+          ...(markdownPath.trim() ? { markdown_sources: [{ project_relative_path: markdownPath.trim() }] } : {}),
+        }),
       });
       setSubmission(created.submission);
       await poll(created.status_ref);
@@ -173,7 +178,7 @@ export function IntentOnboarding({ projectId, project, busy, setBusy, onProjectC
     {error ? <Alert tone="danger">{error}</Alert> : null}
     {!submission ? <>
       {!connectedProjectId ? <Card><h2>Code source</h2><Field label="Source"><select name="intent-source-kind" value={source.kind} onChange={(event) => setSource({ ...source, kind: event.target.value })}><option value="local">Local Git folder</option><option value="git">Git URL</option></select></Field>{source.kind === "git" ? <Field label="HTTPS or SSH Git URL"><input name="intent-source-url" value={source.url} onChange={(event) => setSource({ ...source, url: event.target.value })} placeholder="git@github.com:org/repository.git" /></Field> : <><Field label="Absolute folder path"><input name="intent-source-path" value={source.path} onChange={(event) => setSource({ ...source, path: event.target.value })} placeholder="/path/to/repository" /></Field><Button onClick={pickFolder} disabled={busy}>Choose folder…</Button></>}<Field label="Project label" helper="Optional"><input name="intent-project-label" value={source.label} onChange={(event) => setSource({ ...source, label: event.target.value })} /></Field><p>Credentials in URLs are rejected. Git credential helpers and your SSH agent remain authoritative.</p></Card> : <Card><h2>Code source</h2><p><strong>{project?.display_name || connectedProjectId}</strong> is connected. Source details and inferred topology are available in Project settings.</p></Card>}
-      <Card><h2>Intent</h2><Field label="Request" helper="Text, files, or both are required."><textarea name="intent-request" value={requestText} onChange={(event) => setRequestText(event.target.value)} placeholder="Review the authorization flow and fix the timeout handling…" /></Field><Field label="Text attachments" helper=".txt, .md, .json, .yaml, .yml · up to 10 files"><input name="intent-attachments" type="file" multiple accept=".txt,.md,.json,.yaml,.yml" onChange={chooseFiles} /></Field>{attachments.length ? <p>{attachments.map((item) => item.name).join(", ")}</p> : null}<ResponsiveActions><Button variant="primary" busy={busy || polling} onClick={prepare} disabled={(!connectedProjectId && !sourceValue.trim()) || (!requestText.trim() && attachments.length === 0)}>Prepare task</Button>{onCancel ? <Button onClick={onCancel}>Cancel</Button> : null}</ResponsiveActions></Card>
+      <Card><h2>Intent</h2><Field label="Request" helper="Text, files, or a repository Markdown reference are accepted."><textarea name="intent-request" value={requestText} onChange={(event) => setRequestText(event.target.value)} placeholder="Review the authorization flow and fix the timeout handling…" /></Field><Field label="Repository Markdown path" helper="Optional project-relative .md path; it is pinned to the current local Git revision."><input name="intent-markdown-path" value={markdownPath} onChange={(event) => setMarkdownPath(event.target.value)} placeholder="docs/requirements.md" /></Field><Field label="Text attachments" helper=".txt, .md, .json, .yaml, .yml · up to 10 files"><input name="intent-attachments" type="file" multiple accept=".txt,.md,.json,.yaml,.yml" onChange={chooseFiles} /></Field>{attachments.length ? <p>{attachments.map((item) => item.name).join(", ")}</p> : null}<ResponsiveActions><Button variant="primary" busy={busy || polling} onClick={prepare} disabled={(!connectedProjectId && !sourceValue.trim()) || (!requestText.trim() && attachments.length === 0 && !markdownPath.trim())}>Prepare task</Button>{onCancel ? <Button onClick={onCancel}>Cancel</Button> : null}</ResponsiveActions></Card>
     </> : null}
     {submission && normalization ? <>
       <Card className="intent-review-card">

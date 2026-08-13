@@ -61,7 +61,7 @@ function projectIntentTask({ projectId, entry }) {
       },
     };
   });
-  if (submission.request_text && sourceItems.length === 0) {
+  if (submission.request_text) {
     sourceItems.push({
       schema_version: 1,
       source_id: `${submissionId}.source.inline`,
@@ -71,6 +71,29 @@ function projectIntentTask({ projectId, entry }) {
       stale: false,
       digest: crypto.createHash("sha256").update(String(submission.request_text), "utf8").digest("hex"),
       preview: { kind: "inline-text", text: String(submission.request_text).slice(0, 500) },
+    });
+  }
+  for (const source of Array.isArray(submission.markdown_sources) ? submission.markdown_sources : []) {
+    const sourceId = asString(source.source_id);
+    const digest = asString(source.digest);
+    const relativePath = asString(source.project_relative_path);
+    if (!sourceId || !digest || !relativePath) continue;
+    sourceItems.push({
+      schema_version: 1,
+      source_id: sourceId,
+      kind: "repository-markdown",
+      ref: null,
+      immutable: true,
+      stale: source.stale === true,
+      digest,
+      preview: {
+        kind: "markdown-source",
+        project_relative_path: relativePath,
+        pinned_base_revision: asString(source.pinned_base_revision),
+        media_type: asString(source.media_type) ?? "text/markdown",
+        byte_length: Number.isInteger(source.byte_length) ? source.byte_length : null,
+        sanitized_markdown: asString(source.preview?.sanitized_markdown) ?? "",
+      },
     });
   }
   const intentRef = intentTaskRef(projectId, submissionId);

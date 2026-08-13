@@ -90,6 +90,8 @@ test("packaging-only marker smoke exposes flow-first shell, Ask AOR drawer, evid
   assert.match(source, /MissionDurableSummary/u);
   assert.match(source, /Intent-first onboarding/u);
   assert.match(source, /read-only task preview/u);
+  assert.match(source, /intent-markdown-path/u);
+  assert.match(source, /markdown_sources/u);
   assert.match(source, /Project switcher/u);
   assert.match(source, /activeProjectDisplay/u);
   assert.match(source, /projectOptionsForSwitcher/u);
