@@ -5543,10 +5543,10 @@ function App() {
     || activeProjectOnboarding.initialized === true
     || activeProjectOnboarding.state_exists === true;
   const hasResumableIntent = intentSubmissions.some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
-  const effectiveSurface = consoleSurface ?? (flowOptions.length > 0 || hasResumableIntent ? "home" : "intent");
+  const effectiveSurface = consoleSurface ?? (taskOptions.length > 0 ? "tasks" : flowOptions.length > 0 || hasResumableIntent ? "home" : "intent");
   const homeSurface = effectiveSurface === "home";
   const taskSurface = effectiveSurface === "tasks";
-  const selectedTaskId = readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).taskId ?? taskPayload.selected_task_id ?? null;
+  const selectedTaskId = readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).taskId ?? null;
   const flowSurface = effectiveSurface === "flow" && Boolean(selectedFlow);
   const resumedIntent = intentSubmissions.find((entry) => entry?.submission?.submission_id === readConsoleSurface(typeof window === "undefined" ? "" : window.location.search).intentId) ?? null;
   const invalidSavedSurface = projectSnapshotLoaded && ((effectiveSurface === "flow" && !selectedFlow) || (effectiveSurface === "prepared" && !resumedIntent));
@@ -5968,7 +5968,7 @@ function App() {
       const hasResumableSubmission = (Array.isArray(intentList?.submissions) ? intentList.submissions : [])
         .some((entry) => ["submitted", "preparing", "prepared", "blocked"].includes(entry?.submission?.status));
       const hasTasks = Array.isArray(refreshedTaskPayload?.tasks) && refreshedTaskPayload.tasks.length > 0;
-      const defaultSurface = hasTasks ? "tasks" : flows.length > 0 || hasResumableSubmission ? "home" : "intent";
+      const defaultSurface = hasTasks || shouldReadProjectState ? "tasks" : flows.length > 0 || hasResumableSubmission ? "home" : "intent";
       setConsoleSurface(defaultSurface);
       writeConsoleSurface(defaultSurface, { projectId: effectiveProjectId });
     }
@@ -6727,6 +6727,9 @@ function App() {
             selectedTaskId={selectedTaskId}
             onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
             onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
+            onRefresh={() => refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)))}
+            connectionState={connectionState}
+            resourceError={resourceErrors.taskPayload}
             pending={connectionState === "loading"}
           />
         ) : effectiveSurface === "flow" && !selectedFlow && !projectSnapshotLoaded ? (

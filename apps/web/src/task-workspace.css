@@ -1,4 +1,4 @@
-.task-workspace { display: grid; gap: 1.25rem; max-width: 1120px; margin: 0 auto; }
+.task-workspace { display: grid; gap: 1.25rem; max-width: 1120px; min-width: 0; margin: 0 auto; }
 .task-workspace__header, .task-workspace__toolbar, .task-workspace__card > div:first-child { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .task-workspace__header h1, .task-workspace h2 { margin: 0; }
 .task-workspace__header p, .task-workspace__toolbar p { color: var(--aor-color-text-secondary); }
@@ -8,7 +8,7 @@
 .task-workspace__toolbar > div:last-child { display: flex; gap: .5rem; flex-wrap: wrap; }
 .task-workspace__toolbar input, .task-workspace__toolbar select, .task-workspace textarea { border: 1px solid var(--aor-color-border-default); border-radius: .45rem; padding: .65rem .75rem; background: var(--aor-color-bg-surface); color: var(--aor-color-text-primary); }
 .task-workspace textarea { width: 100%; box-sizing: border-box; margin-top: .5rem; }
-.task-workspace__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: .8rem; }
+.task-workspace__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: .8rem; min-width: 0; }
 .task-workspace__card { text-align: left; border: 1px solid var(--aor-color-border-default); border-radius: .7rem; background: var(--aor-color-bg-surface); color: var(--aor-color-text-primary); padding: 1rem; cursor: pointer; display: grid; gap: .6rem; }
 .task-workspace__card:hover, .task-workspace__card:focus-visible { border-color: var(--aor-color-focus); outline: none; }
 .task-workspace__card span, .task-workspace__card p, .task-workspace__card small { color: var(--aor-color-text-secondary); }

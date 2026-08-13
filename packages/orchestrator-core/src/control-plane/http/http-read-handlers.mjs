@@ -1,6 +1,7 @@
 import { readQueryInteger, sendError, sendJson } from "./http-utils.mjs";
 import { CONTROL_PLANE_LIMITS, resolveBoundedInteger } from "../control-plane-limits.mjs";
 import { getTaskPlanStatus, showTaskPlan } from "../../task-plan-service.mjs";
+import { listIntentSubmissions } from "../../intent-service.mjs";
 import {
   listCompilerRevisionStatuses,
   listDeliveryManifests,
@@ -67,10 +68,11 @@ function toPublicProjectState(state) {
  *   params: Record<string, string>,
  *   requestUrl: URL,
  *   response: import("node:http").ServerResponse,
+ *   registry?: ReturnType<import("../local-project-registry.mjs").createLocalProjectRegistry>,
  *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
-export function handleReadRoute({ routeId, params, requestUrl, response, runtimeOptions }) {
+export function handleReadRoute({ routeId, params, requestUrl, response, registry, runtimeOptions }) {
   switch (routeId) {
     case "project-state":
       sendJson(response, 200, toPublicProjectState(readProjectState(runtimeOptions)));
@@ -106,10 +108,17 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
       sendJson(response, 200, listFlowProjections(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
       return;
     case "tasks":
-      sendJson(response, 200, listTaskProjections(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
+      sendJson(response, 200, listTaskProjections({
+        ...withReadModelLimit(runtimeOptions, requestUrl.searchParams),
+        intentSubmissions: registry ? listIntentSubmissions({ registry, projectId: params.projectId }).submissions : [],
+      }));
       return;
     case "task-detail": {
-      const task = readTaskProjection({ ...runtimeOptions, taskId: params.taskId });
+      const task = readTaskProjection({
+        ...runtimeOptions,
+        taskId: params.taskId,
+        intentSubmissions: registry ? listIntentSubmissions({ registry, projectId: params.projectId }).submissions : [],
+      });
       if (!task) {
         sendError(response, 404, "task.not_found", `Task '${params.taskId}' was not found.`);
         return;

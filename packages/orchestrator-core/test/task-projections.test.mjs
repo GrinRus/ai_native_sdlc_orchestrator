@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { projectTaskFromFlow } from "../src/control-plane/task-projections.mjs";
+import { listTaskProjections, projectTaskFromFlow } from "../src/control-plane/task-projections.mjs";
 
 const baseFlow = {
   flow_id: "flow.project-alpha.mission-1",
@@ -44,4 +44,50 @@ test("completed Flow projects to immutable completed Task without inventing a ne
   assert.equal(task.status, "completed");
   assert.equal(task.completed_read_only, true);
   assert.equal(task.primary_action.available, false);
+});
+
+test("intent submissions project into draft, prepared, and attention Task states", () => {
+  const tasks = [
+    {
+      submission: {
+        submission_id: "intent-draft",
+        status: "submitted",
+        request_text: "Draft a task",
+        created_at: "2026-08-13T10:00:00.000Z",
+        updated_at: "2026-08-13T10:00:00.000Z",
+        attachments: [],
+        normalization_refs: [],
+      },
+      normalization: null,
+    },
+    {
+      submission: {
+        submission_id: "intent-prepared",
+        status: "prepared",
+        request_text: "Prepared task",
+        created_at: "2026-08-13T10:00:00.000Z",
+        updated_at: "2026-08-13T10:01:00.000Z",
+        attachments: [],
+        normalization_refs: ["evidence://projects/project-alpha/reports/intent-normalization-report-intent-prepared-v1.json"],
+      },
+      normalization: { title: "Prepared task", work_type: "code-change", provider: { route_id: "route.intake-normalize.default" } },
+    },
+    {
+      submission: {
+        submission_id: "intent-blocked",
+        status: "blocked",
+        request_text: "Blocked task",
+        created_at: "2026-08-13T10:00:00.000Z",
+        updated_at: "2026-08-13T10:02:00.000Z",
+        attachments: [],
+        normalization_refs: [],
+      },
+      normalization: null,
+    },
+  ];
+  const projection = listTaskProjections({ projectId: "project-alpha", projectRef: ".", intentSubmissions: tasks });
+  assert.deepEqual(projection.tasks.slice(0, 3).map((task) => task.status), ["draft", "prepared", "attention"]);
+  assert.equal(projection.prepared_task_ids.length, 1);
+  assert.equal(projection.tasks[1].lineage.flow_id, null);
+  assert.equal(projection.tasks[2].runner_selection.readiness, "blocked");
 });

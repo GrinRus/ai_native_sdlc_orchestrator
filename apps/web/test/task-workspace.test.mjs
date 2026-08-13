@@ -15,6 +15,9 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /sanitizeMarkdown/u);
   assert.doesNotMatch(source, /dangerouslySetInnerHTML/u);
   assert.match(source, /server-owned Task projection/u);
+  assert.match(source, /Draft/u);
+  assert.match(source, /Tasks are temporarily unavailable/u);
+  assert.match(source, /setFocusedTaskId/u);
 });
 
 test("web client reads the additive task projection without replacing intent mutations", () => {
