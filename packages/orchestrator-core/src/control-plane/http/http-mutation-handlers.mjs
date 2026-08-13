@@ -11,8 +11,8 @@ import { requestRunJobCancel } from "../../run-job.mjs";
 import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
-import { summarizeProjectContext } from "../local-project-registry.mjs";
 import { readFlowProjection } from "../flow-projections.mjs";
+import { listTaskProjections } from "../read-surface.mjs";
 import {
   approveTaskPlan,
   createTaskPlan,
@@ -28,9 +28,10 @@ import {
   IntentServiceError,
   answerIntentQuestions,
   cancelIntentSubmission,
-  confirmIntent,
   confirmAndStartIntent,
+  confirmIntent,
   createIntentSubmission,
+  listIntentSubmissions,
   prepareIntentSubmission,
   retryIntentStart,
   reviseIntentSubmission,
@@ -363,6 +364,101 @@ export async function handleIntentSubmissionAction({ request, response, params, 
   } catch (error) {
     if (error instanceof IntentServiceError) sendError(response, error.statusCode, error.code, error.message, error.details);
     else throw error;
+  }
+}
+
+export async function handleTaskAction({ request, response, params, registry, runtimeOptions }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) return;
+  const action = asString(payload.action);
+  if (!["confirm", "start", "pause", "resume", "cancel", "retry", "request"].includes(action)) {
+    sendError(response, 400, "task.invalid_action", `Unsupported Task action '${action ?? "missing"}'.`);
+    return;
+  }
+  const task = listTaskProjections({
+    ...runtimeOptions,
+    intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
+  }).tasks.find((candidate) => candidate.task_id === params.taskId);
+  if (!task) {
+    sendError(response, 404, "task.not_found", `Task '${params.taskId}' was not found.`);
+    return;
+  }
+  try {
+    if (["confirm", "start"].includes(action)) {
+      const submissionId = asString(task.lineage?.intent_submission_id);
+      if (!submissionId) {
+        sendError(response, 409, "task.confirm_unavailable", "This Task is not an intent-backed prepared submission.");
+        return;
+      }
+      const result = action === "confirm"
+        ? confirmIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision })
+        : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId });
+      sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: { durable: true, task_id: task.task_id, flow_id: result.flow_id ?? null } });
+      return;
+    }
+    if (action === "request" || action === "retry") {
+      const requestText = asString(payload.request_text) ?? (action === "retry" ? "Request a bounded retry for this Task after reviewing the recorded failure." : "");
+      if (!requestText) {
+        sendError(response, 400, "task.request_text_required", "A durable Task request requires request_text.");
+        return;
+      }
+      const result = createOperatorRequest({
+        ...runtimeOptions,
+        sourceSurface: "task-workspace",
+        targetStage: asString(task.current_step) ?? "implement",
+        intentType: action === "retry" ? "repair" : (asString(payload.intent_type) ?? "analyze"),
+        requestText,
+        targetFlowId: task.flow_id ?? undefined,
+        targetRefs: asStringArray(task.evidence_refs),
+        allowedPaths: asStringArray(payload.allowed_paths),
+        deliveryMode: "no-write",
+      });
+      sendJson(response, 201, {
+        task_id: task.task_id,
+        action,
+        operator_request: {
+          request_id: result.requestId,
+          operator_request_ref: result.operatorRequestRef,
+          status: result.status,
+          document: result.operatorRequest,
+        },
+        readback: { durable: true, task_id: task.task_id, flow_id: task.flow_id },
+      });
+      return;
+    }
+    if (task.completed_read_only === true) {
+      sendError(response, 409, "task.completed_read_only", "Completed Tasks are immutable; create a follow-up Intent instead.");
+      return;
+    }
+    const runId = task.run_ids?.[0];
+    if (!runId) {
+      sendError(response, 409, "task.control_unavailable", "This Task has no server-owned active run reference for the requested control.", {
+        recovery_actions: [{ action: "request", payload: { task_id: task.task_id, reason: "Inspect the Task runtime state and create a bounded operator request." } }],
+      });
+      return;
+    }
+    const result = applyRunControlAction({
+      ...runtimeOptions,
+      action,
+      runId,
+      commandId: asString(payload.command_id) ?? `task.${task.task_id}.${action}`,
+      expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+      approvalRef: asString(payload.approval_ref) ?? undefined,
+      reason: asString(payload.reason) ?? `Task Workspace requested ${action}.`,
+    });
+    if (result.blocked) {
+      sendError(response, 409, result.blockedReason?.code ?? "task.control_blocked", result.blockedReason?.message ?? "Task control action is blocked.", {
+        recovery_actions: [{ action: "request", payload: { task_id: task.task_id, reason: "Create a durable operator request for this blocked control." } }],
+      });
+      return;
+    }
+    sendJson(response, 200, { task_id: task.task_id, action, run_control: result, readback: { durable: true, task_id: task.task_id, run_id: runId } });
+  } catch (error) {
+    if (error instanceof OperatorRequestError) {
+      sendError(response, error.statusCode, error.code, error.message);
+      return;
+    }
+    sendError(response, 500, error?.code ?? "task.action_failed", error instanceof Error ? error.message : "Task action failed.");
   }
 }
 

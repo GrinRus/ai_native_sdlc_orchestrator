@@ -638,6 +638,39 @@
         }
       }
     },
+    "/api/projects/{projectId}/tasks/{taskId}/actions": {
+      "post": {
+        "operationId": "applyTaskWorkspaceAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "task-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TaskActionRequest" } },
+            "application/*+json": { "schema": { "$ref": "#/components/schemas/TaskActionRequest" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "201": { "$ref": "#/components/responses/JsonObject" },
+          "202": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" },
+          "408": { "$ref": "#/components/responses/RequestTimeout" },
+          "409": { "$ref": "#/components/responses/JsonError" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMediaType" }
+        }
+      }
+    },
     "/api/projects/{projectId}/flows/selected": {
       "get": {
         "operationId": "getSelectedFlow",
@@ -2832,9 +2865,24 @@
         },
         "additionalProperties": true
       },
+      "TaskActionRequest": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "cancel", "retry", "request"] },
+          "expected_revision": { "type": "integer", "minimum": 0 },
+          "command_id": { "type": "string", "minLength": 1 },
+          "request_text": { "type": "string", "minLength": 1 },
+          "intent_type": { "type": "string", "enum": ["analyze", "explain", "review", "validate", "repair", "plan", "implement"] },
+          "approval_ref": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "allowed_paths": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      },
       "TaskProjection": {
         "type": "object",
-        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "lineage", "source_items", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
+        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
         "properties": {
           "task_id": { "type": "string" },
           "project_id": { "type": "string" },
@@ -2845,11 +2893,13 @@
           "intent_submission_ref": { "type": ["string", "null"] },
           "mission_id": { "type": ["string", "null"] },
           "flow_id": { "type": ["string", "null"] },
+          "run_ids": { "type": "array", "items": { "type": "string" } },
           "lineage": { "$ref": "#/components/schemas/JsonObject" },
           "source_items": { "type": "array", "items": { "$ref": "#/components/schemas/TaskSourceItem" } },
           "lifecycle_path": { "$ref": "#/components/schemas/JsonObject" },
           "current_step": { "type": ["string", "null"] },
           "current_step_label": { "type": ["string", "null"] },
+          "revision": { "type": ["integer", "null"], "minimum": 0 },
           "attention_count": { "type": "integer", "minimum": 0 },
           "blocker_count": { "type": "integer", "minimum": 0 },
           "evidence_refs": { "type": "array", "items": { "type": "string" } },

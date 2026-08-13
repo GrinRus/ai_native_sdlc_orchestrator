@@ -66,6 +66,12 @@ Flow lineage:
   runner-readiness metadata, and one server-owned primary action;
 - `GET /api/projects/:projectId/tasks/:taskId` returns one projection or a
   structured `task.not_found` error;
+- `POST /api/projects/:projectId/tasks/:taskId/actions` is the Task Workspace
+  mutation facade. It delegates `confirm`/`start` to the existing intent
+  CAS/idempotency boundary, `pause`/`resume`/`cancel` to server-owned
+  run-control, and `retry`/`request` to durable bounded operator requests.
+  Every response includes a query-safe durable readback; the route never
+  creates a second Task lifecycle owner or accepts raw provider flags;
 - Task reads are strictly read-only. Create, prepare, revise, confirm, start,
   retry, and cancel continue through the existing intent boundary with its CAS
   and idempotency semantics; Task is not a second lifecycle owner;

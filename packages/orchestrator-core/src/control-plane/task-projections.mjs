@@ -28,6 +28,20 @@ function taskStatus(flow) {
   return "active";
 }
 
+function flowRunIds(flow) {
+  const candidates = [
+    flow.closure_state?.source_run_id,
+    ...(Array.isArray(flow.evidence_refs) ? flow.evidence_refs : []),
+  ];
+  return [...new Set(candidates.flatMap((value) => {
+    const text = asString(value);
+    if (!text) return [];
+    if (text.startsWith("run.")) return [text];
+    const match = text.match(/^run:\/\/([^/]+)$/u);
+    return match ? [match[1]] : [];
+  }))];
+}
+
 function intentTaskRef(projectId, submissionId) {
   return `evidence://projects/${projectId}/inputs/${submissionId}/submission.json`;
 }
@@ -107,6 +121,7 @@ function projectIntentTask({ projectId, entry }) {
     intent_submission_ref: intentRef,
     mission_id: null,
     flow_id: null,
+    run_ids: [],
     lineage: {
       intent_submission_ref: intentRef,
       intent_submission_id: submissionId,
@@ -114,6 +129,7 @@ function projectIntentTask({ projectId, entry }) {
       flow_id: null,
     },
     source_items: sourceItems,
+    revision: Number.isInteger(normalization.revision) ? normalization.revision : null,
     lifecycle_path: {
       path_id: "intent",
       owner: "runtime",
@@ -180,6 +196,7 @@ export function projectTaskFromFlow({ projectId, flow }) {
     intent_submission_ref: flow.intake_packet_ref,
     mission_id: flow.mission_id,
     flow_id: flow.flow_id,
+    run_ids: flowRunIds(flow),
     lineage: {
       intent_submission_ref: flow.intake_packet_ref,
       mission_id: flow.mission_id,
