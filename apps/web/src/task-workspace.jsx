@@ -89,7 +89,7 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
     setScreen("prepared");
   }
 
-  return <section className="task-workspace aor-ui" aria-label="Task Workspace">
+  return <section className="task-workspace aor-ui aor-density-relaxed" aria-label="Task Workspace" data-density="relaxed">
     <header className="task-workspace__header">
       <div><p className="mission-eyebrow">Task Workspace</p><h1>{project?.display_name || project?.project_id || "Your project"}</h1><p>Work from a server-owned Task projection. Runtime lifecycle and next actions remain authoritative.</p></div>
       <Button variant="primary" onClick={() => { setScreen("new"); onNewTask?.(); }}>New Task</Button>

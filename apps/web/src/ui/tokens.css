@@ -57,6 +57,11 @@
   --aor-focus-width: 3px;
   --aor-data-row-compact: 2.25rem;
   --aor-data-row-relaxed: 3rem;
+  --aor-layout-content-max: 70rem;
+  --aor-layout-gutter: clamp(1rem, 3vw, 2.5rem);
+  --aor-layout-section-gap: clamp(1rem, 2vw, 1.5rem);
+  --aor-density-compact-gap: 0.5rem;
+  --aor-density-relaxed-gap: 1rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
