@@ -2869,7 +2869,7 @@
         "type": "object",
         "required": ["action"],
         "properties": {
-          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "cancel", "retry", "request"] },
+          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "cancel", "retry", "request", "follow-up"] },
           "expected_revision": { "type": "integer", "minimum": 0 },
           "command_id": { "type": "string", "minLength": 1 },
           "request_text": { "type": "string", "minLength": 1 },
@@ -2882,7 +2882,7 @@
       },
       "TaskProjection": {
         "type": "object",
-        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
+        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "attention_items", "review", "completion", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
         "properties": {
           "task_id": { "type": "string" },
           "project_id": { "type": "string" },
@@ -2896,6 +2896,9 @@
           "run_ids": { "type": "array", "items": { "type": "string" } },
           "lineage": { "$ref": "#/components/schemas/JsonObject" },
           "source_items": { "type": "array", "items": { "$ref": "#/components/schemas/TaskSourceItem" } },
+          "attention_items": { "type": "array", "items": { "$ref": "#/components/schemas/JsonObject" } },
+          "review": { "$ref": "#/components/schemas/JsonObject" },
+          "completion": { "$ref": "#/components/schemas/JsonObject" },
           "lifecycle_path": { "$ref": "#/components/schemas/JsonObject" },
           "current_step": { "type": ["string", "null"] },
           "current_step_label": { "type": ["string", "null"] },

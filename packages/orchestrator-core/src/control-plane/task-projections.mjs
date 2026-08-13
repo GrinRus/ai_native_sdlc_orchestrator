@@ -42,6 +42,47 @@ function flowRunIds(flow) {
   }))];
 }
 
+function taskAttentionItems(flow) {
+  const blockers = asStringArray(flow.blockers);
+  const qualityBlockers = asStringArray(flow.active_quality_gate?.blockers);
+  return [...new Set([...blockers, ...qualityBlockers])].map((summary, index) => ({
+    item_id: `${flow.flow_id}.attention.${index + 1}`,
+    consequence: summary,
+    state: "needs-attention",
+    evidence_refs: asStringArray(flow.active_quality_gate?.evidence_refs).slice(0, 5),
+  }));
+}
+
+function taskReviewProjection(flow) {
+  const closure = flow.closure_state ?? {};
+  const status = asString(closure.review_status) ?? (flow.status === "completed" ? "unknown" : "pending");
+  return {
+    status,
+    verification_status: asString(closure.verification_status) ?? "unknown",
+    delivery_status: asString(closure.delivery_status) ?? "unknown",
+    changed_paths: asStringArray(flow.changed_paths),
+    evidence_refs: asStringArray(flow.evidence_refs),
+    read_only: true,
+  };
+}
+
+function taskCompletionProjection(flow) {
+  const closure = flow.closure_state ?? {};
+  const reviewStatus = asString(closure.review_status);
+  const verificationStatus = asString(closure.verification_status);
+  const deliveryStatus = asString(closure.delivery_status);
+  const pass = new Set(["pass", "passed", "approved", "complete", "completed", "ready"]);
+  const evidenceComplete = flow.status === "completed" && pass.has(reviewStatus) && pass.has(verificationStatus) && pass.has(deliveryStatus);
+  return {
+    status: flow.status === "completed" ? (evidenceComplete ? "complete" : "blocked") : "incomplete",
+    immutable: flow.status === "completed",
+    verification_status: verificationStatus ?? "unknown",
+    delivery_status: deliveryStatus ?? "unknown",
+    evidence_refs: asStringArray(flow.evidence_refs),
+    follow_up_eligible: flow.status === "completed",
+  };
+}
+
 function intentTaskRef(projectId, submissionId) {
   return `evidence://projects/${projectId}/inputs/${submissionId}/submission.json`;
 }
@@ -129,6 +170,9 @@ function projectIntentTask({ projectId, entry }) {
       flow_id: null,
     },
     source_items: sourceItems,
+    attention_items: status === "attention" ? [{ item_id: `${submissionId}.attention.1`, consequence: "Intent preparation is blocked.", state: "needs-attention", evidence_refs: asStringArray(submission.normalization_refs) }] : [],
+    review: { status: status === "prepared" ? "pending" : "not-ready", verification_status: "unknown", delivery_status: "unknown", changed_paths: [], evidence_refs: asStringArray(submission.normalization_refs), read_only: true },
+    completion: { status: "incomplete", immutable: false, verification_status: "unknown", delivery_status: "unknown", evidence_refs: asStringArray(submission.normalization_refs), follow_up_eligible: false },
     revision: Number.isInteger(normalization.revision) ? normalization.revision : null,
     lifecycle_path: {
       path_id: "intent",
@@ -203,6 +247,9 @@ export function projectTaskFromFlow({ projectId, flow }) {
       flow_id: flow.flow_id,
     },
     source_items: taskSourceItems(flow),
+    attention_items: taskAttentionItems(flow),
+    review: taskReviewProjection(flow),
+    completion: taskCompletionProjection(flow),
     lifecycle_path: flow.lifecycle_path ?? { path_id: null, owner: "runtime", steps: [] },
     current_step: flow.current_step,
     current_step_label: flow.current_step_label,
