@@ -6665,7 +6665,7 @@ function App() {
   }
 
   return (
-    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} quiet-cockpit-preview`} data-console-experience={consoleExperience} data-quiet-mode={quietMode}>
+    <div className={`aor-ui app-shell ${firstRunFocusMode ? "first-run-focus-mode" : "flow-active-mode"} quiet-cockpit-preview ${taskSurface ? "task-surface-active" : ""}`} data-console-experience={consoleExperience} data-quiet-mode={quietMode}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">A</div>
@@ -6819,7 +6819,7 @@ function App() {
           <ExecutionOrchestration runs={runs} deliveryManifests={deliveryManifests} flowId={selectedFlow?.flow_id ?? null} busy={busy} onCommand={(request) => executeOrchestrationCommand({ request, busy, runLifecycle, refresh, setBusy, setError })} />
           </>
         )}
-        {activeProjectDisplay ? (
+        {activeProjectDisplay && !taskSurface ? (
           <details className="project-settings-disclosure">
             <summary><span>Project settings</span><small>Repositories, components, and execution route</small></summary>
             <div className="project-settings-content">

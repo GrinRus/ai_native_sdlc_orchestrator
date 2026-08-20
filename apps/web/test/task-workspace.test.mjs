@@ -19,17 +19,29 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /Tasks are temporarily unavailable/u);
   assert.match(source, /setFocusedTaskId/u);
   assert.match(source, /onTaskAction/u);
-  assert.match(source, /Create durable request/u);
-  assert.match(source, /Request retry/u);
+  assert.match(source, /onTaskAction\?\.\(task, "request"/u);
+  assert.match(source, /Ask AOR/u);
   assert.match(source, /actionBusy/u);
   assert.match(source, /Start follow-up task/u);
-  assert.match(source, /Partial verification or delivery cannot be shown as successful/u);
-  assert.match(source, /Rendered Markdown/u);
+  assert.match(source, /Task completed/u);
+  assert.match(source, /task-rendered-preview/u);
   assert.match(source, /Source diff/u);
+  assert.match(source, /CONTEXT_LIFECYCLE/u);
+  assert.match(source, /task-context-header/u);
+  assert.match(source, /task-context-tabs/u);
+  assert.match(source, /pendingSource/u);
+  assert.match(source, /Digest:/u);
+  assert.match(source, /aria-modal="true"/u);
 });
 
 test("web client reads the additive task projection without replacing intent mutations", () => {
   const source = fs.readFileSync(path.join(root, "src/control-plane-client.js"), "utf8");
   assert.match(source, /taskPayload:.*\/tasks/u);
   assert.match(source, /intentList:.*intent-submissions/u);
+});
+
+test("Task Workspace owns the full viewport without legacy project-settings chrome", () => {
+  const source = fs.readFileSync(path.join(root, "src/spa.jsx"), "utf8");
+  assert.match(source, /taskSurface \? "task-surface-active"/u);
+  assert.match(source, /activeProjectDisplay && !taskSurface/u);
 });
