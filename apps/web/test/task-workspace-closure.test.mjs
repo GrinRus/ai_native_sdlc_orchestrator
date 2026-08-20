@@ -12,6 +12,16 @@ test("W70-S08 closure fixture covers every source, lifecycle, and recovery branc
   assert.equal(fixture.provider_execution, "prohibited");
   assert.equal(fixture.upstream_write, "prohibited");
   assert.equal(fixture.screens.length, 8);
+  assert.equal(fixture.reference_assets.length, fixture.screens.length);
+  assert.deepEqual(fixture.reference_assets.map((asset) => asset.screen), fixture.screens);
+  for (const asset of fixture.reference_assets) {
+    const assetPath = path.join(root, "..", "..", asset.path);
+    assert.ok(fs.existsSync(assetPath), "missing target design reference: " + asset.path);
+    const png = fs.readFileSync(assetPath);
+    assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    assert.equal(png.readUInt32BE(16), asset.viewport.width);
+    assert.equal(png.readUInt32BE(20), asset.viewport.height);
+  }
   assert.deepEqual(fixture.scenarios.map((entry) => entry.id), [
     "text-only", "upload-markdown", "repository-markdown", "stale-source", "runner-unavailable", "attention",
     "failure", "review", "completion", "reload", "offline", "accessibility",
