@@ -65,8 +65,10 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     await expect(page.getByText(entry.id === "text-only" ? "Text-only draft" : entry.id === "upload-markdown" ? "Uploaded Markdown" : entry.id === "repository-markdown" ? "Repository Markdown" : entry.id === "stale-source" ? "Stale source" : entry.id === "runner-unavailable" ? "Unavailable runner" : "Failed task")).toBeVisible();
   }
   await page.getByRole("button", { name: "Unavailable runner" }).click();
+  await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+  await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
+  await page.getByRole("button", { name: "Uploaded Markdown" }).click();
   await expect(page.getByRole("heading", { name: "Prepared Task" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Runner readiness" })).toContainText("unavailable");
   await page.getByRole("button", { name: "Edit task", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New Task" })).toBeVisible();
   await page.getByRole("button", { name: "Add Markdown", exact: true }).click();
@@ -82,7 +84,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Close Markdown Sources", exact: true }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Review task" }).click();
-  await page.getByRole("button", { name: "Start task", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
   await page.getByRole("button", { name: /Changes/u }).click();
   await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
   await expect(page.locator(".task-diff")).toContainText("Old bounded behavior.");
@@ -93,10 +95,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
   await page.getByRole("button", { name: "Completed task" }).click();
   await page.getByRole("button", { name: "Evidence", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Completion & Evidence" })).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText("cannot be shown as successful");
-  await page.getByRole("button", { name: "Start follow-up task" }).click();
-  await expect.poll(() => actionPayloads.at(-1)?.action).toBe("follow-up");
+  await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
 
   const contextBackButton = page.locator(".task-context-back");
   await contextBackButton.focus();

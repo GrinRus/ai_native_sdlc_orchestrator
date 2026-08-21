@@ -6366,6 +6366,25 @@ function App() {
     }
   }
 
+  async function runTaskReviewDecision(task, decision, reason = "") {
+    if (!apiProjectBase || !task?.run_ids?.[0] || busy) {
+      setError("Review decision is unavailable until a durable run is selected.");
+      return null;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await runLifecycle("review decide", { run_id: task.run_ids[0], decision, ...(reason.trim() ? { reason: reason.trim() } : {}) });
+      await refresh({ silent: true });
+      return result;
+    } catch (decisionError) {
+      setError(decisionError instanceof Error ? decisionError.message : String(decisionError));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function loadTaskReview(taskId, selectedPath = null) {
     if (!apiProjectBase || !taskId) throw new Error("Task review is unavailable until the project is loaded.");
     const query = selectedPath ? `?path=${encodeURIComponent(selectedPath)}` : "";
@@ -6684,6 +6703,7 @@ function App() {
             onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
             onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
             onTaskAction={runTaskAction}
+            onReviewDecision={runTaskReviewDecision}
             loadTaskReview={loadTaskReview}
             actionBusy={busy}
             actionError={error}

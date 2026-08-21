@@ -119,6 +119,7 @@ function routeApi(request, response) {
   if (!url.pathname.startsWith(prefix)) return false;
   const suffix = url.pathname.slice(prefix.length);
   if (suffix === "/state") return json(response, 200, { project_id: projectId, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true }, read_only: true });
+  if (suffix === "/lifecycle-command/actions" && request.method === "POST") return json(response, 202, { lifecycle_command: { accepted: true, status: "accepted", command: "review decide" }, readback: { durable: true, task_status: "active", evidence_refs: ["evidence://review-decision/live-ui"] } });
   if (suffix === "/tasks") return json(response, 200, { project_id: projectId, selected_task_id: tasks[0].task_id, tasks, read_only: true });
   if (suffix.startsWith("/tasks/") && suffix.endsWith("/review")) {
     const selectedPath = url.searchParams.get("path") || review.selected_path;

@@ -19,7 +19,9 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /Tasks are temporarily unavailable/u);
   assert.match(source, /setFocusedTaskId/u);
   assert.match(source, /onTaskAction/u);
-  assert.match(source, /onTaskAction\?\.\(task, "request"/u);
+  assert.match(source, /request\("request"/u);
+  assert.match(source, /onReviewDecision/u);
+  assert.match(source, /taskHasCompletionProof/u);
   assert.match(source, /Ask AOR/u);
   assert.match(source, /actionBusy/u);
   assert.match(source, /Start follow-up task/u);
@@ -49,6 +51,8 @@ test("web client reads bounded Task review evidence separately from the Task lis
   assert.match(source, /async function loadTaskReview/u);
   assert.match(source, /tasks\/\$\{encodeURIComponent\(taskId\)\}\/review/u);
   assert.match(source, /loadTaskReview=\{loadTaskReview\}/u);
+  assert.match(source, /runTaskReviewDecision/u);
+  assert.match(source, /review decide/u);
 });
 
 test("Task Workspace owns the full viewport without legacy project-settings chrome", () => {
