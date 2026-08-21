@@ -1,0 +1,58 @@
+schema_version: 1
+task_id: task.project-atlas.flow-auth-142
+project_id: project-atlas
+availability: available
+files:
+  - path: docs/auth-timeouts.md
+    kind: markdown
+    additions: 5
+    deletions: 3
+    diff_available: true
+    truncated: false
+  - path: src/auth/timeout.ts
+    kind: text
+    additions: 4
+    deletions: 1
+    diff_available: true
+    truncated: false
+selected_path: docs/auth-timeouts.md
+selected_file:
+  path: docs/auth-timeouts.md
+  kind: markdown
+  additions: 5
+  deletions: 3
+  diff_available: true
+  truncated: false
+  hunks:
+    - old_start: 6
+      old_lines: 3
+      new_start: 6
+      new_lines: 5
+      rows:
+        - kind: deletion
+          old_line: 6
+          new_line: null
+          text: The idle timeout for authentication sessions is 10 minutes.
+        - kind: addition
+          old_line: null
+          new_line: 6
+          text: The idle timeout for authentication sessions is 15 minutes.
+        - kind: addition
+          old_line: null
+          new_line: 8
+          text: A warning is shown at 13 minutes of inactivity.
+  rendered:
+    before: The idle timeout for authentication sessions is 10 minutes.
+    after: |-
+      The idle timeout for authentication sessions is 15 minutes.
+
+      A warning is shown at 13 minutes of inactivity.
+    sanitized: true
+    partial: true
+  source_ref: evidence://projects/project-atlas/patches/AUTH-142.patch
+evidence_refs:
+  - evidence://projects/project-atlas/patches/AUTH-142.patch
+freshness:
+  status: current
+  updated_at: 2026-08-21T10:00:00.000Z
+read_only: true

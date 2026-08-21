@@ -80,9 +80,9 @@ The authoritative planning model for implementation lives in:
 | W67 | Move mutable state to central AOR Home and make code plus plain-language intent the primary onboarding path. | 5 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-67-implementation-slices.md` |
 | W68 | Reconcile, complete, and certify provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
-| W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 9 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
+| W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
 
-The current roadmap contains **383 slices across 71 waves**.
+The current roadmap contains **384 slices across 71 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |

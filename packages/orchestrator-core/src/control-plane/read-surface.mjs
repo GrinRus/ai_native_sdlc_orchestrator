@@ -23,6 +23,7 @@ export {
 } from "./flow-projections.mjs";
 
 export { listTaskProjections, readTaskProjection } from "./task-projections.mjs";
+export { readTaskReviewProjection } from "./task-review-projection.mjs";
 
 export { readAttentionProjection } from "./attention-projection.mjs";
 

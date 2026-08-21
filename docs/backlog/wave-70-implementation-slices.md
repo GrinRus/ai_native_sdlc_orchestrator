@@ -453,3 +453,78 @@ states; update stories/docs/runbooks; run package and repository gates.
 ### Out of scope
 
 - Hosted multi-user console or organization-wide portfolio orchestration.
+
+## W70-S10 — Task Workspace visual fidelity and review-proof remediation
+
+- **State:** done
+- **Epic:** EPIC-0, EPIC-4, EPIC-6, EPIC-7
+- **Hard dependencies:** W70-S08
+- **Primary modules:** review read contract, Task projection/API, Task Workspace UI, semantic tokens/components, responsive drawer, browser visual proof
+- **Primary user-story surfaces:** DEV-06, OPS-01, OPS-12, PBO-09, PBO-10
+
+**Purpose:** Close the evidence-backed gap between the accepted W70 Task
+Workspace target and the shipped local-browser implementation without moving
+lifecycle ownership into the browser or weakening the no-write boundary.
+
+**Changes:** Add a bounded query-safe Task review read model for real file and
+Markdown diffs; replace font glyphs with the shared outline icon system; align
+typography, list density, semantic controls, completion layout, and narrow
+inspector composition with the W70 target; strengthen same-state visual,
+responsive, accessibility, and console proof until no P0-P2 design-QA finding
+remains.
+
+### Local tasks
+
+1. **Restore acceptance and traceability truth.**
+   - Purpose: make the remediation reviewable without rewriting historical W70 evidence.
+   - Changes: register W70-S10 after W70-S08, link the design-QA report, and keep DEV-06, OPS-01, OPS-12, PBO-09, and PBO-10 closure claims scoped to executable proof.
+   - Validation: backlog status/plan, story reference, and dependency checks agree.
+2. **Define the bounded Task review read contract.**
+   - Purpose: let Review Changes show real evidence instead of browser-owned placeholder content.
+   - Changes: specify changed-file summaries, selected-file hunks, line numbers, Markdown rendered/source comparison, truncation, sanitization, freshness, and evidence lineage in the control-plane contract and OpenAPI examples.
+   - Validation: contract/API tests reject unsafe paths, active content, unbounded payloads, missing lineage, and unknown Tasks or files.
+3. **Implement the review projection and web behavior.**
+   - Purpose: make approval decisions inspectable from durable server-owned evidence.
+   - Changes: build the core/API read projection, client fetch state, selected-file behavior, meaningful diff rows, and Rendered/Source diff tabs with loading, empty, error, binary, and truncated states.
+   - Validation: projection, transport, client, component, and browser tests cover real changed content and fail closed.
+4. **Align the shared Task Workspace visual system.**
+   - Purpose: remove the largest cross-screen fidelity drift without one-off styling.
+   - Changes: reuse the shared outline Icon primitive, align the 28/18/14/12 type scale and density tokens, compact task rows, make select-looking controls semantic, and reflow Completion delivery/evidence content.
+   - Validation: UI foundation, keyboard, accessible-name, contrast, and target-comparison checks pass.
+5. **Complete narrow-layout composition.**
+   - Purpose: keep state, safety, and primary actions usable on tablet, mobile, and 200% zoom.
+   - Changes: add a visible inspector drawer trigger with focus trap/return and Escape close, preserve compact-navigation labels for assistive technology, and prevent overflow or clipped fixed actions.
+   - Validation: tablet, 390x844 mobile, zoom-200, reduced-motion, focus-order, and overflow browser checks pass.
+6. **Re-run installed visual acceptance.**
+   - Purpose: replace the blocked audit with reproducible acceptance evidence.
+   - Changes: match fixture content across all eight 1586x992 target states, retain raw console results, capture focused/mobile evidence, update comparison history, and run the slice and root gates.
+   - Validation: design QA reports zero P0/P1/P2 findings; browser proof, package smoke, `pnpm slice:gate`, and `pnpm check` pass.
+
+### Acceptance criteria
+
+1. Review Changes renders a bounded server-owned diff with selected-file,
+   source/rendered, loading, empty, error, binary, and truncated states; the
+   browser contains no hard-coded approval evidence.
+2. The eight desktop screens match the W70 visual hierarchy and density with
+   one outline icon system, semantic controls, and no visible text-glyph assets.
+3. Tablet, mobile, keyboard-only, 200% zoom, reduced motion, and inspector
+   drawer behavior preserve state, safety, and the primary action without
+   overflow, clipped content, or inaccessible icon-only navigation.
+4. Same-state visual evidence, contrast checks, and retained raw console output
+   leave no unresolved P0, P1, or P2 design-QA findings.
+5. Product, contracts, OpenAPI, examples, Task projections, API/web behavior,
+   browser proof, story coverage, and backlog state agree without changing the
+   W66 provider-qualification hold.
+
+### Done evidence
+
+- Updated Task review API/OpenAPI examples and contract/projection tests
+- Task Workspace component, accessibility, responsive, and browser tests
+- Eight same-state desktop comparisons plus tablet/mobile/zoom evidence
+- `design-qa.md` comparison history with final result `passed`
+- Story/reference checks, package smoke, `pnpm slice:gate`, and `pnpm check`
+
+### Out of scope
+
+- New Task lifecycle ownership, provider execution, hosted multi-user UI, a new
+  web framework, or a new component-library dependency.

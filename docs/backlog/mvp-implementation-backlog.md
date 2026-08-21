@@ -676,6 +676,7 @@ hold/readiness state is not changed by code-only completion.
 | W70-S06 | Attention, change review, and completion evidence | EPIC-4, EPIC-5, EPIC-6 | done | attention, diff/Markdown review, delivery/evidence completion, browser tests | W70-S05 |
 | W70-S07 | Design-system implementation and legacy UI retirement | EPIC-0, EPIC-6 | done | UI tokens/components, responsive CSS, legacy sources/assets, ratchets | W70-S06 |
 | W70-S08 | Installed Task Workspace proof and story closure | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | done | installed browser scenarios, product/story docs, runbooks, package proof | W70-S07 |
+| W70-S10 | Task Workspace visual fidelity and review-proof remediation | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | done | review read contract, Task projection/API, shared UI system, responsive drawer, visual proof | W70-S08 |
 
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work

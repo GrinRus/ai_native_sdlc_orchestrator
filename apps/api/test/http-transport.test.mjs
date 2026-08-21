@@ -992,6 +992,20 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(taskDetailPayload.task_id, guidedTask.task_id);
       assert.equal(taskDetailPayload.read_only, true);
 
+      const taskReviewResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(guidedTask.task_id)}/review`,
+      );
+      assert.equal(taskReviewResponse.status, 200);
+      const taskReviewPayload = await taskReviewResponse.json();
+      assert.equal(taskReviewPayload.task_id, guidedTask.task_id);
+      assert.equal(taskReviewPayload.read_only, true);
+      assert.ok(["available", "empty", "unavailable", "binary", "truncated"].includes(taskReviewPayload.availability));
+
+      const unsafeTaskReviewResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(guidedTask.task_id)}/review?path=${encodeURIComponent("../secret")}`,
+      );
+      assert.equal(unsafeTaskReviewResponse.status, 400);
+
       const taskRequestResponse = await postJson(
         `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(guidedTask.task_id)}/actions`,
         {

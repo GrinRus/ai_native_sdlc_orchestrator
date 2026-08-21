@@ -18,6 +18,7 @@ reference-base rules](canonical-identifiers-and-paths.md).
 - `intent-normalization-report.md`
 - `task-source-item.md`
 - `task-runner-selection.md`
+- `task-review.md`
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `execution-plan.md`
