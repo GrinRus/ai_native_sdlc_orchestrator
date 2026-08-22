@@ -19,13 +19,19 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /Tasks are temporarily unavailable/u);
   assert.match(source, /setFocusedTaskId/u);
   assert.match(source, /onTaskAction/u);
-  assert.match(source, /onTaskAction\?\.\(task, "request"/u);
+  assert.match(source, /request\("request"/u);
+  assert.match(source, /onReviewDecision/u);
+  assert.match(source, /taskHasCompletionProof/u);
   assert.match(source, /Ask AOR/u);
   assert.match(source, /actionBusy/u);
   assert.match(source, /Start follow-up task/u);
   assert.match(source, /Task completed/u);
-  assert.match(source, /task-rendered-preview/u);
+  assert.match(source, /task-rendered-comparison/u);
   assert.match(source, /Source diff/u);
+  assert.match(source, /loadTaskReview/u);
+  assert.match(source, /Diff unavailable/u);
+  assert.match(source, /Binary change/u);
+  assert.match(source, /task-inspector-drawer/u);
   assert.match(source, /CONTEXT_LIFECYCLE/u);
   assert.match(source, /task-context-header/u);
   assert.match(source, /task-context-tabs/u);
@@ -38,6 +44,15 @@ test("web client reads the additive task projection without replacing intent mut
   const source = fs.readFileSync(path.join(root, "src/control-plane-client.js"), "utf8");
   assert.match(source, /taskPayload:.*\/tasks/u);
   assert.match(source, /intentList:.*intent-submissions/u);
+});
+
+test("web client reads bounded Task review evidence separately from the Task list", () => {
+  const source = fs.readFileSync(path.join(root, "src/spa.jsx"), "utf8");
+  assert.match(source, /async function loadTaskReview/u);
+  assert.match(source, /tasks\/\$\{encodeURIComponent\(taskId\)\}\/review/u);
+  assert.match(source, /loadTaskReview=\{loadTaskReview\}/u);
+  assert.match(source, /runTaskReviewDecision/u);
+  assert.match(source, /review decide/u);
 });
 
 test("Task Workspace owns the full viewport without legacy project-settings chrome", () => {

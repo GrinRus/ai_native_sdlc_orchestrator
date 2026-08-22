@@ -382,6 +382,7 @@ graph TD
   W70S06[W70-S06 Attention change review and completion evidence]
   W70S07[W70-S07 Design-system implementation and legacy UI retirement]
   W70S08[W70-S08 Installed Task Workspace proof and story closure]
+  W70S10[W70-S10 Task Workspace visual fidelity and review-proof remediation]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -1575,6 +1576,7 @@ own the stricter terminal control proof evidence for this lane.
 | W70-S06 | W70-S05 |
 | W70-S07 | W70-S06 |
 | W70-S08 | W70-S07 |
+| W70-S10 | W70-S08 |
 
 ## Qualification gates
 
@@ -1980,6 +1982,7 @@ external.
 381. W70-S06
 382. W70-S07
 383. W70-S08
+384. W70-S10
 
 W66 weak-runner remediation edges:
 
@@ -2048,6 +2051,7 @@ graph TD
   W70S05 --> W70S06[W70-S06 Attention change review and completion evidence]
   W70S06 --> W70S07[W70-S07 Design-system implementation and legacy UI retirement]
   W70S07 --> W70S08[W70-S08 Installed Task Workspace proof and story closure]
+  W70S08 --> W70S10[W70-S10 Task Workspace visual fidelity and review-proof remediation]
 ```
 
 ## Planning rule

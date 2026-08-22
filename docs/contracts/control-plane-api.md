@@ -66,6 +66,13 @@ Flow lineage:
   runner-readiness metadata, and one server-owned primary action;
 - `GET /api/projects/:projectId/tasks/:taskId` returns one projection or a
   structured `task.not_found` error;
+- `GET /api/projects/:projectId/tasks/:taskId/review` returns a separate
+  bounded `task-review` read model for changed-file summaries and one selected
+  project-relative file. The optional `path` query is accepted only when it is
+  safe and belongs to the recorded changed set. Unified rows, Markdown
+  excerpts, truncation, binary state, freshness, and durable source refs remain
+  server-owned; the route never exposes execution roots or fabricates browser
+  diff content;
 - `POST /api/projects/:projectId/tasks/:taskId/actions` is the Task Workspace
   mutation facade. It delegates `confirm`/`start` to the existing intent
   CAS/idempotency boundary, `pause`/`resume`/`cancel` to server-owned

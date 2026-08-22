@@ -27,6 +27,7 @@ import {
   readStrategicSnapshot,
   listTaskProjections,
   readTaskProjection,
+  readTaskReviewProjection,
 } from "../read-surface.mjs";
 
 /**
@@ -124,6 +125,24 @@ export function handleReadRoute({ routeId, params, requestUrl, response, registr
         return;
       }
       sendJson(response, 200, task);
+      return;
+    }
+    case "task-review": {
+      const review = readTaskReviewProjection({
+        ...runtimeOptions,
+        taskId: params.taskId,
+        path: requestUrl.searchParams.get("path"),
+        intentSubmissions: registry ? listIntentSubmissions({ registry, projectId: params.projectId }).submissions : [],
+      });
+      if (!review) {
+        sendError(response, 404, "task.not_found", `Task '${params.taskId}' was not found.`);
+        return;
+      }
+      if (review.error) {
+        sendError(response, 400, review.error.code, review.error.detail);
+        return;
+      }
+      sendJson(response, 200, review);
       return;
     }
     case "selected-flow":

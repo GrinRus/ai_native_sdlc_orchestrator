@@ -22,9 +22,20 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
       { field: "readiness", allowedValues: ["ready", "unknown", "stale", "unavailable", "blocked"] },
     ],
   },
+  {
+    family: "task-review",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/task-review.md",
+    exampleGlob: "examples/tasks/task-review*.yaml",
+    status: "implemented",
+    requiredFields: ["schema_version", "task_id", "project_id", "availability", "files", "selected_path", "selected_file", "evidence_refs", "freshness", "read_only"],
+    fieldTypes: { schema_version: "number", task_id: "string", project_id: "string", availability: "string", files: "array", evidence_refs: "array", freshness: "object", read_only: "boolean" },
+    enumChecks: [{ field: "availability", allowedValues: ["available", "empty", "binary", "truncated", "unavailable"] }],
+  },
 ]);
 
 export const TASK_EXAMPLE_RULES = Object.freeze([
   { regex: /^examples\/tasks\/task-source-item[^/]*\.ya?ml$/, family: "task-source-item" },
   { regex: /^examples\/tasks\/task-runner-selection[^/]*\.ya?ml$/, family: "task-runner-selection" },
+  { regex: /^examples\/tasks\/task-review[^/]*\.ya?ml$/, family: "task-review" },
 ]);

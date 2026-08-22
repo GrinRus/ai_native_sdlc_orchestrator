@@ -1,6 +1,7 @@
 import React, { useId, useRef } from "react";
 import { Dialog } from "../dialog.jsx";
 import { requireSemanticTone } from "./semantics.js";
+export { Icon } from "./icon.jsx";
 
 export function Button({ variant = "secondary", size = "default", busy = false, className = "", children, ...props }) { return <button {...props} className={`aor-button ${className}`.trim()} data-variant={variant} data-size={size} aria-busy={busy ? "true" : undefined} disabled={props.disabled || busy}>{children}</button>; }
 export function IconButton({ label, children, ...props }) { return <Button {...props} className={`aor-icon-button ${props.className ?? ""}`.trim()} aria-label={label}>{children}</Button>; }

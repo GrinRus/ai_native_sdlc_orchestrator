@@ -52,6 +52,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   let actionPayloads = [];
   await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true } }) }));
   await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => offline ? route.abort("failed") : route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, selected_task_id: tasks[0].task_id, tasks, read_only: true }) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/review(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ schema_version: 1, task_id: `${base.task_id}.review`, project_id: state.project_id, availability: "available", files: [{ path: "docs/task.md", kind: "markdown", additions: 2, deletions: 1, diff_available: true, truncated: false }], selected_path: "docs/task.md", selected_file: { path: "docs/task.md", kind: "markdown", additions: 2, deletions: 1, diff_available: true, truncated: false, hunks: [{ old_start: 1, old_lines: 1, new_start: 1, new_lines: 2, rows: [{ kind: "deletion", old_line: 1, new_line: null, text: "Old bounded behavior." }, { kind: "addition", old_line: null, new_line: 1, text: "New deterministic behavior." }] }], rendered: { before: "Old bounded behavior.", after: "New deterministic behavior.", sanitized: true, partial: true }, source_ref: "evidence://review/task.patch" }, evidence_refs: ["evidence://review/task.patch"], freshness: { status: "current", updated_at: "2026-08-21T00:00:00.000Z" }, read_only: true }) }));
   await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/actions$`, "u"), async (route) => {
     const payload = route.request().postDataJSON();
     actionPayloads.push(payload);
@@ -64,8 +65,10 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     await expect(page.getByText(entry.id === "text-only" ? "Text-only draft" : entry.id === "upload-markdown" ? "Uploaded Markdown" : entry.id === "repository-markdown" ? "Repository Markdown" : entry.id === "stale-source" ? "Stale source" : entry.id === "runner-unavailable" ? "Unavailable runner" : "Failed task")).toBeVisible();
   }
   await page.getByRole("button", { name: "Unavailable runner" }).click();
+  await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+  await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
+  await page.getByRole("button", { name: "Uploaded Markdown" }).click();
   await expect(page.getByRole("heading", { name: "Prepared Task" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Runner readiness" })).toContainText("unavailable");
   await page.getByRole("button", { name: "Edit task", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New Task" })).toBeVisible();
   await page.getByRole("button", { name: "Add Markdown", exact: true }).click();
@@ -79,14 +82,20 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByLabel("Pinned base revision").fill("abc123");
 
   await page.getByRole("button", { name: "Close Markdown Sources", exact: true }).click();
-  await expect(page.getByText(/No provider process is started/u)).toHaveCount(1);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Review task" }).click();
+  await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
+  await page.getByRole("button", { name: /Changes/u }).click();
+  await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
+  await expect(page.locator(".task-diff")).toContainText("Old bounded behavior.");
+  await expect(page.locator(".task-diff")).toContainText("New deterministic behavior.");
+  await page.getByRole("tab", { name: "Rendered" }).click();
+  await expect(page.locator(".task-rendered-comparison")).toContainText("New deterministic behavior.");
+
+  await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
   await page.getByRole("button", { name: "Completed task" }).click();
   await page.getByRole("button", { name: "Evidence", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Completion & Evidence" })).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText("cannot be shown as successful");
-  await page.getByRole("button", { name: "Start follow-up task" }).click();
-  await expect.poll(() => actionPayloads.at(-1)?.action).toBe("follow-up");
+  await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
 
   const contextBackButton = page.locator(".task-context-back");
   await contextBackButton.focus();

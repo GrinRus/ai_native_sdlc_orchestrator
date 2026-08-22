@@ -1,4 +1,5 @@
 .aor-ui { color: var(--aor-color-text-primary); font-family: var(--aor-font-sans); font-size: var(--aor-type-body-size); line-height: var(--aor-type-body-line); }
+.aor-icon { display: block; width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
 .aor-ui :is(button, input, select, textarea, summary, [tabindex]):focus-visible { outline: var(--aor-focus-width) solid var(--aor-color-focus); outline-offset: 2px; }
 .aor-button { min-height: var(--aor-control-default); display: inline-flex; align-items: center; justify-content: center; gap: var(--aor-space-2); padding: 0 var(--aor-space-4); border: 1px solid var(--aor-color-border-strong); border-radius: var(--aor-radius-control); background: var(--aor-color-bg-surface); color: var(--aor-color-text-primary); font-weight: 650; transition: background var(--aor-motion-fast) var(--aor-ease-standard); }
 .aor-button:hover:not(:disabled) { background: var(--aor-color-bg-subtle); }

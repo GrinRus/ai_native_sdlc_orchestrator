@@ -13,7 +13,7 @@ import { ResourceErrorCard } from "./operator-error-card.jsx";
 import { PlanWorkbench } from "./plan-workbench.jsx";
 import { AddAorProjectDialog, EMPTY_PROJECT_SETUP, ProjectStructure } from "./project-structure.jsx";
 import { mergeProjectPreview } from "./project-snapshot.js"; import { QuietShell, readQuietPresentation, writeQuietPresentation } from "./quiet-shell.jsx"; import { QuietModeSurface } from "./quiet-modes.jsx";
-import { Alert, useRovingTabs } from "./ui/components.jsx";
+import { Alert, Icon, useRovingTabs } from "./ui/components.jsx";
 import "./ui/tokens.css"; import "./ui/components.css"; import "./spa.css"; import "./quiet-cockpit-polish.css"; import "./task-workspace.css";
 
 const STAGES = [
@@ -2090,76 +2090,6 @@ function selectedStageRuntimeCopy(stage, actionStage, state, completed) {
   if (state === "Active") return stage.hint;
   if (state === "Complete") return "Completed stage evidence is available for this selected flow.";
   return `Upcoming stage. The current recommended action remains scoped to ${actionStage.label}.`;
-}
-
-function Icon({ name }) {
-  const paths = {
-    refresh: (
-      <>
-        <path d="M20 12a8 8 0 0 1-13.66 5.66" />
-        <path d="M4 12A8 8 0 0 1 17.66 6.34" />
-        <path d="M17 2v5h5" />
-        <path d="M7 22v-5H2" />
-      </>
-    ),
-    folder: <path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />,
-    target: (
-      <>
-        <circle cx="12" cy="12" r="8" />
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-      </>
-    ),
-    plus: (
-      <>
-        <path d="M12 5v14" />
-        <path d="M5 12h14" />
-      </>
-    ),
-    play: <path d="m8 5 11 7-11 7V5Z" />,
-    copy: (
-      <>
-        <rect x="9" y="9" width="11" height="11" rx="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-      </>
-    ),
-    close: (
-      <>
-        <path d="M18 6 6 18" />
-        <path d="m6 6 12 12" />
-      </>
-    ),
-    lock: (
-      <>
-        <rect x="5" y="11" width="14" height="10" rx="2" />
-        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-      </>
-    ),
-    alert: (
-      <>
-        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-        <path d="M12 9v4" />
-        <path d="M12 17h.01" />
-      </>
-    ),
-    shield: (
-      <>
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-        <path d="m9 12 2 2 4-4" />
-      </>
-    ),
-    eye: (
-      <>
-        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
-        <circle cx="12" cy="12" r="3" />
-      </>
-    ),
-  };
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      {paths[name] ?? null}
-    </svg>
-  );
 }
 
 function IconButton({ label, children, onClick, disabled = false }) {
@@ -6436,6 +6366,31 @@ function App() {
     }
   }
 
+  async function runTaskReviewDecision(task, decision, reason = "") {
+    if (!apiProjectBase || !task?.run_ids?.[0] || busy) {
+      setError("Review decision is unavailable until a durable run is selected.");
+      return null;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await runLifecycle("review decide", { run_id: task.run_ids[0], decision, ...(reason.trim() ? { reason: reason.trim() } : {}) });
+      await refresh({ silent: true });
+      return result;
+    } catch (decisionError) {
+      setError(decisionError instanceof Error ? decisionError.message : String(decisionError));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadTaskReview(taskId, selectedPath = null) {
+    if (!apiProjectBase || !taskId) throw new Error("Task review is unavailable until the project is loaded.");
+    const query = selectedPath ? `?path=${encodeURIComponent(selectedPath)}` : "";
+    return readJson(`${apiProjectBase}/tasks/${encodeURIComponent(taskId)}/review${query}`);
+  }
+
   async function runPlanAction(action, payload = {}) {
     if (!apiProjectBase || !selectedFlow?.flow_id || busy) return;
     const scopeKey = `${apiProjectBase}:${selectedFlow.flow_id}`;
@@ -6748,6 +6703,8 @@ function App() {
             onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
             onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
             onTaskAction={runTaskAction}
+            onReviewDecision={runTaskReviewDecision}
+            loadTaskReview={loadTaskReview}
             actionBusy={busy}
             actionError={error}
             onRefresh={() => refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)))}

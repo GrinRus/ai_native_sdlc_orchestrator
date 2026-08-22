@@ -5,7 +5,7 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 26,
-    "source_manifest_sha256": "f4425bde8da27a95851bac3104d524d582ddd9853946ef36ca02a532a594e2e2"
+    "source_manifest_sha256": "2c2450feac82d75db39f7fbac9f051a219f7e8cf05fae97379a0d16e7f475961"
   },
   "files": {
     "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
@@ -17,7 +17,7 @@
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
     "families.mjs": "78da2f0abb318019165a4f36e950f4bf5335c5e44f8fa15fc82556c5836c8729",
-    "index.d.ts": "90c57e99d25b9dae87ed6e15ea8012322b0099639c9089153319f957538a2c26",
+    "index.d.ts": "62ffc41bb5926083ac5946a630c51b00d869da740e5df303f67ae31f8ffeb1b9",
     "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
@@ -31,7 +31,7 @@
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
-    "task-contract-families.mjs": "2f93efc2cf5636f2fdb72e03a2c70235b1f42cfb8f23f97167826219825f138c",
+    "task-contract-families.mjs": "2164f93ba8608ef667f4b39fc7231acb246e13d73e4505c01c80027072e5a5fc",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
   },
@@ -283,6 +283,47 @@
             "stale",
             "unavailable",
             "blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "family": "task-review",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/task-review.md",
+      "exampleGlob": "examples/tasks/task-review*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "task_id",
+        "project_id",
+        "availability",
+        "files",
+        "selected_path",
+        "selected_file",
+        "evidence_refs",
+        "freshness",
+        "read_only"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "task_id": "string",
+        "project_id": "string",
+        "availability": "string",
+        "files": "array",
+        "evidence_refs": "array",
+        "freshness": "object",
+        "read_only": "boolean"
+      },
+      "enumChecks": [
+        {
+          "field": "availability",
+          "allowedValues": [
+            "available",
+            "empty",
+            "binary",
+            "truncated",
+            "unavailable"
           ]
         }
       ]
@@ -3042,6 +3083,11 @@
       "regex_source": "^examples\\/tasks\\/task-runner-selection[^/]*\\.ya?ml$",
       "regex_flags": "",
       "family": "task-runner-selection"
+    },
+    {
+      "regex_source": "^examples\\/tasks\\/task-review[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-review"
     },
     {
       "regex_source": "^examples\\/prompts\\/[^/]+\\.ya?ml$",

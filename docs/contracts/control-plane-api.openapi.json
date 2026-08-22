@@ -638,6 +638,27 @@
         }
       }
     },
+    "/api/projects/{projectId}/tasks/{taskId}/review": {
+      "get": {
+        "operationId": "getTaskReview",
+        "tags": ["read"],
+        "x-aor-route-id": "task-review",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1 } },
+          { "name": "path", "in": "query", "required": false, "schema": { "type": "string", "minLength": 1 }, "description": "Safe project-relative path from the recorded changed-file set." }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/TaskReview" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "404": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
     "/api/projects/{projectId}/tasks/{taskId}/actions": {
       "post": {
         "operationId": "applyTaskWorkspaceAction",
@@ -1635,6 +1656,14 @@
         "content": {
           "application/json": {
             "schema": { "$ref": "#/components/schemas/TaskProjection" }
+          }
+        }
+      },
+      "TaskReview": {
+        "description": "Bounded query-safe Task review evidence for one selected changed file.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/TaskReviewResponse" }
           }
         }
       },
@@ -2913,6 +2942,75 @@
           "read_only": { "type": "boolean", "const": true }
         },
         "additionalProperties": true
+      },
+      "TaskReviewResponse": {
+        "type": "object",
+        "required": ["schema_version", "task_id", "project_id", "availability", "files", "selected_path", "selected_file", "evidence_refs", "freshness", "read_only"],
+        "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
+          "task_id": { "type": "string" },
+          "project_id": { "type": "string" },
+          "availability": { "type": "string", "enum": ["available", "empty", "binary", "truncated", "unavailable"] },
+          "files": { "type": "array", "maxItems": 200, "items": { "$ref": "#/components/schemas/TaskReviewFileSummary" } },
+          "selected_path": { "type": ["string", "null"] },
+          "selected_file": { "anyOf": [{ "$ref": "#/components/schemas/TaskReviewFile" }, { "type": "null" }] },
+          "evidence_refs": { "type": "array", "maxItems": 50, "items": { "type": "string" } },
+          "freshness": { "$ref": "#/components/schemas/JsonObject" },
+          "read_only": { "type": "boolean", "const": true }
+        },
+        "additionalProperties": false
+      },
+      "TaskReviewFileSummary": {
+        "type": "object",
+        "required": ["path", "kind", "additions", "deletions", "diff_available", "truncated"],
+        "properties": {
+          "path": { "type": "string" },
+          "kind": { "type": "string", "enum": ["markdown", "text", "binary"] },
+          "additions": { "type": "integer", "minimum": 0 },
+          "deletions": { "type": "integer", "minimum": 0 },
+          "diff_available": { "type": "boolean" },
+          "truncated": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "TaskReviewFile": {
+        "allOf": [
+          { "$ref": "#/components/schemas/TaskReviewFileSummary" },
+          {
+            "type": "object",
+            "required": ["hunks", "rendered", "source_ref"],
+            "properties": {
+              "hunks": { "type": "array", "items": { "$ref": "#/components/schemas/TaskReviewHunk" } },
+              "rendered": { "anyOf": [{ "$ref": "#/components/schemas/JsonObject" }, { "type": "null" }] },
+              "source_ref": { "type": ["string", "null"] }
+            }
+          }
+        ]
+      },
+      "TaskReviewHunk": {
+        "type": "object",
+        "required": ["old_start", "old_lines", "new_start", "new_lines", "rows"],
+        "properties": {
+          "old_start": { "type": "integer", "minimum": 0 },
+          "old_lines": { "type": "integer", "minimum": 0 },
+          "new_start": { "type": "integer", "minimum": 0 },
+          "new_lines": { "type": "integer", "minimum": 0 },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "old_line", "new_line", "text"],
+              "properties": {
+                "kind": { "type": "string", "enum": ["context", "addition", "deletion"] },
+                "old_line": { "type": ["integer", "null"], "minimum": 0 },
+                "new_line": { "type": ["integer", "null"], "minimum": 0 },
+                "text": { "type": "string", "maxLength": 4000 }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "TaskSourceItem": {
         "type": "object",
