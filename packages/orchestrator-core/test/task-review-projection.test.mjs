@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizeTaskReviewPath, parseUnifiedTaskReviewDiff } from "../src/control-plane/task-review-projection.mjs";
+import { normalizeTaskReviewPath, parseUnifiedTaskReviewDiff, sanitizeMarkdownExcerpt } from "../src/control-plane/task-review-projection.mjs";
 
 test("Task review path normalization rejects absolute and traversal paths", () => {
   assert.equal(normalizeTaskReviewPath("docs/auth.md"), "docs/auth.md");
@@ -43,4 +43,14 @@ Binary files a/assets/logo.png and b/assets/logo.png differ
 `);
   assert.equal(parsed.files[0].kind, "binary");
   assert.deepEqual(parsed.files[0].hunks, []);
+});
+
+test("Task review Markdown sanitizer removes unsafe HTML blocks with irregular closing tags", () => {
+  const sanitized = sanitizeMarkdownExcerpt(
+    `Visible <script type="application/javascript">alert(1)</script
+>after <style>body { display: none; }</style\t><span>text</span>`,
+  );
+  assert.doesNotMatch(sanitized, /<\/?(?:script|style)/iu);
+  assert.match(sanitized, /Visible .*after .*text/u);
+  assert.equal(sanitizeMarkdownExcerpt("before<script>untrusted"), "before");
 });

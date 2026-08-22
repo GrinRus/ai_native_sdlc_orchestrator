@@ -243,12 +243,81 @@ export function parseUnifiedTaskReviewDiff(source, options = {}) {
   return { files: files.filter((file) => file.path).slice(0, MAX_FILES), truncated };
 }
 
-function sanitizeMarkdownExcerpt(value) {
-  return String(value ?? "")
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/giu, "")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/giu, "")
-    .replace(/<[^>]+>/gu, "")
-    .slice(0, MAX_RENDERED_BYTES);
+function isHtmlWhitespace(code) {
+  return code === 0x09 || code === 0x0a || code === 0x0c || code === 0x0d || code === 0x20;
+}
+
+function isHtmlTagNameCharacter(code) {
+  return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a) || (code >= 0x30 && code <= 0x39) || code === 0x3a || code === 0x2d;
+}
+
+function findHtmlTagEnd(source, start) {
+  let quote = 0;
+  for (let index = start; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+    if (quote !== 0) {
+      if (code === quote) quote = 0;
+      continue;
+    }
+    if (code === 0x22 || code === 0x27) {
+      quote = code;
+      continue;
+    }
+    if (code === 0x3e) return index;
+  }
+  return -1;
+}
+
+function parseHtmlTag(source, start) {
+  const end = findHtmlTagEnd(source, start + 1);
+  if (end < 0) return null;
+  let cursor = start + 1;
+  while (cursor < end && isHtmlWhitespace(source.charCodeAt(cursor))) cursor += 1;
+  const closing = source.charCodeAt(cursor) === 0x2f;
+  if (closing) {
+    cursor += 1;
+    while (cursor < end && isHtmlWhitespace(source.charCodeAt(cursor))) cursor += 1;
+  }
+  const nameStart = cursor;
+  while (cursor < end && isHtmlTagNameCharacter(source.charCodeAt(cursor))) cursor += 1;
+  return { end, closing, name: source.slice(nameStart, cursor).toLowerCase() };
+}
+
+function findClosingHtmlTag(source, start, name) {
+  let cursor = start;
+  while (cursor < source.length) {
+    const open = source.indexOf("<", cursor);
+    if (open < 0) return -1;
+    const tag = parseHtmlTag(source, open);
+    if (!tag) return -1;
+    if (tag.closing && tag.name === name) return tag.end;
+    cursor = tag.end + 1;
+  }
+  return -1;
+}
+
+export function sanitizeMarkdownExcerpt(value) {
+  const source = String(value ?? "");
+  let output = "";
+  let cursor = 0;
+  while (cursor < source.length) {
+    const open = source.indexOf("<", cursor);
+    if (open < 0) {
+      output += source.slice(cursor);
+      break;
+    }
+    output += source.slice(cursor, open);
+    const tag = parseHtmlTag(source, open);
+    if (!tag) break;
+    if (!tag.closing && (tag.name === "script" || tag.name === "style")) {
+      const closingEnd = findClosingHtmlTag(source, tag.end + 1, tag.name);
+      if (closingEnd < 0) break;
+      cursor = closingEnd + 1;
+      continue;
+    }
+    cursor = tag.end + 1;
+  }
+  return output.slice(0, MAX_RENDERED_BYTES);
 }
 
 function renderedExcerpt(file) {
