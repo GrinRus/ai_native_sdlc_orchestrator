@@ -105,6 +105,15 @@ normative in their owning sources.
 
 ![Completion and Evidence](assets/w70-task-workspace-console/08-task-complete.png)
 
+The desktop images above remain the primary W70 visual target. The committed
+same-content mobile companion set at 390 × 844 is available under
+`assets/w70-task-workspace-console/mobile/01-tasks-home-390x844.png` through
+`08-completion-evidence-390x844.png`. The installed browser closure also writes
+the sampled WCAG contrast results to
+`assets/w70-task-workspace-console/task-workspace-contrast-report.json`.
+These artifacts are responsive acceptance evidence for the same eight states,
+not a separate product surface.
+
 ## Markdown source model
 
 Markdown is source material, not a hidden execution channel or a general-purpose

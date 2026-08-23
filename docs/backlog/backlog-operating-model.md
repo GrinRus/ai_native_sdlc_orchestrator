@@ -5,10 +5,11 @@ the single-active-slice rule. The S20-S25 deterministic chain is closed, but
 W66-S09 remains explicitly blocked by the required Anthropic provider cells'
 external runner quota failure. W67-S01 entered through its explicit
 release-only qualification gate. W68-W70 development slices were accepted
-through deterministic code, contracts, and local browser proof, while W70-S10
-is active to close the evidence-backed Task Workspace visual-fidelity and
-review-proof gap; this does not
-close W66-S09, clear the audit hold, or create provider qualification evidence.
+through deterministic code, contracts, and local browser proof. W70-S10 is done
+and closed the evidence-backed Task Workspace visual-fidelity and review-proof
+gap; any follow-up is branch-local maintenance validation and does not reopen
+W70 or create W71. This does not close W66-S09, clear the audit hold, or create
+provider qualification evidence.
 
 ## Purpose
 

@@ -394,7 +394,7 @@ test.describe.serial("installed local operator console", () => {
     await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
     await page.getByRole("button", { name: "Tasks", exact: true }).click();
     await page.getByRole("button", { name: /Prepare a safe Task Workspace/u }).click();
-    await page.getByRole("button", { name: /^Changes(?:\s|$)/u }).click();
+    await page.getByRole("tab", { name: /^Changes(?:\s|$)/u }).click();
     await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve changes", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve changes", exact: true })).toBeDisabled();

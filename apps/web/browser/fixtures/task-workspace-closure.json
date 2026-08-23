@@ -24,6 +24,17 @@
     { "screen": "review-changes", "path": "docs/product/assets/w70-task-workspace-console/07-review-changes.png", "viewport": { "width": 1586, "height": 992 } },
     { "screen": "completion-evidence", "path": "docs/product/assets/w70-task-workspace-console/08-task-complete.png", "viewport": { "width": 1586, "height": 992 } }
   ],
+  "evidence_assets": [
+    { "screen": "tasks-home-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/01-tasks-home-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "new-task-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/02-new-task-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "markdown-sources-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/03-markdown-sources-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "prepared-task-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/04-prepared-task-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "active-task-workspace-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/05-active-task-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "attention-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/06-attention-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "review-changes-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/07-review-changes-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "completion-evidence-mobile", "path": "docs/product/assets/w70-task-workspace-console/mobile/08-completion-evidence-390x844.png", "viewport": { "width": 390, "height": 844 } },
+    { "screen": "task-workspace-contrast-report", "path": "docs/product/assets/w70-task-workspace-console/task-workspace-contrast-report.json" }
+  ],
   "scenarios": [
     { "id": "text-only", "source_kind": "inline-text", "expected_state": "draft" },
     { "id": "upload-markdown", "source_kind": "upload-snapshot", "expected_state": "prepared" },
