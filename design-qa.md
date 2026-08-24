@@ -1,6 +1,6 @@
 # Task Workspace design QA
 
-Date: 2026-08-21
+Date: 2026-08-23
 Scope: W70 Task Workspace, eight target states
 Result: `passed`
 
@@ -18,8 +18,11 @@ The W70-S10 remediation closes every P1/P2 finding from the 2026-08-20 compariso
 - Desktop live inspection: 1586 × 992, all eight states reached through the UI, no document overflow, source and rendered review evidence visually inspected against the eight target references
 - Tablet live inspection: 768 × 1024, Review layout and inspector trigger visible, no document overflow (`12-tablet-review.png`)
 - Mobile live inspection: 390 × 844, wrapped long task title, no document overflow, mobile Review/Completion inspector triggers visible, drawer opens with focus on close and Escape returns focus to the opener (`09-mobile-completion.png`, `10-mobile-completion-drawer.png`, `11-mobile-review.png`)
+- Committed same-content mobile acceptance set: `docs/product/assets/w70-task-workspace-console/mobile/01-tasks-home-390x844.png` through `08-completion-evidence-390x844.png`
 - Narrow-layout stress: 793 × 496 CSS viewport (equivalent available CSS area for a 200% desktop zoom check), no document overflow (`13-zoom-equivalent-review.png`). The in-app browser does not expose a browser-level zoom control, so this is recorded as an equivalent stress check rather than an exact browser zoom measurement.
 - Live accessibility spot-check: 22 buttons on Review, zero unnamed buttons; `document.documentElement.scrollWidth === window.innerWidth` at desktop, tablet, mobile, and narrow-layout widths
+- Focused closure evidence: direct Review/Completion entry and return-to-Tasks navigation, desktop Review CTA inside the 1586 × 992 first viewport, Runner readiness alignment, detailed Markdown source anatomy, and 390 × 844 screenshots for all eight states
+- Numeric contrast evidence: `docs/product/assets/w70-task-workspace-console/task-workspace-contrast-report.json`; every sampled text/control pair passed its WCAG AA threshold (minimum sampled ratio 4.79:1)
 - Installed browser suite: 20 expected, 0 unexpected, 0 flaky
 - Focused web, API, and projection tests: passed
 - Production web build: passed
@@ -56,13 +59,21 @@ Repository, branch, runner, model/effort, and safety choices are native labelled
 
 Delivery metadata is vertically separated, long digests wrap, evidence remains left-scannable, and shared icons replace text glyphs.
 
+### Final closure pass — closed
+
+Review and Completion return to the app-owned Tasks Home state, the desktop
+Review action remains visible in the first viewport, Runner readiness stays
+inside its field at the narrow breakpoint, and Markdown source rows preserve
+type, size, validation, and digest context. Browser regressions cover these
+paths plus direct-entry URL recovery, mobile overflow, reduced motion, offline
+reload, and numeric contrast.
+
 ## Residual P3 polish
 
-- Add a dedicated same-content 390 × 844 visual reference set; current target images are desktop-only.
 - Tune minor one-pixel border/radius and icon-gap differences after the next reference refresh.
-- Add an automated numeric contrast report to complement the existing semantic-token and focus-state checks.
 
 ## History
 
 - Iteration 1 — 2026-08-20: blocked, 0 P0 / 3 P1 / 4 P2.
 - Iteration 2 — 2026-08-21: passed, 0 P0 / 0 P1 / 0 P2; P3 polish only.
+- Iteration 3 — 2026-08-23: passed, 0 P0 / 0 P1 / 0 P2; mobile and numeric contrast evidence added, with P3 polish only.

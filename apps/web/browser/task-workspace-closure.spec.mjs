@@ -5,6 +5,8 @@ import { expect, test } from "@playwright/test";
 import { readHarnessState } from "./harness.mjs";
 
 const closure = JSON.parse(fs.readFileSync(new URL("./fixtures/task-workspace-closure.json", import.meta.url), "utf8"));
+const w70AssetRoot = new URL("../../../docs/product/assets/w70-task-workspace-console/", import.meta.url);
+const updateUiEvidence = process.env.AOR_UPDATE_W70_UI_EVIDENCE === "1";
 
 async function blockExternalNetwork(page, appUrl) {
   const allowedOrigin = new URL(appUrl).origin;
@@ -13,6 +15,76 @@ async function blockExternalNetwork(page, appUrl) {
     if (url.origin === allowedOrigin || url.protocol === "data:" || url.protocol === "blob:") return route.continue();
     return route.abort("blockedbyclient");
   });
+}
+
+async function collectContrastSamples(page, screen, samples) {
+  return page.evaluate(({ screen: sampleScreen, samples: requestedSamples }) => {
+    const parseColor = (value) => {
+      const match = String(value).match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)/u);
+      return match ? { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]), a: match[4] === undefined ? 1 : Number(match[4]) } : null;
+    };
+    const composite = (foreground, background) => {
+      const alpha = foreground.a + background.a * (1 - foreground.a);
+      if (alpha === 0) return { r: 255, g: 255, b: 255, a: 1 };
+      return {
+        r: (foreground.r * foreground.a + background.r * background.a * (1 - foreground.a)) / alpha,
+        g: (foreground.g * foreground.a + background.g * background.a * (1 - foreground.a)) / alpha,
+        b: (foreground.b * foreground.a + background.b * background.a * (1 - foreground.a)) / alpha,
+        a: alpha,
+      };
+    };
+    const backgroundFor = (element) => {
+      const layers = [];
+      for (let current = element; current; current = current.parentElement) {
+        const color = parseColor(window.getComputedStyle(current).backgroundColor);
+        if (color && color.a > 0) layers.push(color);
+      }
+      return layers.reverse().reduce((background, layer) => composite(layer, background), { r: 255, g: 255, b: 255, a: 1 });
+    };
+    const luminance = ({ r, g, b }) => {
+      const channel = (value) => {
+        const normalized = value / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const ratio = (left, right) => {
+      const first = luminance(left);
+      const second = luminance(right);
+      return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    };
+    return requestedSamples.map(({ label, selector }) => {
+      const element = [...document.querySelectorAll(selector)].find((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        const style = window.getComputedStyle(candidate);
+        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+      });
+      if (!element) return { screen: sampleScreen, label, selector, status: "missing" };
+      const style = window.getComputedStyle(element);
+      const background = backgroundFor(element);
+      const parsedText = parseColor(style.color);
+      const text = parsedText ? composite(parsedText, background) : null;
+      const fontSize = Number.parseFloat(style.fontSize) || 0;
+      const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
+      const largeText = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700);
+      const requiredRatio = largeText ? 3 : 4.5;
+      const numericRatio = text ? Number(ratio(text, background).toFixed(2)) : 0;
+      return { screen: sampleScreen, label, selector, status: numericRatio >= requiredRatio ? "pass" : "fail", ratio: numericRatio, required_ratio: requiredRatio, font_size: fontSize, font_weight: fontWeight, foreground: style.color, background: `rgb(${Math.round(background.r)}, ${Math.round(background.g)}, ${Math.round(background.b)})` };
+    });
+  }, { screen, samples });
+}
+
+async function captureMobileEvidence(page, testInfo, name, filename) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".task-workspace-shell")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const screenshot = await page.screenshot({ fullPage: false });
+  await testInfo.attach(name, { body: screenshot, contentType: "image/png" });
+  if (updateUiEvidence) {
+    fs.mkdirSync(new URL("mobile/", w70AssetRoot), { recursive: true });
+    fs.writeFileSync(new URL(`mobile/${filename}`, w70AssetRoot), screenshot);
+  }
 }
 
 function taskFixture(state, overrides = {}) {
@@ -33,7 +105,7 @@ function taskFixture(state, overrides = {}) {
   };
 }
 
-test("W70-S08 installed Task Workspace closure covers sources, recovery, review, and immutable completion", async ({ page }) => {
+test("W70-S08 installed Task Workspace closure covers sources, recovery, review, and immutable completion", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const state = readHarnessState();
   await blockExternalNetwork(page, state.app_url);
@@ -47,6 +119,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     { ...base, task_id: `${base.task_id}.failure`, display_title: "Failed task", status: "attention", status_detail: "failed", attention_count: 1, blocker_count: 1 },
     { ...base, task_id: `${base.task_id}.review`, display_title: "Review task", status: "active", review: { verification_status: "pass", delivery_status: "pending", changed_paths: ["docs/task.md"], evidence_refs: ["evidence://review"] } },
     { ...base, task_id: `${base.task_id}.completed`, display_title: "Completed task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "blocked", verification_status: "partial", delivery_status: "pending", evidence_refs: ["evidence://partial"], follow_up_eligible: true } },
+    { ...base, task_id: `${base.task_id}.complete-proof`, display_title: "Completed proof task", status: "completed", status_detail: "completed", completed_read_only: true, completion: { status: "complete", verification_status: "pass", delivery_status: "pass", patch_ref: "evidence://delivery/closure.patch", digest: "e".repeat(64), evidence_refs: ["evidence://completion/closure"], follow_up_eligible: true } },
   ];
   let offline = false;
   let actionPayloads = [];
@@ -59,25 +132,56 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
     await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ action: payload.action, readback: { durable: true, task_id: tasks.at(-1).task_id, new_intent_submission_id: "intent.follow-up" } }) });
   });
 
+  await page.setViewportSize({ width: 1586, height: 992 });
   await page.goto(state.app_url);
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await captureMobileEvidence(page, testInfo, "w70-mobile-tasks-home-390x844", "01-tasks-home-390x844.png");
+  await page.setViewportSize({ width: 1586, height: 992 });
   for (const entry of closure.scenarios.filter(({ id }) => ["text-only", "upload-markdown", "repository-markdown", "stale-source", "runner-unavailable", "failure"].includes(id))) {
     await expect(page.getByText(entry.id === "text-only" ? "Text-only draft" : entry.id === "upload-markdown" ? "Uploaded Markdown" : entry.id === "repository-markdown" ? "Repository Markdown" : entry.id === "stale-source" ? "Stale source" : entry.id === "runner-unavailable" ? "Unavailable runner" : "Failed task")).toBeVisible();
   }
   await page.getByRole("button", { name: "Unavailable runner" }).click();
   await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+  await captureMobileEvidence(page, testInfo, "w70-mobile-attention-390x844", "06-attention-390x844.png");
+  await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
-  await page.getByRole("button", { name: "Uploaded Markdown" }).click();
+  await page.getByRole("button", { name: "Repository Markdown" }).click();
   await expect(page.getByRole("heading", { name: "Prepared Task" })).toBeVisible();
+  await captureMobileEvidence(page, testInfo, "w70-mobile-prepared-task-390x844", "04-prepared-task-390x844.png");
+  await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("button", { name: "Edit task", exact: true }).click();
   await expect(page.getByRole("heading", { name: "New Task" })).toBeVisible();
+  const runnerField = page.locator(".task-run-field--runner");
+  const runnerReadiness = runnerField.locator(".task-readiness");
+  const [runnerFieldBox, runnerReadinessBox] = await Promise.all([runnerField.boundingBox(), runnerReadiness.boundingBox()]);
+  expect(runnerFieldBox).not.toBeNull();
+  expect(runnerReadinessBox).not.toBeNull();
+  expect(runnerReadinessBox.x + runnerReadinessBox.width).toBeLessThanOrEqual(runnerFieldBox.x + runnerFieldBox.width + 1);
+  const contrastReport = await collectContrastSamples(page, "new-task", [
+    { label: "screen heading", selector: ".task-workspace__breadcrumb h1" },
+    { label: "section heading", selector: ".task-form-section h2" },
+    { label: "runner readiness", selector: ".task-readiness" },
+    { label: "safety note", selector: ".task-safety" },
+    { label: "provider note", selector: ".task-provider-note" },
+  ]);
+  await captureMobileEvidence(page, testInfo, "w70-mobile-new-task-390x844", "02-new-task-390x844.png");
   await page.getByRole("button", { name: "Add Markdown", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Markdown Sources" })).toBeVisible();
-  await page.getByRole("button", { name: "Upload snapshot", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Close Markdown Sources", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Add Markdown source" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add Markdown", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Add Markdown", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Markdown Sources" })).toBeVisible();
+  await captureMobileEvidence(page, testInfo, "w70-mobile-markdown-sources-390x844", "03-markdown-sources-390x844.png");
+  const repositorySourceRow = page.locator(".task-source-row--detailed").filter({ hasText: "docs/task.md" });
+  await expect(repositorySourceRow.getByText("Repository reference", { exact: true })).toHaveCount(1);
+  await expect(repositorySourceRow.locator(".task-source-row__digest")).toHaveAttribute("title", "c".repeat(64));
+  await page.getByRole("tab", { name: "Upload snapshot", exact: true }).click();
   await page.getByLabel("Upload Markdown").setInputFiles({ name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("# Uploaded\n<script>alert('blocked')</script>") });
   await expect(page.locator(".task-markdown-preview")).toContainText("# Uploaded");
   await expect(page.locator(".task-markdown-preview")).not.toContainText("alert");
-  await page.getByRole("button", { name: "Repository file", exact: true }).click();
+  await page.getByRole("tab", { name: "Repository file", exact: true }).click();
   await page.getByLabel("Project-relative Markdown path").fill("docs/task.md");
   await page.getByLabel("Pinned base revision").fill("abc123");
 
@@ -85,23 +189,90 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Review task" }).click();
   await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
-  await page.getByRole("button", { name: /Changes/u }).click();
+  await expect(page.getByRole("tab", { name: "Activity", exact: true })).toBeVisible();
+  await captureMobileEvidence(page, testInfo, "w70-mobile-active-task-390x844", "05-active-task-390x844.png");
+  await page.setViewportSize({ width: 1586, height: 992 });
+  await page.getByRole("tab", { name: /Changes/u }).click();
   await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
   await expect(page.locator(".task-diff")).toContainText("Old bounded behavior.");
   await expect(page.locator(".task-diff")).toContainText("New deterministic behavior.");
   await page.getByRole("tab", { name: "Rendered" }).click();
   await expect(page.locator(".task-rendered-comparison")).toContainText("New deterministic behavior.");
+  const approveButton = page.getByRole("button", { name: "Approve changes", exact: true });
+  await expect(approveButton).toBeDisabled();
+  await expect(page.getByText("Approve changes is available after verification, reference integrity, and review evidence all pass.", { exact: true })).toBeVisible();
+  const approveBox = await approveButton.boundingBox();
+  expect(approveBox).not.toBeNull();
+  expect(approveBox.y).toBeGreaterThanOrEqual(0);
+  expect(approveBox.y + approveBox.height).toBeLessThanOrEqual(992);
+  contrastReport.push(...await collectContrastSamples(page, "review-changes", [
+    { label: "task title", selector: ".task-context-title h2" },
+    { label: "tasks navigation", selector: ".task-context-back" },
+    { label: "review status", selector: ".task-context-status--review" },
+    { label: "changed file", selector: ".task-review-files button.is-selected span" },
+    { label: "rendered diff", selector: ".task-rendered-comparison pre" },
+    { label: "primary approval", selector: ".task-review-layout .task-screen-footer [data-variant='primary']" },
+  ]));
 
-  await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
+  await captureMobileEvidence(page, testInfo, "w70-mobile-review-390x844", "07-review-changes-390x844.png");
+  const contextBackButton = page.locator(".task-context-back");
+  await contextBackButton.focus();
+  await expect(contextBackButton).toBeFocused();
+  await contextBackButton.click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await expect(page).toHaveURL(/surface=tasks/u);
+  expect(new URL(page.url()).searchParams.has("task")).toBe(false);
+
+  const directReviewUrl = new URL(state.app_url);
+  directReviewUrl.searchParams.set("surface", "tasks");
+  directReviewUrl.searchParams.set("task", `${base.task_id}.review`);
+  await page.setViewportSize({ width: 1586, height: 992 });
+  await page.goto(directReviewUrl.href);
+  await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
+  await page.getByRole("tab", { name: /Changes/u }).click();
+  await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
+  await page.locator(".task-context-back").click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  expect(new URL(page.url()).searchParams.has("task")).toBe(false);
+
+  const directCompletionUrl = new URL(state.app_url);
+  directCompletionUrl.searchParams.set("surface", "tasks");
+  directCompletionUrl.searchParams.set("task", `${base.task_id}.completed`);
+  await page.goto(directCompletionUrl.href);
+  await expect(page.getByRole("alert")).toContainText("Closure evidence is not complete.");
+  await expect(page.getByRole("heading", { name: "Task completed" })).toHaveCount(0);
+
+  const directProofUrl = new URL(state.app_url);
+  directProofUrl.searchParams.set("surface", "tasks");
+  directProofUrl.searchParams.set("task", `${base.task_id}.complete-proof`);
+  await page.goto(directProofUrl.href);
+  await expect(page.getByRole("heading", { name: "Completion & Evidence" })).toBeVisible();
+  contrastReport.push(...await collectContrastSamples(page, "completion-evidence", [
+    { label: "task title", selector: ".task-context-title h2" },
+    { label: "completion status", selector: ".task-context-status--complete" },
+    { label: "completion summary", selector: ".task-completion-summary > header p" },
+    { label: "delivery success", selector: ".task-delivery-success" },
+    { label: "follow-up action", selector: ".task-complete-inspector [data-variant='primary']" },
+  ]));
+  await captureMobileEvidence(page, testInfo, "w70-mobile-completion-390x844", "08-completion-evidence-390x844.png");
+  await page.getByRole("button", { name: "Closure details", exact: true }).click();
+  await page.getByRole("button", { name: "Back to tasks", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  expect(new URL(page.url()).searchParams.has("task")).toBe(false);
+
+  expect(contrastReport.filter((sample) => sample.status !== "pass")).toEqual([]);
+  const contrastEvidence = Buffer.from(`${JSON.stringify({ schema_version: 1, standard: "WCAG 2.2 AA", method: "computed foreground/background relative luminance", samples: contrastReport }, null, 2)}\n`);
+  await testInfo.attach("w70-task-workspace-numeric-contrast", {
+    body: contrastEvidence,
+    contentType: "application/json",
+  });
+  if (updateUiEvidence) fs.writeFileSync(new URL("task-workspace-contrast-report.json", w70AssetRoot), contrastEvidence);
+
   await page.getByRole("button", { name: "Completed task" }).click();
   await page.getByRole("button", { name: "Evidence", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();
 
-  const contextBackButton = page.locator(".task-context-back");
-  await contextBackButton.focus();
-  await expect(contextBackButton).toBeFocused();
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   offline = true;
   await page.reload();

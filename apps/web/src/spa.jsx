@@ -6702,6 +6702,7 @@ function App() {
             selectedTaskId={selectedTaskId}
             onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
             onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
+            onOpenProject={() => { setConsoleSurface("home"); writeConsoleSurface("home", { projectId: activeProjectId }); }}
             onTaskAction={runTaskAction}
             onReviewDecision={runTaskReviewDecision}
             loadTaskReview={loadTaskReview}
