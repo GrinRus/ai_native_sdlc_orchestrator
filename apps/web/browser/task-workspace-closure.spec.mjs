@@ -177,11 +177,11 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   const repositorySourceRow = page.locator(".task-source-row--detailed").filter({ hasText: "docs/task.md" });
   await expect(repositorySourceRow.getByText("Repository reference", { exact: true })).toHaveCount(1);
   await expect(repositorySourceRow.locator(".task-source-row__digest")).toHaveAttribute("title", "c".repeat(64));
-  await page.getByRole("button", { name: "Upload snapshot", exact: true }).click();
+  await page.getByRole("tab", { name: "Upload snapshot", exact: true }).click();
   await page.getByLabel("Upload Markdown").setInputFiles({ name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("# Uploaded\n<script>alert('blocked')</script>") });
   await expect(page.locator(".task-markdown-preview")).toContainText("# Uploaded");
   await expect(page.locator(".task-markdown-preview")).not.toContainText("alert");
-  await page.getByRole("button", { name: "Repository file", exact: true }).click();
+  await page.getByRole("tab", { name: "Repository file", exact: true }).click();
   await page.getByLabel("Project-relative Markdown path").fill("docs/task.md");
   await page.getByLabel("Pinned base revision").fill("abc123");
 
