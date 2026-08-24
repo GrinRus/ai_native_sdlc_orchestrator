@@ -167,6 +167,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await captureMobileEvidence(page, testInfo, "w70-mobile-new-task-390x844", "02-new-task-390x844.png");
   await page.getByRole("button", { name: "Add Markdown", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Markdown Sources" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add 1 source", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Close Markdown Sources", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Add Markdown source" })).toHaveCount(0);
