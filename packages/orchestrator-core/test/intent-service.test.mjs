@@ -252,6 +252,36 @@ test("confirm rejects a stale prepared revision before creating a Mission", asyn
   });
 });
 
+test("confirm-and-start rejects a stale prepared revision before starting a Flow", async () => {
+  await withTempRepo({ prefix: "aor-intent-start-stale-", workspaceRoot }, (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-start-stale-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      const created = createIntentSubmission({ registry, projectId, requestText: "Start the bounded task.", autoPrepare: false });
+      const first = reviseIntentSubmission({
+        registry,
+        projectId,
+        submissionId: created.submission.submission_id,
+        normalization: {
+          title: "Start bounded task",
+          outcome: "Start the bounded task after review.",
+          constraints: [], acceptance: ["The task starts only from the current revision."], scope: ["src/**"],
+          work_type: "code-change", assumptions: [], open_questions: [], confidence: 0.8,
+        },
+      });
+      reviseIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id, normalization: { ...first.report, title: "Start revised bounded task" } });
+      assert.throws(
+        () => confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id, expectedRevision: 1 }),
+        (error) => error instanceof IntentServiceError && error.code === "intent_submission.stale_revision" && error.details.current_revision === 2,
+      );
+      assert.equal(readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission.confirmation, undefined);
+    } finally {
+      fs.rmSync(aorHome, { recursive: true, force: true });
+    }
+  });
+});
+
 test("intent submission rejects unsupported and oversized attachments", async () => {
   await withTempRepo({ prefix: "aor-intent-invalid-", workspaceRoot }, (projectRoot) => {
     const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-invalid-home-"));

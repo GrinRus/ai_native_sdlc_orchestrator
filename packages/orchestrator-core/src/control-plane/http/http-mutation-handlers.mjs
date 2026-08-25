@@ -422,7 +422,7 @@ export async function handleTaskAction({ request, response, params, registry, ru
       }
       const result = action === "confirm"
         ? confirmIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision })
-        : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId });
+        : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision });
       sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: { durable: true, task_id: task.task_id, flow_id: result.flow_id ?? null } });
       return;
     }

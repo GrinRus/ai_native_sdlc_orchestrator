@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "9e431f9f1a06b3c755101069795029496f836dbe96bd43a5b3a779063fa22ccb",
+  "source_hash": "c10befe08a35a716285e80d4ed5d7226110563563c66b091faead903c4bd167a",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -45,12 +45,12 @@
   ],
   "dist_files": [
     "apps/web/dist/assets/index-BdgyN-fj.css",
-    "apps/web/dist/assets/index-CU--bIB7.js",
+    "apps/web/dist/assets/index-Dpu5RPLB.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
     "apps/web/dist/assets/index-BdgyN-fj.css": "c26c004ffdda92f2774d739c7fcd1e3dd63e07c92b68f6cd2f14c1de1fa3e0b4",
-    "apps/web/dist/assets/index-CU--bIB7.js": "4babd32ab85a25f26d53c8003b504bc8cde1164c33cc6a00949198464a16f3a2",
-    "apps/web/dist/index.html": "a90db080632e0d3b228b3cd9c07acd93fba34eaf039cb0ae1a6b700816a158c7"
+    "apps/web/dist/assets/index-Dpu5RPLB.js": "57214d4b595a2f01b6cfc430adf4ade17d380d4ccd184493becea68d8ab762d9",
+    "apps/web/dist/index.html": "10b1a4e2bf4708fc4b7e146fc98154fc46e59b42e59a434ddc17480da73010a9"
   }
 }

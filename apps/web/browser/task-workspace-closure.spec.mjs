@@ -134,7 +134,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
 
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.goto(state.app_url);
-  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
   await captureMobileEvidence(page, testInfo, "w70-mobile-tasks-home-390x844", "01-tasks-home-390x844.png");
   await page.setViewportSize({ width: 1586, height: 992 });
   for (const entry of closure.scenarios.filter(({ id }) => ["text-only", "upload-markdown", "repository-markdown", "stale-source", "runner-unavailable", "failure"].includes(id))) {
@@ -146,7 +146,7 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("button", { name: "Tasks", exact: true }).first().click();
   await page.getByRole("button", { name: "Repository Markdown" }).click();
-  await expect(page.getByRole("heading", { name: "Prepared Task" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Prepared Task", exact: true })).toBeVisible();
   await captureMobileEvidence(page, testInfo, "w70-mobile-prepared-task-390x844", "04-prepared-task-390x844.png");
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("button", { name: "Edit task", exact: true }).click();
@@ -278,4 +278,55 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   offline = true;
   await page.reload();
   await expect(page.getByText(/Tasks are temporarily unavailable|Task data is partially available/u)).toBeVisible();
+});
+
+test("Task Workspace creates a server-owned prepared Task before exposing Start", async ({ page }) => {
+  const state = readHarnessState();
+  await blockExternalNetwork(page, state.app_url);
+  const submissionId = "intent.browser-task-create";
+  const preparedTask = taskFixture(state, {
+    task_id: `task.${state.project_id}.intent.${submissionId}`,
+    display_title: "Server prepared task",
+    status: "prepared",
+    status_detail: "prepared",
+    flow_id: null,
+    mission_id: null,
+    lineage: { intent_submission_id: submissionId, intent_submission_ref: `evidence://intent/${submissionId}`, mission_id: null, flow_id: null },
+    intent_submission_ref: `evidence://intent/${submissionId}`,
+    primary_action: { action_id: "confirm", operator_control: "Start task", reason: "Prepared and ready", available: true },
+    revision: 1,
+    normalization: { outcome: "Make the task creation path durable." },
+    lifecycle_path: { owner: "runtime", steps: [{ id: "prepare", label: "Prepare", state: "completed" }] },
+  });
+  let tasks = [];
+  let submissionPayload = null;
+  let actionPayload = null;
+  await page.route(new RegExp(`/api/projects/${state.project_id}/state$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, initialized: true, state: "ready", onboarding_summary: { initialized: true, state_exists: true } }) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks(?:\\?.*)?$`, "u"), (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, selected_task_id: tasks[0]?.task_id ?? null, tasks, read_only: true }) }));
+  await page.route(new RegExp(`/api/projects/${state.project_id}/intent-submissions$`, "u"), async (route) => {
+    if (route.request().method() === "POST") {
+      submissionPayload = route.request().postDataJSON();
+      tasks = [preparedTask];
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ submission: { submission_id: submissionId, status: "prepared", request_text: submissionPayload.request_text }, normalization: preparedTask.normalization }) });
+      return;
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ project_id: state.project_id, submissions: [], read_only: true }) });
+  });
+  await page.route(new RegExp(`/api/projects/${state.project_id}/tasks/.+/actions$`, "u"), async (route) => {
+    actionPayload = route.request().postDataJSON();
+    tasks = [{ ...preparedTask, status: "active", status_detail: "active", primary_action: { action_id: "review", operator_control: "Review changes", reason: "Review the recorded result", available: true } }];
+    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ action: actionPayload.action, confirmation: { flow_id: "flow.browser-task-create" }, readback: { durable: true, task_id: preparedTask.task_id, flow_id: "flow.browser-task-create" } }) });
+  });
+
+  await page.goto(`${state.app_url}?surface=tasks`);
+  await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
+  await page.getByRole("button", { name: "New task", exact: true }).click();
+  await page.getByLabel("Task outcome").fill("Make the task creation path durable.");
+  await page.getByRole("button", { name: "Prepare task", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Prepared Task", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start task", exact: true })).toBeEnabled();
+  expect(submissionPayload).toMatchObject({ request_text: "Make the task creation path durable.", attachments: [], markdown_sources: [], auto_prepare: true });
+  await page.getByRole("button", { name: "Start task", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
+  expect(actionPayload).toEqual({ action: "confirm", expected_revision: 1 });
 });

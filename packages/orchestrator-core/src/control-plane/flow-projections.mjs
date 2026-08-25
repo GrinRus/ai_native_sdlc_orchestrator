@@ -427,7 +427,7 @@ function artifactDisplaySummariesForRefs(refs, summariesByRef, stage) {
  * @returns {Record<string, unknown>}
  */
 function buildClosureProjection(options) {
-  const closureState = asRecord(options.report?.closure_state);
+  const closureState = asRecord(options.report?.closure_state), delivery = asRecord(closureState.delivery);
   const learning = asRecord(closureState.learning);
   const sourceLearningHandoffRefs = resolveSourceLearningHandoffRefs(options.report);
   return {
@@ -437,7 +437,7 @@ function buildClosureProjection(options) {
     review_status: asString(asRecord(closureState.review).status), verification_status: asString(asRecord(closureState.verification).status), delivery_status: asString(asRecord(closureState.delivery).status),
     follow_up_eligible: options.status === "completed" && sourceLearningHandoffRefs.length > 0,
     learning_status: asString(learning.status),
-    source_run_id: asString(closureState.run_id),
+    source_run_id: asString(closureState.run_id), patch_ref: asString(delivery.patch_ref) ?? asString(closureState.patch_ref), digest: asString(delivery.digest) ?? asString(closureState.digest), delivery_manifest_ref: asString(delivery.delivery_manifest_ref),
     source_learning_handoff_refs: sourceLearningHandoffRefs,
     recommended_follow_up_source_handoff_ref: sourceLearningHandoffRefs[0] ?? null,
     follow_up_source_handoff_ref: options.followUpSourceHandoffRef,

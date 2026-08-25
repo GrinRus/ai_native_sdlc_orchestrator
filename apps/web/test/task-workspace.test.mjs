@@ -32,7 +32,7 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /Diff unavailable/u);
   assert.match(source, /Binary change/u);
   assert.match(source, /task-inspector-drawer/u);
-  assert.match(source, /CONTEXT_LIFECYCLE/u);
+  assert.match(source, /lifecycle_path\?\.steps/u);
   assert.match(source, /task-context-header/u);
   assert.match(source, /task-context-tabs/u);
   assert.match(source, /pendingSource/u);

@@ -350,7 +350,7 @@ test.describe.serial("installed local operator console", () => {
       lineage: { intent_submission_ref: "evidence://intent/task-fixture", mission_id: "mission.task-fixture", flow_id: "flow.task-fixture" },
       source_items: [], lifecycle_path: { owner: "runtime", steps: [{ id: "discovery", state: "current" }] }, current_step: "discovery", current_step_label: "Discover",
       attention_count: 0, blocker_count: 0, evidence_refs: ["evidence://intent/task-fixture"],
-      primary_action: { action_id: "task.prepare", operator_control: "Prepare", reason: "Ready", available: true },
+      primary_action: { action_id: "start", operator_control: "Start task", reason: "Ready", available: true },
       runner_selection: { source: "project-default", route_id: "route.implement.simulation", readiness: "ready" }, run_ids: [], updated_at: "2026-08-13T00:00:00.000Z", completed_read_only: false, read_only: true,
     };
     const taskVariants = [

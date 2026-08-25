@@ -71,6 +71,9 @@ function taskCompletionProjection(flow) {
   const reviewStatus = asString(closure.review_status);
   const verificationStatus = asString(closure.verification_status);
   const deliveryStatus = asString(closure.delivery_status);
+  const deliveryManifestRef = asString(closure.delivery_manifest_ref);
+  const patchRef = asString(closure.patch_ref);
+  const digest = asString(closure.digest);
   const pass = new Set(["pass", "passed", "approved", "complete", "completed", "ready"]);
   const evidenceComplete = flow.status === "completed" && pass.has(reviewStatus) && pass.has(verificationStatus) && pass.has(deliveryStatus);
   return {
@@ -78,6 +81,9 @@ function taskCompletionProjection(flow) {
     immutable: flow.status === "completed",
     verification_status: verificationStatus ?? "unknown",
     delivery_status: deliveryStatus ?? "unknown",
+    patch_ref: patchRef,
+    digest,
+    delivery_manifest_ref: deliveryManifestRef,
     evidence_refs: asStringArray(flow.evidence_refs),
     follow_up_eligible: flow.status === "completed",
   };
@@ -185,9 +191,9 @@ function projectIntentTask({ projectId, entry }) {
     blocker_count: status === "attention" ? 1 : 0,
     evidence_refs: asStringArray(submission.normalization_refs),
     primary_action: {
-      action_id: status === "prepared" ? "intent.review" : "intent.resume",
-      operator_control: status === "prepared" ? "Review prepared task" : "Resume task preparation",
-      reason: status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
+      action_id: status === "prepared" ? "confirm" : "intent.resume",
+      operator_control: status === "prepared" ? "Start task" : "Resume task preparation",
+      reason: status === "prepared" ? "Prepared task is ready for revision-checked confirmation." : status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
       available: true,
     },
     runner_selection: {
