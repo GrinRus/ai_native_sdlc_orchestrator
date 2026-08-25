@@ -5815,6 +5815,7 @@ function App() {
         projectState: null,
         nextAction: null,
         selectedFlow: null,
+        taskPayload: { tasks: [], selected_task_id: null },
         selectionApplied: selectionStillCurrent,
       };
     }
@@ -5915,6 +5916,7 @@ function App() {
       projectState: state,
       nextAction: nextReport?.primary_action ? nextReport : null,
       selectedFlow: selectionStillCurrent ? refreshedSelectedFlow : selectedFlow,
+      taskPayload: refreshedTaskPayload ?? { tasks: [], selected_task_id: null },
       selectionApplied: selectionStillCurrent,
     };
   }
@@ -6366,6 +6368,26 @@ function App() {
     }
   }
 
+  async function createTaskFromWorkspace({ requestText, attachments = [], markdownSources = [] } = {}) {
+    if (!apiProjectBase || busy) return null;
+    setBusy(true); setError("");
+    try {
+      const created = await readJson(`${apiProjectBase}/intent-submissions`, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ request_text: requestText, attachments, markdown_sources: markdownSources, auto_prepare: true }),
+      });
+      const refreshed = await refresh({ silent: true });
+      const submissionId = created?.submission?.submission_id;
+      return refreshed?.taskPayload?.tasks?.find((task) => task?.lineage?.intent_submission_id === submissionId) ?? null;
+    } catch (taskError) {
+      setError(taskError instanceof Error ? taskError.message : String(taskError));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runTaskReviewDecision(task, decision, reason = "") {
     if (!apiProjectBase || !task?.run_ids?.[0] || busy) {
       setError("Review decision is unavailable until a durable run is selected.");
@@ -6702,6 +6724,7 @@ function App() {
             selectedTaskId={selectedTaskId}
             onSelectTask={(task) => writeConsoleSurface("tasks", { projectId: activeProjectId, taskId: task?.task_id })}
             onNewTask={() => writeConsoleSurface("tasks", { projectId: activeProjectId })}
+            onCreateTask={createTaskFromWorkspace}
             onOpenProject={() => { setConsoleSurface("home"); writeConsoleSurface("home", { projectId: activeProjectId }); }}
             onTaskAction={runTaskAction}
             onReviewDecision={runTaskReviewDecision}

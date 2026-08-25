@@ -40,7 +40,7 @@ test("completed Flow projects to immutable completed Task without inventing a ne
   const task = projectTaskFromFlow({ projectId: "project-alpha", flow: {
     ...baseFlow,
     status: "completed",
-    closure_state: { review_status: "approved", verification_status: "passed", delivery_status: "complete", evidence_chain: ["evidence://closure/pass"] },
+    closure_state: { review_status: "approved", verification_status: "passed", delivery_status: "complete", patch_ref: "evidence://closure/pass.patch", digest: "a".repeat(64), delivery_manifest_ref: "evidence://closure/pass.manifest", evidence_chain: ["evidence://closure/pass"] },
     primary_action: { action_id: "closure-complete", operator_control: null, reason: "Closed", available: false },
   } });
   assert.equal(task.status, "completed");
@@ -48,6 +48,9 @@ test("completed Flow projects to immutable completed Task without inventing a ne
   assert.equal(task.primary_action.available, false);
   assert.equal(task.completion.status, "complete");
   assert.equal(task.completion.immutable, true);
+  assert.equal(task.completion.patch_ref, "evidence://closure/pass.patch");
+  assert.equal(task.completion.digest, "a".repeat(64));
+  assert.equal(task.completion.delivery_manifest_ref, "evidence://closure/pass.manifest");
 });
 
 test("partial completion evidence remains blocked instead of rendering success", () => {
@@ -113,6 +116,8 @@ test("intent submissions project into draft, prepared, and attention Task states
   assert.deepEqual(projection.tasks.slice(0, 3).map((task) => task.status), ["draft", "prepared", "attention"]);
   assert.equal(projection.prepared_task_ids.length, 1);
   assert.equal(projection.tasks[1].lineage.flow_id, null);
+  assert.equal(projection.tasks[1].primary_action.action_id, "confirm");
+  assert.equal(projection.tasks[1].primary_action.operator_control, "Start task");
   assert.equal(projection.tasks[2].runner_selection.readiness, "blocked");
   const repositorySource = projection.tasks[1].source_items.find((source) => source.kind === "repository-markdown");
   assert.equal(repositorySource.stale, true);

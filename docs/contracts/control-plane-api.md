@@ -79,13 +79,25 @@ Flow lineage:
   run-control, and `retry`/`request` to durable bounded operator requests.
   Every response includes a query-safe durable readback; the route never
   creates a second Task lifecycle owner or accepts raw provider flags;
+- New Task preparation uses the existing intent boundary: the browser submits
+  the outcome and validated source records to `POST
+  /api/projects/:projectId/intent-submissions`, then refreshes the Task
+  projection and keeps the returned `intent_submission_id` as lineage. A
+  local draft preview must never expose a runnable Start action;
+- `confirm` and `start` Task actions carry the displayed non-negative Task
+  `revision` as `expected_revision`. The server forwards that guard to the
+  intent confirmation boundary and rejects a stale prepared projection before
+  creating or starting a Flow;
 - Task reads are strictly read-only. Create, prepare, revise, confirm, start,
   retry, and cancel continue through the existing intent boundary with its CAS
   and idempotency semantics; Task is not a second lifecycle owner;
 - browser surfaces render the server-owned `lifecycle_path` and
   `primary_action` instead of deriving lifecycle or next action from raw
   fields. Draft and prepared Tasks retain their intent-submission lineage;
-  completed tasks remain immutable.
+  completed tasks remain immutable. Completion evidence is considered complete
+  only when verification and delivery pass and the server publishes at least
+  one durable evidence reference; a patch reference is optional for no-write
+  outcomes.
 
 All operator failures use one `OperatorError`: `code`, `title`, `detail`, the compatibility alias `message`, operation/phase/resource/consequence/retryability, scoped refs, field errors, evidence refs, and typed recovery actions. Recovery identifiers come only from the canonical catalog and are never inferred from provider text, stack traces, or shell commands.
 

@@ -641,11 +641,11 @@ export function confirmIntent({ registry, projectId, submissionId, expectedRevis
   return confirmIntentRecord({ registry, projectId, submissionId, expectedRevision }).confirmation;
 }
 
-export function confirmAndStartIntent({ registry, projectId, submissionId }) {
+export function confirmAndStartIntent({ registry, projectId, submissionId, expectedRevision }) {
   const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
   if (loaded.submission.confirmation?.discovery) return loaded.submission.confirmation;
   const record = loaded.submission.confirmation
     ? { confirmation: loaded.submission.confirmation, loaded }
-    : confirmIntentRecord({ registry, projectId, submissionId });
+    : confirmIntentRecord({ registry, projectId, submissionId, expectedRevision });
   return startConfirmedIntent({ registry, projectId, loaded: record.loaded });
 }

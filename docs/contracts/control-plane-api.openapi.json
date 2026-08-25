@@ -2927,7 +2927,7 @@
           "source_items": { "type": "array", "items": { "$ref": "#/components/schemas/TaskSourceItem" } },
           "attention_items": { "type": "array", "items": { "$ref": "#/components/schemas/JsonObject" } },
           "review": { "$ref": "#/components/schemas/JsonObject" },
-          "completion": { "$ref": "#/components/schemas/JsonObject" },
+          "completion": { "$ref": "#/components/schemas/TaskCompletionProjection" },
           "lifecycle_path": { "$ref": "#/components/schemas/JsonObject" },
           "current_step": { "type": ["string", "null"] },
           "current_step_label": { "type": ["string", "null"] },
@@ -3041,6 +3041,22 @@
           "effective_reasoning_effort": { "type": ["string", "null"] },
           "unavailable_reason": { "type": ["string", "null"] },
           "recovery_action": { "type": "string" }
+        },
+        "additionalProperties": true
+      },
+      "TaskCompletionProjection": {
+        "type": "object",
+        "required": ["status", "immutable", "verification_status", "delivery_status", "evidence_refs", "follow_up_eligible"],
+        "properties": {
+          "status": { "type": "string", "enum": ["incomplete", "blocked", "complete"] },
+          "immutable": { "type": "boolean" },
+          "verification_status": { "type": "string" },
+          "delivery_status": { "type": "string" },
+          "patch_ref": { "type": ["string", "null"] },
+          "digest": { "type": ["string", "null"] },
+          "delivery_manifest_ref": { "type": ["string", "null"] },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "follow_up_eligible": { "type": "boolean" }
         },
         "additionalProperties": true
       },
