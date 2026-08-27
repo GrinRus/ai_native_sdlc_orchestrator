@@ -7,6 +7,17 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.20] - 2026-08-27
+
+- Added the W70 Task Workspace experience with resumable Tasks Home,
+  server-owned task navigation, pinned Markdown sources, Prepared Task review,
+  durable task actions, review evidence, and completion evidence.
+- Aligned the installed web console with the W70 responsive design system,
+  including truthful task lifecycle states, attention and blocker surfaces,
+  review flows, completion states, and mobile layouts.
+- Hardened task Markdown rendering and source-count semantics while preserving
+  packaged browser acceptance and no-upstream-write behavior.
+
 ## [0.1.0-alpha.19] - 2026-08-10
 
 - Added intent-first Project Home, resumable Intent navigation, review-first
