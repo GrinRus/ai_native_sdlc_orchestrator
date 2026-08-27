@@ -136,6 +136,9 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await page.goto(state.app_url);
   await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
   await captureMobileEvidence(page, testInfo, "w70-mobile-tasks-home-390x844", "01-tasks-home-390x844.png");
+  await expect(page.locator(".task-inline-mobile-detail")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Ready", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Completed", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1586, height: 992 });
   for (const entry of closure.scenarios.filter(({ id }) => ["text-only", "upload-markdown", "repository-markdown", "stale-source", "runner-unavailable", "failure"].includes(id))) {
     await expect(page.getByText(entry.id === "text-only" ? "Text-only draft" : entry.id === "upload-markdown" ? "Uploaded Markdown" : entry.id === "repository-markdown" ? "Repository Markdown" : entry.id === "stale-source" ? "Stale source" : entry.id === "runner-unavailable" ? "Unavailable runner" : "Failed task")).toBeVisible();
@@ -192,6 +195,9 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await expect(page.getByRole("heading", { name: "Active Task Workspace" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Activity", exact: true })).toBeVisible();
   await captureMobileEvidence(page, testInfo, "w70-mobile-active-task-390x844", "05-active-task-390x844.png");
+  const mobileActiveActions = await page.locator(".task-active-heading .task-inline-actions").boundingBox();
+  expect(mobileActiveActions).not.toBeNull();
+  expect(mobileActiveActions.x).toBeLessThan(170);
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.getByRole("tab", { name: /Changes/u }).click();
   await expect(page.getByRole("heading", { name: "Review Changes" })).toBeVisible();

@@ -143,6 +143,13 @@ independent: the former blocks an oversized static packet before spawn, while
 the latter stops a non-converging provider execution before it exhausts the
 provider's own conversation window.
 
+Profile authors must leave enough headroom for the provider to complete its
+bounded work and emit the required final report after the last tool call. A
+hard bound that is too tight is reported as
+`provider_session_budget_exceeded`; it is a provider-runner configuration
+failure and should be corrected in the adapter profile before rerunning the
+proof.
+
 When configured, `external_runner.session_budget` carries a versioned,
 query-safe report with configured limits, observed assistant/tool counters,
 `status` in `pass|warn|exceeded|not_configured`, an optional

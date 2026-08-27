@@ -223,11 +223,11 @@ function TaskCard({ task, selected, onSelect }) {
   </button>;
 }
 
-function TaskGroup({ title, count, tasks, selectedTaskId, selectedTask, project, onSelect }) {
+function TaskGroup({ title, count, tasks, selectedTaskId, onSelect }) {
   const [collapsed, setCollapsed] = useState(false);
   if (!tasks.length) return null;
   const groupId = `task-group-${title.toLowerCase().replace(/[^a-z0-9]+/gu, "-")}`;
-  return <section className="task-list-group" id={groupId}><header><h3><span className="task-list-group__dot" aria-hidden="true" />{title}</h3><span>{count}</span><button type="button" aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`} aria-expanded={!collapsed} aria-controls={groupId} className={`task-plain-icon${collapsed ? " is-collapsed" : ""}`} onClick={() => setCollapsed((value) => !value)}><Glyph name="chevronDown" /></button></header>{collapsed ? null : tasks.map((task) => <Fragment key={task.task_id}><TaskCard task={task} selected={task.task_id === selectedTaskId} onSelect={onSelect} />{task.task_id === selectedTaskId && selectedTask ? <div className="task-inline-mobile-detail"><TaskHomeDetail task={selectedTask} project={project} onOpen={() => onSelect(selectedTask)} /></div> : null}</Fragment>)}</section>;
+  return <section className="task-list-group" id={groupId}><header><h3><span className="task-list-group__dot" aria-hidden="true" />{title}</h3><span>{count}</span><button type="button" aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`} aria-expanded={!collapsed} aria-controls={groupId} className={`task-plain-icon${collapsed ? " is-collapsed" : ""}`} onClick={() => setCollapsed((value) => !value)}><Glyph name="chevronDown" /></button></header>{collapsed ? null : tasks.map((task) => <TaskCard key={task.task_id} task={task} selected={task.task_id === selectedTaskId} onSelect={onSelect} />)}</section>;
 }
 
 function TasksHome({ tasks, selectedTask, selectedTaskId, onSelect, onNewTask, project, totalTaskCount = tasks.length }) {
@@ -238,7 +238,7 @@ function TasksHome({ tasks, selectedTask, selectedTaskId, onSelect, onNewTask, p
     ["Completed", tasks.filter((task) => task.status === "completed")],
   ];
   return <div className="task-home-layout">
-    <div className="task-list-pane" aria-label="Task list">{groups.map(([title, groupTasks]) => <TaskGroup key={title} title={title} count={groupTasks.length} tasks={groupTasks} selectedTaskId={selectedTaskId} selectedTask={selectedTask} project={project} onSelect={onSelect} />)}{!tasks.length ? <EmptyState title={totalTaskCount ? "No matching tasks" : "No tasks yet"}>{totalTaskCount ? "Try a different search or clear the filter." : "Start with a plain-language outcome and review the prepared task before it can write."}</EmptyState> : null}</div>
+    <div className="task-list-pane" aria-label="Task list">{groups.map(([title, groupTasks]) => <TaskGroup key={title} title={title} count={groupTasks.length} tasks={groupTasks} selectedTaskId={selectedTaskId} onSelect={onSelect} />)}{!tasks.length ? <EmptyState title={totalTaskCount ? "No matching tasks" : "No tasks yet"}>{totalTaskCount ? "Try a different search or clear the filter." : "Start with a plain-language outcome and review the prepared task before it can write."}</EmptyState> : null}</div>
     <div className="task-detail-pane">{selectedTask ? <TaskHomeDetail task={selectedTask} project={project} onOpen={() => onSelect(selectedTask)} /> : <EmptyState title="Select a task">Choose a task to see its server-owned state and next action.</EmptyState>}</div>
   </div>;
 }
