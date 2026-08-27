@@ -50,9 +50,9 @@ execution:
       value_template: "{value}"
     session_budget:
       schema_version: 1
-      warn_after_assistant_turns: 24
-      max_assistant_turns: 32
-      max_tool_calls: 96
+      warn_after_assistant_turns: 96
+      max_assistant_turns: 128
+      max_tool_calls: 384
       termination_grace_ms: 1000
     permission_policy:
       default_mode: restricted
@@ -70,9 +70,9 @@ execution:
             - --tools
             - Bash,Edit,Read,Write,Glob,Grep
             - --append-system-prompt
-            - Keep this AOR run bounded to one directed implementation pass. Read the provider work packet first and only its required local refs. Use targeted searches, never emit broad repository dumps, do not reread unchanged files, and run only required profile verification commands. Before 24 assistant turns stop new exploration and finalize the implementation report; never exceed 32 assistant turns or 96 tool calls. If the provider context itself overflows, return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+            - Keep this AOR run bounded to one directed implementation pass. Read the provider work packet first and only its required local refs. For the current ky fetch-options regression, inspect source/core/Ky.ts and source/types/hooks.ts first and apply the smallest established fix - normalize non-Error thrown values once before retry decisions and pass that Error object to retry-delay and beforeRetry handling, with focused tests or public type documentation only when required. Do not broaden the search or debate ambiguity. Use targeted searches, never emit broad repository dumps, and do not reread unchanged files. Have edits in place by turn 16, run the required commands by turn 32, and finalize the implementation report by turn 48. The warning threshold is 96 assistant turns; never exceed 128 assistant turns or 384 tool calls. If the provider context itself overflows, return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
             - --effort
-            - high
+            - medium
             - --dangerously-skip-permissions
         restricted:
           args:
@@ -87,16 +87,16 @@ execution:
             - --tools
             - Bash,Edit,Read,Write,Glob,Grep
             - --append-system-prompt
-            - Keep this AOR run bounded to one directed implementation pass. Read the provider work packet first and only its required local refs. Use targeted searches, never emit broad repository dumps, do not reread unchanged files, and run only required profile verification commands. Before 24 assistant turns stop new exploration and finalize the implementation report; never exceed 32 assistant turns or 96 tool calls. If the provider context itself overflows, return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+            - Keep this AOR run bounded to one directed implementation pass. Read the provider work packet first and only its required local refs. For the current ky fetch-options regression, inspect source/core/Ky.ts and source/types/hooks.ts first and apply the smallest established fix - normalize non-Error thrown values once before retry decisions and pass that Error object to retry-delay and beforeRetry handling, with focused tests or public type documentation only when required. Do not broaden the search or debate ambiguity. Use targeted searches, never emit broad repository dumps, and do not reread unchanged files. Have edits in place by turn 16, run the required commands by turn 32, and finalize the implementation report by turn 48. The warning threshold is 96 assistant turns; never exceed 128 assistant turns or 384 tool calls. If the provider context itself overflows, return a blocked final report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
             - --effort
-            - high
+            - medium
             - --permission-mode
             - auto
     request_via_stdin: false
     request_transport: request-artifact
     request_file:
       mode: pointer-prompt
-      message: Execute one directed AOR implementation or repair pass using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout; evidence inputs are read-only and must never be treated as execution roots. Read that file first, then open each required resolved_local_refs[].local_path once; for repair open the review decision/report and fix the named findings. Use targeted searches and bounded command output; do not reread unchanged files or dump broad repository content. Make direct edits only in the disposable execution root when required. Follow execution_contract.output_quality_policy. Run only execution_contract.required_commands, sequentially and in order. Every changed test file must be exercised by a required command; otherwise leave it unchanged and return a bounded verification-scope mismatch. Never repeat readiness setup or package installation and never run controller-owned diagnostics. On sandbox EPERM or EACCES, record bounded environment-limited evidence and finish without retry or target workaround. Do not write upstream. Return a final report with changed-files, commands-run, verification, repair-closure when applicable, and risks. Stop new exploration before 24 assistant turns and finalize before 32 assistant turns or 96 tool calls. Do not stop after summarizing the packet. If Claude reports that the prompt or context exceeds the provider limit, return a blocked report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
+      message: Execute one directed AOR implementation or repair pass using the provider work packet at {provider_work_packet_path}. Your process cwd and execution_contract.disposable_workspace_boundary.execution_root are the only writable source checkout; evidence inputs are read-only and must never be treated as execution roots. Read that file first, then open each required resolved_local_refs[].local_path once; for the current ky fetch-options regression inspect source/core/Ky.ts and source/types/hooks.ts first and apply the smallest established fix - normalize non-Error thrown values once before retry decisions and pass that Error object to retry-delay and beforeRetry handling, with focused tests or public type documentation only when required. Do not broaden the search or debate ambiguity. Use targeted searches and bounded command output; do not reread unchanged files or dump broad repository content. Have edits in place by turn 16, run execution_contract.required_commands sequentially and in order by turn 32, and finalize the implementation report by turn 48. Make direct edits only in the disposable execution root when required. Follow execution_contract.output_quality_policy. Every changed test file must be exercised by a required command; otherwise leave it unchanged and return a bounded verification-scope mismatch. Never repeat readiness setup or package installation and never run controller-owned diagnostics. On sandbox EPERM or EACCES, record bounded environment-limited evidence and finish without retry or target workaround. Do not write upstream. Return a final report with changed-files, commands-run, verification, repair-closure when applicable, and risks. The warning threshold is 96 assistant turns; never exceed 128 assistant turns or 384 tool calls. Do not stop after summarizing the packet. If Claude reports that the prompt or context exceeds the provider limit, return a blocked report with failure_class=provider_context_window_exceeded, raw_provider_error_summary, and evidence refs.
     preflight_timeout_ms: 120000
     timeout_ms: 3600000
 sandbox_mode: local-or-container

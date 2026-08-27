@@ -224,9 +224,9 @@ test("Claude live adapter args keep host auth and compact context guardrails", (
     assert.equal(externalRuntime.env_from?.ANTHROPIC_API_KEY, undefined);
     assert.deepEqual(externalRuntime.session_budget, {
       schema_version: 1,
-      warn_after_assistant_turns: 24,
-      max_assistant_turns: 32,
-      max_tool_calls: 96,
+      warn_after_assistant_turns: 96,
+      max_assistant_turns: 128,
+      max_tool_calls: 384,
       termination_grace_ms: 1000,
     });
     for (const mode of ["full-bypass", "restricted"]) {
@@ -241,11 +241,11 @@ test("Claude live adapter args keep host auth and compact context guardrails", (
       assert.equal(args[args.indexOf("--tools") + 1], "Bash,Edit,Read,Write,Glob,Grep");
       assert.ok(args.includes("--append-system-prompt"), `${mode} args must include compact guardrail prompt`);
       assert.ok(args.includes("--effort"), `${mode} args must declare supported effort bound`);
-      assert.equal(args[args.indexOf("--effort") + 1], "high");
+      assert.equal(args[args.indexOf("--effort") + 1], "medium");
       assert.match(args.join(" "), /provider_context_window_exceeded/u, mode);
-      assert.match(args.join(" "), /24 assistant turns/u, mode);
-      assert.match(args.join(" "), /32 assistant turns/u, mode);
-      assert.match(args.join(" "), /96 tool calls/u, mode);
+      assert.match(args.join(" "), /96 assistant turns/u, mode);
+      assert.match(args.join(" "), /128 assistant turns/u, mode);
+      assert.match(args.join(" "), /384 tool calls/u, mode);
     }
     assert.match(externalRuntime.request_file.message, /provider_context_window_exceeded/u);
     assert.match(externalRuntime.request_file.message, /resolved_local_refs\[\]\.local_path/u);
