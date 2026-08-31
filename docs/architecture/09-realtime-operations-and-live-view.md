@@ -24,7 +24,7 @@ Operators need live state without making the UI part of the critical path.
 
 ## Operator surfaces
 - CLI for direct operational control
-- optional local web UI for dashboards, guided Mission intake, and drill-down views
+- optional local Task Workspace for preparation, runtime-owned actions, review, and evidence views
 - API queries for automation and integrations
 
 ## Local app launch
@@ -42,18 +42,17 @@ operator input. The app does not scan the filesystem for projects, persist a
 global recent-project list, or merge multiple `project_id` contexts into one
 portfolio flow.
 
-The app can submit the first Mission form through
-`POST /api/projects/:projectId/lifecycle-command/actions` with
-`command: "mission create"`, then invoke `next` to refresh the durable
-`next-action-report`. It does not own run-state transitions, answer
-continuation, review decisions, or delivery gates.
+The app prepares intent-backed Tasks through
+`POST /api/projects/:projectId/intent-submissions` and invokes only the actions
+published by the Task projection. It does not own run-state transitions,
+answer continuation, review decisions, or delivery gates.
 
 Release and internal maintainer smoke for the web surface uses
 `aor app --smoke true --open false --json`, which loads the real SPA,
-`/app-config.json`, local project index, control-plane state route, the
-first-run wizard / project switcher markers, and the flow selector / `New Flow`
-bundle markers. A generated static HTML snapshot is not a supported operator
-console or proof path.
+`/app-config.json`, local project index, control-plane state route, Task
+Workspace / New task / Prepare task / project-switcher markers, and the absence
+of retired Quiet Cockpit markers. A generated static HTML snapshot is not a
+supported operator console or proof path.
 
 The app can also submit operator-initiated interventions through
 `POST /api/projects/:projectId/operator-requests` and run them through
@@ -63,18 +62,18 @@ and must show sanitized summaries and refs, not raw request text. Successful
 runs refresh/materialize `next-action-report` so the right rail and headless
 CLI/API surfaces converge on the same next action.
 
-## Flow-centric local view
+## Task-centric local view
 
-The W34 local console uses flow projections from the control plane instead of
-browser-owned lifecycle state. The flow selector, active-flow cockpit,
-completed-flow history, and flow-scoped advanced views all read stable
-`flow_id`, `status`, `selected_stage`, evidence refs, and write-back policy
-from runtime artifacts.
+The current local console uses Task projections from the control plane instead
+of browser-owned lifecycle state. Tasks Home, Attention, Review, Completion,
+and follow-up views read stable Task status, lifecycle path, evidence refs, and
+write-back policy from runtime artifacts. An internal `flow_id` may scope
+runtime evidence, but users do not select a parallel Flow renderer.
 
-Connected UI actions may select a flow, create an operator request for that
-flow, or start `New Flow` through lifecycle-command mutations. They must not
-mutate completed flow evidence, infer a selected flow from local storage, or
-create a follow-up without durable mission/intake and next-action evidence.
+Connected UI actions may prepare, start, pause, resume, cancel, retry, request
+bounded help, or create a follow-up only when the Task projection exposes that
+action. They must not mutate completed evidence or infer a selected lifecycle
+from browser storage.
 
 When a W45 `quality-repair-request` is active, the flow projection exposes
 `active_quality_gate` for the local console. The cockpit renders the request

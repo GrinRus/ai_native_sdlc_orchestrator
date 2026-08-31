@@ -33,6 +33,7 @@ const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "examples/skills",
   "examples/wrappers",
   "docs/contracts",
+  "docs/ops/installed-user-first-run.md",
   "docs/ops/npm-cli-alpha-release.md",
   "docs/ops/production-readiness-gate.md",
   "docs/ops/self-hosted-backup-restore.md",
@@ -43,12 +44,14 @@ const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "CHANGELOG.md",
   "README.md",
   "LICENSE",
+  "NOTICE",
 ];
 
 const REQUIRED_PACKED_FILES = [
   "package.json",
   "README.md",
   "LICENSE",
+  "NOTICE",
   "CHANGELOG.md",
   "apps/cli/bin/aor.mjs",
   "apps/cli/src/index.mjs",
@@ -66,6 +69,7 @@ const REQUIRED_PACKED_FILES = [
   "examples/routes/implement-default.yaml",
   "examples/wrappers/wrapper-runner-default.yaml",
   "docs/contracts/00-index.md",
+  "docs/ops/installed-user-first-run.md",
   "docs/ops/npm-cli-alpha-release.md",
   "docs/ops/self-hosted-environment-matrix.md",
 ];

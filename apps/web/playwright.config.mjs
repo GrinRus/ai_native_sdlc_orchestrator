@@ -7,7 +7,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 export default defineConfig({
   testDir: path.join(root, "apps/web/browser"),
-  testMatch: "**/*.spec.mjs",
+  // W63/W65 browser specifications remain historical evidence. The packaged
+  // renderer gate follows the W70 Task Workspace closure only.
+  testMatch: "**/task-workspace-closure.spec.mjs",
   fullyParallel: false,
   workers: 1,
   // Installed-user lifecycle assertions may span two sequential CLI subprocesses.

@@ -5,7 +5,19 @@ versioned AOR snapshots.
 
 ## Unreleased
 
-- No unreleased changes yet.
+- Completed the packaged Task Workspace cutover: clean projects now open the
+  Task surface directly, retired Flow/Quiet Cockpit renderers are excluded from
+  the Vite bundle, and installed browser acceptance covers the default route.
+- Replaced the alpha app-smoke UI fields with `task_workspace_loaded`,
+  `new_task_action_loaded`, `prepare_task_action_loaded`, and
+  `legacy_surface_absent`; this is an intentional pre-release JSON migration.
+- Aligned current architecture and installed-user runbooks with Task Workspace
+  while preserving older console material as historical research evidence.
+- Added `NOTICE` to the npm package guardrails, patched vulnerable transitive
+  development dependencies, and added a scheduled high-severity dependency
+  audit workflow.
+- Improved contributor guidance, confidential reporting instructions, npm
+  metadata, and structured GitHub issue forms.
 
 ## [0.1.0-alpha.20] - 2026-08-27
 

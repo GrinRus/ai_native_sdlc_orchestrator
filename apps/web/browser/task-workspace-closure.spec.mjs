@@ -105,6 +105,20 @@ function taskFixture(state, overrides = {}) {
   };
 }
 
+test("clean installed project opens Task Workspace without a legacy surface override", async ({ page }) => {
+  const state = readHarnessState();
+  await blockExternalNetwork(page, state.app_url);
+  await page.goto(`${state.app_url}?surface=flow&flow=retired&console=quiet-cockpit`);
+  await expect(page.locator(".task-workspace-shell")).toBeVisible();
+  await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
+  await expect(page.getByRole("heading", { name: "No tasks yet" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New task", exact: true })).toBeVisible();
+  await expect(page.getByText("Quiet Cockpit", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("New Flow", { exact: true })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/surface=|flow=|console=/u);
+  expect(fs.existsSync(state.runtime_root), "clean Task Workspace load created repository-local runtime state").toBe(false);
+});
+
 test("W70-S08 installed Task Workspace closure covers sources, recovery, review, and immutable completion", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const state = readHarnessState();
@@ -227,11 +241,11 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   await expect(contextBackButton).toBeFocused();
   await contextBackButton.click();
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
-  await expect(page).toHaveURL(/surface=tasks/u);
+  expect(new URL(page.url()).searchParams.get("project")).toBe(state.project_id);
   expect(new URL(page.url()).searchParams.has("task")).toBe(false);
+  expect(new URL(page.url()).searchParams.has("surface")).toBe(false);
 
   const directReviewUrl = new URL(state.app_url);
-  directReviewUrl.searchParams.set("surface", "tasks");
   directReviewUrl.searchParams.set("task", `${base.task_id}.review`);
   await page.setViewportSize({ width: 1586, height: 992 });
   await page.goto(directReviewUrl.href);
@@ -243,14 +257,12 @@ test("W70-S08 installed Task Workspace closure covers sources, recovery, review,
   expect(new URL(page.url()).searchParams.has("task")).toBe(false);
 
   const directCompletionUrl = new URL(state.app_url);
-  directCompletionUrl.searchParams.set("surface", "tasks");
   directCompletionUrl.searchParams.set("task", `${base.task_id}.completed`);
   await page.goto(directCompletionUrl.href);
   await expect(page.getByRole("alert")).toContainText("Closure evidence is not complete.");
   await expect(page.getByRole("heading", { name: "Task completed" })).toHaveCount(0);
 
   const directProofUrl = new URL(state.app_url);
-  directProofUrl.searchParams.set("surface", "tasks");
   directProofUrl.searchParams.set("task", `${base.task_id}.complete-proof`);
   await page.goto(directProofUrl.href);
   await expect(page.getByRole("heading", { name: "Completion & Evidence" })).toBeVisible();
@@ -324,7 +336,7 @@ test("Task Workspace creates a server-owned prepared Task before exposing Start"
     await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ action: actionPayload.action, confirmation: { flow_id: "flow.browser-task-create" }, readback: { durable: true, task_id: preparedTask.task_id, flow_id: "flow.browser-task-create" } }) });
   });
 
-  await page.goto(`${state.app_url}?surface=tasks`);
+  await page.goto(state.app_url);
   await expect(page.locator(".task-workspace__breadcrumb h1")).toHaveText("Tasks");
   await page.getByRole("button", { name: "New task", exact: true }).click();
   await page.getByLabel("Task outcome").fill("Make the task creation path durable.");

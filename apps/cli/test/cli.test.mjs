@@ -852,10 +852,11 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     const appSmokePayload = JSON.parse(appSmoke.stdout);
     assert.equal(appSmokePayload.status, "smoke-pass");
     assert.equal(appSmokePayload.html_loaded, true);
-    assert.equal(appSmokePayload.flow_selector_loaded, true);
-    assert.equal(appSmokePayload.new_flow_action_loaded, true);
-    assert.equal(appSmokePayload.first_run_wizard_loaded, true);
+    assert.equal(appSmokePayload.task_workspace_loaded, true);
+    assert.equal(appSmokePayload.new_task_action_loaded, true);
+    assert.equal(appSmokePayload.prepare_task_action_loaded, true);
     assert.equal(appSmokePayload.project_switcher_loaded, true);
+    assert.equal(appSmokePayload.legacy_surface_absent, true);
     assert.equal(appSmokePayload.state_project_id, appSmokePayload.project_id);
 
     const appSmokeCompact = spawnSync(process.execPath, [
@@ -876,10 +877,11 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     const appSmokeCompactPayload = JSON.parse(appSmokeCompact.stdout);
     assert.equal(appSmokeCompactPayload.status, "smoke-pass");
     assert.equal(appSmokeCompactPayload.html_loaded, true);
-    assert.equal(appSmokeCompactPayload.flow_selector_loaded, true);
-    assert.equal(appSmokeCompactPayload.new_flow_action_loaded, true);
-    assert.equal(appSmokeCompactPayload.first_run_wizard_loaded, true);
+    assert.equal(appSmokeCompactPayload.task_workspace_loaded, true);
+    assert.equal(appSmokeCompactPayload.new_task_action_loaded, true);
+    assert.equal(appSmokeCompactPayload.prepare_task_action_loaded, true);
     assert.equal(appSmokeCompactPayload.project_switcher_loaded, true);
+    assert.equal(appSmokeCompactPayload.legacy_surface_absent, true);
 
     const redactedAppSmoke = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),

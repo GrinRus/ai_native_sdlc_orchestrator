@@ -1,0 +1,67 @@
+name: Feature request
+description: Propose a bounded product, workflow, documentation, or integration improvement.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Describe the user outcome first. Maintainers will map accepted outcomes to the roadmap and owning slice.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is blocked, what are they trying to accomplish, and why is the current behavior insufficient?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior rather than an implementation preference.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Primary surface
+      options:
+        - CLI
+        - API or contracts
+        - Task Workspace
+        - Runtime or runner integration
+        - Documentation or examples
+        - Quality, CI, or release tooling
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and compatibility considerations
+      description: Note write-back, credentials, private repositories, contract compatibility, or migration concerns.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Suggested acceptance criteria
+      placeholder: |
+        - [ ] The operator can ...
+        - [ ] Failure state ...
+        - [ ] Verification proves ...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include workarounds or smaller options when known.
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and roadmap documentation for this outcome.
+          required: true
+        - label: This request contains no secrets or private repository content.
+          required: true

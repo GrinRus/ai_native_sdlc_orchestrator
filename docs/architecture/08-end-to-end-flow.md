@@ -58,30 +58,23 @@ Guided commands and web stages are an overlay on the canonical flow:
 
 The overlay must not change the orchestration owner. CLI, API, and web surfaces should all point back to the same runtime-owned commands, control-plane mutations, and durable evidence refs.
 
-## Flow-centric overlay
+## Task projection overlay
 
-W34 adds a flow projection over the canonical flow without changing the
-canonical artifact owners. A flow groups one mission/intake lineage, the latest
-next-action report, run/review/delivery/release/learning evidence, and
-operator-request summaries under one stable `flow_id`.
+W70 makes the server-owned Task the installed-user projection over the
+canonical flow. A Task groups one durable intent, immutable sources, optional
+internal `flow_id` lineage, lifecycle path, runner readiness, review state,
+completion evidence, and the currently available primary action.
 
-Active flows remain mutable only through runtime-owned commands and
-control-plane mutations. Completed flows are read-only evidence chains. Starting
-`New Flow` creates a new mission/intake packet and refreshes `next`; if it is a
-follow-up, it cites the completed source flow's learning handoff instead of
-reopening or editing the completed flow.
+Preparation remains read-only. Starting a prepared Task uses the reviewed
+revision as a CAS guard and may create internal Mission/Flow lineage without
+switching the browser to another renderer. Active state changes only through
+runtime-owned commands and control-plane mutations. Completed Tasks are
+read-only evidence chains; follow-up creates a distinct intent rather than
+reopening completed state.
 
-The web ingress is intent-first: Project Home selects a Flow explicitly or
-opens New Intent; preparation remains read-only; `confirm` creates Mission and
-Flow without invoking a provider; Discovery is a separate runtime-owned safe
-action from Cockpit. The Flow projection carries `work_type`, an adaptive
-`lifecycle_path`, human-readable summary fields, and evidence counts for Home.
-
-W69 makes the read-model boundary explicit: lifecycle steps are runtime-owned
-records with state, reason, and evidence refs; the browser only renders them
-and invokes the server-provided primary action. Confirmation uses the latest
-normalization revision as a CAS guard, so a stale Prepared Task cannot compile
-different Mission scope or acceptance than the operator reviewed.
+Tasks Home, Attention, Review, and Completion render runtime-owned records with
+state, reason, and evidence refs. The browser does not infer lifecycle progress
+or action availability from local storage.
 
 ## Why bootstrap is a first-class stage
 AOR cannot safely run against a repository until it knows:

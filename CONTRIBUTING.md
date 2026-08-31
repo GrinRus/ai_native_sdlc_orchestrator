@@ -98,7 +98,8 @@ Notes:
 
 - `slice:sync-ready` recalculates `ready` and `blocked` from hard dependencies.
 - `slice:complete` updates both the master backlog and the owning wave doc state.
-- `slice:gate` runs the mandatory pre-commit gate (`lint`, `test`, `build`, `check`).
+- `slice:gate` delegates once to the mandatory `pnpm check` pipeline; it does
+  not repeat lint, test, or build as separate second passes.
 
 ## CI acceptance gates
 
@@ -106,6 +107,7 @@ The repository uses a repository-integrity workflow plus focused security workfl
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/dependency-review.yml`
+- `.github/workflows/dependency-audit.yml`
 - `.github/workflows/codeql.yml`
 - `.github/workflows/scorecard.yml`
 - `.github/workflows/release-candidate.yml`
@@ -117,12 +119,16 @@ The repository-integrity workflow runs on:
 - manual `workflow_dispatch`.
 
 What the workflows prove today:
-- `pnpm check` runs the repository-integrity baseline (`lint`, `test`, and `build`);
+- `pnpm check` runs lint, type checking, tests, build, quality ratchets,
+  dependency policy, contract parity, and release metadata verification;
 - `pnpm production:ready` runs the stricter self-hosted production-readiness gate;
 - release candidate PRs from `release/v<semver-alpha>` run `pnpm release:gate`,
   which may accept only a valid npm-alpha audit hold while production clearance
   remains false;
-- dependency review, CodeQL, and OpenSSF Scorecard run as separate security workflows.
+- dependency review, scheduled dependency audit, CodeQL, and OpenSSF Scorecard
+  run as separate security workflows. `pnpm audit --audit-level high` remains a
+  network-backed advisory check and therefore does not run inside the
+  deterministic local `pnpm check` pipeline.
 
 If the repository-integrity workflow fails, the failing step maps directly to one of the root checks so the remediation path stays explicit. If a security workflow fails, treat it as a supply-chain or code-scanning finding unless the workflow output clearly identifies a setup problem.
 

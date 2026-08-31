@@ -2227,10 +2227,11 @@ export function runGuidedWebSmoke(options) {
   const taskPassed =
     asNonEmptyString(summary.status) === "smoke-pass" &&
     summary.html_loaded === true &&
-    summary.flow_selector_loaded === true &&
-    summary.new_flow_action_loaded === true &&
-    summary.first_run_wizard_loaded === true &&
+    summary.task_workspace_loaded === true &&
+    summary.new_task_action_loaded === true &&
+    summary.prepare_task_action_loaded === true &&
     summary.project_switcher_loaded === true &&
+    summary.legacy_surface_absent === true &&
     asNonEmptyString(summary.config_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.config_default_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.project_index_default_project_id) === asNonEmptyString(summary.project_id) &&
@@ -2350,10 +2351,11 @@ export function runGuidedWebSmoke(options) {
     kind: "app-smoke-dom-summary",
     status: taskPassed ? "pass" : "not_pass",
     html_loaded: summary.html_loaded === true,
-    flow_selector_loaded: summary.flow_selector_loaded === true,
-    new_flow_action_loaded: summary.new_flow_action_loaded === true,
-    first_run_wizard_loaded: summary.first_run_wizard_loaded === true,
+    task_workspace_loaded: summary.task_workspace_loaded === true,
+    new_task_action_loaded: summary.new_task_action_loaded === true,
+    prepare_task_action_loaded: summary.prepare_task_action_loaded === true,
     project_switcher_loaded: summary.project_switcher_loaded === true,
+    legacy_surface_absent: summary.legacy_surface_absent === true,
     app_url: asNonEmptyString(summary.app_url) || null,
     control_plane: asNonEmptyString(summary.control_plane) || null,
     project_id: asNonEmptyString(summary.project_id) || null,
@@ -2379,10 +2381,11 @@ export function runGuidedWebSmoke(options) {
     surface: "aor app --smoke",
     app_url: asNonEmptyString(summary.app_url) || null,
     html_loaded: summary.html_loaded === true,
-    flow_selector_loaded: summary.flow_selector_loaded === true,
-    new_flow_action_loaded: summary.new_flow_action_loaded === true,
-    first_run_wizard_loaded: summary.first_run_wizard_loaded === true,
+    task_workspace_loaded: summary.task_workspace_loaded === true,
+    new_task_action_loaded: summary.new_task_action_loaded === true,
+    prepare_task_action_loaded: summary.prepare_task_action_loaded === true,
     project_switcher_loaded: summary.project_switcher_loaded === true,
+    legacy_surface_absent: summary.legacy_surface_absent === true,
     note:
       "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
   });

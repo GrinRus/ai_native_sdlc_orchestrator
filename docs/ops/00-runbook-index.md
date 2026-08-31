@@ -3,7 +3,7 @@
 ## Installed-user rehearsal
 - Installed-user rehearsal is internal maintainer repo tooling and is not a public AOR user workflow.
 - `runtime-permission-runner-certification.md` — post-merge real-runner smoke lane for runtime permission mode mappings and restricted-mode interaction evidence.
-- `installed-user-first-run.md` — public guided install, no-settings local `aor app` wizard, local multi-project workspace, Mission form, `aor next`, and advanced `doctor`/`onboard` shortcuts.
+- `installed-user-first-run.md` — public npm-alpha install, clean-project Task Workspace path, packaged smoke contract, browser acceptance, recovery, and headless task equivalents.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 

@@ -1,0 +1,47 @@
+:root { color-scheme: light; background: var(--aor-task-canvas); font-family: var(--aor-font-sans); }
+* { box-sizing: border-box; }
+body { min-width: 0; margin: 0; background: var(--aor-task-canvas); color: var(--aor-task-ink); }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .58; }
+
+.task-app { min-height: 100vh; }
+.task-app-state { display: grid; place-content: center; justify-items: start; gap: 16px; min-height: 100vh; padding: 32px; background: var(--aor-task-canvas); }
+.task-app-state > span { color: var(--aor-task-teal); font-size: 2rem; font-weight: 800; letter-spacing: -.08em; }
+.task-app-state h1, .task-app-state p { max-width: 44rem; margin: 0; }
+.task-app-state p { color: var(--aor-task-muted); }
+.task-app-state > div { display: flex; gap: 10px; }
+.task-app-state__error { padding: 12px 16px; border: 1px solid var(--aor-task-danger-border); border-radius: 6px; background: var(--aor-task-danger-bg); color: var(--aor-color-danger-fg) !important; }
+
+.drawer-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: center; padding: 16px; background: var(--aor-color-overlay); }
+.task-project-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--aor-task-line); border-radius: var(--aor-radius-modal); background: var(--aor-task-surface); box-shadow: var(--aor-elevation-modal); color: var(--aor-task-ink); }
+.task-project-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--aor-task-line); }
+.task-project-dialog__header span { color: var(--aor-task-teal); font-size: .78rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.task-project-dialog h2, .task-project-dialog h3, .task-project-dialog p { margin: 0; }
+.task-project-dialog__header h2 { margin-top: 4px; font-size: 1.75rem; }
+.task-project-dialog__header p, .task-project-dialog__help { margin-top: 8px; color: var(--aor-task-muted); }
+.task-project-dialog > section { display: grid; gap: 12px; padding-top: 20px; }
+.task-project-dialog__list { display: grid; gap: 8px; }
+.task-project-dialog__list > button { display: grid; gap: 3px; padding: 12px 14px; border: 1px solid var(--aor-task-line); border-radius: 6px; background: var(--aor-task-surface); color: inherit; text-align: left; }
+.task-project-dialog__list > button[aria-current="true"] { border-color: var(--aor-task-teal); background: var(--aor-task-teal-soft); }
+.task-project-dialog__list span { color: var(--aor-task-muted); font-family: var(--aor-font-mono); font-size: .78rem; }
+.task-project-dialog__connect label { display: grid; gap: 6px; font-size: .86rem; font-weight: 650; }
+.task-project-dialog__connect :is(input, select) { min-height: 42px; padding: 8px 10px; border: 1px solid var(--aor-task-input-border); border-radius: 5px; background: var(--aor-task-surface); color: inherit; }
+.task-project-dialog__path { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.task-project-dialog__help { font-size: .84rem; font-weight: 400; }
+.task-project-dialog__result { padding: 10px 12px; border-radius: 5px; }
+.task-project-dialog__result--ok { background: var(--aor-task-success-bg); color: var(--aor-task-success-fg); }
+.task-project-dialog__result--error { background: var(--aor-task-danger-bg); color: var(--aor-color-danger-fg); }
+.task-project-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
+
+@media (max-width: 560px) {
+  .task-project-dialog { width: calc(100vw - 16px); max-height: calc(100vh - 16px); padding: 18px; }
+  .task-project-dialog__header { display: grid; }
+  .task-project-dialog__path { grid-template-columns: 1fr; }
+  .task-project-dialog__actions { flex-direction: column-reverse; }
+  .task-project-dialog__actions .aor-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}

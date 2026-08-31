@@ -813,7 +813,7 @@ test("web package no longer exports static operator snapshot modules", () => {
   assert.equal(fs.existsSync(path.join(workspaceRoot, "apps/web/src", oldSourceDir)), false);
 });
 
-test("aor app smoke verifies the real flow-centric packaged SPA, config, and state routes", () => {
+test("aor app smoke verifies the packaged Task Workspace, config, and state routes", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     const runtimeRoot = path.join(projectRoot, ".aor");
@@ -842,10 +842,11 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
     assert.equal(payload.mode, "local-spa");
     assert.equal(payload.status, "smoke-pass");
     assert.equal(payload.html_loaded, true);
-    assert.equal(payload.flow_selector_loaded, true);
-    assert.equal(payload.new_flow_action_loaded, true);
-    assert.equal(payload.first_run_wizard_loaded, true);
+    assert.equal(payload.task_workspace_loaded, true);
+    assert.equal(payload.new_task_action_loaded, true);
+    assert.equal(payload.prepare_task_action_loaded, true);
     assert.equal(payload.project_switcher_loaded, true);
+    assert.equal(payload.legacy_surface_absent, true);
     assert.equal(payload.config_project_id, payload.project_id);
     assert.equal(payload.config_default_project_id, payload.project_id);
     assert.equal(payload.project_index_default_project_id, payload.project_id);

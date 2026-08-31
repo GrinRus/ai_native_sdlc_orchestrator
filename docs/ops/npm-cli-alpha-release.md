@@ -63,18 +63,12 @@ W32 extends the source checkout and package smoke expectations with
 `aor request create --json`, `aor request run --json`, and sanitized
 operator-request API coverage so the packaged CLI proves bounded interactive
 runtime work without changing target files outside `.aor/`.
-W34 extends the app smoke expectation so `aor app --smoke --open false --json`
-must also prove the packaged flow-centric bundle still contains the flow
-selector and `New Flow` markers. This remains a deterministic release guardrail;
-installed-user rehearsal acceptance still comes from
-the configured guided-journey fixture with `browser-task-proof`, flow-loop
-fields, accepted skill-agent decisions, run-health evidence, post-run quality
-assessment evidence when outcome quality is claimed, and no-upstream-write
-assertions.
-W36 extends the same deterministic smoke so it must also prove the first-run
-wizard marker, project switcher marker, `/api/projects` project index, and
-matching `default_project_id` fields while preserving the single-project
-`aor app` launch contract.
+W70 replaces the historical W34/W36 bundle markers. `aor app --smoke --open
+false --json` must prove the packaged Task Workspace contains New task,
+Prepare task, and project-switcher markers and contains no retired Quiet
+Cockpit/Flow-selector renderer markers. Installed-user acceptance still comes
+from the blocking Task Workspace browser matrix with durable Task readback,
+review/completion evidence, and no-upstream-write assertions.
 
 After a publish, registry smoke must run from a neutral temporary runner
 directory rather than from the AOR source checkout:

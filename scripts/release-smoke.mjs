@@ -198,10 +198,11 @@ try {
     appSmoke.command !== "app" ||
     appSmoke.status !== "smoke-pass" ||
     appSmoke.html_loaded !== true ||
-    appSmoke.flow_selector_loaded !== true ||
-    appSmoke.new_flow_action_loaded !== true ||
-    appSmoke.first_run_wizard_loaded !== true ||
+    appSmoke.task_workspace_loaded !== true ||
+    appSmoke.new_task_action_loaded !== true ||
+    appSmoke.prepare_task_action_loaded !== true ||
     appSmoke.project_switcher_loaded !== true ||
+    appSmoke.legacy_surface_absent !== true ||
     appSmoke.config_project_id !== appSmoke.project_id ||
     appSmoke.config_default_project_id !== appSmoke.project_id ||
     appSmoke.project_index_default_project_id !== appSmoke.project_id ||
