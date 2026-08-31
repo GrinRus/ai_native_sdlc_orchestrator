@@ -18,35 +18,40 @@ You can help by:
 
 ## Before you start
 
-Read these in order:
+Read these first:
 
 1. `README.md`
 2. `AGENTS.md`
-3. `docs/backlog/backlog-operating-model.md`
-4. `docs/backlog/mvp-roadmap.md`
-5. the nearest `AGENTS.md` to the files you plan to change
+3. the nearest `AGENTS.md` to the files you plan to change
 
-If the change is implementation work, find the owning slice first. Do not start by writing broad code without a slice boundary.
+If implementation introduces a new product outcome, also read
+`docs/backlog/backlog-operating-model.md`, `docs/backlog/mvp-roadmap.md`, and
+find the owning slice before writing broad code. A tightly scoped bug,
+documentation, or maintenance fix may stay outside a feature slice when its
+boundary is explicit and it does not create a new independently acceptable
+outcome.
 
 For internal maintainer rehearsal dependency requirements, use the maintainer runbooks under `docs/ops/` as the source of truth.
 
 ## Development workflow
 
 1. Fork the repository and create a topic branch.
-2. Pick one slice from `docs/backlog/mvp-implementation-backlog.md`.
-3. Open the owning wave document and use its built-in local-task outline as your starting plan.
-4. Keep the PR bounded to one slice whenever possible.
-5. Update docs, contracts, examples, and code together.
-6. Run the root checks:
+2. Classify the work as one feature slice or one bounded maintenance fix.
+3. For feature work, open the owning wave document and use its built-in
+   local-task outline as your starting plan.
+4. Keep the PR bounded to that slice or maintenance outcome.
+5. Update docs, contracts, examples, and code together when they share the
+   outcome.
+6. Run the default commit-ready gate:
    ```bash
    pnpm install --frozen-lockfile
-   pnpm lint
-   pnpm test
-   pnpm build
    pnpm check
-   pnpm production:ready
    ```
-7. Open a focused pull request with the evidence needed to review the slice.
+7. Run `pnpm production:ready` only when production-readiness or release
+   evidence is in scope. During the documented provider hold, alpha release
+   work may use `pnpm production:ready --allow-audit-hold` as defined by the
+   release workflow below.
+8. Open a focused pull request with the evidence needed to review the change.
 
 ## Release workflow
 

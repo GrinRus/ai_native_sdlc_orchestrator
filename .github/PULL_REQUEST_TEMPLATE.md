@@ -4,9 +4,10 @@ Describe the change in one paragraph.
 
 ## Related roadmap context
 
-- Slice:
-- Wave:
-- Epic:
+- Change type: feature slice / maintenance fix
+- Slice (if applicable):
+- Wave (if applicable):
+- Epic (if applicable):
 - Related issue(s):
 
 ## What changed
@@ -18,17 +19,15 @@ Describe the change in one paragraph.
 ## Evidence
 
 - [ ] `pnpm install --frozen-lockfile`
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
 - [ ] `pnpm check`
-- [ ] `pnpm production:ready`
+- [ ] Focused tests or checks are listed below
+- [ ] `pnpm production:ready` was run when readiness/release evidence is in scope, or marked N/A below
 
 ## Docs and examples
 
 - [ ] README / CONTRIBUTING / AGENTS updated if needed
 - [ ] contracts, examples, and command surfaces still align
-- [ ] runbooks or live E2E profiles updated if needed
+- [ ] runbooks or provider-qualification profiles updated if needed
 
 ## Security and runtime safety
 

@@ -859,7 +859,7 @@ function checkAlphaHardening(rootDir, openApiPath = defaultOpenApiPath) {
     "Hosted SaaS",
     "enterprise identity/SSO",
     "Default upstream write-back automation",
-    "W30",
+    "W66 remains the release-qualification blocker",
   ]) {
     if (!readme.includes(required)) {
       findings.push(`README.md must preserve alpha boundary wording '${required}'.`);
