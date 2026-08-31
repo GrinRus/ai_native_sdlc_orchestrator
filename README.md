@@ -14,20 +14,22 @@ while keeping scope, approvals, and evidence explicit.
 **AOR coordinates coding agents; it does not replace them.**
 
 ```text
-Code source + plain-language intent -> Read-only preparation -> Confirm -> Flow
+Code source + plain-language task -> Read-only preparation -> Confirm -> Work -> Review
 ```
 
-> **Alpha:** AOR is for evaluation and bounded local or self-hosted use. It is not
-> a production-ready general-purpose orchestrator. Start with `no-write` mode
-> and a disposable repository.
+> **Alpha:** AOR is for evaluation and bounded local or self-hosted use. It is
+> not a production-ready general-purpose orchestrator. Start with `no-write`
+> mode and a disposable repository.
 
-[Quickstart](#run-your-first-no-write-local-mission) ·
+[Quickstart](#run-your-first-task) ·
+[Safety](#safety-model) ·
 [How it works](#how-aor-works) ·
-[Documentation](#docs-map) ·
-[Contributing](#contributing) ·
-[Roadmap](#roadmap)
+[Documentation](#documentation) ·
+[Contributing](#contributing)
 
-## What is AOR?
+![AOR Task Workspace](https://raw.githubusercontent.com/GrinRus/ai_native_sdlc_orchestrator/main/docs/product/assets/w70-task-workspace-console/01-tasks-home.png)
+
+## Why AOR?
 
 Coding runners are good at reasoning, editing files, and using tools inside a
 task. AOR provides the control layer around those tasks: it carries project
@@ -42,7 +44,7 @@ delivery is allowed.
 | Produces an implementation result | Preserves packets, reports, decisions, and lineage |
 | May be provider-specific | Keeps the core runner-agnostic through adapters |
 
-AOR is built around a few principles:
+AOR is:
 
 - **Bounded by default.** Every step has explicit scope, commands, budgets, and
   write-back mode.
@@ -50,7 +52,7 @@ AOR is built around a few principles:
   inspectable and traceable.
 - **Validation before evaluation.** Deterministic contract checks run before
   semantic or judge-based quality checks.
-- **Safe delivery.** `no-write`, `patch-only`, `local-branch`, and
+- **Safe by default.** `no-write`, `patch-only`, `local-branch`, and
   `fork-first-pr` make delivery intent explicit; upstream writes are off by
   default.
 - **Headless-first.** The CLI and control-plane runtime work without the
@@ -60,81 +62,20 @@ Use AOR to study or operate a controlled SDLC around repositories you are
 allowed to inspect. Do not expect it to replace your coding agent, CI system,
 issue tracker, or release platform.
 
-## Status: alpha distribution
-
-The repository is docs-first with implemented CLI, API, web, and runtime
-baselines. The current audience is early operators, contributors, and
-researchers.
-
-| Surface | Current state |
-| --- | --- |
-| GitHub `main` | Current source and design baseline; may contain unreleased work |
-| npm `@alpha` | Latest tagged CLI snapshot; can lag behind `main` |
-| Production readiness | Audit hold; no general production clearance |
-| Supported operating shape | Bounded local/self-hosted use on Node.js 22 |
-
-W30 established the alpha hardening boundary. Later audit remediation closed
-historical findings, but the W66 qualification intake invalidated that historical
-release clearance until fresh same-commit Codex and Claude qualification is
-complete. Run `pnpm check` before `pnpm production:ready --json`; the current W66
-disposition remains `audit-hold` with `release_clearance=false`.
-
-The supported alpha does not include hosted SaaS, Windows certification,
-enterprise identity, credentialed provider certification, paid calls, default
-upstream writes, or automatic upstream publication of target-repository
-changes.
-
-W67 defines the breaking central-AOR-Home and intent-first onboarding cutover;
-W68 defines provider-neutral runtime model and reasoning-effort selection.
-W69 defines intent-first confirmation CAS, runtime-owned adaptive Flow
-projections, resume-safe Project Home navigation, review-first Prepared Task,
-and Flow Cockpit UI parity without changing the historical W66 provider hold.
-Its implementation candidate is present, while formal slice completion remains
-backlog-blocked behind the W66-S20-S25 runner-output remediation chain and the
-subsequent W66-S09 qualification closure.
-
-W70 defines the blocked successor design and implementation lane for a
-Task-first installed workspace: Tasks Home, safe Markdown sources, truthful
-task runner selection, active work, Attention, change review, and completion
-evidence. It starts only after W69 closes and does not change the W66 provider
-qualification hold.
-
-Mutable AOR data lives in `~/.aor`; `AOR_HOME` is reserved for isolated tests
-and rehearsals. Runner forks can be selected without shell aliases:
-
-```bash
-export AOR_RUNNER_COMMAND_CLAUDE_CODE=tclaude
-export AOR_RUNNER_COMMAND_QWEN_CODE=nessy
-```
-
-Authentication remains owned by the selected executable and its normal
-credential store or agent.
-
-## Current distribution channels
-
-| Channel | Use it for | Source of version truth |
-| --- | --- | --- |
-| [GitHub `main`](https://github.com/GrinRus/ai_native_sdlc_orchestrator) | Evaluating or contributing to current source | `package.json` in the checkout |
-| [npm `@alpha`](https://www.npmjs.com/package/@grinrus/aor) | Trying the latest tagged CLI release | npm `alpha` dist-tag |
-
-There is no Docker or GHCR version channel yet. Only the root CLI package
-`@grinrus/aor` is published; internal workspace packages stay `private:true`
-and are not public semver APIs. The release process is documented in
-[`docs/ops/npm-cli-alpha-release.md`](docs/ops/npm-cli-alpha-release.md).
-
 ## Requirements
 
 For the installed CLI:
 
 - Node.js `>=22`;
 - a local repository you are allowed to inspect;
-- if you use a live runner, its binary and authentication.
+- for AI-backed preparation or execution, a supported runner binary with its
+  normal authentication already configured.
 
 For source development, also use Corepack and the repository-pinned pnpm
 `10.12.4`. AOR does not install or authenticate Codex CLI, Claude Code,
 OpenCode, Qwen Code, or custom runners.
 
-## Install CLI from npm alpha
+## Install the npm alpha
 
 Resolve the alpha tag explicitly so npm does not select the older `latest`
 dist-tag:
@@ -147,11 +88,10 @@ aor --help
 
 The package includes the CLI, bundled onboarding assets, and the local web
 console used by `aor app`. The npm alpha is a tagged snapshot and may not yet
-include features visible on `main`.
+include unreleased features visible on `main`.
 
-## Clone and install from source
-
-Use this path to evaluate current source or contribute to AOR itself:
+<details>
+<summary>Install from source</summary>
 
 ```bash
 git clone https://github.com/GrinRus/ai_native_sdlc_orchestrator.git
@@ -161,35 +101,55 @@ pnpm install --frozen-lockfile
 pnpm aor --help
 ```
 
-Source-checkout examples use `pnpm aor`; installed-package examples use `aor`.
+Source-checkout examples use `pnpm aor`; installed-package examples use
+`aor`.
 
-## Run your first no-write local mission
+</details>
 
-Connect a disposable local repository and let the browser prepare the task:
+## Run your first task
+
+Start the packaged local console:
 
 ```bash
 aor app
 ```
 
-`aor app` starts a foreground server on `127.0.0.1`, opens the local console,
-and prints its URL. Press `Ctrl+C` to stop it. In the first-run wizard:
+`aor app` starts a foreground server on `127.0.0.1`, opens the browser, and
+prints its URL. Press `Ctrl+C` to stop it.
 
-1. Choose a local Git folder or enter an HTTPS/SSH Git URL.
-2. Enter the intent and optionally attach `.txt`, `.md`, `.json`, or YAML files.
-3. Select **Prepare task** for read-only AI normalization.
-4. Review acceptance, scope, provider, and safety mode, then select
-   **Confirm and start**.
+In the Task Workspace:
 
-Preparation requires one authenticated ready runner. All mutable AOR state is
-stored under `~/.aor` (or `AOR_HOME` for isolated runs), never in the target
-repository. Repository writes occur only through explicit **Materialize project
-config** or selected evidence export actions; AOR never stages, commits, or
-pushes those files.
+1. Select or connect a project.
+2. Choose **New task**, describe the outcome, and optionally add Markdown
+   source material.
+3. Choose **Prepare task**. Preparation is read-only and does not authorize
+   source changes.
+4. Review the prepared outcome, acceptance criteria, scope, runner, and safety
+   mode.
+5. Choose **Start task**, then follow activity, attention, changes, checks, and
+   evidence through completion.
 
-From a flow stage, **Ask AOR** creates a durable operator request rather than a
-direct chat session. The request is validated against its target refs, allowed
-paths, and delivery mode, then routed through the same evidence-producing
-runtime used by CLI and API execution.
+AI-backed preparation requires one authenticated ready runner. All mutable AOR
+state is stored under `~/.aor` (or `AOR_HOME` for isolated runs), never in
+the target repository. Repository writes occur only through explicit
+**Materialize project config** or selected evidence export actions; AOR never
+stages, commits, or pushes those files.
+
+From an active Task, **Ask AOR** creates a durable operator request rather than
+a direct chat session. It passes through the same scope, policy, and
+evidence-producing runtime as CLI and API execution.
+
+### Credential-free UI smoke
+
+Use smoke mode to verify the packaged UI without runner credentials:
+
+```bash
+TARGET_REPO=/path/to/disposable-repository
+aor app --project-ref "$TARGET_REPO" --smoke --open false --json
+```
+
+The command should return `status: "smoke-pass"`. On a clean target, app smoke
+should pass without creating repo-local `.aor/`.
 
 <details>
 <summary>Headless source-checkout quickstart</summary>
@@ -228,155 +188,135 @@ npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- \
 ```
 
 Do not run this registry-package smoke from the AOR source checkout. npm can
-prefer the local package context and produce a misleading `aor: command not
-found` result.
+prefer the local package context and produce a misleading
+`aor: command not found` result.
 
 </details>
 
-First-run safety notes:
+## What you should see
+
+Tasks Home keeps prepared, active, attention, ready, and completed work
+resumable. Each Task moves through explicit preparation, activity, change
+review, checks, and completion evidence without moving lifecycle ownership into
+the browser.
+
+The installed journey is:
+
+```text
+Project -> Task -> Prepare -> Start -> Work -> Review -> Complete
+```
+
+## Safety model
 
 - `~/.aor` is private mutable state and must not be committed.
 - Repo-local `.aor` is reserved for explicit portable config and selected
   evidence exports; legacy runtime content is not loaded or deleted.
 - Prepare is read-only. Patch-capable execution starts only after confirmation,
   and upstream writes are never enabled automatically.
+- Delivery modes, allowed paths, commands, budgets, and approvals remain
+  explicit in runtime evidence.
+- Raw runner output and credential-bearing artifacts are private evidence, not
+  normal CLI, API, or web projections.
 
-## What you should see
+Read the [self-hosted release model](docs/ops/self-hosted-release.md) and
+[secrets and redaction guide](docs/ops/self-hosted-secrets-and-redaction.md)
+before credentialed or write-capable operation.
 
-- Source connect derives the workspace ID, stable mount, topology, components,
-  and verification suggestions.
-- Prepare stores an immutable submission and creates a validated preview.
-- Confirm creates exactly one flow and starts its first executable action.
-- `aor app` shows the project, current flow, lifecycle stage, blockers, and
-  evidence without owning the underlying lifecycle in the browser.
+## Current alpha status
 
-For deterministic UI verification, run:
+The repository is docs-first with implemented CLI, API, web, and runtime
+baselines. The current audience is early operators, contributors, and
+researchers.
 
-```bash
-aor app --project-ref "$TARGET_REPO" --smoke --open false --json
-```
+| Surface | Current state |
+| --- | --- |
+| GitHub `main` | Current source and design baseline; may contain unreleased work |
+| npm `@alpha` | Latest tagged CLI snapshot; can lag behind `main` |
+| Installed UI | Task Workspace with task preparation, work, review, and evidence |
+| Production readiness | Audit hold; no general production clearance |
+| Supported operating shape | Bounded local/self-hosted use on Node.js 22 |
 
-On a clean target, app smoke should pass without creating repo-local `.aor/`.
+Development acceptance and release qualification are separate. W69 and W70 are development-complete, and the Task Workspace is available through the npm
+`@alpha` channel. W66 remains the release-qualification blocker: fresh
+same-commit required-provider evidence is incomplete, so the current
+disposition remains `audit-hold` with `release_clearance=false`.
+
+Run `pnpm check` for repository integrity. Maintainers use
+`pnpm production:ready --json` for the separate release disposition.
+
+The supported alpha does not include hosted SaaS, Windows certification,
+enterprise identity/SSO, credentialed provider certification, paid calls,
+default upstream writes, or automatic upstream publication of
+target-repository changes.
+
+There is no Docker or GHCR version channel yet. Only the root CLI package
+`@grinrus/aor` is published; internal workspace packages stay `private:true`
+and are not public semver APIs. The source-channel version truth is
+`package.json`; the npm-channel truth is the registry `alpha` dist-tag. The
+release process is documented in
+[`docs/ops/npm-cli-alpha-release.md`](docs/ops/npm-cli-alpha-release.md).
 
 ## How AOR works
 
 ```text
-Project profile + Mission
-          |
-          v
-  bounded lifecycle step
-          |
-          +--> route + adapter --> coding runner
-          |                         |
-          |                         v
-          +<-- packets, reports, and runtime evidence
-          |
-          v
- deterministic validation --> evaluation --> review/QA
-          |
-          v
- delivery policy --> patch | local branch | fork-first PR | blocked
-          |
-          v
- release evidence --> incidents, datasets, and recertification
+Project + Task
+      |
+      v
+read-only preparation -> review and confirm
+      |
+      v
+bounded route + adapter -> coding runner
+      |
+      v
+packets, reports, and runtime evidence
+      |
+      v
+deterministic validation -> evaluation -> review/QA
+      |
+      v
+delivery policy -> no-write | patch | local branch | fork-first PR | blocked
 ```
-
-The core objects are:
-
-| Object | Role |
-| --- | --- |
-| **Project** | Repository topology, policies, budgets, and write-back rules |
-| **Mission / Flow** | One outcome and its end-to-end evidence lineage |
-| **Packet / Report** | Durable, contract-validated handoff or decision artifact |
-| **Route / Adapter** | Provider-neutral runner selection and invocation boundary |
-| **Runtime Harness** | Execute, classify, validate, retry or repair, verify, and close |
-| **Delivery mode** | Explicit boundary for no-write, patch, branch, or fork-first delivery |
 
 See the [operating model](docs/architecture/12-orchestrator-operating-model.md)
 for the canonical lifecycle and ownership boundaries.
 
-## Choose a runner
+## Runners
 
-Runner binaries and credentials are configured outside AOR.
+Runner binaries, authentication, and normal credential stores remain outside
+AOR. `mock-runner` supports deterministic tests; Codex CLI and Claude Code have
+adapters but await fresh W66 qualification. OpenCode and Qwen Code remain
+candidate coverage. An adapter profile declares capability; it does not prove
+that a runner is installed, authenticated, safe, or release-qualified.
 
-| Runner path | Current fit |
-| --- | --- |
-| `mock-runner` | Deterministic local tests and credential-free rehearsals |
-| `codex-cli` | Adapter available; fresh W66 qualification is pending |
-| `claude-code` | Adapter available; fresh W66 qualification is pending |
-| `open-code` and `qwen-code` | Candidate adapter coverage, not a required public baseline |
-| Custom adapters | Contract and authoring path; internal packages are not stable public SDKs |
+## Artifacts and interfaces
 
-Treat an adapter profile as a capability declaration, not a guarantee that a
-third-party runner is installed, authenticated, safe for your repository, or
-currently release-qualified.
-
-## Inspect artifacts
-
-JSON output returns logical artifact and report references when files are
-written. The common mutable layout is:
+The common mutable layout is:
 
 ```text
 ${AOR_HOME:-$HOME/.aor}/projects/<workspace-project-id>/
   artifacts/   packets and generated evidence
   reports/     decisions, summaries, and quality evidence
-  state/       project and flow runtime state
+  state/       project and task runtime state
 ```
 
-Treat AOR Home as sensitive machine-local state. Repo-local `.aor/` is reserved
-for explicitly materialized portable configuration and selected exports; do
-not paste credential-bearing artifacts or private repository evidence into
-public issues.
+Treat AOR Home as sensitive machine-local state. Do not paste
+credential-bearing artifacts or private repository evidence into public issues.
 
-## Optional API/web surfaces
-
-AOR is headless-first: the CLI and control-plane runtime remain usable without
-the web console.
-
-- `aor app` launches the packaged local SPA on literal loopback.
-- [`apps/web`](apps/web) contains the React/Vite operator console.
-- [`apps/api`](apps/api) exports the API surface; shared HTTP/SSE transport lives
-  in [`packages/orchestrator-core`](packages/orchestrator-core).
-- The API contract is documented in
-  [`docs/contracts/control-plane-api.md`](docs/contracts/control-plane-api.md).
+AOR remains headless-first. `aor app` launches the packaged Task Workspace on
+literal loopback; [`apps/web`](apps/web) contains the React/Vite console,
+[`apps/api`](apps/api) exports the control-plane API, and
+[`packages/orchestrator-core`](packages/orchestrator-core) owns the shared
+lifecycle. See the
+[`control-plane API contract`](docs/contracts/control-plane-api.md) for the
+HTTP/SSE surface.
 
 These are local alpha surfaces, not a hosted product claim. Browser
-authentication, multi-tenant isolation, remote UI connectivity, and
-enterprise identity/SSO are outside the supported mode.
+authentication, multi-tenant isolation, remote UI connectivity, and enterprise
+identity/SSO are outside the supported mode.
 
-## What works today
-
-| Capability | Current source status |
-| --- | --- |
-| npm CLI distribution | Published alpha snapshots |
-| Repository onboarding and readiness diagnostics | Implemented baseline |
-| Mission intake and evidence-backed next actions | Implemented baseline |
-| Quiet Cockpit local operator console | Implemented on `main`; npm alpha may lag |
-| Durable operator requests | Implemented baseline |
-| CLI, API, contracts, adapters, and runtime harness | Implemented baseline |
-| Single-repo, monorepo-component, and bounded multirepo planning | Implemented baseline |
-| Production-readiness disposition | Implemented gate; current W66 result is audit hold |
-
-"Implemented baseline" means that source, contracts, and automated evidence
-exist. It does not mean GA stability, broad provider parity, or unattended
-production certification.
-
-## Command surface status
-
-The CLI command surface currently includes **73 implemented** commands and **0 planned** commands. See the [CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags, outputs, and contract families.
-
-## Readiness evidence
-
-`pnpm check` validates repository integrity across docs, examples, contracts,
-command surfaces, tests, package metadata, and release policy. It is not a
-production certification.
-
-`pnpm production:ready --json` is a separate maintainer-facing disposition
-gate. The current W66 `audit-hold` may clear only after committed qualification
-evidence satisfies the gate. Read the
-[production-readiness guide](docs/ops/production-readiness-gate.md) and the
-[bounded self-hosted release model](docs/ops/self-hosted-release.md) before any
-credentialed or write-capable use.
+The CLI command surface currently includes **73 implemented** commands and **0 planned** commands. See the
+[CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags,
+outputs, and contract families.
 
 ## When not to use AOR yet
 
@@ -390,7 +330,7 @@ Do not use AOR yet if you need:
 - unattended production automation for critical repositories;
 - guaranteed support or incident-response SLAs.
 
-## Docs map
+## Documentation
 
 | If you want to... | Start here |
 | --- | --- |
@@ -403,12 +343,14 @@ Do not use AOR yet if you need:
 | Operate the alpha safely | [Operations index](docs/ops/00-runbook-index.md) |
 | Follow current work | [MVP roadmap](docs/backlog/mvp-roadmap.md) |
 
-Architecture decisions live in
+W70 is the latest defined development wave and owns the Task Workspace
+implementation history. W66 remains the independent release-qualification
+blocker. Architecture decisions live in
 [`docs/architecture/adr`](docs/architecture/adr), implementation slices in
 [`docs/backlog`](docs/backlog), and runnable contract examples in
 [`examples`](examples).
 
-## Contributor quickstart
+## Contributing
 
 Use this path when changing AOR rather than operating it against a target:
 
@@ -416,77 +358,49 @@ Use this path when changing AOR rather than operating it against a target:
 corepack enable
 pnpm install --frozen-lockfile
 pnpm check
-pnpm production:ready --json --allow-audit-hold
 ```
 
-The explicit hold allowance keeps the current W66 disposition visible without
-turning the known audit hold into a contributor setup failure. Report both the
-integrity result and the readiness disposition in your pull request.
+`pnpm check` is the default commit-ready repository gate. Run
+`pnpm production:ready --json --allow-audit-hold` only when
+production-readiness or release evidence is in scope.
 
 Before opening a pull request:
 
 - read [CONTRIBUTING.md](CONTRIBUTING.md) and the nearest
   [`AGENTS.md`](AGENTS.md);
 - keep docs, contracts, examples, and code aligned;
-- keep changes scoped to one roadmap slice when implementation is involved;
+- use one roadmap slice when implementation introduces a new product outcome;
+- keep tightly scoped bug, documentation, and maintenance fixes explicit
+  without manufacturing a new slice;
 - never commit `.aor/`, credentials, generated target checkouts, or runner
   transcripts.
 
-## Repository map
-
-```text
-apps/
-  cli/                 CLI entrypoint and command surface
-  api/                 control-plane API export surface
-  web/                 optional local operator console
-packages/
-  orchestrator-core/   lifecycle, state, control-plane, and delivery logic
-  contracts/           contract loaders and shared identifiers
-  adapter-sdk/         internal adapter authoring implementation
-  provider-routing/    provider-neutral route resolution
-  harness/             capture, replay, and certification primitives
-  observability/       events, metrics, and audit projections
-docs/
-  product/             supported outcomes and product definition
-  architecture/        runtime behavior and system boundaries
-  contracts/           durable schema and interface source of truth
-  backlog/             roadmap, waves, epics, and slices
-  ops/                 operator and maintainer runbooks
-examples/              profiles, packets, reports, policies, and adapters
-scripts/               repository-integrity and release checks
-```
-
-## Roadmap
-
-The [MVP roadmap](docs/backlog/mvp-roadmap.md) and
-[`docs/backlog/wave-66-implementation-slices.md`](docs/backlog/wave-66-implementation-slices.md)
-are the planning sources of truth. The current lane focuses on restoring fresh
-provider qualification while preserving bounded execution, contract alignment,
-and no-upstream-write defaults.
-
-## Contributing
-
-Contributions are welcome through focused issues and pull requests. Start with
-[CONTRIBUTING.md](CONTRIBUTING.md), use the
+Use the
 [bug report](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=bug-report.md)
-or [feature request](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=feature-request.md)
+or
+[feature request](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=feature-request.md)
 template, and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Security and responsible disclosure
+## Maintainers and governance
+
+AOR is currently maintained by
+[`GrinRus`](https://github.com/GrinRus). Repository ownership is recorded in
+[`.github/CODEOWNERS`](.github/CODEOWNERS); roadmap and contract changes are
+reviewed through focused pull requests against their source-of-truth documents.
+Support remains best-effort during alpha.
+
+## Security and support
 
 Read [SECURITY.md](SECURITY.md) and use GitHub Private Vulnerability Reporting
 for vulnerabilities or possible secret exposure. Never publish credentials,
-private repository contents, exploit details, or sensitive `.aor/` artifacts in
-an issue or pull request.
+private repository contents, exploit details, or sensitive `.aor/` artifacts
+in an issue or pull request.
 
-## Support
-
-Support is best-effort during alpha. Use [GitHub issues](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues)
+Use [GitHub issues](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues)
 for reproducible bugs, documentation gaps, and feature requests; see
-[SUPPORT.md](SUPPORT.md) for the supported channels and current limits.
+[SUPPORT.md](SUPPORT.md) for supported channels and current limits.
 
 ## License
 
 AOR is licensed under the [Apache License 2.0](LICENSE). Attribution notices are
-available in the source repository's
-[NOTICE](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/main/NOTICE).
+available in [NOTICE](NOTICE).

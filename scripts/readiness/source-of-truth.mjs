@@ -20,8 +20,14 @@ export function checkReadinessSourceOfTruth(rootDir) {
   const opsRunbook = documents.get(EVIDENCE[2]);
   const releaseRunbook = documents.get(EVIDENCE[3]);
 
-  if (!readme.includes("W66 qualification intake invalidated that historical")) {
-    findings.push("README.md must state that W66 invalidated historical release clearance.");
+  for (const required of [
+    "W69 and W70 are development-complete",
+    "W66 remains the release-qualification blocker",
+    "release_clearance=false",
+  ]) {
+    if (!readme.includes(required)) {
+      findings.push(`README.md must preserve current development/release status wording '${required}'.`);
+    }
   }
   for (const required of ["pnpm production:ready", "docs/ops/self-hosted-release.md"]) {
     if (!readme.includes(required)) findings.push(`README.md must mention '${required}'.`);

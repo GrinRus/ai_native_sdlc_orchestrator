@@ -422,26 +422,23 @@ for (const file of listPackageSurfaceFiles(packageJson.files ?? [])) {
 }
 
 const readme = read("README.md");
+const readmeSearchText = readme.replace(/\s+/gu, " ");
 for (const section of [
-  "## Status: alpha distribution",
-  "## Current distribution channels",
-  "## What is AOR?",
+  "## Why AOR?",
   "## Requirements",
-  "## Install CLI from npm alpha",
-  "## Clone and install from source",
-  "## Run your first no-write local mission",
+  "## Install the npm alpha",
+  "## Run your first task",
   "## What you should see",
-  "## Choose a runner",
-  "## Inspect artifacts",
-  "## Optional API/web surfaces",
-  "## What works today",
-  "## Readiness evidence",
-  "## When not to use AOR yet",
-  "## Docs map",
-  "## Contributor quickstart",
+  "## Safety model",
+  "## Current alpha status",
   "## How AOR works",
-  "## Roadmap",
+  "## Runners",
+  "## Artifacts and interfaces",
+  "## When not to use AOR yet",
+  "## Documentation",
   "## Contributing",
+  "## Maintainers and governance",
+  "## Security and support",
   "## License",
 ]) {
   if (!readme.includes(section)) {
@@ -461,7 +458,8 @@ for (const needle of [
   "pnpm aor task prepare",
   "pnpm aor task start",
   "Prepare task",
-  "Confirm and start",
+  "Start task",
+  "Credential-free UI smoke",
   "All mutable AOR state is",
   "registry smoke from a neutral temporary runner directory",
   'npm exec --yes --package "@grinrus/aor@$AOR_VERSION" -- aor --help',
@@ -471,9 +469,22 @@ for (const needle of [
   "Prepare is read-only",
   "upstream writes are never enabled automatically",
   "AOR never stages, commits, or",
+  "W69 and W70 are development-complete",
+  "W66 remains the release-qualification blocker",
 ]) {
-  if (!readme.includes(needle)) {
+  if (!readmeSearchText.includes(needle)) {
     console.error(`README.md is missing required operator quickstart detail '${needle}'`);
+    process.exit(1);
+  }
+}
+
+for (const staleClaim of [
+  "W70 defines the blocked successor",
+  "Its implementation candidate is present",
+  "Quiet Cockpit local operator console",
+]) {
+  if (readmeSearchText.includes(staleClaim)) {
+    console.error(`README.md contains stale public status wording '${staleClaim}'.`);
     process.exit(1);
   }
 }
