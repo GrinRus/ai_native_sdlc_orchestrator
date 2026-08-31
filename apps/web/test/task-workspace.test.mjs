@@ -47,16 +47,17 @@ test("web client reads the additive task projection without replacing intent mut
 });
 
 test("web client reads bounded Task review evidence separately from the Task list", () => {
-  const source = fs.readFileSync(path.join(root, "src/spa.jsx"), "utf8");
+  const source = fs.readFileSync(path.join(root, "src/task-app.jsx"), "utf8");
   assert.match(source, /async function loadTaskReview/u);
   assert.match(source, /tasks\/\$\{encodeURIComponent\(taskId\)\}\/review/u);
   assert.match(source, /loadTaskReview=\{loadTaskReview\}/u);
-  assert.match(source, /runTaskReviewDecision/u);
+  assert.match(source, /async function reviewTask/u);
   assert.match(source, /review decide/u);
 });
 
 test("Task Workspace owns the full viewport without legacy project-settings chrome", () => {
-  const source = fs.readFileSync(path.join(root, "src/spa.jsx"), "utf8");
-  assert.match(source, /taskSurface \? "task-surface-active"/u);
-  assert.match(source, /activeProjectDisplay && !taskSurface/u);
+  const source = fs.readFileSync(path.join(root, "src/task-app.jsx"), "utf8");
+  assert.match(source, /data-app-surface="task-workspace"/u);
+  assert.match(source, /<TaskWorkspace/u);
+  assert.doesNotMatch(source, /QuietShell|FlowSelector|IntentOnboarding/u);
 });

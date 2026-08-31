@@ -15,7 +15,10 @@ near credentials or private repositories.
 
 ## Reporting a Vulnerability
 
-Use GitHub Private Vulnerability Reporting for this repository when it is available. If it is temporarily unavailable, contact the repository owner privately before opening any public issue.
+Use the repository's [GitHub Private Vulnerability Reporting form](https://github.com/GrinRus/ai_native_sdlc_orchestrator/security/advisories/new).
+If GitHub reports that the form is unavailable, do not post vulnerability
+details publicly. Open a minimal issue stating only that private security
+contact is required; a maintainer can then establish a confidential channel.
 
 Do not publish secrets, exploit details, private repository names, target checkout contents, live runner transcripts, or credential-bearing `.aor/` artifacts in public issues, pull requests, discussions, or comments.
 

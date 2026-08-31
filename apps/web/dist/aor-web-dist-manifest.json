@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "07057c73a34eb035556bee68fed5b46940b7005481b1ccb6428fa959394e684b",
+  "source_hash": "d5a6c8a6fbb0a36a5159494f7ed40a0ef50660c1c63ce1205bdfce31fa7a9e2b",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -34,6 +34,8 @@
     "apps/web/src/quiet-shell.jsx",
     "apps/web/src/spa.css",
     "apps/web/src/spa.jsx",
+    "apps/web/src/task-app.css",
+    "apps/web/src/task-app.jsx",
     "apps/web/src/task-workspace.css",
     "apps/web/src/task-workspace.jsx",
     "apps/web/src/ui/components.css",
@@ -44,13 +46,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-B7tN92d0.css",
-    "apps/web/dist/assets/index-CF71uKiJ.js",
+    "apps/web/dist/assets/index-BgBEV5M_.js",
+    "apps/web/dist/assets/index-BlZ0EPOY.css",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-B7tN92d0.css": "11327116219b72c3943bdd76d666036f82cb88256017fd31a8aee609a988a78e",
-    "apps/web/dist/assets/index-CF71uKiJ.js": "5c96b887fc3154fed58ace77f1d0cb0f77fa2bd05fc352182fa53506ab44afee",
-    "apps/web/dist/index.html": "a18a2ada8aff79cb8c63edd9bcf005873f4112a3b2090f8d46959b7a4cb56252"
+    "apps/web/dist/assets/index-BgBEV5M_.js": "31a7921bb40b86aa18ea796d378d3f6d98adea19209beb4dd1e44c01c66efa17",
+    "apps/web/dist/assets/index-BlZ0EPOY.css": "d38a223789059c4822dbef346f4f3423e9f7ecd60ce20cf3250268595b2b445b",
+    "apps/web/dist/index.html": "1f8f500f61b52b2eeb0adb845dbb1b9b81b298c2d21a25710f34e5722737ee82"
   }
 }

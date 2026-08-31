@@ -283,7 +283,7 @@ async function buildRenderGuard(input) {
   const rootElementPresent = /\bid=["']root["']/u.test(input.html);
   const titlePresent = input.html.includes("AOR Operator Console");
   const appShellMarkerPresent =
-    combinedScripts.includes("AOR Operator Console") && combinedScripts.includes("Intent-first onboarding");
+    combinedScripts.includes("Task Workspace") && combinedScripts.includes("Prepare task");
   const blankRootRegressionDetected = /\bmissionStatus\b/u.test(combinedScripts);
   const findings = [];
   if (!rootElementPresent) findings.push("index.html does not expose the React root element");
@@ -337,16 +337,17 @@ function readPackagedSpaText(staticRoot) {
 /**
  * @param {string} staticRoot
  * @param {string} html
- * @returns {{ htmlLoaded: boolean, flowSelectorLoaded: boolean, newFlowActionLoaded: boolean, wizardLoaded: boolean, projectSwitcherLoaded: boolean }}
+ * @returns {{ htmlLoaded: boolean, taskWorkspaceLoaded: boolean, newTaskActionLoaded: boolean, prepareTaskActionLoaded: boolean, projectSwitcherLoaded: boolean, legacySurfaceAbsent: boolean }}
  */
 function inspectPackagedSpa(staticRoot, html) {
   const packagedText = `${html}\n${readPackagedSpaText(staticRoot)}`;
   return {
     htmlLoaded: html.includes("AOR Operator Console"),
-    flowSelectorLoaded: packagedText.includes("Flow selector") && packagedText.includes("flow-selector"),
-    newFlowActionLoaded: packagedText.includes("Prepare task") && packagedText.includes("Intent-first onboarding"),
-    wizardLoaded: packagedText.includes("Code source") && packagedText.includes("Connect project"),
-    projectSwitcherLoaded: packagedText.includes("Project switcher") && packagedText.includes("project-switcher"),
+    taskWorkspaceLoaded: packagedText.includes("Task Workspace") && packagedText.includes("task-workspace-shell"),
+    newTaskActionLoaded: packagedText.includes("New task"),
+    prepareTaskActionLoaded: packagedText.includes("Prepare task") && packagedText.includes("Start task"),
+    projectSwitcherLoaded: packagedText.includes("Current project") && packagedText.includes("task-workspace__project-switcher"),
+    legacySurfaceAbsent: !["Quiet Cockpit", "New Flow", "flow-selector"].some((marker) => packagedText.includes(marker)),
   };
 }
 
@@ -424,10 +425,11 @@ export async function runAppCommand(args, options = {}) {
         const renderGuard = await buildRenderGuard({ html, appUrl });
         const routeChecksPass =
           packagedSpa.htmlLoaded &&
-          packagedSpa.flowSelectorLoaded &&
-          packagedSpa.newFlowActionLoaded &&
-          packagedSpa.wizardLoaded &&
+          packagedSpa.taskWorkspaceLoaded &&
+          packagedSpa.newTaskActionLoaded &&
+          packagedSpa.prepareTaskActionLoaded &&
           packagedSpa.projectSwitcherLoaded &&
+          packagedSpa.legacySurfaceAbsent &&
           config.project_id === transport.projectId &&
           projectIndex.default_project_id === transport.projectId &&
           state.project_id === transport.projectId;
@@ -436,10 +438,11 @@ export async function runAppCommand(args, options = {}) {
           ...summary,
           status: smokePass ? "smoke-pass" : "smoke-fail",
           html_loaded: packagedSpa.htmlLoaded,
-          flow_selector_loaded: packagedSpa.flowSelectorLoaded,
-          new_flow_action_loaded: packagedSpa.newFlowActionLoaded,
-          first_run_wizard_loaded: packagedSpa.wizardLoaded,
+          task_workspace_loaded: packagedSpa.taskWorkspaceLoaded,
+          new_task_action_loaded: packagedSpa.newTaskActionLoaded,
+          prepare_task_action_loaded: packagedSpa.prepareTaskActionLoaded,
           project_switcher_loaded: packagedSpa.projectSwitcherLoaded,
+          legacy_surface_absent: packagedSpa.legacySurfaceAbsent,
           config_project_id: config.project_id,
           config_default_project_id: config.default_project_id,
           config_project_profile_ref: config.project_profile_ref,

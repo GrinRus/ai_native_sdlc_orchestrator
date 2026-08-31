@@ -19,7 +19,7 @@ Expected behavior:
 - `/app-config.json` returns the default workspace project id, `projects[]`, version, and API base; storage placement remains server-owned;
 - `GET /api/projects` returns explicit local project summaries without initializing AOR Home project state;
 - `/api/projects/:projectId/**` serves the same control-plane read, mutation, and SSE routes;
-- the first-run surface exposes code source plus intent; the top bar retains the active project switcher;
+- the first-run surface is Tasks Home; its project control switches or explicitly connects project sources;
 - the browser opens unless `--open false` is passed;
 - `Ctrl+C` stops the app server without changing run state.
 
@@ -31,10 +31,11 @@ aor app --project-ref <repo> --smoke --open false --json
 Expected smoke outcome:
 - `status="smoke-pass"`;
 - `html_loaded=true`;
-- `first_run_wizard_loaded=true`;
+- `task_workspace_loaded=true`;
+- `new_task_action_loaded=true`;
+- `prepare_task_action_loaded=true`;
 - `project_switcher_loaded=true`;
-- `flow_selector_loaded=true`;
-- `new_flow_action_loaded=true`;
+- `legacy_surface_absent=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
 - `config_default_project_id` and `project_index_default_project_id` match;
 - mutable state changes only in AOR Home; the target repository remains unchanged.
@@ -124,10 +125,11 @@ aor app \
 Expected smoke outcome:
 - JSON summary reports `mode="local-spa"` and `status="smoke-pass"`;
 - `html_loaded=true`;
-- `first_run_wizard_loaded=true`;
+- `task_workspace_loaded=true`;
+- `new_task_action_loaded=true`;
+- `prepare_task_action_loaded=true`;
 - `project_switcher_loaded=true`;
-- `flow_selector_loaded=true`;
-- `new_flow_action_loaded=true`;
+- `legacy_surface_absent=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
 - `config_default_project_id` and `project_index_default_project_id` match;
 - CLI/API/headless surfaces remain available when the app process exits.
@@ -205,11 +207,11 @@ aor app \
 ```
 
 Expected full-flow console evidence:
-- app smoke loads the packaged SPA, `/app-config.json`, `GET /api/projects`, `GET /api/projects/:projectId/state`, the first-run wizard marker, project switcher marker, flow selector marker, and the `New Flow` marker;
-- connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; the SPA Mission form creates guided intake evidence and `next` refreshes the durable next-action report for the selected flow;
-- `New Flow` creates fresh mission/intake evidence and never mutates a completed flow;
-- Ask AOR/request-change actions use `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions` with the selected `target_flow_id`;
-- Evidence Graph, Runtime Trace, and Evidence & Documents stay scoped to the selected flow; refs can be copied or attached as operator-request targets without opening raw mutable files;
+- app smoke loads the packaged SPA, `/app-config.json`, `GET /api/projects`, `GET /api/projects/:projectId/state`, Task Workspace, New task, Prepare task, and project-switcher markers, and proves that retired renderer markers are absent;
+- Task preparation uses `POST /api/projects/:projectId/intent-submissions`; Start and recovery use `POST /api/projects/:projectId/tasks/:taskId/actions` with revision-aware payloads;
+- completed Tasks remain immutable and follow-up creates distinct intent evidence;
+- bounded help uses the Task action surface or the underlying operator-request routes while preserving internal lineage;
+- Review and Completion stay scoped to the selected Task; refs remain server-owned evidence rather than mutable browser state;
 - pending runner questions are derived from `step-result.requested_interaction`;
 - submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
 - detaching the session stops web follow capture only; run state and evidence remain queryable through CLI/API.
@@ -220,10 +222,10 @@ Closure branch checks:
 - `hold` and `request-repair` decisions set `guided_lifecycle.state=blocked` and preserve the review-decision ref in stage evidence;
 - delivery and release recommendations include `--require-review-decision`;
 - release-ready evidence selects `aor learning handoff --run-id <RUN_ID>`;
-- completed learning handoff changes the primary action to evidence inspection or explicit follow-up flow creation rather than mutating the completed flow.
+- completed learning handoff changes the primary action to evidence inspection or explicit follow-up Task creation rather than mutating completed evidence.
 
 Read-only checks:
-- completed flows stay inspectable but mutation controls are disabled or replaced by no-write inspection actions;
+- completed Tasks stay inspectable but mutation controls are disabled or replaced by follow-up/no-write inspection actions;
 - use CLI/API reads when mutation transport is unavailable or intentionally disabled;
 - stage evidence, blockers, policy history, live/event history, and next-action report refs remain visible through headless commands;
 - the local app must not become the only way to discover the exact CLI command an operator can run headlessly.

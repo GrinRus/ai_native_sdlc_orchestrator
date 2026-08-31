@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/GrinRus/ai_native_sdlc_orchestrator/security/advisories/new
+    about: Report vulnerabilities, possible secret exposure, or exploit details privately.
+  - name: Support and usage guidance
+    url: https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/main/SUPPORT.md
+    about: Review supported channels and current alpha limitations before opening an issue.

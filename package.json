@@ -3,6 +3,14 @@
   "private": false,
   "version": "0.1.0-alpha.20",
   "description": "AI-native SDLC orchestrator CLI for bounded packets, evidence, reviews, and delivery decisions.",
+  "keywords": [
+    "ai",
+    "cli",
+    "orchestration",
+    "sdlc",
+    "software-development"
+  ],
+  "author": "GrinRus",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
@@ -33,6 +41,7 @@
     "examples/skills",
     "examples/wrappers",
     "docs/contracts",
+    "docs/ops/installed-user-first-run.md",
     "docs/ops/npm-cli-alpha-release.md",
     "docs/ops/production-readiness-gate.md",
     "docs/ops/project-topology-onboarding.md",
@@ -43,7 +52,8 @@
     "docs/ops/self-hosted-secrets-and-redaction.md",
     "CHANGELOG.md",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "repository": {
     "type": "git",
@@ -63,7 +73,7 @@
     "test:web:browser": "playwright test --config apps/web/playwright.config.mjs",
     "test": "node ./scripts/test-runner.mjs",
     "typecheck": "node ./scripts/typecheck-ratchet.mjs",
-    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/contract-kernel-parity.mjs",
+    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/contract-kernel-parity.mjs && node ./scripts/current-doc-vocabulary.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",

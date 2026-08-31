@@ -64,6 +64,7 @@ function copyFixtureRepo() {
     "CHANGELOG.md",
     "SECURITY.md",
     "SUPPORT.md",
+    "NOTICE",
     "package.json",
   ]) {
     fs.copyFileSync(path.join(workspaceRoot, file), path.join(tempRoot, file));
@@ -246,6 +247,7 @@ test("packed file validation rejects runtime, test, and private rehearsal artifa
     "package.json",
     "README.md",
     "LICENSE",
+    "NOTICE",
     "CHANGELOG.md",
     "apps/cli/bin/aor.mjs",
     "apps/cli/src/index.mjs",
@@ -260,6 +262,7 @@ test("packed file validation rejects runtime, test, and private rehearsal artifa
     "examples/routes/implement-default.yaml",
     "examples/wrappers/wrapper-runner-default.yaml",
     "docs/contracts/00-index.md",
+    "docs/ops/installed-user-first-run.md",
     "docs/ops/npm-cli-alpha-release.md",
     "docs/ops/self-hosted-environment-matrix.md",
     ".aor/projects/run.json",

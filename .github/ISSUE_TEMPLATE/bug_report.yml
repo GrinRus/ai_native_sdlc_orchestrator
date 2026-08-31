@@ -1,0 +1,110 @@
+name: Bug report
+description: Report a reproducible CLI, API, web, documentation, or workflow defect.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AOR. Do not include credentials, private repository content, exploit details, or unredacted `.aor/` artifacts. Use private vulnerability reporting for security issues.
+  - type: input
+    id: version
+    attributes:
+      label: AOR version or commit
+      description: Paste `aor --version`, the npm alpha version, or the source commit SHA.
+      placeholder: 0.1.0-alpha.20 or a0612e7
+    validations:
+      required: true
+  - type: dropdown
+    id: install_channel
+    attributes:
+      label: Installation channel
+      options:
+        - npm alpha
+        - Source checkout
+        - Packaged tarball or release candidate
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include operating system, architecture, Node.js version, and pnpm version when relevant.
+      placeholder: macOS 15 arm64, Node 22.14.0, pnpm 10.12.4
+    validations:
+      required: true
+  - type: input
+    id: runner
+    attributes:
+      label: Runner and route
+      description: Name the configured runner/route without including credentials. Enter `none` for read-only or preparation-only paths.
+      placeholder: route.implement.simulation / none
+    validations:
+      required: true
+  - type: dropdown
+    id: safety_mode
+    attributes:
+      label: Safety or delivery mode
+      options:
+        - no-write
+        - patch-only
+        - local-branch
+        - fork-first-pr
+        - Unknown or not applicable
+    validations:
+      required: true
+  - type: dropdown
+    id: target_modified
+    attributes:
+      label: Was the target repository modified unexpectedly?
+      options:
+        - "No"
+        - "Yes"
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the observable defect and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs or evidence
+      description: Paste the smallest useful excerpt and replace private paths, repository data, tokens, and credentials.
+      render: shell
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed secrets, credentials, private repository content, and sensitive `.aor/` artifacts.
+          required: true
+        - label: I searched existing issues for the same defect.
+          required: true

@@ -224,10 +224,11 @@ test("documented app smoke does not initialize clean target runtime", () => {
     });
     const smoke = parseJsonObject(run.stdout);
     assert.equal(smoke.status, "smoke-pass");
-    assert.equal(smoke.first_run_wizard_loaded, true);
+    assert.equal(smoke.task_workspace_loaded, true);
     assert.equal(smoke.project_switcher_loaded, true);
-    assert.equal(smoke.flow_selector_loaded, true);
-    assert.equal(smoke.new_flow_action_loaded, true);
+    assert.equal(smoke.new_task_action_loaded, true);
+    assert.equal(smoke.prepare_task_action_loaded, true);
+    assert.equal(smoke.legacy_surface_absent, true);
     assert.match(smoke.project_id, /^local-project-[a-f0-9]{8}$/u);
     assert.equal(fs.existsSync(path.join(targetRepo, ".aor")), false, "clean app smoke must not create repo-local .aor");
   } finally {

@@ -147,9 +147,9 @@ evidence and never becomes an ordinary CLI/API/web projection.
 - **Execution plan** — immutable approved task-to-unit mapping.
 - **Task progress report** — evidence-derived task, unit, and attempt state;
   adapter success alone never means task completion.
-- **Flow projection** — control-plane view over one mission/intake lineage,
-  latest next action, run/review/delivery/release/learning evidence, and
-  operator-request summaries.
+- **Task projection** — the installed-user view over one durable intent and its
+  optional internal Flow lineage, latest next action, run/review/delivery
+  evidence, source pins, and operator-request summaries.
 - **Run and step results** — normalized execution state.
 - **Operator request** — durable operator-initiated intervention intent that can be compiled into a routed step without becoming direct chat.
 - **Quality repair request** — durable review/QA repair intent with source
@@ -176,9 +176,10 @@ evidence and never becomes an ordinary CLI/API/web projection.
 ## Detailed execution pattern
 1. load the project profile and target repository information;
 2. analyze or verify the project if required;
-3. optionally launch the local packaged UI with `aor app` for readiness, Mission intake, next-action, and evidence inspection;
-4. materialize the next packet boundary and, for W34 flow-centric surfaces,
-   derive the selected flow from runtime/control-plane evidence;
+3. optionally launch the local packaged UI with `aor app` for Task preparation,
+   runtime-owned next actions, review, and evidence inspection;
+4. materialize the next packet boundary and project any internal Flow lineage
+   through the selected server-owned Task rather than a browser-owned selector;
 5. for planning, invoke the runner-agnostic planning route and accept a
    structured candidate without allowing provider output to write runtime
    artifacts directly;
@@ -344,14 +345,17 @@ For internal full-journey installed-user rehearsal, the same loop must also leav
 
 Learning handoff aggregates evidence refs and next actions. It may recommend backlog, eval, incident, or asset-recertification follow-up, but it does not replace feature review, Runtime Harness diagnosis, or asset certification decisions.
 
-## Quiet Cockpit presentation boundary
+## Task Workspace presentation boundary
 
-Quiet Cockpit is the packaged local-console projection and control surface over the canonical
-application services. It does not own lifecycle state, completion, evidence, or
-shell-command interpretation. W63-S08 proves the safe no-write installed path
-by mapping each visible label to an allowlisted structured mutation and a
-durable server-owned readback ref. The deterministic simulation proof does not
-extend the supported boundary to credentialed providers, hosted UI, paid calls,
-target-source edits, or upstream writes. W65-S07 proves the installed
-single-renderer default; W34 remains historical evidence and rollback requires
-the previous package version.
+Task Workspace is the only renderer in the packaged local console. It projects
+server-owned Tasks and may expose an internal `flow_id` as lineage evidence,
+but it does not own lifecycle state, completion, evidence, route selection, or
+shell-command interpretation. Preparation is read-only; Start, recovery,
+review, and follow-up controls remain structured control-plane mutations with
+durable readback.
+
+The installed proof starts from a clean project without a surface query
+override, blocks external browser traffic, and verifies that completed Tasks
+remain immutable. Quiet Cockpit and Flow-console artifacts from W34/W63/W65 are
+historical research evidence only; rollback requires a previous package
+version and does not ship a second renderer in the current package.
