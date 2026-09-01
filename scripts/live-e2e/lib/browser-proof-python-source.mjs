@@ -276,31 +276,36 @@ def main():
         }""", {"controlPlane": payload["control_plane"], "projectId": payload["project_id"], "responseId": action_probe.get("response_id")})
 
         post_reload_readiness = wait_for_ready()
-        cockpit_probe = {"status": "not_pass", "reason": "continue-flow-control-not-found"}
-        cockpit_screenshot = str(Path(screenshot_file).with_name(Path(screenshot_file).stem + "-cockpit.png"))
-        continue_flow = page.get_by_role("button", name="Continue Flow", exact=True)
-        if continue_flow.count() == 1 and continue_flow.is_enabled():
+        task_workspace_probe = {"status": "not_pass", "reason": "new-task-control-not-found"}
+        task_workspace_screenshot = str(Path(screenshot_file).with_name(Path(screenshot_file).stem + "-task-workspace.png"))
+        new_task = page.get_by_role("button", name="New task", exact=True)
+        if new_task.count() == 1 and new_task.is_enabled():
             try:
-                continue_flow.click()
-                page.locator(".flow-cockpit").wait_for(state="visible", timeout=timeout_ms)
-                cockpit_ready = wait_for_ready()
-                primary_actions = page.locator(".flow-cockpit .cockpit-actions button.primary")
-                page.screenshot(path=cockpit_screenshot, full_page=True)
-                cockpit_probe = {
-                    "status": "pass" if cockpit_ready.get("status") == "pass" and primary_actions.count() == 1 else "not_pass",
-                    "surface": "flow",
+                new_task.click()
+                page.get_by_role("heading", name="New Task", exact=True).wait_for(state="visible", timeout=timeout_ms)
+                outcome = page.get_by_label("Task outcome", exact=True)
+                outcome.fill("Installed browser proof Task Workspace")
+                page.get_by_role("button", name="Prepare task", exact=True).click()
+                page.get_by_role("heading", name="Prepared Task", exact=True).wait_for(state="visible", timeout=timeout_ms)
+                prepared_ready = page.get_by_role("button", name="Start task", exact=True)
+                page.screenshot(path=task_workspace_screenshot, full_page=True)
+                task_workspace_probe = {
+                    "status": "pass" if prepared_ready.count() == 1 else "not_pass",
+                    "surface": "task-workspace",
                     "url": page.url,
-                    "ready": cockpit_ready,
-                    "primary_action_count": primary_actions.count(),
-                    "screenshot_ref": cockpit_screenshot,
+                    "new_task_visible": True,
+                    "prepared_task_visible": True,
+                    "start_action_count": prepared_ready.count(),
+                    "provider_execution": "prohibited",
+                    "screenshot_ref": task_workspace_screenshot,
                 }
             except Exception as error:
-                cockpit_probe = {"status": "not_pass", "reason": str(error)[:240]}
+                task_workspace_probe = {"status": "not_pass", "reason": str(error)[:240]}
         page.goto(app_url, wait_until="domcontentloaded", timeout=timeout_ms)
         home_readiness = wait_for_ready()
 
         viewport_matrix = []
-        screenshot_files = [screenshot_file, cockpit_screenshot]
+        screenshot_files = [screenshot_file, task_workspace_screenshot]
         for viewport_id, width, height in [("desktop", 1280, 900), ("tablet", 768, 1024), ("mobile", 390, 844)]:
             page.set_viewport_size({"width": width, "height": height})
             page.reload(wait_until="domcontentloaded", timeout=timeout_ms)
@@ -488,7 +493,7 @@ def main():
         {"id": "terminal-read-only", "status": "pass" if readiness["status"] == "pass" else "not_pass"},
     ]
     matrices = viewport_matrix + accessibility_matrix + recovery_matrix
-    proof_status = "pass" if readiness["status"] == "pass" and post_reload_readiness["status"] == "pass" and home_readiness["status"] == "pass" and cockpit_probe.get("status") == "pass" and action_probe.get("status") == "pass" and reload_readback and all(entry["status"] == "pass" for entry in matrices) and not console_errors and not external_requests else "not_pass"
+    proof_status = "pass" if readiness["status"] == "pass" and post_reload_readiness["status"] == "pass" and home_readiness["status"] == "pass" and task_workspace_probe.get("status") == "pass" and action_probe.get("status") == "pass" and reload_readback and all(entry["status"] == "pass" for entry in matrices) and not console_errors and not external_requests else "not_pass"
     proof = {
         "schema_version": 2,
         "kind": "installed-browser-proof",
@@ -504,7 +509,7 @@ def main():
         "visual_guardrail_file": payload["visual_guardrail_file"],
         "screenshot_files": screenshot_files,
         "screenshot_refs": screenshot_files,
-        "cockpit_probe": cockpit_probe,
+        "task_workspace_probe": task_workspace_probe,
         "scenarios": [{"id": "authoritative-project-readiness", **readiness}],
         "actions": [{
             "id": "ask-aor-no-write-request",

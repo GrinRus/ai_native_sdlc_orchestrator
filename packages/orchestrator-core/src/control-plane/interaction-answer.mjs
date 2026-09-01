@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { redactSensitiveValue } from "../../../observability/src/index.mjs";
+import { normalizeIdentifierFragment } from "../../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 import { resumeRunJobAfterInput } from "../run-job.mjs";
 
@@ -54,7 +55,7 @@ function asStringArray(value) {
  * @returns {string}
  */
 function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalizeIdentifierFragment(value);
 }
 
 /**

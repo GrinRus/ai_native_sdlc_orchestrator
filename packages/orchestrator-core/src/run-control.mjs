@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
-import { validatePublicId } from "../../contracts/src/index.mjs";
+import { normalizeIdentifierFragment, validatePublicId } from "../../contracts/src/index.mjs";
 import { redactSensitiveValue, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
@@ -31,7 +31,7 @@ function nowIso() {
  * @returns {string}
  */
 function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalizeIdentifierFragment(value);
 }
 
 function requirePublicId(field, value) {

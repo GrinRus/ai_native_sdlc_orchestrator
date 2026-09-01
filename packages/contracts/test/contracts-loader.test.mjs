@@ -11,6 +11,7 @@ import {
   loadContractFile,
   loadExampleContracts,
   matchesAllowedPath,
+  normalizeIdentifierFragment,
   validateAllowedPathPattern,
   validateContractDocument,
   validatePublicId,
@@ -226,6 +227,13 @@ test("canonical public identifiers reject traversal, separators, controls, Unico
   assert.equal(derivePublicId(["run-1", "event", "000001"], "event"), "run-1.event.000001");
   assert.match(derivePublicId([`run-${"r".repeat(124)}`, "event", "000001"], "event"), /^event-[a-f0-9]{32}$/u);
   assert.throws(() => derivePublicId(["RUN-1", "event"], "event"), /Cannot derive/u);
+});
+
+test("identifier fragments normalize hostile text linearly without changing separator semantics", () => {
+  assert.equal(normalizeIdentifierFragment("A !! B"), "a-b");
+  assert.equal(normalizeIdentifierFragment("---A---"), "a");
+  assert.equal(normalizeIdentifierFragment("!!!"), "");
+  assert.equal(normalizeIdentifierFragment(`${"!".repeat(20_000)}A${"?".repeat(20_000)}B`), "a-b");
 });
 
 test("allowed_paths distinguishes absent, deny-all, bounded, unrestricted, and malformed scopes", () => {
