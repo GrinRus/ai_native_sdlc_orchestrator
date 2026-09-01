@@ -5,10 +5,10 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 26,
-    "source_manifest_sha256": "2c2450feac82d75db39f7fbac9f051a219f7e8cf05fae97379a0d16e7f475961"
+    "source_manifest_sha256": "99f8fc1bff30b017f4f5720c90222a1766216fc8865adf1fbc423c59f4a6dbcb"
   },
   "files": {
-    "canonical-values.mjs": "e6e43337f0e43368521308bb2054b1d34627afeccd6be38da9fdde90dcf91eec",
+    "canonical-values.mjs": "d38defd8b6eb9380d53b306bc07b55a8ee84013e084d4d123d8b89f8115b5650",
     "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
@@ -17,8 +17,8 @@
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
     "families.mjs": "78da2f0abb318019165a4f36e950f4bf5335c5e44f8fa15fc82556c5836c8729",
-    "index.d.ts": "62ffc41bb5926083ac5946a630c51b00d869da740e5df303f67ae31f8ffeb1b9",
-    "index.mjs": "504816de97735d2c2081b07b8617a14e8f0fcdd055c434e2cd7e018e6638a767",
+    "index.d.ts": "d083d8858b59e722464427dd2a64b747ecbc5d02b85ab80687bf14207becb1ee",
+    "index.mjs": "0631348368f1288c1116ce6af4e41edda2a4667b5fc4d04f10a61779a7093f15",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
     "loader.mjs": "089a787ef78d418fd13ce00a60daf2f5c124ec09b63776619a2840e651093b06",

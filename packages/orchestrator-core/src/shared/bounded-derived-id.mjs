@@ -1,12 +1,9 @@
 import crypto from "node:crypto";
 
-import { validatePublicId } from "../../../contracts/src/index.mjs";
+import { normalizeIdentifierFragment, validatePublicId } from "../../../contracts/src/index.mjs";
 
 function normalizePrefix(value) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
+  return normalizeIdentifierFragment(value);
 }
 
 /**

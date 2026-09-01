@@ -47,15 +47,17 @@ test("guided browser collector waits for ready project state before every viewpo
   assert.match(source, /viewport_readiness\.get\("status"\) != "pass"/u);
 });
 
-test("guided browser collector proves the Active Flow Cockpit before responsive captures", () => {
+test("guided browser collector proves the canonical Task Workspace before responsive captures", () => {
   const source = guidedBrowserTaskCollectorPythonSource();
-  const cockpitProbe = source.indexOf('page.get_by_role("button", name="Continue Flow", exact=True)');
-  const cockpitCapture = source.indexOf('page.screenshot(path=cockpit_screenshot, full_page=True)');
+  const taskWorkspaceProbe = source.indexOf('page.get_by_role("button", name="New task", exact=True)');
+  const taskWorkspaceCapture = source.indexOf('page.screenshot(path=task_workspace_screenshot, full_page=True)');
   const viewportReload = source.indexOf('page.reload(wait_until="domcontentloaded", timeout=timeout_ms)\n            viewport_readiness = wait_for_ready()');
-  assert.ok(cockpitProbe >= 0, "collector should enter the active Flow from Project Home");
-  assert.ok(cockpitCapture > cockpitProbe, "collector should capture the Cockpit after entering it");
-  assert.ok(viewportReload > cockpitCapture, "responsive captures should run after the Cockpit assertion");
+  assert.ok(taskWorkspaceProbe >= 0, "collector should enter the canonical Task Workspace from Project Home");
+  assert.ok(taskWorkspaceCapture > taskWorkspaceProbe, "collector should capture the Task Workspace after entering it");
+  assert.ok(viewportReload > taskWorkspaceCapture, "responsive captures should run after the Task Workspace assertion");
   assert.match(source, /post_reload_readiness = wait_for_ready\(\)/u);
-  assert.match(source, /\.flow-cockpit \.cockpit-actions button\.primary/u);
-  assert.match(source, /"cockpit_probe": cockpit_probe/u);
+  assert.match(source, /get_by_role\("heading", name="New Task", exact=True\)/u);
+  assert.match(source, /get_by_role\("heading", name="Prepared Task", exact=True\)/u);
+  assert.match(source, /"task_workspace_probe": task_workspace_probe/u);
+  assert.doesNotMatch(source, /Continue Flow|flow-cockpit|cockpit_probe/u);
 });

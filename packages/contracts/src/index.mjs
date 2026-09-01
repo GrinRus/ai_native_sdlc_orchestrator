@@ -6,6 +6,7 @@ export {
   PUBLIC_ID_PATTERN,
   classifyAllowedPaths,
   derivePublicId,
+  normalizeIdentifierFragment,
   matchesAllowedPath,
   validateAllowedPathPattern,
   validateCanonicalContractValues,

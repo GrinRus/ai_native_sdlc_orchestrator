@@ -57,6 +57,43 @@ export function validatePublicId(value) {
   return { ok: true, value_class: "canonical", migration: null };
 }
 
+/**
+ * Normalize a producer-owned value for a generated filename or audit suffix.
+ * This is intentionally not public-ID validation: invalid input must still be
+ * rejected at public-ID boundaries. The implementation stays linear for
+ * attacker-controlled text and collapses each run of disallowed characters to
+ * one separator without backtracking regular expressions.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+export function normalizeIdentifierFragment(value) {
+  const lowered = value.toLowerCase();
+  let result = "";
+  let pendingSeparator = false;
+  for (const character of lowered) {
+    const code = character.charCodeAt(0);
+    const allowed =
+      (code >= 0x61 && code <= 0x7a) ||
+      (code >= 0x30 && code <= 0x39) ||
+      character === "." ||
+      character === "_" ||
+      character === "-";
+    if (allowed) {
+      if (pendingSeparator && result.length > 0 && !result.endsWith("-")) result += "-";
+      result += character;
+      pendingSeparator = false;
+    } else if (result.length > 0) {
+      pendingSeparator = true;
+    }
+  }
+  let start = 0;
+  let end = result.length;
+  while (start < end && result[start] === "-") start += 1;
+  while (end > start && result[end - 1] === "-") end -= 1;
+  return result.slice(start, end);
+}
+
 export function derivePublicId(components, fallbackPrefix) {
   if (!Array.isArray(components) || components.length === 0) {
     throw new TypeError("Derived public IDs require at least one component.");

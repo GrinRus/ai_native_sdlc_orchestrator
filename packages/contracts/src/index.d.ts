@@ -197,6 +197,7 @@ export const PUBLIC_ID_FIELDS: readonly string[];
 export const CANONICAL_REFERENCE_BASES: readonly string[];
 export function validatePublicId(value: unknown): { ok: boolean; value_class: string; migration: string | null };
 export function derivePublicId(components: string[], fallbackPrefix: string): string;
+export function normalizeIdentifierFragment(value: string): string;
 export function validateAllowedPathPattern(value: unknown): { ok: boolean; value_class: string; migration: string | null };
 export function matchesAllowedPath(pattern: string, candidate: string): boolean;
 export function classifyAllowedPaths(value: unknown): { ok: boolean; state: string; patterns: string[] };
