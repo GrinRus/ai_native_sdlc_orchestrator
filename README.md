@@ -14,7 +14,7 @@ while keeping scope, approvals, and evidence explicit.
 **AOR coordinates coding agents; it does not replace them.**
 
 ```text
-Code source + plain-language task -> Read-only preparation -> Confirm -> Work -> Review
+Code source + plain-language task -> Prepare (read-only) -> Review and Start task -> Work -> Review
 ```
 
 > **Alpha:** AOR is for evaluation and bounded local or self-hosted use. It is

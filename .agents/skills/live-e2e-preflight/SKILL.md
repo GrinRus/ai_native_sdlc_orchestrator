@@ -3,7 +3,7 @@ name: live-e2e-preflight
 description: Use when you need to prepare, review, or update a live E2E rehearsal profile for AOR.
 ---
 
-1. Start with `docs/ops/live-e2e-target-catalog.md` and the machine-readable catalog under `scripts/live-e2e/catalog/targets/*.yaml`.
+1. Start with `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md` and the machine-readable catalog under `scripts/live-e2e/catalog/targets/*.yaml`.
 2. Treat live E2E proof as skill-agent-only installed-user proof. Bounded deterministic rehearsal profiles are no longer supported live proof inputs.
 3. Choose a supported full-journey/catalog-backed profile or `installed-user-guided-journey`.
 4. Require both `target_catalog_id` and `feature_mission_id`; do not allow raw `repo_url` plus free-form objective text.

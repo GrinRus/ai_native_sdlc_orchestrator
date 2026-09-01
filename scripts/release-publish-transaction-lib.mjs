@@ -90,6 +90,19 @@ export function planAlphaPublishReconciliation(classification) {
     };
   }
 
+  // npm Trusted Publishing authenticates `npm publish`, not arbitrary npm
+  // maintenance commands such as `npm dist-tag add`. Stop before mutation so
+  // an OIDC-only workflow cannot fail with an opaque authentication error.
+  if (classification.surfaces.npm && !classification.surfaces.alpha) {
+    return {
+      status: "manual-intervention",
+      operations: [],
+      delete_branch_allowed: false,
+      conflicts: [],
+      manual_action: "npm dist-tag add <package>@<version> alpha with maintainer authentication, then rerun the workflow",
+    };
+  }
+
   const operations = [];
   if (!classification.surfaces.tag) operations.push("create-tag");
   if (!classification.surfaces.release) operations.push("create-release");
@@ -118,6 +131,12 @@ export async function reconcileAlphaPublication({ expected, inspect, execute, on
     if (plan.status === "conflict") {
       const error = new Error(`Alpha publication conflict: ${plan.conflicts.join("; ")}`);
       error.code = "alpha-publication-conflict";
+      error.transitions = transitions;
+      throw error;
+    }
+    if (plan.status === "manual-intervention") {
+      const error = new Error(`Alpha publication requires manual intervention: ${plan.manual_action}.`);
+      error.code = "alpha-publication-manual-intervention";
       error.transitions = transitions;
       throw error;
     }

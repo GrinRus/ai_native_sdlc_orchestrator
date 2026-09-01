@@ -80,6 +80,9 @@ AOR must work with:
 - mock adapters for development and certification
 - future internal adapters
 
+Qwen Code is an extended candidate adapter; restricted-mode and full live
+qualification remain pending and are not baseline support claims.
+
 Runner integration is handled through adapters and capability profiles, not by hard-coding provider behavior into core workflows.
 
 ## Prompt and runtime-context evolution
