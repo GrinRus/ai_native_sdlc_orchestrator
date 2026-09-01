@@ -35,7 +35,7 @@ The default journey is:
 
 | Current concept or surface | Task Workspace destination | Rule |
 |---|---|---|
-| Project Home and Flow selector | Tasks Home | Show user-facing Tasks; preserve `flow_id` in durable detail and URLs where required. |
+| Legacy project/Flow navigation | Tasks Home | Show user-facing Tasks; preserve `flow_id` in durable detail and URLs where required. |
 | Guided Mission intake | New Task | Ask for outcome and sources first; keep normalization and Mission creation server-owned. |
 | Execution Setup | New Task Runner and Project defaults | Expose approved choices and readiness without raw profile editing. |
 | Flow Cockpit | Active Task Workspace | Keep activity, controls, freshness, budget, and current safe action in one Task context. |

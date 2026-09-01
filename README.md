@@ -86,6 +86,11 @@ npm install -g "@grinrus/aor@$AOR_VERSION"
 aor --help
 ```
 
+Unqualified npm installs are unsupported during alpha. The historical
+`latest` dist-tag is reserved for a future stable release and currently points
+to an obsolete bootstrap snapshot; only the version resolved by `alpha` is the
+supported npm channel.
+
 The package includes the CLI, bundled onboarding assets, and the local web
 console used by `aor app`. The npm alpha is a tagged snapshot and may not yet
 include unreleased features visible on `main`.
@@ -131,9 +136,11 @@ In the Task Workspace:
 
 AI-backed preparation requires one authenticated ready runner. All mutable AOR
 state is stored under `~/.aor` (or `AOR_HOME` for isolated runs), never in
-the target repository. Repository writes occur only through explicit
-**Materialize project config** or selected evidence export actions; AOR never
-stages, commits, or pushes those files.
+the target repository. AOR-owned repository configuration and evidence writes
+occur only through explicit **Materialize project config** or export actions;
+AOR never stages, commits, or pushes those files. Source changes requested by a
+Task begin only after **Start task** and remain bounded by its selected delivery
+and write-back policy.
 
 From an active Task, **Ask AOR** creates a durable operator request rather than
 a direct chat session. It passes through the same scope, policy, and
@@ -376,9 +383,9 @@ Before opening a pull request:
   transcripts.
 
 Use the
-[bug report](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=bug-report.md)
+[bug report](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=bug_report.yml)
 or
-[feature request](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=feature-request.md)
+[feature request](https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues/new?template=feature_request.yml)
 template, and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Maintainers and governance

@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Code of conduct concern
+    url: https://support.github.com/contact/report-abuse
+    about: Report abuse on GitHub privately; do not put sensitive conduct details in a public issue.
   - name: Security vulnerability
     url: https://github.com/GrinRus/ai_native_sdlc_orchestrator/security/advisories/new
     about: Report vulnerabilities, possible secret exposure, or exploit details privately.

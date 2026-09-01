@@ -25,17 +25,18 @@ severity, recurrence, and the safety of affected community members.
 
 ## Reporting and Privacy
 
-Report conduct concerns confidentially through the repository's
-[private reporting form](https://github.com/GrinRus/ai_native_sdlc_orchestrator/security/advisories/new)
-and begin the title with `Conduct report:`. This private channel is also used
-for conduct reports until a dedicated community address is published; reports
-do not need to describe a security vulnerability.
+For conduct on GitHub, use GitHub's private
+[Report Abuse form](https://support.github.com/contact/report-abuse). For a
+project-specific concern, open a minimal issue requesting confidential
+maintainer contact, without including names, screenshots, private messages, or
+other sensitive details. A dedicated project conduct address is not yet
+published; the repository's vulnerability-reporting form is reserved for
+security vulnerabilities.
 
 Maintainers will limit report details to people needed for investigation and
 will avoid assigning a reported maintainer to decide their own case. Retaliation
 against a reporter or participant is itself a violation. Security issues must
-follow `SECURITY.md` and should not be mixed into a conduct report unless the
-same event genuinely involves both concerns.
+follow `SECURITY.md` and must not be submitted as conduct reports.
 
 ## Attribution
 

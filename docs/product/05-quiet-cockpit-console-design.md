@@ -1,5 +1,9 @@
 # Quiet Cockpit operator console target design
 
+> **Historical design contract:** W70 Task Workspace supersedes this installed
+> console target. Retain this document only for compatibility, migration, and
+> decision evidence; it does not describe the packaged default.
+
 ## Status
 
 - **Design name:** AOR Quiet Cockpit Operator Console v2.

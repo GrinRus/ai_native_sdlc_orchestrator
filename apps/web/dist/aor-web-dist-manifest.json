@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "source_hash": "d5a6c8a6fbb0a36a5159494f7ed40a0ef50660c1c63ce1205bdfce31fa7a9e2b",
+  "source_hash": "d17e8dd99a2b659036ad936fa945e80983da5d9cbe8d63cda6769bbd7b44daea",
   "source_files": [
     "apps/web/index.html",
     "apps/web/package.json",
@@ -13,6 +13,7 @@
     "apps/web/src/execution-setup.css",
     "apps/web/src/execution-setup.jsx",
     "apps/web/src/intent-onboarding.jsx",
+    "apps/web/src/live-run-stream.js",
     "apps/web/src/mission-builder.css",
     "apps/web/src/mission-builder.jsx",
     "apps/web/src/operator-control.js",
@@ -46,13 +47,13 @@
     "apps/web/vite.config.mjs"
   ],
   "dist_files": [
-    "apps/web/dist/assets/index-BgBEV5M_.js",
     "apps/web/dist/assets/index-BlZ0EPOY.css",
+    "apps/web/dist/assets/index-BwA_43gA.js",
     "apps/web/dist/index.html"
   ],
   "dist_hashes": {
-    "apps/web/dist/assets/index-BgBEV5M_.js": "31a7921bb40b86aa18ea796d378d3f6d98adea19209beb4dd1e44c01c66efa17",
     "apps/web/dist/assets/index-BlZ0EPOY.css": "d38a223789059c4822dbef346f4f3423e9f7ecd60ce20cf3250268595b2b445b",
-    "apps/web/dist/index.html": "1f8f500f61b52b2eeb0adb845dbb1b9b81b298c2d21a25710f34e5722737ee82"
+    "apps/web/dist/assets/index-BwA_43gA.js": "3a372d84d3783bb47a2d0826c99e6ecb96f567fc81d11eb77096fb96a9e7f67b",
+    "apps/web/dist/index.html": "4cf3715d4d0d71ea0b30405d1cf9ae74d688de9dd6831093a07cf1c666dc487e"
   }
 }

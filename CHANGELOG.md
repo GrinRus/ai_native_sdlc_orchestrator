@@ -5,6 +5,13 @@ versioned AOR snapshots.
 
 ## Unreleased
 
+- Prevented Task Workspace live-event subscriptions from reconnecting after
+  cleanup or churning on every task refresh, with focused lifecycle coverage.
+- Made the installed-user product journey and internal rehearsal vocabulary
+  consistently Task-first and added deterministic guards for product-doc drift
+  and missing GitHub issue templates.
+- Clarified npm alpha support, conduct-reporting boundaries, and release
+  verification while upgrading the supported ESLint development toolchain.
 - Completed the packaged Task Workspace cutover: clean projects now open the
   Task surface directly, retired Flow/Quiet Cockpit renderers are excluded from
   the Vite bundle, and installed browser acceptance covers the default route.

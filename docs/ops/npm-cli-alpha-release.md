@@ -10,6 +10,11 @@ and local UI path.
 Internal workspace packages under `apps/*` and `packages/*` stay private. They
 are implementation modules inside the CLI package, not public semver APIs.
 
+The `latest` dist-tag is not a supported release channel during alpha and must
+not be advanced by alpha automation. It remains reserved for a future stable
+release. Only the version currently resolved by `@grinrus/aor@alpha` is
+supported; users of older snapshots must upgrade before requesting support.
+
 ## Branch model
 
 Normal development merges to `main` through regular pull requests. Those merges
