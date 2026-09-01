@@ -6,9 +6,7 @@ on:
       - closed
 
 permissions:
-  contents: write
-  id-token: write
-  pull-requests: read
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
@@ -17,6 +15,10 @@ concurrency:
 jobs:
   publish:
     name: Publish npm CLI alpha
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: read
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.base.ref == 'main' &&
@@ -45,10 +47,6 @@ jobs:
         with:
           node-version: 22.14.0
           cache: pnpm
-          registry-url: https://registry.npmjs.org
-
-      - name: Setup npm for trusted publishing
-        run: npm install -g npm@11.15.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -62,6 +60,12 @@ jobs:
 
       - name: Run release gate on merge commit
         run: pnpm release:gate
+
+      - name: Setup Node.js for trusted publishing
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24.20.0
+          registry-url: https://registry.npmjs.org
 
       - name: Reconcile alpha publication transaction
         env:

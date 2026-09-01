@@ -158,10 +158,11 @@ publish reasons. Do not advance `latest` from automation until a stable channel
 exists; release automation must update only the `alpha` dist-tag.
 
 The workflow uses npm Trusted Publishing through GitHub OIDC. Do not add npm
-tokens or token fallback behavior. The release workflows pin Node.js `22.14.0`
-and install `npm@11.15.0`, matching the npm Trusted Publishing registry
-contract that requires explicit publish permissions instead of relying on the
-hosted runner image defaults.
+tokens or token fallback behavior. Release validation runs on pinned Node.js
+`22.14.0`; after the gate passes, the publish workflow switches to pinned Node.js
+`24.20.0`, whose bundled npm version satisfies the Trusted Publishing runtime
+requirement. This keeps the publish toolchain reproducible without an
+unpinned global npm installation.
 
 ## External prerequisites
 
@@ -178,12 +179,17 @@ If those prerequisites are missing, the publish workflow must fail closed.
 
 ## Partial publication recovery
 
-Rerun the failed `Release publish` workflow against the same merged release PR.
-The transaction classifies the remote state before mutation:
+Rerun the failed `Release publish` workflow against the same merged release PR
+when the failed operation is publishable through GitHub OIDC. The transaction
+classifies the remote state before mutation:
 
 - `absent` starts a fresh publication;
-- `tag-only`, `release-only`, `npm-only`, and other compatible partial states
-  create only the missing surfaces;
+- `tag-only`, `release-only`, and other compatible partial states create only the
+  missing surfaces;
+- an existing immutable npm version without the expected `alpha` dist-tag stops
+  before mutation because Trusted Publishing does not authorize `npm dist-tag`.
+  A maintainer must run `npm dist-tag add @grinrus/aor@<version> alpha` with
+  normal npm authentication, then rerun the workflow;
 - `complete` performs no publication and only removes a retained release branch;
 - `conflict` stops before mutation and retains the branch for investigation.
 

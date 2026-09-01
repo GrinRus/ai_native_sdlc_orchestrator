@@ -10,7 +10,8 @@ import {
   RELEASE_LABEL,
   validatePackedFiles,
   validatePublishEvent,
-  RELEASE_NPM_VERSION,
+  RELEASE_PUBLISH_NODE_VERSION,
+  RELEASE_VALIDATE_NODE_VERSION,
   validateReleaseState,
 } from "../release-lib.mjs";
 import {
@@ -220,7 +221,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
         "jobs:",
         "  publish:",
         "    steps:",
-        `      - run: npm install -g npm@${RELEASE_NPM_VERSION}`,
+        "      - run: npm install -g npm@11.15.0",
         "      - run: node ./scripts/legacy-publish.mjs",
         "",
       ].join("\n"),
@@ -232,10 +233,12 @@ test("release verifier rejects publish workflows without trusted publishing runt
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /node-version: 22\.14\.0/u);
+    assert.match(result.findings.join("\n"), new RegExp(`node-version: ${RELEASE_VALIDATE_NODE_VERSION.replaceAll(".", "\\.")}`, "u"));
+    assert.match(result.findings.join("\n"), new RegExp(`node-version: ${RELEASE_PUBLISH_NODE_VERSION.replaceAll(".", "\\.")}`, "u"));
     assert.match(result.findings.join("\n"), /playwright install --with-deps chromium/u);
     assert.match(result.findings.join("\n"), /release-publish-transaction\.mjs/u);
     assert.match(result.findings.join("\n"), /RELEASE_COMMIT_SHA/u);
+    assert.match(result.findings.join("\n"), /must not install npm globally/u);
     assert.doesNotMatch(result.findings.join("\n"), /npm@11\.5\.1/u);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -453,34 +456,23 @@ test("alpha publication conflict fails before mutation and retains recovery bran
   assert.deepEqual(operations, []);
 });
 
-test("alpha publication resumes a missing dist-tag without republishing the immutable npm version", async () => {
+test("alpha publication stops before an OIDC-incompatible missing dist-tag mutation", async () => {
   const state = publicationState({ tag: true, release: true, npm: true });
   const operations = [];
-  let injected = true;
   const execute = async (operation) => {
     operations.push(operation);
-    if (operation === "set-alpha-dist-tag" && injected) {
-      injected = false;
-      throw new Error("injected dist-tag failure");
-    }
-    if (operation === "set-alpha-dist-tag") state.npm.alpha_version = expectedPublication.version;
     if (operation === "delete-release-branch") state.branch_deleted = true;
   };
   await assert.rejects(
     reconcileAlphaPublication({
       expected: expectedPublication,
-      inspect: async () => structuredClone(state),
-      execute,
-    }),
-    /injected dist-tag failure/u,
+        inspect: async () => structuredClone(state),
+        execute,
+      }),
+    (error) => error.code === "alpha-publication-manual-intervention" && /npm dist-tag add/u.test(error.message),
   );
-  const resumed = await reconcileAlphaPublication({
-    expected: expectedPublication,
-    inspect: async () => structuredClone(state),
-    execute,
-  });
-  assert.equal(resumed.status, "complete");
-  assert.equal(operations.includes("publish-npm"), false);
+  assert.deepEqual(operations, []);
+  assert.equal(state.branch_deleted, undefined);
 });
 
 test("local bare remote preserves exact tag identity used by publication reconciliation", () => {

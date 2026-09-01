@@ -573,7 +573,7 @@ const workflowExpectations = new Map([
     [
       "pull_request:",
       "push:",
-      "security-events: write",
+      "  codeql:\n    name: CodeQL\n    permissions:\n      contents: read\n      security-events: write",
       "github/codeql-action/init@",
       "github/codeql-action/analyze@",
       "languages: javascript-typescript",
@@ -584,7 +584,7 @@ const workflowExpectations = new Map([
     [
       "pull_request:",
       "workflow_dispatch:",
-      "security-events: write",
+      "  scorecard:\n    name: OpenSSF Scorecard\n    permissions:\n      contents: read\n      security-events: write",
       "publish_results: false",
       "ossf/scorecard-action@",
       "github/codeql-action/upload-sarif@",
@@ -596,7 +596,6 @@ const workflowExpectations = new Map([
       "pull_request:",
       "release/v",
       "contents: read",
-      "npm@11.15.0",
       "pnpm install --frozen-lockfile",
       "pnpm exec playwright install --with-deps chromium",
       "pnpm release:gate",
@@ -607,10 +606,10 @@ const workflowExpectations = new Map([
     [
       "pull_request:",
       "types:",
-      "contents: write",
-      "id-token: write",
+      "permissions:\n  contents: read",
+      "    permissions:\n      contents: write\n      id-token: write\n      pull-requests: read",
       "release:publish",
-      "npm@11.15.0",
+      "node-version: 24.20.0",
       "pnpm exec playwright install --with-deps chromium",
       "node ./scripts/release-event-guard.mjs",
       "pnpm release:gate",
@@ -627,6 +626,10 @@ for (const [workflowPath, needles] of workflowExpectations) {
       console.error(`${workflowPath} is missing '${needle}'`);
       process.exit(1);
     }
+  }
+  if (/npm install -g npm@/u.test(workflowContent)) {
+    console.error(`${workflowPath} must not install npm globally; use the pinned Node.js runtime.`);
+    process.exit(1);
   }
 }
 
