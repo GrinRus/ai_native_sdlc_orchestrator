@@ -5,6 +5,10 @@ versioned AOR snapshots.
 
 ## Unreleased
 
+- No unreleased changes yet.
+
+## [0.1.0-alpha.21] - 2026-09-01
+
 - Prevented Task Workspace live-event subscriptions from reconnecting after
   cleanup or churning on every task refresh, with focused lifecycle coverage.
 - Made the installed-user product journey and internal rehearsal vocabulary
