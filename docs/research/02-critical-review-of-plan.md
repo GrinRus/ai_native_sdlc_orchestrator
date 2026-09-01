@@ -16,7 +16,7 @@ AOR is heavily contract-driven. If docs change without examples, or examples cha
 Prompt bundles, wrappers, routes, and adapters are powerful. Without explicit promotion, freeze, and rollback paths, a "small prompt tweak" can behave like a production release without the right discipline.
 
 ### 3. Live E2E can become ad hoc
-Without a fixed target catalog and safety policy, live E2E risks turning into one-off demos. The public-repo target catalog in `docs/ops/live-e2e-target-catalog.md` is meant to prevent that.
+Without a fixed target catalog and safety policy, live E2E risks turning into one-off demos. The public-repo target catalog in `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md` is meant to prevent that.
 
 ### 4. The root AGENTS file can become too large
 AGENTS files are only useful when they stay accurate and concise. The repo now uses nested AGENTS plus reusable skills to avoid context bloat.
