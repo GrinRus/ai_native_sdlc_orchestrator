@@ -10,8 +10,12 @@ near credentials or private repositories.
 | Version | Supported |
 | --- | --- |
 | `main` | Yes, for source-channel alpha reports |
-| `@grinrus/aor@0.1.0-alpha.x` | Yes, for npm CLI alpha reports |
+| `@grinrus/aor@alpha` | Yes, only for the version currently resolved by npm's `alpha` dist-tag |
 | Internal workspace packages | Not public APIs; report issues through the source repo |
+
+Older alpha snapshots, including the obsolete bootstrap snapshot still held by
+the historical `latest` dist-tag, are unsupported. Upgrade to
+`@grinrus/aor@alpha` before reporting a version-specific vulnerability.
 
 ## Reporting a Vulnerability
 

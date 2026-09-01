@@ -2,9 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const roots = ["README.md", "docs/architecture", "docs/ops"];
+const roots = ["README.md", "docs/architecture", "docs/ops", "docs/product"];
 const excluded = new Set([
   "docs/ops/quiet-cockpit-cutover.md",
+  "docs/product/03-flow-centric-console-design.md",
+  "docs/product/05-quiet-cockpit-console-design.md",
+  "docs/product/06-quiet-cockpit-ui-foundation.md",
+  "docs/product/07-quiet-cockpit-action-contract.md",
 ]);
 const forbidden = [
   { pattern: /\bFlow selector\b/iu, replacement: "Task list or internal Flow lineage" },
@@ -31,11 +35,25 @@ function markdownFiles(relativePath) {
 }
 
 const findings = [];
-for (const file of roots.flatMap(markdownFiles).filter((entry) => !excluded.has(entry)).sort()) {
+const currentDocs = roots.flatMap(markdownFiles).filter((entry) => !excluded.has(entry)).sort();
+for (const file of currentDocs) {
   const lines = fs.readFileSync(path.join(root, file), "utf8").split(/\r?\n/u);
   lines.forEach((line, index) => {
     for (const rule of forbidden) {
       if (rule.pattern.test(line)) findings.push(`${file}:${index + 1} uses retired installed-UI vocabulary; use '${rule.replacement}' or move historical evidence under docs/research/.`);
+    }
+    for (const match of line.matchAll(/https:\/\/github\.com\/GrinRus\/ai_native_sdlc_orchestrator\/issues\/new\?[^)\s]*\btemplate=([^&)\s]+)/giu)) {
+      let template = match[1];
+      try {
+        template = decodeURIComponent(template);
+      } catch {
+        findings.push(`${file}:${index + 1} contains an invalid encoded GitHub issue-template URL.`);
+        continue;
+      }
+      const templatePath = path.join(root, ".github", "ISSUE_TEMPLATE", template);
+      if (!fs.existsSync(templatePath) || !fs.statSync(templatePath).isFile()) {
+        findings.push(`${file}:${index + 1} links to missing GitHub issue template '.github/ISSUE_TEMPLATE/${template}'.`);
+      }
     }
   });
 }

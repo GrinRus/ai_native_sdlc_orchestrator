@@ -227,6 +227,7 @@ export function validateReleaseState(options = {}) {
   ensureIncludes(findings, readme, RELEASE_PACKAGE_NAME, "README.md");
   ensureIncludes(findings, readme, `npm view ${RELEASE_PACKAGE_NAME} dist-tags.alpha`, "README.md");
   ensureIncludes(findings, readme, `npm install -g "${RELEASE_PACKAGE_NAME}@$AOR_VERSION"`, "README.md");
+  ensureIncludes(findings, readme, "Unqualified npm installs are unsupported", "README.md");
   ensureIncludes(findings, readme, "docs/ops/npm-cli-alpha-release.md", "README.md");
 
   const contributing = readText(rootDir, "CONTRIBUTING.md");
@@ -238,7 +239,10 @@ export function validateReleaseState(options = {}) {
   ensureIncludes(findings, changelog, `## [${packageVersion}]`, "CHANGELOG.md");
 
   const security = readText(rootDir, "SECURITY.md");
-  ensureIncludes(findings, security, RELEASE_PACKAGE_NAME, "SECURITY.md");
+  ensureIncludes(findings, security, `${RELEASE_PACKAGE_NAME}@alpha`, "SECURITY.md");
+  if (/0\.1\.0-alpha\.x/u.test(security)) {
+    findings.push("SECURITY.md must not claim support for every 0.1.0 alpha snapshot.");
+  }
 
   const support = readText(rootDir, "SUPPORT.md");
   ensureIncludes(findings, support, RELEASE_PACKAGE_NAME, "SUPPORT.md");
@@ -255,6 +259,7 @@ export function validateReleaseState(options = {}) {
       "npm Trusted Publishing",
       "npm publish --access public --tag alpha --provenance",
       "pnpm release:gate",
+      "latest` dist-tag is not a supported release channel",
     ]) {
       ensureIncludes(findings, runbook, required, runbookPath);
     }

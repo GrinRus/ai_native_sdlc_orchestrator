@@ -3,8 +3,11 @@
   "mode": "local-spa",
   "status": "smoke-pass",
   "html_loaded": true,
-  "flow_selector_loaded": true,
-  "new_flow_action_loaded": true,
+  "task_workspace_loaded": true,
+  "new_task_action_loaded": true,
+  "prepare_task_action_loaded": true,
+  "project_switcher_loaded": true,
+  "legacy_surface_absent": true,
   "project_id": "local-target",
   "config_project_id": "local-target",
   "state_project_id": "local-target",
@@ -20,15 +23,16 @@
   "task_outcome": {
     "status": "pass",
     "checked_tasks": [
-      "flow selector rendered",
-      "completed source flow stayed read-only",
-      "follow-up flow became active",
-      "Ask AOR targeted the selected flow"
+      "Tasks Home rendered",
+      "Task preparation remained read-only",
+      "completed source Task stayed read-only",
+      "follow-up Task became active",
+      "Ask AOR targeted the selected Task"
     ],
     "findings": []
   },
   "ux_findings": [
-    "Flow closure controls were visible and did not mutate completed-flow evidence."
+    "Task completion controls were visible and did not mutate completed Task evidence."
   ],
   "operator_decision_ref": ".aor/projects/aor-core/reports/live-e2e-operator-decision-w21-s07-10-learning.json"
 }

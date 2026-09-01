@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { readControlPlaneJson as readJson } from "./control-plane-client.js";
 import { Dialog } from "./dialog.jsx";
+import { subscribeToLiveRunEvents } from "./live-run-stream.js";
 import { TaskWorkspace } from "./task-workspace.jsx";
 import { Button } from "./ui/components.jsx";
 import "./ui/tokens.css";
@@ -86,6 +87,10 @@ function TaskApp() {
 
   const activeProject = useMemo(() => projects.find((project) => project.project_id === activeProjectId) ?? null, [activeProjectId, projects]);
   const apiProjectBase = activeProjectId ? `/api/projects/${encodeURIComponent(activeProjectId)}` : null;
+  const liveRunId = useMemo(() => {
+    const activeTask = tasks.find((task) => ["active", "running"].includes(task.status));
+    return activeTask?.run_ids?.[0] ?? null;
+  }, [tasks]);
 
   const refresh = useCallback(async ({ projectId = null, silent = false, keepSelection = true } = {}) => {
     if (!silent) setConnectionState("loading");
@@ -140,28 +145,18 @@ function TaskApp() {
     }
   }, [activeProjectId, config, initialLocation.projectId, selectedTaskId, tasks]);
 
-  useEffect(() => { void refresh(); }, []);
+  const refreshRef = useRef(refresh);
+  useEffect(() => { refreshRef.current = refresh; }, [refresh]);
+  useEffect(() => { void refreshRef.current(); }, []);
 
   useEffect(() => {
-    if (!apiProjectBase) return undefined;
-    const activeTask = tasks.find((task) => ["active", "running"].includes(task.status));
-    const liveRunId = activeTask?.run_ids?.[0];
-    if (!liveRunId || typeof EventSource === "undefined") return undefined;
-    let closed = false;
-    let cursor = "";
-    let source;
-    const connect = () => {
-      const query = new URLSearchParams({ maxReplay: "0" });
-      if (cursor) query.set("after_event_id", cursor);
-      source = new EventSource(`${apiProjectBase}/runs/${encodeURIComponent(liveRunId)}/events?${query}`);
-      const consume = (event) => { if (event.lastEventId) cursor = event.lastEventId; void refresh({ silent: true }); };
-      source.addEventListener("live-run-event", consume);
-      source.addEventListener("message", consume);
-      source.onerror = () => { source?.close(); if (!closed) window.setTimeout(connect, 1000); };
-    };
-    connect();
-    return () => { closed = true; source?.close(); };
-  }, [apiProjectBase, refresh, tasks]);
+    if (!apiProjectBase || !liveRunId || typeof EventSource === "undefined") return undefined;
+    return subscribeToLiveRunEvents({
+      eventSourceUrl: `${apiProjectBase}/runs/${encodeURIComponent(liveRunId)}/events`,
+      onEvent: () => { void refreshRef.current({ silent: true }); },
+      EventSourceImpl: EventSource,
+    });
+  }, [apiProjectBase, liveRunId]);
 
   async function runTaskAction(task, action, payload = {}) {
     if (!apiProjectBase || !task?.task_id || busy) return null;

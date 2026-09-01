@@ -164,6 +164,27 @@ test("release verifier rejects missing changelog entry", () => {
   }
 });
 
+test("release verifier rejects broad support for every alpha snapshot", () => {
+  const tempRoot = copyFixtureRepo();
+  try {
+    const securityPath = path.join(tempRoot, "SECURITY.md");
+    const security = fs.readFileSync(securityPath, "utf8").replace(
+      "@grinrus/aor@alpha",
+      "@grinrus/aor@0.1.0-alpha.x",
+    );
+    fs.writeFileSync(securityPath, security, "utf8");
+    const result = validateReleaseState({
+      rootDir: tempRoot,
+      releaseBranch: RELEASE_BRANCH,
+      strictReleaseBranch: true,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /must not claim support for every 0\.1\.0 alpha snapshot/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("release verifier rejects wrong package name and public internal packages", () => {
   const tempRoot = copyFixtureRepo();
   try {
