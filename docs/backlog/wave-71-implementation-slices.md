@@ -255,7 +255,7 @@ commands, and expose actual lint/type/test coverage.
 
 ## W71-S04 — Versioned Task contract and execution-route truth
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W71-S03
 - **Remediation priority:** P0
