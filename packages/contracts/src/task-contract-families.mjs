@@ -1,5 +1,27 @@
 export const TASK_CONTRACT_FAMILIES = Object.freeze([
   {
+    family: "task-projection",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/task-projection.md",
+    exampleGlob: "examples/tasks/task-projection*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "schema_version", "task_id", "project_id", "display_title", "status",
+      "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage",
+      "source_items", "attention_items", "review", "completion", "lifecycle_path",
+      "runner_selection", "primary_action", "prepared_contract", "completed_read_only",
+      "read_only",
+    ],
+    fieldTypes: {
+      schema_version: "number", task_id: "string", project_id: "string", display_title: "string",
+      status: "string",
+      run_ids: "array", lineage: "object", source_items: "array", attention_items: "array",
+      review: "object", completion: "object", lifecycle_path: "object", runner_selection: "object",
+      primary_action: "object", prepared_contract: "object", completed_read_only: "boolean", read_only: "boolean",
+    },
+    enumChecks: [{ field: "status", allowedValues: ["draft", "prepared", "active", "attention", "completed"] }],
+  },
+  {
     family: "task-source-item",
     familyGroup: "core-packets-and-profiles",
     sourceContract: "docs/contracts/task-source-item.md",
@@ -35,6 +57,7 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
 ]);
 
 export const TASK_EXAMPLE_RULES = Object.freeze([
+  { regex: /^examples\/tasks\/task-projection[^/]*\.ya?ml$/, family: "task-projection" },
   { regex: /^examples\/tasks\/task-source-item[^/]*\.ya?ml$/, family: "task-source-item" },
   { regex: /^examples\/tasks\/task-runner-selection[^/]*\.ya?ml$/, family: "task-runner-selection" },
   { regex: /^examples\/tasks\/task-review[^/]*\.ya?ml$/, family: "task-review" },

@@ -1166,7 +1166,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       primary: "object",
       required_output_schema_ref: "string", required_output_mode: "string",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "step", allowedValues: ROUTE_STEP_VALUES }],
   },
   {
     family: "wrapper-profile",

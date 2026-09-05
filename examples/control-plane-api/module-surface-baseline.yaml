@@ -34,6 +34,9 @@ openapi_contract:
     - LifecycleCommandActionResponse
     - InteractionAnswerRequest
     - InteractionAnswerResponse
+    - TaskProjection
+    - TaskPreparedContract
+    - TaskActionRequest
 
 read_operations:
   - operation_id: read.project-state
@@ -185,6 +188,31 @@ execution_profile_operations:
     - execution-profile
     - execution-readiness-report
     - provider-route-profile
+
+task_operations:
+  owning_slice: W71-S04
+  status: implemented
+  read_routes:
+    - GET /api/projects/:projectId/tasks
+    - GET /api/projects/:projectId/tasks/:taskId
+  mutation_route: POST /api/projects/:projectId/tasks/:taskId/actions
+  start_action: start
+  compatibility_action: confirm
+  revision_guard: expected_revision
+  contract_families:
+    - task-projection
+    - task-source-item
+    - task-runner-selection
+    - intent-submission
+    - intent-normalization-report
+  route_separation:
+    intake_normalization_route_prefix: route.intake-normalize.
+    approved_execution_route_source: execution-profile
+    provider_metadata_is_execution_selection: false
+  ui_handoff:
+    disposition: no-overlap
+    sibling_thread_id: 01a061b2-119a-7272-91d0-13add13d75c2
+    immutable_commit: 59943bfa
 
 run_control_operations:
   - operation_id: run.start

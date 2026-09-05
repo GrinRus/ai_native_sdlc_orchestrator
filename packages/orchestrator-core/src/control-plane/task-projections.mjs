@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { listFlowProjections } from "./flow-projections.mjs";
+import { readExecutionProfile } from "./execution-profile.mjs";
 
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -16,6 +17,65 @@ function normalizeId(value) {
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/gu, "-")
     .replace(/^-+|-+$/gu, "") || "task";
+}
+
+const WORK_TYPE_TO_STEP = Object.freeze({
+  analyze: "discovery",
+  explain: "research",
+  review: "review",
+  "document-change": "implement",
+  "code-change": "implement",
+});
+
+function approvedExecutionSelection({ executionProfile, workType, step }) {
+  const selectedStep = step ?? WORK_TYPE_TO_STEP[workType] ?? null;
+  const row = Array.isArray(executionProfile?.routes)
+    ? executionProfile.routes.find((candidate) => candidate?.step === selectedStep)
+    : null;
+  const routeId = asString(row?.route_id);
+  const approved = routeId && !/^route\.intake-normalize\./u.test(routeId) ? routeId : null;
+  const readiness = ["ready", "stale", "unavailable", "blocked"].includes(row?.readiness) ? row.readiness : "unknown";
+  return {
+    schema_version: 1,
+    source: "project-default",
+    route_id: approved,
+    step: selectedStep,
+    readiness,
+    requested_model: asString(row?.requested_model),
+    effective_model: asString(row?.effective_model),
+    requested_reasoning_effort: asString(row?.requested_reasoning_effort),
+    effective_reasoning_effort: asString(row?.effective_reasoning_effort),
+    unavailable_reason: approved ? (readiness === "ready" ? null : `Execution route readiness is ${readiness}.`) : "No approved execution route is selected for this Task.",
+    recovery_action: approved ? "Refresh execution readiness before starting this Task." : "Select an approved project execution route before starting this Task.",
+    readiness_revision: Number.isInteger(executionProfile?.revision) ? executionProfile.revision : null,
+  };
+}
+
+function preparedContract({ normalization, executionProfile, workType, scope, deliveryMode, status, step }) {
+  const selection = approvedExecutionSelection({ executionProfile, workType, step });
+  const mode = deliveryMode ?? asString(normalization?.delivery_mode) ?? "no-write";
+  const writeCapable = mode !== "no-write";
+  return {
+    schema_version: 1,
+    outcome: asString(normalization?.outcome),
+    acceptance_criteria: asStringArray(normalization?.acceptance),
+    scope: {
+      allowed_paths: asStringArray(scope),
+      forbidden_paths: [],
+    },
+    delivery_mode: mode,
+    normalization_revision: Number.isInteger(normalization?.revision) ? normalization.revision : 0,
+    approved_execution_route: selection,
+    readiness_revision: selection.readiness_revision,
+    write_effects: {
+      mode,
+      write_capable: writeCapable,
+      target_write_allowed: writeCapable,
+      upstream_writes_allowed: false,
+      direct_edits_allowed: writeCapable,
+    },
+    state: status,
+  };
 }
 
 function taskId(projectId, flowId) {
@@ -93,7 +153,7 @@ function intentTaskRef(projectId, submissionId) {
   return `evidence://projects/${projectId}/inputs/${submissionId}/submission.json`;
 }
 
-function projectIntentTask({ projectId, entry }) {
+function projectIntentTask({ projectId, entry, executionProfile }) {
   const submission = entry?.submission ?? {};
   const normalization = entry?.normalization ?? {};
   const submissionId = asString(submission.submission_id);
@@ -158,7 +218,11 @@ function projectIntentTask({ projectId, entry }) {
     });
   }
   const intentRef = intentTaskRef(projectId, submissionId);
+  const selection = approvedExecutionSelection({ executionProfile, workType: asString(normalization.work_type) });
+  const prepared = preparedContract({ normalization, executionProfile, workType: asString(normalization.work_type), scope: normalization.scope, deliveryMode: asString(normalization.delivery_mode), status, });
+  const startAvailable = status === "prepared" && Boolean(selection.route_id) && selection.readiness === "ready";
   return {
+    schema_version: 1,
     task_id: taskId(projectId, `intent.${submissionId}`),
     project_id: projectId,
     display_title: title,
@@ -172,8 +236,10 @@ function projectIntentTask({ projectId, entry }) {
     lineage: {
       intent_submission_ref: intentRef,
       intent_submission_id: submissionId,
+      normalization_revision: Number.isInteger(normalization.revision) ? normalization.revision : null,
       mission_id: null,
       flow_id: null,
+      run_ids: [],
     },
     source_items: sourceItems,
     attention_items: status === "attention" ? [{ item_id: `${submissionId}.attention.1`, consequence: "Intent preparation is blocked.", state: "needs-attention", evidence_refs: asStringArray(submission.normalization_refs) }] : [],
@@ -191,23 +257,22 @@ function projectIntentTask({ projectId, entry }) {
     blocker_count: status === "attention" ? 1 : 0,
     evidence_refs: asStringArray(submission.normalization_refs),
     primary_action: {
-      action_id: status === "prepared" ? "confirm" : "intent.resume",
+      action_id: status === "prepared" ? "start" : "intent.resume",
       operator_control: status === "prepared" ? "Start task" : "Resume task preparation",
-      reason: status === "prepared" ? "Prepared task is ready for revision-checked confirmation." : status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
-      available: true,
+      reason: status === "prepared"
+        ? (startAvailable ? "Prepared task is ready for revision-checked start." : selection.unavailable_reason)
+        : status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
+      available: status === "prepared" ? startAvailable : true,
     },
     runner_selection: {
       schema_version: 1,
       source: "project-default",
-      route_id: asString(normalization.provider?.route_id),
-      readiness: status === "attention" ? "blocked" : status === "prepared" ? "ready" : "unknown",
-      requested_model: null,
-      effective_model: null,
-      requested_reasoning_effort: null,
-      effective_reasoning_effort: null,
-      unavailable_reason: status === "attention" ? "Intent preparation is blocked." : null,
-      recovery_action: status === "attention" ? "Revise or retry the intent preparation." : "Review the prepared task before confirmation.",
+      ...selection,
+      readiness: status === "attention" ? "blocked" : selection.readiness,
+      unavailable_reason: status === "attention" ? "Intent preparation is blocked." : selection.unavailable_reason,
+      recovery_action: status === "attention" ? "Revise or retry the intent preparation." : selection.recovery_action,
     },
+    prepared_contract: prepared,
     updated_at: asString(submission.updated_at) ?? asString(submission.created_at),
     completed_read_only: false,
     read_only: true,
@@ -233,10 +298,12 @@ function taskSourceItems(flow) {
  * model. This module owns presentation identity only; lifecycle and mutations
  * remain owned by intent, Mission, Flow, and Runtime Harness services.
  */
-export function projectTaskFromFlow({ projectId, flow }) {
+export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
   const id = taskId(projectId, flow.flow_id);
   const status = taskStatus(flow);
+  const selection = approvedExecutionSelection({ executionProfile, workType: asString(flow.work_type), step: asString(flow.current_step) });
   return {
+    schema_version: 1,
     task_id: id,
     project_id: projectId,
     display_title: flow.display_title,
@@ -249,8 +316,11 @@ export function projectTaskFromFlow({ projectId, flow }) {
     run_ids: flowRunIds(flow),
     lineage: {
       intent_submission_ref: flow.intake_packet_ref,
+      intent_submission_id: asString(flow.intent_submission_id),
+      normalization_revision: Number.isInteger(flow.normalization_revision) ? flow.normalization_revision : null,
       mission_id: flow.mission_id,
       flow_id: flow.flow_id,
+      run_ids: flowRunIds(flow),
     },
     source_items: taskSourceItems(flow),
     attention_items: taskAttentionItems(flow),
@@ -271,15 +341,9 @@ export function projectTaskFromFlow({ projectId, flow }) {
     runner_selection: {
       schema_version: 1,
       source: "project-default",
-      route_id: null,
-      readiness: "unknown",
-      requested_model: null,
-      effective_model: null,
-      requested_reasoning_effort: null,
-      effective_reasoning_effort: null,
-      unavailable_reason: null,
-      recovery_action: "Open execution settings to inspect approved routes.",
+      ...selection,
     },
+    prepared_contract: preparedContract({ normalization: null, executionProfile, workType: asString(flow.work_type), scope: [], deliveryMode: asString(flow.writeback_policy?.mode), status, step: asString(flow.current_step) }),
     updated_at: flow.updated_at ?? null,
     completed_read_only: status === "completed",
     read_only: true,
@@ -288,9 +352,17 @@ export function projectTaskFromFlow({ projectId, flow }) {
 
 export function listTaskProjections(options = {}) {
   const flows = listFlowProjections(options);
-  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({ projectId: flows.project_id, flow }));
+  let executionProfile = options.executionProfile ?? null;
+  if (!executionProfile && options.registry && options.projectId) {
+    try {
+      executionProfile = readExecutionProfile({ registry: options.registry, projectId: options.projectId });
+    } catch {
+      executionProfile = null;
+    }
+  }
+  const flowTasks = flows.flows.map((flow) => projectTaskFromFlow({ projectId: flows.project_id, flow, executionProfile }));
   const intentTasks = Array.isArray(options.intentSubmissions)
-    ? options.intentSubmissions.map((entry) => projectIntentTask({ projectId: flows.project_id, entry })).filter(Boolean)
+    ? options.intentSubmissions.map((entry) => projectIntentTask({ projectId: flows.project_id, entry, executionProfile })).filter(Boolean)
     : [];
   const tasks = [...intentTasks, ...flowTasks];
   return {

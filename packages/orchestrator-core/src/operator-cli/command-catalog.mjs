@@ -298,10 +298,10 @@ const COMMAND_DEFINITIONS = Object.freeze([
     category: "intent-first",
     status: "implemented",
     summary: "Confirm a prepared intent submission and idempotently start its Flow.",
-    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--help"],
+    inputs: ["--submission-id <id>", "--project-id <id> (optional)", "--expected-revision <n> (optional)", "--help"],
     outputs: ["task_start", "contract_families", "command_catalog_alignment"],
     requiredFlags: ["submission-id"],
-    contractFamilies: ["intent-submission", "intake-request-body"],
+    contractFamilies: ["intent-submission", "intake-request-body", "task-projection"],
   },
   {
     command: "evidence export",

@@ -64,6 +64,12 @@ Flow lineage:
 - `GET /api/projects/:projectId/tasks` returns stable public `task_id` values,
   draft/prepared/active/attention/completed status projections, source refs, runtime lifecycle path, attention/blocker counts,
   runner-readiness metadata, and one server-owned primary action;
+- Every Task response is the versioned `task-projection` read model. Its
+  `prepared_contract` carries the exact normalized outcome, acceptance,
+  bounded scope, delivery mode, normalization revision, approved execution
+  route, readiness revision, and explicit write effects used by `start`.
+  `route.intake-normalize.*` remains preparation provenance and is never an
+  approved execution route;
 - `GET /api/projects/:projectId/tasks/:taskId` returns one projection or a
   structured `task.not_found` error;
 - `GET /api/projects/:projectId/tasks/:taskId/review` returns a separate
@@ -88,6 +94,8 @@ Flow lineage:
   `revision` as `expected_revision`. The server forwards that guard to the
   intent confirmation boundary and rejects a stale prepared projection before
   creating or starting a Flow;
+- `start` is the only Task start action. The legacy `confirm-and-start` action
+  remains available only on the intent-submission compatibility route;
 - Task reads are strictly read-only. Create, prepare, revise, confirm, start,
   retry, and cancel continue through the existing intent boundary with its CAS
   and idempotency semantics; Task is not a second lifecycle owner;
