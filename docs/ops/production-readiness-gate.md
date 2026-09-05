@@ -4,9 +4,12 @@
 
 `pnpm production:ready` is the release-disposition gate. It is intentionally
 separate from `pnpm check`: the latter remains the repository-integrity baseline.
-The current expected result is a valid W66 qualification audit hold. Historical
-bounded self-hosted release clearance remains prerequisite evidence, not the
-current release disposition.
+The current expected result is a valid W66 qualification audit hold plus the
+post-W70 W71 remediation hold. Historical bounded self-hosted release clearance
+remains prerequisite evidence, not the current release disposition. The active
+machine-readable W71 disposition is
+`docs/research/26-w71-audit-disposition.json`; it must remain
+`release_clearance=false` until its owned findings close.
 
 The gate is review-oriented and fails closed. It must not create runtime state, target checkouts, upstream writes, or `.aor/` artifacts.
 
@@ -51,6 +54,13 @@ hotspot policy, and package verification once. `pnpm slice:gate` delegates to
 that pipeline instead of repeating root stages. Raw analyzer reports stay under
 ignored `.aor/quality`.
 
+Before a filesystem or Task-flow remediation slice, run
+`pnpm remediation:gate`. This slim gate inventories committed, staged,
+working-tree, and untracked changes, maps every changed source/test file to
+focused lint/typecheck/test coverage, and fails on unmapped files, spawn
+errors, signals, timeouts, or non-zero exits. It is a bootstrap containment
+check, not a replacement for the full `pnpm check` gate.
+
 To verify another sanitized proof fixture:
 
 ```bash
@@ -70,6 +80,9 @@ The gate verifies:
 - audit remediation ledger validity, complete AUD-001 through AUD-055
   disposition, the post-audit `project-context-cwd-divergence` entry, and every
   open release-blocking invariant;
+- post-W70 W71 disposition validity: stable owner slices, affected invariants,
+  evidence-tier policy, story downgrades, and every open release-blocking
+  finding are exposed in the readiness output;
 - W57 remediation closure integrity: the exact W57 finding set maps one-to-one
   to existing deterministic evidence, while AUD-009 and AUD-052 retain their
   explicitly shared W58 disposition;
@@ -108,6 +121,7 @@ Top-level meanings:
 | Failed check | Meaning | Operator action |
 |---|---|---|
 | `audit-remediation-ledger` | The ledger is missing, malformed, incomplete, or contains an invalid resolved claim. | Restore the ledger and evidence; do not infer release status. |
+| `w71-audit-disposition` | The post-W70 disposition is missing, stale, malformed, or loses an owner/evidence-tier blocker. | Restore `docs/research/26-w71-audit-disposition.json`; keep `release_clearance=false` and continue the owning W71 slice. |
 | `w57-remediation-closure` | The W57 finding set is missing, duplicated, regressed, or points at missing evidence. | Restore the closure report and its referenced deterministic suites; keep the audit hold. |
 | `w58-remediation-closure` | The W58 runtime-quality set, integration profile, remaining W59 map, or evidence paths drifted. | Restore the W58 closure report and rerun `pnpm w58:proof`; do not claim release clearance. |
 | `w59-audit-closure` | The final 55-finding map, independent S1 review, commit range, or direct evidence drifted. | Restore W59 closure evidence and keep readiness failed or blocked. |

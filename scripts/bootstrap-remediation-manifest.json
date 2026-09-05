@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "description": "Fail-hard changed-file classes for the pre-remediation gate.",
+  "file_classes": [
+    {
+      "class_id": "test-source",
+      "path_prefixes": ["apps/", "packages/", "scripts/"],
+      "suffixes": [".test.mjs"],
+      "required_checks": ["lint", "typecheck", "test"]
+    },
+    {
+      "class_id": "runtime-source",
+      "path_prefixes": ["apps/", "packages/", "scripts/"],
+      "extensions": [".css", ".js", ".jsx", ".mjs", ".ts", ".tsx"],
+      "exclude_suffixes": [".test.mjs"],
+      "required_checks": ["lint", "typecheck"]
+    }
+  ],
+  "ignored_path_prefixes": [
+    "apps/web/dist/"
+  ]
+}
