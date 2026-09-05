@@ -125,3 +125,66 @@ test("partial provisioning rolls back owned checkouts and retains failure eviden
   assert.equal(fs.existsSync(path.join(projectRuntimeRoot, "workspace-sets", "run-failure")), false);
   assert.equal(JSON.parse(fs.readFileSync(path.join(projectRuntimeRoot, "reports", "workspace-set.run-failure.json"), "utf8")).status, "failed");
 });
+
+test("workspace-set cleanup rejects a forged owner marker without deleting the checkout", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-workspace-forged-marker-"));
+  const source = repository(root, "source");
+  const projectRuntimeRoot = runtime(root);
+  try {
+    const manifest = provisionWorkspaceSet({
+      workspaceSetId: "workspace-set-forged",
+      projectId: "project-1",
+      runId: "run-forged",
+      bindingRef: "binding://project-1@r1",
+      projectRuntimeRoot,
+      repositories: [{ repoId: "main", mountPath: "repos/main", sourceRoot: source, baseRef: "HEAD" }],
+    });
+    fs.writeFileSync(manifest.owner_marker, JSON.stringify({ ...JSON.parse(fs.readFileSync(manifest.owner_marker, "utf8")), workspace_root: path.join(root, "outside") }), "utf8");
+    assert.throws(() => finalizeWorkspaceSet(manifest, "success"), /owner marker/u);
+    assert.equal(fs.existsSync(manifest.workspace_root), true);
+    assert.equal(fs.existsSync(path.join(source, "README.md")), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace-set provisioning rejects an escaping workspace-sets symlink", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-workspace-root-link-"));
+  const source = repository(root, "source");
+  const projectRuntimeRoot = runtime(root);
+  const outside = path.join(root, "outside");
+  fs.mkdirSync(outside);
+  fs.mkdirSync(path.join(outside, "run-link", "repos", "main"), { recursive: true });
+  fs.writeFileSync(path.join(outside, "sentinel.txt"), "keep\n", "utf8");
+  fs.symlinkSync(outside, path.join(projectRuntimeRoot, "workspace-sets"), "dir");
+  try {
+    assert.throws(() => provisionWorkspaceSet({
+      workspaceSetId: "workspace-set-link",
+      projectId: "project-1",
+      runId: "run-link",
+      bindingRef: "binding://project-1@r1",
+      projectRuntimeRoot,
+      repositories: [{ repoId: "main", mountPath: "repos/main", sourceRoot: source, baseRef: "HEAD" }],
+    }), /Workspace-set root escaped/u);
+    assert.equal(fs.readFileSync(path.join(outside, "sentinel.txt"), "utf8"), "keep\n");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("workspace-set resume rejects an escaping workspace-sets symlink", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-workspace-resume-link-"));
+  const projectRuntimeRoot = runtime(root);
+  const outside = path.join(root, "outside");
+  fs.mkdirSync(outside);
+  fs.mkdirSync(path.join(outside, "run-link", "repos", "main"), { recursive: true });
+  fs.symlinkSync(outside, path.join(projectRuntimeRoot, "workspace-sets"), "dir");
+  try {
+    assert.throws(() => resumeWorkspaceSetIsolation({
+      projectRuntimeRoot,
+      executionRoot: path.join(outside, "run-link", "repos", "main"),
+    }), /Workspace sets root|workspace-set repository/u);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

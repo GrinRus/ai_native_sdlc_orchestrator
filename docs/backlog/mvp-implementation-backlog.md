@@ -682,7 +682,7 @@ hold/readiness state is not changed by code-only completion.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W71-S01 | Audit disposition, proof scope, and coordination baseline | EPIC-0, EPIC-4, EPIC-5, EPIC-7 | done | audit/readiness ledgers, story coverage, backlog sources, production-readiness policy, bootstrap gate and tests | W66-S25, W70-S10 |
-| W71-S02 | Symlink-safe path confinement and durable cleanup | EPIC-0, EPIC-1, EPIC-2, EPIC-5 | ready | path containment, Markdown ingress, workspace cleanup, integration evidence paths, security tests | W71-S01 |
+| W71-S02 | Symlink-safe path confinement and durable cleanup | EPIC-0, EPIC-1, EPIC-2, EPIC-5 | done | path containment, Markdown ingress, workspace cleanup, integration evidence paths, security tests | W71-S01 |
 | W71-S03 | Deterministic repository gate and dependency/process safety | EPIC-0, EPIC-5, EPIC-7 | blocked | package/lockfile, dependency policy, test/typecheck runners, process supervision, CI/release gates | W71-S02 |
 | W71-S04 | Versioned Task contract and execution-route truth | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | Task contracts/projections, control-plane API/OpenAPI, CLI parity, examples and tests | W71-S03 |
 | W71-S05 | Atomic intent and runtime state transactions | EPIC-0, EPIC-2, EPIC-3, EPIC-6 | blocked | intent preparation, run/step state, heartbeat supervision, shared locks/atomic storage | W71-S04 |

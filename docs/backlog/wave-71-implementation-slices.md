@@ -138,7 +138,7 @@ visual/component history.
 
 ## W71-S02 — Symlink-safe path confinement and durable cleanup
 
-- **State:** ready
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-5
 - **Hard dependencies:** W71-S01
 - **Remediation priority:** P0

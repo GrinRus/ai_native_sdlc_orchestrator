@@ -6,6 +6,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { derivePublicId, validateContractDocument, validatePublicId } from "../../contracts/src/index.mjs";
 import { previewProjectRuntime } from "./project-init.mjs";
+import { readCanonicalContainedFile, removeCanonicalContainedPath, resolveCanonicalContainedPath } from "./shared/canonical-paths.mjs";
 
 export class ProjectWritebackError extends Error {
   constructor(code, message, statusCode = 409) {
@@ -104,17 +105,21 @@ function resolveEvidence(context, reference) {
   if (!relative || segments.some((segment) => !segment || segment === "." || segment === "..") || segments[0] === "inputs" || segments[0] === "logs" || /(?:provider|runner|adapter).*(?:raw|log|transcript)|(?:raw|transcript).*(?:provider|runner|adapter)/iu.test(basename)) {
     throw new ProjectWritebackError("evidence_export.forbidden_ref", `Evidence ref '${reference}' is not exportable.`, 400);
   }
-  const source = path.join(context.projectRuntimeRoot, ...segments);
-  const containment = path.relative(context.projectRuntimeRoot, source);
-  if (containment.startsWith("..") || path.isAbsolute(containment) || !fs.existsSync(source) || fs.lstatSync(source).isSymbolicLink() || !fs.statSync(source).isFile()) {
-    throw new ProjectWritebackError("evidence_export.not_found", `Evidence ref '${reference}' was not found.`, 404);
+  const read = readCanonicalContainedFile({
+    root: context.projectRuntimeRoot,
+    relativePath: segments.join("/"),
+    base: "runtime-relative",
+    maxBytes: 10 * 1024 * 1024,
+  });
+  if (!read.ok) {
+    const forbidden = new Set(["lexical-escape", "symlink-escape", "canonical-escape", "final-symlink"]);
+    throw new ProjectWritebackError(
+      forbidden.has(read.reason) ? "evidence_export.forbidden_ref" : "evidence_export.not_found",
+      `Evidence ref '${reference}' could not be read inside the project evidence boundary (${read.reason}).`,
+      forbidden.has(read.reason) ? 400 : 404,
+    );
   }
-  const realSource = fs.realpathSync.native(source);
-  const realContainment = path.relative(fs.realpathSync.native(context.projectRuntimeRoot), realSource);
-  if (realContainment.startsWith("..") || path.isAbsolute(realContainment)) {
-    throw new ProjectWritebackError("evidence_export.forbidden_ref", `Evidence ref '${reference}' escapes the project evidence boundary.`, 400);
-  }
-  return { source, relative };
+  return { source: read.canonicalPath, relative, bytes: read.bytes };
 }
 
 export function exportEvidence({ registry, projectId, flowId, exportId, evidenceRefs }) {
@@ -125,14 +130,16 @@ export function exportEvidence({ registry, projectId, flowId, exportId, evidence
   const selectedExportId = exportId || derivePublicId(["evidence-export", flowId, crypto.randomUUID()], "evidence-export");
   if (!validatePublicId(selectedExportId).ok) throw new ProjectWritebackError("evidence_export.invalid_export_id", "exportId must be a canonical public identifier.", 400);
   const relativeDestination = path.posix.join(".aor", "exports", flowId, selectedExportId);
-  const destination = path.join(context.projectRoot, relativeDestination);
+  const destinationResolution = resolveCanonicalContainedPath({ root: context.projectRoot, relativePath: relativeDestination, base: "project-relative", rejectFinalSymlink: true });
+  if (!destinationResolution.ok) throw new ProjectWritebackError("evidence_export.invalid_destination", `Evidence export destination is not owned by the project root (${destinationResolution.reason}).`, 400);
+  const destination = destinationResolution.canonicalPath;
   if (fs.existsSync(destination)) throw new ProjectWritebackError("evidence_export.exists", `Evidence export '${selectedExportId}' already exists.`);
   const staging = `${destination}.${process.pid}.${crypto.randomUUID()}.tmp`;
   fs.mkdirSync(staging, { recursive: true });
   try {
     const entries = evidenceRefs.map((reference, index) => {
       const resolved = resolveEvidence(context, reference);
-      const bytes = fs.readFileSync(resolved.source);
+      const bytes = resolved.bytes;
       const exportedPath = `${String(index + 1).padStart(2, "0")}-${path.basename(resolved.relative)}`;
       fs.writeFileSync(path.join(staging, exportedPath), bytes, { mode: 0o600, flag: "wx" });
       return { source_ref: reference, exported_path: exportedPath, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), byte_length: bytes.length, family: path.basename(resolved.relative).replace(/\.[^.]+$/u, "") };
@@ -154,7 +161,8 @@ export function exportEvidence({ registry, projectId, flowId, exportId, evidence
     fs.renameSync(staging, destination);
     return { manifest, directory: destination, warning: ignoredWarning(context.projectRoot, relativeDestination) };
   } catch (error) {
-    fs.rmSync(staging, { recursive: true, force: true });
+    const removal = removeCanonicalContainedPath({ root: context.projectRoot, target: staging });
+    if (!removal.ok) throw new ProjectWritebackError("evidence_export.cleanup_failed", `Evidence export cleanup was refused (${removal.reason}).`, 500);
     throw error;
   }
 }
