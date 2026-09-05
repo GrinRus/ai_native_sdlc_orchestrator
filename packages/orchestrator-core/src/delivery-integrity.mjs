@@ -69,13 +69,19 @@ export function captureDeliveryDiff(executionRoot) {
   ]);
 
   for (const repoPath of allPaths) {
+    const canonicalReference = repoPath.replace(/\/+$/u, "");
     const resolution = resolveCanonicalContainedPath({
       root,
-      relativePath: repoPath,
+      relativePath: canonicalReference,
       base: "repository-bound",
       rejectFinalSymlink: true,
     });
-    if (!resolution.ok) throw new Error(`Delivery path '${repoPath}' cannot be canonically owned (${resolution.reason}).`);
+    if (!resolution.ok) {
+      const detail = ["symlink-escape", "canonical-escape", "final-symlink"].includes(resolution.reason)
+        ? "symbolic link or canonical escape"
+        : "canonical ownership failure";
+      throw new Error(`Delivery path '${repoPath}' cannot be canonically owned (${detail}: ${resolution.reason}).`);
+    }
   }
 
   return { baseline: { head_sha }, changes: { ...changes, all_paths: allPaths } };
