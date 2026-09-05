@@ -126,8 +126,10 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 
 W60 now provides the requalified structured-plan contract, mission-specific
 decomposition, deterministic completeness before semantic checks, exact-version
-approval, evidence-derived task progress, and the accessible Plan workbench.
-W61 closes project topology and installed execution setup. W62-S01 adds the
+approval, and evidence-derived task progress through public plan commands and
+read models. W61 provides headless project topology and approved route setup;
+its Project Structure and Execution Setup screens and W60's Plan workbench
+are retired. W62-S01 adds the
 run-owned isolated workspace-set provisioner and per-repository change
 evidence. W62-S02 adds exact task-to-unit DAG planning, impacted topology scope,
 criteria coverage, and reasoned concurrency candidates. W62-S03 adds the
@@ -159,7 +161,7 @@ headless bounded-execution baseline rather than the full operator workflow in
 
 `W31-S01` and `W36-S03`/`W36-S04` established the earlier repo-attached local UI baseline. W67 supersedes its first-run contract with explicit local/Git source connection, central AOR Home, free-form intent preparation, confirmation, project switching, and logical evidence refs without exposing storage paths.
 
-That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S05/W61-S07 remain the neutral Workspace and approved Execution Setup baseline; W71-S14 owns the missing current Task-level route/readiness/safety selection and exact Prepared-to-Start execution proof for `PBO-10`.
+That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S05/W61-S07 record the historical neutral Workspace and approved Execution Setup baseline; the retired setup screen is no longer an installed workflow. Approved route selection remains available through `aor route select` and `aor route check`. W71-S14 owns the missing current Task-level route/readiness/safety selection and exact Prepared-to-Start execution proof for `PBO-10`.
 
 W67 replaces that topology-first baseline with central AOR Home and intent-first
 ingress. Its target outcome is: an installed user supplies code plus text or a

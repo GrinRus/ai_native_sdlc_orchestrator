@@ -11,14 +11,11 @@
     {"file":"scripts/live-e2e/run-profile.mjs","name":"writeProofRunnerArtifacts"}
   ],
   "file_line_ceiling_overrides": {
-    "apps/web/src/spa.jsx": 7565,
-    "apps/web/src/spa.css": 5022,
     "packages/adapter-sdk/src/index.mjs": 3800,
-    "packages/contracts/src/families.mjs": 1662,
+    "packages/contracts/src/families.mjs": 1661,
     "packages/contracts/src/loader.mjs": 4112,
     "packages/orchestrator-core/src/certification-decision.mjs": 1279,
     "packages/orchestrator-core/src/control-plane/flow-projections.mjs": 1085,
-    "packages/orchestrator-core/src/control-plane/read-artifact-readers.mjs": 1001,
     "packages/orchestrator-core/src/control-plane/read-run-projections.mjs": 1290,
     "packages/orchestrator-core/src/handoff-packets.mjs": 1132,
     "packages/orchestrator-core/src/next-action.mjs": 2026,
@@ -29,13 +26,12 @@
     "packages/orchestrator-core/src/project-verify.mjs": 2116,
     "packages/orchestrator-core/src/review-run.mjs": 1338,
     "packages/orchestrator-core/src/runtime-harness-report.mjs": 1420,
-    "packages/orchestrator-core/src/step-execution-engine.mjs": 2214,
-    "scripts/live-e2e/lib/contracts/families.mjs": 1895,
-    "scripts/live-e2e/lib/contracts/loader.mjs": 5738,
-    "scripts/live-e2e/run-profile.mjs": 4498,
-    "scripts/live-e2e/lib/flows.mjs": 7766,
-    "scripts/live-e2e/lib/step-controller.mjs": 1927,
-    "scripts/live-e2e/quality-assessment.mjs": 1321,
+    "packages/orchestrator-core/src/step-execution-engine.mjs": 2212,
+    "scripts/live-e2e/lib/contracts/loader.mjs": 3205,
+    "scripts/live-e2e/run-profile.mjs": 4497,
+    "scripts/live-e2e/lib/flows.mjs": 7717,
+    "scripts/live-e2e/lib/step-controller.mjs": 1914,
+    "scripts/live-e2e/quality-assessment.mjs": 1320,
     "scripts/production-readiness.mjs": 1085
   }
 }

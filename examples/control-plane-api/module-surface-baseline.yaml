@@ -270,7 +270,7 @@ flow_projection_contract:
   owning_slice: W34-S02
   status: implemented-read-baseline
   source_of_truth:
-    product: docs/product/03-flow-centric-console-design.md
+    product: docs/product/08-task-workspace-console-design.md
     contract: docs/contracts/control-plane-api.md
   projection_fields:
     - flow_id
@@ -743,7 +743,7 @@ execution_evidence_summary_contract:
   source_of_truth:
     contract: docs/contracts/control-plane-api.md
     openapi: docs/contracts/control-plane-api.openapi.json
-    product: docs/product/03-flow-centric-console-design.md
+    product: docs/product/08-task-workspace-console-design.md
     runbook: docs/ops/run-control-lifecycle.md
   read_payload_fields:
     - RunSummary.execution_evidence

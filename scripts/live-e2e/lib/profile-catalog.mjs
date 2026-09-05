@@ -17,13 +17,6 @@ import {
 } from "./common.mjs";
 import { getProfileStages } from "./stages.mjs";
 
-export const DEFAULT_BACKLOG_REFS = Object.freeze([
-  "docs/backlog/mvp-implementation-backlog.md",
-  "docs/backlog/mvp-roadmap.md",
-  "scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md",
-]);
-
-
 /**
  * @param {string} hostRoot
  * @returns {string}

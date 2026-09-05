@@ -523,7 +523,7 @@ export function cancelIntentSubmission({ registry, projectId, submissionId }) {
   return { submission: loaded.submission };
 }
 
-function startConfirmedIntent({ registry: _registry, projectId: _projectId, loaded }) {
+function startConfirmedIntent({ loaded }) {
   const discovery = runLifecycleCommand({
     cwd: loaded.context.projectRoot,
     projectRef: loaded.context.projectRoot,
@@ -548,7 +548,7 @@ export function retryIntentStart({ registry, projectId, submissionId }) {
     throw new IntentServiceError("intent_submission.not_confirmed", "Confirm the prepared task before retrying its start.", 409);
   }
   if (loaded.submission.confirmation.retryable_start !== true) return loaded.submission.confirmation;
-  return startConfirmedIntent({ registry, projectId, loaded });
+  return startConfirmedIntent({ loaded });
 }
 
 function confirmIntentRecord({ registry, projectId, submissionId, expectedRevision }) {
@@ -645,5 +645,5 @@ export function confirmAndStartIntent({ registry, projectId, submissionId, expec
   const record = loaded.submission.confirmation
     ? { confirmation: loaded.submission.confirmation, loaded }
     : confirmIntentRecord({ registry, projectId, submissionId, expectedRevision });
-  return startConfirmedIntent({ registry, projectId, loaded: record.loaded });
+  return startConfirmedIntent({ loaded: record.loaded });
 }

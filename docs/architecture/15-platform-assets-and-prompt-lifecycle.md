@@ -238,8 +238,10 @@ Compiler revisions are tracked through `compiler-revision-status`: one report re
 ## Operator intervention context
 
 Operator requests do not introduce a separate prompt system. `aor request run`
-and the web Ask AOR drawer use the normal route, wrapper, prompt bundle,
+and the operator-request run API use the normal route, wrapper, prompt bundle,
 policy, adapter, and context compiler path for the selected target step. The
+Task Workspace Ask AOR composer currently creates a bounded `no-write` request;
+creation alone does not execute the step or compile its context. The
 only additive context asset is `context-bundle://context.bundle.operator-intervention@v1`,
 which expands the always-on `context-rule://context.rule.operator-intervention@v1`.
 

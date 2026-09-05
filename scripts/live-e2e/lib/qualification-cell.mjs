@@ -9,15 +9,6 @@ import { asNonEmptyString, asRecord, asStringArray, nowIso, readJson, uniqueStri
 
 const SCRIPT_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const QUALITY_ASSESSMENT_SCRIPT = path.join(SCRIPT_ROOT, "quality-assessment.mjs");
-const DIMENSION_KEYS = Object.freeze([
-  "public_lifecycle",
-  "run_health",
-  "diagnostic_verification",
-  "final_assessment",
-  "changed_paths",
-  "checkout_integrity",
-  "delivery_safety",
-]);
 
 export const REQUIRED_QUALIFICATION_CELLS = Object.freeze([
   Object.freeze({ cell_id: "openai-primary.medium", provider_variant_id: "openai-primary", feature_size: "medium" }),

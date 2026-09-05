@@ -54,19 +54,6 @@ function listYamlFiles(root) {
 }
 
 /**
- * @param {string} root
- * @param {import("../src/index.d.ts").ContractFamily} family
- */
-function assertDirectoryContractsLoad(root, family) {
-  const files = listYamlFiles(root);
-  assert.ok(files.length > 0, `expected at least one YAML document under ${root}`);
-  for (const filePath of files) {
-    const loaded = loadContractFile({ filePath, family });
-    assert.equal(loaded.ok, true, `${path.relative(workspaceRoot, filePath)} should load as ${family}`);
-  }
-}
-
-/**
  * @param {import("../src/index.d.ts").ContractValidationResult} validation
  * @param {string} code
  * @param {string} field

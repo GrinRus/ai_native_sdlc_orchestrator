@@ -137,7 +137,7 @@ product acceptance requires independent step-quality plus final all-pass quality
 - `pnpm build`
 - `pnpm check`
 - `pnpm slice:gate`
-- `docs/ops/live-e2e-proof-complete-findings.md`
+- `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`
 
 ### Out of scope
 - committing `.aor/` runtime state

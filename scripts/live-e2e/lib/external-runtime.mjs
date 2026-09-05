@@ -83,18 +83,6 @@ function hasEnvValue(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {string}
- */
-function stableJsonText(value) {
-  try {
-    return JSON.stringify(value) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-/**
  * @param {string} text
  * @returns {string}
  */

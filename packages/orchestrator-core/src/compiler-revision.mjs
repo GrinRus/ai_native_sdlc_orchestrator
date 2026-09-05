@@ -20,16 +20,6 @@ function asString(value) {
 
 /**
  * @param {unknown} value
- * @returns {string[]}
- */
-function asStringArray(value) {
-  return Array.isArray(value)
-    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
-    : [];
-}
-
-/**
- * @param {unknown} value
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {

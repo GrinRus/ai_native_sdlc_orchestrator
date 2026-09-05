@@ -126,7 +126,7 @@ Key takeaways:
 
 References:
 
-- [openai/codex `.github/workflows/ci.yml`](https://github.com/openai/codex/blob/main/.github/workflows/ci.yml)
+- [openai/codex workflow directory](https://github.com/openai/codex/tree/main/.github/workflows)
 - [langchain-ai/langchainjs `.github/workflows/ci.yml`](https://github.com/langchain-ai/langchainjs/blob/main/.github/workflows/ci.yml)
 
 Useful patterns adopted for AOR:

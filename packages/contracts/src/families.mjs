@@ -3,7 +3,6 @@ import { EXECUTION_READINESS_CONTRACT_FAMILIES, EXECUTION_READINESS_EXAMPLE_RULE
 import { INTEGRATION_CONTRACT_FAMILIES, INTEGRATION_EXAMPLE_RULES } from "./integration-contract-family.mjs";
 import { EXTERNAL_RUN_PROJECTION_CONTRACT_FAMILIES, EXTERNAL_RUN_PROJECTION_EXAMPLE_RULES } from "./external-run-projection-contract-family.mjs";
 import { INTENT_CONTRACT_FAMILIES, INTENT_EXAMPLE_RULES } from "./intent-contract-families.mjs"; import { RUNNER_OUTPUT_CONTRACT_FAMILIES, RUNNER_OUTPUT_EXAMPLE_RULES } from "./runner-output-contract-families.mjs"; import { TASK_CONTRACT_FAMILIES, TASK_EXAMPLE_RULES } from "./task-contract-families.mjs"; const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
-const ROUTE_STEP_VALUES = ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];

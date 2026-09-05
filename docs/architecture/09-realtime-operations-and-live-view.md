@@ -54,13 +54,15 @@ Workspace / New task / Prepare task / project-switcher markers, and the absence
 of retired Quiet Cockpit markers. A generated static HTML snapshot is not a
 supported operator console or proof path.
 
-The app can also submit operator-initiated interventions through
-`POST /api/projects/:projectId/operator-requests` and run them through
+The active Task guidance composer submits an operator-initiated request through
+`POST /api/projects/:projectId/tasks/:taskId/actions` with `action=request`.
+This creates a `no-write` request; it does not run the target step. Explicit
+execution remains available through `aor request run` or
 `POST /api/projects/:projectId/operator-requests/:requestId/actions` with
-`action=run`. Read views use `GET /api/projects/:projectId/operator-requests`
-and must show sanitized summaries and refs, not raw request text. Successful
-runs refresh/materialize `next-action-report` so the right rail and headless
-CLI/API surfaces converge on the same next action.
+`action=run`. The separate operator-request create/read API remains available
+to headless clients. Read views must show sanitized summaries and refs, not raw
+request text. Successful request runs refresh/materialize `next-action-report`;
+W71-S08 owns complete Task create-and-run recovery and durable readback.
 
 ## Task-centric local view
 
@@ -75,14 +77,17 @@ bounded help, or create a follow-up only when the Task projection exposes that
 action. They must not mutate completed evidence or infer a selected lifecycle
 from browser storage.
 
-When a W45 `quality-repair-request` is active, the flow projection exposes
-`active_quality_gate` for the local console. The cockpit renders the request
-ref, cycle id, source stage, request status, bounded attempt budget, blockers,
-evidence summaries, and the resolver's single primary action. Review-origin
-repair, QA-origin repair, and exhausted repair budgets are displayed as
-operator-visible quality gates; delivery and release actions remain hidden
-behind the gate until the request closes or an explicit exhausted-budget
-operator hold/override is recorded by the runtime.
+When a W45 `quality-repair-request` is active, the Flow read model retains
+`active_quality_gate` with the request identity, cycle, source stage, status,
+and attempt budget. The current Task projection carries its blockers and up to
+five evidence refs per attention item. Task Workspace does not render the full
+quality-gate detail as a dedicated panel; inspect the Flow/API evidence for
+those fields.
+
+The runtime still owns repair and downstream delivery/release gating. A limited
+Task presentation does not clear a blocked gate, consume an attempt, or record
+an exhausted-budget hold/override. The full installed recovery and review
+journey remains subject to W71 acceptance evidence.
 
 ## Interactive continuation
 When a runner asks a question, AOR treats it as a run continuation boundary:

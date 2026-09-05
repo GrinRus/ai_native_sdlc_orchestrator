@@ -78,11 +78,11 @@ remaining available from CLI, API, and the local web console.
 - `packages/orchestrator-core/src/operator-request.mjs`
 - `packages/orchestrator-core/src/operator-cli/command-handlers/request.mjs`
 - `packages/orchestrator-core/src/control-plane/http/**`
-- `apps/web/src/spa.jsx`
-- `apps/web/src/spa.css`
+- [spa.jsx snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.jsx)
+- [spa.css snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.css)
 - `packages/orchestrator-core/test/operator-request.test.mjs`
-- `apps/web/test/operator-request-spa.test.mjs`
-- `examples/live-e2e/fixtures/w32-s01/operator-request-interactive-flow.sample.json`
+- [operator-request-spa.test.mjs snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-request-spa.test.mjs)
+- `scripts/live-e2e/fixtures/evidence/w32-s01/operator-request-interactive-flow.sample.json`
 - updated README, product, architecture, contract, ADR, ops, release, and
   backlog docs
 

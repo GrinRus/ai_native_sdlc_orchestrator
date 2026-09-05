@@ -11,6 +11,11 @@ prepare a Task without source writes, explicitly start bounded work, and follow
 activity, review, completion, and evidence through a durable Task record with
 no surprise upstream writes.
 
+This is the intended journey. The current W70 presentation baseline and the
+remaining W71 integrated-runtime gaps are distinguished in the
+[story coverage matrix](user-story-coverage-matrix.md); a visible control or
+fixture screenshot alone does not prove the full installed journey.
+
 ## Stage model
 | Stage | Guided intent | Runtime-owned evidence | Owning follow-up slice |
 |---|---|---|---|
@@ -18,7 +23,7 @@ no surprise upstream writes.
 | Task draft | Choose **New task**, describe the outcome, and attach optional Markdown sources. | Server-owned Task submission and source metadata. | W70-S04 |
 | Prepare | Choose **Prepare task** to derive a reviewable outcome, acceptance criteria, scope, runner, and safety mode without authorizing source writes. | Preparation run, prepared Task state, logical evidence refs. | W70-S04 |
 | Start and work | Explicitly choose **Start task**, then observe bounded activity, changes, checks, blockers, and live events. | Task/run linkage, step results, live-run events, policy and run-control evidence. | W70-S05 |
-| Ask AOR | Request bounded analysis, revision, repair, validation, planning, implementation, or review from the selected Task. | `operator-request`, compiled context, step result, proposal/patch refs. | W70-S05 |
+| Ask AOR | Create a bounded no-write request from the active Task guidance composer; execute it separately through the request CLI/API. | Created `operator-request`; compiled context, step result, and proposal/patch refs only after a separate successful run. | W70-S05, W71-S08 |
 | Review and completion | Resolve attention, inspect review and QA evidence, and retain the completed Task as a durable read-only outcome. | Review report and decision, Runtime Harness report, completion and closure evidence. | W70-S06 |
 | Follow-up | Create a fresh Task that may cite prior evidence without mutating the completed source Task. | New Task submission plus preserved internal Flow and evidence lineage. | W70-S06 |
 | Guided proof | Rehearse the clean-project Task journey with no upstream-write defaults. | `installed-user-guided-journey.yaml`, current app-smoke fields, browser Task proof, durable readback, and no-write assertions. | W70-S09 |
@@ -56,15 +61,17 @@ The current implemented console reference is
 `docs/product/08-task-workspace-console-design.md`. W70 owns the Tasks Home,
 Task draft and preparation, explicit start, active work, Attention, review,
 completion, follow-up, and responsive behavior shipped by the packaged app.
-The older flow-centric and cockpit design documents are retained as historical
-compatibility and migration evidence; they do not define the installed default.
+Older flow-centric and cockpit designs remain available in Git history as
+migration evidence; they do not define the installed default.
 
 Project-topology and detailed planning behavior is defined in
 `docs/product/04-project-topology-and-task-planning-ux.md`. W60-W62 preserve the
-internal Flow lifecycle boundary while adding Project Structure, a plan workbench,
-parent/child execution visibility, integration recovery, and coordinated
-delivery. Task Workspace presents applicable plan and execution evidence inside
-the selected Task, with accessible list/table alternatives to graph views.
+internal Flow lifecycle boundary and headless topology, planning, and execution
+contracts. Their Project Structure, Execution Setup, and Plan workbench screens
+have been retired. Use the public project, route, and plan commands for those
+operations; Task Workspace presents applicable plan and execution evidence
+inside the selected Task. Integrated recovery and coordinated-delivery proof
+remain bounded by the current W71 acceptance requirements.
 
 A flow is a runtime/control-plane projection over mission/intake, next-action,
 operator-request, run, review, delivery, release, and learning evidence.
@@ -97,30 +104,42 @@ Tasks Home and New task have no lifecycle rail. Prepared Task is a review
 surface; preparation does not authorize source changes. **Start task** is the
 explicit boundary that permits the bounded runtime to begin work.
 
-Each selected Task stage exposes durable evidence refs, blocker codes,
-selected-run policy history counts, event/log counts, and the exact current
-next action from the latest `next-action-report`. Connected mode invokes
-`mission create`, `next`, and other bounded lifecycle commands through
-`POST /api/projects/:projectId/lifecycle-command/actions`; read-only mode keeps
-the same evidence visible while disabling mutation descriptors.
+Task Workspace reads server-owned Task projections with lifecycle position,
+evidence refs, attention items, review/completion summaries, and a primary
+action. Prepare uses the intent-submission API; Task controls use
+`POST /api/projects/:projectId/tasks/:taskId/actions`. Review decisions use the
+lifecycle-command API. Lower-level `mission create` and `next` commands remain
+available through CLI/API, but are not separate current browser controls.
+Detailed policy history and event/log counts are not guaranteed by the Task
+projection; use the corresponding headless read surfaces when needed.
 
 The pre-W67 Mission form used a safe walkthrough template. W67 supersedes that first-run surface: free-form intent normalization now compiles title, goals, constraints, KPI, Definition of Done, and bounded delivery mode before confirmation, while UI state exposes logical evidence refs and server-owned AOR Home status.
 
-Each selected Task exposes an Ask AOR action. The request drawer captures
-intent, target refs, allowed paths, delivery mode, and a preview of what runtime
-will do. Runtime may retain an internal `target_flow_id`; the installed UI keeps
-the request and refreshed activity scoped to the Task. Submitting creates an
-`operator-request` and runs it through the selected target step. Task activity,
-checks, changes, and evidence remain scoped to the selected Task; refs can be
-attached as request targets. The Interactions Inbox remains
-for runtime-initiated `requested_interaction` questions and submits answers
-through `/interactions/answers`; it is distinct from operator-initiated
-`operator-request` work.
+The active Task view exposes an Ask AOR **Task guidance** text composer.
+Submitting calls `POST /api/projects/:projectId/tasks/:taskId/actions` with
+`action=request`. The server creates an `operator-request` for the Task's
+current step and evidence refs, defaults the intent to `analyze`, and fixes
+its delivery mode to `no-write`. The composer does not expose target-ref,
+allowed-path, delivery-mode, or preview controls.
 
-For the final three stages, the web console reads `next-action-report.closure_state` directly:
-- review/QA shows review report, Runtime Harness report, current `review-decision`, downstream delivery gate status, and whether downstream delivery is blocked;
-- delivery/release shows delivery-plan, delivery-manifest, release-packet, write-back result, release readiness, and blocked reasons;
-- learning shows scorecard and handoff refs plus the evidence chain that links back to review, quality, delivery, and release artifacts.
+A successful submission confirms request creation only. The current Task action
+does not run that request. Use `aor request run` or the operator-request run API
+for explicit execution; use request status to inspect the resulting evidence.
+W71-S08 owns durable create-and-run recovery and review/completion continuity.
+Task activity, checks, changes, and evidence remain scoped to the selected Task.
+
+Runtime-initiated `requested_interaction` questions use `aor run answer` or
+`POST /api/projects/:projectId/interactions/answers`. Task Workspace has no
+separate Interactions Inbox or answer form. These answers remain distinct from
+operator-initiated requests; the [headless runbook](../ops/ui-attach-detach.md)
+provides the public transport examples.
+
+The server derives Task review and completion summaries from durable Flow
+closure state. The current browser shows verification/delivery status, bounded
+change-review evidence, and completion patch or delivery-manifest refs. It does
+not read raw `next-action-report.closure_state` directly or provide separate
+release and learning workbenches. Inspect the linked artifacts and headless
+CLI/API reads for full review, Runtime Harness, release, and learning evidence.
 
 The web surface does not store approval, hold, repair, release, or learning state locally. It only renders durable artifacts and invokes the same lifecycle mutations that CLI/API expose.
 
@@ -129,7 +148,7 @@ Installed-user onboarding defaults to public-repo safety:
 - no upstream writes by default;
 - `no-write` or planning-only behavior until delivery mode is explicit;
 - bounded execution scope, commands, budgets, allowed paths, and writeback policy before runner work;
-- runtime output under `.aor/`, with no runtime state committed by default;
+- runtime output under AOR Home (`~/.aor` or `AOR_HOME`), with no runtime state committed;
 - headless CLI/API operation remains valid when the local app is absent, stopped, or detached;
 - production monitoring, offline certification, rehearsal proof, and delivery evidence stay separate.
 

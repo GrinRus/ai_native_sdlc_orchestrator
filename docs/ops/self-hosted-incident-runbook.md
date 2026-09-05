@@ -7,7 +7,7 @@ failure, unsafe output, suspected secret exposure, or delivery concern.
 
 1. Stop detached API and web surfaces.
 2. Stop external runner processes owned by the run.
-3. Preserve `.aor/` evidence before deleting or rewriting runtime state.
+3. Preserve the selected project evidence in AOR Home before deleting or rewriting runtime state.
 4. Preserve target repository status, current branch, and commit ids.
 5. Do not push, publish, or enable upstream write-back while triage is open.
 
@@ -16,7 +16,7 @@ failure, unsafe output, suspected secret exposure, or delivery concern.
 - run id and project id;
 - command or route invoked;
 - delivery mode and write-back policy;
-- `.aor/` reports, live-run events, run-control audit records, review reports,
+- AOR Home project reports, live-run events, run-control audit records, review reports,
   delivery manifests, and Runtime Harness reports;
 - sanitized terminal excerpts when needed;
 - affected target repository paths and changed-path summaries.
@@ -33,7 +33,7 @@ failure, unsafe output, suspected secret exposure, or delivery concern.
 
 ## Recovery
 
-1. Follow `docs/ops/self-hosted-backup-restore.md` for workspace-local restore.
+1. Follow `docs/ops/self-hosted-backup-restore.md` to restore central AOR Home and its Workspace registry identity.
 2. Re-run `pnpm check` and `pnpm production:ready --json` before release review.
 3. Open or update incident evidence through the existing incident/audit command
    surfaces when the runtime evidence is safe to inspect.
