@@ -7,6 +7,7 @@ import { validateStructuredTaskPlan } from "./structured-task-plan.mjs"; import 
 import { normalizeProjectTopology, validateProjectBinding, validateProjectTopology, validateWorkspaceSet } from "./project-topology.mjs";
 import { validateExecutionPlanV2 } from "./execution-plan-validation.mjs"; import { validateRuntimeHarnessParentRelation } from "./runtime-harness-validation.mjs"; import { validateOperatorControl } from "./operator-control-validation.mjs";
 import { RUNNER_OUTPUT_MODE_VALUES, validateExecutionOutcome, validateProviderWorkPacket, validateRunnerFinalReport, validateRunnerOutputEnvelope } from "./runner-output-validation.mjs";
+import { validateDeliveryManifestContract, validateDeliveryPlanContract, validateIntegrationReportContract, validateReleasePacketContract } from "./delivery-contract-validation.mjs";
 import { validateContextBudgetEstimate, validateContextSizeSources } from "./context-size-validation.mjs"; import { validateTaskProjection } from "./task-projection-validation.mjs";
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"], WORK_TYPE_VALUES = ["analyze", "explain", "review", "document-change", "code-change"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
@@ -261,6 +262,10 @@ export function validateContractDocument({ family, document, source = "<in-memor
   if (family === "task-progress-report") {
     issues.push(...validateTaskProgressReport(document, source));
   } if (family === "task-projection") issues.push(...validateTaskProjection(document, source));
+  if (family === "delivery-plan") issues.push(...validateDeliveryPlanContract(document, source));
+  if (family === "delivery-manifest") issues.push(...validateDeliveryManifestContract(document, source));
+  if (family === "release-packet") issues.push(...validateReleasePacketContract(document, source));
+  if (family === "integration-report") issues.push(...validateIntegrationReportContract(document, source));
   if (family === "compiled-context-artifact") {
     issues.push(...validateCompiledContextArtifact(document, source));
   }

@@ -5,6 +5,8 @@ reference-base rules](canonical-identifiers-and-paths.md).
 
 Shared mutable local state also follows the [state transaction contract](state-transaction.md).
 
+Evidence bytes and lineage follow the [evidence reference contract](evidence-reference.md).
+
 Filesystem reads, materialization, copy, and cleanup additionally inherit the
 [canonical path ownership rules](canonical-path-ownership.md).
 

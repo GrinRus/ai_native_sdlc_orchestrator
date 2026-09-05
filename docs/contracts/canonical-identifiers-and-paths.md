@@ -62,6 +62,12 @@ moved or deleted merely because the destination is inside scope. Git status is
 read in NUL-delimited form so spaces, Unicode, CR/LF, and both rename endpoints
 remain data rather than parser syntax.
 
+`normalizePathScope` deduplicates and sorts valid patterns. `pathScopesOverlap`
+performs a segment-aware intersection check; string prefixes are never treated
+as scope overlap (`src/*` does not overlap `src-escape/*`). Observed changed
+paths are always literal and are checked with `compareChangedPathsToScope`;
+glob syntax in an observed path is rejected rather than expanded.
+
 ## Canonical reference bases
 
 Every relative or evidence reference declares exactly one base:

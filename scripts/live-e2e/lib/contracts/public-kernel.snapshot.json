@@ -4,24 +4,25 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 27,
-    "source_manifest_sha256": "57a350b78ef9b4b9e4a441445a374da8300de5fbc018fbea928470651c48ac39"
+    "source_file_count": 28,
+    "source_manifest_sha256": "338af90bfe295f9b2791d7ffcf048b88a911d5d4ed9c3f59742799c29fb43368"
   },
   "files": {
-    "canonical-values.mjs": "d38defd8b6eb9380d53b306bc07b55a8ee84013e084d4d123d8b89f8115b5650",
+    "canonical-values.mjs": "9cc71f91eb39bc17d017f72d6c94c6ea575c1000dad255a0a285b0be01310a03",
     "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
+    "delivery-contract-validation.mjs": "5422eeaeb426a9777f200e69076d0952ed12d84488167c63e042adc34a4172d9",
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
     "example-reference-validation.mjs": "2e392196356e875248078cea3d2ef4c1ffc909eea21411be636654a62a26365d",
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "4a916783896400b733b30ff7070c55d83628be27f3f7b4aaac70fb9750d8f1bc",
-    "index.d.ts": "cc47f9c7165bce1607ec1fe16691aaac25236ec62f79c83f0b27f5dfdbdf5c62",
-    "index.mjs": "0631348368f1288c1116ce6af4e41edda2a4667b5fc4d04f10a61779a7093f15",
+    "families.mjs": "b53146411380ea19797b023c18ae446c40663434d35fe9a9b2a07f52ed062bab",
+    "index.d.ts": "ac704366b8314fa57b7f12aa10d8b6731e8c41e13611b47bd25589fd33f8d366",
+    "index.mjs": "7139b31f836d42ccfd725f777bed9ba5145401bc97915f68559ea577d8b0159b",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
-    "loader.mjs": "98a05bf702b757d981b5cb34a93ef3d0a8e53d7ebc98df6a595e7b5176983620",
+    "loader.mjs": "3ec905ab65481280f76976241ba83963a4d990aac770e177a82445bb70ecf409",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
     "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
@@ -1128,7 +1129,18 @@
         "status": "string",
         "created_at": "string"
       },
-      "enumChecks": []
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "draft",
+            "ready-for-close",
+            "released",
+            "blocked",
+            "failed"
+          ]
+        }
+      ]
     },
     {
       "family": "delivery-plan",
@@ -1235,7 +1247,19 @@
         "created_at": "string",
         "coordination_transaction": "object"
       },
-      "enumChecks": []
+      "enumChecks": [
+        {
+          "field": "status",
+          "allowedValues": [
+            "draft",
+            "submitted",
+            "complete",
+            "partial",
+            "blocked",
+            "failed"
+          ]
+        }
+      ]
     },
     {
       "family": "incident-report",

@@ -6,6 +6,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { captureDeliveryDiff } from "./delivery-integrity.mjs";
 import { runTransactionCoordinator } from "./verification-delivery-transactions.mjs";
+import { resolveEvidenceReference } from "./aor-home.mjs";
 
 export const CANONICAL_DELIVERY_MODES = Object.freeze([
   "no-write",
@@ -42,14 +43,20 @@ function verifyIntegrationMaterialization(integrationReport, options) {
   const authorityFile = `${reportFile}.authority.json`;
   if (reportFile !== path.resolve(canonical) || !fs.existsSync(reportFile) || !fs.existsSync(authorityFile)) return false;
   try {
-    const reportBytes = fs.readFileSync(reportFile);
+    const resolved = resolveEvidenceReference({
+      projectRoot: options.projectRoot ?? options.runtimeLayout.projectRuntimeRoot,
+      projectRuntimeRoot: options.runtimeLayout.projectRuntimeRoot,
+      workspaceProjectId: options.projectId,
+      reference: reportFile,
+    });
+    const reportBytes = resolved.bytes;
     const report = JSON.parse(reportBytes);
     const authority = JSON.parse(fs.readFileSync(authorityFile, "utf8"));
     return authority.authority_kind === "aor-integration-materialization"
       && authority.project_id === options.projectId
       && authority.parent_run_id === parentRunId
       && authority.report_file === reportFile
-      && authority.report_digest === createHash("sha256").update(reportBytes).digest("hex")
+      && authority.report_digest === resolved.sha256
       && report.project_id === options.projectId
       && report.parent_run_id === parentRunId
       && report.status === "passed";
@@ -84,9 +91,21 @@ function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
 }
 
-function lockEvidenceRefs(refs, executionRoot, runtimeLayout) {
+function lockEvidenceRefs(refs, executionRoot, runtimeLayout, projectId) {
   if (!executionRoot) return [];
   return uniqueStrings(refs).map((ref) => {
+    try {
+      const resolved = resolveEvidenceReference({
+        projectRoot: executionRoot,
+        projectRuntimeRoot: runtimeLayout?.projectRuntimeRoot,
+        workspaceProjectId: projectId,
+        reference: ref,
+      });
+      return { ref, resolved_path: resolved.filePath, status: "locked", sha256: resolved.sha256 };
+    } catch {
+      // Keep compatibility with v1 handoff/promotion paths while retaining a
+      // missing lock when neither canonical root can resolve the reference.
+    }
     const candidate = ref.startsWith("evidence://") ? ref.slice("evidence://".length) : ref;
     const candidates = [path.isAbsolute(candidate) ? candidate : path.resolve(executionRoot, candidate)];
     if (candidate.startsWith("handoff/") && runtimeLayout?.artifactsRoot) {
@@ -373,7 +392,7 @@ function executeDeliveryPlanTransaction(options) {
   if (writebackAuthorizationRequired && diffAuthorization === null) {
     blockingReasons.push("exact-diff-authorization-required");
   }
-  const evidenceLocks = options.evidenceLocks ?? lockEvidenceRefs(evidenceRefs, options.executionRoot, options.runtimeLayout);
+  const evidenceLocks = options.evidenceLocks ?? lockEvidenceRefs(evidenceRefs, options.executionRoot, options.runtimeLayout, options.projectId);
   if (writebackAuthorizationRequired && (evidenceLocks.length !== evidenceRefs.length ||
       evidenceLocks.some((lock) => lock.status !== "locked" || !lock.sha256))) {
     blockingReasons.push("delivery-evidence-lock-required");

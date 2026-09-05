@@ -79,6 +79,11 @@ export type ContractValidationIssueCode =
   | "identifier_format_invalid"
   | "path_scope_invalid"
   | "reference_base_invalid"
+  | "contract_invariant_failed"
+  | "identity_binding_mismatch"
+  | "digest_format_invalid"
+  | "evidence_reference_invalid"
+  | "path_scope_overlap"
   | "yaml_parse_error";
 
 export interface ContractValidationIssue {

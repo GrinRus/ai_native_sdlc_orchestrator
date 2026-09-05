@@ -12,8 +12,8 @@
   ],
   "file_line_ceiling_overrides": {
     "packages/adapter-sdk/src/index.mjs": 3800,
-    "packages/contracts/src/families.mjs": 1661,
-    "packages/contracts/src/loader.mjs": 4112,
+    "packages/contracts/src/families.mjs": 1663,
+    "packages/contracts/src/loader.mjs": 4116,
     "packages/orchestrator-core/src/certification-decision.mjs": 1279,
     "packages/orchestrator-core/src/control-plane/flow-projections.mjs": 1085,
     "packages/orchestrator-core/src/control-plane/read-run-projections.mjs": 1290,

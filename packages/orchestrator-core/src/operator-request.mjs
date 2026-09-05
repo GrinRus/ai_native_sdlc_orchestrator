@@ -7,6 +7,7 @@ import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { resolveNextAction } from "./next-action.mjs";
 import { assertFlowMutationAllowed } from "./control-plane/flow-projections.mjs";
+import { resolveEvidenceReference } from "./aor-home.mjs";
 
 export const OPERATOR_REQUEST_INTENTS = Object.freeze([
   "analyze",
@@ -166,20 +167,19 @@ function resolveEvidenceRef(options, ref) {
   if (!evidenceRef.startsWith("evidence://")) {
     return null;
   }
-  const evidencePath = evidenceRef.slice("evidence://".length);
-  if (!evidencePath) {
-    return null;
-  }
-  const resolved = path.isAbsolute(evidencePath) ? evidencePath : path.resolve(options.projectRoot, evidencePath);
-  const allowedRoots = [options.projectRoot, options.runtimeRoot].filter((entry) => typeof entry === "string");
-  if (!allowedRoots.some((root) => isPathInsideRoot(root, resolved))) {
+  try {
+    return resolveEvidenceReference({
+      projectRoot: options.projectRoot,
+      projectRuntimeRoot: options.runtimeRoot,
+      reference: evidenceRef,
+    }).filePath;
+  } catch (error) {
     throw new OperatorRequestError(
       "operator_request.ref_outside_project",
-      `Operator request ref '${ref}' resolves outside the project runtime boundary.`,
+      `Operator request ref '${ref}' cannot be resolved safely: ${error instanceof Error ? error.message : String(error)}.`,
       400,
     );
   }
-  return path.resolve(resolved);
 }
 
 /**
