@@ -360,7 +360,9 @@ workstream until W71's final integration proof. W66 remains the independent
 release-qualification blocker. Architecture decisions live in
 [`docs/architecture/adr`](docs/architecture/adr), implementation slices in
 [`docs/backlog`](docs/backlog), and runnable contract examples in
-[`examples`](examples).
+[`examples`](examples). The active post-W70 disposition is recorded in
+[`docs/research/26-w71-audit-disposition.json`](docs/research/26-w71-audit-disposition.json);
+run `pnpm remediation:gate` before filesystem or Task-flow remediation work.
 
 ## Contributing
 

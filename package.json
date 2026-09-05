@@ -80,6 +80,7 @@
     "aor": "node ./apps/cli/bin/aor.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm quality:ratchet && pnpm release:verify",
     "production:ready": "node ./scripts/production-readiness.mjs",
+    "remediation:gate": "node ./scripts/bootstrap-remediation-gate.mjs",
     "w58:proof": "node ./scripts/w58-runtime-quality-proof.mjs",
     "w61:proof": "node ./scripts/w61-topology-onboarding-proof.mjs",
     "w62:proof": "node ./scripts/w62-full-flow-proof.mjs",

@@ -6,6 +6,7 @@ const EVIDENCE = [
   "docs/backlog/self-hosted-production-readiness.md",
   "docs/ops/production-readiness-gate.md",
   "docs/ops/self-hosted-release.md",
+  "docs/research/26-w71-audit-disposition.json",
 ];
 
 function readText(rootDir, file) {
@@ -19,6 +20,7 @@ export function checkReadinessSourceOfTruth(rootDir) {
   const readiness = documents.get(EVIDENCE[1]);
   const opsRunbook = documents.get(EVIDENCE[2]);
   const releaseRunbook = documents.get(EVIDENCE[3]);
+  const w71Disposition = documents.get(EVIDENCE[4]);
 
   for (const required of [
     "W69 and W70 are development-complete",
@@ -28,6 +30,9 @@ export function checkReadinessSourceOfTruth(rootDir) {
     if (!readme.includes(required)) {
       findings.push(`README.md must preserve current development/release status wording '${required}'.`);
     }
+  }
+  for (const required of ["W71", "audit-hold", "release_clearance", "story_downgrades"]) {
+    if (!w71Disposition.includes(required)) findings.push("W71 disposition must preserve the current post-W70 audit hold and story downgrade registry.");
   }
   for (const required of ["pnpm production:ready", "docs/ops/self-hosted-release.md"]) {
     if (!readme.includes(required)) findings.push(`README.md must mention '${required}'.`);

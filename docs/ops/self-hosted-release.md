@@ -6,7 +6,9 @@ AOR retains the W57-W59 **bounded self-hosted release clearance** as historical
 prerequisite evidence for the declared Node 22 CLI/API, loopback local app, and
 no-upstream-write defaults. W66 has placed current release disposition on
 `audit-hold` until deterministic remediation and fresh same-commit Codex and
-Claude qualification close.
+Claude qualification close. Post-W70 remediation blockers are tracked
+separately in `docs/research/26-w71-audit-disposition.json` and keep
+`release_clearance=false` until W71-S14 freezes the integrated proof.
 
 - CLI and API/control-plane runtime are supported operator surfaces.
 - The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
@@ -32,6 +34,13 @@ Run the baseline repository gate first:
 
 ```bash
 pnpm check
+```
+
+For W71 filesystem or Task-flow changes, run the slim fail-hard bootstrap gate
+before the full repository gate:
+
+```bash
+pnpm remediation:gate
 ```
 
 This writes the ignored test-execution manifest consumed by readiness. Do not

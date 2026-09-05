@@ -71,7 +71,10 @@ test("production readiness gate derives the W66 disposition from closure evidenc
   assert.ok(!result.blocking_invariants.some((entry) => entry.finding_id === "AUD-043"));
   assert.deepEqual(
     result.blocking_invariants.map((entry) => entry.finding_id),
-    qualified ? [] : ["W66-QUALIFICATION"],
+    [
+      ...Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
+      ...(qualified ? [] : ["W66-QUALIFICATION"]),
+    ],
   );
   assert.equal(
     result.checks.find((check) => check.id === "w25-real-proof-fixture")?.status,
@@ -82,6 +85,7 @@ test("production readiness gate derives the W66 disposition from closure evidenc
     "pass",
   );
   assert.equal(result.checks.find((check) => check.id === "dependency-safety")?.status, "pass");
+  assert.equal(result.checks.find((check) => check.id === "w71-audit-disposition")?.status, "pass");
   assert.equal(result.checks.find((check) => check.id === "w57-remediation-closure")?.status, "pass");
   assert.equal(result.checks.find((check) => check.id === "w58-remediation-closure")?.status, "pass");
   assert.equal(result.checks.find((check) => check.id === "w59-audit-closure")?.status, "pass");
@@ -93,6 +97,24 @@ test("production readiness gate derives the W66 disposition from closure evidenc
   assert.equal(result.remediation_closure_reports.W59, "docs/research/10-w59-audit-closure.json");
   assert.equal(result.remediation_closure_reports.W66, "docs/research/25-w66-qualification-closure.json");
   assert.equal(result.checks.find((check) => check.id === "w66-qualification-closure")?.status, "pass");
+});
+
+test("W71 disposition enumerates every open blocker and fails closed on drift", () => {
+  const sourcePath = path.join(root, "docs/research/26-w71-audit-disposition.json");
+  const source = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w71-disposition-"));
+  const tempPath = path.join(tempDir, "w71-disposition.json");
+  try {
+    source.findings = source.findings.filter((entry) => entry.finding_id !== "W71-AUD-008");
+    fs.writeFileSync(tempPath, `${JSON.stringify(source, null, 2)}\n`);
+    const result = runProductionReadinessGate({ rootDir: root, w71DispositionPath: tempPath, testReportPath: writeCurrentPassingTestReport() });
+    assert.equal(result.status, "fail");
+    const check = result.checks.find((entry) => entry.id === "w71-audit-disposition");
+    assert.equal(check?.status, "fail");
+    assert.match(check?.findings?.join("\n") ?? "", /W71-AUD-008/u);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("W58 runtime-quality profile proves clean read, explicit mutation, durable run parity, evaluation, and fail-closed transport", () => {
@@ -205,7 +227,10 @@ test("a valid ledger with closed historical blockers defers to the W66 qualifica
   assert.equal(result.release_clearance, qualified);
   assert.deepEqual(
     result.blocking_invariants.map((entry) => entry.finding_id),
-    qualified ? [] : ["W66-QUALIFICATION"],
+    [
+      ...Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
+      ...(qualified ? [] : ["W66-QUALIFICATION"]),
+    ],
   );
 });
 
@@ -230,7 +255,11 @@ test("production readiness gate returns audit-hold for a valid newly opened rele
   assert.equal(result.release_disposition, "audit-hold");
   assert.deepEqual(
     result.blocking_invariants.map((entry) => entry.finding_id),
-    currentW66ClosurePassed() ? ["AUD-049"] : ["AUD-049", "W66-QUALIFICATION"],
+    [
+      "AUD-049",
+      ...Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
+      ...(currentW66ClosurePassed() ? [] : ["W66-QUALIFICATION"]),
+    ],
   );
 });
 
