@@ -1,7 +1,6 @@
 import { getContractFamilyIndex, validatePublicId } from "../../../contracts/src/index.mjs";
 
 import {
-  RUNTIME_ROOT_DIRNAME,
   getCommandDefinition,
   getImplementedCommands,
   getPlannedCommands,

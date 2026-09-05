@@ -23,6 +23,9 @@ test("W61 public topology onboarding proof covers three isolated topologies with
     assert.equal(report.scenarios.every((entry) => ["pass", "warn"].includes(entry.validation_status)), true);
     assert.equal(report.scenarios.some((entry) => entry.id === "bounded-multirepo" && entry.validation_status === "warn"), true);
     assert.equal(report.project_isolation.project_count, 3);
+    assert.equal(report.browser_assessment.status, "not-run");
+    assert.deepEqual(report.browser_evidence_refs, []);
+    for (const reference of report.supporting_evidence_refs) assert.equal(fs.existsSync(path.join(root, reference)), true, reference);
     assert.equal(report.credentialed_provider_calls, false);
     assert.equal(report.upstream_writes, false);
     assert.equal(report.committed_machine_paths, false);

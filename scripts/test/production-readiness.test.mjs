@@ -7,6 +7,7 @@ import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
 
 import { runProductionReadinessGate } from "../production-readiness.mjs";
+import { checkW59ClosureReport } from "../readiness/w59-closure.mjs";
 import { evaluateAuditReleaseHold } from "../../packages/orchestrator-core/src/audit-release-hold.mjs";
 import { getCommandDefinition } from "../../packages/orchestrator-core/src/operator-cli/command-catalog.mjs";
 import {
@@ -205,6 +206,47 @@ test("W59 closure report maps all audit findings exactly once and requires indep
   assert.match(closureCheck?.findings?.join("\n") ?? "", /missing 'AUD-049'/u);
 });
 
+test("W59 historical evidence accepts immutable repository links without local history", () => {
+  const archive = "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.jsx#L1";
+  const source = JSON.parse(fs.readFileSync(path.join(root, "docs/research/10-w59-audit-closure.json"), "utf8"));
+  const review = JSON.parse(fs.readFileSync(path.join(root, "docs/research/11-w59-independent-s1-review.json"), "utf8"));
+  for (const entry of source.findings) entry.evidence_refs = [archive];
+  for (const entry of review.reviews) entry.evidence_refs = [archive];
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w59-archived-evidence-"));
+  try {
+    const options = {
+      rootDir: tempDir,
+      auditLedgerPath: path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"),
+      closureReportPath: path.join(tempDir, "closure.json"),
+      independentReviewPath: path.join(tempDir, "review.json"),
+    };
+    fs.writeFileSync(options.independentReviewPath, JSON.stringify(review));
+    const check = (ref) => {
+      source.findings[0].evidence_refs = [ref];
+      fs.writeFileSync(options.closureReportPath, JSON.stringify(source));
+      return checkW59ClosureReport(options);
+    };
+    assert.equal(check(archive).status, "pass");
+    assert.equal(check(path.join(root, "README.md")).status, "pass");
+    for (const invalid of [
+      archive.replace("f6de7e3167e74a2fd975deb5736e464cdcffac2f", "main"),
+      archive.replace("f6de7e3167e74a2fd975deb5736e464cdcffac2f", "f6de7e3"),
+      archive.replace("github.com", "example.com"),
+      archive.replace("GrinRus/ai_native_sdlc_orchestrator", "another-owner/another-repo"),
+      archive.replace("/blob/", "/tree/"),
+      archive.replace("/apps/", "/../apps/"),
+      archive.replace("#L1", "?raw=1"),
+      path.join(tempDir, "missing.js"),
+    ]) {
+      const result = check(invalid);
+      assert.equal(result.status, "fail", invalid);
+      assert.ok(result.findings.some((finding) => finding.includes(invalid)), invalid);
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("a valid ledger with closed historical blockers defers to the W66 qualification disposition", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-audit-ledger-"));
   const tempLedger = path.join(tempDir, "audit-ledger.json");
@@ -325,12 +367,11 @@ test("test discovery maps every tracked candidate exactly once", () => {
 
 test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {
   const candidates = ["area/test/example.test.mjs"];
-  const unmapped = buildTestExecutionPlan({ rootDir: root, manifest: { groups: [], exclusions: [] }, candidates });
+  const unmapped = buildTestExecutionPlan({ manifest: { groups: [], exclusions: [] }, candidates });
   assert.equal(unmapped.ok, false);
   assert.match(unmapped.errors.join("\n"), /not mapped/u);
 
   const duplicate = buildTestExecutionPlan({
-    rootDir: root,
     manifest: {
       groups: [
         { group_id: "one", path_prefixes: ["area/"], timeout_class: "standard" },
@@ -344,7 +385,6 @@ test("test discovery fails on unmapped, duplicate, and invalid exclusion policie
   assert.match(duplicate.errors.join("\n"), /multiple .*groups/u);
 
   const invalidExclusion = buildTestExecutionPlan({
-    rootDir: root,
     manifest: { groups: [], exclusions: [{ path: candidates[0], owner: "", reason: "", expires_at: "2020-01-01" }] },
     candidates,
     now: new Date("2026-07-15T00:00:00Z"),

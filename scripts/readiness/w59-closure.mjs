@@ -15,8 +15,15 @@ function exists(rootDir, file) {
   return fs.existsSync(path.isAbsolute(file) ? file : path.join(rootDir, file));
 }
 
-function evidenceExists(rootDir, ref) {
-  const file = String(ref).split("#", 1)[0];
+function evidenceReferenceValid(rootDir, ref) {
+  const value = String(ref);
+  if (value.includes("://")) {
+    // Archived closure evidence can predate a shallow checkout. Validate its
+    // immutable repository reference without requiring Git history or network.
+    const match = /^https:\/\/github\.com\/GrinRus\/ai_native_sdlc_orchestrator\/blob\/[a-f0-9]{40}\/([A-Za-z0-9._/-]+)(?:#L[1-9]\d*(?:-L[1-9]\d*)?)?$/u.exec(value);
+    return Boolean(match && match[1].split("/").every((segment) => segment && segment !== "." && segment !== ".."));
+  }
+  const file = value.split("#", 1)[0];
   return file.length > 0 && exists(rootDir, file);
 }
 
@@ -78,7 +85,7 @@ export function checkW59ClosureReport(options) {
     const refs = Array.isArray(entry.evidence_refs) ? entry.evidence_refs : [];
     if (refs.length === 0) findings.push(`W59 closure finding '${findingId}' must cite direct evidence.`);
     for (const ref of refs) {
-      if (!evidenceExists(rootDir, ref)) findings.push(`W59 closure evidence '${ref}' for '${findingId}' does not exist.`);
+      if (!evidenceReferenceValid(rootDir, ref)) findings.push(`W59 closure evidence '${ref}' for '${findingId}' must be an existing local path or a pinned same-repository blob URL.`);
     }
   }
   for (const findingId of reportById.keys()) {
@@ -104,7 +111,7 @@ export function checkW59ClosureReport(options) {
     const entry = reviewed.get(findingId);
     if (!entry || entry.result !== "pass") findings.push(`Independent S1 review is missing a passing '${findingId}' result.`);
     for (const ref of entry?.evidence_refs ?? []) {
-      if (!evidenceExists(rootDir, ref)) findings.push(`Independent review evidence '${ref}' for '${findingId}' does not exist.`);
+      if (!evidenceReferenceValid(rootDir, ref)) findings.push(`Independent review evidence '${ref}' for '${findingId}' must be an existing local path or a pinned same-repository blob URL.`);
     }
   }
   for (const findingId of reviewed.keys()) {

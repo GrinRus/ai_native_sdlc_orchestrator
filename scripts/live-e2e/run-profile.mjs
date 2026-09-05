@@ -4195,7 +4195,6 @@ function runCli(rawArgs) {
       `Profile '${asNonEmptyString(profile.profile_id) || profileRef}' targets feature_size=xlarge, which is manual-only. Use manual-live-e2e.mjs so each controller step is operator-inspected.`,
     );
   }
-  const productionProof = fullJourneyResolution ? buildProductionProofSummary(profile) : null;
   const examplesRoot = requireDirectory(path.join(hostRoot, "examples"));
   const runId =
     resolveOptionalStringFlag(flags["run-id"], "run-id") ??

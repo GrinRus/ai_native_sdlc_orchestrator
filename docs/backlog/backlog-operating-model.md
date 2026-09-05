@@ -155,7 +155,7 @@ The default implementation loop is sequential and slice-driven:
 2. Build a branch-local plan from `### Local tasks`.
 3. Implement the slice.
 4. Run self-review against acceptance criteria.
-5. Run the full root check gate (`pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`).
+5. Run `pnpm slice:gate`, which delegates once to the full `pnpm check` pipeline.
 6. Fix gaps and rerun step 4 and step 5 until clean.
 7. Commit one slice atomically.
 8. Mark the slice state as `done`.

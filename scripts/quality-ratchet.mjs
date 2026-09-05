@@ -7,7 +7,7 @@ import { runCheckedProcess } from "./process-runner.mjs";
 const root = process.cwd();
 const baseline = JSON.parse(fs.readFileSync(path.join(root, "scripts/quality-baseline.json"), "utf8"));
 const sourceRoots = ["apps", "packages", "scripts"];
-const productionExtensions = new Set([".mjs", ".jsx", ".css"]);
+const productionExtensions = new Set([".mjs", ".js", ".jsx", ".css"]);
 const files = [];
 
 function walk(relative) {
@@ -53,7 +53,7 @@ for (const entry of baseline.facade_functions ?? []) {
   }
 }
 
-const eslintTargets = ["scripts/slice-cycle.mjs", "scripts/typecheck-ratchet.mjs", "scripts/quality-ratchet.mjs", "scripts/dependency-policy.mjs"];
+const eslintTargets = files.filter((file) => /\.(?:mjs|js)$/u.test(file));
 const eslint = runCheckedProcess({
   label: "quality ESLint",
   command: process.platform === "win32" ? "pnpm.cmd" : "pnpm",
@@ -72,4 +72,4 @@ if (violations.length > 0) {
   console.error(violations.join("\n"));
   process.exit(1);
 }
-console.log(`quality ratchet ok: ${files.length} production files checked; scoped ESLint passed`);
+console.log(`quality ratchet ok: ${files.length} production files checked; ESLint passed for ${eslintTargets.length} JavaScript modules`);

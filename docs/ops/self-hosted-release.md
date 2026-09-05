@@ -12,7 +12,7 @@ separately in `docs/research/26-w71-audit-disposition.json` and keep
 
 - CLI and API/control-plane runtime are supported operator surfaces.
 - The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
-- Runtime outputs stay under `.aor/` in the operator workspace and must not be committed.
+- Runtime outputs stay under AOR Home (`~/.aor` or `AOR_HOME`) and must not be committed.
 - Production proof is limited to the committed W25 real-run fixture and the stricter production-readiness gate.
 - W30 alpha-hardening ADRs, OpenAPI route drift checks, and self-hosted operations runbooks are part of the reviewable bounded-mode evidence.
 - W31 installed-user app launch evidence covers the local SPA first-run path without changing the headless runtime boundary.
@@ -121,7 +121,7 @@ Operator requests follow the same delivery-policy vocabulary:
 Rollback is workspace-local for this supported mode:
 
 1. Stop the detached API/web surfaces, including any foreground `aor app` process.
-2. Preserve `.aor/` evidence for audit before cleanup.
+2. Preserve the selected project evidence in AOR Home for audit before cleanup.
 3. Revert or discard local target checkout changes according to the operator's repository policy.
 4. Drop local branches created by `local-branch` delivery only after delivery manifests and audit refs are preserved.
 5. Re-run `pnpm check` and `pnpm production:ready` after restoring the workspace.

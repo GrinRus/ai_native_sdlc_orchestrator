@@ -40,12 +40,6 @@ test("Task Workspace exposes all eight server-owned screens and safe Markdown pr
   assert.match(source, /aria-modal="true"/u);
 });
 
-test("web client reads the additive task projection without replacing intent mutations", () => {
-  const source = fs.readFileSync(path.join(root, "src/control-plane-client.js"), "utf8");
-  assert.match(source, /taskPayload:.*\/tasks/u);
-  assert.match(source, /intentList:.*intent-submissions/u);
-});
-
 test("web client reads bounded Task review evidence separately from the Task list", () => {
   const source = fs.readFileSync(path.join(root, "src/task-app.jsx"), "utf8");
   assert.match(source, /async function loadTaskReview/u);

@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { validateContractDocument } from "../../../contracts/src/index.mjs";

@@ -23,7 +23,7 @@ import {
   isLiveE2eControllerStop,
   resolveLiveE2eCommandStep,
 } from "./step-controller.mjs";
-import { DEFAULT_BACKLOG_REFS, createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
+import { createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
 import {
   buildGuidedJourneyProof,
   isGuidedJourneyEnabled,
@@ -37,8 +37,8 @@ import {
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
 import { materializeAndAttachDependencySnapshot, resolveStabilizedSetupCommands } from "./dependency-snapshot.mjs";
-import { deriveBrowserCacheKey, prepareBrowserCachePreflight } from "./browser-cache.mjs";
-import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
+import { prepareBrowserCachePreflight } from "./browser-cache.mjs";
+import { runLiveAdapterPreflight } from "./preflight.mjs";
 import { requireProviderWorkspaceDependencies } from "./provider-workspace-setup.mjs";
 import { deriveGuidedFollowUpMissionId } from "./guided-flow-identity.mjs";
 import { runGuidedBrowserTaskCollector } from "./browser-proof-collector.mjs";
@@ -1275,16 +1275,6 @@ function getStringField(payload, field) {
 function getStringArrayField(payload, field) {
   if (!payload) return [];
   return asStringArray(payload[field]);
-}
-
-/**
- * @param {Record<string, unknown>} profile
- * @returns {string[]}
- */
-function getBacklogRefs(profile) {
-  const learningLoop = asRecord(profile.learning_loop);
-  const refs = asStringArray(learningLoop.backlog_refs);
-  return refs.length > 0 ? refs : [...DEFAULT_BACKLOG_REFS];
 }
 
 /**

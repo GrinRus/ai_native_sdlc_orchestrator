@@ -13,7 +13,7 @@ after the current required proof set is stable.
   source instead of a dirty worktree label.
 - **Epic:** EPIC-0, EPIC-7
 - **State:** done
-- **Primary modules:** `docs/ops/live-e2e-proof-complete-findings.md`,
+- **Primary modules:** `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`,
   `scripts/live-e2e/**`, root checks, live proof artifacts
 - **Hard dependencies:** W50-S04
 
@@ -75,7 +75,7 @@ after the current required proof set is stable.
 - **Epic:** EPIC-7
 - **State:** done
 - **Primary modules:** `scripts/live-e2e/profiles/full-journey-regress-vitest-large-openai.yaml`,
-  `scripts/live-e2e/**`, `docs/ops/live-e2e-proof-complete-findings.md`
+  `scripts/live-e2e/**`, `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`
 - **Hard dependencies:** W51-S01
 
 ### Readiness note
@@ -105,7 +105,7 @@ available before verification.
 - Vitest large run summary
 - target toolchain/preflight evidence
 - classified blocker record in
-  `docs/ops/live-e2e-proof-complete-findings.md`
+  `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`
 
 ### Out of scope
 - making Vitest optional required coverage

@@ -1,4 +1,3 @@
-import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 

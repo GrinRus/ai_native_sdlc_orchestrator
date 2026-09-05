@@ -227,7 +227,7 @@ closure.
 5. For every terminal pass, prepare, validate, and all-pass gate the final
    product-quality assessment.
 6. Record every terminal outcome as accepted proof evidence or a classified
-   blocker in `docs/ops/live-e2e-proof-complete-findings.md`.
+   blocker in `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`.
 7. Run `git diff --check`, `pnpm live-e2e:test`, `pnpm test`, `pnpm build`,
    and `pnpm check`.
 
@@ -249,7 +249,7 @@ closure.
 - `pnpm test`
 - `pnpm build`
 - `pnpm check`
-- `docs/ops/live-e2e-proof-complete-findings.md`
+- `scripts/live-e2e/docs/runbooks/live-e2e-proof-complete-findings.md`
 
 ### Out of scope
 - Publishing provider qualification results.

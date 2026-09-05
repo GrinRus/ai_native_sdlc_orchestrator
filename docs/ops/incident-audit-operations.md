@@ -48,7 +48,7 @@ aor incident backfill \
 ```
 
 Expected signals:
-- `incident_backfill_proposal_file` exists under `.aor/projects/<project_id>/reports/incident-backfill-proposal-*.json`.
+- `incident_backfill_proposal_file` exists under `${AOR_HOME:-$HOME/.aor}/projects/<workspace-project-id>/reports/incident-backfill-proposal-*.json`.
 - `incident_backfill_proposal_state` is `proposed` unless an explicit reviewed state was supplied.
 - `incident_backfill_suite_ref` and `incident_backfill_dataset_ref` identify the intended quality assets.
 - `incident_backfill_review_required` is `true`.

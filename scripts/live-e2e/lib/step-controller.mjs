@@ -99,14 +99,6 @@ export function resolveLiveE2eFlowRangePolicy(profile) {
 }
 
 /**
- * @param {"delivery_default" | "full_lifecycle"} policy
- * @returns {string[]}
- */
-export function getLiveE2eIncludedSteps(policy) {
-  return policy === "full_lifecycle" ? [...FULL_LIFECYCLE_STEPS] : [...DELIVERY_STEPS];
-}
-
-/**
  * @param {Record<string, unknown>} profile
  * @returns {string[]}
  */
@@ -721,14 +713,9 @@ export function createLiveE2eStepController(options) {
   /** @type {Record<string, unknown>} */
   const state = {
     run_id: options.runId,
-    mode,
-    flow_range_policy: policy,
-    included_steps: includedSteps,
     current_step: includedSteps[0] ?? null,
     observed_steps: [], accepted_steps: [], completed_steps: [],
     pending_decision: null,
-    operator_context: operatorContext,
-    retry_counters: retryCounters,
     step_quality_assessment_request_refs: [],
     step_quality_assessment_refs: [],
     pending_step_quality_assessment: null,
