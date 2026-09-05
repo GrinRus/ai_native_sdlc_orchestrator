@@ -7,10 +7,10 @@
   "transition_count": 15,
   "installed_browser_case": "installed Quiet Cockpit executes the canonical no-write lifecycle with durable readback",
   "evidence": [
-    "apps/web/browser/fixtures/golden-lifecycle.json",
-    "apps/web/browser/golden-lifecycle-loader.mjs",
-    "apps/web/browser/operator-scenarios.spec.mjs",
-    "apps/web/src/operator-control.js",
+    "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/fixtures/golden-lifecycle.json",
+    "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/golden-lifecycle-loader.mjs",
+    "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/operator-scenarios.spec.mjs",
+    "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/operator-control.js",
     "docs/research/15-w63-installed-console-acceptance.md"
   ],
   "assertions": {

@@ -316,7 +316,7 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W34-S01 | Flow product and contract baseline | EPIC-6 | done | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/**`, `docs/backlog/**` | W33-S10, W32-S01, W21-S07 |
 | W34-S02 | Runtime and control-plane flow projections | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `docs/contracts/**`, `examples/control-plane-api/**`, tests | W34-S01 |
-| W34-S03 | Flow-first local web shell | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `docs/product/03-flow-centric-console-design.md`, tests | W34-S02 |
+| W34-S03 | Flow-first local web shell | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, [W34 flow-centric design snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/03-flow-centric-console-design.md), tests | W34-S02 |
 | W34-S04 | Flow-scoped evidence, trace, and interaction workbench | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, tests | W34-S02 |
 | W34-S05 | Closure-to-new-flow UX | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/contracts/**`, tests | W34-S02 |
 | W34-S06 | Installed-user browser-task flow-loop proof | EPIC-7 | done | `internal maintainer rehearsal tooling`, `internal maintainer rehearsal fixtures`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests | W34-S03, W34-S04, W34-S05 |

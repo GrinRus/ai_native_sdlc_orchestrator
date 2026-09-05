@@ -14,6 +14,6 @@ description: Use when you need to choose a delivery slice, derive local tasks, s
    than reducing it to a one-line checklist item.
 7. Refine those local tasks branch-locally if needed, but stay inside one slice unless the work has become a new independently acceptable outcome.
 8. If behavior changes are user-visible, use `story-traceability` to verify the slice still closes the intended user outcome.
-9. Before commit, run `pnpm slice:gate` so `lint`, `test`, `build`, and `check` all pass in sequence.
+9. Before commit, run `pnpm slice:gate`, which delegates once to the canonical `pnpm check` pipeline. Do not repeat its lint, test, or build stages separately.
 10. Close the slice only after every acceptance criterion has reviewable evidence in docs, examples, tests, or runnable commands, then run `pnpm slice:complete -- <SLICE_ID> --apply`.
 11. If you add or split a slice, update the wave document, the master backlog, the epic map, and the dependency graph together.

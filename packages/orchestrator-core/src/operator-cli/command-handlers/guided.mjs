@@ -42,19 +42,17 @@ function shellQuote(value) {
 /**
  * @param {string} command
  * @param {string} projectRoot
- * @param {{ runtimeRoot?: string, includeRuntimeRoot?: boolean }} [context]
  * @returns {string}
  */
-function projectCommand(command, projectRoot, context = {}) {
+function projectCommand(command, projectRoot) {
   return `aor ${command} --project-ref ${shellQuote(projectRoot)}`;
 }
 
 /**
  * @param {string} projectRoot
- * @param {string} runtimeRoot
  * @returns {string}
  */
-function controlPlaneSmokeCommand(projectRoot, runtimeRoot) {
+function controlPlaneSmokeCommand(projectRoot) {
   return [
     "node apps/api/scripts/control-plane-smoke.mjs",
     "--project-ref",
@@ -64,25 +62,6 @@ function controlPlaneSmokeCommand(projectRoot, runtimeRoot) {
     "--port",
     String(LOCAL_CONTROL_PLANE_PORT),
   ].join(" ");
-}
-
-/**
- * @param {string} projectRoot
- * @returns {string}
- */
-function defaultRuntimeRoot(projectRoot) {
-  return path.resolve(projectRoot, ".aor");
-}
-
-/**
- * @param {{ projectRoot: string, runtimeRoot: string, runtimeRootExplicit?: boolean }} options
- * @returns {{ runtimeRoot: string, includeRuntimeRoot: boolean }}
- */
-function runtimeRootCommandContext(options) {
-  return {
-    runtimeRoot: options.runtimeRoot,
-    includeRuntimeRoot: false,
-  };
 }
 
 /**
@@ -115,10 +94,9 @@ function resolveKpiFlags(value) {
 /**
  * @param {string} projectRoot
  * @param {string} runtimeRoot
- * @param {{ runtimeRoot?: string, includeRuntimeRoot?: boolean }} commandContext
  * @returns {{ status: "ready" | "blocked", checks: Array<Record<string, unknown>>, blockers: Array<Record<string, string>> }}
  */
-function inspectReadiness(projectRoot, runtimeRoot, commandContext) {
+function inspectReadiness(projectRoot, runtimeRoot) {
   const checks = [];
   const blockers = [];
 
@@ -180,7 +158,7 @@ function inspectReadiness(projectRoot, runtimeRoot, commandContext) {
     status: fs.existsSync(runtimeRoot) ? "pass" : "warn",
     detail: fs.existsSync(runtimeRoot)
       ? `Runtime root exists at ${runtimeRoot}.`
-      : `Runtime root is not initialized yet. Run ${projectCommand("onboard", projectRoot, commandContext)}.`,
+      : `Runtime root is not initialized yet. Run ${projectCommand("onboard", projectRoot)}.`,
   });
 
   return {
@@ -192,16 +170,14 @@ function inspectReadiness(projectRoot, runtimeRoot, commandContext) {
 
 /**
  * @param {{ flags: Record<string, string | string[] | true>, cwd: string }} options
- * @returns {{ projectRoot: string, runtimeRoot: string, runtimeRootExplicit: boolean }}
+ * @returns {{ projectRoot: string, runtimeRoot: string }}
  */
 function resolveGuidedProject(options) {
   const projectRef = resolveOptionalStringFlag("project-ref", options.flags["project-ref"]) ?? ".";
   const projectRoot = path.resolve(options.cwd, projectRef);
-  const runtimeRootExplicit = options.flags["runtime-root"] !== undefined;
   return {
     projectRoot,
     runtimeRoot: resolveRuntimeRoot(options.flags["runtime-root"], projectRoot),
-    runtimeRootExplicit,
   };
 }
 
@@ -213,9 +189,8 @@ export function handleGuidedCommand(context) {
   const { command, flags, cwd, outputState } = context;
 
   if (command === "doctor") {
-    const { projectRoot, runtimeRoot, runtimeRootExplicit } = resolveGuidedProject({ flags, cwd });
-    const commandContext = runtimeRootCommandContext({ projectRoot, runtimeRoot, runtimeRootExplicit });
-    const readiness = inspectReadiness(projectRoot, runtimeRoot, commandContext);
+    const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
+    const readiness = inspectReadiness(projectRoot, runtimeRoot);
 
     outputState.resolvedProjectRef = projectRoot;
     outputState.resolvedRuntimeRoot = runtimeRoot;
@@ -233,7 +208,7 @@ export function handleGuidedCommand(context) {
     outputState.guidedActionableBlockers = readiness.blockers;
     outputState.guidedRecommendedCommands =
       readiness.status === "ready"
-        ? [projectCommand("onboard", projectRoot, commandContext), projectCommand("next", projectRoot, commandContext)]
+        ? [projectCommand("onboard", projectRoot), projectCommand("next", projectRoot)]
         : readiness.blockers.map((blocker) => blocker.next_command);
     outputState.readOnly = true;
     outputState.futureControlHooks = ["onboard", "next", "app"];
@@ -285,15 +260,10 @@ export function handleGuidedCommand(context) {
       "Onboarding ran through the existing project init path. Low-level project commands remain available and scriptable.";
     outputState.guidedLowLevelCommand = "project init";
     outputState.guidedActionableBlockers = [];
-    const commandContext = runtimeRootCommandContext({
-      projectRoot: initResult.projectRoot,
-      runtimeRoot: initResult.runtimeRoot,
-      runtimeRootExplicit: flags["runtime-root"] !== undefined,
-    });
     outputState.guidedRecommendedCommands = [
-      projectCommand("doctor", initResult.projectRoot, commandContext),
-      projectCommand("next", initResult.projectRoot, commandContext),
-      projectCommand("app", initResult.projectRoot, commandContext),
+      projectCommand("doctor", initResult.projectRoot),
+      projectCommand("next", initResult.projectRoot),
+      projectCommand("app", initResult.projectRoot),
     ];
     return true;
   }
@@ -383,29 +353,23 @@ export function handleGuidedCommand(context) {
       ? "Guided mission intake is complete and preserved as an intake-request artifact packet."
       : "Guided mission intake was saved, but missing product evidence blocks the next lifecycle stage.";
     outputState.guidedLowLevelCommand = "intake create";
-    const commandContext = runtimeRootCommandContext({
-      projectRoot: missionInit.projectRoot,
-      runtimeRoot: missionInit.runtimeRoot,
-      runtimeRootExplicit: flags["runtime-root"] !== undefined,
-    });
     outputState.guidedActionableBlockers = complete
       ? []
       : completeness.missing_fields.map((field) => ({
           code: `mission-${field}-missing`,
           summary: `Mission intake is missing ${field}.`,
-          next_command: projectCommand("mission create", missionInit.projectRoot, commandContext),
+          next_command: projectCommand("mission create", missionInit.projectRoot),
         }));
     outputState.guidedRecommendedCommands = complete
-      ? [projectCommand("next", missionInit.projectRoot, commandContext)]
-      : [projectCommand("mission create", missionInit.projectRoot, commandContext)];
+      ? [projectCommand("next", missionInit.projectRoot)]
+      : [projectCommand("mission create", missionInit.projectRoot)];
     outputState.futureControlHooks = ["next", "discovery run", "spec build"];
     return true;
   }
 
   if (command === "app") {
-    const { projectRoot, runtimeRoot, runtimeRootExplicit } = resolveGuidedProject({ flags, cwd });
-    const commandContext = runtimeRootCommandContext({ projectRoot, runtimeRoot, runtimeRootExplicit });
-    const readiness = inspectReadiness(projectRoot, runtimeRoot, commandContext);
+    const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
+    const readiness = inspectReadiness(projectRoot, runtimeRoot);
     const host = resolveOptionalStringFlag("host", flags.host) ?? "127.0.0.1";
     const port = resolveOptionalStringFlag("port", flags.port) ?? "0";
     const open = resolveOptionalStringFlag("open", flags.open) ?? "true";
@@ -424,10 +388,10 @@ export function handleGuidedCommand(context) {
     outputState.guidedRecommendedCommands =
       readiness.status === "ready"
         ? [
-            `${projectCommand("app", projectRoot, commandContext)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
-            `${projectCommand("app", projectRoot, commandContext)} --smoke true --open false --json`,
-            projectCommand("ui detach", projectRoot, commandContext),
-            projectCommand("run status", projectRoot, commandContext),
+            `${projectCommand("app", projectRoot)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
+            `${projectCommand("app", projectRoot)} --smoke true --open false --json`,
+            projectCommand("ui detach", projectRoot),
+            projectCommand("run status", projectRoot),
           ]
         : readiness.blockers.map((blocker) => blocker.next_command);
     outputState.guidedWebSurface = {
@@ -436,10 +400,10 @@ export function handleGuidedCommand(context) {
       host,
       port,
       open,
-      launch_command: `${projectCommand("app", projectRoot, commandContext)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
-      smoke_command: `${projectCommand("app", projectRoot, commandContext)} --smoke true --open false --json`,
-      detach_command: projectCommand("ui detach", projectRoot, commandContext),
-      local_control_plane_smoke_command: controlPlaneSmokeCommand(projectRoot, runtimeRoot),
+      launch_command: `${projectCommand("app", projectRoot)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
+      smoke_command: `${projectCommand("app", projectRoot)} --smoke true --open false --json`,
+      detach_command: projectCommand("ui detach", projectRoot),
+      local_control_plane_smoke_command: controlPlaneSmokeCommand(projectRoot),
       web_app_root: "apps/web",
       app_mode: "local-spa",
       headless_safe: true,

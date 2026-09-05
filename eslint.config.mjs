@@ -1,6 +1,6 @@
 export default [
   {
-    files: ["scripts/**/*.mjs", "apps/**/*.mjs", "packages/**/*.mjs"],
+    files: ["scripts/**/*.{mjs,js}", "apps/**/*.{mjs,js}", "packages/**/*.{mjs,js}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -16,7 +16,7 @@ export default [
     },
     rules: {
       "no-dupe-keys": "error",
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_", ignoreRestSiblings: true }],
     },
   },
 ];

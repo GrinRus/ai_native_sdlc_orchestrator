@@ -93,7 +93,7 @@ function materializePlanSemanticEvaluation(options, result) {
     suppliedSemantic: options.semanticEvaluation,
     adapterOutput,
   });
-  const { semantic, warnings, findings, status: evaluationStatus, correctionGuidance } = semanticEvaluation;
+  const { warnings, findings, status: evaluationStatus, correctionGuidance } = semanticEvaluation;
 
   const loadedProfile = loadContractFile({ filePath: result.projectProfilePath, family: "project-profile" });
   const profile = loadedProfile.ok ? asRecord(loadedProfile.document) : {};

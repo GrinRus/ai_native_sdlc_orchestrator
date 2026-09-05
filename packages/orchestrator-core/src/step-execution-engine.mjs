@@ -177,8 +177,6 @@ function packetNameFromRef(packetRef) {
   return match ? match[1] : null;
 }
 
-const STEP_RESULT_FILE_REGEX = /^step-result-.*\.json$/u;
-
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}

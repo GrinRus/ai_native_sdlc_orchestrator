@@ -47,7 +47,7 @@ Ownership is singular:
 ## Rules
 - do not merge prompt guidance, runtime context, and execution envelope into one opaque file;
 - `AGENTS.md` and `.agents/**` are repository-development guidance, not runtime assets;
-- committed registry roots contain source assets and static samples only; runtime-emitted compiled artifacts still belong under `.aor/`;
+- committed registry roots contain source assets and static samples only; runtime-emitted compiled artifacts belong under AOR Home (`~/.aor` or `AOR_HOME`);
 - certify prompt-bundle, context, and compiler changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.

@@ -7,8 +7,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 export default defineConfig({
   testDir: path.join(root, "apps/web/browser"),
-  // W63/W65 browser specifications remain historical evidence. The packaged
-  // renderer gate follows the W70 Task Workspace closure only.
+  // The packaged renderer gate follows the current Task Workspace closure.
+  // Retired W63/W65 browser specifications are preserved in Git history.
   testMatch: "**/task-workspace-closure.spec.mjs",
   fullyParallel: false,
   workers: 1,

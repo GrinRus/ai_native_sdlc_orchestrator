@@ -60,14 +60,15 @@ removes the legacy renderer after executable parity and safety proof pass.
 
 ## Normative reference registry
 
-These references are the comparison set for every W65 review. Reference PNGs
-are visual targets, not contracts or proof of implementation.
+These references preserve the comparison set used by W65. Retired renderer
+source, tests, and designs resolve to the pre-cleanup Git snapshot. They are
+historical evidence, not the current installed surface or current proof.
 
 ### Product and UX sources of truth
 
-- [Quiet Cockpit target design](../product/05-quiet-cockpit-console-design.md)
+- [Quiet Cockpit target design](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/05-quiet-cockpit-console-design.md)
 - [Installed-user onboarding journey](../product/02-installed-user-onboarding-journey.md)
-- [Current W34 flow-centric baseline](../product/03-flow-centric-console-design.md)
+- [Historical W34 flow-centric baseline](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/03-flow-centric-console-design.md)
 - [Project topology and task-planning UX](../product/04-project-topology-and-task-planning-ux.md)
 - [Supported user stories](../product/00-supported-user-stories.md)
 - [Machine-checkable story coverage](../product/user-story-coverage-matrix.md)
@@ -79,15 +80,15 @@ The Guided Mission, Active Cockpit, Attention, Journey, Evidence, and mobile
 recovery scenarios remain specified in the Quiet Cockpit product document. The
 W63 PNG set was retired by W70 and is available in Git history.
 
-### Current implemented before-state
+### Historical implemented before-state
 
 - [W34 implementation plan](wave-34-implementation-slices.md)
-- [Current SPA](../../apps/web/src/spa.jsx)
-- [Current styles](../../apps/web/src/spa.css)
-- [Current Plan workbench](../../apps/web/src/plan-workbench.jsx)
-- [Web operator-console tests](../../apps/web/test/operator-console.test.mjs)
-- [Web operator-request tests](../../apps/web/test/operator-request-spa.test.mjs)
-- [Web Plan workbench tests](../../apps/web/test/plan-workbench.test.mjs)
+- [Historical SPA](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.jsx)
+- [Historical styles](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/spa.css)
+- [Historical Plan workbench](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/src/plan-workbench.jsx)
+- [Web operator-console tests](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-console.test.mjs)
+- [Web operator-request tests](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-request-spa.test.mjs)
+- [Web Plan workbench tests](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/plan-workbench.test.mjs)
 
 ### Architecture and operating boundaries
 

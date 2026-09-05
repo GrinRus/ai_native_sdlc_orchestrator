@@ -62,10 +62,12 @@ attempt under the same task IDs. Adapter success advances a task only to
 `verification-pending`; required verification, criteria, and evidence must be
 present before progress becomes `complete`.
 
-The W60 closure proof is reproducible with the public plan commands, flow-plan
-HTTP routes, `pnpm test:web:browser`, and `pnpm slice:gate -- W60-S05`. It does
-not exercise provider credentials, parallel scheduling, multirepo provisioning,
-or upstream writes.
+The public plan commands and flow-plan HTTP routes remain the supported
+headless planning surface. W60's installed Plan workbench has been retired;
+the current `pnpm test:web:browser` suite validates Task Workspace and does not
+reproduce that historical browser proof. These plan commands do not themselves
+prove provider execution, parallel scheduling, multirepo provisioning, or
+upstream writes.
 
 ## Recovery
 
@@ -82,4 +84,4 @@ or upstream writes.
 - `stale` task progress: rerun or replan from the invalidated task boundary;
   evidence transfers only when the task digest is unchanged.
 
-Runtime artifacts remain under `.aor/` and must not be committed.
+Runtime artifacts remain under AOR Home (`~/.aor` or `AOR_HOME`) and must not be committed.

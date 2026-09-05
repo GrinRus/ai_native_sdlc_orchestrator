@@ -47,7 +47,7 @@ function validateExclusion(exclusion, now) {
   return errors;
 }
 
-export function buildTestExecutionPlan({ rootDir, manifest, candidates, now = new Date() }) {
+export function buildTestExecutionPlan({ manifest, candidates, now = new Date() }) {
   const errors = [];
   const groups = Array.isArray(manifest.groups) ? manifest.groups : [];
   const exclusions = Array.isArray(manifest.exclusions) ? manifest.exclusions : [];
@@ -114,7 +114,7 @@ export function buildTestExecutionPlan({ rootDir, manifest, candidates, now = ne
 export function discoverTestExecutionPlan(rootDir, manifestPath = DEFAULT_TEST_MANIFEST_PATH) {
   const loaded = loadTestManifest(rootDir, manifestPath);
   const candidates = listTrackedTestCandidates(rootDir);
-  const plan = buildTestExecutionPlan({ rootDir, manifest: loaded.document, candidates });
+  const plan = buildTestExecutionPlan({ manifest: loaded.document, candidates });
   return {
     ...plan,
     candidates,

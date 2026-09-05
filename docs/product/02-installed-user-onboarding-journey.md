@@ -56,15 +56,17 @@ The current implemented console reference is
 `docs/product/08-task-workspace-console-design.md`. W70 owns the Tasks Home,
 Task draft and preparation, explicit start, active work, Attention, review,
 completion, follow-up, and responsive behavior shipped by the packaged app.
-The older flow-centric and cockpit design documents are retained as historical
-compatibility and migration evidence; they do not define the installed default.
+Older flow-centric and cockpit designs remain available in Git history as
+migration evidence; they do not define the installed default.
 
 Project-topology and detailed planning behavior is defined in
 `docs/product/04-project-topology-and-task-planning-ux.md`. W60-W62 preserve the
-internal Flow lifecycle boundary while adding Project Structure, a plan workbench,
-parent/child execution visibility, integration recovery, and coordinated
-delivery. Task Workspace presents applicable plan and execution evidence inside
-the selected Task, with accessible list/table alternatives to graph views.
+internal Flow lifecycle boundary and headless topology, planning, and execution
+contracts. Their Project Structure, Execution Setup, and Plan workbench screens
+have been retired. Use the public project, route, and plan commands for those
+operations; Task Workspace presents applicable plan and execution evidence
+inside the selected Task. Integrated recovery and coordinated-delivery proof
+remain bounded by the current W71 acceptance requirements.
 
 A flow is a runtime/control-plane projection over mission/intake, next-action,
 operator-request, run, review, delivery, release, and learning evidence.
@@ -129,7 +131,7 @@ Installed-user onboarding defaults to public-repo safety:
 - no upstream writes by default;
 - `no-write` or planning-only behavior until delivery mode is explicit;
 - bounded execution scope, commands, budgets, allowed paths, and writeback policy before runner work;
-- runtime output under `.aor/`, with no runtime state committed by default;
+- runtime output under AOR Home (`~/.aor` or `AOR_HOME`), with no runtime state committed;
 - headless CLI/API operation remains valid when the local app is absent, stopped, or detached;
 - production monitoring, offline certification, rehearsal proof, and delivery evidence stay separate.
 

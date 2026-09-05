@@ -40,7 +40,10 @@ specification, planning, execution, review, QA, delivery, release, and learning.
 
 - This repository is docs-first with implemented CLI, API, web, and runtime
   baselines, but it is not yet a production-ready orchestrator runtime.
-- Runtime outputs belong in `.aor/` and must not be committed.
+- Product runtime outputs belong in AOR Home (`~/.aor` or `AOR_HOME`) and must
+  not be committed. Maintainer rehearsal outputs may use ignored repo-local
+  `.aor/`; target repositories receive only explicitly materialized portable
+  config or evidence exports.
 - English is the default language for docs, contracts, examples, comments, and
   commit-ready artifacts unless an external source requires another language.
 

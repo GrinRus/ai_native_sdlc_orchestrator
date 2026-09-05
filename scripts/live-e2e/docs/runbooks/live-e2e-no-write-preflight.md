@@ -1,257 +1,84 @@
 # Live E2E no-write preflight procedure
 
-This procedure is the reusable baseline for public-repo rehearsals across bootstrap, quality, and delivery-oriented flows.
+Use this procedure before an internal installed-user rehearsal. The maintained
+execution procedure is `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`;
+this preflight establishes target, storage, profile, and verification boundaries.
 
-## Safety invariants
-- Upstream write-back stays disabled (`write_back_to_remote=false`) unless a fork/local mirror policy is explicitly approved.
-- Preferred delivery mode stays in canonical `patch-only`, `local-branch`, or `fork-first-pr` safe options.
-- Rehearsal stops immediately when preflight safety gates fail.
+## Safety and storage
 
-## Isolation mode guidance (W4-S01)
-Choose runtime workspace isolation explicitly through `project-profile.runtime_defaults.workspace_mode`:
+- Keep upstream write-back disabled (`write_back_to_remote=false`). Select the
+  profile's explicit delivery mode; `no-write` smoke does not authorize a later
+  source change.
+- Use a disposable target checkout and isolated `AOR_HOME`. Product runtime
+  state belongs in AOR Home, not the target repository.
+- Keep generated profiles, operator decisions, inputs, and private transcripts
+  in the maintainer run's ignored output directory. Do not inject examples,
+  route overrides, or runtime scaffolding into the target checkout.
+- Public `aor` commands do not accept `--runtime-root`. Pass `AOR_HOME` through
+  the environment to isolate public command state.
 
-- `ephemeral` — run in the primary checkout. Use for bootstrap-only no-write smoke where delivery mutation is not attempted.
-- `workspace-clone` — run in an isolated filesystem clone. Recommended for patch-only and fork-first delivery rehearsals.
-- `worktree` — run in an isolated worktree-style root. Recommended for local-branch delivery rehearsals.
+## Credential-free installation smoke
 
-Cleanup policy is controlled by `runtime_defaults.workspace_cleanup`:
-- `on_success`, `on_abort`, `on_failure` each accept `delete`, `retain`, or `none`.
-- Default behavior for isolated roots is `delete` on success/abort and `retain` on failure.
-- Default behavior for `ephemeral` mode is `none` for all outcomes.
-
-## Preflight sequence
-1. **Clone** target repository with the configured ref and checkout strategy.
-2. **Inspect** repo shape, prerequisites, and local command ownership.
-3. **Analyze** target topology and candidate verification commands.
-4. **Validate** profile, refs, and policy defaults.
-5. **Verify** bounded local commands.
-6. **Stop** for bounded rehearsals when verify fails. For full-journey acceptance, continue only when setup/readiness, validation, routed dry-run, adapter readiness, and no-write safety gates pass; target verification command failures are baseline diagnostics unless the profile sets `verification.baseline_gate.mode=blocking`.
-
-Production-proof candidate profiles always set `verification.baseline_gate.mode=blocking`. They use packaged bootstrap assets only, require real external-process adapter preflight, and keep `output_policy.write_back_to_remote=false` with `patch-only` or `local-branch` delivery.
-
-## Bootstrap rehearsal procedure (W1 baseline)
-Use this exact sequence when validating bootstrap flow readiness without delivery automation:
+Run from a neutral directory using the installed package:
 
 ```bash
-# AOR workspace target (expected verify success)
-aor project init --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor
-aor project analyze --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor
-aor project validate --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor
-aor project verify --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor --require-validation-pass
-
-# Public target from catalog (sindresorhus/ky, safe-failure verify allowed)
-aor project init --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml
-aor project analyze --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml
-aor project validate --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml
-aor project verify --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml --require-validation-pass
-```
-
-Evidence fixtures captured for this procedure:
-- `scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/aor/*.json`
-- `scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/aor/runtime-tree.txt`
-- `scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/ky/*.json`
-- `scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/ky/runtime-tree.txt`
-
-Observed baseline:
-- AOR target completes validate `pass` and verify `passed`.
-- `sindresorhus/ky` target keeps validate `pass` and verify `failed` safely with no upstream write-back.
-
-Validation step output must materialize a deterministic `validation-report` with `pass`, `warn`, or `fail` status. When verify is started with validation gating enabled, a `fail` report blocks verify until the failing validators are resolved.
-
-## Routed rehearsal procedure (W2-S06 baseline)
-Use this bounded no-write rehearsal to prove routed execution path readiness (route + asset + policy + adapter) before delivery automation:
-
-```bash
-aor project init --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal
-aor project analyze --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal
-aor handoff prepare --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal
-aor handoff approve --project-ref <AOR_WORKSPACE> --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal --handoff-packet <AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json --approval-ref approval://W2-S06-REHEARSAL
-aor project validate --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal --require-approved-handoff --handoff-packet <AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
-aor project verify --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal --require-validation-pass --routed-dry-run-step implement
-```
-
-Expected routed rehearsal signals:
-- `handoff approve` returns `handoff_status=approved`;
-- validation handoff gate returns `pass`;
-- `project verify` materializes `routed_step_result_file`;
-- labeled `project verify` summaries identify whether evidence came from baseline diagnostics, primary post-run quality, or diagnostic full-suite checks;
-- routed `step-result` and `compiled-context` artifacts use run/step-scoped names (for example `step-result-routed-<run>.<step>.attempt.<n>.json`) and keep prior same-step artifacts intact;
-- the routed `step-result` contains route, asset, policy, and adapter resolution metadata with `mode=dry-run`.
-
-Evidence fixtures captured for this procedure:
-- `scripts/live-e2e/fixtures/evidence/routed-rehearsal/aor/routed-rehearsal-transcript.md`
-- `scripts/live-e2e/fixtures/evidence/routed-rehearsal/aor/project-verify-routed.json`
-- `scripts/live-e2e/fixtures/evidence/routed-rehearsal/aor/step-result-routed-*.json`
-- `scripts/live-e2e/fixtures/evidence/routed-rehearsal/aor/runtime-tree.txt`
-
-## External live adapter rehearsal (W10-S01 baseline)
-Use this bounded rehearsal when validating the external live adapter path:
-
-```bash
-aor project verify \
-  --project-ref <AOR_WORKSPACE> \
-  --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml \
-  --runtime-root <AOR_WORKSPACE>/.aor/w10-s01-live-adapter \
-  --routed-live-step implement \
-  --approved-handoff-ref evidence://handoff/live-approved \
-  --promotion-evidence-refs evidence://promotion/live-pass
-```
-
-Expected W10-S01 signals:
-- `routed_execution.mode=execute`;
-- adapter response status is explicit (`success`, `blocked`, or `failed`);
-- successful path records external runner metadata and raw execution evidence reference under `adapter_response.output.external_runner`;
-- missing command/runtime prerequisites produce `failure_kind=missing-command` or `failure_kind=missing-live-runtime` without synthetic success;
-- delivery guardrails continue to block execution when required approval/promotion evidence is missing.
-- the internal `node ./scripts/live-e2e/run-profile.mjs` proof runner reuses the same branch signatures and exposes routed evidence via `routed_step_result_file`, `compiled_context_ref`, and `adapter_raw_evidence_ref`.
-
-Evidence fixtures captured for this procedure:
-- `scripts/live-e2e/fixtures/evidence/w10-s01/external-live-adapter-transcript.json`
-
-## Operator-request rehearsal (W32-S01 baseline)
-Use this bounded rehearsal when validating interactive operator requests without
-upstream writes:
-
-```bash
-aor request create \
-  --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor/w32-s01-operator-request \
-  --stage discovery \
-  --intent analyze \
-  --request "Analyze the current next action and explain the safest follow-up." \
-  --target-ref evidence://projects/<PROJECT_ID>/reports/next-action-report.json \
-  --delivery-mode no-write \
+AOR_REHEARSAL_HOME="$(mktemp -d)"
+AOR_HOME="$AOR_REHEARSAL_HOME" aor doctor \
+  --project-ref /path/to/disposable-target \
   --json
-
-aor request run \
-  --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor/w32-s01-operator-request \
-  --request-ref <OPERATOR_REQUEST_REF> \
-  --target-step plan \
-  --json
+AOR_HOME="$AOR_REHEARSAL_HOME" aor app \
+  --project-ref /path/to/disposable-target \
+  --smoke --open false --json
 ```
 
-Use this patch-only document-change rehearsal when the operator asks for a
-document update proposal:
+`doctor` reports environment and repository blockers. App smoke must return
+`status: "smoke-pass"` without creating repo-local `.aor` or changing target
+HEAD/status. It checks package and transport readiness; it does not certify
+provider execution or the complete installed Task lifecycle.
 
-```bash
-aor request create \
-  --project-ref <AOR_WORKSPACE> \
-  --runtime-root <AOR_WORKSPACE>/.aor/w32-s01-operator-request \
-  --stage review \
-  --intent revise-document \
-  --request "Propose edits for the installed-user first-run runbook." \
-  --target-ref docs/ops/installed-user-first-run.md \
-  --allowed-path "docs/ops/**" \
-  --delivery-mode patch-only \
-  --json
-```
+## Profile and target checks
 
-Expected W32-S01 signals:
-- request create writes an `operator-request` artifact with raw text stored only
-  in durable evidence;
-- request status/list output shows sanitized summary plus refs, not raw text;
-- request run writes a routed `step-result` with `operator_request_ref`;
-- no-write emits proposal evidence only;
-- patch-only emits proposal and patch evidence and does not mutate target files
-  silently;
-- `next-action-report` is refreshed after the run.
-
-Evidence fixture captured for this procedure:
-- `scripts/live-e2e/fixtures/evidence/w32-s01/operator-request-interactive-flow.sample.json`
-
-## Quality rehearsal procedure (W3-S06 baseline)
-Use this baseline on selected public targets after no-write preflight gates pass:
-
-```bash
-aor eval run --project-ref <TARGET_ROOT> --project-profile <TARGET_ROOT>/examples/project.aor.yaml --suite-ref suite.regress.short@v1 --subject-ref run://<target-id>
-aor harness certify --project-ref <TARGET_ROOT> --project-profile <TARGET_ROOT>/examples/project.aor.yaml --asset-ref wrapper://wrapper.runner.default@v3 --subject-ref run://<target-id> --suite-ref suite.regress.short@v1 --step-class implement
-```
-
-Expected quality rehearsal signals:
-- eval output returns `evaluation_status=pass`;
-- certification output returns `promotion_decision_status=pass`;
-- evaluation report, harness capture/replay, and promotion decision files are all materialized.
-
-Evidence fixtures captured for this procedure:
-- `scripts/live-e2e/fixtures/evidence/w3-s06/ky-eval.json`
-- `scripts/live-e2e/fixtures/evidence/w3-s06/ky-certify.json`
-- `scripts/live-e2e/fixtures/evidence/w3-s06/httpie-cli-eval.json`
-- `scripts/live-e2e/fixtures/evidence/w3-s06/httpie-cli-certify.json`
-- `scripts/live-e2e/fixtures/evidence/w3-s06/artifacts/ky/*`
-- `scripts/live-e2e/fixtures/evidence/w3-s06/artifacts/httpie-cli/*`
-
-## Delivery command pack smoke (W6-S05 baseline)
-Use this command path when you need explicit delivery/release packet materialization while keeping no-write safety:
-
-```bash
-aor deliver prepare \
-  --project-ref <TARGET_ROOT> \
-  --run-id <RUN_ID> \
-  --mode no-write \
-  --coordination-evidence-refs evidence://coordination/<RUN_ID> \
-  --rerun-of-run-id <FAILED_RUN_ID> \
-  --rerun-failed-step deliver.prepare \
-  --rerun-packet-boundary delivery-manifest
-
-aor release prepare \
-  --project-ref <TARGET_ROOT> \
-  --run-id <RUN_ID> \
-  --mode no-write \
-  --coordination-evidence-refs evidence://coordination/<RUN_ID> \
-  --rerun-of-run-id <FAILED_RUN_ID> \
-  --rerun-failed-step release.prepare \
-  --rerun-packet-boundary release-packet
-```
-
-Expected no-write command signals:
-- `delivery_plan_status=ready`;
-- `delivery_mode=no-write`;
-- `delivery_writeback_result=no-write-confirmed`;
-- `delivery_coordination` reports repo scope and coordination evidence status;
-- `delivery_rerun_recovery` preserves explicit failed-step and packet-boundary retry scope;
-- `delivery_manifest_file` and `release_packet_file` are both materialized.
-
-## Bounded multirepo proof smoke
-Use the bounded multirepo sample profile when validating repo graph and coordination behavior without upstream writes:
-
-```bash
-aor project analyze --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.bounded-multirepo.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w18-s04-multirepo
-aor project validate --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.bounded-multirepo.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w18-s04-multirepo
-aor deliver prepare --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.bounded-multirepo.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w18-s04-multirepo --mode no-write --coordination-evidence-refs evidence://coordination/w18-s04
-```
-
-Expected bounded multirepo signals:
-- analysis report includes `repo_scope_proof.repo_graph`, `impacted_repo_scope`, per-repo validation evidence, and integration validation refs;
-- validation report includes a passing `repo-scope-proof` validator;
-- `patch-only`, `local-branch`, and `fork-first-pr` delivery plans block without coordination evidence when more than one repo is in scope;
-- delivery manifest and release packet preserve repo ids and coordination refs for audit replay.
-
-## Required target annotations
-Each profile and runbook must provide:
-- prerequisites;
-- repo-shape notes;
-- failure-safe defaults;
-- abort conditions.
+1. Resolve `target_catalog_id` and `feature_mission_id` from
+   `scripts/live-e2e/catalog/targets/*.yaml`. Pin the target revision and inspect
+   repository shape, tool prerequisites, and verification commands.
+2. Check the profile's flow range, installation policy, operator/interaction
+   policies, frontend capability, implementation repair budget, and
+   `no-upstream-write` safety policy using `.agents/skills/live-e2e-preflight/SKILL.md`.
+3. Keep the generated profile and bootstrap assets outside the target checkout.
+   Full-journey execution uses the installed public CLI/API/web boundary.
+4. Inspect setup, readiness, and verification evidence before continuing.
+   Required command failures block. Baseline diagnostics remain distinguishable
+   from post-run verification; follow the profile's declared enforcement mode.
+5. For provider qualification, satisfy the W71-S14 freeze prerequisite in
+   `docs/ops/w66-qualification-freeze.md` before starting any W66-S09 cell.
 
 ## Abort conditions
-Abort the rehearsal when any of these conditions occur:
-- checkout, setup, or dependency installation fails;
-- required verification commands fail in bounded rehearsal or in a profile with `verification.baseline_gate.mode=blocking`;
-- a command path requires upstream write-back in a no-write rehearsal;
-- a production-proof candidate profile is run with unsafe write-back policy, missing target verification commands, missing runner auth, or failed edit/permission readiness;
-- routed dry-run step result is missing or has status `failed`;
-- budget limits are exceeded before safety gates pass.
 
-Full-journey observation additionally runs target verification again after provider execution. A post-run verification failure is recorded in `final_analysis.code_quality` and in the relevant step journal entries; delivery evidence no longer downgrades terminal failures to `warn`.
+Stop when target checkout or setup fails, required tools or authorization are
+missing, required verification fails, command or path ownership is ambiguous,
+upstream writes would be required, or the declared execution budget is exhausted.
+Preserve the run's existing evidence and report the owning blocker before retry.
+Do not turn a setup/provider failure into a passing product-quality verdict.
 
-## Reuse map for later waves
-- **Bootstrap rehearsals:** reuse clone/inspect/analyze/validate/verify gating before packet materialization.
-- **Quality rehearsals:** reuse verify success as a prerequisite for eval or harness execution.
-- **Delivery rehearsals:** reuse no-write defaults while still allowing manifest/release packet materialization.
+## Follow-up procedures
 
-## Related artifacts
-- Target catalog: `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md`
-- Profiles: `scripts/live-e2e/profiles/*.yaml`
-- Quality rehearsal runbook: `scripts/live-e2e/docs/runbooks/live-e2e-quality-rehearsal.md`
-- Runbooks: `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`, `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md`
+- Full-journey execution and operator decisions:
+  `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`.
+- Target requirements and verification policy:
+  `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md`.
+- Quality assessment:
+  `scripts/live-e2e/docs/runbooks/live-e2e-quality-rehearsal.md`.
+- Operator-request lifecycle: `docs/ops/ui-attach-detach.md`.
+- Delivery boundaries: `docs/ops/github-fork-first-delivery.md`.
+- Bounded multirepo component proof: `docs/ops/repo-aware-execution-proof.md`.
+
+## Historical evidence
+
+Retained bootstrap samples are indexed by
+`scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/README.md`. They describe
+the pre-W67 storage layout and do not prove the current installed journey.
+Historical W10 and W32 samples remain under
+`scripts/live-e2e/fixtures/evidence/w10-s01/` and
+`scripts/live-e2e/fixtures/evidence/w32-s01/`. Reproduction of current behavior
+must use the current public commands and declared profile, not old transcript
+paths or synthetic evidence references.

@@ -3,13 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const roots = ["README.md", "docs/architecture", "docs/ops", "docs/product"];
-const excluded = new Set([
-  "docs/ops/quiet-cockpit-cutover.md",
-  "docs/product/03-flow-centric-console-design.md",
-  "docs/product/05-quiet-cockpit-console-design.md",
-  "docs/product/06-quiet-cockpit-ui-foundation.md",
-  "docs/product/07-quiet-cockpit-action-contract.md",
-]);
+
 const forbidden = [
   { pattern: /\bFlow selector\b/iu, replacement: "Task list or internal Flow lineage" },
   { pattern: /\bNew Flow\b/iu, replacement: "New task or follow-up Task" },
@@ -35,7 +29,7 @@ function markdownFiles(relativePath) {
 }
 
 const findings = [];
-const currentDocs = roots.flatMap(markdownFiles).filter((entry) => !excluded.has(entry)).sort();
+const currentDocs = roots.flatMap(markdownFiles).sort();
 for (const file of currentDocs) {
   const lines = fs.readFileSync(path.join(root, file), "utf8").split(/\r?\n/u);
   lines.forEach((line, index) => {

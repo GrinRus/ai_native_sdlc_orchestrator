@@ -7,9 +7,9 @@ local AOR run.
 
 | Mode | Primary surface | Required credentials | Required commands | Evidence and safety boundary |
 |---|---|---|---|---|
-| Local trusted | CLI plus module-backed API helpers | none for AOR transport; runner credentials only when the selected external runner requires them | `pnpm check`; `pnpm aor doctor --project-ref <repo> --json`; `pnpm aor onboard --project-ref <repo> --json` | Writes only local `.aor/` runtime evidence unless the operator chooses another delivery mode. Transport auth can be disabled for loopback development. |
+| Local trusted | CLI plus module-backed API helpers | none for AOR transport; runner credentials only when the selected external runner requires them | `pnpm check`; `pnpm aor doctor --project-ref <repo> --json`; `pnpm aor onboard --project-ref <repo> --json` | Writes runtime evidence only to AOR Home (`~/.aor` or `AOR_HOME`); source changes require an explicit delivery mode. Transport auth can be disabled for loopback development. |
 | Production-hardened loopback | Detached HTTP/SSE API plus CLI | bearer principals configured outside committed files; explicit `read` and/or `mutate` permissions; optional runner credentials outside repo files | `pnpm production:ready --json`; start detached API with `production-hardened` security mode; verify denied and allowed routes | Requires bearer auth for read, stream, and mutation routes. Transport denials do not invoke mutation handlers. |
-| Packaged local web | Optional flow-centric SPA served by `aor app` on literal `127.0.0.1` or `::1` from the same origin as its control plane | none for the local transport; runner credentials only for explicit live external-runner workflows | `aor app`; `aor app --smoke --open false --json` | This is the only supported browser topology. Canonical Host, exact browser Origin, JSON media type, 1 MiB, and five-second body bounds are enforced. Same-OS-account local clients are trusted; LAN, hostile-local, multi-user, and arbitrary remote attachment require a separate authenticated topology. |
+| Packaged local web | Optional Task Workspace SPA served by `aor app` on literal `127.0.0.1` or `::1` from the same origin as its control plane | none for the local transport; runner credentials only for explicit live external-runner workflows | `aor app`; `aor app --smoke --open false --json` | This is the only supported browser topology. Canonical Host, exact browser Origin, JSON media type, 1 MiB, and five-second body bounds are enforced. Same-OS-account local clients are trusted; LAN, hostile-local, multi-user, and arbitrary remote attachment require a separate authenticated topology. |
 | npm alpha install | Installed `@grinrus/aor` CLI plus packaged local SPA | npm registry access; runner credentials only for explicit live external-runner workflows | resolve `AOR_VERSION="$(npm view @grinrus/aor dist-tags.alpha)"`; `npm install -g "@grinrus/aor@$AOR_VERSION"`; `aor --help`; registry proof: `npm exec --package "@grinrus/aor@$AOR_VERSION" -- aor ...` from a neutral temp runner directory | Public alpha package smoke proves the bounded local package surface only. It does not prove hosted SaaS, Docker/GHCR, SSO, arbitrary remote web, or unattended production automation. |
 
 ## Environment variables
@@ -46,10 +46,12 @@ code-changing delivery proof is explicitly intended and reviewable local patch
 artifacts are acceptable.
 
 `pnpm w62:proof` writes only ignored proof output under
-`node_modules/.cache/aor`. It verifies the two curated repo-aware execution
-models, stable task/unit/attempt identity, bounded recovery, and coordinated
-delivery projections. Run `pnpm test:web:browser` separately for the installed
-loopback UI evidence referenced by the closure report.
+`node_modules/.cache/aor`. It runs deterministic component fixtures for the
+execution DAG and stale boundary; its browser assessment is `not-run` and its
+quality assessment is `fixture-only`. It does not prove the public
+provision-to-integration lifecycle or coordinated delivery. W71-S10/W71-S14 own
+the installed lifecycle and final integrated Task Workspace proof described in
+[repo-aware execution proof](repo-aware-execution-proof.md).
 
 Outside the bounded cleared matrix, external credentialed write-capable execution and
 credentialed network delivery are blocked by default. Maintainer-only source

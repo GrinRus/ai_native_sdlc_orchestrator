@@ -42,8 +42,8 @@ orchestration, delivery modes, or live E2E acceptance policy.
 
 ### Done evidence
 - updated web source and focused web tests
-- `node --test apps/web/test/operator-console.test.mjs`
-- `node --test apps/web/test/operator-request-spa.test.mjs`
+- [historical operator-console.test.mjs check (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-console.test.mjs)
+- [historical operator-request-spa.test.mjs check (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-request-spa.test.mjs)
 - `pnpm web:build`
 - `pnpm aor app --project-ref <repo> --runtime-root <temp> --smoke --open false --json`
 
@@ -96,8 +96,8 @@ orchestration, delivery modes, or live E2E acceptance policy.
 
 ### Done evidence
 - updated web source and focused web tests
-- `node --test apps/web/test/operator-console.test.mjs`
-- `node --test apps/web/test/operator-request-spa.test.mjs`
+- [historical operator-console.test.mjs check (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-console.test.mjs)
+- [historical operator-request-spa.test.mjs check (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-request-spa.test.mjs)
 - `pnpm web:build`
 - `pnpm aor app --project-ref <temp-target> --runtime-root <temp-target>/.aor --smoke --open false --json`
 - rendered browser check at `1440x900`, `390x844`, and `768x1024`
@@ -157,8 +157,8 @@ orchestration, delivery modes, or live E2E acceptance policy.
 
 ### Done evidence
 - updated web source and focused web tests
-- `node --test apps/web/test/operator-console.test.mjs`
-- `node --test apps/web/test/operator-request-spa.test.mjs`
+- [historical operator-console.test.mjs check (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-console.test.mjs)
+- [historical operator-request-spa.test.mjs check (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/test/operator-request-spa.test.mjs)
 - `pnpm web:build`
 - `pnpm aor app --project-ref <temp-target> --runtime-root <temp-target>/.aor --smoke --open false --json`
 - rendered browser check at `1440x900`, `390x844`, and `768x1024`

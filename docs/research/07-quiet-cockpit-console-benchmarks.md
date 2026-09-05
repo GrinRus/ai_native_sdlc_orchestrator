@@ -44,7 +44,7 @@ orchestration.
 
 Use the external references only after checking the AOR sources of truth:
 
-- `docs/product/05-quiet-cockpit-console-design.md`
+- [W63 Quiet Cockpit design snapshot (f6de7e31)](https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/docs/product/05-quiet-cockpit-console-design.md)
 - `docs/product/02-installed-user-onboarding-journey.md`
 - `docs/product/04-project-topology-and-task-planning-ux.md`
 - `docs/architecture/12-orchestrator-operating-model.md`

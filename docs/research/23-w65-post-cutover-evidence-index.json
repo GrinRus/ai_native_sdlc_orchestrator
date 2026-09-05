@@ -12,7 +12,7 @@
     "profiles": ["keyboard-only", "reduced-motion", "zoom-200", "partial", "offline", "reload", "reconnect", "duplicate-action"]
   },
   "golden_lifecycle": {
-    "manifest": "apps/web/browser/fixtures/golden-lifecycle.json",
+    "manifest": "https://github.com/GrinRus/ai_native_sdlc_orchestrator/blob/f6de7e3167e74a2fd975deb5736e464cdcffac2f/apps/web/browser/fixtures/golden-lifecycle.json",
     "selector_required": false,
     "transitions": 15,
     "status": "pass",

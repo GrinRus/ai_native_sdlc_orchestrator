@@ -3,7 +3,7 @@ name: live-e2e-runner
 description: Use when you need to run or assess AOR live E2E profiles through the black-box step journal.
 ---
 
-1. Start with `docs/ops/live-e2e-standard-runner.md` and `docs/ops/live-e2e-target-catalog.md`.
+1. Start with `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md` and `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md`.
 2. Decide whether the run is full-journey acceptance, guided installed-user proof, or production proof.
 3. Confirm the profile declares `live_e2e.flow_range_policy`, `live_e2e.installation_policy`, `live_e2e.interaction_capability`, `live_e2e.frontend_capability`, `live_e2e.safety_policy`, operator policy fields, and `implementation_loop`.
 4. Use the manual loop for acceptance and production-proof runs; the skill-agent running this skill is the live E2E operator:

@@ -168,7 +168,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ### Closure rehearsal references
 - profile: catalog-backed full-journey live E2E profile
-- runbook: `docs/ops/live-e2e-standard-runner.md`
+- runbook: `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`
 - historical fixture bundle removed after the live E2E skill-agent-only migration
 
 ### Out of scope

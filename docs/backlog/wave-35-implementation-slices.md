@@ -246,10 +246,10 @@ The W35 backlog comes from real local live E2E operation:
 
 ### Implementation note
 W35-S05 has synthetic operator-UX proof coverage in
-`examples/live-e2e/fixtures/w35-s05/silent-provider-ux-proof.sample.json` and
-targeted regression coverage in `scripts/test/live-e2e-proof-runner.test.mjs`.
+`scripts/live-e2e/fixtures/evidence/w35-s05/silent-provider-ux-proof.sample.json` and
+targeted regression coverage in `scripts/live-e2e/test/live-e2e-proof-runner.test.mjs`.
 The 2026-06-02 local live attempt summary is captured in
-`examples/live-e2e/fixtures/w35-s05/live-attempts-summary.sample.json`: Codex
+`scripts/live-e2e/fixtures/evidence/w35-s05/live-attempts-summary.sample.json`: Codex
 small reached public baseline target verification but blocked on long-running
 target `npm test`/AVA/WebKit before a live controller decision could be
 produced; Qwen CLI availability was confirmed, but Qwen proof was not advanced

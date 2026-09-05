@@ -1,6 +1,7 @@
 # AGENTS.md
 
-Files in this directory implement repository-integrity checks.
+Files in this directory implement repository-integrity checks and internal
+maintainer rehearsals for the implemented AOR runtime.
 
 ## Rules
 
@@ -18,4 +19,5 @@ These scripts should validate things like:
 - backlog consistency;
 - workflow conventions.
 
-They should not pretend to compile or run a product runtime that does not exist yet.
+Build and rehearsal checks must exercise the implemented runtime and distinguish
+fixture coverage from installed end-to-end proof.

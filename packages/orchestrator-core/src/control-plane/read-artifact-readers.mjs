@@ -89,14 +89,6 @@ export function applyReadModelLimit(entries, limit) {
 }
 
 /**
- * @param {string} value
- * @returns {string}
- */
-function toPosix(value) {
-  return value.replace(/\\/g, "/");
-}
-
-/**
  * @param {ReturnType<typeof createProjectReadContext>} init
  * @param {string} filePath
  * @returns {string}
