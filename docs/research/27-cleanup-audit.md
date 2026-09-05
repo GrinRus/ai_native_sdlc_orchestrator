@@ -57,8 +57,47 @@ specification remains normative; its recovery requirements do not establish
 that W71-S08 implementation is complete. No runtime behavior, public contract,
 story status, release hold, or future slice is changed by this iteration.
 
-## Remaining review work
+## Iteration 3: integrated consistency and verification
 
-Iteration 3 must review the integrated code, documentation, links, and gate
-evidence from the updated main. Each iteration is a separate PR; findings remain
-open until the corresponding changes and applicable checks are complete.
+Base: main `f008fc744b3725162d57b5abd40a2b5a58b47052`, after
+[iteration 2 PR #297](https://github.com/GrinRus/ai_native_sdlc_orchestrator/pull/297).
+Its [CI run](https://github.com/GrinRus/ai_native_sdlc_orchestrator/actions/runs/33971181902)
+passed the full gate, validated 103/103 tracked test files, and passed all three
+browser scenarios with the existing readiness audit hold. Runtime, build, test,
+workflow, and dependency files are byte-identical to the merged first iteration.
+
+The third review restarted from that integrated base:
+
+| Surface | Evidence and result |
+|---|---|
+| Module references | Parsed 418 JavaScript/TypeScript source and test modules; no missing literal relative imports or re-exports. |
+| Public exports | Compared all 17 changed package source modules with the pre-cleanup main; declared exports are unchanged. |
+| Production checks | Quality ratchet passed for 309 production files and 300 JavaScript modules; coverage accounts for 421 source files, 103 unit-test files, one browser specification, and two generated-file exclusions. |
+| Contract authority | Kernel v13 parity passed with 66 public and 75 effective private families; dependency policy passed with 10 locked direct dependencies. |
+| Packaged UI | Freshness check passed against current source; prior full CI exercised all three retained browser scenarios. |
+| Local documentation links | Scanned 303 tracked Markdown files and classified 173 actual local links; no missing targets or anchors. One initial candidate was identifier-regex syntax inside a code block, not a link. |
+| Historical evidence | All 105 pinned references resolve to 32 existing Git blob targets. No unpinned local references to deleted files remain in the scanned text surfaces. |
+| External references | Rechecked 65 existing outbound URLs: 64 returned HTTP 2xx; the npm package page returned 403, while the public npm registry confirms that the package exists. The replacement Codex workflow-directory link also returned 2xx; audit PR and CI references were verified through GitHub. |
+| Examples and compatibility | Reference-integrity checks passed for 260 refs and 224 compatibility checks. |
+| Committed scratch state | No tracked `.aor/`, `node_modules/`, backup, reject, temporary, log, or `.DS_Store` files were found by the targeted inventory. |
+
+No additional confirmed cleanup finding remained after this pass. This iteration
+records the review instead of introducing a synthetic runtime change. The PR's
+full CI result and the final merged-main check remain the authoritative gate
+evidence; this report's focused checks do not substitute for them.
+
+## Retention and decision boundaries
+
+- Safe removals were the 63 non-build files whose current consumers were retired
+  or absent, plus unused private code and regenerated bundle assets.
+- Keep referenced historical screenshots, pinned closure evidence, fixtures with
+  active tests, intentional privacy omissions in object destructuring, and
+  public compatibility exports. Static absence of an internal caller is not
+  sufficient evidence to remove a shipped entrypoint.
+- Removing supported CLI/API capabilities, contract families, unique audit
+  history, or unrelated workspace/user state requires a separate scoped
+  decision. None is proposed as remaining confirmed garbage.
+- W71 runtime acceptance work, W66 provider qualification, and the existing
+  production release hold remain outside this cleanup. HTTP 403 is an access
+  limitation, not evidence of a dead npm link. The review does not claim absolute
+  absence of all possible unused code or semantic documentation drift.
