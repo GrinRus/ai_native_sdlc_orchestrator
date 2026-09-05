@@ -630,7 +630,7 @@ acceptance, bounded output repair, explicit quality-repair retry, structured
 artifact/evaluator consumers, and adversarial replay proof. All W66-S09 evidence
 predating this chain remains diagnostic-only for final wave closure.
 
-W68-W70 use a separate development-acceptance lane: deterministic contracts,
+W68-W71 use a separate development-acceptance lane: deterministic contracts,
 fixtures, static/API parity, and local browser proof may close these slices
 without provider execution. `W66-S09` remains a release-only blocker and its
 hold/readiness state is not changed by code-only completion.
@@ -677,6 +677,25 @@ hold/readiness state is not changed by code-only completion.
 | W70-S07 | Design-system implementation and legacy UI retirement | EPIC-0, EPIC-6 | done | UI tokens/components, responsive CSS, legacy sources/assets, ratchets | W70-S06 |
 | W70-S08 | Installed Task Workspace proof and story closure | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | done | installed browser scenarios, product/story docs, runbooks, package proof | W70-S07 |
 | W70-S10 | Task Workspace visual fidelity and review-proof remediation | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | done | review read contract, Task projection/API, shared UI system, responsive drawer, visual proof | W70-S08 |
+
+## W71 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W71-S01 | Audit disposition, proof scope, and coordination baseline | EPIC-0, EPIC-4, EPIC-5, EPIC-7 | ready | audit/readiness ledgers, story coverage, backlog sources, production-readiness policy, bootstrap gate and tests | W66-S25, W70-S10 |
+| W71-S02 | Symlink-safe path confinement and durable cleanup | EPIC-0, EPIC-1, EPIC-2, EPIC-5 | blocked | path containment, Markdown ingress, workspace cleanup, integration evidence paths, security tests | W71-S01 |
+| W71-S03 | Deterministic repository gate and dependency/process safety | EPIC-0, EPIC-5, EPIC-7 | blocked | package/lockfile, dependency policy, test/typecheck runners, process supervision, CI/release gates | W71-S02 |
+| W71-S04 | Versioned Task contract and execution-route truth | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | Task contracts/projections, control-plane API/OpenAPI, CLI parity, examples and tests | W71-S03 |
+| W71-S05 | Atomic intent and runtime state transactions | EPIC-0, EPIC-2, EPIC-3, EPIC-6 | blocked | intent preparation, run/step state, heartbeat supervision, shared locks/atomic storage | W71-S04 |
+| W71-S06 | Closed delivery, release, route, and scope validation | EPIC-0, EPIC-4, EPIC-5 | blocked | public contracts/examples, family registry/loaders, shared evidence storage/resolver, Runtime Harness ingestion and provider routing | W71-S05 |
+| W71-S07 | Server-owned Task start and action progression | EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | intent start, Task/Flow projections, lifecycle mutations, control-plane client contract | W71-S06 |
+| W71-S08 | Durable Ask AOR, review, and completion | EPIC-2, EPIC-4, EPIC-5, EPIC-6 | blocked | operator requests, review/verification/delivery closure, Task projections and recovery tests | W71-S07 |
+| W71-S09 | Canonical multirepo scope locks and isolated integration | EPIC-0, EPIC-3, EPIC-5 | blocked | multirepo coordination, workspace provisioner, integration service, Git evidence and tests | W71-S06 |
+| W71-S10 | Public workspace provision-to-integration lifecycle | EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6 | blocked | workspace/parent-run contracts, CLI/API/OpenAPI, scheduler, integration and delivery projections | W71-S08, W71-S09 |
+| W71-S11 | Resolvable evidence and adversarial qualification proof | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification evidence bindings/freshness, W66 readiness/proof, live-E2E target materialization and profiles | W71-S10 |
+| W71-S12 | Enforceable quality coverage and maintainability ratchets | EPIC-0, EPIC-7 | blocked | lint/type/coverage/complexity tooling, ownership/exception manifests and quality tests | W71-S11 |
+| W71-S15 | Live-E2E flow hotspot decomposition | EPIC-0, EPIC-4, EPIC-7 | blocked | live-E2E flow module, extracted flow families, characterization tests and size/import ratchets | W71-S12 |
+| W71-S13 | Source-of-truth and story-evidence alignment | EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | blocked | README, product/story docs, architecture/contracts, backlog/readiness, runbooks and examples | W71-S15 |
+| W71-S14 | UI-refactor integration, installed black-box closure, and freeze | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | blocked | merged Command Desk integration, installed browser harness, package proof, freeze/readiness | W71-S13 |
 
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work

@@ -239,14 +239,17 @@ researchers.
 | --- | --- |
 | GitHub `main` | Current source and design baseline; may contain unreleased work |
 | npm `@alpha` | Latest tagged CLI snapshot; can lag behind `main` |
-| Installed UI | Task Workspace with task preparation, work, review, and evidence |
+| Installed UI | Task Workspace baseline; canonical end-to-end execution proof is open in W71 |
 | Production readiness | Audit hold; no general production clearance |
 | Supported operating shape | Bounded local/self-hosted use on Node.js 22 |
 
 Development acceptance and release qualification are separate. W69 and W70 are development-complete, and the Task Workspace is available through the npm
-`@alpha` channel. W66 remains the release-qualification blocker: fresh
-same-commit required-provider evidence is incomplete, so the current
-disposition remains `audit-hold` with `release_clearance=false`.
+`@alpha` channel. W71 is the current deterministic remediation wave for the
+post-W70 filesystem, Task-flow, state, multirepo, contract, evidence, and gate
+findings; it also defines the merge boundary for the parallel Command Desk UI
+refactor. W66 remains the release-qualification blocker: fresh same-commit
+required-provider evidence is incomplete, so the current disposition remains
+`audit-hold` with `release_clearance=false`.
 
 Run `pnpm check` for repository integrity. Maintainers use
 `pnpm production:ready --json` for the separate release disposition.
@@ -350,9 +353,11 @@ Do not use AOR yet if you need:
 | Operate the alpha safely | [Operations index](docs/ops/00-runbook-index.md) |
 | Follow current work | [MVP roadmap](docs/backlog/mvp-roadmap.md) |
 
-W70 is the latest defined development wave and owns the Task Workspace
-implementation history. W66 remains the independent release-qualification
-blocker. Architecture decisions live in
+W71 is the latest defined development wave and owns post-W70 trust and
+canonical-flow recovery. W70 retains the Task Workspace implementation history,
+while the parallel Command Desk UI refactor stays a disjoint product-refinement
+workstream until W71's final integration proof. W66 remains the independent
+release-qualification blocker. Architecture decisions live in
 [`docs/architecture/adr`](docs/architecture/adr), implementation slices in
 [`docs/backlog`](docs/backlog), and runnable contract examples in
 [`examples`](examples).

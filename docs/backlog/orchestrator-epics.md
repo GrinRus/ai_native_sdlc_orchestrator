@@ -50,6 +50,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W68:** `W68-S01` Contract and migration baseline for runtime selection; `W68-S05` Cutover, certification, and docs closure
 - **W69:** `W69-S01` Intent confirmation CAS and contract parity; `W69-S02` Runtime-owned Flow projection and adaptive lifecycle; `W69-S06` Incremental SPA decomposition and semantic visual cleanup; `W69-S07` Visual proof, story traceability, and closure
 - **W70:** `W70-S01` Task Workspace product, screen, and migration baseline; `W70-S02` Task runner override and Markdown source contracts; `W70-S09` Task Workspace live E2E proof harness baseline; `W70-S07` Design-system implementation and legacy UI retirement; `W70-S08` Installed Task Workspace proof and story closure; `W70-S10` Task Workspace visual fidelity and review-proof remediation
+- **W71:** `W71-S01` Audit disposition, proof scope, and coordination baseline; `W71-S02` Symlink-safe path confinement and durable cleanup; `W71-S03` Deterministic repository gate and dependency/process safety; `W71-S04` Versioned Task contract and execution-route truth; `W71-S05` Atomic intent and runtime state transactions; `W71-S06` Closed delivery, release, route, and scope validation; `W71-S09` Canonical multirepo scope locks and isolated integration; `W71-S11` Resolvable evidence and adversarial qualification proof; `W71-S12` Enforceable quality coverage and maintainability ratchets; `W71-S15` Live-E2E flow hotspot decomposition; `W71-S13` Source-of-truth and story-evidence alignment; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -58,6 +59,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 **W68:** `W68-S03` Runtime selection projection and presets
 **W69:** `W69-S01` Intent confirmation CAS and contract parity; `W69-S02` Runtime-owned Flow projection and adaptive lifecycle; `W69-S03` Project Home resume-safe navigation; `W69-S04` Review-first Prepared Task; `W69-S05` Flow Cockpit context and runtime path presentation
 **W70:** `W70-S01` Task Workspace product, screen, and migration baseline; `W70-S02` Task runner override and Markdown source contracts; `W70-S03` Task shell, Home, and resumable task list; `W70-S04` New Task, Markdown Sources, and Prepared Task
+**W71:** `W71-S02` Symlink-safe path confinement and durable cleanup; `W71-S04` Versioned Task contract and execution-route truth; `W71-S07` Server-owned Task start and action progression; `W71-S13` Source-of-truth and story-evidence alignment; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
 
 **Slices by wave:**
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
@@ -88,6 +90,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 **W68:** `W68-S01` Contract and migration baseline for runtime selection
 **W69:** `W69-S01` Intent confirmation CAS and contract parity; `W69-S04` Review-first Prepared Task
 **W70:** `W70-S02` Task runner override and Markdown source contracts; `W70-S04` New Task, Markdown Sources, and Prepared Task
+**W71:** `W71-S02` Symlink-safe path confinement and durable cleanup; `W71-S04` Versioned Task contract and execution-route truth; `W71-S05` Atomic intent and runtime state transactions; `W71-S07` Server-owned Task start and action progression; `W71-S08` Durable Ask AOR, review, and completion; `W71-S10` Public workspace provision-to-integration lifecycle
 
 **Slices by wave:**
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
@@ -108,6 +111,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 **W68:** `W68-S02` Runtime resolution and adapter argument mapping
 **W69:** `W69-S05` Flow Cockpit context and runtime path presentation
 **W70:** `W70-S02` Task runner override and Markdown source contracts; `W70-S05` Active Task Workspace and durable guidance
+**W71:** `W71-S04` Versioned Task contract and execution-route truth; `W71-S05` Atomic intent and runtime state transactions; `W71-S07` Server-owned Task start and action progression; `W71-S09` Canonical multirepo scope locks and isolated integration; `W71-S10` Public workspace provision-to-integration lifecycle; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
@@ -136,6 +140,7 @@ Implement validation, eval, harness, certification, and promotion.
 **W68:** `W68-S02` Runtime resolution and adapter argument mapping; `W68-S04` Live E2E selection and Codex Luna/high rehearsal; `W68-S05` Cutover, certification, and docs closure
 **W69:** `W69-S07` Visual proof, story traceability, and closure
 **W70:** `W70-S09` Task Workspace live E2E proof harness baseline; `W70-S05` Active Task Workspace and durable guidance; `W70-S06` Attention, change review, and completion evidence; `W70-S08` Installed Task Workspace proof and story closure; `W70-S10` Task Workspace visual fidelity and review-proof remediation
+**W71:** `W71-S01` Audit disposition, proof scope, and coordination baseline; `W71-S06` Closed delivery, release, route, and scope validation; `W71-S08` Durable Ask AOR, review, and completion; `W71-S10` Public workspace provision-to-integration lifecycle; `W71-S11` Resolvable evidence and adversarial qualification proof; `W71-S15` Live-E2E flow hotspot decomposition; `W71-S13` Source-of-truth and story-evidence alignment; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
 
 **Slices by wave:**
 - **W1:** `W1-S04` Deterministic project validate flow
@@ -193,12 +198,14 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W62:** `W62-S01` Workspace-set provisioner and repository change evidence; `W62-S04` Integration, stale-task invalidation, and bounded repair; `W62-S05` Coordinated delivery and execution UX
 - **W64:** `W64-S01` Idempotent alpha publish transaction and partial-failure recovery; `W64-S02` Verification-to-delivery transaction decomposition
 - **W66:** `W66-S06` Parent/child integration and coordinated delivery correctness; `W66-S10` Non-repair review warning approval compatibility
+- **W71:** `W71-S01` Audit disposition, proof scope, and coordination baseline; `W71-S02` Symlink-safe path confinement and durable cleanup; `W71-S03` Deterministic repository gate and dependency/process safety; `W71-S06` Closed delivery, release, route, and scope validation; `W71-S08` Durable Ask AOR, review, and completion; `W71-S09` Canonical multirepo scope locks and isolated integration; `W71-S10` Public workspace provision-to-integration lifecycle; `W71-S13` Source-of-truth and story-evidence alignment; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
 
 **W68:** `W68-S03` Runtime selection projection and presets
 **W69:** `W69-S03` Project Home resume-safe navigation; `W69-S04` Review-first Prepared Task; `W69-S05` Flow Cockpit context and runtime path presentation; `W69-S06` Incremental SPA decomposition and semantic visual cleanup
 **W70:** `W70-S01` Task Workspace product, screen, and migration baseline; `W70-S09` Task Workspace live E2E proof harness baseline; `W70-S03` Task shell, Home, and resumable task list; `W70-S04` New Task, Markdown Sources, and Prepared Task; `W70-S05` Active Task Workspace and durable guidance; `W70-S06` Attention, change review, and completion evidence; `W70-S07` Design-system implementation and legacy UI retirement; `W70-S08` Installed Task Workspace proof and story closure; `W70-S10` Task Workspace visual fidelity and review-proof remediation
+**W71:** `W71-S04` Versioned Task contract and execution-route truth; `W71-S05` Atomic intent and runtime state transactions; `W71-S07` Server-owned Task start and action progression; `W71-S08` Durable Ask AOR, review, and completion; `W71-S10` Public workspace provision-to-integration lifecycle; `W71-S13` Source-of-truth and story-evidence alignment; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
 
 **Slices by wave:**
 - **W1:** `W1-S01` Bootstrap CLI shell and command contracts
@@ -307,3 +314,4 @@ Standardize internal installed-user rehearsal, scorecards, and learning-loop ope
 - **W68:** `W68-S02` Runtime resolution and adapter argument mapping; `W68-S03` Runtime selection projection and presets
 - **W69:** `W69-S05` Flow Cockpit context and runtime path presentation; `W69-S06` Incremental SPA decomposition and semantic visual cleanup; `W69-S07` Visual proof, story traceability, and closure
 - **W70:** `W70-S09` Task Workspace live E2E proof harness baseline; `W70-S08` Installed Task Workspace proof and story closure; `W70-S10` Task Workspace visual fidelity and review-proof remediation
+- **W71:** `W71-S01` Audit disposition, proof scope, and coordination baseline; `W71-S03` Deterministic repository gate and dependency/process safety; `W71-S11` Resolvable evidence and adversarial qualification proof; `W71-S12` Enforceable quality coverage and maintainability ratchets; `W71-S15` Live-E2E flow hotspot decomposition; `W71-S13` Source-of-truth and story-evidence alignment; `W71-S14` UI-refactor integration, installed black-box closure, and freeze
