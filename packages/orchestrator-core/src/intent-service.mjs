@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
+import { readJsonState, withFileLock, writeJsonAtomic } from "../../observability/src/index.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
 import { readCanonicalContainedFile } from "./shared/canonical-paths.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
@@ -53,11 +54,34 @@ function now() { return new Date().toISOString(); }
 function asStrings(value) { return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : []; }
 function asRecord(value) { return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}; }
 
-function atomicJson(file, document) {
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  fs.writeFileSync(temporary, `${JSON.stringify(document, null, 2)}\n`, { mode: 0o600 });
-  fs.renameSync(temporary, file);
+function atomicJson(file, document) { writeJsonAtomic(file, document); }
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map((entry) => stableJson(entry)).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function preparationKey(normalization) {
+  return normalization
+    ? `operator-${crypto.createHash("sha256").update(stableJson(normalization)).digest("hex")}`
+    : "provider-intake-normalize";
+}
+
+function latestNormalizationReport(loaded) {
+  const latestRef = loaded.submission.normalization_refs?.at(-1);
+  const reportName = latestRef?.split("/").at(-1);
+  const reportFile = reportName ? path.join(loaded.init.runtimeLayout.reportsRoot, reportName) : null;
+  return reportFile && fs.existsSync(reportFile)
+    ? { reportFile, report: readJsonState(reportFile) }
+    : { reportFile: null, report: null };
+}
+
+function withSubmissionLock(registry, projectId, submissionId, callback) {
+  const preview = loadSubmission(registry, projectId, submissionId, { initialize: false });
+  return withFileLock(`${preview.file}.lock`, callback, { staleAfterMs: 30 * 60 * 1000, timeoutMs: 30 * 60 * 1000 });
 }
 
 function resolveProject(registry, projectId, { initialize = true } = {}) {
@@ -80,7 +104,7 @@ function loadSubmission(registry, projectId, submissionId, { initialize = false 
   const { context, init } = resolveProject(registry, projectId, { initialize });
   const file = submissionFile(init, submissionId);
   if (!fs.existsSync(file)) throw new IntentServiceError("intent_submission.not_found", `Intent submission '${submissionId}' was not found.`, 404);
-  return { context, init, file, submission: JSON.parse(fs.readFileSync(file, "utf8")) };
+  return { context, init, file, submission: readJsonState(file) };
 }
 
 function attachmentRecords(init, submissionId, attachments) {
@@ -369,66 +393,85 @@ export function createIntentSubmission({ registry, projectId, requestText = "", 
 }
 
 export function prepareIntentSubmission({ registry, projectId, submissionId, normalization }) {
-  const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
-  const { submission, init, context, file } = loaded;
-  if (["confirmed", "canceled"].includes(submission.status)) throw new IntentServiceError("intent_submission.terminal", "Terminal intent submissions cannot be prepared again.", 409);
-  const previousNormalization = normalization && submission.normalization_refs.length > 0
-    ? readIntentSubmission({ registry, projectId, submissionId }).normalization
-    : null;
-  submission.status = "preparing";
-  submission.updated_at = now();
-  atomicJson(file, submission);
-  let provider = normalization
-    ? previousNormalization?.provider?.adapter_id ?? "operator-revision"
-    : providerReadiness(registry, projectId);
-  let selectedRouteId = normalization
-    ? previousNormalization?.provider?.route_id ?? "route.intake-normalize.default"
-    : "route.intake-normalize.default";
-  let candidate = normalization ? asRecord(normalization) : {};
-  let extraction = null;
-  try {
-    if (!normalization) {
-      if (!provider) throw new IntentServiceError("intent_provider.not_ready", "Configure and authenticate Codex, Claude, or Qwen before preparing this task.", 409);
-      selectedRouteId = provider === "claude-code" ? "route.intake-normalize.claude" : provider === "qwen-code" ? "route.intake-normalize.qwen" : "route.intake-normalize.default";
-      const routed = executeRoutedStep({
-        ...context.runtimeOptions,
-        stepClass: "discovery",
-        dryRun: false,
-        runId: derivePublicId(["intent-normalize", submissionId], "intent-normalize-run"),
-        stepId: "intent.normalize",
-        requireDiscoveryCompleteness: false,
-        routeOverrides: { discovery: selectedRouteId },
-        promptBundleOverrides: { discovery: "intake-normalize" },
-        forceReadOnly: true,
-        runtimeEvidenceRefs: [file, ...submission.attachments.map((entry) => path.join(init.runtimeLayout.projectRuntimeRoot, entry.storage_ref))],
-      });
-      extraction = findNormalization(routed.stepResult?.routed_execution?.adapter_response?.output);
-      candidate = extraction.candidate ?? {};
-      provider = routed.stepResult?.routed_execution?.adapter_resolution?.selected?.adapter ?? provider;
+  return withSubmissionLock(registry, projectId, submissionId, () => {
+    const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+    const { submission, init, context, file } = loaded;
+    if (["confirmed", "canceled"].includes(submission.status)) throw new IntentServiceError("intent_submission.terminal", "Terminal intent submissions cannot be prepared again.", 409);
+
+    const key = preparationKey(normalization);
+    const latest = latestNormalizationReport(loaded);
+    if (submission.status === "prepared" && submission.preparation_key === key && latest.report) {
+      return { submission, report: latest.report, report_file: latest.reportFile, idempotent: true };
     }
-    const revision = submission.normalization_refs.length + 1;
-    const report = validateNormalization(candidate, {
-      submission_id: submissionId,
-      workspace_project_id: context.projectId,
-      project_id: init.projectId,
-      revision,
-      previous_revision_ref: submission.normalization_refs.at(-1) ?? null,
-      provider: { route_id: selectedRouteId, adapter_id: provider },
-    }, normalization ? null : extraction);
-    const reportFile = path.join(init.runtimeLayout.reportsRoot, `intent-normalization-report-${submissionId}-v${revision}.json`);
-    atomicJson(reportFile, report);
-    submission.normalization_refs.push(`evidence://projects/${context.projectId}/reports/${path.basename(reportFile)}`);
-    submission.status = report.status === "prepared" ? "prepared" : "blocked";
+    if (submission.status === "preparing") {
+      submission.status = "blocked";
+      submission.blocker = {
+        code: "intent_prepare.interrupted",
+        message: "A previous preparation attempt stopped before it committed a result; retrying from the durable submission state.",
+      };
+    }
+    const previousNormalization = normalization ? latest.report : null;
+    const attemptId = derivePublicId(["intent-prepare-attempt", submissionId, key], "intent-prepare-attempt");
+    submission.status = "preparing";
+    submission.preparation_key = key;
+    submission.preparation_attempt = { attempt_id: attemptId, preparation_key: key, owner_pid: process.pid, started_at: now() };
     submission.updated_at = now();
     atomicJson(file, submission);
-    return { submission, report, report_file: reportFile };
-  } catch (error) {
-    submission.status = "blocked";
-    submission.updated_at = now();
-    submission.blocker = { code: error?.code ?? "intent_prepare.failed", message: error instanceof Error ? error.message : String(error) };
-    atomicJson(file, submission);
-    throw error;
-  }
+    let provider = normalization
+      ? previousNormalization?.provider?.adapter_id ?? "operator-revision"
+      : providerReadiness(registry, projectId);
+    let selectedRouteId = normalization
+      ? previousNormalization?.provider?.route_id ?? "route.intake-normalize.default"
+      : "route.intake-normalize.default";
+    let candidate = normalization ? asRecord(normalization) : {};
+    let extraction = null;
+    try {
+      if (!normalization) {
+        if (!provider) throw new IntentServiceError("intent_provider.not_ready", "Configure and authenticate Codex, Claude, or Qwen before preparing this task.", 409);
+        selectedRouteId = provider === "claude-code" ? "route.intake-normalize.claude" : provider === "qwen-code" ? "route.intake-normalize.qwen" : "route.intake-normalize.default";
+        const routed = executeRoutedStep({
+          ...context.runtimeOptions,
+          stepClass: "discovery",
+          dryRun: false,
+          runId: derivePublicId(["intent-normalize", submissionId], "intent-normalize-run"),
+          stepId: "intent.normalize",
+          requireDiscoveryCompleteness: false,
+          routeOverrides: { discovery: selectedRouteId },
+          promptBundleOverrides: { discovery: "intake-normalize" },
+          forceReadOnly: true,
+          runtimeEvidenceRefs: [file, ...submission.attachments.map((entry) => path.join(init.runtimeLayout.projectRuntimeRoot, entry.storage_ref))],
+        });
+        extraction = findNormalization(routed.stepResult?.routed_execution?.adapter_response?.output);
+        candidate = extraction.candidate ?? {};
+        provider = routed.stepResult?.routed_execution?.adapter_resolution?.selected?.adapter ?? provider;
+      }
+      const revision = submission.normalization_refs.length + 1;
+      const report = validateNormalization(candidate, {
+        submission_id: submissionId,
+        workspace_project_id: context.projectId,
+        project_id: init.projectId,
+        revision,
+        previous_revision_ref: submission.normalization_refs.at(-1) ?? null,
+        provider: { route_id: selectedRouteId, adapter_id: provider },
+      }, normalization ? null : extraction);
+      report.preparation_key = key;
+      const reportFile = path.join(init.runtimeLayout.reportsRoot, `intent-normalization-report-${submissionId}-v${revision}.json`);
+      atomicJson(reportFile, report);
+      submission.normalization_refs.push(`evidence://projects/${context.projectId}/reports/${path.basename(reportFile)}`);
+      submission.status = report.status === "prepared" ? "prepared" : "blocked";
+      submission.preparation_attempt = { ...submission.preparation_attempt, status: "completed", finished_at: now() };
+      submission.updated_at = now();
+      atomicJson(file, submission);
+      return { submission, report, report_file: reportFile, idempotent: false };
+    } catch (error) {
+      submission.status = "blocked";
+      submission.preparation_attempt = { ...submission.preparation_attempt, status: "failed", finished_at: now() };
+      submission.updated_at = now();
+      submission.blocker = { code: error?.code ?? "intent_prepare.failed", message: error instanceof Error ? error.message : String(error) };
+      atomicJson(file, submission);
+      throw error;
+    }
+  });
 }
 
 export function readIntentSubmission({ registry, projectId, submissionId }) {
@@ -438,7 +481,7 @@ export function readIntentSubmission({ registry, projectId, submissionId }) {
   const reportFile = reportName ? path.join(loaded.init.runtimeLayout.reportsRoot, reportName) : null;
   return {
     submission: { ...loaded.submission, markdown_sources: currentMarkdownSourceStatus(loaded.context, loaded.submission.markdown_sources) },
-    normalization: reportFile && fs.existsSync(reportFile) ? JSON.parse(fs.readFileSync(reportFile, "utf8")) : null,
+    normalization: reportFile && fs.existsSync(reportFile) ? readJsonState(reportFile) : null,
   };
 }
 
@@ -453,18 +496,14 @@ export function listIntentSubmissions({ registry, projectId }) {
     .map((entry) => {
       const file = path.join(root, entry.name, "submission.json");
       if (!fs.existsSync(file)) return null;
-      try {
-        const submission = JSON.parse(fs.readFileSync(file, "utf8"));
-        const latestRef = submission.normalization_refs?.at(-1);
-        const reportName = latestRef?.split("/").at(-1);
-        const reportFile = reportName ? path.join(init.runtimeLayout.reportsRoot, reportName) : null;
-        const normalization = reportFile && fs.existsSync(reportFile)
-          ? JSON.parse(fs.readFileSync(reportFile, "utf8"))
-          : null;
-        return { submission: { ...submission, markdown_sources: currentMarkdownSourceStatus(context, submission.markdown_sources) }, normalization };
-      } catch {
-        return null;
-      }
+      const submission = readJsonState(file);
+      const latestRef = submission.normalization_refs?.at(-1);
+      const reportName = latestRef?.split("/").at(-1);
+      const reportFile = reportName ? path.join(init.runtimeLayout.reportsRoot, reportName) : null;
+      const normalization = reportFile && fs.existsSync(reportFile)
+        ? readJsonState(reportFile)
+        : null;
+      return { submission: { ...submission, markdown_sources: currentMarkdownSourceStatus(context, submission.markdown_sources) }, normalization };
     })
     .filter(Boolean)
     .sort((left, right) => String(right.submission.updated_at ?? "").localeCompare(String(left.submission.updated_at ?? "")));
@@ -515,12 +554,14 @@ export function answerIntentQuestions({ registry, projectId, submissionId, answe
 }
 
 export function cancelIntentSubmission({ registry, projectId, submissionId }) {
-  const loaded = loadSubmission(registry, projectId, submissionId);
-  if (loaded.submission.status === "confirmed") throw new IntentServiceError("intent_submission.confirmed", "Confirmed submissions cannot be canceled.", 409);
-  loaded.submission.status = "canceled";
-  loaded.submission.updated_at = now();
-  atomicJson(loaded.file, loaded.submission);
-  return { submission: loaded.submission };
+  return withSubmissionLock(registry, projectId, submissionId, () => {
+    const loaded = loadSubmission(registry, projectId, submissionId);
+    if (loaded.submission.status === "confirmed") throw new IntentServiceError("intent_submission.confirmed", "Confirmed submissions cannot be canceled.", 409);
+    loaded.submission.status = "canceled";
+    loaded.submission.updated_at = now();
+    atomicJson(loaded.file, loaded.submission);
+    return { submission: loaded.submission };
+  });
 }
 
 function startConfirmedIntent({ loaded }) {
@@ -543,15 +584,17 @@ function startConfirmedIntent({ loaded }) {
 }
 
 export function retryIntentStart({ registry, projectId, submissionId }) {
-  const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
-  if (!loaded.submission.confirmation) {
-    throw new IntentServiceError("intent_submission.not_confirmed", "Confirm the prepared task before retrying its start.", 409);
-  }
-  if (loaded.submission.confirmation.retryable_start !== true) return loaded.submission.confirmation;
-  return startConfirmedIntent({ loaded });
+  return withSubmissionLock(registry, projectId, submissionId, () => {
+    const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+    if (!loaded.submission.confirmation) {
+      throw new IntentServiceError("intent_submission.not_confirmed", "Confirm the prepared task before retrying its start.", 409);
+    }
+    if (loaded.submission.confirmation.retryable_start !== true) return loaded.submission.confirmation;
+    return startConfirmedIntent({ loaded });
+  });
 }
 
-function confirmIntentRecord({ registry, projectId, submissionId, expectedRevision }) {
+function confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision }) {
   const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
   if (loaded.submission.confirmation) {
     if (loaded.submission.confirmation.next_action) return { confirmation: loaded.submission.confirmation, loaded };
@@ -636,14 +679,16 @@ function confirmIntentRecord({ registry, projectId, submissionId, expectedRevisi
 }
 
 export function confirmIntent({ registry, projectId, submissionId, expectedRevision }) {
-  return confirmIntentRecord({ registry, projectId, submissionId, expectedRevision }).confirmation;
+  return withSubmissionLock(registry, projectId, submissionId, () => confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision }).confirmation);
 }
 
 export function confirmAndStartIntent({ registry, projectId, submissionId, expectedRevision }) {
-  const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
-  if (loaded.submission.confirmation?.discovery) return loaded.submission.confirmation;
-  const record = loaded.submission.confirmation
-    ? { confirmation: loaded.submission.confirmation, loaded }
-    : confirmIntentRecord({ registry, projectId, submissionId, expectedRevision });
-  return startConfirmedIntent({ loaded: record.loaded });
+  return withSubmissionLock(registry, projectId, submissionId, () => {
+    const loaded = loadSubmission(registry, projectId, submissionId, { initialize: true });
+    if (loaded.submission.confirmation?.discovery) return loaded.submission.confirmation;
+    const record = loaded.submission.confirmation
+      ? { confirmation: loaded.submission.confirmation, loaded }
+      : confirmIntentRecordUnlocked({ registry, projectId, submissionId, expectedRevision });
+    return startConfirmedIntent({ loaded: record.loaded });
+  });
 }

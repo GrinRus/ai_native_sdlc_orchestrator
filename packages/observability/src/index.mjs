@@ -1,5 +1,13 @@
 export { appendLiveRunEvent, listLiveRunEvents, openLiveRunEventStream } from "./live-run-events.mjs";
-export { acquireFileLock, releaseFileLock, withFileLock, writeJsonAtomic } from "./file-transaction.mjs";
+export {
+  acquireFileLock,
+  releaseFileLock,
+  StateTransactionError,
+  readJsonState,
+  updateJsonState,
+  withFileLock,
+  writeJsonAtomic,
+} from "./file-transaction.mjs";
 export { buildFinanceMonitoringSnapshot, FINANCE_MONITORING_DIMENSION_NAMES } from "./finance-monitoring.mjs";
 export {
   applyIncidentRecertification,

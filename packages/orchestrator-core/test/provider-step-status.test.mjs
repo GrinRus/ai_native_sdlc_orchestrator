@@ -9,7 +9,7 @@ import { listRuns, readProjectState, readRunEventHistory } from "../src/control-
 import { finalizeRunControlState } from "../src/operator-cli/command-runtime.mjs";
 import { mergeProviderStepStatus, normalizeProviderStepStatus } from "../src/provider-step-status.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
-import { applyRunControlAction } from "../src/run-control.mjs";
+import { applyRunControlAction, updateRunControlProviderStepStatus } from "../src/run-control.mjs";
 
 /**
  * @param {(repoRoot: string) => void} callback
@@ -317,6 +317,44 @@ test("run cancel records provider interruption instead of pass or crash", () => 
     assert.equal(run?.execution_evidence?.provider_interruption_owner, "operator");
     assert.equal(run?.execution_evidence?.provider_interruption_status, "operator-stopped");
     assert.equal(run?.execution_evidence?.actions.find((entry) => entry.action_id === "save_partial_evidence")?.enabled, true);
+  });
+});
+
+test("provider status transaction preserves operator controls and action revision", () => {
+  withCleanRepo((repoRoot) => {
+    const started = applyRunControlAction({ cwd: repoRoot, projectRef: repoRoot, runId: "provider-race", action: "start", commandId: "command-provider-start" });
+    const paused = applyRunControlAction({ cwd: repoRoot, projectRef: repoRoot, runId: "provider-race", action: "pause", commandId: "command-provider-pause", expectedRevision: started.revision });
+    const providerStatus = updateRunControlProviderStepStatus({
+      stateFile: paused.stateFile,
+      patch: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.qwen",
+        step_id: "run.start.implement",
+        status: "running",
+        timeout_budget_ms: 60_000,
+        started_at: "2026-06-02T00:00:00.000Z",
+      },
+    });
+    assert.equal(providerStatus.adapter, "qwen-code");
+    const state = JSON.parse(fs.readFileSync(paused.stateFile, "utf8"));
+    assert.equal(state.status, "paused");
+    assert.equal(state.last_action, "pause");
+    assert.equal(state.action_sequence, paused.revision);
+    assert.equal(state.provider_step_status.status, "timeout-risk");
+  });
+});
+
+test("provider status transaction quarantines a corrupt run-control state", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    const stateFile = path.join(init.runtimeLayout.stateRoot, "run-control-state-corrupt-provider.json");
+    fs.writeFileSync(stateFile, "{broken\n", "utf8");
+    assert.throws(
+      () => updateRunControlProviderStepStatus({ stateFile, patch: { status: "running" } }),
+      (error) => error.code === "state-corrupt" && Boolean(error.recovery_ref),
+    );
+    assert.equal(fs.existsSync(stateFile), false);
   });
 });
 

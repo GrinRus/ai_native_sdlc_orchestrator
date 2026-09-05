@@ -378,13 +378,14 @@ function listReadableEvidenceSidecarSummaries(options = {}) {
  */
 function readLatestProviderStepStatus(init, options = {}) {
   const requestedRunId = asString(options.runId);
+  const currentStateRoot = path.resolve(init.runtimeLayout.stateRoot);
   const runControlStatuses = listRunControlStateFiles(init)
     .flatMap((filePath) => {
       try {
         const state = JSON.parse(fs.readFileSync(filePath, "utf8"));
         const normalized = normalizeProviderStepStatus(asRecord(state).provider_step_status);
         const runId = asString(asRecord(state).run_id);
-        return normalized ? [{ status: normalized, runId, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
+        return normalized ? [{ status: normalized, runId, file: filePath, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
       } catch {
         return [];
       }
@@ -398,7 +399,10 @@ function readLatestProviderStepStatus(init, options = {}) {
     });
   const matchingStatuses = requestedRunId
     ? statuses.filter((entry) => entry.runId === requestedRunId)
-    : statuses;
+    : (() => {
+        const currentProjectStatuses = statuses.filter((entry) => path.resolve(path.dirname(entry.file ?? "")) === currentStateRoot);
+        return currentProjectStatuses.length > 0 ? currentProjectStatuses : statuses;
+      })();
   return (matchingStatuses[0] ?? statuses[0])?.status ?? null;
 }
 

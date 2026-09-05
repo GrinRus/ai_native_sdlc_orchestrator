@@ -3,6 +3,8 @@
 All families inherit the cross-cutting [canonical identifier, path-scope, and
 reference-base rules](canonical-identifiers-and-paths.md).
 
+Shared mutable local state also follows the [state transaction contract](state-transaction.md).
+
 Filesystem reads, materialization, copy, and cleanup additionally inherit the
 [canonical path ownership rules](canonical-path-ownership.md).
 

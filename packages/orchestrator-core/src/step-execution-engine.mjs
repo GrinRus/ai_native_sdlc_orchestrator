@@ -28,7 +28,6 @@ import {
   resolveRuntimeMissionProfile,
   synthesizeRepairAttempts,
 } from "./runtime-harness-report.mjs";
-import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mjs";
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { applyExecutableFailurePolicy } from "./failure-policy.mjs";
@@ -36,6 +35,7 @@ import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
 import { completeStepAttemptReservation, renewStepAttemptReservation, reserveStepAttempt } from "./attempt-store.mjs";
 import { buildStepExecutionIdentity } from "./execution-input-identity.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
+import { updateRunControlProviderStepStatus as persistRunControlProviderStepStatus } from "./run-control.mjs";
 import { captureCheckoutSnapshot, compareCheckoutSnapshots, prepareWorkspaceIsolation, resumeWorkspaceIsolation, resumeWorkspaceSetIsolation } from "./workspace-isolation.mjs";
 import {
   evaluateRuntimePermissionRequest,
@@ -213,18 +213,7 @@ function readJsonFile(filePath) {
  * @returns {Record<string, unknown> | null}
  */
 function updateRunControlProviderStepStatus(filePath, patch) {
-  if (typeof filePath !== "string" || filePath.trim().length === 0) return null;
-  const stateFile = filePath.trim();
-  const existingState = readJsonFile(stateFile) ?? {};
-  const status = mergeProviderStepStatus(asRecord(existingState.provider_step_status), patch);
-  const nextState = {
-    ...existingState,
-    provider_step_status: status,
-    updated_at: status.updated_at,
-  };
-  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
-  fs.writeFileSync(stateFile, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
-  return status;
+  return persistRunControlProviderStepStatus({ stateFile: filePath, patch });
 }
 
 /**
