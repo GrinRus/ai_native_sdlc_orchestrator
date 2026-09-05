@@ -383,6 +383,21 @@ graph TD
   W70S07[W70-S07 Design-system implementation and legacy UI retirement]
   W70S08[W70-S08 Installed Task Workspace proof and story closure]
   W70S10[W70-S10 Task Workspace visual fidelity and review-proof remediation]
+  W71S01[W71-S01 Audit disposition, proof scope, and coordination baseline]
+  W71S02[W71-S02 Symlink-safe path confinement and durable cleanup]
+  W71S03[W71-S03 Deterministic repository gate and dependency/process safety]
+  W71S04[W71-S04 Versioned Task contract and execution-route truth]
+  W71S05[W71-S05 Atomic intent and runtime state transactions]
+  W71S06[W71-S06 Closed delivery, release, route, and scope validation]
+  W71S07[W71-S07 Server-owned Task start and action progression]
+  W71S08[W71-S08 Durable Ask AOR, review, and completion]
+  W71S09[W71-S09 Canonical multirepo scope locks and isolated integration]
+  W71S10[W71-S10 Public workspace provision-to-integration lifecycle]
+  W71S11[W71-S11 Resolvable evidence and adversarial qualification proof]
+  W71S12[W71-S12 Enforceable quality coverage and maintainability ratchets]
+  W71S15[W71-S15 Live-E2E flow hotspot decomposition]
+  W71S13[W71-S13 Source-of-truth and story-evidence alignment]
+  W71S14[W71-S14 UI-refactor integration, installed black-box closure, and freeze]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -920,6 +935,34 @@ graph TD
   W69S04 --> W69S05
   W69S05 --> W69S06
   W69S06 --> W69S07
+  W69S07 --> W70S01
+  W70S01 --> W70S02
+  W70S02 --> W70S09
+  W70S09 --> W70S03
+  W70S02 --> W70S04
+  W70S03 --> W70S04
+  W70S04 --> W70S05
+  W70S05 --> W70S06
+  W70S06 --> W70S07
+  W70S07 --> W70S08
+  W70S08 --> W70S10
+  W66S25 --> W71S01
+  W70S10 --> W71S01
+  W71S01 --> W71S02
+  W71S02 --> W71S03
+  W71S03 --> W71S04
+  W71S04 --> W71S05
+  W71S05 --> W71S06
+  W71S06 --> W71S07
+  W71S07 --> W71S08
+  W71S06 --> W71S09
+  W71S08 --> W71S10
+  W71S09 --> W71S10
+  W71S10 --> W71S11
+  W71S11 --> W71S12
+  W71S12 --> W71S15
+  W71S15 --> W71S13
+  W71S13 --> W71S14
 ```
 
 ## W0 hard dependencies
@@ -1577,6 +1620,21 @@ own the stricter terminal control proof evidence for this lane.
 | W70-S07 | W70-S06 |
 | W70-S08 | W70-S07 |
 | W70-S10 | W70-S08 |
+| W71-S01 | W66-S25, W70-S10 |
+| W71-S02 | W71-S01 |
+| W71-S03 | W71-S02 |
+| W71-S04 | W71-S03 |
+| W71-S05 | W71-S04 |
+| W71-S06 | W71-S05 |
+| W71-S07 | W71-S06 |
+| W71-S08 | W71-S07 |
+| W71-S09 | W71-S06 |
+| W71-S10 | W71-S08, W71-S09 |
+| W71-S11 | W71-S10 |
+| W71-S12 | W71-S11 |
+| W71-S15 | W71-S12 |
+| W71-S13 | W71-S15 |
+| W71-S14 | W71-S13 |
 
 ## Qualification gates
 
@@ -1594,7 +1652,7 @@ qualification_gate:
 The gate is valid only while `W66-S09` is `blocked` with its recorded external
 Anthropic runner-quota blocker. It permits deterministic W67 entry and
 completion; it never marks `W66-S09` done, clears production `audit-hold`, or
-creates provider qualification evidence. W68-W70 development closure uses
+creates provider qualification evidence. W68-W71 development closure uses
 deterministic and local-browser acceptance; release qualification remains
 external.
 
@@ -1983,6 +2041,21 @@ external.
 382. W70-S07
 383. W70-S08
 384. W70-S10
+385. W71-S01
+386. W71-S02
+387. W71-S03
+388. W71-S04
+389. W71-S05
+390. W71-S06
+391. W71-S09
+392. W71-S07
+393. W71-S08
+394. W71-S10
+395. W71-S11
+396. W71-S12
+397. W71-S15
+398. W71-S13
+399. W71-S14
 
 W66 weak-runner remediation edges:
 
@@ -2052,6 +2125,29 @@ graph TD
   W70S06 --> W70S07[W70-S07 Design-system implementation and legacy UI retirement]
   W70S07 --> W70S08[W70-S08 Installed Task Workspace proof and story closure]
   W70S08 --> W70S10[W70-S10 Task Workspace visual fidelity and review-proof remediation]
+```
+
+W71 dependency edges:
+
+```mermaid
+graph TD
+  W66S25[W66-S25 Weak-runner adversarial proof and qualification reset] --> W71S01[W71-S01 Audit disposition, proof scope, and coordination baseline]
+  W70S10[W70-S10 Task Workspace visual fidelity and review-proof remediation] --> W71S01
+  W71S01 --> W71S02[W71-S02 Symlink-safe path confinement and durable cleanup]
+  W71S02 --> W71S03[W71-S03 Deterministic repository gate and dependency/process safety]
+  W71S03 --> W71S04[W71-S04 Versioned Task contract and execution-route truth]
+  W71S04 --> W71S05[W71-S05 Atomic intent and runtime state transactions]
+  W71S05 --> W71S06[W71-S06 Closed delivery, release, route, and scope validation]
+  W71S06 --> W71S07[W71-S07 Server-owned Task start and action progression]
+  W71S07 --> W71S08[W71-S08 Durable Ask AOR, review, and completion]
+  W71S06 --> W71S09[W71-S09 Canonical multirepo scope locks and isolated integration]
+  W71S08 --> W71S10[W71-S10 Public workspace provision-to-integration lifecycle]
+  W71S09 --> W71S10
+  W71S10 --> W71S11[W71-S11 Resolvable evidence and adversarial qualification proof]
+  W71S11 --> W71S12[W71-S12 Enforceable quality coverage and maintainability ratchets]
+  W71S12 --> W71S15[W71-S15 Live-E2E flow hotspot decomposition]
+  W71S15 --> W71S13[W71-S13 Source-of-truth and story-evidence alignment]
+  W71S13 --> W71S14[W71-S14 UI-refactor integration, installed black-box closure, and freeze]
 ```
 
 ## Planning rule

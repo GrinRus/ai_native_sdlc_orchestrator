@@ -1,15 +1,16 @@
 # Backlog operating model
 
-The latest defined wave is W70. It is registered behind W69-S07 and preserves
-the single-active-slice rule. The S20-S25 deterministic chain is closed, but
-W66-S09 remains explicitly blocked by the required Anthropic provider cells'
-external runner quota failure. W67-S01 entered through its explicit
-release-only qualification gate. W68-W70 development slices were accepted
-through deterministic code, contracts, and local browser proof. W70-S10 is done
-and closed the evidence-backed Task Workspace visual-fidelity and review-proof
-gap; any follow-up is branch-local maintenance validation and does not reopen
-W70 or create W71. This does not close W66-S09, clear the audit hold, or create
-provider qualification evidence.
+The latest defined wave is W71. It converts the post-W70 codebase audit into a
+release-blocking remediation lane and preserves the single-active-slice rule.
+The W66 S20-S25 deterministic chain is closed, but W66-S09 remains explicitly
+blocked by the required Anthropic provider cells' external runner quota
+failure. W67-S01 entered through its explicit release-only qualification gate,
+and W68-W70 development slices were accepted through deterministic code,
+contracts, and local browser proof. W70-S10 remains closed for its accepted
+visual-fidelity and review-read scope; the newly demonstrated filesystem,
+Task-flow, state, multirepo, contract, gate, and evidence gaps are independent
+outcomes owned by W71 rather than a rewrite of W70 history. W71 does not close
+W66-S09, clear the audit hold, or create provider qualification evidence.
 
 ## Purpose
 
@@ -43,7 +44,7 @@ Every wave may carry two independent statuses:
 - **release qualification** — provider/live evidence, paid-run policy, and the
   release ledger.
 
-Development acceptance may close W68-S04 through W70-S08 without running Codex,
+Development acceptance may close W68 through W71 slices without running Codex,
 Claude, or Qwen. Code-only completion is not provider qualification evidence.
 W66-S09 remains the separate release blocker; production readiness stays
 `blocked` with `release_disposition=audit-hold` and `release_clearance=false`
@@ -203,7 +204,7 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 The repo carries detailed wave documents for every currently defined
 `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is
-`W70`. W22-W56 remain the completed implementation and proof history. W57 is the
+`W71`. W22-W56 remain the completed implementation and proof history. W57 is the
 selected audit-remediation lane for release truth, contracts, no-write/isolation,
 permissions, delivery, initialization, project-context anchoring, and concurrent
 evidence integrity. W58 continues with non-materializing reads, effective
@@ -267,6 +268,16 @@ internal-object-first navigation with Tasks, adds truthful task runner override
 and Markdown source handling, unifies active work/review/evidence, and requires
 installed visual/accessibility proof before retiring the Quiet Cockpit surface.
 
+W71 is the post-W70 trust and canonical-flow recovery lane. It first records
+the audit disposition and parallel UI ownership boundary, then repairs
+filesystem containment, repository gates, Task contracts and server-owned
+actions, state transactions, delivery/release validation, multirepo locks and
+integration, public provision-to-close reachability, evidence integrity,
+quality ratchets, and source-of-truth drift. Its final slice integrates the
+separately merged Command Desk UI refactor and proves the packaged product
+through real control-plane no-write, patch/recovery/Ask AOR, and two-repository
+journeys before freezing inputs for W66-S09.
+
 Because W57-W59 are audit remediation, their owning wave documents also record
 `remediation_priority` and `estimated_effort`. These are planning metadata for
 sequencing and capacity; acceptance still depends on executable evidence, not an
@@ -274,5 +285,9 @@ estimate or severity label.
 
 The implementation order remains constrained by hard dependencies and the
 single-active-slice rule. Provider/live prerequisites are release concerns, not
-development blockers for W68-W70. A later-wave slice can be implemented after
+development blockers for W68-W71. A later-wave slice can be implemented after
 its code dependencies close while W66-S09 continues to hold release readiness.
+Parallel UI work may investigate and implement its disjoint web-owned write set,
+but each W71 slice must inspect that task/branch/PR before editing a shared
+surface; W71-S14 is the single integration owner after the UI merge or immutable
+handoff.

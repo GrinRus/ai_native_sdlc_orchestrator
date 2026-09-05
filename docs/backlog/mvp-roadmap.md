@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-70-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-71-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -81,8 +81,9 @@ The authoritative planning model for implementation lives in:
 | W68 | Reconcile, complete, and certify provider-neutral runtime model and reasoning-effort selection with adapter-owned argument mapping and durable evidence. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-68-implementation-slices.md` |
 | W69 | Close intent-first confirmation correctness, runtime-owned adaptive paths, resume-safe navigation, review-first Prepared Task UX, and Flow Cockpit visual parity. | 7 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-69-implementation-slices.md` |
 | W70 | Replace internal-object-first console navigation with the Task Workspace, truthful task runner selection, safe Markdown sources, integrated review, and installed visual acceptance. | 10 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-70-implementation-slices.md` |
+| W71 | Restore post-W70 filesystem, gate, Task-flow, state, multirepo, contract, evidence, and source-of-truth integrity while integrating the parallel Command Desk UI refactor only at final installed acceptance. | 15 | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-71-implementation-slices.md` |
 
-The current roadmap contains **384 slices across 71 waves**.
+The current roadmap contains **399 slices across 72 waves**.
 
 ## Post-MVP story allocation
 | Slice ID | Story allocation / closure target |
@@ -328,6 +329,21 @@ The current roadmap contains **384 slices across 71 waves**.
 | W66-S24 | structured artifact and evaluator hardening target: EMP-01, EMP-02, DEV-01, DEV-05, RQA-05, OPS-06 |
 | W66-S25 | weak-runner adversarial proof and qualification reset target: DEV-01, DEV-04, DEV-05, AIP-12, RQA-05, OPS-06, OPS-07 |
 | W66-S09 | same-commit Codex/Claude qualification closure target: DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03 |
+| W71-S01 | audit disposition, evidence-tier truth, and parallel UI ownership baseline: PBO-10, EMP-03, DEV-05, OPS-06, OPS-10, OPS-11, OPS-12, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, FIN-03 |
+| W71-S02 | canonical filesystem containment and durable cleanup target: PBO-05, SEC-04, DTX-05, FIN-03 |
+| W71-S03 | deterministic repository gate and dependency/process safety target: OPS-06, OPS-07, SEC-04, FIN-03 |
+| W71-S04 | truthful versioned Task and execution-route contract target: PBO-09, PBO-10, DEV-01, OPS-01, OPS-12 |
+| W71-S05 | atomic intent/runtime state and control-transition target: EMP-05, DEV-05, OPS-01, OPS-02, OPS-11, OPS-12, FIN-03 |
+| W71-S06 | fail-closed delivery/release/route/scope validation target: DEV-01, SEC-04, RMO-04, RMO-05, DTX-04, DTX-07, DTX-08, FIN-03 |
+| W71-S07 | server-owned Prepare/Start/Work target: PBO-09, PBO-10, DEV-01, OPS-01, OPS-12 |
+| W71-S08 | durable Ask AOR, review, recovery, and completion target: DEV-05, DEV-06, RQA-02, OPS-04, OPS-11, OPS-12, DTX-01, DTX-04 |
+| W71-S09 | atomic multirepo scope locks and isolated integration target: EMP-03, RMO-03, RMO-04, RMO-05, RMO-06, DTX-05, DTX-06, DTX-08, SEC-04 |
+| W71-S10 | public provision-to-integration lifecycle target: EMP-03, DEV-01, DEV-05, OPS-01, OPS-10, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08 |
+| W71-S11 | resolvable evidence and adversarial qualification-proof target: AIP-06, OPS-06, OPS-07, FIN-03, FIN-04 |
+| W71-S12 | enforceable static/structural/critical-path quality ratchets (no direct story closure) |
+| W71-S15 | bounded live-E2E flow hotspot decomposition (no direct story closure) |
+| W71-S13 | current source-of-truth and story-evidence alignment target: PBO-09, PBO-10, OPS-06, OPS-11, OPS-12, EMP-03, DEV-05, RMO-04, RMO-05, RMO-06, DTX-06, DTX-08, FIN-03 |
+| W71-S14 | merged UI/runtime installed black-box and qualification-freeze target: PBO-09, PBO-10, DEV-05, DEV-06, OPS-01, OPS-06, OPS-11, OPS-12, RMO-04, RMO-05, RMO-06, DTX-01, DTX-04, DTX-08 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -1487,10 +1503,9 @@ private live profile explicitly selects a supported value, with adapter-owned
 argument mapping, durable requested/effective/source evidence, and a reversible
 qualification-backed cutover.
 
-**Entry condition:** W67-S05 is complete. W68-S01 through W68-S03 are
-deterministic and complete; W68-S04 is ready for the bounded Codex-only
-rehearsal. No Claude/Qwen live run or provider waiver changes the active W66
-qualification baseline.
+**Historical entry record:** W67-S05 was complete before W68 began. W68-S01
+through W68-S05 are now done; their deterministic acceptance did not run or
+waive the separate W66 live qualification baseline.
 
 **Decision boundary:** W68 is not a greenfield route implementation. Existing
 route, adapter, SDK, evidence, and projection fields must receive an explicit
@@ -1506,9 +1521,9 @@ than translating effort vocabularies across providers.
 Cockpit presentation with the intent-driven console contract while keeping
 runtime ownership headless-first and the W66 qualification hold unchanged.
 
-**Entry condition:** W68-S05 remains the hard dependency for the shared
-backlog lane. W69 work is recorded as a blocked successor and does not alter
-the single-active-slice rule or historical W66 evidence.
+**Historical entry record:** W68-S05 was the hard dependency for the shared
+backlog lane. W69-S01 through W69-S07 are now done and did not alter historical
+W66 evidence or the independent live qualification hold.
 
 **Exit criteria:**
 
@@ -1531,8 +1546,9 @@ write-back choices before execution, treat Markdown as immutable or pinned
 source material, and integrate activity, attention, review, and evidence into
 one coherent workspace.
 
-**Entry condition:** W69-S07 closes. W70 remains a blocked successor while the
-W66 qualification and W67-W69 dependency chain is open.
+**Historical entry record:** W69-S07 was complete before W70 began. W70-S01
+through W70-S10 are now done under deterministic and installed-browser
+development acceptance; W66 live qualification remains independently blocked.
 
 **Exit criteria:**
 
@@ -1552,6 +1568,49 @@ W66 qualification and W67-W69 dependency chain is open.
 - product, contracts, examples, stories, browser proof, and runbooks agree.
 
 **Detailed slices:** `docs/backlog/wave-70-implementation-slices.md`
+
+## W71 - trust and canonical-flow recovery
+
+**Goal:** Convert the post-W70 audit into a deterministic remediation lane that
+restores filesystem containment, repository-gate truth, server-owned Task
+execution, concurrent-state integrity, bounded multirepo integration, and
+independently verifiable evidence before the next live qualification attempt.
+
+**Entry condition:** W66-S25 and W70-S10 are complete. W66-S09 remains an
+independent release-only blocker, so its external Anthropic quota does not block
+deterministic W71 work and W71 does not grant release clearance.
+
+**Parallel UI boundary:** The separate Command Desk UI-refactor task owns all
+`apps/web/src/**`, `apps/web/browser/**`, `apps/web/test/**`, generated
+`apps/web/dist/**`, and its additive product-design document until merge. Every
+pre-integration W71 slice, including W71-S15, owns only disjoint contracts,
+core/API behavior, state, multirepo execution, evidence, and non-visual tests;
+it must not edit the UI-owned write set concurrently. W71-S14 fetches and
+updates from `origin/main` after the UI handoff, reconciles minimal client
+wiring, and owns the combined installed black-box proof.
+
+**Exit criteria:**
+
+- release/readiness sources expose every post-W70 blocker and no stale or mock
+  proof is represented as current integrated evidence;
+- repository-controlled paths cannot escape canonical roots through symlinks,
+  races, forged ownership, or restart cleanup;
+- the supported Node matrix, dependency audits, process budgets, and canonical
+  repository gate pass deterministically;
+- Prepared Task exposes the exact versioned outcome, acceptance, scope,
+  write-back, route, readiness, and revision that Start executes;
+- Start, Ask AOR, recovery, review, and completion are atomic, idempotent,
+  server-owned, and recoverable after reload/restart;
+- multirepo scope locks, Git integration, output identity, actual diff, public
+  provisioning, repair, and coordinated delivery fail closed;
+- evidence bytes, digests, provenance, freshness, and per-family adversarial
+  validation are independently reproducible;
+- the merged Command Desk UI passes no-write, patch/recovery/Ask AOR, and
+  two-repository installed scenarios without AOR API fulfillment mocks or
+  upstream writes;
+- one immutable current-version freeze is ready for a complete W66-S09 rerun.
+
+**Detailed slices:** `docs/backlog/wave-71-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

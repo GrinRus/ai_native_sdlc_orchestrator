@@ -104,7 +104,7 @@ W18 closes the connected operator-surface path for runner-requested questions: s
 
 `W32-S01` adds operator-initiated runtime intervention: CLI, API, and web can create a durable `operator-request`, compile it into the selected runtime step, and materialize proposal/patch evidence while keeping `run steer` as run-control only.
 
-The `OPS-11` baseline is limited to bounded operator-request creation and execution against a selected flow. `OPS-12` is proven by the W63 golden lifecycle and W65 post-cutover installed single-renderer acceptance; it remains bounded to deterministic no-write execution without credentialed providers or upstream writes.
+The current `OPS-11` partial baseline is limited to bounded operator-request creation; W71-S08 owns atomic create-and-run and resumable completion. W63/W65 remain historical deterministic lifecycle evidence for `OPS-12`, while W71-S14 owns current installed real-control-plane proof without credentialed providers or upstream writes.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
@@ -159,7 +159,7 @@ headless bounded-execution baseline rather than the full operator workflow in
 
 `W31-S01` and `W36-S03`/`W36-S04` established the earlier repo-attached local UI baseline. W67 supersedes its first-run contract with explicit local/Git source connection, central AOR Home, free-form intent preparation, confirmation, project switching, and logical evidence refs without exposing storage paths.
 
-That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S07 closes the approved Execution Setup UX over the canonical execution-profile contract, and W61-S05 records the combined neutral Workspace, topology, persistence, and installed onboarding proof that closes `PBO-10`.
+That `PBO-09` baseline is intentionally repo-attached and ends at first Mission intake. It does not prove neutral-directory Workspace launch or a complete UI-only lifecycle. W61-S05/W61-S07 remain the neutral Workspace and approved Execution Setup baseline; W71-S14 owns the missing current Task-level route/readiness/safety selection and exact Prepared-to-Start execution proof for `PBO-10`.
 
 W67 replaces that topology-first baseline with central AOR Home and intent-first
 ingress. Its target outcome is: an installed user supplies code plus text or a

@@ -1901,11 +1901,14 @@ it does not reopen them inside adapter implementation.
 - **Primary modules:** private live-E2E profiles and operator loop, qualification
   reports, final assessment/evidence indexes, backlog/readiness closure docs
 - **Hard dependencies:** W66-S25
-- **External blocker:** The required Anthropic medium and large cells are blocked
-  at claude-code adapter preflight because the host runner is Kimi-backed and
-  its billing-cycle quota returned HTTP 403. Provider execution was not
-  attempted, so W66-S09 cannot close or grant release clearance until an
-  authorized runner with available quota is restored.
+- **External blocker:** W71-S14 qualification freeze is absent and the required Anthropic runner quota is unavailable.
+
+  Both conditions must be explicitly re-evaluated before W66-S09 starts.
+  W71-S14 must merge or consume the immutable `Улучшить UI и UX` handoff, pass
+  the installed real-control-plane journeys, and freeze current qualification
+  identities. Separately, the current Kimi-backed host failed claude-code
+  adapter preflight with HTTP 403 before provider execution. Restored quota
+  alone does not remove the W71-S14 prerequisite.
 - **Primary user story surfaces:** DEV-01, DEV-04, AIP-12, OPS-06, OPS-07, FIN-03
 
 ### Local tasks
@@ -1915,6 +1918,13 @@ post-validation, structured-artifact, and repair-retry contracts. Every guided
 or provider result predating that behavior chain remains immutable diagnostic
 evidence but cannot satisfy the final W66-S09 four-cell closure.
 
+Post-W70 audit reset on 2026-09-05: W71 restores evidence integrity and the
+canonical installed lifecycle before another paid qualification attempt. No
+W66-S09 cell may start until W71-S14 has merged the parallel UI refactor,
+passed the real-control-plane black-box journeys, and frozen one current source,
+target, profile, and evidence identity. Earlier evidence remains diagnostic and
+does not grant release clearance.
+
 1. **Installed guided proof baseline**
    - Purpose: Establish UI/UX and accessibility dimensions on the exact AOR commit used by all cells.
    - Changes: Run one installed guided proof with the S07 scenario contract and
@@ -1923,10 +1933,13 @@ evidence but cannot satisfy the final W66-S09 four-cell closure.
      reload/reconnect, and no-write criteria on the frozen commit.
 2. **Sequential four-cell execution**
    - Purpose: Produce comparable provider qualification evidence without concurrent contamination.
-   - Changes: Run medium Codex, medium Claude, large Codex, and large Claude in
-     fresh isolated workspaces using one AOR commit and one pinned `ky` commit.
-   - Validation: Every cell records actual provider/adapter/model/reasoning,
-     terminal controller state, diagnostics, changed paths, delivery, and health.
+   - Changes: Consume the exact W71-S14 qualification-freeze manifest and run
+     medium Codex, medium Claude, large Codex, and large Claude in fresh isolated
+     workspaces without changing any frozen source, target, package, UI handoff,
+     profile, or proof identity.
+   - Validation: Every cell matches all freeze digests and records actual
+     provider/adapter/model/reasoning, terminal controller state, diagnostics,
+     changed paths, delivery, and health.
 3. **Public-only operation and bounded repair**
    - Purpose: Preserve the black-box boundary through every interaction and repair.
    - Changes: Use only installed public AOR commands for decisions, answers,
@@ -2055,7 +2068,7 @@ four-cell W66 matrix because Anthropic medium and both large cells were not run.
   remained `active`, and the release disposition remained `audit-hold` with
   `release_clearance=false`; the current checkpoint below supersedes it.
 
-### Current four-cell qualification checkpoint — 2026-08-11
+### Historical four-cell qualification checkpoint — 2026-08-11 (superseded)
 
 The S20-S25 remediation chain is now merged and the fresh matrix ran against
 one AOR commit and one pinned `ky` commit. Two Codex cells passed; both required
@@ -2079,20 +2092,24 @@ partial W66 pass, and it does not authorize W67 entry.
   `docs/research/24-w66-live-qualification-evidence-index.json`, and the
   machine-readable closure is in
   `docs/research/25-w66-qualification-closure.json`.
-- Readiness remains `status=blocked`, `gate_execution_status=pass`,
-  `release_disposition=audit-hold`, and `release_clearance=false`. W67-W70
-  remain blocked by the single-active-slice rule until W66-S09 closes.
+- At that checkpoint readiness remained `status=blocked`,
+  `gate_execution_status=pass`, `release_disposition=audit-hold`, and
+  `release_clearance=false`, and W67-W70 were recorded as blocked. Their later
+  deterministic development acceptance used the documented release-only
+  qualification exception; W71 now supersedes this checkpoint while W66-S09
+  remains the independent release blocker.
 
 ### Acceptance criteria
 
-1. All four cells use one AOR commit and one pinned target commit.
+1. All four cells consume the exact W71-S14 freeze manifest and match its AOR,
+   target, package, UI handoff, profile, proof, and artifact digests.
 2. Every cell reaches terminal public lifecycle with `run_health=pass`.
 3. Required diagnostics, review, QA, and delivery evidence pass.
 4. Every cell has a validated final all-pass quality assessment.
 5. Exact changed paths are meaningful, scoped, and evidence-backed.
 6. Primary AOR/target checkouts and upstream remotes remain unchanged.
 7. No credential value, paid judge transcript, raw runtime path, or private artifact is committed.
-8. Any product fix after matrix start invalidates and restarts all four final cells.
+8. Any frozen-identity drift before or during the matrix invalidates and restarts all four final cells.
 9. W66 closes only after the four-cell comparison and ledger-derived readiness decision are reproducible.
 
 ### Done evidence
