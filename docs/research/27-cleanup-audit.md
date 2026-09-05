@@ -28,10 +28,37 @@ families and 75 effective private families). Full gate and browser acceptance
 must pass on the PR revision before merge; these focused results alone do not
 establish that result. The PR's CI run is the authoritative merge evidence.
 
+## Iteration 2: active documentation and evidence scope
+
+Base: main `d94c599d5499c2f9191c420cda08f406e2f2587a`, after
+[iteration 1 PR #296](https://github.com/GrinRus/ai_native_sdlc_orchestrator/pull/296).
+Its [CI run](https://github.com/GrinRus/ai_native_sdlc_orchestrator/actions/runs/33970459445)
+passed the full `pnpm check`, validated 103/103 tracked test files, and passed
+all three browser scenarios. Readiness retained the valid audit hold with
+`release_clearance=false`.
+
+The second review traced current instructions to the Task renderer, Task/Flow
+projections, HTTP router, request action handler, and W62 component proof:
+
+- Strategic/planner and finance reads remain available through CLI/API; retired
+  panels no longer count as current web coverage.
+- FIN-03 now distinguishes W62 execution-DAG/stale-boundary fixtures from a
+  produced public workspace, integration, and delivery evidence chain.
+- Ask AOR is an active-Task text composer. Its Task action creates a `no-write`
+  request without running it; explicit request execution and interaction answers
+  remain available through the separate public CLI/API surfaces.
+- Task attention exposes quality blockers and evidence refs, not the full Flow
+  quality-gate detail panel. Runtime gating remains authoritative.
+- Related onboarding claims now distinguish Task summaries/actions from old
+  stage workbenches, raw closure-state rendering, and policy/event counters.
+
+Accepted W32 ADR text remains historical decision evidence. The W70 target
+specification remains normative; its recovery requirements do not establish
+that W71-S08 implementation is complete. No runtime behavior, public contract,
+story status, release hold, or future slice is changed by this iteration.
+
 ## Remaining review work
 
-Iteration 2 must align active Strategic/finance, Ask AOR, and quality-gate UI
-instructions with Task Workspace, and correct FIN-03's W62 proof scope.
 Iteration 3 must review the integrated code, documentation, links, and gate
 evidence from the updated main. Each iteration is a separate PR; findings remain
 open until the corresponding changes and applicable checks are complete.

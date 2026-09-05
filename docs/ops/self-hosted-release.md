@@ -79,7 +79,7 @@ well-formed audited hold and cannot turn failed evidence into clearance.
 6. Scope bearer principals to the expected project id unless cross-project automation is intentional.
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 8. For installed-user UI validation, launch `aor app --project-ref <repo> on loopback.
-9. For operator-initiated runtime work, use `aor request create/run/status` or the local UI Ask AOR drawer; keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
+9. For operator-initiated runtime work, use `aor request create/run/status`. The active Task's Ask AOR guidance composer creates a `no-write` request but does not run it; execute and inspect it through the request CLI/API. Keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
 10. Keep credentialed provider qualification and real network delivery inside
     the explicitly reviewed W66 profile only. The compatibility flag
     `--unsafe-development-override` is for maintainer development probes and
