@@ -73,8 +73,11 @@
   --aor-task-sidebar-operator-halo: rgb(71 169 92 / 18%);
   --aor-task-queue-header-bg: #f6f9f9;
   --aor-task-row-hover: #edf7f6;
-  --aor-task-row-selected: #e3f2f1;
-  --aor-task-row-id: #1b7d86;
+  --aor-task-row-selected: #e7f5f4;
+  --aor-task-row-id: #087e83;
+  --aor-task-selected-border: #a4cece;
+  --aor-task-group-attention: #c56600;
+  --aor-task-group-active: #3e843a;
   --aor-task-running: #4d913a;
   --aor-task-running-bg: #eef7eb;
   --aor-task-ready: #2782a0;
