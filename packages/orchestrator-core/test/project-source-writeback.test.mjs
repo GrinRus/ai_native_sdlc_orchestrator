@@ -215,6 +215,12 @@ test("portable config and selected evidence export are explicit and never stage 
       assert.equal(exported.manifest.entries[0].sha256.length, 64);
       assert.equal(fs.existsSync(path.join(exported.directory, "evidence-export-manifest.json")), true);
       assert.equal(spawnSync("git", ["-C", projectRoot, "diff", "--cached", "--quiet"]).status, 0);
+      const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-writeback-outside-"));
+      try {
+        fs.writeFileSync(path.join(outsideRoot, "secret.json"), "secret\n", { mode: 0o600 });
+        fs.symlinkSync(path.join(outsideRoot, "secret.json"), path.join(context.projectRuntimeRoot, "reports", "external.json"), "file");
+        assert.throws(() => exportEvidence({ registry, projectId, flowId: "flow.test", exportId: "external", evidenceRefs: [`evidence://projects/${projectId}/reports/external.json`] }), ProjectWritebackError);
+      } finally { fs.rmSync(outsideRoot, { recursive: true, force: true }); }
       assert.throws(() => exportEvidence({ registry, projectId, flowId: "flow.test", exportId: "bad", evidenceRefs: [`evidence://projects/${projectId}/inputs/private.txt`] }), ProjectWritebackError);
       fs.mkdirSync(path.join(context.projectRuntimeRoot, "logs"), { recursive: true });
       fs.writeFileSync(path.join(context.projectRuntimeRoot, "logs", "provider-raw.log"), "secret");

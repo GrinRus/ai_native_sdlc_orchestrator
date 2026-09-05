@@ -141,6 +141,12 @@ test("repository Markdown sources are pinned, sanitized, and fail closed on unsa
       assert.equal(source.stale, false);
       fs.appendFileSync(path.join(projectRoot, "docs", "requirements.md"), "\nChanged after pin.\n", "utf8");
       assert.equal(readIntentSubmission({ registry, projectId: registry.defaultProjectId, submissionId: created.submission.submission_id }).submission.markdown_sources[0].stale, true);
+      const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-markdown-outside-"));
+      try {
+        fs.writeFileSync(path.join(outsideRoot, "secret.md"), "secret\n", "utf8");
+        fs.symlinkSync(path.join(outsideRoot, "secret.md"), path.join(projectRoot, "docs", "external.md"), "file");
+        assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "docs/external.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_path");
+      } finally { fs.rmSync(outsideRoot, { recursive: true, force: true }); }
       assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "../outside.md" }], autoPrepare: false }), (error) => error.code === "intent_source.invalid_path");
       assert.throws(() => createIntentSubmission({ registry, projectId: registry.defaultProjectId, markdownSources: [{ project_relative_path: "missing.md" }], autoPrepare: false }), (error) => error.code === "intent_source.not_found");
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }

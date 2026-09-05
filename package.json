@@ -65,7 +65,7 @@
   "homepage": "https://github.com/GrinRus/ai_native_sdlc_orchestrator#readme",
   "packageManager": "pnpm@10.12.4",
   "engines": {
-    "node": ">=22"
+    "node": ">=22 <23"
   },
   "scripts": {
     "build": "node ./scripts/build.mjs",
@@ -73,12 +73,15 @@
     "test:web:browser": "playwright test --config apps/web/playwright.config.mjs",
     "test": "node ./scripts/test-runner.mjs",
     "typecheck": "node ./scripts/typecheck-ratchet.mjs",
-    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/contract-kernel-parity.mjs && node ./scripts/current-doc-vocabulary.mjs",
+    "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/gate-coverage.mjs && node ./scripts/contract-kernel-parity.mjs && node ./scripts/current-doc-vocabulary.mjs",
+    "audit:all": "node ./scripts/dependency-audit.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
+    "guidance:check": "node ./scripts/guidance-check.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm quality:ratchet && pnpm release:verify",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm quality:ratchet && pnpm audit:all && pnpm release:verify",
     "production:ready": "node ./scripts/production-readiness.mjs",
+    "remediation:gate": "node ./scripts/bootstrap-remediation-gate.mjs",
     "w58:proof": "node ./scripts/w58-runtime-quality-proof.mjs",
     "w61:proof": "node ./scripts/w61-topology-onboarding-proof.mjs",
     "w62:proof": "node ./scripts/w62-full-flow-proof.mjs",

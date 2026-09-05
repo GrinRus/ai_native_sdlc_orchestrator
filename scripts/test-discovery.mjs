@@ -64,6 +64,9 @@ export function buildTestExecutionPlan({ manifest, candidates, now = new Date() 
     if (!new Set(["standard", "private-proof-harness"]).has(group.timeout_class)) {
       errors.push(`Test group '${group.group_id}' has invalid timeout_class '${group.timeout_class}'.`);
     }
+    if (group.test_name_pattern !== undefined && typeof group.test_name_pattern !== "string") {
+      errors.push(`Test group '${group.group_id}' has invalid test_name_pattern.`);
+    }
     if (group.test_concurrency !== undefined && (!Number.isInteger(group.test_concurrency) || group.test_concurrency < 1)) {
       errors.push(`Test group '${group.group_id}' has invalid test_concurrency '${group.test_concurrency}'.`);
     }
@@ -79,10 +82,13 @@ export function buildTestExecutionPlan({ manifest, candidates, now = new Date() 
     group_id: group.group_id,
     timeout_class: group.timeout_class,
     test_concurrency: group.test_concurrency,
+    test_name_pattern: group.test_name_pattern,
     files: [],
   }));
   const plannedById = new Map(plannedGroups.map((group) => [group.group_id, group]));
   const excluded = [];
+  const partitioned = [];
+  let partitionedExtraCount = 0;
 
   for (const candidate of candidates) {
     const exclusion = exclusionByPath.get(candidate);
@@ -93,8 +99,15 @@ export function buildTestExecutionPlan({ manifest, candidates, now = new Date() 
       continue;
     }
     if (matches.length === 0) errors.push(`Tracked test '${candidate}' is not mapped to a test group.`);
-    if (matches.length > 1) errors.push(`Tracked test '${candidate}' maps to multiple groups: ${matches.map((g) => g.group_id).join(", ")}.`);
+    if (matches.length > 1 && matches.some((group) => typeof group.test_name_pattern !== "string")) {
+      errors.push(`Tracked test '${candidate}' maps to multiple unpartitioned groups: ${matches.map((g) => g.group_id).join(", ")}.`);
+    }
     if (matches.length === 1) plannedById.get(matches[0].group_id).files.push(candidate);
+    else if (matches.length > 1 && matches.every((group) => typeof group.test_name_pattern === "string")) {
+      partitioned.push(candidate);
+      partitionedExtraCount += matches.length - 1;
+      for (const group of matches) plannedById.get(group.group_id).files.push(candidate);
+    }
   }
 
   for (const exclusionPath of exclusionByPath.keys()) {
@@ -107,6 +120,8 @@ export function buildTestExecutionPlan({ manifest, candidates, now = new Date() 
     errors,
     candidate_count: candidates.length,
     excluded: excluded.sort((a, b) => a.path.localeCompare(b.path)),
+    partitioned: partitioned.sort(),
+    partitioned_extra_count: partitionedExtraCount,
     groups: plannedGroups.filter((group) => group.files.length > 0),
   };
 }
@@ -170,7 +185,9 @@ export function validateTestExecutionReport(rootDir, options = {}) {
     errors.push("Test report group execution does not cover every non-excluded candidate.");
   }
   if (reportedGroups.some((group) => group.status !== "pass")) errors.push("Test report contains a non-passing group.");
-  if (recomputedDuplicates.length > 0) errors.push(`Test report groups duplicate: ${recomputedDuplicates.join(", ")}.`);
+  const allowedPartitioned = new Set(plan.partitioned ?? []);
+  const invalidDuplicates = recomputedDuplicates.filter((file) => !allowedPartitioned.has(file));
+  if (invalidDuplicates.length > 0) errors.push(`Test report groups duplicate: ${invalidDuplicates.join(", ")}.`);
   if (Array.isArray(report.duplicate_files) && report.duplicate_files.length > 0) errors.push("Test report contains duplicate executions.");
   if (Array.isArray(report.missing_files) && report.missing_files.length > 0) errors.push("Test report contains missing executions.");
 

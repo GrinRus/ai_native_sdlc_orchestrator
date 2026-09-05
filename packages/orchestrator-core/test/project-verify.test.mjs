@@ -11,6 +11,7 @@ import {
   captureCheckoutSnapshot,
   compareCheckoutSnapshots,
   prepareWorkspaceIsolation,
+  resumeWorkspaceIsolation,
 } from "../src/workspace-isolation.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -144,6 +145,39 @@ test("workspace cleanup refuses a symlink replacement and preserves its external
   } finally {
     fs.rmSync(projectRoot, { recursive: true, force: true });
     fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
+
+test("workspace cleanup records corruption and a resumed retry remains idempotent", () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-s03-cleanup-retry-"));
+  try {
+    fs.writeFileSync(path.join(projectRoot, "source.txt"), "source\n", "utf8");
+    const projectRuntimeRoot = path.join(projectRoot, ".aor", "projects", "project-one");
+    fs.mkdirSync(projectRuntimeRoot, { recursive: true });
+    const isolation = prepareWorkspaceIsolation({
+      projectRoot,
+      runtimeRoot: path.join(projectRoot, ".aor"),
+      projectRuntimeRoot,
+      runtimeDefaults: { workspace_mode: "ephemeral" },
+      runId: "project-one.cleanup-retry",
+    });
+    const marker = fs.readFileSync(isolation.ownerMarker, "utf8");
+    fs.writeFileSync(isolation.ownerMarker, "{corrupted\n", "utf8");
+    assert.equal(isolation.cleanup("failure", "delete").status, "delete-failed");
+    assert.equal(JSON.parse(fs.readFileSync(isolation.cleanupStatePath, "utf8")).state, "delete-failed");
+    assert.equal(fs.existsSync(isolation.executionRoot), true);
+    fs.writeFileSync(isolation.ownerMarker, marker, "utf8");
+    const resumed = resumeWorkspaceIsolation({
+      projectRoot,
+      projectRuntimeRoot,
+      executionRoot: isolation.executionRoot,
+      runtimeDefaults: { workspace_mode: "ephemeral" },
+    });
+    assert.equal(resumed.cleanup("failure", "delete").status, "deleted");
+    assert.equal(JSON.parse(fs.readFileSync(isolation.cleanupStatePath, "utf8")).state, "deleted");
+    assert.equal(resumed.cleanup("failure", "delete").status, "deleted");
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
   }
 });
 

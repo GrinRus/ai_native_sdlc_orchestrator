@@ -47,10 +47,87 @@ Ownership is singular:
 ## Rules
 - do not merge prompt guidance, runtime context, and execution envelope into one opaque file;
 - `AGENTS.md` and `.agents/**` are repository-development guidance, not runtime assets;
-- committed registry roots contain source assets and static samples only; runtime-emitted compiled artifacts belong under AOR Home (`~/.aor` or `AOR_HOME`);
+- committed registry roots contain source assets and static samples only;
+  product runtime compilation outputs follow the
+  [AOR Home layout](15-runtime-root-layout.md) under `AOR_HOME` (default `~/.aor`);
 - certify prompt-bundle, context, and compiler changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.
+
+Internal maintainer rehearsal tooling may use ignored run-scoped output under
+the AOR source checkout's `.aor/`, as governed by
+`scripts/AGENTS.md`. Connected target repositories reserve `.aor/` for
+explicit portable configuration and evidence exports.
+
+## Authoring prompt and context changes
+
+Use this entry point when the requested change affects instructions or reference
+content without adding a runtime field or changing an API. First identify the
+selected asset and its consumers: project defaults and step overrides select
+prompt bundles and skill profiles, while selected context bundles enumerate
+context docs, rules, and skills. `applies_to` describes applicability; it does
+not independently discover or activate an unreferenced asset.
+
+Keep the change in its owning asset:
+
+| Requested change | Owning source |
+|---|---|
+| Task instructions, input expectations, output guidance | `examples/prompts/` and `docs/contracts/prompt-bundle.md` |
+| Step-class workflow selected by a project profile | `examples/skills/` and `docs/contracts/skill-profile.md` |
+| Runtime references, constraints, or bundled workflows | `examples/context/` and the matching context contract in `docs/contracts/00-index.md` |
+| Contributor workflow for developing AOR | `AGENTS.md` and `.agents/skills/` |
+
+Revise the minimum selected assets needed by the task. Inspect existing bundle
+composition and profile overrides before adding another overlay. Prompt wording
+cannot grant execution permissions: tools and execution envelopes remain owned
+by wrappers, model selection by routes, and retry/writeback bounds by policies.
+If a change needs new fields, reference syntax, or accepted output structure,
+follow the contract-first workflow for the owning validator and consumers too.
+
+### Version, content identity, and compatibility
+
+The declared ID and `version` form the reference selected by consumers. The
+content digest identifies the normalized source content that was actually
+compiled. The compiled fingerprint also includes asset order, provenance, and
+compiler revision. Retaining an `@vN` reference therefore does not make an
+edited asset equivalent to the previously evaluated content.
+
+State the compatibility decision when changing an asset. A compatible candidate
+revision can keep its existing reference, but its changed content needs fresh
+evidence. Use a distinct version when consumers need to select the old and new
+behavior separately, and identify affected defaults, overrides, bundles, input
+requirements, and output expectations. Preserve any documented fallback still
+needed by existing profiles. A version bump alone does not demonstrate
+compatibility, quality, or promotion readiness.
+
+Context registries reject conflicting content under one canonical identity;
+byte-identical duplicates are accepted only across explicitly ordered registry
+roots. Check actual compiled content and digests when validating an edit. A
+context doc's `source.ref` and a context skill's `source_refs` preserve reference
+links. The current compiler delivers the selected context asset YAML inline;
+it does not recursively load the linked documents into that payload.
+
+### Evidence for an asset change
+
+Use [the contributor validation matrix](../../CONTRIBUTING.md#validation-by-change-type)
+to select commands and the final repository gate. Build evidence in this order:
+
+1. Validate the asset's contract and reference graph. Content-only edits do not
+   require an unrelated schema change or contract-kernel snapshot rewrite.
+2. Check resolution and compilation for the affected step: selected refs,
+   override/default precedence, required inputs, inline content, digest, and
+   fingerprint. Existing focused coverage lives in
+   `packages/orchestrator-core/test/asset-loader.test.mjs`,
+   `packages/orchestrator-core/test/skill-registry.test.mjs`, and
+   `packages/orchestrator-core/test/context-compiler.test.mjs`; choose the tests
+   relevant to the changed selection or content path.
+3. For a behavioral claim, compare representative outputs against the recorded
+   baseline using the applicable replay/evaluation flow. Capture the asset refs,
+   content identity, compiler revision, cases, and observed regressions. Passing
+   schema or reference checks alone does not establish instruction quality.
+4. Use the existing certification and promotion flow when changing an asset's
+   lifecycle status. Record pending evidence honestly; a local edit does not
+   itself authorize paid provider runs, publishing, or promotion.
 
 ## Runtime loading order (W2-S02)
 Asset resolution for a step is deterministic and follows this order:

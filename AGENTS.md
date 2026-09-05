@@ -17,7 +17,9 @@ specification, planning, execution, review, QA, delivery, release, and learning.
   actions.
 - Ask before destructive actions, upstream or external writes, publishing or
   releases, paid calls, credential or secret changes, new production
-  dependencies, or a material expansion of scope.
+  dependencies, or a material expansion of scope unless the user has already
+  explicitly authorized that action. Carry existing authorization forward;
+  do not ask again for routine actions within its bounds.
 - If a material ambiguity affects contracts, safety, or user-visible behavior,
   stop and ask. Otherwise proceed and call out the assumption in the handoff.
 
@@ -40,10 +42,11 @@ specification, planning, execution, review, QA, delivery, release, and learning.
 
 - This repository is docs-first with implemented CLI, API, web, and runtime
   baselines, but it is not yet a production-ready orchestrator runtime.
-- Product runtime outputs belong in AOR Home (`~/.aor` or `AOR_HOME`) and must
-  not be committed. Maintainer rehearsal outputs may use ignored repo-local
-  `.aor/`; target repositories receive only explicitly materialized portable
-  config or evidence exports.
+- Product runtime state belongs in AOR Home (`~/.aor`, or `AOR_HOME` for
+  isolated runs). Target-repository `.aor/` is reserved for explicit portable
+  configuration and evidence exports. Internal maintainer rehearsals may use
+  ignored run-scoped output under the source checkout's `.aor/` as documented
+  by their owning runbook. Never commit private runtime or rehearsal state.
 - English is the default language for docs, contracts, examples, comments, and
   commit-ready artifacts unless an external source requires another language.
 
@@ -72,10 +75,13 @@ Use the slice helpers when a slice is involved:
 - `pnpm slice:plan -- <slice-id>`
 - `pnpm slice:gate`
 
-For a commit-ready repository change, run `pnpm check`. Run
-`pnpm production:ready` only when production-readiness or release evidence is in
-scope. Use `pnpm install --frozen-lockfile` when dependencies need installation.
-If a relevant check is intentionally pending, state the exact reason.
+Choose focused verification from the
+[change validation matrix](CONTRIBUTING.md#validation-by-change-type), then run
+`pnpm check` once as the commit-ready repository gate. `pnpm slice:gate` and
+the scoped `pnpm release:gate` already include it. Production clearance and npm alpha release
+evidence use the distinct gates in the matrix. Use
+`pnpm install --frozen-lockfile` when dependencies need installation. If a
+relevant check is pending, state the exact reason.
 
 ## Parallel work
 
@@ -153,7 +159,9 @@ Use the root skills when their workflow matches the task:
 
 - `repo-navigation` for ownership and cross-file impact.
 - `contract-first-change` for packet, report, profile, route, wrapper, policy,
-  or API changes.
+  API, and runtime prompt/context/skill changes.
 - `backlog-workflow` for choosing, splitting, or validating a slice.
 - `story-traceability` for user-story coverage.
 - `npm-cli-alpha-release` for alpha release preparation or publication.
+- `live-e2e-preflight` and `live-e2e-runner` for internal maintainer rehearsals;
+  start with `scripts/AGENTS.md` for their boundary and runbook ownership.

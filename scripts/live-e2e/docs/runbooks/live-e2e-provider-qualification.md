@@ -1,5 +1,12 @@
 # Live E2E provider qualification matrix
 
+Reviewing existing qualification evidence is read-only. Fresh attempts,
+resuming a run, preparing reports, and recording qualification accounting are
+distinct operations and must match the user's request and budgets. Missing
+auth, permissions, or evidence does not authorize credential changes, commits,
+or paid reruns. Record mode writes local accounting without launching a new
+provider attempt.
+
 ## W66 fresh four-cell qualification
 
 The W66 qualification loop uses the versioned
@@ -49,7 +56,8 @@ provider path without turning optional providers into release blockers. It is a
 readable operator report surface, not raw runner logs and not a stable-release
 certificate.
 
-The W40 matrix covers:
+The W40 provider-path matrix described below remains separate from the W66
+required qualification matrix above. The W40 matrix covers:
 - `openai-primary` through the `codex-cli` adapter;
 - `anthropic-primary` through the `claude-code` adapter;
 - `open-code-primary` through the `open-code` adapter;
@@ -83,17 +91,21 @@ repository setup/build/test failures and local environment/auth blockers are
 valid fail-closed evidence, but they do not count as AOR product pass or
 provider quality pass.
 
-Provider qualification uses `live-e2e-run-health-report` only for run failure
+The W40 provider-path matrix uses `live-e2e-run-health-report` only for run failure
 classification. It must not use post-run code quality, artifact content quality,
 UI/UX quality, accessibility quality, `live-e2e-step-quality-assessment-report`,
 or `live-e2e-quality-assessment-report` to decide whether a provider path is
-qualified. Medium+ product acceptance consumes those quality reports separately.
+qualified. W66 cells additionally require accepted step-quality evidence and an
+all-pass final assessment, as described above; a W40 `qualified` status does not
+close those requirements. Medium+ product acceptance also consumes the quality
+reports separately.
 
-Strict quality-driven fix-and-rerun work may additionally run
+Authorized quality-driven fix-and-rerun work may additionally run
 `quality-assessment.mjs gate --policy all-pass` after a completed flow. That
 gate is a local outcome-quality closure check. It can create follow-up work and
-force a local rerun loop, but it does not change provider qualification status,
-release-blocking policy, or run-health owner/phase/class classification.
+identify the need for another attempt, but it does not rewrite the W40
+provider-path status, release-blocking policy, or run-health owner/phase/class
+classification. A new attempt still needs to fit the authorized run budget.
 
 ## Status rules
 
@@ -134,7 +146,7 @@ The sample matrix lives at
 
 ## Running or recording attempts
 
-For medium-or-larger qualification loops:
+For an authorized medium or large qualification attempt:
 
 ```bash
 node ./scripts/live-e2e/qualification-loop.mjs \
@@ -143,27 +155,30 @@ node ./scripts/live-e2e/qualification-loop.mjs \
   --qualification-set-file /tmp/aor-live-e2e-qualification-set.json
 ```
 
-For a manually resumed run, record the same run summary instead of starting a
-new target workspace:
+For a completed manually resumed run with an all-pass final assessment, record
+the same evidence when qualification accounting is requested:
 
 ```bash
 node ./scripts/live-e2e/qualification-loop.mjs \
   --project-ref . \
   --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-codex.yaml \
   --qualification-set-file /tmp/aor-live-e2e-qualification-set.json \
-  --record-run-summary-file <live-e2e-run-summary-file>
+  --record-run-summary-file <live-e2e-run-summary-file> \
+  --final-assessment-report-file <live-e2e-quality-assessment-report>
 ```
 
 The generated qualification set includes `provider_qualification_matrix` and
 the W66 four-cell `required_qualification_matrix`.
 Short/small diagnostic runs may be cited as blocker or candidate evidence, but
-they do not replace medium-or-larger qualification-loop evidence.
+they do not replace medium or large qualification-loop evidence. Xlarge uses
+manual operation only and cannot be entered into qualification sets even when
+its outcome assessment passes.
 
 The generated qualification analysis includes `run_health_report_ref`,
 `run_health_status`, and `run_health_gaps`. Treat these as the source for
-provider/environment/operator/AOR-owner follow-up. Use the separate quality
-assessment report for outcome backlog items only after provider qualification is
-recorded.
+provider/environment/operator/AOR-owner follow-up. Inspect the separate final
+quality assessment before recording W66 qualification, and use its outcome
+findings for any authorized follow-up work.
 
 Context-budget blockers such as `compiled_context_budget_exceeded` and
 provider-side overflow blockers such as `provider_context_window_exceeded` are

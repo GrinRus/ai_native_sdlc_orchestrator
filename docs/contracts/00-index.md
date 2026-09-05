@@ -3,6 +3,9 @@
 All families inherit the cross-cutting [canonical identifier, path-scope, and
 reference-base rules](canonical-identifiers-and-paths.md).
 
+Filesystem reads, materialization, copy, and cleanup additionally inherit the
+[canonical path ownership rules](canonical-path-ownership.md).
+
 ## Core packets and profiles
 - `workspace-registry.md`
 - `project-profile.md`

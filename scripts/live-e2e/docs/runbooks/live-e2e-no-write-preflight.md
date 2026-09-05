@@ -1,84 +1,113 @@
 # Live E2E no-write preflight procedure
 
-Use this procedure before an internal installed-user rehearsal. The maintained
-execution procedure is `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`;
-this preflight establishes target, storage, profile, and verification boundaries.
+This is the preparation checklist for current catalog-backed full journeys and
+installed-user guided proof. It supports profile review without a live run and
+preparation within an authorized rehearsal. Use the
+[standard runner](live-e2e-standard-runner.md) for exact launch and continuation
+commands and the [target catalog](live-e2e-target-catalog.md) for the selected
+mission's prerequisites and command ownership.
 
-## Safety and storage
+## Review before running
 
-- Keep upstream write-back disabled (`write_back_to_remote=false`). Select the
-  profile's explicit delivery mode; `no-write` smoke does not authorize a later
-  source change.
-- Use a disposable target checkout and isolated `AOR_HOME`. Product runtime
-  state belongs in AOR Home, not the target repository.
-- Keep generated profiles, operator decisions, inputs, and private transcripts
-  in the maintainer run's ignored output directory. Do not inject examples,
-  route overrides, or runtime scaffolding into the target checkout.
-- Public `aor` commands do not accept `--runtime-root`. Pass `AOR_HOME` through
-  the environment to isolate public command state.
+Inspect the selected profile and catalog cell first. Record:
 
-## Credential-free installation smoke
+- target and mission identity, provider variant, feature size, and run tier;
+- source-install policy, source/target commit requirements, and workspace mode;
+- setup, baseline, primary post-run, and diagnostic commands and their owners;
+- provider, command, iteration, and change budgets;
+- delivery policy, public interaction and browser-proof requirements;
+- required operator decisions, step-quality reports, and terminal evidence.
 
-Run from a neutral directory using the installed package:
+Review or diagnosis alone does not start a provider process, clone a target, or
+install its dependencies. A run request authorizes preparation only within its
+selected scope and budgets. Missing credentials or readiness are blockers to
+report; changing credentials, permissions, or paid attempt budgets requires
+applicable authorization. Keep `output_policy.write_back_to_remote=false`.
+A fork-shaped delivery plan does not authorize publication.
 
-```bash
-AOR_REHEARSAL_HOME="$(mktemp -d)"
-AOR_HOME="$AOR_REHEARSAL_HOME" aor doctor \
-  --project-ref /path/to/disposable-target \
-  --json
-AOR_HOME="$AOR_REHEARSAL_HOME" aor app \
-  --project-ref /path/to/disposable-target \
-  --smoke --open false --json
-```
+Small missions are flow-regression canaries. Medium and large product-change
+missions may contribute to qualification under the
+[current provider qualification rules](live-e2e-provider-qualification.md).
+Xlarge is manual observation only and cannot enter the step evaluator or
+qualification sets. Medium, large, and xlarge product-change steps all require
+accepted step-quality reports before continuation; final product quality uses
+a separate all-pass assessment.
 
-`doctor` reports environment and repository blockers. App smoke must return
-`status: "smoke-pass"` without creating repo-local `.aor` or changing target
-HEAD/status. It checks package and transport readiness; it does not certify
-provider execution or the complete installed Task lifecycle.
+## Installed-user preparation
 
-## Profile and target checks
+During an authorized run, let the proof runner own this sequence and inspect
+its evidence before allowing product execution:
 
-1. Resolve `target_catalog_id` and `feature_mission_id` from
-   `scripts/live-e2e/catalog/targets/*.yaml`. Pin the target revision and inspect
-   repository shape, tool prerequisites, and verification commands.
-2. Check the profile's flow range, installation policy, operator/interaction
-   policies, frontend capability, implementation repair budget, and
-   `no-upstream-write` safety policy using `.agents/skills/live-e2e-preflight/SKILL.md`.
-3. Keep the generated profile and bootstrap assets outside the target checkout.
-   Full-journey execution uses the installed public CLI/API/web boundary.
-4. Inspect setup, readiness, and verification evidence before continuing.
-   Required command failures block. Baseline diagnostics remain distinguishable
-   from post-run verification; follow the profile's declared enforcement mode.
-5. For provider qualification, satisfy the W71-S14 freeze prerequisite in
-   `docs/ops/w66-qualification-freeze.md` before starting any W66-S09 cell.
+1. Prove the installed AOR launcher. Source-channel acceptance uses an isolated
+   source install and records install, build, `aor --help`, and
+   `aor project init --help` results. A supplied binary must pass the required
+   launcher proof. `--runtime-root` and `--aor-install-mode repo-local` are
+   explicit dev/debug overrides, not acceptance defaults.
+2. Materialize the catalog target at its selected ref in the disposable
+   checkout. Check target identity, toolchain prerequisites, and initial
+   checkout cleanliness. Do not repair the original repository to make a
+   rehearsal pass.
+3. Prepare the feature request and generated profiles/assets in host-side
+   run-scoped state. Bootstrap through public installed `aor project init`
+   using those assets. Do not copy AOR examples, context, route overrides,
+   root project configuration, or provider-home state into the target.
+4. Run and inspect target setup, public analysis, validation, baseline
+   verification, and routed dry-run evidence in the runner's prescribed order.
+   Setup, validation, missing dry-run evidence, and unsafe write-back block
+   execution. Full-journey baseline verification is diagnostic unless the
+   profile declares `verification.baseline_gate.mode=blocking`; preserve the
+   actual failure rather than treating a diagnostic exception as a pass.
+5. Inspect real adapter readiness before provider execution. The readiness
+   probe may itself call the paid provider and uses the authorized auth and
+   permission mode. It must not recursively launch another provider CLI.
+   Missing runtime/auth, failed edit or permission probes, and exhausted budgets
+   stop execution with classified evidence.
+6. Continue through the public lifecycle only after the current controller
+   decision and any required step-quality gate are accepted. Use public
+   interaction, cancellation, and retry surfaces. A repair or retry remains
+   bounded by the existing task authorization and profile budget.
 
-## Abort conditions
+Production-proof candidates additionally require a blocking baseline gate,
+packaged bootstrap assets, real external-process readiness, and safe patch or
+local-branch delivery. A historical fixture is not fresh qualification proof.
 
-Stop when target checkout or setup fails, required tools or authorization are
-missing, required verification fails, command or path ownership is ambiguous,
-upstream writes would be required, or the declared execution budget is exhausted.
-Preserve the run's existing evidence and report the owning blocker before retry.
-Do not turn a setup/provider failure into a passing product-quality verdict.
+## Runtime and evidence ownership
 
-## Follow-up procedures
+The proof runner stores its own transcripts, summaries, generated assets, and
+target checkouts in its isolated workspace. An explicitly selected ignored
+`.aor/` root may hold internal rehearsal artifacts. Its session launcher sets
+an isolated `AOR_HOME` for mutable product state; ordinary installed operation
+uses `${AOR_HOME:-$HOME/.aor}`. These are different storage concerns.
 
-- Full-journey execution and operator decisions:
-  `scripts/live-e2e/docs/runbooks/live-e2e-standard-runner.md`.
-- Target requirements and verification policy:
-  `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md`.
-- Quality assessment:
-  `scripts/live-e2e/docs/runbooks/live-e2e-quality-rehearsal.md`.
-- Operator-request lifecycle: `docs/ops/ui-attach-detach.md`.
-- Delivery boundaries: `docs/ops/github-fork-first-delivery.md`.
-- Bounded multirepo component proof: `docs/ops/repo-aware-execution-proof.md`.
+Before provider execution, only runner-permitted `.aor/` preparation files may
+appear in the disposable target checkout. This narrow rehearsal allowance does
+not move product state into the target or permit arbitrary scaffolding. Use
+reported artifact refs and installation/session evidence rather than assuming
+all reports share a target-local path. Keep generated state and raw transcripts
+out of commits.
 
-## Historical evidence
+## Abort and handoff
 
-Retained bootstrap samples are indexed by
-`scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/README.md`. They describe
-the pre-W67 storage layout and do not prove the current installed journey.
-Historical W10 and W32 samples remain under
-`scripts/live-e2e/fixtures/evidence/w10-s01/` and
-`scripts/live-e2e/fixtures/evidence/w32-s01/`. Reproduction of current behavior
-must use the current public commands and declared profile, not old transcript
-paths or synthetic evidence references.
+Stop at failed setup or required verification, unsafe delivery policy, failed
+adapter readiness, missing controller or quality evidence, or exhausted budget.
+Keep run-health owner, phase, and failure class distinct from outcome-quality
+findings. Post-run primary verification and required diagnostics still need
+factual evidence even when baseline verification was diagnostic.
+
+Report the selected cell, attempted preparation, inspected evidence, readiness
+gaps, current decision, and next authorized action. A failed or incomplete flow
+cannot be promoted by manually changing reports or by reusing unrelated proof.
+
+## Historical rehearsal evidence
+
+W1/W2 bootstrap and routed rehearsal command sequences were removed from this
+active procedure because they depended on old target-local example assets and
+fixture directories that are no longer present. They are not current executable
+instructions or live acceptance inputs.
+
+Retained sanitized snapshots under
+`scripts/live-e2e/fixtures/evidence/bootstrap-rehearsal/ky/` and the W3, W4,
+W10, and W32 fixture directories document their original wave only. Interpret
+them with the owning historical wave and fixture notes. Current acceptance uses
+the installed-user sequence above, the standard runner's public step journal,
+and fresh evidence required by the selected qualification policy.

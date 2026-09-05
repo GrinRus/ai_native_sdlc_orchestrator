@@ -31,7 +31,9 @@ documentation, or maintenance fix may stay outside a feature slice when its
 boundary is explicit and it does not create a new independently acceptable
 outcome.
 
-For internal maintainer rehearsal dependency requirements, use the maintainer runbooks under `docs/ops/` as the source of truth.
+For internal maintainer rehearsal dependencies and procedures, start with
+`scripts/AGENTS.md` and follow its owning runbooks. Installed-user operations
+remain under `docs/ops/`.
 
 ## Development workflow
 
@@ -42,16 +44,47 @@ For internal maintainer rehearsal dependency requirements, use the maintainer ru
 4. Keep the PR bounded to that slice or maintenance outcome.
 5. Update docs, contracts, examples, and code together when they share the
    outcome.
-6. Run the default commit-ready gate:
+6. Select focused checks from the validation matrix below, then run the default
+   commit-ready gate once. Install dependencies when needed:
    ```bash
    pnpm install --frozen-lockfile
    pnpm check
    ```
-7. Run `pnpm production:ready` only when production-readiness or release
-   evidence is in scope. During the documented provider hold, alpha release
-   work may use `pnpm production:ready --allow-audit-hold` as defined by the
-   release workflow below.
+7. Run the additional readiness or release gate only when that evidence is in
+   scope, as defined in the matrix and release workflow below.
 8. Open a focused pull request with the evidence needed to review the change.
+
+## Validation by change type
+
+Use Node.js 22.x (`>=22 <23`) and the pnpm version pinned in `package.json` when reproducing CI.
+The installed CLI's minimum Node requirement is not certification of every
+newer Node version for contributor tests.
+
+Use the rows that match the changed surfaces. Start with deterministic checks,
+then focused tests, and finish with one `pnpm check` run for a commit-ready
+change. `pnpm slice:gate` and the scoped `pnpm release:gate` already run
+`pnpm check`; use the selected enclosing gate without a separate duplicate
+run. Repeat checks only when subsequent changes or failures require it.
+Record any pending check and its exact reason in the handoff or PR.
+
+| Changed surface | Focused verification and additional evidence |
+| --- | --- |
+| Contributor guidance, `AGENTS.md`, `.agents/skills/**`, or navigation docs | `pnpm guidance:check`; check referenced commands, paths, ownership, and authorization boundaries. |
+| Contracts, schemas, API payloads, or canonical examples | `pnpm test:references`; owning contract/parser tests and affected API tests; review compatibility and example parity. |
+| Runtime behavior, CLI/API command handling, or tooling | Owning runtime, command, or script tests, including failure and recovery paths affected by the change. |
+| Runtime prompts, context assets, skills, wrappers, or compiler | Reference checks and affected asset-loader/context-compiler tests; inspect version/ref compatibility and compiled provenance; use representative evaluation and baseline evidence for behavioral changes. See [asset lifecycle](docs/architecture/15-platform-assets-and-prompt-lifecycle.md). |
+| Rendered web UI or browser interaction | Relevant web tests and `pnpm test:web:browser`; inspect the changed flow, responsive behavior, and keyboard/focus states. Install Chromium with `pnpm exec playwright install chromium` if needed. A build alone does not prove browser behavior. |
+| Production clearance | `pnpm production:ready --json` must pass without an audit-hold exception; report gate execution and release disposition separately. |
+| npm CLI alpha release | `pnpm release:gate` includes the repository, browser, package, and smoke checks. It may accept a valid audit hold for alpha distribution; it does not grant production clearance. See [release runbook](docs/ops/npm-cli-alpha-release.md). |
+
+Checks involving paid providers, credentials, or external writes must stay
+within the user's explicit authorization. Reuse authorization already granted
+for the same bounded action; a validation row does not expand that scope.
+
+For changes to skill selection, task boundaries, or complex contributor
+workflows, use the [representative guidance cases](.agents/evals/contributor-guidance.md).
+The static guidance checker proves metadata/reference integrity; independent
+case replay evaluates the decisions an agent makes from those instructions.
 
 ## Release workflow
 
@@ -121,7 +154,11 @@ The repository-integrity workflow runs on:
 What the workflows prove today:
 - `pnpm check` runs lint, type checking, tests, build, quality ratchets,
   dependency policy, contract parity, and release metadata verification;
-- `pnpm production:ready` runs the stricter self-hosted production-readiness gate;
+- CI separately runs executable browser acceptance after installing Chromium;
+- CI runs `pnpm production:ready --json --allow-audit-hold` as a disposition
+  check: valid `audit-hold` evidence can pass this CI step while the report
+  remains `status: blocked` and `release_clearance: false`. Production
+  clearance requires the unqualified `pnpm production:ready` gate to pass;
 - release candidate PRs from `release/v<semver-alpha>` run `pnpm release:gate`,
   which may accept only a valid npm-alpha audit hold while production clearance
   remains false;
@@ -137,7 +174,13 @@ If the repository-integrity workflow fails, the failing step maps directly to on
 - English is the default project language.
 - Packet-first and contract-first rules are non-negotiable.
 - Keep orchestrator core runner-agnostic.
-- Do not commit `.aor/`, generated target checkouts, `.env` files, secrets, personal access tokens, credentials, or machine-local scratch notes.
+- Product runtime state resolves through `~/.aor` or the isolated `AOR_HOME`.
+  Target-repository `.aor/` is only for explicit portable config and selected
+  exports; internal rehearsals may keep ignored run-scoped output in the AOR
+  source checkout's `.aor/` according to their runbook.
+- Do not commit private AOR Home state, source-checkout `.aor/` rehearsal output,
+  generated target checkouts, `.env` files, secrets, personal access tokens,
+  credentials, or machine-local scratch notes.
 - Do not paste secrets, exploit details, private repository data, or credential-bearing runner transcripts into public issues, PRs, logs, or comments.
 - Public-repo rehearsals must stay no-write by default unless the selected slice explicitly expands the write-back boundary.
 - If a flow changes, update the matching public runbook or operator-facing guidance in the same PR.

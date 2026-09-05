@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validatePublicId } from "../../contracts/src/index.mjs";
+import { readCanonicalContainedFile, removeCanonicalContainedPath, resolveCanonicalContainedPath } from "./shared/canonical-paths.mjs";
 
 const OWNER_FILE = ".aor-workspace-set-owner.json";
 const SCRATCH_ROOTS = new Set([".aor", ".codex", ".claude", ".qwen", ".opencode"]);
@@ -126,7 +127,8 @@ function provisionRepository(repository, executionRoot) {
   if (preferred === "detached-worktree") {
     const result = runGit(repository.sourceRoot, ["worktree", "add", "--detach", executionRoot, repository.resolvedCommit], true);
     if (result.status === 0) return "detached-worktree";
-    fs.rmSync(executionRoot, { recursive: true, force: true });
+    const removal = removeCanonicalContainedPath({ root: path.dirname(executionRoot), target: executionRoot });
+    if (!removal.ok) throw new Error(`Failed to remove incomplete repository worktree (${removal.reason}).`);
   }
   const clone = runGit(repository.sourceRoot, ["clone", "--no-hardlinks", "--no-checkout", "--", repository.sourceRoot, executionRoot], true);
   if (clone.status !== 0) throw new Error(`Failed to provision repository '${repository.repoId}' by worktree or clone.`);
@@ -134,12 +136,20 @@ function provisionRepository(repository, executionRoot) {
   return "independent-clone";
 }
 
-function removeRepository(repository) {
-  if (!fs.existsSync(repository.execution_root)) return;
+function removeRepository(repository, managedRoot) {
+  const resolution = resolveCanonicalContainedPath({
+    root: managedRoot,
+    relativePath: path.relative(managedRoot, repository.execution_root).split(path.sep).join("/"),
+    base: "repository-bound",
+    rejectFinalSymlink: true,
+  });
+  if (!resolution.ok && resolution.reason !== "missing") throw new Error(`Repository cleanup refused '${repository.execution_root}' (${resolution.reason}).`);
+  if (!resolution.ok || !resolution.finalExists) return;
   if (repository.provisioning.strategy === "detached-worktree") {
     runGit(repository.source_root, ["worktree", "remove", "--force", repository.execution_root], true);
   }
-  fs.rmSync(repository.execution_root, { recursive: true, force: true });
+  const removal = removeCanonicalContainedPath({ root: managedRoot, target: repository.execution_root });
+  if (!removal.ok) throw new Error(`Repository cleanup failed (${removal.reason}).`);
 }
 
 export function provisionWorkspaceSet(options) {
@@ -148,14 +158,22 @@ export function provisionWorkspaceSet(options) {
   validateId(options.runId, "run_id");
   const repositories = validateRepositories(options.repositories, options.deliveryCapable === true);
   const projectRuntimeRoot = fs.realpathSync.native(options.projectRuntimeRoot);
-  const setsRoot = path.join(projectRuntimeRoot, "workspace-sets");
-  fs.mkdirSync(setsRoot, { recursive: true });
+  const setsRootCandidate = path.join(projectRuntimeRoot, "workspace-sets");
+  fs.mkdirSync(setsRootCandidate, { recursive: true });
+  const setsRoot = fs.realpathSync.native(setsRootCandidate);
+  if (!inside(setsRoot, projectRuntimeRoot)) throw new Error("Workspace-set root escaped the project runtime boundary.");
   const workspaceRoot = path.join(setsRoot, options.runId);
   const ownerMarker = path.join(workspaceRoot, OWNER_FILE);
-  const reportPath = options.reportPath ?? path.join(projectRuntimeRoot, "reports", `workspace-set.${options.runId}.json`);
+  const requestedReportPath = options.reportPath ?? path.join(projectRuntimeRoot, "reports", `workspace-set.${options.runId}.json`);
+  const reportRelative = path.relative(projectRuntimeRoot, path.resolve(requestedReportPath)).split(path.sep).join("/");
+  const reportResolution = resolveCanonicalContainedPath({ root: projectRuntimeRoot, relativePath: reportRelative, base: "repository-bound", rejectFinalSymlink: true });
+  if (!reportResolution.ok) throw new Error(`Workspace-set report path is not owned by the project runtime root (${reportResolution.reason}).`);
+  const reportPath = reportResolution.canonicalPath;
+  const cleanupStatePath = path.join(setsRoot, `.${options.runId}.cleanup.json`);
   if (fs.existsSync(workspaceRoot)) throw new Error(`Workspace set root already exists for run '${options.runId}'.`);
   fs.mkdirSync(workspaceRoot, { recursive: false });
   fs.writeFileSync(ownerMarker, `${JSON.stringify({ workspace_set_id: options.workspaceSetId, project_id: options.projectId, run_id: options.runId, workspace_root: workspaceRoot }, null, 2)}\n`, { flag: "wx" });
+  atomicJson(cleanupStatePath, { schema_version: 1, state: "pending", updated_at: new Date().toISOString(), workspace_root: workspaceRoot, workspace_set_id: options.workspaceSetId });
   const provisioned = [];
   try {
     for (const [index, repository] of repositories.entries()) {
@@ -201,8 +219,14 @@ export function provisionWorkspaceSet(options) {
     atomicJson(reportPath, manifest);
     return manifest;
   } catch (error) {
-    for (const repository of [...provisioned].reverse()) removeRepository(repository);
-    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+    try {
+      for (const repository of [...provisioned].reverse()) removeRepository(repository, workspaceRoot);
+      const removal = removeCanonicalContainedPath({ root: setsRoot, target: workspaceRoot });
+      if (!removal.ok) throw new Error(`Workspace-set rollback failed (${removal.reason}).`);
+      atomicJson(cleanupStatePath, { schema_version: 1, state: "deleted", updated_at: new Date().toISOString(), workspace_root: workspaceRoot, workspace_set_id: options.workspaceSetId });
+    } catch (cleanupError) {
+      atomicJson(cleanupStatePath, { schema_version: 1, state: "delete-failed", updated_at: new Date().toISOString(), workspace_root: workspaceRoot, workspace_set_id: options.workspaceSetId, error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError) });
+    }
     const relativeReport = path.relative(projectRuntimeRoot, reportPath).split(path.sep).join("/");
     const failure = {
       schema_version: 2,
@@ -236,14 +260,28 @@ export function finalizeWorkspaceSet(manifest, outcome) {
     manifest.cleanup.state = "retained";
     return manifest;
   }
-  const marker = JSON.parse(fs.readFileSync(manifest.owner_marker, "utf8"));
-  if (marker.workspace_set_id !== manifest.workspace_set_id || marker.workspace_root !== manifest.workspace_root || !inside(manifest.workspace_root, path.dirname(manifest.workspace_root))) {
+  const managedRoot = fs.realpathSync.native(path.dirname(manifest.workspace_root));
+  const markerRelative = path.relative(managedRoot, manifest.owner_marker).split(path.sep).join("/");
+  const markerRead = readCanonicalContainedFile({ root: managedRoot, relativePath: markerRelative, base: "repository-bound", maxBytes: 32 * 1024 });
+  if (!markerRead.ok) throw new Error(`Workspace-set owner marker cannot be safely read (${markerRead.reason}).`);
+  const marker = JSON.parse(markerRead.bytes.toString("utf8"));
+  if (marker.workspace_set_id !== manifest.workspace_set_id || marker.workspace_root !== manifest.workspace_root || !inside(manifest.workspace_root, managedRoot)) {
     throw new Error("Workspace-set owner marker does not match cleanup target.");
   }
-  for (const repository of [...manifest.repositories].reverse()) removeRepository(repository);
-  fs.rmSync(manifest.workspace_root, { recursive: true, force: true });
-  manifest.cleanup.state = "deleted";
-  return manifest;
+  const cleanupStatePath = path.join(managedRoot, `.${manifest.run_id}.cleanup.json`);
+  try {
+    atomicJson(cleanupStatePath, { schema_version: 1, state: "deleting", updated_at: new Date().toISOString(), workspace_root: manifest.workspace_root, workspace_set_id: manifest.workspace_set_id });
+    for (const repository of [...manifest.repositories].reverse()) removeRepository(repository, manifest.workspace_root);
+    const removal = removeCanonicalContainedPath({ root: managedRoot, target: manifest.workspace_root });
+    if (!removal.ok) throw new Error(`Workspace-set cleanup failed (${removal.reason}).`);
+    atomicJson(cleanupStatePath, { schema_version: 1, state: "deleted", updated_at: new Date().toISOString(), workspace_root: manifest.workspace_root, workspace_set_id: manifest.workspace_set_id });
+    manifest.cleanup.state = "deleted";
+    return manifest;
+  } catch (error) {
+    atomicJson(cleanupStatePath, { schema_version: 1, state: "delete-failed", updated_at: new Date().toISOString(), workspace_root: manifest.workspace_root, workspace_set_id: manifest.workspace_set_id, error: error instanceof Error ? error.message : String(error) });
+    manifest.cleanup.state = "delete-failed";
+    throw error;
+  }
 }
 
 export function collectWorkspaceSetChanges(manifest) {

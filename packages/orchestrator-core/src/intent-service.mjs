@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 
 import { derivePublicId, validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime, previewProjectRuntime } from "./project-init.mjs";
+import { readCanonicalContainedFile } from "./shared/canonical-paths.mjs";
 import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { runLifecycleCommand } from "./control-plane/lifecycle-command.mjs";
 import { resolveNextAction } from "./next-action.mjs";
@@ -151,16 +152,13 @@ function repositoryMarkdownRecords(context, markdownSources) {
     if (path.extname(relativePath).toLowerCase() !== ".md") {
       throw new IntentServiceError("intent_source.unsupported", `Repository source '${relativePath}' must be a Markdown file.`);
     }
-    const absolutePath = path.resolve(context.projectRoot, relativePath);
-    const projectRoot = path.resolve(context.projectRoot);
-    if (absolutePath !== projectRoot && !absolutePath.startsWith(`${projectRoot}${path.sep}`)) {
-      throw new IntentServiceError("intent_source.invalid_path", "Repository Markdown paths must stay inside the connected project.");
+    const read = readCanonicalContainedFile({ root: context.projectRoot, relativePath, base: "project-relative", maxBytes: MAX_FILE_BYTES });
+    if (!read.ok) {
+      const invalidPathReasons = new Set(["lexical-escape", "symlink-escape", "canonical-escape", "final-symlink", "non-regular-file"]);
+      const code = invalidPathReasons.has(read.reason) ? "intent_source.invalid_path" : "intent_source.not_found";
+      throw new IntentServiceError(code, `Repository Markdown source '${relativePath}' could not be read inside the connected project (${read.reason}).`);
     }
-    if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
-      throw new IntentServiceError("intent_source.not_found", `Repository Markdown source '${relativePath}' was not found.`);
-    }
-    const content = fs.readFileSync(absolutePath);
-    if (content.length > MAX_FILE_BYTES) throw new IntentServiceError("intent_source.too_large", `Repository Markdown source '${relativePath}' exceeds 1 MiB.`);
+    const content = read.bytes;
     const text = content.toString("utf8");
     if (text.includes("\uFFFD")) throw new IntentServiceError("intent_source.invalid_utf8", `Repository Markdown source '${relativePath}' is not valid UTF-8.`);
     const digest = crypto.createHash("sha256").update(content).digest("hex");
@@ -192,16 +190,16 @@ function currentMarkdownSourceStatus(context, sources) {
   const head = awaitableSpawn("git", ["-C", context.projectRoot, "rev-parse", "HEAD"]);
   return sources.map((source) => {
     const relativePath = String(source?.project_relative_path ?? "").trim().replaceAll("\\", "/");
-    const absolutePath = relativePath ? path.resolve(context.projectRoot, relativePath) : null;
-    const projectRoot = path.resolve(context.projectRoot);
-    const safe = absolutePath && (absolutePath === projectRoot || absolutePath.startsWith(`${projectRoot}${path.sep}`));
+    const read = relativePath
+      ? readCanonicalContainedFile({ root: context.projectRoot, relativePath, base: "project-relative", maxBytes: MAX_FILE_BYTES })
+      : { ok: false, reason: "missing" };
     let currentDigest = null;
-    if (safe && fs.existsSync(absolutePath) && fs.statSync(absolutePath).isFile()) {
-      currentDigest = `sha256:${crypto.createHash("sha256").update(fs.readFileSync(absolutePath)).digest("hex")}`;
+    if (read.ok) {
+      currentDigest = `sha256:${crypto.createHash("sha256").update(read.bytes).digest("hex")}`;
     }
     return {
       ...source,
-      stale: source.stale === true || !safe || currentDigest !== source.digest || (source.pinned_base_revision && head !== source.pinned_base_revision),
+      stale: source.stale === true || !read.ok || currentDigest !== source.digest || (source.pinned_base_revision && head !== source.pinned_base_revision),
     };
   });
 }

@@ -70,7 +70,7 @@ substitutes.
 
 ## W71-S01 — Audit disposition, proof scope, and coordination baseline
 
-- **State:** ready
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-5, EPIC-7
 - **Hard dependencies:** W66-S25, W70-S10
 - **Remediation priority:** P0
@@ -138,7 +138,7 @@ visual/component history.
 
 ## W71-S02 — Symlink-safe path confinement and durable cleanup
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-2, EPIC-5
 - **Hard dependencies:** W71-S01
 - **Remediation priority:** P0
@@ -196,7 +196,7 @@ restart cannot escape or misreport ownership.
 
 ## W71-S03 — Deterministic repository gate and dependency/process safety
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-5, EPIC-7
 - **Hard dependencies:** W71-S02
 - **Remediation priority:** P0

@@ -66,7 +66,7 @@ issue tracker, or release platform.
 
 For the installed CLI:
 
-- Node.js `>=22`;
+- Node.js `22.x` (`>=22 <23`);
 - a local repository you are allowed to inspect;
 - for AI-backed preparation or execution, a supported runner binary with its
   normal authentication already configured.
@@ -241,7 +241,7 @@ researchers.
 | npm `@alpha` | Latest tagged CLI snapshot; can lag behind `main` |
 | Installed UI | Task Workspace baseline; canonical end-to-end execution proof is open in W71 |
 | Production readiness | Audit hold; no general production clearance |
-| Supported operating shape | Bounded local/self-hosted use on Node.js 22 |
+| Supported operating shape | Bounded local/self-hosted use on Node.js 22.x (`>=22 <23`) |
 
 Development acceptance and release qualification are separate. W69 and W70 are development-complete, and the Task Workspace is available through the npm
 `@alpha` channel. W71 is the current deterministic remediation wave for the
@@ -360,7 +360,9 @@ workstream until W71's final integration proof. W66 remains the independent
 release-qualification blocker. Architecture decisions live in
 [`docs/architecture/adr`](docs/architecture/adr), implementation slices in
 [`docs/backlog`](docs/backlog), and runnable contract examples in
-[`examples`](examples).
+[`examples`](examples). The active post-W70 disposition is recorded in
+[`docs/research/26-w71-audit-disposition.json`](docs/research/26-w71-audit-disposition.json);
+run `pnpm remediation:gate` before filesystem or Task-flow remediation work.
 
 ## Contributing
 
@@ -372,9 +374,12 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
-`pnpm check` is the default commit-ready repository gate. Run
-`pnpm production:ready --json --allow-audit-hold` only when
-production-readiness or release evidence is in scope.
+`pnpm check` is the default commit-ready repository gate. Select focused
+checks from the [change validation matrix](CONTRIBUTING.md#validation-by-change-type).
+Production clearance requires `pnpm production:ready --json` to pass without
+an audit-hold exception. The npm alpha release gate and CI disposition check
+may accept a valid audit hold while `release_clearance` remains false; see
+[CONTRIBUTING.md](CONTRIBUTING.md#ci-acceptance-gates).
 
 Before opening a pull request:
 
