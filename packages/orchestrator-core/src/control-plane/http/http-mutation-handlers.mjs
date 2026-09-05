@@ -377,6 +377,8 @@ export async function handleTaskAction({ request, response, params, registry, ru
   }
   const task = listTaskProjections({
     ...runtimeOptions,
+    registry,
+    projectId: params.projectId,
     intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
   }).tasks.find((candidate) => candidate.task_id === params.taskId);
   if (!task) {
@@ -415,6 +417,15 @@ export async function handleTaskAction({ request, response, params, registry, ru
       return;
     }
     if (["confirm", "start"].includes(action)) {
+      if (action === "start" && task.status === "prepared") {
+        const route = task.prepared_contract?.approved_execution_route;
+        if (!route?.route_id || route.readiness !== "ready") {
+          sendError(response, 409, "task.execution_route_not_ready", "Task start requires an approved execution route with a ready readiness revision.", {
+            recovery_actions: [{ action: "refresh", payload: { resource: `task://${task.task_id}`, current_revision: task.revision ?? null } }],
+          });
+          return;
+        }
+      }
       const submissionId = asString(task.lineage?.intent_submission_id);
       if (!submissionId) {
         sendError(response, 409, "task.confirm_unavailable", "This Task is not an intent-backed prepared submission.");

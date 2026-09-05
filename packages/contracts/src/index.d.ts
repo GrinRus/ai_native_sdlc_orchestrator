@@ -20,6 +20,7 @@ export type ContractFamily =
   | "integration-report"
   | "task-progress-report"
   | "task-source-item"
+  | "task-projection"
   | "task-runner-selection"
   | "task-review"
   | "release-packet"

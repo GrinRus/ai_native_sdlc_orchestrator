@@ -2911,8 +2911,9 @@
       },
       "TaskProjection": {
         "type": "object",
-        "required": ["task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "attention_items", "review", "completion", "lifecycle_path", "runner_selection", "primary_action", "completed_read_only", "read_only"],
+        "required": ["schema_version", "task_id", "project_id", "display_title", "status", "intent_submission_ref", "mission_id", "flow_id", "run_ids", "lineage", "source_items", "attention_items", "review", "completion", "lifecycle_path", "runner_selection", "primary_action", "prepared_contract", "completed_read_only", "read_only"],
         "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
           "task_id": { "type": "string" },
           "project_id": { "type": "string" },
           "display_title": { "type": "string" },
@@ -2936,10 +2937,56 @@
           "blocker_count": { "type": "integer", "minimum": 0 },
           "evidence_refs": { "type": "array", "items": { "type": "string" } },
           "primary_action": { "$ref": "#/components/schemas/JsonObject" },
+          "prepared_contract": { "$ref": "#/components/schemas/TaskPreparedContract" },
           "runner_selection": { "$ref": "#/components/schemas/TaskRunnerSelection" },
           "updated_at": { "type": ["string", "null"], "format": "date-time" },
           "completed_read_only": { "type": "boolean" },
           "read_only": { "type": "boolean", "const": true }
+        },
+        "additionalProperties": true
+      },
+      "TaskPreparedContract": {
+        "type": "object",
+        "required": ["schema_version", "outcome", "acceptance_criteria", "scope", "delivery_mode", "normalization_revision", "approved_execution_route", "readiness_revision", "write_effects"],
+        "properties": {
+          "schema_version": { "type": "integer", "const": 1 },
+          "outcome": { "type": ["string", "null"] },
+          "acceptance_criteria": { "type": "array", "items": { "type": "string" } },
+          "scope": {
+            "type": "object",
+            "required": ["allowed_paths", "forbidden_paths"],
+            "properties": {
+              "allowed_paths": { "type": "array", "items": { "type": "string" } },
+              "forbidden_paths": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          },
+          "delivery_mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first-pr"] },
+          "normalization_revision": { "type": "integer", "minimum": 0 },
+          "approved_execution_route": {
+            "type": "object",
+            "required": ["route_id", "step", "source", "readiness"],
+            "properties": {
+              "route_id": { "type": ["string", "null"] },
+              "step": { "type": ["string", "null"], "enum": ["discovery", "research", "spec", "planning", "implement", "review", "qa", "repair", "eval", "harness", null] },
+              "source": { "type": "string", "enum": ["project-default", "task-override"] },
+              "readiness": { "type": "string", "enum": ["ready", "unknown", "stale", "unavailable", "blocked"] }
+            },
+            "additionalProperties": true
+          },
+          "readiness_revision": { "type": ["integer", "null"], "minimum": 0 },
+          "write_effects": {
+            "type": "object",
+            "required": ["mode", "write_capable", "target_write_allowed", "upstream_writes_allowed", "direct_edits_allowed"],
+            "properties": {
+              "mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first-pr"] },
+              "write_capable": { "type": "boolean" },
+              "target_write_allowed": { "type": "boolean" },
+              "upstream_writes_allowed": { "type": "boolean" },
+              "direct_edits_allowed": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
         },
         "additionalProperties": true
       },

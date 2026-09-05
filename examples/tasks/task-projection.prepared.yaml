@@ -1,0 +1,95 @@
+schema_version: 1
+task_id: task.demo.intent-123
+project_id: demo
+display_title: Implement the bounded change
+work_type: code-change
+status: prepared
+status_detail: prepared
+intent_submission_ref: evidence://projects/demo/inputs/intent-123/submission.json
+mission_id: null
+flow_id: null
+run_ids: []
+lineage:
+  task_id: task.demo.intent-123
+  intent_submission_id: intent-123
+  intent_submission_ref: evidence://projects/demo/inputs/intent-123/submission.json
+  normalization_revision: 2
+  mission_id: null
+  flow_id: null
+  run_ids: []
+source_items:
+  - schema_version: 1
+    source_id: intent-123.source.inline
+    kind: inline-text
+    ref: null
+    immutable: true
+    stale: false
+    digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    preview:
+      kind: inline-text
+      text: Implement the bounded change.
+attention_items: []
+review:
+  status: pending
+  verification_status: unknown
+  delivery_status: unknown
+  changed_paths: []
+  evidence_refs: []
+  read_only: true
+completion:
+  status: incomplete
+  immutable: false
+  verification_status: unknown
+  delivery_status: unknown
+  evidence_refs: []
+  follow_up_eligible: false
+lifecycle_path:
+  path_id: intent
+  owner: runtime
+  steps:
+    - id: prepare
+      label: Prepare
+      state: completed
+runner_selection:
+  schema_version: 1
+  source: project-default
+  route_id: route.implement.default
+  readiness: ready
+  requested_model: coding-primary
+  effective_model: coding-primary
+  requested_reasoning_effort: null
+  effective_reasoning_effort: null
+  unavailable_reason: null
+  recovery_action: Refresh execution readiness before starting this Task.
+primary_action:
+  action_id: start
+  operator_control: Start task
+  reason: Prepared task is ready for revision-checked start.
+  available: true
+prepared_contract:
+  schema_version: 1
+  outcome: Implement the bounded change.
+  acceptance_criteria:
+    - The change is covered by a focused test.
+  scope:
+    allowed_paths:
+      - packages/**
+    forbidden_paths:
+      - .aor/**
+  delivery_mode: patch-only
+  normalization_revision: 2
+  approved_execution_route:
+    schema_version: 1
+    source: project-default
+    route_id: route.implement.default
+    step: implement
+    readiness: ready
+  readiness_revision: 7
+  write_effects:
+    mode: patch-only
+    write_capable: true
+    target_write_allowed: true
+    upstream_writes_allowed: false
+    direct_edits_allowed: true
+completed_read_only: false
+read_only: true
