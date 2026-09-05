@@ -8,6 +8,7 @@ import { initializeProjectRuntime } from "../project-init.mjs";
 import { applyTopologyAction } from "./topology-management.mjs";
 import { inspectRepositoryBinding } from "./topology-discovery.mjs";
 import { discoverTopologyProposals } from "./topology-discovery.mjs";
+import { removeCanonicalContainedPath } from "../shared/canonical-paths.mjs";
 
 const jobs = new Map();
 
@@ -194,8 +195,13 @@ export function deleteProjectData({ registry, projectId, confirmation }) {
     candidate.projectId !== projectId && registry.getProjectInput(candidate.projectId)?.source?.repository_id === repositoryId
   ));
   registry.removeProject(projectId);
-  fs.rmSync(context.projectRuntimeRoot, { recursive: true, force: true });
-  if (repositoryId && !repositoryShared) fs.rmSync(path.join(registry.storageRoot, "repositories", repositoryId), { recursive: true, force: true });
+  const storageRoot = fs.realpathSync.native(registry.storageRoot);
+  const runtimeRemoval = removeCanonicalContainedPath({ root: storageRoot, target: context.projectRuntimeRoot });
+  if (!runtimeRemoval.ok) throw new Error(`Project runtime cleanup refused its owned root (${runtimeRemoval.reason}).`);
+  if (repositoryId && !repositoryShared) {
+    const repositoryRemoval = removeCanonicalContainedPath({ root: storageRoot, target: path.join(storageRoot, "repositories", repositoryId) });
+    if (!repositoryRemoval.ok) throw new Error(`Managed repository cleanup refused its owned root (${repositoryRemoval.reason}).`);
+  }
   return { project_id: projectId, disconnected: true, data_deleted: true, repository_preserved: !repositoryId || repositoryShared };
 }
 

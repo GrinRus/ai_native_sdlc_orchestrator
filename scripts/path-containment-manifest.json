@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "pattern": "fs.(rmSync|cpSync|copyFileSync)",
+  "scope": ["packages", "apps", "scripts"],
+  "excluded_segments": ["/test/", "/browser/"],
+  "entries": [
+    {"path":"packages/adapter-sdk/src/index.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/observability/src/file-transaction.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/observability/src/live-run-events.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/orchestrator-core/src/control-plane/project-source.mjs","sink_count":6,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/orchestrator-core/src/control-plane/workspace-registry-store.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/orchestrator-core/src/integration-service.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/orchestrator-core/src/project-init.mjs","sink_count":3,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/orchestrator-core/src/shared/canonical-paths.mjs","sink_count":2,"disposition":"shared-primitive"},
+    {"path":"packages/orchestrator-core/src/workspace-isolation.mjs","sink_count":1,"disposition":"shared-primitive"},
+    {"path":"scripts/live-e2e/lib/browser-cache.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/live-e2e/lib/decision-helper.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/live-e2e/lib/external-runtime.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/live-e2e/lib/flows.mjs","sink_count":6,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/live-e2e/lib/preflight.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/live-e2e/lib/target-materialization.mjs","sink_count":3,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/live-e2e/manual-live-e2e.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/release-smoke.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/test-runner.mjs","sink_count":3,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/w58-runtime-quality-proof.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
+    {"path":"scripts/w61-topology-onboarding-proof.mjs","sink_count":1,"disposition":"reviewed-owned-scope"}
+  ]
+}
