@@ -61,3 +61,15 @@ test("Task Workspace owns the full viewport without legacy project-settings chro
   assert.match(source, /<TaskWorkspace/u);
   assert.doesNotMatch(source, /QuietShell|FlowSelector|IntentOnboarding/u);
 });
+
+test("Command Desk queue keeps server identity and runner context visible", () => {
+  const source = fs.readFileSync(path.join(root, "src/task-workspace.jsx"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "src/task-workspace.css"), "utf8");
+  assert.match(source, /task-queue-header/u);
+  assert.match(source, /taskIdLabel/u);
+  assert.match(source, /taskRunnerLabel/u);
+  assert.match(source, /task-list-row__status/u);
+  assert.match(styles, /--aor-task-sidebar-bg/u);
+  assert.match(styles, /@media \(max-width: 680px\)/u);
+  assert.match(styles, /task-workspace__sidebar-footer/u);
+});
