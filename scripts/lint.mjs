@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { checkGuidance } from "./guidance-check.mjs";
 
 const root = process.cwd();
 
@@ -182,6 +183,12 @@ for (const file of [
   }
 }
 
-console.log(`guidance coverage ok: ${requiredAgents.length} AGENTS files, ${requiredDocs.length} required docs`);
+console.log(`required guidance baseline ok: ${requiredAgents.length} AGENTS files, ${requiredDocs.length} docs`);
+const guidance = checkGuidance(root);
+if (!guidance.ok) {
+  console.error(guidance.findings.join("\n"));
+  process.exit(1);
+}
+console.log(`guidance integrity ok: ${guidance.agents} discovered AGENTS files, ${guidance.skills} skills`);
 assertNoAppToAppSourceEdges();
 assertCanonicalControlPlaneBoundary();

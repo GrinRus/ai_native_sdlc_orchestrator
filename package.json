@@ -75,6 +75,7 @@
     "typecheck": "node ./scripts/typecheck-ratchet.mjs",
     "quality:ratchet": "node ./scripts/quality-ratchet.mjs && node ./scripts/dependency-policy.mjs && node ./scripts/contract-kernel-parity.mjs && node ./scripts/current-doc-vocabulary.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
+    "guidance:check": "node ./scripts/guidance-check.mjs",
     "lint": "node ./scripts/lint.mjs",
     "aor": "node ./apps/cli/bin/aor.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm quality:ratchet && pnpm release:verify",
