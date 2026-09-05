@@ -35,6 +35,9 @@ const ICON_PATHS = {
   upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></>,
   code: <><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></>,
   download: <><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></>,
+  help: <><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 4.15 1.52c-.72.85-1.95 1.34-1.95 2.73"/><path d="M12 17h.01"/></>,
+  settings: <><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.64 5.64l1.42 1.42M16.94 16.94l1.42 1.42M18.36 5.64l-1.42 1.42M7.06 16.94l-1.42 1.42"/><circle cx="12" cy="12" r="4"/></>,
+  signal: <><path d="M4 18a8 8 0 0 1 16 0"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M10 18a2 2 0 0 1 4 0"/></>,
 };
 
 export function Icon({ name, className = "", title }) {
