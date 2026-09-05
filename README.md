@@ -372,9 +372,12 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
-`pnpm check` is the default commit-ready repository gate. Run
-`pnpm production:ready --json --allow-audit-hold` only when
-production-readiness or release evidence is in scope.
+`pnpm check` is the default commit-ready repository gate. Select focused
+checks from the [change validation matrix](CONTRIBUTING.md#validation-by-change-type).
+Production clearance requires `pnpm production:ready --json` to pass without
+an audit-hold exception. The npm alpha release gate and CI disposition check
+may accept a valid audit hold while `release_clearance` remains false; see
+[CONTRIBUTING.md](CONTRIBUTING.md#ci-acceptance-gates).
 
 Before opening a pull request:
 

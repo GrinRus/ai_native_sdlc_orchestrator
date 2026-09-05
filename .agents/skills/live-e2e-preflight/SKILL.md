@@ -1,24 +1,52 @@
 ---
 name: live-e2e-preflight
-description: Use when you need to prepare, review, or update a live E2E rehearsal profile for AOR.
+description: Review or prepare AOR live E2E profiles, catalog missions, and prerequisites before an authorized rehearsal.
 ---
 
-1. Start with `scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md` and the machine-readable catalog under `scripts/live-e2e/catalog/targets/*.yaml`.
-2. Treat live E2E proof as skill-agent-only installed-user proof. Bounded deterministic rehearsal profiles are no longer supported live proof inputs.
-3. Choose a supported full-journey/catalog-backed profile or `installed-user-guided-journey`.
-4. Require both `target_catalog_id` and `feature_mission_id`; do not allow raw `repo_url` plus free-form objective text.
-5. Confirm the profile declares:
-   - `live_e2e.flow_range_policy` as `delivery_default` or `full_lifecycle`;
-   - `live_e2e.installation_policy=source-install-required` unless a reviewed installed binary path is passed through `--aor-bin`;
-   - `live_e2e.interaction_capability=public-control-plane`;
-   - `live_e2e.frontend_capability=none`, `guided-web-smoke`, or `browser-task-proof`;
-   - `live_e2e.safety_policy=no-upstream-write`;
-   - `live_e2e.operator_mode=skill-agent`;
-   - `live_e2e.agent_decision_policy=required`;
-   - `live_e2e.interaction_answer_policy=agent-required`;
-   - `live_e2e.target_write_policy=aor-runtime-only-before-execution`.
-6. Confirm `implementation_loop.enabled=true`, `implementation_loop.max_iterations >= 1`, repair actions include `request-repair`, and blocking review/runtime failures do not silently continue.
-7. Confirm the target repo shape, setup commands, verification commands, safety defaults, expected result evidence, and change budget. Do not require `allowed_paths` or `forbidden_paths`; they are not live E2E acceptance gates.
-8. Ensure the runner will use isolated AOR source install by default. `--runtime-root` or `--aor-install-mode repo-local` is a dev/debug override, not acceptance proof.
-9. Ensure the runner will prepare the feature request input during the run instead of skipping directly to execution.
-10. Keep upstream write-back disabled unless a fork is explicitly configured and the profile really needs release-shaped delivery evidence.
+# Live E2E preflight
+
+Profile review and preparation do not require a provider run. Inspect or edit
+only what the request authorizes; cloning targets, installing target tools,
+probing provider authentication, and starting a rehearsal belong to an
+authorized run. Do not infer permission for credential changes, paid retries,
+or broader write-back from a profile's settings.
+
+Read the
+[current preparation procedure](../../../scripts/live-e2e/docs/runbooks/live-e2e-no-write-preflight.md)
+and the relevant cell in the
+[target catalog](../../../scripts/live-e2e/docs/runbooks/live-e2e-target-catalog.md).
+Resolve `target_catalog_id` and `feature_mission_id` against the machine-readable
+catalog under `scripts/live-e2e/catalog/targets/`. Supported live proof uses a
+catalog-backed full journey or installed-user guided journey; historical bounded
+deterministic rehearsals are not acceptance inputs.
+
+Check the selected profile's:
+
+- flow range, source-install policy, public-control-plane interaction capability,
+  frontend capability, and `no-upstream-write` safety policy;
+- skill-agent operator mode, required operator decisions, public interaction
+  answers, and target-write policy before execution;
+- enabled implementation loop, iteration and provider budgets, review/QA repair
+  actions, and stop conditions;
+- target shape, toolchain, setup and verification command ownership, baseline
+  gate, expected artifacts, delivery mode, and change budget.
+
+Medium and large product-change missions require accepted step-quality reports
+before continuation and a separate final all-pass assessment for product
+acceptance. Xlarge has the same quality evidence requirements but is manual-only
+observation, excluded from the step evaluator and qualification sets. Use the
+[qualification runbook](../../../scripts/live-e2e/docs/runbooks/live-e2e-provider-qualification.md)
+when current W66 coverage or same-commit evidence is in scope.
+
+The runner prepares the feature request and host-side profiles/assets, then
+uses public installed commands. Keep the default isolated source install;
+`--runtime-root` and `--aor-install-mode repo-local` are explicit debug overrides.
+The launcher isolates product `AOR_HOME`; internal rehearsal outputs may use
+ignored `.aor/` paths. Do not inject examples, route overlays, or provider-home
+state into the target checkout. Path lists are not live E2E acceptance gates;
+use the catalog mission and evidence requirements rather than inventing them.
+
+Keep `output_policy.write_back_to_remote=false`. A fork-shaped delivery profile
+does not authorize an upstream write or publication. Report the resolved cell,
+readiness gaps, required evidence, and bounded next action; run only within
+existing user authorization.

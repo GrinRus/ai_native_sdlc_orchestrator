@@ -18,10 +18,12 @@ Describe the change in one paragraph.
 
 ## Evidence
 
-- [ ] `pnpm install --frozen-lockfile`
+- [ ] Dependencies installed with `pnpm install --frozen-lockfile` if needed
 - [ ] `pnpm check`
-- [ ] Focused tests or checks are listed below
-- [ ] `pnpm production:ready` was run when readiness/release evidence is in scope, or marked N/A below
+- [ ] Focused evidence from the [change validation matrix](../CONTRIBUTING.md#validation-by-change-type) is listed below, including browser checks for rendered UI changes
+- [ ] Readiness/release evidence is listed when in scope, or marked N/A; gate execution, audit hold, and production clearance are distinguished
+
+Checks run, outcomes, and exact reasons for any pending checks:
 
 ## Docs and examples
 
