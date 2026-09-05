@@ -196,7 +196,7 @@ restart cannot escape or misreport ownership.
 
 ## W71-S03 — Deterministic repository gate and dependency/process safety
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-5, EPIC-7
 - **Hard dependencies:** W71-S02
 - **Remediation priority:** P0

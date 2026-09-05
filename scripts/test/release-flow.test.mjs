@@ -186,6 +186,24 @@ test("release verifier rejects broad support for every alpha snapshot", () => {
   }
 });
 
+test("release verifier rejects an untested open-ended Node runtime range", () => {
+  const tempRoot = copyFixtureRepo();
+  try {
+    updateJson(path.join(tempRoot, "package.json"), (json) => {
+      json.engines.node = ">=22";
+    });
+    const result = validateReleaseState({
+      rootDir: tempRoot,
+      releaseBranch: RELEASE_BRANCH,
+      strictReleaseBranch: true,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), />=22 <23/u);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("release verifier rejects wrong package name and public internal packages", () => {
   const tempRoot = copyFixtureRepo();
   try {

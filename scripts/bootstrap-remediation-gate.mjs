@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { nonInteractiveEnvironment } from "./process-runner.mjs";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultManifestPath = "scripts/bootstrap-remediation-manifest.json";
@@ -151,7 +152,7 @@ export function runCheckedCommand({
   try {
     result = runner(command, args, {
       cwd,
-      env,
+      env: nonInteractiveEnvironment(env),
       encoding: "utf8",
       timeout: timeoutMs,
       killSignal: "SIGKILL",

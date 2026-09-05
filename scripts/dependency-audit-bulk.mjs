@@ -14,11 +14,18 @@ for (const [name, metadata] of Object.entries(productionDependencies)) {
 }
 
 const endpoint = "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk";
-const response = await fetch(endpoint, {
-  method: "POST",
-  headers: { "content-type": "application/json", accept: "application/json" },
-  body: JSON.stringify(requestBody),
-});
+const timeoutMs = Number(process.env.AOR_DEPENDENCY_AUDIT_TIMEOUT_MS ?? 30_000);
+let response;
+try {
+  response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(requestBody),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+} catch (error) {
+  throw new Error(`Bulk dependency audit failed (${error?.name === "TimeoutError" ? "timeout" : "network"}) after ${timeoutMs}ms.`, { cause: error });
+}
 if (!response.ok) throw new Error(`Bulk dependency audit failed with HTTP ${response.status}.`);
 const advisories = await response.json();
 const advisoryCount = Object.values(advisories).reduce(
