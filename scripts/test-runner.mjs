@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -11,11 +10,11 @@ import {
   readGitHead,
   writeTestExecutionReport,
 } from "./test-discovery.mjs";
+import { assertProcessSuccess, runCheckedProcess } from "./process-runner.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// The CLI group is intentionally process-isolated and now contains the full
-// W6/W13/W67 command matrix; keep the default above its observed cold-run time
-// while retaining AOR_TEST_GROUP_TIMEOUT_MS for slower CI hosts.
+// CLI tests are intentionally process-isolated and partitioned by test-name
+// pattern; retain a generous bounded timeout for slower CI hosts.
 const standardTimeoutMs = Number(process.env.AOR_TEST_GROUP_TIMEOUT_MS ?? 12 * 60 * 1000);
 const privateTimeoutMs = Number(process.env.AOR_LIVE_E2E_TEST_SUITE_TIMEOUT_MS ?? 20 * 60 * 1000);
 const privateContextFile = path.join(os.tmpdir(), `aor-live-e2e-test-context-${process.pid}`);
@@ -49,6 +48,7 @@ const report = {
   executed_files: [],
   duplicate_files: [],
   missing_files: [...plan.candidates],
+  partitioned_files: plan.partitioned,
 };
 
 function persistReport() {
@@ -56,29 +56,31 @@ function persistReport() {
 }
 
 function runCommand(label, command, args, options = {}) {
-  const groupStarted = Date.now();
-  const run = spawnSync(command, args, {
+  const result = runCheckedProcess({
+    label,
+    command,
+    args,
     cwd: root,
     env: options.env ?? testEnvironment,
+    timeoutMs: options.timeout,
     stdio: "inherit",
-    timeout: options.timeout,
-    killSignal: "SIGKILL",
   });
-  if (run.status !== 0) {
-    const timeout = /** @type {NodeJS.ErrnoException | undefined} */ (run.error)?.code === "ETIMEDOUT";
-    const error = /** @type {Error & { durationMs?: number }} */ (
-      new Error(`${label} failed${timeout ? ` after timeout ${options.timeout}ms` : ""}.`)
-    );
-    error.durationMs = Date.now() - groupStarted;
+  try {
+    assertProcessSuccess(result);
+  } catch (error) {
+    error.durationMs = result.duration_ms;
+    error.failureType = result.failure_type;
     throw error;
   }
-  return Date.now() - groupStarted;
+  return result.duration_ms;
 }
 
 function refreshExecutionAccounting() {
   const executions = report.groups.flatMap((group) => group.files);
   report.executed_files = [...new Set(executions)].sort();
-  report.duplicate_files = [...new Set(executions.filter((file, index) => executions.indexOf(file) !== index))].sort();
+  report.duplicate_files = [...new Set(executions.filter((file, index) => executions.indexOf(file) !== index))]
+    .filter((file) => !plan.partitioned.includes(file))
+    .sort();
   report.missing_files = plan.candidates.filter(
     (file) => !report.executed_files.includes(file) && !plan.excluded.some((entry) => entry.path === file),
   );
@@ -107,6 +109,7 @@ try {
           testWorkerHomeBootstrap,
           "--test",
           ...(group.test_concurrency ? [`--test-concurrency=${group.test_concurrency}`] : []),
+          ...(group.test_name_pattern ? [`--test-name-pattern=${group.test_name_pattern}`] : []),
           ...group.files.map((file) => path.join(root, file)),
         ],
         {
@@ -121,6 +124,7 @@ try {
         group_id: group.group_id,
         timeout_class: group.timeout_class,
         test_concurrency: group.test_concurrency ?? null,
+        test_name_pattern: group.test_name_pattern ?? null,
         status: "pass",
         duration_ms: durationMs,
         files: group.files,
@@ -132,6 +136,7 @@ try {
         group_id: group.group_id,
         timeout_class: group.timeout_class,
         test_concurrency: group.test_concurrency ?? null,
+        test_name_pattern: group.test_name_pattern ?? null,
         status: "fail",
         duration_ms: Number(error?.durationMs ?? 0),
         files: group.files,
@@ -158,6 +163,7 @@ try {
   report.status = "fail";
   report.finished_at = new Date().toISOString();
   report.failure = error instanceof Error ? error.message : String(error);
+  report.failure_type = error?.failureType ?? "unknown";
   persistReport();
   console.error(report.failure);
   process.exit(1);

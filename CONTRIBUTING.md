@@ -56,7 +56,7 @@ remain under `docs/ops/`.
 
 ## Validation by change type
 
-Use Node.js 22 and the pnpm version pinned in `package.json` when reproducing CI.
+Use Node.js 22.x (`>=22 <23`) and the pnpm version pinned in `package.json` when reproducing CI.
 The installed CLI's minimum Node requirement is not certification of every
 newer Node version for contributor tests.
 

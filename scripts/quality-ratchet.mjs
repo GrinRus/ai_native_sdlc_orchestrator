@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { runCheckedProcess } from "./process-runner.mjs";
 
 const root = process.cwd();
 const baseline = JSON.parse(fs.readFileSync(path.join(root, "scripts/quality-baseline.json"), "utf8"));
@@ -54,12 +54,14 @@ for (const entry of baseline.facade_functions ?? []) {
 }
 
 const eslintTargets = ["scripts/slice-cycle.mjs", "scripts/typecheck-ratchet.mjs", "scripts/quality-ratchet.mjs", "scripts/dependency-policy.mjs"];
-const eslint = spawnSync(
-  process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-  ["exec", "eslint", ...eslintTargets],
-  { cwd: root, encoding: "utf8" },
-);
-if (eslint.status !== 0) violations.push(`ESLint:\n${eslint.stdout}${eslint.stderr}`);
+const eslint = runCheckedProcess({
+  label: "quality ESLint",
+  command: process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+  args: ["exec", "eslint", ...eslintTargets],
+  cwd: root,
+  timeoutMs: Number(process.env.AOR_LINT_TIMEOUT_MS ?? 180_000),
+});
+if (!eslint.ok) violations.push(`ESLint (${eslint.failure_type}):\n${eslint.stdout}\n${eslint.stderr}`);
 
 fs.mkdirSync(path.join(root, ".aor/quality"), { recursive: true });
 fs.writeFileSync(

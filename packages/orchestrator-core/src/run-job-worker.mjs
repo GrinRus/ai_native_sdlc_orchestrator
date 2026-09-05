@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readRunControlState } from "./control-plane/run-control.mjs";
-import { readRunJobFile, startRunJob, updateRunJobFile } from "./run-job.mjs";
+import { readRunJobFile, signalProcessGroup, startRunJob, updateRunJobFile } from "./run-job.mjs";
 import { classifyRunJobTerminalStatus } from "./run-job-status.mjs";
 import { advanceParentForChildRun } from "./parent-run-scheduler.mjs";
 
@@ -73,7 +73,9 @@ child.on("error", (error) => {
 let stopped = false;
 let killTimer = null;
 const signalGroup = (signal) => {
-  try { process.kill(-child.pid, signal); } catch { try { child.kill(signal); } catch {} }
+  if (!signalProcessGroup(child.pid, signal)) {
+    try { child.kill(signal); } catch {}
+  }
 };
 const monitor = setInterval(() => {
   const current = readRunJobFile(jobFile);

@@ -66,7 +66,7 @@ issue tracker, or release platform.
 
 For the installed CLI:
 
-- Node.js `>=22`;
+- Node.js `22.x` (`>=22 <23`);
 - a local repository you are allowed to inspect;
 - for AI-backed preparation or execution, a supported runner binary with its
   normal authentication already configured.
@@ -241,7 +241,7 @@ researchers.
 | npm `@alpha` | Latest tagged CLI snapshot; can lag behind `main` |
 | Installed UI | Task Workspace baseline; canonical end-to-end execution proof is open in W71 |
 | Production readiness | Audit hold; no general production clearance |
-| Supported operating shape | Bounded local/self-hosted use on Node.js 22 |
+| Supported operating shape | Bounded local/self-hosted use on Node.js 22.x (`>=22 <23`) |
 
 Development acceptance and release qualification are separate. W69 and W70 are development-complete, and the Task Workspace is available through the npm
 `@alpha` channel. W71 is the current deterministic remediation wave for the

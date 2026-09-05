@@ -320,7 +320,7 @@ test("test discovery maps every tracked candidate exactly once", () => {
   assert.equal(plan.ok, true, plan.errors.join("\n"));
   assert.ok(plan.candidate_count > 0);
   assert.equal(plan.excluded.length, 0);
-  assert.equal(plan.groups.flatMap((group) => group.files).length, plan.candidate_count);
+  assert.equal(plan.groups.flatMap((group) => group.files).length, plan.candidate_count + plan.partitioned_extra_count);
 });
 
 test("test discovery fails on unmapped, duplicate, and invalid exclusion policies", () => {
@@ -341,7 +341,7 @@ test("test discovery fails on unmapped, duplicate, and invalid exclusion policie
     candidates,
   });
   assert.equal(duplicate.ok, false);
-  assert.match(duplicate.errors.join("\n"), /multiple groups/u);
+  assert.match(duplicate.errors.join("\n"), /multiple .*groups/u);
 
   const invalidExclusion = buildTestExecutionPlan({
     rootDir: root,

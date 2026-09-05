@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { spawnSync } from "node:child_process";
+import { runCheckedProcess } from "./process-runner.mjs";
 
 const root = process.cwd();
 const privateSurfaceToken = ["live", "e2e"].join("-");
@@ -653,12 +653,17 @@ for (const entry of fs.readdirSync(workflowDir, { withFileTypes: true })) {
   }
 }
 
-const webBuild = spawnSync("pnpm", ["web:build"], {
+const webBuild = runCheckedProcess({
+  label: "web build",
+  command: process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+  args: ["web:build"],
   cwd: root,
-  stdio: "inherit",
+  timeoutMs: Number(process.env.AOR_BUILD_TIMEOUT_MS ?? 180_000),
 });
-if (webBuild.status !== 0) {
-  process.exit(webBuild.status ?? 1);
+if (!webBuild.ok) {
+  console.error(`${webBuild.failure_type}: ${webBuild.message}`);
+  if (webBuild.stderr) console.error(webBuild.stderr);
+  process.exit(1);
 }
 
 console.log("scaffold integrity ok: community files, workflow conventions, root package settings, and web app build are present");
