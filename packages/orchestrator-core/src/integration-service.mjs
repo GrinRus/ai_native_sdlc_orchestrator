@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeQualityRepairRequest } from "../../observability/src/quality-repair-request.mjs";
 import { withFileLock, writeJsonAtomic } from "../../observability/src/file-transaction.mjs";
+import { resolveEvidenceReference } from "./aor-home.mjs";
 
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -241,7 +242,13 @@ export function applyIntegrationToParent(options) {
         code: "integration-report-not-authoritative",
       });
     }
-    const reportBytes = fs.readFileSync(reportFile);
+    const resolvedReport = resolveEvidenceReference({
+      projectRoot: projectRuntimeRoot,
+      projectRuntimeRoot,
+      workspaceProjectId: parent.project_id,
+      reference: reportFile,
+    });
+    const reportBytes = resolvedReport.bytes;
     const report = JSON.parse(reportBytes);
     const authority = JSON.parse(fs.readFileSync(authorityFile, "utf8"));
     if (

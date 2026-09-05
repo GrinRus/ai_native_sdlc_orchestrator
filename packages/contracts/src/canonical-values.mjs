@@ -197,6 +197,72 @@ export function classifyAllowedPaths(value) {
   return { ok: true, state: "bounded", patterns: [...value] };
 }
 
+/**
+ * Return a deterministic scope representation without changing the meaning of
+ * a caller-supplied pattern. Invalid patterns are reported instead of being
+ * silently widened.
+ */
+export function normalizePathScope(value) {
+  if (!Array.isArray(value)) return { ok: false, patterns: [], value_class: "non-array" };
+  const patterns = [...new Set(value)];
+  const invalid = patterns.find((pattern) => !validateAllowedPathPattern(pattern));
+  if (invalid !== undefined) return { ok: false, patterns: [], value_class: "invalid-pattern", invalid };
+  return { ok: true, patterns: patterns.sort(), value_class: patterns.length === 0 ? "deny-all" : "canonical" };
+}
+
+function segmentPatternsOverlap(left, right) {
+  if (left === "*" || right === "*") return true;
+  if (!left.includes("*") && !right.includes("*")) return left === right;
+  const leftLiterals = left.split("*");
+  const rightLiterals = right.split("*");
+  const candidates = new Set(["", "x", ...leftLiterals, ...rightLiterals]);
+  for (const a of leftLiterals) for (const b of rightLiterals) for (const suffix of ["", "x"]) {
+    candidates.add(`${a}${b}${suffix}`);
+    candidates.add(`${b}${a}${suffix}`);
+  }
+  return [...candidates].some((candidate) => matchesSegment(left, candidate) && matchesSegment(right, candidate));
+}
+
+function scopeSegmentsOverlap(left, right) {
+  const a = left.split("/");
+  const b = right.split("/");
+  const pending = [[0, 0]];
+  const visited = new Set();
+  while (pending.length > 0) {
+    const [i, j] = pending.pop();
+    const key = `${i}:${j}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    if (i === a.length && j === b.length) return true;
+    if (i < a.length && a[i] === "**") pending.push([i + 1, j]);
+    if (j < b.length && b[j] === "**") pending.push([i, j + 1]);
+    if (i < a.length && j < b.length) {
+      if (a[i] === "**" && b[j] === "**") pending.push([i + 1, j + 1]);
+      else if (a[i] === "**") pending.push([i, j + 1]);
+      else if (b[j] === "**") pending.push([i + 1, j]);
+      else if (segmentPatternsOverlap(a[i], b[j])) pending.push([i + 1, j + 1]);
+    }
+  }
+  return false;
+}
+
+/** Segment-aware overlap check for canonical project-relative path scopes. */
+export function pathScopesOverlap(left, right) {
+  if (!validateAllowedPathPattern(left).ok || !validateAllowedPathPattern(right).ok) return false;
+  return scopeSegmentsOverlap(left, right);
+}
+
+/**
+ * Compare an observed changed-path set with an authorized scope. Every path is
+ * checked literally; glob syntax in observed paths is rejected.
+ */
+export function compareChangedPathsToScope(changedPaths, allowedPatterns) {
+  const normalized = normalizePathScope(allowedPatterns);
+  if (!normalized.ok) return { ok: false, reason: "scope-invalid", unauthorized: [...changedPaths] };
+  const unauthorized = changedPaths.filter((candidate) => typeof candidate !== "string" || candidate.includes("*") || !normalized.patterns.some((pattern) => matchesAllowedPath(pattern, candidate)));
+  return { ok: unauthorized.length === 0, reason: unauthorized.length === 0 ? "within-scope" : "path-out-of-scope", unauthorized };
+}
+
 export function validateReferenceBinding({ reference, base }) {
   if (!CANONICAL_REFERENCE_BASES.includes(base)) {
     return invalidResult("missing-or-unknown-base", `Declare one canonical base: ${CANONICAL_REFERENCE_BASES.join(", ")}.`);

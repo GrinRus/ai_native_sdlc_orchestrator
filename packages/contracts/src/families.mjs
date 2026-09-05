@@ -25,6 +25,8 @@ const COMPILER_REVISION_LIFECYCLE_VALUES = ["draft", "candidate", "stable", "fro
 const COMPILER_REVISION_STATUS_VALUES = ["ready", "blocked"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const DELIVERY_MANIFEST_STATUS_VALUES = ["draft", "submitted", "complete", "partial", "blocked", "failed"];
+const RELEASE_PACKET_STATUS_VALUES = ["draft", "ready-for-close", "released", "blocked", "failed"];
 const ASSET_MODE_VALUES = ["bundled", "materialized"];
 const ONBOARDING_STATUS_VALUES = ["ready", "blocked"];
 const NEXT_ACTION_STATUS_VALUES = ["ready", "blocked"];
@@ -490,7 +492,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       status: "string",
       created_at: "string",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "status", allowedValues: RELEASE_PACKET_STATUS_VALUES }],
   },
   {
     family: "delivery-plan",
@@ -582,7 +584,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       created_at: "string",
       coordination_transaction: "object",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "status", allowedValues: DELIVERY_MANIFEST_STATUS_VALUES }],
   },
   {
     family: "incident-report",

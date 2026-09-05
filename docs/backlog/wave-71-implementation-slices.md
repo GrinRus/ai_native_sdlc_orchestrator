@@ -372,7 +372,7 @@ corruption and persistence failures as recovery evidence.
 
 ## W71-S06 — Closed delivery, release, route, and scope validation
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-4, EPIC-5
 - **Hard dependencies:** W71-S05
 - **Remediation priority:** P0

@@ -7,10 +7,13 @@ import { fileURLToPath } from "node:url";
 import {
   getContractFamilyIndex,
   classifyAllowedPaths,
+  compareChangedPathsToScope,
   derivePublicId,
   loadContractFile,
   loadExampleContracts,
   matchesAllowedPath,
+  normalizePathScope,
+  pathScopesOverlap,
   normalizeIdentifierFragment,
   validateAllowedPathPattern,
   validateContractDocument,
@@ -237,6 +240,54 @@ test("allowed_paths distinguishes absent, deny-all, bounded, unrestricted, and m
   assert.equal(matchesAllowedPath("source/*.ts", "source/index.js"), false);
   assert.equal(matchesAllowedPath("source/**", "source/nested/index.ts"), true);
   assert.equal(matchesAllowedPath("source/**", "source-escape/index.ts"), false);
+});
+
+test("canonical path scopes compare literal changes and segment-aware overlap", () => {
+  assert.equal(pathScopesOverlap("src/**", "src/generated/*.ts"), true);
+  assert.equal(pathScopesOverlap("src/*", "src/nested/*"), false);
+  assert.equal(pathScopesOverlap("src/foo", "src/bar"), false);
+  assert.deepEqual(normalizePathScope(["src/**", "src/**", "lib/*.js"]).patterns, ["lib/*.js", "src/**"]);
+  assert.deepEqual(compareChangedPathsToScope(["src/a.ts", "docs/readme.md"], ["src/**"]), {
+    ok: false,
+    reason: "path-out-of-scope",
+    unauthorized: ["docs/readme.md"],
+  });
+  assert.equal(compareChangedPathsToScope(["src/a.ts"], ["src/**"]).ok, true);
+});
+
+test("delivery and release validators reject contradictory success claims", () => {
+  const plan = loadContractFile({ filePath: path.join(workspaceRoot, "examples/packets/delivery-plan-implement-fork-first-pr.yaml"), family: "delivery-plan" });
+  assert.equal(plan.ok, true);
+  const invalidPlan = structuredClone(plan.document);
+  invalidPlan.status = "ready";
+  invalidPlan.execution_allowed = false;
+  assertValidationIssue(validateContractDocument({ family: "delivery-plan", document: invalidPlan }), "contract_invariant_failed", "execution_allowed");
+
+  const manifest = loadContractFile({ filePath: path.join(workspaceRoot, "examples/delivery-manifest.sample.yaml"), family: "delivery-manifest" });
+  assert.equal(manifest.ok, true);
+  const partial = structuredClone(manifest.document);
+  partial.coordination_transaction.status = "partial";
+  partial.coordination_transaction.completed_repo_ids = ["backend"];
+  partial.coordination_transaction.failed_repo_ids = [];
+  assertValidationIssue(validateContractDocument({ family: "delivery-manifest", document: partial }), "contract_invariant_failed", "coordination_transaction");
+
+  const release = loadContractFile({ filePath: path.join(workspaceRoot, "examples/packets/release-wave-004.yaml"), family: "release-packet" });
+  assert.equal(release.ok, true);
+  const incomplete = structuredClone(release.document);
+  incomplete.status = "ready-for-close";
+  incomplete.evidence_lineage.execution_refs = [];
+  assertValidationIssue(validateContractDocument({ family: "release-packet", document: incomplete }), "contract_invariant_failed", "evidence_lineage");
+});
+
+test("integration report rejects mismatched child ownership and passed-with-blockers", () => {
+  const loaded = loadContractFile({ filePath: path.join(workspaceRoot, "examples/reports/integration-report-parent-run.yaml"), family: "integration-report" });
+  assert.equal(loaded.ok, true);
+  const mismatch = structuredClone(loaded.document);
+  mismatch.source_attempts[0].project_id = "other-project";
+  assertValidationIssue(validateContractDocument({ family: "integration-report", document: mismatch }), "identity_binding_mismatch", "source_attempts[0].project_id");
+  const blocked = structuredClone(loaded.document);
+  blocked.blockers = [{ code: "conflict" }];
+  assertValidationIssue(validateContractDocument({ family: "integration-report", document: blocked }), "contract_invariant_failed", "status");
 });
 
 test("contract diagnostics identify rejected value class and a safe migration action", () => {
