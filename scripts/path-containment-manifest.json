@@ -5,7 +5,7 @@
   "excluded_segments": ["/test/", "/browser/"],
   "entries": [
     {"path":"packages/adapter-sdk/src/index.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
-    {"path":"packages/observability/src/file-transaction.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/observability/src/file-transaction.mjs","sink_count":3,"disposition":"reviewed-owned-scope"},
     {"path":"packages/observability/src/live-run-events.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
     {"path":"packages/orchestrator-core/src/control-plane/project-source.mjs","sink_count":6,"disposition":"reviewed-owned-scope"},
     {"path":"packages/orchestrator-core/src/control-plane/workspace-registry-store.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},

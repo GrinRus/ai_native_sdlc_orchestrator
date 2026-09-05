@@ -685,7 +685,7 @@ hold/readiness state is not changed by code-only completion.
 | W71-S02 | Symlink-safe path confinement and durable cleanup | EPIC-0, EPIC-1, EPIC-2, EPIC-5 | done | path containment, Markdown ingress, workspace cleanup, integration evidence paths, security tests | W71-S01 |
 | W71-S03 | Deterministic repository gate and dependency/process safety | EPIC-0, EPIC-5, EPIC-7 | done | package/lockfile, dependency policy, test/typecheck runners, process supervision, CI/release gates | W71-S02 |
 | W71-S04 | Versioned Task contract and execution-route truth | EPIC-0, EPIC-1, EPIC-2, EPIC-3, EPIC-6 | done | Task contracts/projections, control-plane API/OpenAPI, CLI parity, examples and tests | W71-S03 |
-| W71-S05 | Atomic intent and runtime state transactions | EPIC-0, EPIC-2, EPIC-3, EPIC-6 | blocked | intent preparation, run/step state, heartbeat supervision, shared locks/atomic storage | W71-S04 |
+| W71-S05 | Atomic intent and runtime state transactions | EPIC-0, EPIC-2, EPIC-3, EPIC-6 | active | intent preparation, run/step state, heartbeat supervision, shared locks/atomic storage | W71-S04 |
 | W71-S06 | Closed delivery, release, route, and scope validation | EPIC-0, EPIC-4, EPIC-5 | blocked | public contracts/examples, family registry/loaders, shared evidence storage/resolver, Runtime Harness ingestion and provider routing | W71-S05 |
 | W71-S07 | Server-owned Task start and action progression | EPIC-1, EPIC-2, EPIC-3, EPIC-6 | blocked | intent start, Task/Flow projections, lifecycle mutations, control-plane client contract | W71-S06 |
 | W71-S08 | Durable Ask AOR, review, and completion | EPIC-2, EPIC-4, EPIC-5, EPIC-6 | blocked | operator requests, review/verification/delivery closure, Task projections and recovery tests | W71-S07 |

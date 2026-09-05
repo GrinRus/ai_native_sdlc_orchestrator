@@ -313,7 +313,7 @@ server-owned actions; preserve additive compatibility for existing clients.
 
 ## W71-S05 — Atomic intent and runtime state transactions
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W71-S04
 - **Remediation priority:** P0

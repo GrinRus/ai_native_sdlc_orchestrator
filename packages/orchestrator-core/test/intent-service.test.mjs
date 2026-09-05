@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +22,28 @@ import {
 } from "../src/intent-service.mjs";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const intentModuleUrl = new URL("../src/intent-service.mjs", import.meta.url).href;
+
+function runPreparationWorker(projectRoot, aorHome, submissionId, projectId) {
+  const source = `
+    import { createLocalProjectRegistry } from ${JSON.stringify(new URL("../src/control-plane/local-project-registry.mjs", import.meta.url).href)};
+    import { prepareIntentSubmission } from ${JSON.stringify(intentModuleUrl)};
+    const registry = createLocalProjectRegistry({ cwd: process.argv[1], projects: [], persistence: { mode: "persistent", root: process.argv[2] } });
+    const result = prepareIntentSubmission({ registry, projectId: process.argv[4], submissionId: process.argv[3], normalization: ${JSON.stringify({ title: "Concurrent preparation", outcome: "Prepare once.", acceptance: ["One revision."], scope: ["src/**"], work_type: "review", constraints: [], assumptions: [], open_questions: [], confidence: 0.9 })} });
+    process.stdout.write(JSON.stringify({ revision: result.report.revision, idempotent: result.idempotent }));
+  `;
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "--eval", source, projectRoot, aorHome, submissionId, projectId], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("exit", (code) => code === 0 ? resolve(JSON.parse(stdout)) : reject(new Error(`worker exited ${code}: ${stderr}`)));
+  });
+}
 
 test("intent provider extraction rejects arbitrary nested JSON and preserves bounded parse status", () => {
   const candidate = {
@@ -93,6 +116,25 @@ test("intent submission stores bounded text inputs under central AOR Home", asyn
       });
       assert.equal(secondRevision.report.revision, 2);
       assert.equal(secondRevision.report.previous_revision_ref, revised.submission.normalization_refs[0]);
+    } finally {
+      fs.rmSync(aorHome, { recursive: true, force: true });
+    }
+  });
+});
+
+test("concurrent intent preparation reuses one ordered normalization revision", async () => {
+  await withTempRepo({ prefix: "aor-intent-concurrency-", workspaceRoot }, async (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-concurrency-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      const created = createIntentSubmission({ registry, projectId, requestText: "Prepare concurrently.", autoPrepare: false });
+      const results = await Promise.all(Array.from({ length: 4 }, () => runPreparationWorker(projectRoot, aorHome, created.submission.submission_id, projectId)));
+      assert.equal(results.filter((result) => result.idempotent === false).length, 1);
+      assert.equal(results.filter((result) => result.idempotent === true).length, 3);
+      const current = readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id });
+      assert.equal(current.normalization.revision, 1);
+      assert.equal(current.submission.normalization_refs.length, 1);
     } finally {
       fs.rmSync(aorHome, { recursive: true, force: true });
     }
@@ -213,6 +255,26 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       assert.equal(second.mission.command_output?.mission_id ?? second.mission.command, first.mission.command_output?.mission_id ?? first.mission.command);
       assert.equal(readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission.status, "confirmed");
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
+  });
+});
+
+test("listing intent submissions fails closed when a state document is corrupt", () => {
+  withTempRepo({ prefix: "aor-intent-corrupt-list-", workspaceRoot }, (projectRoot) => {
+    const aorHome = fs.mkdtempSync(path.join(os.tmpdir(), "aor-intent-corrupt-list-home-"));
+    try {
+      const registry = createLocalProjectRegistry({ cwd: projectRoot, projects: [{ projectRef: projectRoot }], persistence: { mode: "persistent", root: aorHome } });
+      const projectId = registry.defaultProjectId;
+      const created = createIntentSubmission({ registry, projectId, requestText: "Corrupt this state.", autoPrepare: false });
+      const stateFile = created.submission_file;
+      fs.writeFileSync(stateFile, "{not-json\n", "utf8");
+      assert.throws(
+        () => listIntentSubmissions({ registry, projectId }),
+        (error) => error.code === "state-corrupt" && error.state_file === stateFile && typeof error.recovery_ref === "string",
+      );
+      assert.equal(fs.existsSync(stateFile), false);
+    } finally {
+      fs.rmSync(aorHome, { recursive: true, force: true });
+    }
   });
 });
 
