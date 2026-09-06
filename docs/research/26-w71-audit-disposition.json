@@ -117,11 +117,11 @@
       "finding_id": "W71-AUD-010",
       "severity": "S2",
       "state": "open",
-      "owner_slices": ["W71-S12", "W71-S15"],
+      "owner_slices": ["W71-S15"],
       "release_blocking": true,
       "affected_invariants": ["quality-coverage", "maintainability-ratchet", "bounded-hotspots"],
-      "summary": "Quality and maintainability checks do not yet enforce complete behavior coverage and bounded critical hotspots.",
-      "evidence_refs": ["docs/research/06-maintainability-and-backlog-triage-2026-07.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "summary": "W71-S12 now enforces complete source ownership, non-increasing structural debt, and critical-path positive/negative evidence; bounded hotspot decomposition remains open for W71-S15.",
+      "evidence_refs": ["docs/research/06-maintainability-and-backlog-triage-2026-07.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s12-quality-ratchets-execution-plan.md", "scripts/quality-ratchet.mjs", "scripts/quality-exceptions.json", "scripts/critical-path-coverage.json", "scripts/test/quality-ratchet.test.mjs"],
       "limitations": ["Behavior-preserving hotspot decomposition follows the deterministic gate restoration."]
     },
     {
