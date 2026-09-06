@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { readSourceFiles } from "./quality-ratchet-lib.mjs";
 
 const root = process.cwd();
 const manifestPath = path.join(root, "scripts/test-manifest.json");
@@ -37,6 +38,11 @@ const sourceFiles = files.filter((file) => sourceExtensions.has(path.posix.extna
 const excludedFiles = sourceFiles.filter((file) => excluded.some((entry) => file.startsWith(normalize(entry.path_prefix))));
 const executableSourceFiles = sourceFiles.filter((file) => !excludedFiles.includes(file));
 const lintTypecheck = executableSourceFiles;
+const productionFiles = new Set(readSourceFiles(root));
+const accountedProductionFiles = new Set(executableSourceFiles);
+for (const file of productionFiles) {
+  if (!accountedProductionFiles.has(file)) errors.push(`Production source file is missing from gate coverage: ${file}`);
+}
 const unitTests = files.filter((file) => file.endsWith(".test.mjs") && !file.startsWith("apps/web/browser/"));
 const browserTests = files.filter((file) => file.startsWith("apps/web/browser/") && file.endsWith(".spec.mjs"));
 
@@ -45,6 +51,7 @@ const report = {
   status: errors.length === 0 ? "pass" : "fail",
   manifest_path: "scripts/test-manifest.json",
   source_files: lintTypecheck.map((file) => ({ file, checks: ["lint", "typecheck"] })),
+  production_source_files: [...productionFiles].sort().map((file) => ({ file, checks: ["lint", "typecheck"] })),
   unit_tests: unitTests,
   browser_tests: browserTests,
   excluded_files: excludedFiles.map((file) => ({ file, ...excluded.find((entry) => file.startsWith(normalize(entry.path_prefix))) })),
