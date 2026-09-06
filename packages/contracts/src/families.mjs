@@ -56,7 +56,7 @@ const OPERATOR_REQUEST_INTENT_VALUES = [
   "implement",
   "review",
 ];
-const OPERATOR_REQUEST_STATUS_VALUES = ["created", "running", "completed", "failed", "blocked"];
+const OPERATOR_REQUEST_STATUS_VALUES = ["created", "run-pending", "running", "completed", "failed", "blocked"];
 export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
   "run.started", "parent.started", "parent.updated", "parent.terminal",
@@ -1127,7 +1127,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
     fieldTypes: {
       request_id: "string",
-      project_id: "string",
+      idempotency_key: "string", project_id: "string",
       version: "number",
       source_surface: "string",
       target_stage: "string",
@@ -1142,7 +1142,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       created_at: "string",
       updated_at: "string",
       result_refs: "array",
-      evidence_refs: "array",
+      evidence_refs: "array", attempt: "number", execution: "object",
     },
     enumChecks: [
       { field: "target_stage", allowedValues: OPERATOR_REQUEST_STAGE_VALUES },

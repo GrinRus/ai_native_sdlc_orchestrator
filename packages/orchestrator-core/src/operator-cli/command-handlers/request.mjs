@@ -31,6 +31,7 @@ function applyOperatorRequestOutput(options) {
   options.outputState.operatorRequestRef = options.result.operatorRequestRef;
   options.outputState.operatorRequestId = options.result.requestId;
   options.outputState.operatorRequestStatus = options.result.status;
+  options.outputState.operatorRequestIdempotent = options.result.idempotent === true;
 }
 
 /**
@@ -53,6 +54,7 @@ export function handleRequestCommand(context) {
         intentType: resolveOptionalStringFlag("intent", flags.intent) ?? "",
         requestText: resolveOptionalStringFlag("request", flags.request) ?? "",
         targetFlowId: resolveOptionalStringFlag("target-flow-id", flags["target-flow-id"]),
+        idempotencyKey: resolveOptionalStringFlag("idempotency-key", flags["idempotency-key"]),
         targetRefs: resolveOptionalCsvFlag("target-ref", flags["target-ref"]),
         allowedPaths: resolveOptionalCsvFlag("allowed-path", flags["allowed-path"]),
         deliveryMode: resolveOptionalStringFlag("delivery-mode", flags["delivery-mode"]),

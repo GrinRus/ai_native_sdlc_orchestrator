@@ -1,4 +1,5 @@
 request_id: operator-request.aor-core.checkout-risk.1
+idempotency_key: operator-request-key-aor-core-checkout-risk-1
 project_id: aor-core
 version: 1
 source_surface: web
@@ -13,6 +14,7 @@ target_refs:
 allowed_paths: []
 delivery_mode: no-write
 status: completed
+attempt: 1
 created_at: "2026-05-28T00:00:00.000Z"
 updated_at: "2026-05-28T00:00:10.000Z"
 result_refs:
@@ -20,3 +22,7 @@ result_refs:
 evidence_refs:
   - packet://operator-request@evidence://reports/operator-request-aor-core-checkout-risk-1.json
   - evidence://projects/aor-core/reports/next-action-report-checkout-risk.json
+execution:
+  attempt: 1
+  status: completed
+  recovery_action: none

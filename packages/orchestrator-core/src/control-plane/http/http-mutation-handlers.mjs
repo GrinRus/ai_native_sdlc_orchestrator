@@ -497,15 +497,17 @@ export async function handleTaskAction({ request, response, params, registry, ru
         targetFlowId: task.flow_id ?? undefined,
         targetRefs: asStringArray(task.evidence_refs),
         allowedPaths: asStringArray(payload.allowed_paths),
+        idempotencyKey: asString(payload.idempotency_key) ?? asString(payload.command_id) ?? undefined,
         deliveryMode: "no-write",
       });
-      sendJson(response, 201, {
+      sendJson(response, result.idempotent ? 200 : 201, {
         task_id: task.task_id,
         action,
         operator_request: {
           request_id: result.requestId,
           operator_request_ref: result.operatorRequestRef,
           status: result.status,
+          idempotent: result.idempotent === true,
           document: result.operatorRequest,
         },
         readback: durableReadback(result),
@@ -764,16 +766,18 @@ export async function handleOperatorRequestCreate({ request, response, runtimeOp
       intentType: asString(payload.intent_type) ?? "",
       requestText: asString(payload.request_text) ?? asString(payload.request) ?? "",
       targetFlowId: asString(payload.target_flow_id) ?? undefined,
+      idempotencyKey: asString(payload.idempotency_key) ?? undefined,
       targetRefs: asStringArray(payload.target_refs),
       allowedPaths: asStringArray(payload.allowed_paths),
       deliveryMode: asString(payload.delivery_mode) ?? undefined,
     });
-    sendJson(response, 201, {
+    sendJson(response, result.idempotent ? 200 : 201, {
       operator_request: {
         request_id: result.requestId,
         operator_request_ref: result.operatorRequestRef,
         operator_request_file: result.operatorRequestFile,
         status: result.status,
+        idempotent: result.idempotent === true,
         document: result.operatorRequest,
       },
     });

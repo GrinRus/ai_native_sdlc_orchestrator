@@ -2,12 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { writeJsonAtomic } from "../../observability/src/index.mjs";
 
 import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { resolveNextAction } from "./next-action.mjs";
 import { assertFlowMutationAllowed } from "./control-plane/flow-projections.mjs";
 import { resolveEvidenceReference } from "./aor-home.mjs";
+import {
+  operatorRequestInputsMatch,
+  resolveOperatorRequestIdempotencyKey,
+  withOperatorRequestTransaction,
+} from "./operator-request-transaction.mjs";
 
 export const OPERATOR_REQUEST_INTENTS = Object.freeze([
   "analyze",
@@ -451,6 +457,7 @@ function resolveTargetStep(intentType, targetStage) {
  *   allowedPaths?: string[],
  *   deliveryMode?: string,
  *   targetFlowId?: string,
+ *   idempotencyKey?: string,
  * }} options
  */
 export function createOperatorRequest(options) {
@@ -461,6 +468,17 @@ export function createOperatorRequest(options) {
   const sourceSurface = asString(options.sourceSurface) ?? "cli";
   const deliveryMode = asString(options.deliveryMode) ?? "no-write";
   const targetFlowId = asString(options.targetFlowId);
+  const idempotencyKey = resolveOperatorRequestIdempotencyKey({
+    projectId: init.projectId,
+    targetStage: targetStage ?? "",
+    intentType: intentType ?? "",
+    requestText: requestText ?? "",
+    targetFlowId,
+    targetRefs: uniqueStrings(options.targetRefs ?? []),
+    allowedPaths: uniqueStrings(options.allowedPaths ?? []),
+    deliveryMode,
+    idempotencyKey: options.idempotencyKey,
+  });
   const targetRefs = uniqueStrings(options.targetRefs ?? []);
   const allowedPaths = uniqueStrings(options.allowedPaths ?? []);
 
@@ -513,42 +531,79 @@ export function createOperatorRequest(options) {
     );
   }
 
-  const timestamp = new Date().toISOString();
-  const suffix = normalizeForId(`${targetStage}-${intentType}-${timestamp}`) || String(Date.now());
-  const requestId = `operator-request.${init.projectId}.${suffix}`;
-  const filePath = path.join(init.runtimeLayout.reportsRoot, `operator-request-${normalizeForId(requestId)}.json`);
-  const operatorRequestRef = toOperatorRequestPacketRef(init.projectRoot, filePath);
-  const document = {
-    request_id: requestId,
-    project_id: init.projectId,
-    version: 1,
-    source_surface: sourceSurface,
-    target_stage: targetStage,
-    ...(targetFlowId ? { target_flow_id: targetFlowId } : {}),
-    intent_type: intentType,
-    request_text: requestText,
-    request_summary: summarizeOperatorRequest(requestText),
-    target_refs: targetRefs,
-    allowed_paths: allowedPaths,
-    delivery_mode: deliveryMode,
-    status: "created",
-    created_at: timestamp,
-    updated_at: timestamp,
-    result_refs: [],
-    evidence_refs: [operatorRequestRef],
-  };
-  assertValidOperatorRequest(document, filePath);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
-  return {
-    operatorRequest: sanitizeOperatorRequestDocument(document),
-    operatorRequestFile: filePath,
-    operatorRequestRef: operatorRequestRef,
-    requestId,
-    status: "created",
-    projectRoot: init.projectRoot,
-    runtimeRoot: init.runtimeRoot,
-  };
+  return /** @type {ReturnType<typeof createOperatorRequest>} */ (withOperatorRequestTransaction(init, () => {
+    const existing = listRawOperatorRequestsForInit(init).find(
+      (entry) => asString(entry.document.idempotency_key) === idempotencyKey,
+    );
+    if (existing) {
+      if (!operatorRequestInputsMatch(existing.document, {
+        projectId: init.projectId,
+        targetStage,
+        intentType,
+        requestText,
+        targetFlowId,
+        targetRefs,
+        allowedPaths,
+        deliveryMode,
+      })) {
+        throw new OperatorRequestError(
+          "operator_request.idempotency_conflict",
+          `Idempotency key '${idempotencyKey}' is already associated with a different operator request.`,
+          409,
+        );
+      }
+      return {
+        operatorRequest: sanitizeOperatorRequestDocument(existing.document),
+        operatorRequestFile: existing.file,
+        operatorRequestRef: existing.operator_request_ref,
+        requestId: asString(existing.document.request_id),
+        status: asString(existing.document.status) ?? "created",
+        idempotencyKey,
+        idempotent: true,
+        projectRoot: init.projectRoot,
+        runtimeRoot: init.runtimeRoot,
+      };
+    }
+    const timestamp = new Date().toISOString();
+    const suffix = normalizeForId(idempotencyKey) || "request";
+    const requestId = `operator-request.${init.projectId}.${suffix}`;
+    const filePath = path.join(init.runtimeLayout.reportsRoot, `operator-request-${normalizeForId(requestId)}.json`);
+    const operatorRequestRef = toOperatorRequestPacketRef(init.projectRoot, filePath);
+    const document = {
+      request_id: requestId,
+      idempotency_key: idempotencyKey,
+      project_id: init.projectId,
+      version: 1,
+      source_surface: sourceSurface,
+      target_stage: targetStage,
+      ...(targetFlowId ? { target_flow_id: targetFlowId } : {}),
+      intent_type: intentType,
+      request_text: requestText,
+      request_summary: summarizeOperatorRequest(requestText),
+      target_refs: targetRefs,
+      allowed_paths: allowedPaths,
+      delivery_mode: deliveryMode,
+      status: "created",
+      attempt: 0,
+      created_at: timestamp,
+      updated_at: timestamp,
+      result_refs: [],
+      evidence_refs: [operatorRequestRef],
+    };
+    assertValidOperatorRequest(document, filePath);
+    writeJsonAtomic(filePath, document);
+    return {
+      operatorRequest: sanitizeOperatorRequestDocument(document),
+      operatorRequestFile: filePath,
+      operatorRequestRef,
+      requestId,
+      status: "created",
+      idempotencyKey,
+      idempotent: false,
+      projectRoot: init.projectRoot,
+      runtimeRoot: init.runtimeRoot,
+    };
+  }));
 }
 
 /**
@@ -562,6 +617,7 @@ export function createOperatorRequest(options) {
  *   resultRefs?: string[],
  *   evidenceRefs?: string[],
  *   execution?: Record<string, unknown>,
+ *   attempt?: number,
  * }} options
  */
 function updateOperatorRequest(options) {
@@ -569,6 +625,11 @@ function updateOperatorRequest(options) {
   const document = {
     ...options.request,
     status: options.status,
+    attempt: Number.isInteger(options.attempt)
+      ? options.attempt
+      : Number.isInteger(options.request.attempt)
+        ? options.request.attempt
+        : 0,
     updated_at: updatedAt,
     result_refs: uniqueStrings([
       ...asStringArray(options.request.result_refs),
@@ -585,7 +646,7 @@ function updateOperatorRequest(options) {
     ...(options.execution ? { execution: options.execution } : {}),
   };
   assertValidOperatorRequest(document, options.requestFile);
-  fs.writeFileSync(options.requestFile, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  writeJsonAtomic(options.requestFile, document);
   return document;
 }
 
@@ -624,7 +685,7 @@ function writeProposalArtifacts(options) {
         ? "Patch-only evidence was materialized; source files were not mutated by v1 operator request runtime."
         : "No-write evidence was materialized; source files were not mutated.",
   };
-  fs.writeFileSync(proposalFile, `${JSON.stringify(proposal, null, 2)}\n`, "utf8");
+  writeJsonAtomic(proposalFile, proposal);
 
   const proposalRefs = [toEvidenceRef(options.init.projectRoot, proposalFile)];
   const patchRefs = [];
@@ -661,9 +722,9 @@ function writeProposalArtifacts(options) {
  * }} options
  */
 export function runOperatorRequest(options) {
-  const loaded = readOperatorRequest(options);
-  const request = loaded.document;
-  const deliveryMode = asString(request.delivery_mode) ?? "no-write";
+  let loaded = readOperatorRequest(options);
+  let request = loaded.document;
+  let deliveryMode = asString(request.delivery_mode) ?? "no-write";
   const intentType = asString(request.intent_type) ?? "analyze";
   const targetStage = asString(request.target_stage) ?? "discovery";
   const targetFlowId = asString(request.target_flow_id);
@@ -694,15 +755,69 @@ export function runOperatorRequest(options) {
     );
   }
 
-  const runningDocument = updateOperatorRequest({
-    init: loaded.init,
-    request,
-    requestFile: loaded.file,
-    status: "running",
-    evidenceRefs: [operatorRequestRef],
-  });
+  return /** @type {ReturnType<typeof runOperatorRequest>} */ (withOperatorRequestTransaction(loaded.init, () => {
+    // Reload after taking the transaction lock. A second caller that waited
+    // behind the first one must observe its terminal document and return the
+    // same refs instead of executing the routed step a second time.
+    loaded = readOperatorRequest(options);
+    request = loaded.document;
+    deliveryMode = asString(request.delivery_mode) ?? "no-write";
+    const existingExecution = request.execution && typeof request.execution === "object"
+      ? /** @type {Record<string, unknown>} */ (request.execution)
+      : {};
+    if (request.status === "completed") {
+      return {
+        operatorRequest: sanitizeOperatorRequestDocument(request),
+        operatorRequestFile: loaded.file,
+        operatorRequestRef: loaded.operator_request_ref,
+        requestId: asString(request.request_id),
+        status: "completed",
+        runId: asString(existingExecution.run_id),
+        routedStepResultFile: asString(existingExecution.routed_step_result_file),
+        routedStepResultRef: asString(existingExecution.routed_step_result_ref),
+        compiledContextRef: asString(existingExecution.compiled_context_ref),
+        proposalRefs: asStringArray(request.result_refs).filter((ref) => ref.includes("operator-request-proposal")),
+        patchRefs: asStringArray(request.result_refs).filter((ref) => ref.includes("operator-request-") && ref.endsWith(".patch")),
+        nextActionReportFile: null,
+        nextActionReportRef: null,
+        projectRoot: loaded.init.projectRoot,
+        runtimeRoot: loaded.init.runtimeRoot,
+        idempotent: true,
+      };
+    }
+    if (request.status === "running") {
+      request = updateOperatorRequest({
+        init: loaded.init,
+        request,
+        requestFile: loaded.file,
+        status: "run-pending",
+        evidenceRefs: [loaded.operator_request_ref],
+        execution: {
+          ...existingExecution,
+          status: "run-pending",
+          recovery_action: "request run",
+          interrupted_at: new Date().toISOString(),
+        },
+      });
+    }
+    const attempt = (Number.isInteger(request.attempt) ? request.attempt : 0) + 1;
+    const runningDocument = updateOperatorRequest({
+      init: loaded.init,
+      request,
+      requestFile: loaded.file,
+      status: "running",
+      attempt,
+      evidenceRefs: [operatorRequestRef],
+      execution: {
+        ...((request.execution && typeof request.execution === "object") ? request.execution : {}),
+        attempt,
+        status: "running",
+        recovery_action: "request run",
+        started_at: new Date().toISOString(),
+      },
+    });
 
-  try {
+    try {
     const runId = `operator-request.${normalizeForId(asString(request.request_id) ?? "request")}`;
     const stepId = `operator-request.${normalizeForId(targetStep) || "step"}`;
     const contextBundleOverrides = resolveContextBundleOverrides(loaded.init, targetStep);
@@ -770,6 +885,8 @@ export function runOperatorRequest(options) {
         nextActionReportRef ?? "",
       ]),
       execution: {
+        attempt,
+        status: "completed",
         run_id: runId,
         target_step: targetStep,
         routed_step_result_file: routedExecution.stepResultPath,
@@ -795,15 +912,21 @@ export function runOperatorRequest(options) {
       nextActionReportRef,
       projectRoot: loaded.init.projectRoot,
       runtimeRoot: loaded.init.runtimeRoot,
+      idempotent: false,
     };
   } catch (error) {
     const failedDocument = updateOperatorRequest({
       init: loaded.init,
       request: runningDocument,
       requestFile: loaded.file,
-      status: "failed",
+      status: "run-pending",
+      attempt,
       evidenceRefs: [operatorRequestRef],
       execution: {
+        attempt,
+        status: "run-pending",
+        recovery_action: "request run",
+        retryable: true,
         error: error instanceof Error ? error.message : String(error),
         target_step: targetStep,
         delivery_mode: deliveryMode,
@@ -820,6 +943,7 @@ export function runOperatorRequest(options) {
     wrapped.operatorRequest = sanitizeOperatorRequestDocument(failedDocument);
     throw wrapped;
   }
+  }));
 }
 
 /**
