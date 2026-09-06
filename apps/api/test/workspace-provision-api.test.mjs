@@ -4,12 +4,13 @@ import path from "node:path";
 import test from "node:test";
 
 import { createControlPlaneHttpServer } from "../src/index.mjs";
-import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { runGitChecked, withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 
 const workspaceRoot = path.resolve(new URL("../../..", import.meta.url).pathname);
 
 test("public API provisions a workspace set through the shared project action boundary", async () => {
   await withTempRepo({ prefix: "aor-s10-workspace-api-", workspaceRoot }, async (repoRoot) => {
+    runGitChecked({ cwd: repoRoot, args: ["branch", "-M", "main"] });
     const runtimeRoot = process.env.AOR_HOME;
     const transport = await createControlPlaneHttpServer({
       projectRef: repoRoot,
