@@ -13,6 +13,8 @@ test("gate coverage reports exact source, unit, browser, and generated ownership
   const report = JSON.parse(fs.readFileSync(path.join(root, ".aor/quality/gate-coverage.json"), "utf8"));
   assert.equal(report.status, "pass");
   assert.ok(report.source_files.length > 0);
+  assert.ok(report.production_source_files.length > 0);
+  assert.equal(report.findings.length, 0);
   assert.ok(report.unit_tests.length > 0);
   assert.ok(report.browser_tests.length > 0);
   assert.ok(report.excluded_files.some((entry) => entry.file.startsWith("apps/web/dist/")));

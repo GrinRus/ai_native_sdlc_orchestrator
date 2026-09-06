@@ -759,7 +759,7 @@ installed real-control-plane freeze remain explicitly owned by W71-S14.
 
 ## W71-S12 — Enforceable quality coverage and maintainability ratchets
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-7
 - **Hard dependencies:** W71-S11
 - **Remediation priority:** P1
