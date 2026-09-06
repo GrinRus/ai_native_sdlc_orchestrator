@@ -44,4 +44,3 @@
   aggregate and leave source checkouts unchanged.
 - Provision, child attempts, contention, retry, integration, aggregate
   delivery/readback, cleanup, and no-upstream-write evidence are journaled.
-
