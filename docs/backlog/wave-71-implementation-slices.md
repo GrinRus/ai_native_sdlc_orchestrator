@@ -497,7 +497,7 @@ without editing the parallel workstream's visual composition.
 
 ## W71-S08 — Durable Ask AOR, review, and completion
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-2, EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W71-S07
 - **Remediation priority:** P0

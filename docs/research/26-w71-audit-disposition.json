@@ -84,10 +84,10 @@
       "finding_id": "W71-AUD-007",
       "severity": "S1",
       "state": "open",
-      "owner_slices": ["W71-S08"],
+      "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["operator-request-durability", "review-completion-recovery"],
-      "summary": "Ask AOR, recovery, review, and completion need durable server-owned transitions and explicit pending outcomes.",
+      "summary": "W71-S08 now supplies durable Ask AOR, recovery, review, and completion transitions; installed public control-plane qualification remains for W71-S14.",
       "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md"],
       "limitations": ["Historical deterministic lifecycle evidence is retained as historical or fixture evidence only."]
     },
