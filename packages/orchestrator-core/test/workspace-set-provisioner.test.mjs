@@ -101,6 +101,24 @@ test("workspace set fails before provisioning on dirty, duplicate, and missing-r
   }), /Mount|base ref/u);
 });
 
+test("workspace-set validation blocks overlapping shared-repository scopes", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-workspace-scope-overlap-"));
+  const source = repository(root, "source");
+  const projectRuntimeRoot = runtime(root);
+  assert.throws(() => provisionWorkspaceSet({
+    workspaceSetId: "workspace-set-overlap",
+    projectId: "project-1",
+    runId: "run-overlap",
+    bindingRef: "binding://project-1@r1",
+    projectRuntimeRoot,
+    deliveryCapable: true,
+    repositories: [
+      { repoId: "one", mountPath: "repos/one", sourceRoot: source, baseRef: "HEAD", accessMode: "write", writeScope: ["src/**"] },
+      { repoId: "two", mountPath: "repos/two", sourceRoot: source, baseRef: "HEAD", accessMode: "write", writeScope: ["src/generated/*.js"] },
+    ],
+  }), /overlapping write scope/u);
+});
+
 test("partial provisioning rolls back owned checkouts and retains failure evidence", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aor-workspace-failure-"));
   const first = repository(root, "first");

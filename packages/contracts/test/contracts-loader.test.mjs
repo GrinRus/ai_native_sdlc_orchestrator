@@ -244,9 +244,14 @@ test("allowed_paths distinguishes absent, deny-all, bounded, unrestricted, and m
 
 test("canonical path scopes compare literal changes and segment-aware overlap", () => {
   assert.equal(pathScopesOverlap("src/**", "src/generated/*.ts"), true);
+  assert.equal(pathScopesOverlap("apps/**/api", "apps/api/**"), true);
+  assert.equal(pathScopesOverlap("packages/*/src/**", "packages/contracts/src/index.mjs"), true);
+  assert.equal(pathScopesOverlap("packages/a/**", "packages/b/**"), false);
+  assert.equal(pathScopesOverlap("src/**", "src2/**"), false);
   assert.equal(pathScopesOverlap("src/*", "src/nested/*"), false);
   assert.equal(pathScopesOverlap("src/foo", "src/bar"), false);
   assert.deepEqual(normalizePathScope(["src/**", "src/**", "lib/*.js"]).patterns, ["lib/*.js", "src/**"]);
+  assert.equal(normalizePathScope(["src/**api"]).ok, false);
   assert.deepEqual(compareChangedPathsToScope(["src/a.ts", "docs/readme.md"], ["src/**"]), {
     ok: false,
     reason: "path-out-of-scope",

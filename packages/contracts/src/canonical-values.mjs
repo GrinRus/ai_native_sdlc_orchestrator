@@ -205,7 +205,7 @@ export function classifyAllowedPaths(value) {
 export function normalizePathScope(value) {
   if (!Array.isArray(value)) return { ok: false, patterns: [], value_class: "non-array" };
   const patterns = [...new Set(value)];
-  const invalid = patterns.find((pattern) => !validateAllowedPathPattern(pattern));
+  const invalid = patterns.find((pattern) => !validateAllowedPathPattern(pattern).ok);
   if (invalid !== undefined) return { ok: false, patterns: [], value_class: "invalid-pattern", invalid };
   return { ok: true, patterns: patterns.sort(), value_class: patterns.length === 0 ? "deny-all" : "canonical" };
 }

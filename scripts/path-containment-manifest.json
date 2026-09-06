@@ -9,7 +9,7 @@
     {"path":"packages/observability/src/live-run-events.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
     {"path":"packages/orchestrator-core/src/control-plane/project-source.mjs","sink_count":6,"disposition":"reviewed-owned-scope"},
     {"path":"packages/orchestrator-core/src/control-plane/workspace-registry-store.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
-    {"path":"packages/orchestrator-core/src/integration-service.mjs","sink_count":2,"disposition":"reviewed-owned-scope"},
+    {"path":"packages/orchestrator-core/src/integration-service.mjs","sink_count":1,"disposition":"reviewed-owned-scope"},
     {"path":"packages/orchestrator-core/src/project-init.mjs","sink_count":3,"disposition":"reviewed-owned-scope"},
     {"path":"packages/orchestrator-core/src/shared/canonical-paths.mjs","sink_count":2,"disposition":"shared-primitive"},
     {"path":"packages/orchestrator-core/src/workspace-isolation.mjs","sink_count":1,"disposition":"shared-primitive"},

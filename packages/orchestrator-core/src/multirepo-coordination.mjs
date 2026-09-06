@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { normalizePathScope, pathScopesOverlap, validateContractDocument } from "../../contracts/src/index.mjs";
+import { readJsonState, withFileLock, writeJsonAtomic } from "../../observability/src/file-transaction.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { toLogicalEvidenceRef } from "./aor-home.mjs";
@@ -99,27 +100,6 @@ function normalizeGlob(glob) {
  * @param {string} glob
  * @returns {string}
  */
-function globPrefix(glob) {
-  if (glob === "**" || glob === "*") return "";
-  if (glob.endsWith("/**")) return glob.slice(0, -3);
-  if (glob.endsWith("*")) return glob.slice(0, -1);
-  return glob;
-}
-
-/**
- * @param {string} left
- * @param {string} right
- * @returns {boolean}
- */
-function globsOverlap(left, right) {
-  if (left === "**" || right === "**" || left === "*" || right === "*") return true;
-  if (left === right) return true;
-  const leftPrefix = globPrefix(left);
-  const rightPrefix = globPrefix(right);
-  if (!leftPrefix || !rightPrefix) return true;
-  return leftPrefix.startsWith(rightPrefix) || rightPrefix.startsWith(leftPrefix);
-}
-
 /**
  * @param {string[]} left
  * @param {string[]} right
@@ -135,8 +115,8 @@ function repoScopesOverlap(left, right) {
  * @param {string[]} right
  * @returns {boolean}
  */
-function pathScopesOverlap(left, right) {
-  return left.some((leftGlob) => right.some((rightGlob) => globsOverlap(leftGlob, rightGlob)));
+function pathScopeArraysOverlap(left, right) {
+  return left.some((leftGlob) => right.some((rightGlob) => pathScopesOverlap(leftGlob, rightGlob)));
 }
 
 /**
@@ -144,20 +124,13 @@ function pathScopesOverlap(left, right) {
  * @returns {{ schema_version: number, locks: Array<Record<string, unknown>> }}
  */
 function readLockStore(statePath) {
-  if (!fs.existsSync(statePath)) {
-    return { schema_version: 1, locks: [] };
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(statePath, "utf8"));
-    const record = asRecord(parsed);
-    return {
-      schema_version: 1,
-      locks: Array.isArray(record.locks) ? record.locks.filter((entry) => typeof entry === "object" && entry) : [],
-    };
-  } catch {
-    return { schema_version: 1, locks: [] };
-  }
+  const parsed = readJsonState(statePath, { quarantine: true });
+  const record = asRecord(parsed);
+  return {
+    schema_version: 1,
+    revision: Number.isInteger(record.revision) && record.revision >= 0 ? record.revision : 0,
+    locks: Array.isArray(record.locks) ? record.locks.filter((entry) => typeof entry === "object" && entry) : [],
+  };
 }
 
 /**
@@ -166,7 +139,7 @@ function readLockStore(statePath) {
  */
 function writeLockStore(statePath, store) {
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
-  fs.writeFileSync(statePath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+  writeJsonAtomic(statePath, store);
 }
 
 /**
@@ -339,89 +312,102 @@ export function materializeMultirepoCoordinationStatus(options = {}) {
   const requestedLockId =
     asString(options.lockId) ?? `lock.${normalizeForId(runId)}.${normalizeForId(repoIds.join("-") || "repo-scope")}`;
   const statePath = path.join(init.runtimeLayout.stateRoot, LOCK_STATE_FILE);
-  const store = readLockStore(statePath);
-  store.locks = store.locks.map((lock) => normalizeStoredLock(lock, now));
-
-  /** @type {string[]} */
-  const blockingReasons = [];
-  /** @type {Record<string, unknown>[]} */
-  let conflicts = [];
-  /** @type {Record<string, unknown> | null} */
-  let activeLock = null;
-  /** @type {string | null} */
-  let releasedAt = null;
   const releaseEvidenceRefs = uniqueStrings(options.releaseEvidenceRefs ?? []);
+  const lockTransaction = withFileLock(`${statePath}.lock`, () => {
+    const store = readLockStore(statePath);
+    store.locks = store.locks.map((lock) => normalizeStoredLock(lock, now));
+    /** @type {string[]} */
+    const blockingReasons = [];
+    /** @type {Record<string, unknown>[]} */
+    let conflicts = [];
+    /** @type {Record<string, unknown> | null} */
+    let activeLock = null;
+    /** @type {string | null} */
+    let releasedAt = null;
+    const requestedScope = normalizePathScope(pathGlobs);
+    if (!requestedScope.ok) blockingReasons.push("lock-scope-invalid");
 
-  if (action === "acquire") {
-    if (!ownerRef) blockingReasons.push("lock-owner-required");
-    if (repoIds.length === 0) blockingReasons.push("lock-repo-scope-required");
-    const overlappingLocks = store.locks.filter((lock) => {
-      const lockRepoIds = asStringArray(lock.repo_ids);
-      const lockPathGlobs = asStringArray(lock.path_globs);
-      const lockStatus = asString(lock.status);
-      if (lockStatus === "released") return false;
-      return repoScopesOverlap(repoIds, lockRepoIds) && pathScopesOverlap(pathGlobs, lockPathGlobs);
-    });
-
-    const staleLocks = overlappingLocks.filter((lock) => asString(lock.status) === "stale");
-    const activeConflicts = overlappingLocks.filter((lock) => {
-      const lockStatus = asString(lock.status);
-      const sameOwnerRun = asString(lock.owner_ref) === ownerRef && asString(lock.run_id) === runId;
-      return lockStatus === "active" && !sameOwnerRun;
-    });
-    if (staleLocks.length > 0) {
-      blockingReasons.push("lock-stale");
-      conflicts = staleLocks.map((lock) => conflictRecord(lock, "stale-lock-overlaps-requested-scope"));
-    } else if (activeConflicts.length > 0) {
-      blockingReasons.push("lock-conflict");
-      conflicts = activeConflicts.map((lock) => conflictRecord(lock, "active-lock-overlaps-requested-scope"));
-    }
-
-    if (blockingReasons.length === 0) {
-      const expiresAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
-      activeLock = {
-        lock_id: requestedLockId,
-        owner_ref: ownerRef,
-        run_id: runId,
-        repo_ids: repoIds,
-        path_globs: pathGlobs,
-        acquired_at: createdAt,
-        expires_at: iso(expiresAt),
-        released_at: null,
-        release_evidence_refs: [],
-        status: "active",
-      };
-      store.locks = [
-        ...store.locks.filter((lock) => asString(lock.lock_id) !== requestedLockId),
-        activeLock,
-      ];
-      writeLockStore(statePath, store);
-    }
-  } else if (action === "release") {
-    const matchingLock = store.locks.find((lock) => asString(lock.lock_id) === requestedLockId);
-    if (!matchingLock) {
-      blockingReasons.push("lock-not-found");
-    } else if (ownerRef && asString(matchingLock.owner_ref) !== ownerRef) {
-      blockingReasons.push("lock-owner-mismatch");
-      conflicts = [conflictRecord(matchingLock, "release-owner-does-not-match-lock-owner")];
-    } else {
-      releasedAt = createdAt;
-      Object.assign(matchingLock, {
-        status: "released",
-        released_at: releasedAt,
-        release_evidence_refs: releaseEvidenceRefs,
+    if (action === "acquire") {
+      if (!ownerRef) blockingReasons.push("lock-owner-required");
+      if (repoIds.length === 0) blockingReasons.push("lock-repo-scope-required");
+      const overlappingLocks = store.locks.filter((lock) => {
+        const lockRepoIds = asStringArray(lock.repo_ids);
+        const lockStatus = asString(lock.status);
+        if (lockStatus === "released") return false;
+        const lockScope = normalizePathScope(lock.path_globs);
+        if (!lockScope.ok) return repoScopesOverlap(repoIds, lockRepoIds);
+        return repoScopesOverlap(repoIds, lockRepoIds) && pathScopeArraysOverlap(pathGlobs, lockScope.patterns);
       });
-      activeLock = matchingLock;
-      writeLockStore(statePath, store);
-    }
-  }
 
-  const inspectedLocks = store.locks
-    .map((lock) => normalizeStoredLock(lock, now))
-    .filter((lock) => {
-      if (repoIds.length === 0) return true;
-      return repoScopesOverlap(repoIds, asStringArray(lock.repo_ids));
-    });
+      const invalidOverlaps = overlappingLocks.filter((lock) => !normalizePathScope(lock.path_globs).ok);
+      if (invalidOverlaps.length > 0) {
+        blockingReasons.push("lock-scope-invalid");
+        conflicts = invalidOverlaps.map((lock) => conflictRecord(lock, "stored-lock-scope-is-invalid"));
+      }
+      const staleLocks = overlappingLocks.filter((lock) => asString(lock.status) === "stale");
+      const activeConflicts = overlappingLocks.filter((lock) => {
+        const lockStatus = asString(lock.status);
+        const sameOwnerRun = asString(lock.owner_ref) === ownerRef && asString(lock.run_id) === runId;
+        return lockStatus === "active" && !sameOwnerRun;
+      });
+      if (staleLocks.length > 0) {
+        blockingReasons.push("lock-stale");
+        conflicts = [...conflicts, ...staleLocks.map((lock) => conflictRecord(lock, "stale-lock-overlaps-requested-scope"))];
+      } else if (activeConflicts.length > 0) {
+        blockingReasons.push("lock-conflict");
+        conflicts = [...conflicts, ...activeConflicts.map((lock) => conflictRecord(lock, "active-lock-overlaps-requested-scope"))];
+      }
+
+      if (blockingReasons.length === 0) {
+        const expiresAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
+        activeLock = {
+          lock_id: requestedLockId,
+          owner_ref: ownerRef,
+          run_id: runId,
+          repo_ids: repoIds,
+          path_globs: requestedScope.patterns,
+          acquired_at: createdAt,
+          expires_at: iso(expiresAt),
+          released_at: null,
+          release_evidence_refs: [],
+          status: "active",
+        };
+        store.locks = [
+          ...store.locks.filter((lock) => asString(lock.lock_id) !== requestedLockId),
+          activeLock,
+        ];
+        store.revision += 1;
+        writeLockStore(statePath, store);
+      }
+    } else if (action === "release") {
+      const matchingLock = store.locks.find((lock) => asString(lock.lock_id) === requestedLockId);
+      if (!matchingLock) {
+        blockingReasons.push("lock-not-found");
+      } else if (ownerRef && asString(matchingLock.owner_ref) !== ownerRef) {
+        blockingReasons.push("lock-owner-mismatch");
+        conflicts = [conflictRecord(matchingLock, "release-owner-does-not-match-lock-owner")];
+      } else {
+        releasedAt = createdAt;
+        Object.assign(matchingLock, {
+          status: "released",
+          released_at: releasedAt,
+          release_evidence_refs: releaseEvidenceRefs,
+        });
+        activeLock = matchingLock;
+        store.revision += 1;
+        writeLockStore(statePath, store);
+      }
+    }
+
+    const inspectedLocks = store.locks
+      .map((lock) => normalizeStoredLock(lock, now))
+      .filter((lock) => {
+        if (repoIds.length === 0) return true;
+        return repoScopesOverlap(repoIds, asStringArray(lock.repo_ids));
+      });
+    return { store, blockingReasons, conflicts, activeLock, releasedAt, inspectedLocks };
+  }, { staleAfterMs: 30 * 60 * 1000, timeoutMs: 30 * 60 * 1000 });
+  const { blockingReasons, conflicts, activeLock, releasedAt, inspectedLocks } = lockTransaction;
   const latestLock = activeLock ?? inspectedLocks.find((lock) => asString(lock.lock_id) === requestedLockId) ?? null;
   const lockStatus =
     action === "inspect"
