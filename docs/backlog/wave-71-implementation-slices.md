@@ -682,7 +682,7 @@ explicit W71-S14 input, so no installed-proof claim is promoted here.
 
 ## W71-S11 — Resolvable evidence and adversarial qualification proof
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W71-S10
 - **Remediation priority:** P0
@@ -736,6 +736,20 @@ adversarial proof on the final integrated commit before creating the freeze.
 - current live-E2E profile and target-cleanliness fixtures
 - `pnpm w66:proof`
 - `pnpm slice:gate`
+
+**Closure evidence (2026-09-06):** implementation merged in PR #313 as
+`949c6068`; the executable plan and UI no-overlap handoff are recorded in
+`docs/backlog/handoffs/w71-s11-qualification-proof-execution-plan.md`. The
+shared evidence resolver now recomputes immutable bytes and qualification
+identity, stale cells are diagnostic-only, W66 reports validator-owned
+mutation/replay cases for all six families, and live-E2E runtime state defaults
+to central AOR Home with a clean target checkout. Focused qualification,
+boundary, and resolver tests pass (10/10 plus 7/7), `pnpm w66:proof` passes,
+contract-kernel parity passes, and the required Node 22 Repo integrity CI run
+passes. The local Node 25 full runner reached 110/110 repository-script tests
+but was interrupted in the CLI worker; this is retained as a local validation
+limitation, not a release-proof claim. Paid provider qualification and the
+installed real-control-plane freeze remain explicitly owned by W71-S14.
 
 ### Out of scope
 

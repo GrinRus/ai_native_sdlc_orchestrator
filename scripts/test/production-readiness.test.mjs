@@ -48,6 +48,15 @@ function currentW66ClosurePassed() {
   return closure.status === "passed";
 }
 
+function currentW71BlockingIds() {
+  const disposition = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/research/26-w71-audit-disposition.json"), "utf8"),
+  );
+  return disposition.findings
+    .filter((entry) => entry.release_blocking === true && !["resolved", "superseded"].includes(entry.state))
+    .map((entry) => entry.finding_id);
+}
+
 test("production readiness gate derives the W66 disposition from closure evidence", () => {
   const ledger = JSON.parse(
     fs.readFileSync(path.join(root, "docs/research/07-codebase-audit-remediation-ledger-2026-07.json"), "utf8"),
@@ -73,7 +82,7 @@ test("production readiness gate derives the W66 disposition from closure evidenc
   assert.deepEqual(
     result.blocking_invariants.map((entry) => entry.finding_id),
     [
-      ...Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
+      ...currentW71BlockingIds(),
       ...(qualified ? [] : ["W66-QUALIFICATION"]),
     ],
   );
@@ -270,7 +279,7 @@ test("a valid ledger with closed historical blockers defers to the W66 qualifica
   assert.deepEqual(
     result.blocking_invariants.map((entry) => entry.finding_id),
     [
-      ...Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
+      ...currentW71BlockingIds(),
       ...(qualified ? [] : ["W66-QUALIFICATION"]),
     ],
   );
@@ -299,7 +308,7 @@ test("production readiness gate returns audit-hold for a valid newly opened rele
     result.blocking_invariants.map((entry) => entry.finding_id),
     [
       "AUD-049",
-      ...Array.from({ length: 12 }, (_, index) => `W71-AUD-${String(index + 1).padStart(3, "0")}`),
+      ...currentW71BlockingIds(),
       ...(currentW66ClosurePassed() ? [] : ["W66-QUALIFICATION"]),
     ],
   );
