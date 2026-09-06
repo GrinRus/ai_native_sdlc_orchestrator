@@ -1902,6 +1902,8 @@ test("intent submission API preserves immutable input and creates normalization 
       const taskListBeforeConfirm = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks`);
       const preparedTask = (await taskListBeforeConfirm.json()).tasks.find((task) => task.lineage.intent_submission_id === created.submission.submission_id);
       assert.ok(preparedTask);
+      assert.equal(preparedTask.runner_selection.route_id, "route.review.default");
+      assert.equal(preparedTask.prepared_contract.approved_execution_route.route_id, "route.review.default");
       const staleTaskAction = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(preparedTask.task_id)}/actions`, {
         action: "confirm",
         expected_revision: staleRevision,

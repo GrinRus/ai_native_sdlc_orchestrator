@@ -112,6 +112,7 @@ export function handleReadRoute({ routeId, params, requestUrl, response, registr
       sendJson(response, 200, listTaskProjections({
         ...withReadModelLimit(runtimeOptions, requestUrl.searchParams),
         registry,
+        projectId: params.projectId,
         intentSubmissions: registry ? listIntentSubmissions({ registry, projectId: params.projectId }).submissions : [],
       }));
       return;
