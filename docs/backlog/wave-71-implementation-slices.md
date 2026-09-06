@@ -976,10 +976,12 @@ were changed; the sibling UI handoff remains `59943bfa` for W71-S14 integration.
 
 ## W71-S14 — UI-refactor integration, installed black-box closure, and freeze
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W71-S13
-- **External blocker:** `Улучшить UI и UX` must be merged to `main` or provide an explicit immutable handoff commit before S14 starts.
+- **UI handoff:** explicit immutable commit `59943bfa` from `Улучшить UI и UX` is
+  bound for merge-first integration; no sibling UI work is assumed complete
+  until this commit is integrated and verified against the current `main`.
 - **Remediation priority:** P0
 - **Estimated effort:** L
 - **Primary modules:** merged Command Desk/Task Workspace client integration,

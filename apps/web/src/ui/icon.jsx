@@ -2,6 +2,12 @@ const ICON_PATHS = {
   refresh: <><path d="M20 12a8 8 0 0 1-13.66 5.66"/><path d="M4 12A8 8 0 0 1 17.66 6.34"/><path d="M17 2v5h5"/><path d="M7 22v-5H2"/></>,
   folder: <path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>,
   project: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6"/></>,
+  layers: <><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4"/><path d="m4 17 8 4 8-4"/></>,
+  grid: <><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></>,
+  alertCircle: <><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></>,
+  lightning: <path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z"/>,
+  history: <><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></>,
+  clipboard: <><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6"/></>,
   tasks: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m5.5 8 1 1 1.5-2"/></>,
   target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></>,
   plus: <><path d="M12 5v14"/><path d="M5 12h14"/></>,
@@ -35,6 +41,9 @@ const ICON_PATHS = {
   upload: <><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></>,
   code: <><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></>,
   download: <><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></>,
+  help: <><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.35 2.35 0 1 1 4.15 1.52c-.72.85-1.95 1.34-1.95 2.73"/><path d="M12 17h.01"/></>,
+  settings: <><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.64 5.64l1.42 1.42M16.94 16.94l1.42 1.42M18.36 5.64l-1.42 1.42M7.06 16.94l-1.42 1.42"/><circle cx="12" cy="12" r="4"/></>,
+  signal: <><path d="M4 18a8 8 0 0 1 16 0"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M10 18a2 2 0 0 1 4 0"/></>,
 };
 
 export function Icon({ name, className = "", title }) {

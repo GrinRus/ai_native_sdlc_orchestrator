@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { HttpRequestBodyError, asString, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
 import {
   toInteractionAnswerResponse,
@@ -7,6 +9,7 @@ import {
 } from "./http-presenters.mjs";
 import { InteractionAnswerError, submitInteractionAnswer } from "../interaction-answer.mjs";
 import { runLifecycleCommand } from "../lifecycle-command.mjs";
+import { resolveAorHome, resolveLogicalEvidenceRef } from "../../aor-home.mjs";
 import { requestRunJobCancel } from "../../run-job.mjs";
 import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
@@ -431,6 +434,15 @@ export async function handleIntentSubmissionAction({ request, response, params, 
   }
 }
 
+function resolveTaskInputPacketPath(reference, runtimeOptions, workspaceProjectId) {
+  return resolveLogicalEvidenceRef({
+    projectRoot: runtimeOptions.projectRef ?? runtimeOptions.cwd ?? process.cwd(),
+    projectRuntimeRoot: path.join(runtimeOptions.runtimeRoot ?? resolveAorHome(), "projects", workspaceProjectId),
+    workspaceProjectId,
+    reference,
+  });
+}
+
 export async function handleTaskAction({ request, response, params, registry, runtimeOptions }) {
   const payload = await readMutationPayload(request, response);
   if (!payload) return;
@@ -590,7 +602,9 @@ export async function handleTaskAction({ request, response, params, registry, ru
         return;
       }
       const flags = {};
-      if (action === "discovery-run" && task.intent_submission_ref) flags["input-packet"] = task.intent_submission_ref;
+      if (action === "discovery-run" && task.intent_submission_ref) {
+        flags["input-packet"] = resolveTaskInputPacketPath(task.intent_submission_ref, runtimeOptions, params.projectId);
+      }
       if (["review-run", "learning-handoff"].includes(action) && task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
       if (["delivery-prepare", "release-prepare"].includes(action)) {
         if (task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];

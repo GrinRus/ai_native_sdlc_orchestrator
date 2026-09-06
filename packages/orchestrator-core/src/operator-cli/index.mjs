@@ -96,7 +96,7 @@ async function waitForFollowTerminal(args, options) {
   // child can receive SIGINT during the synchronous read-context bootstrap;
   // without this early listener the default signal action terminates the
   // process before the follow subscription can release itself cleanly.
-  let interruptedBeforeSubscription = false;
+  let interruptedBeforeSubscription = options.interruptedDuringBootstrap === true;
   const onEarlySigint = () => {
     interruptedBeforeSubscription = true;
   };
@@ -135,7 +135,7 @@ async function waitForFollowTerminal(args, options) {
 
 /**
  * @param {string[]} args
- * @param {{ cwd?: string, stdout?: NodeJS.WriteStream, stderr?: NodeJS.WriteStream }} [options]
+ * @param {{ cwd?: string, stdout?: NodeJS.WriteStream, stderr?: NodeJS.WriteStream, interruptedDuringBootstrap?: boolean }} [options]
  * @returns {number | Promise<number>}
  */
 export async function runCli(args, options = {}) {
