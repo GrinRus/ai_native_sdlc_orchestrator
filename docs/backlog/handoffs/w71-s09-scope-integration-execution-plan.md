@@ -20,4 +20,3 @@
 - `pnpm lint`, `pnpm typecheck`, `pnpm quality:ratchet`, `pnpm test`;
 - `pnpm slice:gate` / CI Node 22 Repo integrity;
 - review confirms no UI overlap and preserves the `941f26da` handoff for W71-S14.
-
