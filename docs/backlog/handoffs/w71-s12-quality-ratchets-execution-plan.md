@@ -21,7 +21,7 @@
 ## UI coordination
 
 The neighboring UI task is `Улучшить UI и UX` (`01a061b2-119a-7272-91d0-13add13d75c2`)
-on `codex/command-desk-ui`. Its latest immutable commit is `941f26da`
+on `codex/command-desk-ui`. Its latest immutable commit is `59943bfa`
 (`feat(web): align command desk target geometry`), already merged to `main`.
 The UI task reports responsive target geometry, keyboard focus, 200% zoom, and
 browser/build checks complete. S12 uses `mode: no-overlap`: it does not edit

@@ -759,7 +759,7 @@ installed real-control-plane freeze remain explicitly owned by W71-S14.
 
 ## W71-S12 — Enforceable quality coverage and maintainability ratchets
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-0, EPIC-7
 - **Hard dependencies:** W71-S11
 - **Remediation priority:** P1
@@ -809,6 +809,19 @@ structural refactoring into the ratchet rollout.
 - before/after quality-ratchet metrics
 - `pnpm quality:ratchet`
 - `pnpm slice:gate`
+
+Closure evidence: implementation PR #315 merged as `b0db379e` after Node 22
+Repo integrity, CodeQL, Dependency Review, and Scorecard passed. The merged
+quality surface now accounts for 320 production files and 441 manifest source
+entries, with non-increasing baseline metrics of 114,995 lines, 24,561
+complexity units, 139 long functions, maximum nesting 11, 1,001 duplicate
+windows, and zero dead-code markers. `pnpm lint`, `pnpm typecheck`,
+`pnpm quality:ratchet`, the gate/ratchet focused tests (8/8), and the five
+critical-path suites (positive and negative evidence) passed locally. The
+largest live-E2E hotspot remains intentionally unchanged and is the measured
+successor target for W71-S15. No `apps/web/**` files were changed; the sibling
+UI thread `Улучшить UI и UX` remains a no-overlap handoff at latest commit
+`59943bfa`.
 
 ### Out of scope
 
