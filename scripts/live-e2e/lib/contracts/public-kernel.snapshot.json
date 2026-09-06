@@ -4,13 +4,14 @@
   "source": "packages/contracts/src",
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
-    "source_file_count": 28,
-    "source_manifest_sha256": "d8f34a89e42203114aae7993451b5e799a96e315df9e80169a8fe7ecf591d2fd"
+    "source_file_count": 29,
+    "source_manifest_sha256": "18358e3248b3afe06d9d312b1b5285e99f1dee917ec246f7f68b4fc578b16951"
   },
   "files": {
     "canonical-values.mjs": "46b098e0ba673b2bfc6d82ee3bdd71ed5920ab85c5e03b3ada51479a25933c98",
     "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
     "delivery-contract-validation.mjs": "b3f412e88540e167b5873b23137c5f120521d178a7b466a9e60b9de784959775",
+    "evidence-reference.mjs": "1f1c29f069dad5eb7d0f77e1683b29e0f3d18b8ac849ba95df26fe3d6e30e625",
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
     "example-reference-validation.mjs": "2e392196356e875248078cea3d2ef4c1ffc909eea21411be636654a62a26365d",
