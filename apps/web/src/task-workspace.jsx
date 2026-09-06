@@ -42,6 +42,20 @@ function taskTitle(task) {
   return task?.display_title || "Untitled task";
 }
 
+function taskIdLabel(task) {
+  const value = String(task?.task_id ?? "").trim();
+  if (!value) return "—";
+  if (/^T-[A-Z0-9-]+$/u.test(value)) return value;
+  const tail = value.split(".").at(-1) || value;
+  return tail.length > 16 ? `${tail.slice(0, 13)}…` : tail;
+}
+
+function taskRunnerLabel(task) {
+  const route = String(task?.runner_selection?.route_id ?? "").trim();
+  if (!route) return "—";
+  return route.replace(/^route\.[^.]+\./u, "").replaceAll("-", " ");
+}
+
 function completionEvidenceRefs(task) {
   return Array.isArray(task?.completion?.evidence_refs) ? task.completion.evidence_refs.filter(Boolean) : [];
 }
@@ -216,10 +230,14 @@ function TaskMeta({ task, project }) {
 }
 
 function TaskCard({ task, selected, onSelect }) {
+  const statusDetail = task?.status_detail || (task?.status === "attention" ? "Needs attention" : taskStatusLabel(task));
   return <button type="button" className={`task-workspace__card task-list-row${selected ? " is-selected" : ""}`} onClick={() => onSelect(task)}>
-    <span className={`task-list-row__indicator task-list-row__indicator--${taskStatusTone(task)}`} aria-hidden="true" />
-    <span className="task-list-row__content"><strong>{taskTitle(task)}</strong>{task?.status === "attention" ? <span>{task?.status_detail || "Needs approval"}</span> : null}</span>
+    <span className="task-list-row__id" title={task?.task_id || undefined}>{taskIdLabel(task)}</span>
+    <span className="task-list-row__content"><strong>{taskTitle(task)}</strong><span>{task?.work_type || (task?.status === "attention" ? "Needs approval" : "Task outcome")}</span></span>
+    <span className={`task-list-row__status task-status--${taskStatusTone(task)} task-list-row__status--${task?.status || "unknown"}`}><span className="task-status__dot" aria-hidden="true" /><span>{taskStatusLabel(task)}</span><small>{statusDetail}</small></span>
     <time>{taskAge(task?.updated_at)}</time>
+    <span className="task-list-row__runner">{taskRunnerLabel(task)}</span>
+    <Glyph name="chevronRight" />
   </button>;
 }
 
@@ -227,7 +245,8 @@ function TaskGroup({ title, count, tasks, selectedTaskId, onSelect }) {
   const [collapsed, setCollapsed] = useState(false);
   if (!tasks.length) return null;
   const groupId = `task-group-${title.toLowerCase().replace(/[^a-z0-9]+/gu, "-")}`;
-  return <section className="task-list-group" id={groupId}><header><h3><span className="task-list-group__dot" aria-hidden="true" />{title}</h3><span>{count}</span><button type="button" aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`} aria-expanded={!collapsed} aria-controls={groupId} className={`task-plain-icon${collapsed ? " is-collapsed" : ""}`} onClick={() => setCollapsed((value) => !value)}><Glyph name="chevronDown" /></button></header>{collapsed ? null : tasks.map((task) => <TaskCard key={task.task_id} task={task} selected={task.task_id === selectedTaskId} onSelect={onSelect} />)}</section>;
+  const groupClass = title.toLowerCase().replace(/[^a-z0-9]+/gu, "-");
+  return <section className={`task-list-group task-list-group--${groupClass}`} id={groupId}><header><h3><span className="task-list-group__dot" aria-hidden="true" />{title}</h3><span>{count}</span><button type="button" aria-label={`${collapsed ? "Expand" : "Collapse"} ${title}`} aria-expanded={!collapsed} aria-controls={groupId} className={`task-plain-icon${collapsed ? " is-collapsed" : ""}`} onClick={() => setCollapsed((value) => !value)}><Glyph name="chevronDown" /></button></header>{collapsed ? null : tasks.map((task) => <TaskCard key={task.task_id} task={task} selected={task.task_id === selectedTaskId} onSelect={onSelect} />)}</section>;
 }
 
 function TasksHome({ tasks, selectedTask, selectedTaskId, onSelect, project, totalTaskCount = tasks.length }) {
@@ -238,7 +257,7 @@ function TasksHome({ tasks, selectedTask, selectedTaskId, onSelect, project, tot
     ["Completed", tasks.filter((task) => task.status === "completed")],
   ];
   return <div className="task-home-layout">
-    <div className="task-list-pane" aria-label="Task list">{groups.map(([title, groupTasks]) => <TaskGroup key={title} title={title} count={groupTasks.length} tasks={groupTasks} selectedTaskId={selectedTaskId} onSelect={onSelect} />)}{!tasks.length ? <EmptyState title={totalTaskCount ? "No matching tasks" : "No tasks yet"}>{totalTaskCount ? "Try a different search or clear the filter." : "Start with a plain-language outcome and review the prepared task before it can write."}</EmptyState> : null}</div>
+    <div className="task-list-pane" aria-label="Task list"><div className="task-queue-header" aria-hidden="true"><span>ID</span><span>Task</span><span>Status</span><span>Updated</span><span>Runner</span><span /></div>{groups.map(([title, groupTasks]) => <TaskGroup key={title} title={title} count={groupTasks.length} tasks={groupTasks} selectedTaskId={selectedTaskId} onSelect={onSelect} />)}{!tasks.length ? <EmptyState title={totalTaskCount ? "No matching tasks" : "No tasks yet"}>{totalTaskCount ? "Try a different search or clear the filter." : "Start with a plain-language outcome and review the prepared task before it can write."}</EmptyState> : null}</div>
     <div className="task-detail-pane">{selectedTask ? <TaskHomeDetail task={selectedTask} project={project} onOpen={() => onSelect(selectedTask)} /> : <EmptyState title="Select a task">Choose a task to see its server-owned state and next action.</EmptyState>}</div>
   </div>;
 }
@@ -636,14 +655,18 @@ export function TaskWorkspace({ project, tasks = [], selectedTaskId = null, onSe
       <div className="task-workspace__logo">AOR</div>
       <button type="button" className="task-workspace__project-switcher" aria-label="Current project" onClick={() => onOpenProject?.()}><Glyph name="project" /><span>{project?.display_name || project?.label || "Project"}</span><Glyph name="chevronDown" /></button>
       <nav className="task-workspace__side-nav" aria-label="Task navigation">{SIDE_NAV.map(([target, label, icon]) => { const selected = target === "home" ? screen !== "attention" : target === screen; const attentionCount = tasks.filter((task) => task.status === "attention").length; return <button type="button" key={label} aria-label={label} className={selected ? "is-selected" : ""} aria-current={selected ? "page" : undefined} onClick={() => target === "home" ? backToTasks() : target === "project" ? onOpenProject?.() : setScreen(target === "evidence" ? (taskHasCompletionProof(selectedTask) ? "complete" : "review") : target)}><Glyph name={icon} /><span>{label}</span>{label === "Attention" && attentionCount > 0 ? <span className="task-nav-count">{attentionCount}</span> : null}</button>; })}</nav>
-      <button type="button" className="task-workspace__collapse" aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!navCollapsed} onClick={() => setNavCollapsed((value) => !value)}><Glyph name="collapse" /></button>
+      <div className="task-workspace__sidebar-footer">
+        <div className="task-workspace__safe-mode"><Glyph name="shield" /><span>Safe mode</span><small>Patch only</small></div>
+        <div className="task-workspace__operator"><span className="task-workspace__operator-dot" aria-hidden="true" /><span>Operator</span><small>Local</small></div>
+        <button type="button" className="task-workspace__collapse" aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!navCollapsed} onClick={() => setNavCollapsed((value) => !value)}><Glyph name="collapse" /></button>
+      </div>
     </aside>
     <div className="task-workspace__viewport">
       {connectionState !== "connected" ? <div className="task-workspace__notice" role="alert"><strong>{connectionState === "offline" ? "Tasks are temporarily unavailable." : "Task data is partially available."}</strong><p>{resourceError?.detail || "AOR will not infer lifecycle or next action from stale data."}</p>{onRefresh ? <Button onClick={onRefresh}>Retry</Button> : null}</div> : null}
       {actionError ? <div className="task-workspace__notice task-workspace__notice--danger" role="alert"><strong>Task action needs recovery</strong><p>{actionError}</p></div> : null}
       <header className="task-workspace__topbar">
-        <div className="task-workspace__breadcrumb">{screen !== "home" && screen !== "attention" && screen !== "sources" && screen !== "active" ? <button type="button" onClick={backToTasks} aria-label="Back to tasks"><Glyph name="back" />Tasks</button> : null}<h1 aria-label={SCREENS.find(([id]) => id === screen)?.[1] || screenTitle}>{screenTitle}</h1>{screen === "attention" ? <select aria-label="Attention status filter" className="task-title-filter" value="attention" onChange={() => setFilter("attention")}><option value="attention">Open</option></select> : null}{screen === "new" ? <span className="task-draft-label">{outcome.trim() ? "Unsaved local draft" : "Draft not saved"}</span> : null}{screen === "prepared" ? <span className="task-status-chip"><span />{preparedTask?.status === "prepared" ? "Ready to start" : taskStatusLabel(preparedTask)}</span> : null}{screen === "prepared" && Number.isInteger(preparedTask?.revision) ? <span className="task-revision-label">Revision {preparedTask.revision}</span> : null}</div>
-        <div className="task-workspace__top-actions">{["home", "active", "attention", "prepared"].includes(screen) ? <label className="task-search"><Glyph name="search" /><input aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /></label> : null}{["home", "active", "attention", "prepared"].includes(screen) ? <select aria-label="Filter tasks" className="task-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All tasks</option><option value="attention">Open</option><option value="active">Active</option><option value="ready">Ready</option><option value="completed">Completed</option></select> : null}{!["new", "sources", "review", "complete"].includes(screen) ? <Button variant="primary" onClick={startNewTask}><Glyph name="plus" />New task</Button> : null}</div>
+        <div className="task-workspace__breadcrumb">{screen !== "home" && screen !== "attention" && screen !== "sources" && screen !== "active" ? <button type="button" onClick={backToTasks} aria-label="Back to tasks"><Glyph name="back" />Tasks</button> : null}<div className="task-workspace__title-stack">{screen === "home" ? <span className="task-workspace__product-label">Command Desk</span> : null}<h1 aria-label={SCREENS.find(([id]) => id === screen)?.[1] || screenTitle}>{screenTitle}</h1></div>{screen === "attention" ? <select aria-label="Attention status filter" className="task-title-filter" value="attention" onChange={() => setFilter("attention")}><option value="attention">Open</option></select> : null}{screen === "new" ? <span className="task-draft-label">{outcome.trim() ? "Unsaved local draft" : "Draft not saved"}</span> : null}{screen === "prepared" ? <span className="task-status-chip"><span />{preparedTask?.status === "prepared" ? "Ready to start" : taskStatusLabel(preparedTask)}</span> : null}{screen === "prepared" && Number.isInteger(preparedTask?.revision) ? <span className="task-revision-label">Revision {preparedTask.revision}</span> : null}</div>
+        <div className="task-workspace__top-actions"><span className="task-safe-badge"><Glyph name="shield" />Safe mode</span>{["home", "active", "attention", "prepared"].includes(screen) ? <label className="task-search"><Glyph name="search" /><input aria-label="Search tasks" placeholder="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} /></label> : null}{["home", "active", "attention", "prepared"].includes(screen) ? <select aria-label="Filter tasks" className="task-filter" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">All tasks</option><option value="attention">Open</option><option value="active">Active</option><option value="ready">Ready</option><option value="completed">Completed</option></select> : null}{!["new", "sources", "review", "complete"].includes(screen) ? <Button variant="primary" onClick={startNewTask}><Glyph name="plus" />New task</Button> : null}</div>
       </header>
       <main className="task-workspace__body">
         {screen === "home" ? <TasksHome tasks={filteredTasks} totalTaskCount={tasks.length} selectedTask={listSelectedTask} selectedTaskId={listSelectedTask?.task_id} onSelect={chooseTask} project={project} /> : null}
