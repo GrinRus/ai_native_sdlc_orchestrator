@@ -324,7 +324,7 @@ These are local alpha surfaces, not a hosted product claim. Browser
 authentication, multi-tenant isolation, remote UI connectivity, and enterprise
 identity/SSO are outside the supported mode.
 
-The CLI command surface currently includes **73 implemented** commands and **0 planned** commands. See the
+The CLI command surface currently includes **74 implemented** commands and **0 planned** commands. See the
 [CLI command catalog](docs/architecture/14-cli-command-catalog.md) for flags,
 outputs, and contract families.
 

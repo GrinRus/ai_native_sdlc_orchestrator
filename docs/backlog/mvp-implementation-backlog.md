@@ -690,7 +690,7 @@ hold/readiness state is not changed by code-only completion.
 | W71-S07 | Server-owned Task start and action progression | EPIC-1, EPIC-2, EPIC-3, EPIC-6 | done | intent start, Task/Flow projections, lifecycle mutations, control-plane client contract | W71-S06 |
 | W71-S08 | Durable Ask AOR, review, and completion | EPIC-2, EPIC-4, EPIC-5, EPIC-6 | done | operator requests, review/verification/delivery closure, Task projections and recovery tests | W71-S07 |
 | W71-S09 | Canonical multirepo scope locks and isolated integration | EPIC-0, EPIC-3, EPIC-5 | done | multirepo coordination, workspace provisioner, integration service, Git evidence and tests | W71-S06 |
-| W71-S10 | Public workspace provision-to-integration lifecycle | EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6 | blocked | workspace/parent-run contracts, CLI/API/OpenAPI, scheduler, integration and delivery projections | W71-S08, W71-S09 |
+| W71-S10 | Public workspace provision-to-integration lifecycle | EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6 | active | workspace/parent-run contracts, CLI/API/OpenAPI, scheduler, integration and delivery projections | W71-S08, W71-S09 |
 | W71-S11 | Resolvable evidence and adversarial qualification proof | EPIC-0, EPIC-4, EPIC-7 | blocked | qualification evidence bindings/freshness, W66 readiness/proof, live-E2E target materialization and profiles | W71-S10 |
 | W71-S12 | Enforceable quality coverage and maintainability ratchets | EPIC-0, EPIC-7 | blocked | lint/type/coverage/complexity tooling, ownership/exception manifests and quality tests | W71-S11 |
 | W71-S15 | Live-E2E flow hotspot decomposition | EPIC-0, EPIC-4, EPIC-7 | blocked | live-E2E flow module, extracted flow families, characterization tests and size/import ratchets | W71-S12 |

@@ -135,8 +135,8 @@ export function validateWorkspaceSet(document, source) {
     if (!/^[0-9a-f]{40}$/u.test(String(repository.resolved_commit ?? ""))) pushTopologyIssue(issues, source, `repositories.${index}.resolved_commit`, "Workspace repository commit must be an exact 40-character Git SHA.", String(repository.resolved_commit));
     if (!string(repository.execution_root)) pushTopologyIssue(issues, source, `repositories.${index}.execution_root`, "Workspace repository execution root is required.");
     const provisioning = record(repository.provisioning);
-    if (!provisioning || !["detached-worktree", "independent-clone"].includes(String(provisioning.strategy)) || !["ready", "failed", "cleaned"].includes(String(provisioning.state))) {
-      pushTopologyIssue(issues, source, `repositories.${index}.provisioning`, "Workspace repository provisioning must declare a supported strategy and state.");
+    if (!provisioning || !["detached-worktree", "independent-clone"].includes(String(provisioning.strategy)) || !["planned", "ready", "failed", "cleaned"].includes(String(provisioning.state))) {
+      pushTopologyIssue(issues, source, `repositories.${index}.provisioning`, "Workspace repository provisioning must declare a supported strategy and state (planned, ready, failed, or cleaned).");
     }
     const identity = string(repository.resolved_identity);
     if (identity && string(repository.access_mode) !== "read-only") {

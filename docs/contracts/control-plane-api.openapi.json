@@ -2058,11 +2058,21 @@
           "action": {
             "type": "string",
             "enum": [
-              "connect", "connect-repository", "refresh-source", "disconnect", "delete-aor-data", "materialize-project-config", "export-evidence"
+              "connect", "connect-repository", "refresh-source", "disconnect", "delete-aor-data", "materialize-project-config", "export-evidence", "provision-workspace-set", "integrate-parent-run"
             ]
           },
           "source": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string", "enum": ["local", "git"] }, "path": { "type": "string" }, "url": { "type": "string" } } },
           "project_id": { "type": "string" },
+          "run_id": { "type": "string", "description": "Run-owned workspace identity; required for provision-workspace-set." },
+          "workspace_set_id": { "type": "string" },
+          "binding_ref": { "type": "string" },
+          "dry_run": { "type": "boolean", "default": false },
+          "delivery_capable": { "type": "boolean", "default": false },
+          "parent_run_id": { "type": "string", "description": "Parent run identity; required for integrate-parent-run." },
+          "execution_plan_ref": { "type": "string" },
+          "workspace_set_ref": { "type": "string" },
+          "child_output_refs": { "type": "array", "items": { "type": "string" } },
+          "expected_revision": { "type": "integer", "minimum": 0 },
           "label": {
             "type": "string"
           }

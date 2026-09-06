@@ -41,3 +41,7 @@ export {
   applyExecutionProfileAction,
   readExecutionProfile,
 } from "../../../packages/orchestrator-core/src/control-plane/execution-profile.mjs";
+export {
+  provisionProjectWorkspaceSet,
+  readProjectWorkspaceSet,
+} from "../../../packages/orchestrator-core/src/workspace-set-service.mjs";

@@ -65,7 +65,7 @@ const TOP_LEVEL_HELP_GROUPS = Object.freeze([
   },
   {
     title: "Run control",
-    commands: ["run start", "run pause", "run resume", "run steer", "run cancel", "run retry", "run integration", "run answer", "run status"],
+    commands: ["workspace provision", "run start", "run pause", "run resume", "run steer", "run cancel", "run retry", "run integration", "run answer", "run status"],
   },
   {
     title: "Review and QA",

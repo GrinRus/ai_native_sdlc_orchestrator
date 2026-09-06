@@ -20,6 +20,22 @@ Workspace-scoped source and write-back action boundary. Its primary
 `action=connect` payload uses `source.kind=local|git`; it never accepts a
 runtime-root override.
 
+The same route exposes `action=provision-workspace-set` for bounded execution
+setup. The request carries `project_id` and `run_id` plus optional
+`workspace_set_id`, `binding_ref`, `dry_run`, and `delivery_capable`; the
+service derives repositories from the registered project profile and local
+bindings, validates exact Git commits, and returns a schema-v2 workspace-set
+readback. A dry run never creates disposable checkouts. The equivalent
+headless command is `aor workspace provision --project-ref <path> --run-id
+<id>`.
+
+`action=integrate-parent-run` on the same project action boundary consumes
+durable child-output evidence, materializes the authoritative integration
+report, and applies it to the parent under optional `expected_revision` CAS.
+Repeating the action after a successful report is a read-only idempotent
+readback; missing or invalid outputs produce a blocked report rather than a
+partial success.
+
 W67 adds intent-first onboarding:
 
 - `POST /api/projects/:projectId/intent-submissions` stores text, bounded text
