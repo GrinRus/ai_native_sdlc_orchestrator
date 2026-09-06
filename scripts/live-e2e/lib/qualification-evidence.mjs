@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { resolveEvidenceReference } from "../../../packages/contracts/src/evidence-reference.mjs";
+import { resolveEvidenceReference } from "../../../shared/evidence-reference.mjs";
 
 const IDENTITY_FIELDS = Object.freeze([
   "source_commit",

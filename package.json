@@ -26,6 +26,7 @@
     "packages/observability/src",
     "packages/orchestrator-core/src",
     "packages/provider-routing/src",
+    "shared",
     "examples/project*.aor.yaml",
     "examples/adapters",
     "examples/context",
