@@ -832,7 +832,7 @@ UI thread `Улучшить UI и UX` remains a no-overlap handoff at latest com
 
 ## W71-S15 — Live-E2E flow hotspot decomposition
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W71-S12
 - **Remediation priority:** P1
@@ -884,6 +884,19 @@ artifact behavior, and ratchet the original file plus new module boundaries.
 - successor slice candidates for remaining measured hotspots
 - `pnpm quality:ratchet`
 - `pnpm slice:gate`
+
+Closure evidence: implementation PR #317 merged as `71feaef5` after Node 22
+Repo integrity (7m59s), CodeQL, Dependency Review, and Scorecard passed. The
+artifact-consistency seam now owns matrix/coverage parity comparison behind a
+provider-neutral one-way import. `scripts/live-e2e/lib/flows.mjs` decreased
+from 7,717 to 7,574 lines and its expiring ceiling was lowered to 7,600.
+Focused characterization coverage passed 130/130 tests (including positive and
+mutated artifact parity), `pnpm lint`, `pnpm typecheck`, and
+`pnpm quality:ratchet` passed. Structural debt is non-increasing versus the
+S12 baseline: 114,936 lines, 24,242 complexity units, maximum complexity
+1,402, maximum nesting 11, 1,001 duplicate windows, and zero dead-code
+markers. No `apps/web/**` files or UI fixtures were changed; the sibling UI
+handoff remains `Улучшить UI и UX` at immutable commit `59943bfa`.
 
 ### Out of scope
 
