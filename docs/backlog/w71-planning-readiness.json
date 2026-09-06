@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "wave_id": "W71",
+  "latest_wave": "W71",
+  "slice_count": 15,
+  "status_counts": {
+    "ready": 0,
+    "active": 1,
+    "blocked": 1,
+    "done": 13
+  },
+  "release_blockers": ["W66-S09", "W71-S14"],
+  "historical_snapshot_labels": ["W34-S06", "W57-W65", "W70-S10"],
+  "source_documents": [
+    "docs/backlog/mvp-roadmap.md",
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/slice-dependency-graph.md",
+    "docs/backlog/wave-71-implementation-slices.md",
+    "docs/product/user-story-coverage-matrix.md"
+  ]
+}

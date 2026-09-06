@@ -7,6 +7,8 @@
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
+Additional operational references: [harness-capture-lifecycle.md](harness-capture-lifecycle.md), [harness-certification-baseline.md](harness-certification-baseline.md), [local-workspace-registry.md](local-workspace-registry.md), [project-topology-onboarding.md](project-topology-onboarding.md), [repo-aware-execution-proof.md](repo-aware-execution-proof.md), [review-decision-operations.md](review-decision-operations.md), and [w66-qualification-freeze.md](w66-qualification-freeze.md).
+
 ## Run control
 - `structured-task-plan-lifecycle.md` — create, inspect, revise, approve, execute, and recover versioned structured task plans.
 - `run-control-lifecycle.md` — start/pause/resume/steer/cancel commands, guardrails, audit checks, and the boundary between `run steer` and operator requests.

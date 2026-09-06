@@ -8,6 +8,12 @@ Coverage status values:
 - `partial` - current implementation covers part of the outcome, but a backlog slice owns the missing behavior, hardening, or proof evidence.
 - `blocked` - the outcome cannot be closed honestly until a named prerequisite or real proof slice lands.
 
+Evidence strength is tracked separately from the product-maturity `Tier` column
+in [`story-evidence-tiers.json`](story-evidence-tiers.json). The registry uses
+the ordered tiers `unit`, `contract`, `fixture`, `mocked-browser`,
+`integrated-local`, and `live-provider`; W71-S13 keeps audited stories at their
+current status and assigns W71-S14 as the owner of any integrated-proof upgrade.
+
 Current planning status counts: `baseline-covered=102`, `proof-covered=4`, `partial=8`, `blocked=2`. The 114-story W34-S06 result and later W57-W65 closure records remain immutable historical evidence at their demonstrated scope. The post-W70 audit reclassifies W62 handcrafted multirepo orchestration and W70 route-fulfilled browser state as partial rather than current integrated proof. W71 owns public provision-to-integration reachability, executable Ask AOR, route/safety truth, the canonical installed Task lifecycle, and proof restoration. W66 keeps release clearance on `audit-hold` until W71 freezes current identities and the fresh same-commit Codex/Claude matrix closes; OpenCode certification outcomes remain blocked.
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |

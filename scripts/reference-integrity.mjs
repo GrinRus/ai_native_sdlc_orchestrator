@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 
 import { loadExampleContracts, validateExampleReferences } from "../packages/contracts/src/index.mjs";
+import { checkReadinessSourceOfTruth } from "./readiness/source-of-truth.mjs";
 
 const workspaceRoot = process.cwd();
 
@@ -31,4 +32,14 @@ if (!referenceValidation.ok) {
 const examplesRootRelative = path.relative(workspaceRoot, referenceValidation.examplesRoot) || ".";
 console.log(
   `reference integrity ok: ${referenceValidation.checkedReferences} refs and ${referenceValidation.checkedCompatibility} compatibility checks in ${examplesRootRelative}`,
+);
+
+const sourceOfTruth = checkReadinessSourceOfTruth(workspaceRoot);
+if (sourceOfTruth.status !== "pass") {
+  console.error("Source-of-truth integrity failed:");
+  for (const finding of sourceOfTruth.findings ?? []) console.error(`- ${finding}`);
+  process.exit(1);
+}
+console.log(
+  `source-of-truth integrity ok: ${sourceOfTruth.planning_report?.slice_count ?? 0} W71 slices, ${sourceOfTruth.evidence_tier_report?.story_count ?? 0} stories, and bidirectional indexes checked`,
 );

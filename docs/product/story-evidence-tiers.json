@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "description": "Evidence strength is independent from product-maturity tiers in the story matrix.",
+  "tiers": [
+    { "id": "unit", "order": 1 },
+    { "id": "contract", "order": 2 },
+    { "id": "fixture", "order": 3 },
+    { "id": "mocked-browser", "order": 4 },
+    { "id": "integrated-local", "order": 5 },
+    { "id": "live-provider", "order": 6 }
+  ],
+  "protected_story_ids": {
+    "PBO-10": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "OPS-11": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "OPS-12": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "EMP-03": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "RMO-04": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "RMO-05": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "RMO-06": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" },
+    "DTX-08": { "allowed_statuses": ["partial"], "owner_slice": "W71-S14" }
+  }
+}

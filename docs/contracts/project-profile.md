@@ -63,7 +63,7 @@ Deterministic runtime default resolution follows this order:
 3. prompt bundle from `default_prompt_bundles.<step>`;
 4. context bundles from `default_context_bundles.<step>[]`.
 
-`registry_roots` declares AOR asset roots for routes, wrappers, prompt bundles, policies, adapters, evaluation registries, skill profiles, and runtime context assets. Runtime context assets are AOR-owned artifacts, not contributor guidance files from the target repository. Relative roots resolve from the target project root; absolute roots are allowed for bundled installed assets. Runtime-generated outputs still belong under `.aor/`.
+`registry_roots` declares AOR asset roots for routes, wrappers, prompt bundles, policies, adapters, evaluation registries, skill profiles, and runtime context assets. Runtime context assets are AOR-owned artifacts, not contributor guidance files from the target repository. Relative roots resolve from the target project root; absolute roots are allowed for bundled installed assets. Runtime-generated outputs belong under `${AOR_HOME:-$HOME/.aor}/projects/<workspace-project-id>/`; a repository-local `.aor/` directory is reserved for explicit portable configuration or evidence export.
 
 The canonical registry-root keys are:
 - `routes`
@@ -81,7 +81,7 @@ The canonical registry-root keys are:
 W21 guided onboarding preserves both modes:
 - bundled mode is the default clean-repo path and must not copy `examples/` into the target repository;
 - materialized mode is explicit and records intentional asset ejection/materialization when a user wants local committed AOR assets;
-- runtime outputs still belong under `.aor/` in both modes.
+- runtime outputs remain under central AOR Home in both modes; materialized repo-local `.aor/` content is explicit portable configuration or export only.
 
 `default_prompt_bundles` is keyed by workflow step and resolves one prompt bundle ref per step.
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.

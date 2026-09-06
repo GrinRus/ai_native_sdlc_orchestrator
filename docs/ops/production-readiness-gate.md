@@ -100,7 +100,7 @@ The gate verifies:
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
 - story honesty: all 116 stories remain machine-counted, OPS-12 cites the executable W63-S08 installed golden-path proof, other proof-covered rows retain their exact evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
-- source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on the current W66 qualification disposition and excluded surfaces;
+- source-of-truth alignment: README, self-hosted readiness docs, indexes, the W71 planning snapshot, and this runbook agree on the current W66 qualification disposition and excluded surfaces; `pnpm test:references` also verifies central AOR Home guidance and story evidence tiers;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;
 - W24 harness evidence: run-level Runtime Harness report fields, strict-delivery example evidence, and controller tests exist.
 - W30 alpha hardening: ADR index and accepted alpha-boundary ADRs exist, the OpenAPI 3.1 route contract matches the implemented HTTP/SSE router, self-hosted ops runbooks exist, W30 backlog source-of-truth docs are present, unsupported Docker/GHCR/SaaS/SSO/default-write-back claims remain out of scope, and OpenCode stories remain blocked without real certification proof.
