@@ -44,4 +44,3 @@
   sensitivity for each claimed family.
 - Current profile/fixture evidence is central-AOR-Home based, target-clean, and
   preserves canonical Task lifecycle lineage without upstream writes.
-
