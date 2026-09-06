@@ -9,12 +9,13 @@ import { parse as parseYaml } from "yaml";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeParentIntegration, provisionProjectWorkspaceSet } from "../src/workspace-set-service.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
-import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { runGitChecked, withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 
 const workspaceRoot = path.resolve(new URL("../../..", import.meta.url).pathname);
 
 test("public workspace service derives a contract-valid set and supports a no-write dry run", () => {
   withTempRepo({ prefix: "aor-s10-workspace-service-", workspaceRoot }, (repoRoot) => {
+    runGitChecked({ cwd: repoRoot, args: ["branch", "-M", "main"] });
     const profile = path.join(repoRoot, "examples", "project.aor.yaml");
     const dryRun = provisionProjectWorkspaceSet({
       cwd: repoRoot,
@@ -52,6 +53,7 @@ test("public workspace service derives a contract-valid set and supports a no-wr
 
 test("public workspace service rejects a dirty source before creating a disposable checkout", () => {
   withTempRepo({ prefix: "aor-s10-workspace-dirty-", workspaceRoot }, (repoRoot) => {
+    runGitChecked({ cwd: repoRoot, args: ["branch", "-M", "main"] });
     const profile = path.join(repoRoot, "examples", "project.aor.yaml");
     fs.writeFileSync(path.join(repoRoot, "dirty.txt"), "dirty\n");
     assert.throws(() => provisionProjectWorkspaceSet({
@@ -66,6 +68,7 @@ test("public workspace service rejects a dirty source before creating a disposab
 
 test("public integration materializes and applies a parent report with idempotent readback", () => {
   withTempRepo({ prefix: "aor-s10-integration-service-", workspaceRoot }, (repoRoot) => {
+    runGitChecked({ cwd: repoRoot, args: ["branch", "-M", "main"] });
     const profile = path.join(repoRoot, "examples", "project.aor.yaml");
     const provisioned = provisionProjectWorkspaceSet({ cwd: repoRoot, projectRef: repoRoot, projectProfile: profile, runId: "run-s10-integrate" });
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot, projectProfile: profile });
