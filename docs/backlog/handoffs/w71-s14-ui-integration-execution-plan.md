@@ -74,10 +74,15 @@
   emulation, zero console errors, and zero POSTs during read/reload checks.
 - The immutable record is
   `docs/research/27-w71-s14-installed-control-plane-evidence.json`.
-- The final source commit has a fresh 16-case adversarial proof and a
-  same-commit qualification manifest under the disposable AOR Home. Provider
-  calls remain prohibited, so the W66 provider matrix is still an explicit
-  release hold.
+- The final integrated product commit is `91beaaef9c7b206840333ae7ebf3aefd48460a7d`;
+  its fresh 16-case adversarial proof is `sha256:d56e8f73af9e03e9192b0765418c18e90280048ed788e98e217a9b21bab22285`,
+  and its same-commit qualification manifest is
+  `sha256:39cab25abe76fb7784a3f575efa7a93418c39574816867f3d6deb4357f1e93cc`.
+  Provider calls remain prohibited, so the W66 provider matrix is still an
+  explicit release hold.
+- Final package checks also pass: `pnpm test:web:browser` (3/3),
+  `pnpm release:pack` (442 files), and `pnpm release:smoke` (neutral launcher
+  and target repository remained clean).
 
 ## Exit condition
 
