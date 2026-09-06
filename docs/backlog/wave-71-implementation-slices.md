@@ -438,7 +438,7 @@ grammar for later locking and integration.
 
 ## W71-S07 — Server-owned Task start and action progression
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-1, EPIC-2, EPIC-3, EPIC-6
 - **Hard dependencies:** W71-S06
 - **Remediation priority:** P0
