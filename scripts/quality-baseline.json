@@ -46,7 +46,7 @@
     "packages/orchestrator-core/src/step-execution-engine.mjs": 2212,
     "scripts/live-e2e/lib/contracts/loader.mjs": 3205,
     "scripts/live-e2e/run-profile.mjs": 4497,
-    "scripts/live-e2e/lib/flows.mjs": 7717,
+    "scripts/live-e2e/lib/flows.mjs": 7600,
     "scripts/live-e2e/lib/step-controller.mjs": 1914,
     "scripts/live-e2e/quality-assessment.mjs": 1320,
     "scripts/production-readiness.mjs": 1085

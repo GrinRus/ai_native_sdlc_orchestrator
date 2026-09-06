@@ -74,7 +74,6 @@ const debtMetrics = collectDebtMetrics(sourceMap, {
 });
 const baselineMetrics = baseline.debt_metrics ?? {};
 const debtKeys = [
-  "file_count",
   "total_lines",
   "complexity_units",
   "max_complexity",
