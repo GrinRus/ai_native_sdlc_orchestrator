@@ -138,13 +138,13 @@
     {
       "finding_id": "W71-AUD-012",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["merged-ui-runtime-journey", "installed-black-box-proof", "qualification-freeze"],
-      "summary": "The merged Command Desk UI and runtime still need one installed real-control-plane proof and immutable qualification freeze.",
-      "evidence_refs": ["docs/backlog/wave-71-implementation-slices.md", "docs/product/user-story-coverage-matrix.md"],
-      "limitations": ["The sibling UI branch is an immutable handoff until its own review and merge; it is not current main evidence."]
+      "summary": "The merged Command Desk UI and runtime now have an installed real-control-plane proof and same-commit qualification-freeze inputs.",
+      "evidence_refs": ["docs/research/27-w71-s14-installed-control-plane-evidence.json", "docs/backlog/handoffs/w71-s14-ui-integration-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md", "docs/product/user-story-coverage-matrix.md"],
+      "limitations": ["Fresh W66 provider qualification remains an independent release hold.", "The sibling UI branch remains an immutable handoff; the integrated runtime evidence is recorded on the S14 candidate."]
     }
   ],
   "story_downgrades": [

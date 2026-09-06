@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "evidence_id": "w71-s14-installed-control-plane-2026-09-06",
+  "kind": "w71-s14-installed-control-plane-evidence",
+  "captured_at": "2026-09-06T16:32:18Z",
+  "source_commit": "8453809ada45e02ddce7f7ac9959e209fe1fc286",
+  "ui_handoff": {
+    "thread_id": "01a061b2-119a-7272-91d0-13add13d75c2",
+    "branch": "codex/command-desk-ui",
+    "commits": [
+      "654eb576",
+      "941f26da",
+      "59943bfaa7af0c97b1eff38e7093aced069d0fb9"
+    ],
+    "coordination": "merge-first",
+    "overlap": "none before S14; exact immutable UI commits integrated and reviewed in S14"
+  },
+  "environment": {
+    "launcher": "aor app --project-ref <disposable-target> --host 127.0.0.1 --port 0 --open false",
+    "runtime_storage": "central AOR Home under disposable AOR_HOME",
+    "target_repository_state": "clean before and after journeys",
+    "provider_calls": false,
+    "upstream_writes": false,
+    "api_route_fulfillment": false
+  },
+  "control_plane": {
+    "task_prepare": {
+      "surface": "public POST intent-submissions + public revise action",
+      "delivery_mode": "no-write",
+      "normalization_revision": 1,
+      "route_id": "route.review.default",
+      "task_projection_route_id": "route.review.default",
+      "result": "pass"
+    },
+    "task_patch_only": {
+      "surface": "public POST intent-submissions + public revise action",
+      "delivery_mode": "patch-only",
+      "route_id": "route.implement.default",
+      "start_blocked_until_ready": true,
+      "result": "pass"
+    },
+    "recovery": {
+      "surface": "public Task action start",
+      "error_code": "task.execution_route_not_ready",
+      "recovery_action": "refresh",
+      "result": "pass"
+    },
+    "ask_aor": {
+      "surface": "browser Task Workspace -> POST tasks/:taskId/actions",
+      "action": "request",
+      "operator_request_status": "created",
+      "target_stage": "discovery",
+      "delivery_mode": "no-write",
+      "result": "pass"
+    },
+    "two_repository": {
+      "surface": "public project connect job",
+      "connection_job_status": "succeeded",
+      "project_count_after_connection": 2,
+      "result": "pass"
+    },
+    "lifecycle_packet_resolution": {
+      "surface": "browser-facing Task discovery-run action",
+      "result": "pass",
+      "regression_test": "Task lifecycle actions resolve logical intake packets from central AOR Home"
+    }
+  },
+  "browser": {
+    "real_same_origin_app": true,
+    "task_route_survives_reload": true,
+    "desktop_keyboard_control_k_focus": "task-search-input",
+    "mobile_viewport": "390x844",
+    "mobile_horizontal_overflow": false,
+    "two_hundred_percent_zoom_horizontal_overflow": false,
+    "reduced_motion": "emulated",
+    "console_errors": 0,
+    "post_requests_during_read_reload": 0
+  },
+  "verification_tiers": {
+    "installed_control_plane": "integrated-local",
+    "task_workspace_fixture": "fixture",
+    "provider_qualification": "not-run (provider calls prohibited)"
+  },
+  "limitations": [
+    "Live provider Prepare-to-Work and fresh W66 provider matrix remain outside this no-write evidence and require separately authorized provider cells.",
+    "Offline/reconnect state-machine assertions remain covered by the installed browser fixture; this record does not claim a provider-backed offline run."
+  ],
+  "status": "integrated-local-pass-with-provider-hold"
+}

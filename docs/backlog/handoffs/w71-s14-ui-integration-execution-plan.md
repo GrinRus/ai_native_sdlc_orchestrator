@@ -60,9 +60,31 @@
 - `pnpm slice:gate`
 - `pnpm test` with the final execution manifest at `114/114`
 
+## Execution record
+
+- UI handoff was integrated as the exact immutable sibling commits listed
+  above; no stale sibling branch was merged.
+- The real same-origin app was launched from a neutral directory with a
+  disposable `AOR_HOME`. Public control-plane journeys covered no-write and
+  patch-only preparation, revision-aware route readback, route persistence
+  across reload, readiness recovery, durable Ask AOR, a successful second
+  repository connection, and the Task `discovery-run` lifecycle action.
+- Browser checks used the running app without API route fulfilment: desktop
+  keyboard focus, 390x844 mobile overflow, 200% zoom overflow, reduced-motion
+  emulation, zero console errors, and zero POSTs during read/reload checks.
+- The immutable record is
+  `docs/research/27-w71-s14-installed-control-plane-evidence.json`.
+- The final source commit has a fresh 16-case adversarial proof and a
+  same-commit qualification manifest under the disposable AOR Home. Provider
+  calls remain prohibited, so the W66 provider matrix is still an explicit
+  release hold.
+
 ## Exit condition
 
 S14 may be marked done only after the merged installed proof and immutable
-freeze manifest are present. A blocked readiness result is acceptable only when
-it identifies the external W66-S09 provider quota/matrix as the remaining
-release blocker and contains no stale UI or W71 source-of-truth claim.
+freeze manifest are present. The integrated-local proof is complete for the
+public no-write/control-plane boundary, but the slice remains release-blocked
+until the separately authorized W66-S09 provider matrix is available. A blocked
+readiness result is acceptable only when it identifies that external provider
+quota/matrix as the remaining release blocker and contains no stale UI or W71
+source-of-truth claim.
