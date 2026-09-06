@@ -105,12 +105,12 @@
     {
       "finding_id": "W71-AUD-009",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S11"],
       "release_blocking": true,
       "affected_invariants": ["evidence-resolvability", "provenance", "adversarial-qualification"],
-      "summary": "Qualification evidence needs resolvable bytes, current digests, provenance, and per-family adversarial validation.",
-      "evidence_refs": ["docs/backlog/wave-71-implementation-slices.md", "docs/ops/production-readiness-gate.md"],
+      "summary": "W71-S11 resolves qualification bytes through the shared evidence owner, binds current identity and freshness, and proves validator-owned adversarial coverage; paid provider qualification remains a separate release gate.",
+      "evidence_refs": ["docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s11-qualification-proof-execution-plan.md", "scripts/live-e2e/docs/contracts/live-e2e-qualification-cell-report.md", "scripts/live-e2e/test/qualification-evidence.test.mjs", "scripts/w66-adversarial-proof.mjs"],
       "limitations": ["Paid provider qualification remains outside deterministic W71 development acceptance."]
     },
     {
