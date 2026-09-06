@@ -832,7 +832,7 @@ UI thread `Улучшить UI и UX` remains a no-overlap handoff at latest com
 
 ## W71-S15 — Live-E2E flow hotspot decomposition
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W71-S12
 - **Remediation priority:** P1

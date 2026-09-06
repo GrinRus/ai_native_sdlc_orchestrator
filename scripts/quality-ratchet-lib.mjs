@@ -80,7 +80,7 @@ export function duplicateWindowCount(fileSources, windowSize = 6) {
 export function collectDebtMetrics(fileSources, { longFunctionMaxLines = 100 } = {}) {
   const fileMetrics = {};
   let totalLines = 0;
-  let complexityUnits = 0;
+  let complexityUnits = 1;
   let maxComplexity = 0;
   let maxFunctionLines = 0;
   let longFunctionCount = 0;
@@ -94,7 +94,7 @@ export function collectDebtMetrics(fileSources, { longFunctionMaxLines = 100 } =
     const nesting = maxBraceNesting(source);
     const fileLongFunctions = functions.filter(({ lines: count }) => count > longFunctionMaxLines).length;
     totalLines += lines;
-    complexityUnits += complexity;
+    complexityUnits += complexity - 1;
     maxComplexity = Math.max(maxComplexity, complexity);
     maxFunctionLines = Math.max(maxFunctionLines, ...functions.map(({ lines: count }) => count), 0);
     longFunctionCount += fileLongFunctions;
