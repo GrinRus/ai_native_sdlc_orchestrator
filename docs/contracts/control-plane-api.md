@@ -83,8 +83,12 @@ Flow lineage:
   mutation facade. It delegates `confirm`/`start` to the existing intent
   CAS/idempotency boundary, `pause`/`resume`/`cancel` to server-owned
   run-control, and `retry`/`request` to durable bounded operator requests.
-  Every response includes a query-safe durable readback; the route never
-  creates a second Task lifecycle owner or accepts raw provider flags;
+  The accepted action ids, permissions, payload requirements, and lifecycle
+  dispatch are published by the canonical [Task action catalog](task-action-catalog.md)
+  rather than a transport-local allowlist. Every response includes a
+  query-safe durable readback (Task, lineage, state, revision, and evidence
+  refs); the route never creates a second Task lifecycle owner or accepts raw
+  provider flags;
 - New Task preparation uses the existing intent boundary: the browser submits
   the outcome and validated source records to `POST
   /api/projects/:projectId/intent-submissions`, then refreshes the Task

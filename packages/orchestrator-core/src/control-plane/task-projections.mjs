@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { listFlowProjections } from "./flow-projections.mjs";
 import { readExecutionProfile } from "./execution-profile.mjs";
+import { getTaskActionDefinition } from "./task-action-catalog.mjs";
 
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -17,6 +18,24 @@ function normalizeId(value) {
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/gu, "-")
     .replace(/^-+|-+$/gu, "") || "task";
+}
+
+function publicAction(action, status) {
+  const actionId = asString(action?.action_id);
+  const definition = actionId ? getTaskActionDefinition(actionId) : null;
+  const operatorControl = action?.operator_control && typeof action.operator_control === "object" && !Array.isArray(action.operator_control)
+    ? { ...action.operator_control }
+    : asString(action?.operator_control);
+  return {
+    action_id: actionId,
+    operator_control: operatorControl,
+    reason: asString(action?.reason),
+    available: status !== "completed" && action?.available !== false && Boolean(actionId),
+    permission: definition?.permission ?? "read",
+    category: definition?.category ?? "unavailable",
+    requires_confirmation: definition?.requires_confirmation === true,
+    payload: definition?.payload ?? {},
+  };
 }
 
 const WORK_TYPE_TO_STEP = Object.freeze({
@@ -156,6 +175,10 @@ function intentTaskRef(projectId, submissionId) {
 function projectIntentTask({ projectId, entry, executionProfile }) {
   const submission = entry?.submission ?? {};
   const normalization = entry?.normalization ?? {};
+  // Once confirmation has materialized a Flow, the Flow-backed projection is
+  // the canonical Task identity. Do not expose a second draft Task for the
+  // same intent lineage after reload.
+  if (submission.confirmation?.flow_id) return null;
   const submissionId = asString(submission.submission_id);
   if (!submissionId) return null;
   const status = submission.status === "blocked"
@@ -256,14 +279,14 @@ function projectIntentTask({ projectId, entry, executionProfile }) {
     attention_count: status === "attention" ? 1 : 0,
     blocker_count: status === "attention" ? 1 : 0,
     evidence_refs: asStringArray(submission.normalization_refs),
-    primary_action: {
+    primary_action: publicAction({
       action_id: status === "prepared" ? "start" : "intent.resume",
       operator_control: status === "prepared" ? "Start task" : "Resume task preparation",
       reason: status === "prepared"
         ? (startAvailable ? "Prepared task is ready for revision-checked start." : selection.unavailable_reason)
         : status === "attention" ? "Resolve the recorded preparation blocker." : "Continue the intent-first task flow.",
       available: status === "prepared" ? startAvailable : true,
-    },
+    }, status),
     runner_selection: {
       schema_version: 1,
       source: "project-default",
@@ -332,12 +355,12 @@ export function projectTaskFromFlow({ projectId, flow, executionProfile }) {
     attention_count: Number.isInteger(flow.attention_count) ? flow.attention_count : 0,
     blocker_count: Number.isInteger(flow.blocker_count) ? flow.blocker_count : 0,
     evidence_refs: asStringArray(flow.evidence_refs),
-    primary_action: flow.primary_action ?? {
+    primary_action: publicAction(flow.primary_action ?? {
       action_id: null,
       operator_control: null,
       reason: null,
       available: false,
-    },
+    }, status),
     runner_selection: {
       schema_version: 1,
       source: "project-default",
