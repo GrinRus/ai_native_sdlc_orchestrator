@@ -3,12 +3,13 @@ import path from "node:path";
 import test from "node:test";
 
 import { invokeCli } from "../src/index.mjs";
-import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { runGitChecked, withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 
 const workspaceRoot = path.resolve(new URL("../../..", import.meta.url).pathname);
 
 test("public CLI workspace provision keeps full JSON parity with the shared service", () => {
   withTempRepo({ prefix: "aor-s10-workspace-cli-", workspaceRoot }, (repoRoot) => {
+    runGitChecked({ cwd: repoRoot, args: ["branch", "-M", "main"] });
     const result = invokeCli([
       "workspace", "provision",
       "--project-ref", repoRoot,
