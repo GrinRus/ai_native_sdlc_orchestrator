@@ -1899,6 +1899,16 @@ test("intent submission API preserves immutable input and creates normalization 
       assert.equal(staleConfirm.error.recovery_actions[0].payload.current_revision, latestRevision.report.revision);
       assert.equal(fs.existsSync(path.join(projectRoot, ".aor")), false);
 
+      const taskListBeforeConfirm = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks`);
+      const preparedTask = (await taskListBeforeConfirm.json()).tasks.find((task) => task.lineage.intent_submission_id === created.submission.submission_id);
+      assert.ok(preparedTask);
+      const staleTaskAction = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(preparedTask.task_id)}/actions`, {
+        action: "confirm",
+        expected_revision: staleRevision,
+      });
+      assert.equal(staleTaskAction.status, 409);
+      assert.equal((await staleTaskAction.json()).error.code, "intent_submission.stale_revision");
+
       const confirmResponse = await postJson(`${transport.baseUrl}${created.status_ref}/actions`, {
         action: "confirm",
         expected_revision: latestRevision.report.revision,
