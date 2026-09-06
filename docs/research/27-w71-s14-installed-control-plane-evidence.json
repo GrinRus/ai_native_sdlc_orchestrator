@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "evidence_id": "w71-s14-installed-control-plane-2026-09-06",
+  "evidence_id": "w71-s14-installed-control-plane-2026-09-06-r2",
   "kind": "w71-s14-installed-control-plane-evidence",
-  "captured_at": "2026-09-06T16:32:18Z",
-  "source_commit": "8453809ada45e02ddce7f7ac9959e209fe1fc286",
+  "captured_at": "2026-09-06T20:35:17Z",
+  "source_commit": "91beaaef9c7b206840333ae7ebf3aefd48460a7d",
   "ui_handoff": {
     "thread_id": "01a061b2-119a-7272-91d0-13add13d75c2",
     "branch": "codex/command-desk-ui",
@@ -75,6 +75,22 @@
     "reduced_motion": "emulated",
     "console_errors": 0,
     "post_requests_during_read_reload": 0
+  },
+  "qualification_freeze": {
+    "aor_commit": "91beaaef9c7b206840333ae7ebf3aefd48460a7d",
+    "target_commit": "3419113b48e034fdcf8fa6bd3be3da7b3d0d758f",
+    "adversarial_proof_status": "pass",
+    "adversarial_proof_sha256": "sha256:d56e8f73af9e03e9192b0765418c18e90280048ed788e98e217a9b21bab22285",
+    "manifest_sha256": "sha256:39cab25abe76fb7784a3f575efa7a93418c39574816867f3d6deb4357f1e93cc",
+    "required_provider_cells": [
+      "openai-primary.medium",
+      "openai-primary.large",
+      "anthropic-primary.medium",
+      "anthropic-primary.large"
+    ],
+    "status": "ready-for-fresh-provider-matrix",
+    "network_policy": "provider-calls-prohibited",
+    "write_policy": "no-upstream-write"
   },
   "verification_tiers": {
     "installed_control_plane": "integrated-local",
