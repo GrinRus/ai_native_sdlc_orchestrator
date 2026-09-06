@@ -682,7 +682,7 @@ explicit W71-S14 input, so no installed-proof claim is promoted here.
 
 ## W71-S11 — Resolvable evidence and adversarial qualification proof
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-4, EPIC-7
 - **Hard dependencies:** W71-S10
 - **Remediation priority:** P0

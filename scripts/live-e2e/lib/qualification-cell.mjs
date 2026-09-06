@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateContractDocument } from "./contracts/index.mjs";
 import { asNonEmptyString, asRecord, asStringArray, nowIso, readJson, uniqueStrings } from "./common.mjs";
+import { normalizeQualificationIdentity, resolveQualificationEvidence } from "./qualification-evidence.mjs";
 
 const SCRIPT_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const QUALITY_ASSESSMENT_SCRIPT = path.join(SCRIPT_ROOT, "quality-assessment.mjs");
@@ -17,21 +17,23 @@ export const REQUIRED_QUALIFICATION_CELLS = Object.freeze([
   Object.freeze({ cell_id: "anthropic-primary.large", provider_variant_id: "anthropic-primary", feature_size: "large" }),
 ]);
 
-function digestFile(file) {
-  return `sha256:${crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex")}`;
-}
-
-function fileEvidence(kind, file, owner, runId) {
-  if (!file || !fs.existsSync(file)) return null;
-  const document = asRecord(readJson(file));
-  return {
+function fileEvidence(kind, file, owner, runId, options = {}) {
+  if (!file || !fs.existsSync(file)) return { entry: null, issues: [`${kind} evidence is missing`] };
+  const resolved = resolveQualificationEvidence({
     kind,
-    ref: file,
-    digest: digestFile(file),
+    reference: file,
+    projectRoot: options.projectRoot,
+    projectRuntimeRoot: options.projectRuntimeRoot,
+    workspaceProjectId: options.workspaceProjectId,
+    expectedRunId: runId,
+    expectedIdentity: options.qualificationIdentity,
+    expectedDigest: options.expectedDigest,
+    reportGeneratedAt: options.reportGeneratedAt,
+    requirePortable: options.requirePortable,
+    requireRedaction: options.requireRedaction,
     owner,
-    generated_at: asNonEmptyString(document.generated_at) || asNonEmptyString(document.created_at) || fs.statSync(file).mtime.toISOString(),
-    run_id: asNonEmptyString(document.run_id) || runId,
-  };
+  });
+  return { entry: resolved.entry, issues: resolved.issues };
 }
 
 function dimension(status, refs = []) {
@@ -78,11 +80,6 @@ function assessFinalAssessment(assessmentFile, runId) {
   return { status: gate.status === 0 && issues.length === 0 ? "pass" : "blocked", issues, document };
 }
 
-function resolveRef(summaryFile, ref) {
-  if (!ref) return null;
-  return path.isAbsolute(ref) ? ref : path.resolve(path.dirname(summaryFile), ref);
-}
-
 /**
  * Build one fail-closed qualification cell from immutable evidence files.
  *
@@ -94,15 +91,25 @@ export function buildQualificationCellReport(options) {
   const runId = asNonEmptyString(summary.run_id);
   const providerVariantId = asNonEmptyString(summary.provider_variant_id);
   const featureSize = asNonEmptyString(summary.feature_size);
-  const observationFile = resolveRef(
-    summaryFile,
-    options.observationFile || asNonEmptyString(summary.live_e2e_observation_report_file),
-  );
-  const runHealthFile = resolveRef(
-    summaryFile,
-    options.runHealthFile || asNonEmptyString(summary.live_e2e_run_health_report_file),
-  );
-  const assessmentFile = resolveRef(summaryFile, options.assessmentFile);
+  const resolveInput = (value) => {
+    if (!value) return null;
+    return path.isAbsolute(value) ? value : path.resolve(path.dirname(summaryFile), value);
+  };
+  const observationFile = resolveInput(options.observationFile || asNonEmptyString(summary.live_e2e_observation_report_file));
+  const runHealthFile = resolveInput(options.runHealthFile || asNonEmptyString(summary.live_e2e_run_health_report_file));
+  const assessmentFile = resolveInput(options.assessmentFile);
+  const projectRoot = path.resolve(options.projectRoot || path.dirname(summaryFile));
+  const projectRuntimeRoot = path.resolve(options.projectRuntimeRoot || projectRoot);
+  const qualificationIdentity = normalizeQualificationIdentity({
+    ...asRecord(options.qualificationIdentity),
+    source_commit: options.qualificationIdentity?.source_commit || summary.commit_sha,
+    target_commit: options.qualificationIdentity?.target_commit || summary.target_commit,
+    profile_sha256: options.qualificationIdentity?.profile_sha256 || summary.profile_sha256 || summary.profile_digest,
+    proof_sha256: options.qualificationIdentity?.proof_sha256 || summary.proof_sha256 || summary.adversarial_proof_sha256,
+    cell_id: options.qualificationIdentity?.cell_id || `${providerVariantId}.${featureSize}`,
+    provider_variant_id: options.qualificationIdentity?.provider_variant_id || providerVariantId,
+    feature_size: options.qualificationIdentity?.feature_size || featureSize,
+  });
   const observation = observationFile && fs.existsSync(observationFile) ? asRecord(readJson(observationFile)) : {};
   const runHealth = runHealthFile && fs.existsSync(runHealthFile) ? asRecord(readJson(runHealthFile)) : {};
   const assessment = assessFinalAssessment(assessmentFile, runId);
@@ -110,6 +117,35 @@ export function buildQualificationCellReport(options) {
   const productionProof = asRecord(summary.production_proof);
   const changedPaths = asStringArray(summary.meaningful_changed_paths).filter((entry) => !entry.startsWith(".aor/"));
   const blockingFindings = [];
+  const evidenceResults = [
+    fileEvidence("observation", observationFile, "aor", runId, {
+      projectRoot,
+      projectRuntimeRoot,
+      workspaceProjectId: options.workspaceProjectId || summary.project_id,
+      qualificationIdentity,
+      reportGeneratedAt: options.generatedAt || nowIso(),
+      requirePortable: options.requirePortable,
+    }),
+    fileEvidence("run-health", runHealthFile, "aor", runId, {
+      projectRoot,
+      projectRuntimeRoot,
+      workspaceProjectId: options.workspaceProjectId || summary.project_id,
+      qualificationIdentity,
+      reportGeneratedAt: options.generatedAt || nowIso(),
+      requirePortable: options.requirePortable,
+    }),
+    fileEvidence("final-assessment", assessmentFile, "evaluator", runId, {
+      projectRoot,
+      projectRuntimeRoot,
+      workspaceProjectId: options.workspaceProjectId || summary.project_id,
+      qualificationIdentity,
+      reportGeneratedAt: options.generatedAt || nowIso(),
+      requirePortable: options.requirePortable,
+    }),
+  ];
+  const evidenceIssues = evidenceResults.flatMap((result) => result.issues);
+  const evidence = evidenceResults.map((result) => result.entry).filter(Boolean);
+  const evidenceRefs = (kind) => evidence.filter((entry) => entry.kind === kind).map((entry) => entry.ref);
   const dimensions = {
     public_lifecycle: dimension(
       asNonEmptyString(summary.status) === "pass" &&
@@ -117,9 +153,9 @@ export function buildQualificationCellReport(options) {
         asNonEmptyString(asRecord(observation.final_analysis).status) === "pass"
         ? "pass"
         : "blocked",
-      [observationFile],
+      evidenceRefs("observation"),
     ),
-    run_health: dimension(asNonEmptyString(runHealth.overall_status) === "pass" ? "pass" : "blocked", [runHealthFile]),
+    run_health: dimension(asNonEmptyString(runHealth.overall_status) === "pass" ? "pass" : "blocked", evidenceRefs("run-health")),
     diagnostic_verification: dimension(
       asNonEmptyString(summary.post_run_diagnostic_status) === "pass" &&
         asNonEmptyString(summary.post_run_verify_status) === "pass"
@@ -127,7 +163,7 @@ export function buildQualificationCellReport(options) {
         : "blocked",
       [asNonEmptyString(summary.post_run_verify_summary_file), asNonEmptyString(summary.post_run_diagnostic_verify_summary_file)],
     ),
-    final_assessment: dimension(assessment.status, [assessmentFile]),
+    final_assessment: dimension(assessment.status, evidenceRefs("final-assessment")),
     changed_paths: dimension(
       changedPaths.length > 0 &&
         asNonEmptyString(asRecord(productionProof.delivery_integrity).status) === "pass"
@@ -163,12 +199,33 @@ export function buildQualificationCellReport(options) {
       ));
     }
   }
-  const evidence = [
-    fileEvidence("run-summary", summaryFile, "aor", runId),
-    fileEvidence("observation", observationFile, "aor", runId),
-    fileEvidence("run-health", runHealthFile, "aor", runId),
-    fileEvidence("final-assessment", assessmentFile, "evaluator", runId),
-  ].filter(Boolean);
+  for (const issue of evidenceIssues) {
+    blockingFindings.push(finding(
+      "qualification.evidence.unresolvable",
+      "aor",
+      "evidence",
+      "evidence_resolution_failed",
+      issue,
+    ));
+  }
+  const summaryEvidence = fileEvidence("run-summary", summaryFile, "aor", runId, {
+    projectRoot,
+    projectRuntimeRoot,
+    workspaceProjectId: options.workspaceProjectId || summary.project_id,
+    qualificationIdentity,
+    reportGeneratedAt: options.generatedAt || nowIso(),
+    requirePortable: options.requirePortable,
+  });
+  if (summaryEvidence.entry) evidence.push(summaryEvidence.entry);
+  for (const issue of summaryEvidence.issues) {
+    blockingFindings.push(finding(
+      "qualification.evidence.summary_unresolvable",
+      "aor",
+      "evidence",
+      "evidence_resolution_failed",
+      issue,
+    ));
+  }
   const report = {
     schema_version: 1,
     report_id: `${runId || "unknown"}.qualification-cell.v1`,
@@ -187,6 +244,7 @@ export function buildQualificationCellReport(options) {
     warnings: [],
     blocking_findings: blockingFindings,
     evidence,
+    qualification_identity: qualificationIdentity,
   };
   return {
     report,
@@ -200,17 +258,32 @@ export function buildQualificationCellReport(options) {
 
 /**
  * @param {Array<Record<string, unknown>>} reports
+ * @param {{ qualificationIdentity?: Record<string, unknown> }} [options]
  */
-export function evaluateQualificationMatrix(reports) {
+export function evaluateQualificationMatrix(reports, options = {}) {
   const byCell = new Map(reports.map((report) => [asNonEmptyString(report.cell_id), report]));
+  const expectedIdentity = normalizeQualificationIdentity(options.qualificationIdentity);
+  const identityMismatches = [];
   const commitShas = uniqueStrings(reports.map((report) => asNonEmptyString(report.commit_sha)).filter(Boolean));
   const cells = REQUIRED_QUALIFICATION_CELLS.map((required) => {
     const report = asRecord(byCell.get(required.cell_id));
+    const actualIdentity = normalizeQualificationIdentity({
+      ...report,
+      source_commit: report.source_commit ?? report.commit_sha,
+      profile_sha256: report.profile_sha256 ?? report.profile_digest,
+      proof_sha256: report.proof_sha256 ?? report.adversarial_proof_sha256,
+    });
+    const mismatches = Object.keys(expectedIdentity).length > 0
+      ? Object.keys(expectedIdentity).filter((field) => actualIdentity[field] !== expectedIdentity[field])
+      : [];
+    if (mismatches.length > 0) identityMismatches.push({ cell_id: required.cell_id, fields: mismatches });
     return {
       ...required,
       run_id: asNonEmptyString(report.run_id) || null,
       commit_sha: asNonEmptyString(report.commit_sha) || null,
-      status: asNonEmptyString(report.status) || "missing",
+      status: mismatches.length > 0 ? "stale" : asNonEmptyString(report.status) || "missing",
+      freshness_status: mismatches.length > 0 ? "stale" : "current",
+      invalidation_reason: mismatches.length > 0 ? "qualification identity changed; prior evidence is diagnostic-only" : null,
     };
   });
   const missingOrFailed = cells.filter((cell) => cell.status !== "pass");
@@ -218,6 +291,7 @@ export function evaluateQualificationMatrix(reports) {
     matrix_id: "live-e2e.required-provider-qualification-matrix.v1",
     required_cells: cells,
     commit_sha: commitShas.length === 1 ? commitShas[0] : null,
+    qualification_identity: expectedIdentity,
     status: missingOrFailed.length === 0 && commitShas.length === 1 ? "pass" : "blocked",
     blocking_findings: [
       ...missingOrFailed.map((cell) => ({
@@ -226,6 +300,12 @@ export function evaluateQualificationMatrix(reports) {
         status: cell.status,
       })),
       ...(commitShas.length === 1 ? [] : [{ code: "qualification.commit_set_mismatch", commit_shas: commitShas }]),
+      ...identityMismatches.map((entry) => ({
+        code: "qualification.identity_stale",
+        cell_id: entry.cell_id,
+        fields: entry.fields,
+        diagnostic_only: true,
+      })),
     ],
     generated_at: nowIso(),
   };

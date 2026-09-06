@@ -65,7 +65,7 @@ export function ensureRuntimeLayout(options) {
     ? path.isAbsolute(options.runtimeRootOverride)
       ? options.runtimeRootOverride
       : path.resolve(options.hostRoot, options.runtimeRootOverride)
-    : path.join(options.hostRoot, ".aor");
+    : path.resolve(process.env.AOR_HOME?.trim() || path.join(os.homedir(), ".aor"));
   const projectRuntimeRoot = path.join(runtimeRoot, "projects", options.hostProjectId);
   const reportsRoot = path.join(projectRuntimeRoot, "reports");
   const stateRoot = path.join(projectRuntimeRoot, "state");

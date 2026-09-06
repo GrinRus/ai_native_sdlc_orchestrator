@@ -41,6 +41,17 @@ verification failure, timeout, wrong-run evidence, stale evidence, missing
 digests, checkout drift, upstream writes, and missing or non-all-pass final
 assessment all fail closed.
 
+Evidence is resolved through the shared AOR evidence-reference owner before it
+is accepted. The resolver recomputes bytes and SHA-256, enforces project/runtime
+containment and optional authority bindings, and rejects missing, moved,
+traversed, symlinked, or mutated artifacts. Each report carries a
+`qualification_identity` (source/target commits, profile and proof digests,
+cell, provider, and feature size); a mismatch makes the evidence
+diagnostic-only. Evidence entries also record a portable reference, retention
+policy, and explicit redaction state. Legacy relative `evidence://` references
+remain readable during migration, but absolute runtime paths are never emitted
+as the canonical report reference.
+
 `observations` and `positive_evidence` never become gaps merely because they
 exist. Actionable gaps belong only in `warnings` or `blocking_findings`, with a
 stable `owner`, `phase`, and `class`.

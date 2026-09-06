@@ -44,6 +44,18 @@ const REQUIRED_PROVIDER_COUNTS = Object.freeze({
   "anthropic-primary": 2,
 });
 
+function buildQualificationIdentity(summary) {
+  return {
+    source_commit: asNonEmptyString(summary.source_commit) || asNonEmptyString(summary.commit_sha),
+    target_commit: asNonEmptyString(summary.target_commit) || asNonEmptyString(summary.target_commit_sha),
+    profile_sha256: asNonEmptyString(summary.profile_sha256) || asNonEmptyString(summary.profile_digest),
+    proof_sha256: asNonEmptyString(summary.proof_sha256) || asNonEmptyString(summary.adversarial_proof_sha256),
+    cell_id: `${asNonEmptyString(summary.provider_variant_id) || "unknown"}.${asNonEmptyString(summary.feature_size) || "unknown"}`,
+    provider_variant_id: asNonEmptyString(summary.provider_variant_id),
+    feature_size: asNonEmptyString(summary.feature_size),
+  };
+}
+
 /**
  * @param {string} cwd
  * @param {string[]} args
@@ -346,6 +358,11 @@ function updateQualificationSet(options) {
     feature_mission_id: asNonEmptyString(options.summary.feature_mission_id) || null,
     feature_size: asNonEmptyString(options.summary.feature_size) || null,
     commit_sha: asNonEmptyString(options.summary.commit_sha) || null,
+    source_commit: asNonEmptyString(options.summary.source_commit) || asNonEmptyString(options.summary.commit_sha) || null,
+    target_commit: asNonEmptyString(options.summary.target_commit) || asNonEmptyString(options.summary.target_commit_sha) || null,
+    profile_sha256: asNonEmptyString(options.summary.profile_sha256) || asNonEmptyString(options.summary.profile_digest) || null,
+    proof_sha256: asNonEmptyString(options.summary.proof_sha256) || asNonEmptyString(options.summary.adversarial_proof_sha256) || null,
+    qualification_identity: buildQualificationIdentity(options.summary),
     branch_name: asNonEmptyString(options.summary.branch_name) || null,
     summary_ref: asNonEmptyString(options.summary.summary_ref) || null,
     observation_report_ref: asNonEmptyString(options.summary.live_e2e_observation_report_file) || null,
@@ -391,7 +408,8 @@ function updateQualificationSet(options) {
     ...existingCellReports.filter((entry) => asNonEmptyString(entry.cell_id) !== cellId),
     options.cellReport,
   ];
-  const requiredQualificationMatrix = evaluateQualificationMatrix(qualification_cell_reports);
+  const qualificationIdentity = buildQualificationIdentity(options.summary);
+  const requiredQualificationMatrix = evaluateQualificationMatrix(qualification_cell_reports, { qualificationIdentity });
   const qualification_status = requiredQualificationMatrix.status === "pass" ? "passed" : "incomplete";
   const document = {
     qualification_report_id: "live-e2e.w66-qualification.v1",
@@ -408,9 +426,11 @@ function updateQualificationSet(options) {
       attempts,
       requiredProviderCounts: REQUIRED_PROVIDER_COUNTS,
       releaseBlockingProviderIds: [],
+      qualificationIdentity,
     }),
     required_qualification_matrix: requiredQualificationMatrix,
     qualification_cell_reports,
+    qualification_identity: qualificationIdentity,
     attempts,
     updated_at: nowIso(),
   };
@@ -455,6 +475,8 @@ function recordQualificationResult(options) {
     observationFile,
     runHealthFile,
     assessmentFile: options.assessmentFile,
+    qualificationIdentity: buildQualificationIdentity(summary),
+    projectRoot: options.hostRoot,
   });
   if (!qualificationCell.validation.ok) {
     throw new UsageError(
@@ -629,6 +651,8 @@ function runCli(rawArgs) {
     observationFile,
     runHealthFile,
     assessmentFile: finalAssessmentReportFile,
+    qualificationIdentity: buildQualificationIdentity(summary),
+    projectRoot: path.dirname(summaryFile),
   });
   const cellReportFile = path.join(
     path.dirname(summaryFile || process.cwd()),

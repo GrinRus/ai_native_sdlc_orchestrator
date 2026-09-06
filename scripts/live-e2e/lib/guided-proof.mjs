@@ -495,6 +495,10 @@ export function buildGuidedJourneyProof(options) {
     },
     flow_loop: buildFlowLoopProof(options.artifacts),
     no_write_assertions: {
+      runtime_ownership: asNonEmptyString(options.artifacts.aor_home) ? "central-aor-home" : null,
+      central_aor_home_root: asNonEmptyString(options.artifacts.aor_home) || null,
+      runtime_state_under_central_aor_home: Boolean(asNonEmptyString(options.artifacts.aor_home)),
+      target_dot_aor_absent: !fs.existsSync(path.join(options.targetCheckoutRoot, ".aor")),
       output_policy_write_back_to_remote: outputPolicy.write_back_to_remote === false,
       preferred_delivery_mode: asNonEmptyString(outputPolicy.preferred_delivery_mode) || null,
       upstream_writes_default: false,
@@ -668,6 +672,11 @@ export function validateGuidedJourneyProof(proof, options) {
   const noWrite = asRecord(proof.no_write_assertions);
   if (noWrite.output_policy_write_back_to_remote !== true) {
     issues.push("guided proof profile does not expose write_back_to_remote=false");
+  }
+  if (noWrite.runtime_ownership === "central-aor-home") {
+    if (noWrite.runtime_state_under_central_aor_home !== true || noWrite.target_dot_aor_absent !== true) {
+      issues.push("guided proof must keep runtime state in central AOR Home and leave target .aor absent");
+    }
   }
   if (noWrite.target_head_unchanged !== true) {
     issues.push("target repository HEAD changed during guided proof");
