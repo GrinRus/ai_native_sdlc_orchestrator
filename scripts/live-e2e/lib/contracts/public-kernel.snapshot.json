@@ -5,7 +5,7 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 28,
-    "source_manifest_sha256": "4bd353e9c072b0ff745b187c5da60c595395e0c4bfa200503819b3cfb4df7d01"
+    "source_manifest_sha256": "d8f34a89e42203114aae7993451b5e799a96e315df9e80169a8fe7ecf591d2fd"
   },
   "files": {
     "canonical-values.mjs": "46b098e0ba673b2bfc6d82ee3bdd71ed5920ab85c5e03b3ada51479a25933c98",
@@ -24,7 +24,7 @@
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
     "loader.mjs": "3ec905ab65481280f76976241ba83963a4d990aac770e177a82445bb70ecf409",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
-    "project-topology.mjs": "ae32e59f7a0dee2f4d9bde653f0ce658d063895e183bf59ebe2fddebcd515425",
+    "project-topology.mjs": "ee8ab3c944f3513a393a79a9f7a8729ed6308451cf30d9c5dd1dfbbeb1e3ae8b",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
     "runner-output-contract-families.mjs": "734d4dcf4d0bcbf6810ce0e69435ee191eea6dc238d853c3168c41c293fc76fc",
     "runner-output-validation.mjs": "0c7c6331858b277dcd3cb8785e9e1a308eb4f0f55a56cdb6064cb7e15b36e5d3",

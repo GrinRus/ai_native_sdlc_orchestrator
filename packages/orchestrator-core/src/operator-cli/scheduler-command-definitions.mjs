@@ -75,8 +75,11 @@ export const RUN_INTEGRATION_COMMAND_DEFINITION = Object.freeze({
   inputs: [
     "--project-ref <path>",
     "--parent-run-id <id>",
-    "--action <show|apply|verify|repair|hold|resume>",
+    "--action <show|apply|verify|repair|hold|resume|materialize>",
     "--integration-report-file <path> (required for apply|verify)",
+    "--child-output-file <path> (repeatable, required for materialize when no prior report exists)",
+    "--execution-plan-ref <ref> (optional, defaults to parent run plan)",
+    "--workspace-set-ref <ref> (optional, defaults to parent run workspace set)",
     "--quality-repair-ref <ref> (required for repair)",
     "--command-id <id> (required for mutations)",
     "--expected-revision <integer> (required for mutations)",
@@ -84,9 +87,34 @@ export const RUN_INTEGRATION_COMMAND_DEFINITION = Object.freeze({
   ],
   outputs: [
     "resolved_project_ref", "parent_run", "parent_run_file",
-    "integration_report", "read_only", "future_control_hooks", "contract_families",
+    "integration_report", "integration_report_file", "integration_report_ref", "integration_authority_file",
+    "read_only", "future_control_hooks", "contract_families",
     "command_catalog_alignment",
   ],
   requiredFlags: ["project-ref", "parent-run-id", "action"],
-  contractFamilies: ["integration-report", "quality-repair-request", "runtime-harness-report"],
+  contractFamilies: ["integration-report", "quality-repair-request", "runtime-harness-report", "execution-plan", "workspace-set"],
+});
+
+export const WORKSPACE_PROVISION_COMMAND_DEFINITION = Object.freeze({
+  command: "workspace provision",
+  category: "execution-lifecycle",
+  status: "implemented",
+  summary: "Provision a bounded run-owned workspace set from the approved project topology and local bindings.",
+  inputs: [
+    "--project-ref <path>",
+    "--project-profile <path> (optional)",
+    "--run-id <id>",
+    "--workspace-set-id <id> (optional)",
+    "--binding-ref <ref> (optional)",
+    "--dry-run <true|false> (optional, defaults to false)",
+    "--delivery-capable <true|false> (optional, defaults to false)",
+    "--help",
+  ],
+  outputs: [
+    "resolved_project_ref", "workspace_set", "workspace_set_file", "workspace_set_ref",
+    "workspace_set_id", "workspace_set_status", "workspace_set_digest", "workspace_set_dry_run",
+    "workspace_set_idempotent", "read_only", "contract_families", "command_catalog_alignment",
+  ],
+  requiredFlags: ["project-ref", "run-id"],
+  contractFamilies: ["project-profile", "project-binding", "workspace-set"],
 });

@@ -23,6 +23,7 @@ import {
 import { applyTopologyAction, TopologyManagementError } from "../topology-management.mjs";
 import { applyExecutionProfileAction, ExecutionProfileError } from "../execution-profile.mjs";
 import { connectAdditionalRepository, createProjectConnectionJob, deleteProjectData, disconnectProject, refreshProjectSource } from "../project-source.mjs";
+import { materializeParentIntegration, provisionProjectWorkspaceSet, workspaceSetDigest } from "../../workspace-set-service.mjs";
 import { openNativeFolderPicker } from "../folder-picker.mjs";
 import { exportEvidence, materializeProjectConfig, ProjectWritebackError } from "../../project-writeback.mjs";
 import {
@@ -296,6 +297,68 @@ export async function handleProjectAction({ request, response, registry }) {
     const projectId = asString(payload.project_id);
     if (!projectId) {
       sendError(response, 400, "project_id_required", `Project action '${action ?? "missing"}' requires project_id.`);
+      return;
+    }
+    if (action === "provision-workspace-set") {
+      const context = registry.getContext(projectId);
+      if (!context) {
+        sendError(response, 404, "project_not_found", `Project '${projectId}' was not found.`);
+        return;
+      }
+      const result = provisionProjectWorkspaceSet({
+        ...context.runtimeOptions,
+        projectRef: context.projectRoot,
+        projectProfile: context.canonicalProfilePath,
+        runId: asString(payload.run_id),
+        workspaceSetId: asString(payload.workspace_set_id) ?? undefined,
+        bindingRef: asString(payload.binding_ref) ?? undefined,
+        dryRun: payload.dry_run === true,
+        deliveryCapable: payload.delivery_capable === true,
+        bindings: registry.getProjectInput(projectId)?.bindings ?? [],
+        command: "POST /api/projects/actions action=provision-workspace-set",
+      });
+      sendJson(response, result.dryRun ? 200 : 201, {
+        project_id: result.workspaceSet.project_id,
+        run_id: result.workspaceSet.run_id,
+        workspace_set: result.workspaceSet,
+        workspace_set_file: result.workspaceSetFile,
+        workspace_set_ref: result.workspaceSet.workspace_set_ref,
+        workspace_set_digest: workspaceSetDigest(result.workspaceSet),
+        dry_run: result.dryRun,
+        idempotent: result.idempotent,
+      });
+      return;
+    }
+    if (action === "integrate-parent-run") {
+      const context = registry.getContext(projectId);
+      if (!context) {
+        sendError(response, 404, "project_not_found", `Project '${projectId}' was not found.`);
+        return;
+      }
+      const childOutputRefs = Array.isArray(payload.child_output_refs)
+        ? payload.child_output_refs.filter((value) => typeof value === "string")
+        : [];
+      const result = materializeParentIntegration({
+        ...context.runtimeOptions,
+        projectRef: context.projectRoot,
+        projectProfile: context.canonicalProfilePath,
+        parentRunId: asString(payload.parent_run_id),
+        executionPlanRef: asString(payload.execution_plan_ref) ?? undefined,
+        workspaceSetRef: asString(payload.workspace_set_ref) ?? undefined,
+        childOutputRefs,
+        expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : undefined,
+        command: "POST /api/projects/actions action=integrate-parent-run",
+      });
+      sendJson(response, result.idempotent ? 200 : 201, {
+        project_id: result.init.projectId,
+        parent_run: result.parent,
+        parent_run_file: result.parentFile,
+        integration_report: result.report,
+        integration_report_file: result.reportFile,
+        integration_report_ref: result.reportRef ?? null,
+        integration_authority_file: result.authorityFile ?? null,
+        idempotent: result.idempotent,
+      });
       return;
     }
     if (action === "refresh-source") sendJson(response, 200, refreshProjectSource({ registry, projectId }));

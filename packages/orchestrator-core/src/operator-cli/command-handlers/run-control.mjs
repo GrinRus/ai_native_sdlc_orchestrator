@@ -29,9 +29,14 @@ import {
   startRunJob,
   startParentRun,
   applyIntegrationToParent,
+  provisionProjectWorkspaceSet,
+  workspaceSetDigest,
+  materializeParentIntegration,
+  createLocalProjectRegistry,
   submitInteractionAnswer,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
+  resolveOptionalStringListFlag,
   resolveOptionalBooleanFlag,
   resolveOptionalIntegerFlag,
   resolveOptionalCsvFlag,
@@ -48,6 +53,7 @@ import {
 } from "../command-runtime.mjs";
 
 export const RUN_CONTROL_COMMANDS = Object.freeze([
+  "workspace provision",
   "run start",
   "run pause",
   "run resume",
@@ -109,6 +115,41 @@ function errorMessage(error) {
  */
 export function handleRunControlCommand(context) {
   const { command, flags, cwd, outputState } = context;
+  if (command === "workspace provision") {
+    ensureRequiredFlags(command, flags);
+    const projectRef = /** @type {string} */ (flags["project-ref"]);
+    const workspace = createLocalProjectRegistry({ cwd, projects: [], persistence: { mode: "persistent" } });
+    const projectRoot = resolveProjectRef(projectRef, cwd);
+    const registered = workspace.listContexts().find((candidate) => candidate.projectRoot === projectRoot);
+    const result = provisionProjectWorkspaceSet({
+      cwd,
+      projectRef,
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId: resolveOptionalStringFlag("run-id", flags["run-id"]),
+      workspaceSetId: resolveOptionalStringFlag("workspace-set-id", flags["workspace-set-id"]),
+      bindingRef: resolveOptionalStringFlag("binding-ref", flags["binding-ref"]),
+      dryRun: flags["dry-run"] === undefined ? false : resolveOptionalBooleanFlag("dry-run", flags["dry-run"]),
+      deliveryCapable: flags["delivery-capable"] === undefined ? false : resolveOptionalBooleanFlag("delivery-capable", flags["delivery-capable"]),
+      bindings: registered ? workspace.getProjectInput(registered.projectId)?.bindings : [],
+      command: "aor workspace provision",
+    });
+    outputState.resolvedProjectRef = result.init.projectRoot;
+    outputState.resolvedRuntimeRoot = result.init.runtimeRoot;
+    outputState.workspaceSet = result.workspaceSet;
+    outputState.workspaceSetFile = result.workspaceSetFile;
+    outputState.workspaceSetRef = result.workspaceSet.workspace_set_ref;
+    outputState.workspaceSetId = result.workspaceSet.workspace_set_id;
+    outputState.workspaceSetStatus = result.workspaceSet.status;
+    outputState.workspaceSetDigest = workspaceSetDigest(result.workspaceSet);
+    outputState.workspaceSetDryRun = result.dryRun;
+    outputState.workspaceSetIdempotent = result.idempotent;
+    outputState.readOnly = result.dryRun;
+    outputState.futureControlHooks = result.dryRun
+      ? [`workspace provision --project-ref ${projectRef} --run-id ${result.workspaceSet.run_id}`]
+      : [`run start --project-ref ${projectRef} --run-id ${result.workspaceSet.run_id} --execution-plan-ref <ref> --workspace-set-ref ${result.workspaceSet.workspace_set_ref}`];
+    return true;
+  }
   if (command === "run integration") {
     ensureRequiredFlags(command, flags);
     const projectRef = /** @type {string} */ (flags["project-ref"]);
@@ -128,6 +169,27 @@ export function handleRunControlCommand(context) {
     const commandId = resolveOptionalStringFlag("command-id", flags["command-id"]);
     const expectedRevision = resolveOptionalIntegerFlag("expected-revision", flags["expected-revision"], { min: 0 });
     if (!commandId || expectedRevision === null) throw new CliUsageError("Integration mutations require '--command-id' and '--expected-revision'.");
+    if (action === "materialize") {
+      const result = materializeParentIntegration({
+        cwd,
+        projectRef,
+        runtimeRoot,
+        parentRunId,
+        executionPlanRef: resolveOptionalStringFlag("execution-plan-ref", flags["execution-plan-ref"]),
+        workspaceSetRef: resolveOptionalStringFlag("workspace-set-ref", flags["workspace-set-ref"]),
+        childOutputRefs: resolveOptionalStringListFlag("child-output-file", flags["child-output-file"]),
+        expectedRevision,
+        command: "aor run integration --action materialize",
+      });
+      outputState.parentRun = result.parent;
+      outputState.integrationReport = result.report;
+      outputState.integrationReportFile = result.reportFile;
+      outputState.integrationReportRef = result.reportRef ?? toEvidenceRef(result.init.projectRoot, result.reportFile);
+      outputState.integrationAuthorityFile = result.authorityFile ?? null;
+      outputState.readOnly = result.idempotent === true;
+      outputState.futureControlHooks = [`run integration --parent-run-id ${parentRunId} --action show`];
+      return true;
+    }
     if (action === "apply" || action === "verify") {
       const reportFile = resolveOptionalStringFlag("integration-report-file", flags["integration-report-file"]);
       if (!reportFile) throw new CliUsageError(`Integration action '${action}' requires '--integration-report-file'.`);

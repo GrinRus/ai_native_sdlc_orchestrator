@@ -615,7 +615,7 @@ Git evidence and authoritative unit ownership.
 
 ## W71-S10 — Public workspace provision-to-integration lifecycle
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W71-S08, W71-S09
 - **Remediation priority:** P0
