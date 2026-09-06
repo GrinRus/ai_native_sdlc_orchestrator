@@ -127,13 +127,13 @@
     {
       "finding_id": "W71-AUD-011",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S13"],
       "release_blocking": true,
       "affected_invariants": ["source-of-truth", "story-evidence-honesty", "release-ledger-alignment"],
-      "summary": "Current story and readiness claims must distinguish baseline, fixture, integrated-local, and live-provider evidence.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/ops/production-readiness-gate.md"],
-      "limitations": ["W59 historical closure remains immutable and is not rewritten by W71."]
+      "summary": "W71-S13 enforces central-AOR-Home guidance, deterministic planning/readiness summaries, bidirectional indexes, and audited story evidence tiers.",
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/product/story-evidence-tiers.json", "docs/backlog/w71-planning-readiness.json", "docs/backlog/wave-71-implementation-slices.md", "docs/ops/production-readiness-gate.md", "scripts/readiness/source-of-truth.mjs", "scripts/test/source-of-truth.test.mjs"],
+      "limitations": ["W59 historical closure remains immutable and is not rewritten by W71.", "Integrated installed proof remains owned by W71-S14; S13 does not promote affected stories."]
     },
     {
       "finding_id": "W71-AUD-012",

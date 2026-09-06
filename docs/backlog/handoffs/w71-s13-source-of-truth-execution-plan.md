@@ -36,3 +36,15 @@
    integrated claims partial and S14-owned.
 5. Run focused reference/readiness tests, lint/typecheck, then the canonical
    slice gate; review changed paths for UI overlap before handoff.
+
+## Closure
+
+- Implementation commit: `f617f3e6`.
+- PR: #319, merged to `main` as `7a0e22e1`.
+- CI: CodeQL, Dependency Review, OpenSSF Scorecard, and Node 22 Repo integrity
+  all passed (the first Node 22 attempt exposed a transient concurrent intent
+  test failure and was rerun successfully).
+- Focused evidence: `pnpm test:references`, source-of-truth tests 5/5,
+  `pnpm lint`, `pnpm typecheck`, `pnpm quality:ratchet`, and full `pnpm check`.
+- S13 state: `done`; S14 remains blocked until the sibling UI handoff is merged
+  or explicitly bound by the integration owner.
