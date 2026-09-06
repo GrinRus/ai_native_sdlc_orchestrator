@@ -906,7 +906,7 @@ handoff remains `Улучшить UI и UX` at immutable commit `59943bfa`.
 
 ## W71-S13 — Source-of-truth and story-evidence alignment
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W71-S15
 - **Remediation priority:** P1
@@ -964,6 +964,15 @@ produces the installed integrated proof.
 - Rewriting labelled historical research artifacts.
 - New product outcomes beyond the audited Task and multirepo flows.
 - Live provider qualification.
+
+Closure evidence: implementation PR #319 merged as `7a0e22e1` after CodeQL,
+Dependency Review, OpenSSF Scorecard, and Node 22 Repo integrity passed. The
+reference gate now checks central AOR Home guidance, 15 W71 planning states,
+bidirectional contract/runbook indexes, and 116 story rows against the ordered
+unit → contract → fixture → mocked-browser → integrated-local → live-provider
+evidence tiers. Focused source-of-truth tests passed 5/5 and the full local
+`pnpm check` passed after the quality baseline update. No `apps/web/**` files
+were changed; the sibling UI handoff remains `59943bfa` for W71-S14 integration.
 
 ## W71-S14 — UI-refactor integration, installed black-box closure, and freeze
 
