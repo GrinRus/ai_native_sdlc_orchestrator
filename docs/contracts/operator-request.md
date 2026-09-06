@@ -7,6 +7,8 @@ An operator request is not a direct chat transcript. The request is stored as a 
 ## Required Fields
 
 - `request_id`: stable request identifier.
+- `idempotency_key`: stable submission key used to collapse duplicate creates
+  and retries onto one request identity.
 - `project_id`: owning AOR project id.
 - `version`: contract version, currently `1`.
 - `source_surface`: source surface such as `cli`, `api`, or `web`.
@@ -19,12 +21,24 @@ An operator request is not a direct chat transcript. The request is stored as a 
 - `target_refs[]`: evidence, packet, compiled-context, or project-relative document refs.
 - `allowed_paths[]`: bounded write/proposal scope. Non-`no-write` delivery requires explicit paths.
 - `delivery_mode`: existing AOR delivery mode; default UI/CLI behavior is `no-write`.
-- `status`: `created`, `running`, `completed`, `failed`, or `blocked`.
+- `status`: `created`, `run-pending`, `running`, `completed`, `failed`, or
+  `blocked`. `run-pending` means execution ownership was persisted but no
+  terminal result was committed; a later `request run` resumes that request.
 - `created_at`: ISO timestamp.
 - `result_refs[]`: durable runtime output refs such as proposal/patch/step-result refs.
 - `evidence_refs[]`: audit and context evidence refs.
+- `attempt`: monotonic bounded execution-attempt number.
+- `execution`: optional durable execution state, including attempt, run id,
+  terminal status, and recovery action.
 
 `updated_at` is optional but SHOULD be present after the first mutation.
+
+Creation and execution are serialized by the runtime request transaction. A
+duplicate submission with the same `idempotency_key` returns the existing
+request and never creates a second request file. A request left in
+`run-pending` or `running` after interruption is resumed under the same
+`request_id`; retries increment `attempt` and may create new run evidence, but
+must not duplicate a completed result.
 
 ## Runtime Semantics
 

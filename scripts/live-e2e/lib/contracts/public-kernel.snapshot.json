@@ -5,7 +5,7 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 28,
-    "source_manifest_sha256": "826a25a14db8f93ef786f25acc79a7f156f7ecdb04e0eac95524bcf502209aea"
+    "source_manifest_sha256": "4bd353e9c072b0ff745b187c5da60c595395e0c4bfa200503819b3cfb4df7d01"
   },
   "files": {
     "canonical-values.mjs": "46b098e0ba673b2bfc6d82ee3bdd71ed5920ab85c5e03b3ada51479a25933c98",
@@ -17,7 +17,7 @@
     "execution-plan-validation.mjs": "41c74e89ed2003fcddea4280edbedb8cac3ab53372c2f0dd347a7fb2fcfb9ab5",
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
-    "families.mjs": "b53146411380ea19797b023c18ae446c40663434d35fe9a9b2a07f52ed062bab",
+    "families.mjs": "41bf8f87bec1bccce0b7c61624e8be36cae45f78975574fad486d1065f5cc871",
     "index.d.ts": "aa257b7602222af64b4b3a5c963f8475aea9c541b1179f23ed4e531dbc0ffb3b",
     "index.mjs": "7139b31f836d42ccfd725f777bed9ba5145401bc97915f68559ea577d8b0159b",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
@@ -2155,6 +2155,7 @@
       ],
       "fieldTypes": {
         "request_id": "string",
+        "idempotency_key": "string",
         "project_id": "string",
         "version": "number",
         "source_surface": "string",
@@ -2170,7 +2171,9 @@
         "created_at": "string",
         "updated_at": "string",
         "result_refs": "array",
-        "evidence_refs": "array"
+        "evidence_refs": "array",
+        "attempt": "number",
+        "execution": "object"
       },
       "enumChecks": [
         {
@@ -2218,6 +2221,7 @@
           "field": "status",
           "allowedValues": [
             "created",
+            "run-pending",
             "running",
             "completed",
             "failed",

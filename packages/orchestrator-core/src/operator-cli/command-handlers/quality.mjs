@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import {
   CliUsageError,
   listCompilerRevisionStatuses,
@@ -25,6 +28,7 @@ import {
   resolveOptionalIntegerFlag,
   resolveOptionalCsvFlag,
   resolveOptionalStringListFlag,
+  asStringArray,
   uniqueStrings,
   readJson,
   asPlainObject,
@@ -81,6 +85,117 @@ export function resolveRepairClosureStatusBlocker(options) {
     return "A requested quality repair requires a distinct '--closure-run-id' with refreshed repair evidence.";
   }
   return null;
+}
+
+// Resolve legacy absolute evidence URIs against the canonical artifact file.
+function evidenceRefsMatch(decisionRef, artifact) {
+  if (typeof decisionRef !== "string" || decisionRef.trim().length === 0) return false;
+  if (decisionRef === artifact.artifact_ref) return true;
+  const value = decisionRef.trim();
+  const absoluteRef = value.startsWith("evidence:///")
+    ? path.resolve(value.slice("evidence://".length))
+    : path.isAbsolute(value)
+      ? path.resolve(value)
+      : null;
+  if (!absoluteRef || typeof artifact.file !== "string" || !path.isAbsolute(artifact.file)) return false;
+  try {
+    return fs.realpathSync.native(absoluteRef) === fs.realpathSync.native(artifact.file);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Completion is a server-owned gate. Learning artifacts must never be used to
+ * make an active, unreviewed, or stale run look complete.
+ *
+ * @param {{
+ *   projectRoot: string,
+ *   runId: string,
+ *   runState: Record<string, unknown> | null,
+ *   runSummary: Record<string, unknown>,
+ *   reviewArtifact: { artifact_ref: string, file?: string, document: Record<string, unknown> } | null,
+ *   runtimeHarnessArtifact: { artifact_ref: string, file?: string, document: Record<string, unknown> } | null,
+ *   reviewDecisions: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *   existingLearningHandoff?: { artifact_ref: string } | null,
+ * }} options
+ * @returns {{ decision: Record<string, unknown>, reviewArtifact: { artifact_ref: string, file?: string, document: Record<string, unknown> }, runtimeHarnessArtifact: { artifact_ref: string, file?: string, document: Record<string, unknown> } }}
+ */
+export function assertLearningHandoffPrerequisites(options) {
+  if (options.existingLearningHandoff) {
+    throw new CliUsageError(
+      `Learning handoff for run '${options.runId}' already exists; completed evidence is immutable. Create a follow-up Task instead.`,
+    );
+  }
+
+  const blockers = [];
+  const state = options.runState && typeof options.runState === "object" ? options.runState : null;
+  const runStatus = typeof state?.status === "string" ? state.status.trim().toLowerCase() : "";
+  const terminalSuccessStatuses = new Set(["completed", "succeeded", "success", "pass", "passed"]);
+  if (!state) {
+    blockers.push("run control state is missing");
+  } else if (!terminalSuccessStatuses.has(runStatus)) {
+    blockers.push(`run control status is '${runStatus || "unknown"}', not a terminal success`);
+  }
+
+  const review = options.reviewArtifact?.document ?? null;
+  const harness = options.runtimeHarnessArtifact?.document ?? null;
+  const decisionEntry = options.reviewDecisions[0] ?? null;
+  const decision = decisionEntry?.document ?? null;
+  if (!review || !options.reviewArtifact) {
+    blockers.push("a current review report is required");
+  } else if (!reviewReportAllowsApproval(review)) {
+    blockers.push("the current review report is not eligible for approval");
+  }
+  if (!harness || !options.runtimeHarnessArtifact) {
+    blockers.push("a Runtime Harness report is required");
+  } else if (harness.overall_decision !== "pass") {
+    blockers.push(`Runtime Harness overall_decision is '${String(harness.overall_decision ?? "unknown")}'`);
+  }
+  if (!decisionEntry || !decision) {
+    blockers.push("an approved review decision is required");
+  } else {
+    const gate = asPlainObject(decision.delivery_gate);
+    if (decision.decision !== "approve" || gate.status !== "pass" || gate.blocks_downstream === true) {
+      blockers.push("the latest review decision does not approve delivery");
+    }
+    if (options.reviewArtifact && !evidenceRefsMatch(decision.review_report_ref, options.reviewArtifact)) {
+      blockers.push("review decision is bound to a stale or mismatched review report");
+    }
+    if (options.runtimeHarnessArtifact && !evidenceRefsMatch(decision.runtime_harness_report_ref, options.runtimeHarnessArtifact)) {
+      blockers.push("review decision is bound to a stale or mismatched Runtime Harness report");
+    }
+    const decidedAt = Date.parse(String(decision.decided_at ?? ""));
+    const generatedAt = Date.parse(String(review?.generated_at ?? ""));
+    const harnessGeneratedAt = Date.parse(String(harness?.generated_at ?? ""));
+    if (Number.isFinite(decidedAt) && Number.isFinite(generatedAt) && generatedAt > decidedAt) {
+      blockers.push("review report was regenerated after the approval decision");
+    }
+    if (Number.isFinite(decidedAt) && Number.isFinite(harnessGeneratedAt) && harnessGeneratedAt > decidedAt) {
+      blockers.push("Runtime Harness report was regenerated after the approval decision");
+    }
+    if (!evidenceRefExists(options.projectRoot, String(decision.review_report_ref ?? ""))) {
+      blockers.push("approved review report evidence is unavailable");
+    }
+    if (!evidenceRefExists(options.projectRoot, String(decision.runtime_harness_report_ref ?? ""))) {
+      blockers.push("approved Runtime Harness evidence is unavailable");
+    }
+    if (asStringArray(decision.evidence_refs).length === 0) blockers.push("review decision has no evidence lineage");
+  }
+  if (asStringArray(review?.evidence_refs).length === 0) blockers.push("review report has no evidence lineage");
+  if (asStringArray(harness?.evidence_refs).length === 0) blockers.push("Runtime Harness report has no evidence lineage");
+  if (asStringArray(options.runSummary.step_result_refs).length === 0) blockers.push("run has no recorded step-result evidence");
+
+  if (blockers.length > 0) {
+    throw new CliUsageError(
+      `Learning handoff for run '${options.runId}' is blocked: ${blockers.join("; ")}. Refresh the run and review evidence, then retry.`,
+    );
+  }
+  return {
+    decision: /** @type {Record<string, unknown>} */ (decision),
+    reviewArtifact: /** @type {{ artifact_ref: string, document: Record<string, unknown> }} */ (options.reviewArtifact),
+    runtimeHarnessArtifact: /** @type {{ artifact_ref: string, document: Record<string, unknown> }} */ (options.runtimeHarnessArtifact),
+  };
 }
 
 /**
@@ -719,13 +834,40 @@ export function handleQualityCommand(context) {
     if (!runSummary) {
       throw new CliUsageError(`Run '${runId}' was not found for learning handoff.`);
     }
-    const runtimeHarness = materializeRuntimeHarnessReport({
+    const qualityArtifacts = listQualityArtifacts({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const reviewDecisions = listReviewDecisions({
+      projectRoot: projectState.project_root,
+      runtimeLayout: projectState.runtime_layout,
       runId,
     });
+    const latestDecision = reviewDecisions[0]?.document ?? null;
+    const approvedHarnessRef = typeof latestDecision?.runtime_harness_report_ref === "string"
+      ? latestDecision.runtime_harness_report_ref
+      : null;
+    const existingHarnessCandidates = qualityArtifacts
+      .filter((artifact) => artifact.family === "runtime-harness-report" && artifact.document.run_id === runId)
+      .sort((left, right) => String(right.document.generated_at ?? "").localeCompare(String(left.document.generated_at ?? "")));
+    const existingHarness = (approvedHarnessRef
+      ? existingHarnessCandidates.find((artifact) => evidenceRefsMatch(approvedHarnessRef, artifact))
+      : null) ?? existingHarnessCandidates[0] ?? null;
+    const runtimeHarness = existingHarness
+      ? {
+          report: existingHarness.document,
+          reportPath: existingHarness.file,
+          reportRef: existingHarness.artifact_ref,
+        }
+      : materializeRuntimeHarnessReport({
+          cwd,
+          projectRef: /** @type {string} */ (flags["project-ref"]),
+          projectProfile,
+          runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+          runId,
+        });
     outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
     outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
     outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
@@ -750,8 +892,55 @@ export function handleQualityCommand(context) {
         .filter((artifact) => artifact.family === "evaluation-report")
         .map((artifact) => (typeof artifact.document.suite_ref === "string" ? artifact.document.suite_ref : "")),
     );
-    const reviewArtifact =
-      qualityForRun.find((artifact) => artifact.family === "review-report") ?? null;
+    const reviewArtifact = (typeof latestDecision?.review_report_ref === "string"
+      ? qualityForRun.find((artifact) => artifact.family === "review-report" && evidenceRefsMatch(latestDecision.review_report_ref, artifact))
+      : null) ?? qualityForRun.find((artifact) => artifact.family === "review-report") ?? null;
+    const existingLearningHandoff = qualityForRun.find((artifact) => artifact.family === "learning-loop-handoff") ?? null;
+    if (existingLearningHandoff) {
+      assertLearningHandoffPrerequisites({
+        projectRoot: projectState.project_root,
+        runId,
+        runState: runState.state,
+        runSummary,
+        reviewArtifact,
+        runtimeHarnessArtifact: {
+          artifact_ref: runtimeHarness.reportRef,
+          file: runtimeHarness.reportPath,
+          document: runtimeHarness.report,
+        },
+        reviewDecisions,
+        existingLearningHandoff: null,
+      });
+      const scorecardArtifact = qualityForRun.find((artifact) => artifact.family === "learning-loop-scorecard") ?? null;
+      const incidentArtifact = qualityForRun.find((artifact) => artifact.family === "incident-report") ?? null;
+      outputState.learningLoopScorecardFile = scorecardArtifact?.file ?? null;
+      outputState.learningLoopHandoffFile = existingLearningHandoff.file;
+      outputState.incidentReportFile = incidentArtifact?.file ?? null;
+      outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
+      outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
+      outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+      outputState.readOnly = true;
+      outputState.futureControlHooks = [
+        `incident show --run-id ${runId}`,
+        `audit runs --run-id ${runId}`,
+        `evidence show --run-id ${runId}`,
+      ];
+      return true;
+    }
+    assertLearningHandoffPrerequisites({
+      projectRoot: projectState.project_root,
+      runId,
+      runState: runState.state,
+      runSummary,
+      reviewArtifact,
+      runtimeHarnessArtifact: {
+        artifact_ref: runtimeHarness.reportRef,
+        file: runtimeHarness.reportPath,
+        document: runtimeHarness.report,
+      },
+      reviewDecisions,
+      existingLearningHandoff,
+    });
     const reviewDocument = asPlainObject(reviewArtifact?.document);
     outputState.reviewOverallStatus =
       typeof reviewDocument.overall_status === "string" ? reviewDocument.overall_status : outputState.reviewOverallStatus;
