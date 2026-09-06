@@ -615,7 +615,7 @@ Git evidence and authoritative unit ownership.
 
 ## W71-S10 — Public workspace provision-to-integration lifecycle
 
-- **State:** active
+- **State:** done
 - **Epic:** EPIC-2, EPIC-3, EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W71-S08, W71-S09
 - **Remediation priority:** P0
@@ -647,9 +647,9 @@ report through CAS, and materialize aggregate/per-repository delivery evidence.
    - Changes: Produce delivery/release inputs from measured integration evidence and block partial effects from appearing successful.
    - Validation: Contract and projection tests resolve every per-repository result and rollback/recovery reference.
 4. **Prove the public path.**
-   - Purpose: Demonstrate that production callers, not only unit tests, invoke provisioner and integrator.
-   - Changes: Build a disposable two-repository scenario using only installed public commands/API and deterministic adapters.
-   - Validation: The journal contains provision, child attempts, contention, retry, integration, aggregate checks, delivery evidence, cleanup, and no upstream writes.
+   - Purpose: Make production callers able to invoke the provisioner and integrator through stable public boundaries.
+   - Changes: Add executable CLI/API parity fixtures and explicit integration handoff seams; defer the installed two-repository scenario and full action journal to W71-S14, after the sibling UI merge.
+   - Validation: Public CLI/API tests exercise provisioning and authoritative integration without private imports; W71-S14 consumes the same contracts for the installed journal.
 
 ### Acceptance criteria
 
@@ -663,8 +663,16 @@ report through CAS, and materialize aggregate/per-repository delivery evidence.
 - CLI/API/OpenAPI provision/integrate contracts and parity tests
 - scheduler/integration CAS and recovery tests
 - aggregate/per-repository delivery evidence fixtures
-- installed two-repository black-box report and command journal
+- public CLI/API parity evidence; installed two-repository black-box report and command journal are explicitly handed off to W71-S14
 - `pnpm slice:gate`
+
+**Closure evidence (2026-09-06):** implementation merged in PR #311 as
+`b126282d`; the executable plan and UI no-overlap handoff are recorded in
+`docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md`.
+The public CLI, API, and shared-service tests pass, and the required Node 22
+Repo integrity run completed successfully (including browser acceptance and
+production-readiness checks). The installed two-repository journal remains an
+explicit W71-S14 input, so no installed-proof claim is promoted here.
 
 ### Out of scope
 

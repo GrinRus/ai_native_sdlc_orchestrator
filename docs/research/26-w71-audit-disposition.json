@@ -3,7 +3,7 @@
   "disposition_id": "aor-post-w70-audit-disposition-2026-09",
   "audit_source": "docs/research/05-codebase-audit-2026-07.md",
   "baseline_commit": "f6de7e3167e74a2fd975deb5736e464cdcffac2f",
-  "updated_at": "2026-09-05",
+  "updated_at": "2026-09-06",
   "release_disposition": "audit-hold",
   "release_clearance": false,
   "historical_qualification_boundary": "W66 qualification remains a separate release hold until its fresh matrix closes.",
@@ -73,11 +73,11 @@
       "finding_id": "W71-AUD-006",
       "severity": "S1",
       "state": "open",
-      "owner_slices": ["W71-S07", "W71-S10"],
+      "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["server-owned-task-lifecycle", "public-provisioning"],
-      "summary": "The public Prepare-to-Start-to-Work lifecycle is not yet reachable as one server-owned flow.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "summary": "W71-S07/S10 expose the server-owned Task and provision/integration boundaries; one installed Prepare-to-Start-to-Work proof remains for W71-S14.",
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md"],
       "limitations": ["W70 browser fixtures do not constitute integrated control-plane proof."]
     },
     {
@@ -95,11 +95,11 @@
       "finding_id": "W71-AUD-008",
       "severity": "S1",
       "state": "open",
-      "owner_slices": ["W71-S10"],
+      "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["public-integration"],
-      "summary": "W71-S09 now hardens multirepo scope locking and isolated measured integration; a public provision-to-integration producer path remains missing.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "summary": "W71-S09 hardens multirepo scope locking and isolated measured integration; W71-S10 now exposes the public provision-to-integration producer path, while installed closure remains for W71-S14.",
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md"],
       "limitations": ["Constructed W62 proof remains useful diagnostic evidence but is not installed public proof."]
     },
     {
@@ -148,10 +148,10 @@
     }
   ],
   "story_downgrades": [
-    {"story_id": "EMP-03", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S10"], "reason": "W71-S09 supplies deterministic scope and integration coordination; the public multirepo provision-to-integration path remains open."},
-    {"story_id": "RMO-04", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S10"], "reason": "W71-S09 supplies authoritative isolated two-repository integration evidence; the installed public producer path remains unproven."},
-    {"story_id": "RMO-05", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S10"], "reason": "W71-S09 supplies isolated integration evidence, but the manifest is not yet produced by the installed public lifecycle."},
-    {"story_id": "RMO-06", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S10"], "reason": "W71-S09 hardens scope locks and integration; public provisioning, restart recovery, and installed proof remain open."},
-    {"story_id": "DTX-08", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S10"], "reason": "W71-S09 adds measured isolated integration evidence; the public provision-to-integration manifest producer remains missing."}
+    {"story_id": "EMP-03", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 exposes public provision/integration boundaries; installed end-to-end coordination remains unproven."},
+    {"story_id": "RMO-04", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 adds the public producer boundary; installed two-repository validation with authoritative outputs remains unproven."},
+    {"story_id": "RMO-05", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 adds public materialization, but the manifest is not yet produced by the installed lifecycle."},
+    {"story_id": "RMO-06", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 adds public provisioning/materialization; installed restart recovery and proof remain open."},
+    {"story_id": "DTX-08", "from": "baseline-covered", "to": "partial", "owner_slices": ["W71-S14"], "reason": "W71-S10 exposes the bounded manifest producer path; installed multirepo delivery evidence remains unproven."}
   ]
 }
