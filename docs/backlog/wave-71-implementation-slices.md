@@ -497,7 +497,7 @@ without editing the parallel workstream's visual composition.
 
 ## W71-S08 — Durable Ask AOR, review, and completion
 
-- **State:** blocked
+- **State:** ready
 - **Epic:** EPIC-2, EPIC-4, EPIC-5, EPIC-6
 - **Hard dependencies:** W71-S07
 - **Remediation priority:** P0
@@ -556,7 +556,7 @@ and keep completed Tasks immutable.
 
 ## W71-S09 — Canonical multirepo scope locks and isolated integration
 
-- **State:** blocked
+- **State:** done
 - **Epic:** EPIC-0, EPIC-3, EPIC-5
 - **Hard dependencies:** W71-S06
 - **Remediation priority:** P0
