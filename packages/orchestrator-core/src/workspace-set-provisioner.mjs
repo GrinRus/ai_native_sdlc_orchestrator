@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import { validatePublicId } from "../../contracts/src/index.mjs";
+import { normalizePathScope, pathScopesOverlap, validatePublicId } from "../../contracts/src/index.mjs";
 import { readCanonicalContainedFile, removeCanonicalContainedPath, resolveCanonicalContainedPath } from "./shared/canonical-paths.mjs";
 
 const OWNER_FILE = ".aor-workspace-set-owner.json";
@@ -35,6 +35,14 @@ function portableMount(value) {
 function validateId(value, label) {
   const result = validatePublicId(value);
   if (!result.ok) throw new Error(`${label} is invalid (${result.value_class}). ${result.migration}`);
+}
+
+function scopesOverlap(left, right) {
+  const leftScope = normalizePathScope(left);
+  const rightScope = normalizePathScope(right);
+  if (!leftScope.ok || !rightScope.ok) throw new Error("Workspace repository write scope must use canonical path patterns.");
+  if (leftScope.patterns.length === 0 || rightScope.patterns.length === 0) return false;
+  return leftScope.patterns.some((leftPattern) => rightScope.patterns.some((rightPattern) => pathScopesOverlap(leftPattern, rightPattern)));
 }
 
 function atomicJson(filePath, value) {
@@ -110,12 +118,13 @@ function validateRepositories(repositories, deliveryCapable) {
     if (deliveryCapable && accessMode === "primary-checkout") throw new Error(`Delivery-capable repository '${repository.repoId}' cannot use the primary checkout.`);
     const identity = repository.resolvedIdentity ?? sourceRoot;
     if (accessMode !== "read-only") {
-      const scope = JSON.stringify([...(repository.writeScope ?? [])].sort());
-      const existing = writableScopes.get(identity);
-      if (existing?.has(scope)) throw new Error(`Shared repository '${identity}' has an overlapping write scope.`);
-      const scopes = existing ?? new Set();
-      scopes.add(scope);
-      writableScopes.set(identity, scopes);
+      const scope = normalizePathScope(Array.isArray(repository.writeScope) ? repository.writeScope : []);
+      if (!scope.ok) throw new Error(`Shared repository '${identity}' has an invalid write scope.`);
+      const existing = writableScopes.get(identity) ?? [];
+      if (existing.some((candidate) => scopesOverlap(scope.patterns, candidate))) {
+        throw new Error(`Shared repository '${identity}' has an overlapping write scope.`);
+      }
+      writableScopes.set(identity, [...existing, scope.patterns]);
     }
     return { ...repository, sourceRoot, baseRef, resolvedCommit, accessMode, identity };
   });
@@ -190,7 +199,7 @@ export function provisionWorkspaceSet(options) {
         resolved_commit: repository.resolvedCommit,
         resolved_identity: repository.identity,
         access_mode: repository.accessMode,
-        write_scope: repository.writeScope ?? [],
+        write_scope: normalizePathScope(Array.isArray(repository.writeScope) ? repository.writeScope : []).patterns,
         source_root: repository.sourceRoot,
         execution_root: executionRoot,
         provisioning: { strategy, state: "ready" },

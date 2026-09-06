@@ -5,12 +5,12 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 28,
-    "source_manifest_sha256": "332341418f11e46c017ba014dbeabcbd5f07a8bfb5b13536ade0225de5d4bea0"
+    "source_manifest_sha256": "826a25a14db8f93ef786f25acc79a7f156f7ecdb04e0eac95524bcf502209aea"
   },
   "files": {
-    "canonical-values.mjs": "9cc71f91eb39bc17d017f72d6c94c6ea575c1000dad255a0a285b0be01310a03",
+    "canonical-values.mjs": "46b098e0ba673b2bfc6d82ee3bdd71ed5920ab85c5e03b3ada51479a25933c98",
     "context-size-validation.mjs": "47ee7e5e42ed36feaaa17706351e7b8f9d38974bf0d597305c3bb0c83282a8c5",
-    "delivery-contract-validation.mjs": "5422eeaeb426a9777f200e69076d0952ed12d84488167c63e042adc34a4172d9",
+    "delivery-contract-validation.mjs": "b3f412e88540e167b5873b23137c5f120521d178a7b466a9e60b9de784959775",
     "example-loader.mjs": "81f7946579c6505575ed9980add9a6926a9258c895d90f957d9671a030cbe131",
     "example-paths.mjs": "cde12cd4a86e41ba641161b55cbc4218c14c77e7bdd368cc077dd2f22e998db7",
     "example-reference-validation.mjs": "2e392196356e875248078cea3d2ef4c1ffc909eea21411be636654a62a26365d",
@@ -24,7 +24,7 @@
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
     "loader.mjs": "3ec905ab65481280f76976241ba83963a4d990aac770e177a82445bb70ecf409",
     "operator-control-validation.mjs": "6080b819cf18eaac52c79b008ca30040844dbbb9987c22d846ab83848eeca62b",
-    "project-topology.mjs": "678257e9a7490b5006504d1994132a58f12f02b794eb4e06354566a44ca3f8d9",
+    "project-topology.mjs": "ae32e59f7a0dee2f4d9bde653f0ce658d063895e183bf59ebe2fddebcd515425",
     "reference-registry.mjs": "1ef57220a7a59b54cf615a9e357d2aac7e92a285e9dce8a473fc4975ec3d12ab",
     "runner-output-contract-families.mjs": "734d4dcf4d0bcbf6810ce0e69435ee191eea6dc238d853c3168c41c293fc76fc",
     "runner-output-validation.mjs": "0c7c6331858b277dcd3cb8785e9e1a308eb4f0f55a56cdb6064cb7e15b36e5d3",
