@@ -5,8 +5,8 @@
   "slice_count": 15,
   "status_counts": {
     "ready": 0,
-    "active": 0,
-    "blocked": 1,
+    "active": 1,
+    "blocked": 0,
     "done": 14
   },
   "release_blockers": [

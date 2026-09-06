@@ -695,7 +695,7 @@ hold/readiness state is not changed by code-only completion.
 | W71-S12 | Enforceable quality coverage and maintainability ratchets | EPIC-0, EPIC-7 | done | lint/type/coverage/complexity tooling, ownership/exception manifests and quality tests | W71-S11 |
 | W71-S15 | Live-E2E flow hotspot decomposition | EPIC-0, EPIC-4, EPIC-7 | done | live-E2E flow module, extracted flow families, characterization tests and size/import ratchets | W71-S12 |
 | W71-S13 | Source-of-truth and story-evidence alignment | EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | done | README, product/story docs, architecture/contracts, backlog/readiness, runbooks and examples | W71-S15 |
-| W71-S14 | UI-refactor integration, installed black-box closure, and freeze | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | blocked | merged Command Desk integration, installed browser harness, package proof, freeze/readiness | W71-S13 |
+| W71-S14 | UI-refactor integration, installed black-box closure, and freeze | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | active | merged Command Desk integration, installed browser harness, package proof, freeze/readiness | W71-S13 |
 
 Every wave document includes a starter local-task outline for each slice. New
 medium+ slices carry Purpose, concrete Changes, and Validation for each work
