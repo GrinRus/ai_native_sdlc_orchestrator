@@ -1167,6 +1167,55 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
   });
 });
 
+test("Task lifecycle actions resolve logical intake packets from central AOR Home", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const missionResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`, {
+        command: "mission create",
+        flags: {
+          mission_id: "task-input-packet-resolution",
+          goal: "Exercise Task lifecycle packet resolution.",
+          constraint: "Keep orchestration owned by the runtime.",
+          kpi: "packet-resolution:Packet resolved:Task lifecycle remains public",
+          dod: "The Task lifecycle action resolves its intake packet from AOR Home.",
+          delivery_mode: "no-write",
+          source_kind: "local-note",
+          source_ref: "docs/ops/ui-attach-detach.md",
+        },
+      });
+      assert.equal(missionResponse.status, 200);
+
+      const nextResponse = await postJson(`${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`, {
+        command: "next",
+        flags: {},
+      });
+      assert.equal(nextResponse.status, 200);
+
+      const tasksResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/tasks`);
+      assert.equal(tasksResponse.status, 200);
+      const tasks = await tasksResponse.json();
+      const task = tasks.tasks.find((candidate) => candidate.flow_id === `flow.${transport.projectId}.task-input-packet-resolution`);
+      assert.ok(task);
+      assert.equal(task.primary_action.action_id, "discovery-run");
+      assert.equal(task.primary_action.available, true);
+      assert.match(task.intent_submission_ref, /^evidence:\/\/projects\//u);
+
+      const actionResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/tasks/${encodeURIComponent(task.task_id)}/actions`,
+        { action: "discovery-run" },
+      );
+      assert.equal(actionResponse.status, 200);
+      const actionPayload = await actionResponse.json();
+      assert.equal(actionPayload.action, "discovery-run");
+      assert.equal(actionPayload.lifecycle_command.blocked, false);
+      assert.equal(actionPayload.readback.durable, true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("HTTP run start returns 202 while a durable worker job executes", async () => {
   await withTempRepo(async (repoRoot) => {
     const transport = await createControlPlaneHttpServer({ projectRef: repoRoot, cwd: repoRoot, host: "127.0.0.1", port: 0 });
