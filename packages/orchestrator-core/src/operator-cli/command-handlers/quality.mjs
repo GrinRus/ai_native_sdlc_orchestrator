@@ -861,6 +861,26 @@ export function handleQualityCommand(context) {
     );
     const reviewArtifact = qualityForRun.find((artifact) => artifact.family === "review-report") ?? null;
     const existingLearningHandoff = qualityForRun.find((artifact) => artifact.family === "learning-loop-handoff") ?? null;
+    if (existingLearningHandoff) {
+      // A completed handoff is immutable, but replaying the public command is
+      // safe: return the durable artifacts instead of attempting a second
+      // materialization or mutating the completed lineage.
+      const scorecardArtifact = qualityForRun.find((artifact) => artifact.family === "learning-loop-scorecard") ?? null;
+      const incidentArtifact = qualityForRun.find((artifact) => artifact.family === "incident-report") ?? null;
+      outputState.learningLoopScorecardFile = scorecardArtifact?.file ?? null;
+      outputState.learningLoopHandoffFile = existingLearningHandoff.file;
+      outputState.incidentReportFile = incidentArtifact?.file ?? null;
+      outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
+      outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
+      outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+      outputState.readOnly = true;
+      outputState.futureControlHooks = [
+        `incident show --run-id ${runId}`,
+        `audit runs --run-id ${runId}`,
+        `evidence show --run-id ${runId}`,
+      ];
+      return true;
+    }
     assertLearningHandoffPrerequisites({
       projectRoot: projectState.project_root,
       runId,
