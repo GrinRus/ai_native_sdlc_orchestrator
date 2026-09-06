@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { withTempRepo } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { createLocalProjectRegistry } from "../src/control-plane/local-project-registry.mjs";
+import { listTaskProjections } from "../src/control-plane/task-projections.mjs";
 import {
   IntentServiceError,
   answerIntentQuestions,
@@ -253,7 +254,20 @@ test("normalization blockers remain retryable and confirmation is idempotent", a
       const first = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       const second = confirmAndStartIntent({ registry, projectId, submissionId: created.submission.submission_id });
       assert.equal(second.mission.command_output?.mission_id ?? second.mission.command, first.mission.command_output?.mission_id ?? first.mission.command);
-      assert.equal(readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission.status, "confirmed");
+      const durable = readIntentSubmission({ registry, projectId, submissionId: created.submission.submission_id }).submission;
+      assert.equal(durable.status, "confirmed");
+      assert.equal(durable.confirmation.start_transaction.status, "completed");
+      assert.equal(durable.confirmation.start_transaction.transaction_id, first.start_transaction.transaction_id);
+      assert.equal(durable.confirmation.start_transaction.idempotency_key, first.start_transaction.idempotency_key);
+      const taskProjection = listTaskProjections({
+        registry,
+        projectId,
+        projectRef: projectRoot,
+        runtimeRoot: aorHome,
+        intentSubmissions: listIntentSubmissions({ registry, projectId }).submissions,
+      });
+      assert.equal(taskProjection.tasks.filter((task) => task.flow_id === first.flow_id).length, 1);
+      assert.equal(taskProjection.tasks.some((task) => task.lineage.intent_submission_id === created.submission.submission_id && task.flow_id === null), false);
     } finally { fs.rmSync(aorHome, { recursive: true, force: true }); }
   });
 });

@@ -80,8 +80,13 @@ function latestNormalizationReport(loaded) {
 }
 
 function withSubmissionLock(registry, projectId, submissionId, callback) {
-  const preview = loadSubmission(registry, projectId, submissionId, { initialize: false });
-  return withFileLock(`${preview.file}.lock`, callback, { staleAfterMs: 30 * 60 * 1000, timeoutMs: 30 * 60 * 1000 });
+  // Resolve the lock path without reading the JSON state first. A concurrent
+  // atomic writer may briefly replace the state file; pre-lock parsing would
+  // turn that normal race into a false corruption/recovery event.
+  const { init } = resolveProject(registry, projectId, { initialize: false });
+  const file = submissionFile(init, submissionId);
+  if (!fs.existsSync(file)) throw new IntentServiceError("intent_submission.not_found", `Intent submission '${submissionId}' was not found.`, 404);
+  return withFileLock(`${file}.lock`, callback, { staleAfterMs: 30 * 60 * 1000, timeoutMs: 30 * 60 * 1000 });
 }
 
 function resolveProject(registry, projectId, { initialize = true } = {}) {
@@ -565,6 +570,31 @@ export function cancelIntentSubmission({ registry, projectId, submissionId }) {
 }
 
 function startConfirmedIntent({ loaded }) {
+  const existingTransaction = loaded.submission.confirmation?.start_transaction;
+  if (existingTransaction?.status === "in-progress") {
+    throw new IntentServiceError(
+      "intent_submission.start_in_progress",
+      "Task start is already in progress or was interrupted; refresh the Task before retrying.",
+      409,
+      {
+        transaction_id: existingTransaction.transaction_id,
+        recovery_actions: [{ action: "retry", payload: { resource: `intent-submission://${loaded.submission.submission_id}` } }],
+      },
+    );
+  }
+  const transaction = {
+    transaction_id: existingTransaction?.transaction_id ?? derivePublicId([loaded.init.workspaceProjectId, loaded.submission.submission_id, "start"], "task-start"),
+    idempotency_key: existingTransaction?.idempotency_key ?? `task-start:${loaded.init.workspaceProjectId}:${loaded.submission.submission_id}`,
+    status: "in-progress",
+    started_at: existingTransaction?.started_at ?? now(),
+    attempt: Number.isInteger(existingTransaction?.attempt) ? existingTransaction.attempt + 1 : 1,
+  };
+  loaded.submission.confirmation = {
+    ...loaded.submission.confirmation,
+    start_transaction: transaction,
+  };
+  loaded.submission.updated_at = now();
+  atomicJson(loaded.file, loaded.submission);
   const discovery = runLifecycleCommand({
     cwd: loaded.context.projectRoot,
     projectRef: loaded.context.projectRoot,
@@ -575,6 +605,11 @@ function startConfirmedIntent({ loaded }) {
   loaded.submission.confirmation = {
     ...loaded.submission.confirmation,
     discovery,
+    start_transaction: {
+      ...transaction,
+      status: discovery.ok === true ? "completed" : "failed",
+      finished_at: now(),
+    },
     last_start_attempt_at: now(),
     retryable_start: discovery.ok !== true,
   };
@@ -655,7 +690,10 @@ function confirmIntentRecordUnlocked({ registry, projectId, submissionId, expect
     },
   });
   if (!mission.ok) throw new IntentServiceError("intent_confirmation.failed", mission.error?.detail ?? "Mission creation failed.", mission.statusCode ?? 409);
-  const flowId = `flow.${loaded.init.projectId}.${String(missionId).replace(/[^a-zA-Z0-9._-]/gu, "-")}`;
+  // Public Task/Flow lineage is keyed by the Workspace project identity. The
+  // runtime profile id is machine-local and must not leak into readback or
+  // create a second Flow when the same project is reopened after restart.
+  const flowId = `flow.${loaded.init.workspaceProjectId}.${String(missionId).replace(/[^a-zA-Z0-9._-]/gu, "-")}`;
   const next = resolveNextAction({
     cwd: loaded.context.projectRoot,
     projectRef: loaded.context.projectRoot,

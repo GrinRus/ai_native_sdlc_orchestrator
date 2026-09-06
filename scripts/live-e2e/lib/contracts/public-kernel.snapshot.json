@@ -5,7 +5,7 @@
   "generation": {
     "generator": "scripts/contract-kernel-parity.mjs",
     "source_file_count": 28,
-    "source_manifest_sha256": "338af90bfe295f9b2791d7ffcf048b88a911d5d4ed9c3f59742799c29fb43368"
+    "source_manifest_sha256": "332341418f11e46c017ba014dbeabcbd5f07a8bfb5b13536ade0225de5d4bea0"
   },
   "files": {
     "canonical-values.mjs": "9cc71f91eb39bc17d017f72d6c94c6ea575c1000dad255a0a285b0be01310a03",
@@ -18,7 +18,7 @@
     "execution-readiness-contract-families.mjs": "effab59efd65d4f46a5373015a3f4349cf29902f031e6d0785a43b8d2e9b9f86",
     "external-run-projection-contract-family.mjs": "bb69ab7de10a9280a519a71f904d8c4dda7e14228bed7ccf9f9968620c432b0b",
     "families.mjs": "b53146411380ea19797b023c18ae446c40663434d35fe9a9b2a07f52ed062bab",
-    "index.d.ts": "ac704366b8314fa57b7f12aa10d8b6731e8c41e13611b47bd25589fd33f8d366",
+    "index.d.ts": "aa257b7602222af64b4b3a5c963f8475aea9c541b1179f23ed4e531dbc0ffb3b",
     "index.mjs": "7139b31f836d42ccfd725f777bed9ba5145401bc97915f68559ea577d8b0159b",
     "integration-contract-family.mjs": "25978997f4edbe837ef579e4046da624050df2a076b5a161c8c2abf8e811c1a4",
     "intent-contract-families.mjs": "8c46d01901c86a655b4b076e681d71423a30ff19d68f790f0512e8f99bb938d3",
@@ -32,7 +32,7 @@
     "session-budget-validation.mjs": "0a7aadeadb742d44df278499f37a775b601c7351d75f5135d906435890cbe708",
     "structured-task-plan-checks.mjs": "f59010e4660a4c4b54ce55eeda0de7ad2d993d866f12d291d6644f76242d9bce",
     "structured-task-plan.mjs": "6f6fc9c052a9806d69c285b206fc191dd9431a2eee8b4986036e1c371e21436a",
-    "task-contract-families.mjs": "d6f64311c3ea86d622d9b629a82ceaa229218c5f4f09b6cb066c366c314c29ac",
+    "task-contract-families.mjs": "c4dd99c32ef3813039b81f6a73460d6af68485a6d766943858f59d242093bb5f",
     "task-projection-validation.mjs": "6d97496a34ecdde52b6fba2e0d34da34e596c20948d34c5e18e70b42e4df80b0",
     "topology-contract-families.mjs": "2b6bccdc261abe81802e131ddea47f567ae79270e18897fd697a5f4ed2253e72",
     "utils.mjs": "44c1872a2eb590a7428bda50b5b701104fc4ff4f04568f11434b21d61641b64c"
@@ -207,6 +207,26 @@
         "entries": "array",
         "excluded_categories": "array",
         "created_at": "string"
+      },
+      "enumChecks": []
+    },
+    {
+      "family": "task-action-catalog",
+      "familyGroup": "execution-and-quality",
+      "sourceContract": "docs/contracts/task-action-catalog.md",
+      "exampleGlob": "examples/tasks/task-action-catalog*.yaml",
+      "status": "implemented",
+      "requiredFields": [
+        "schema_version",
+        "catalog_id",
+        "actions",
+        "readback"
+      ],
+      "fieldTypes": {
+        "schema_version": "number",
+        "catalog_id": "string",
+        "actions": "array",
+        "readback": "object"
       },
       "enumChecks": []
     },
@@ -3174,6 +3194,11 @@
       "regex_source": "^examples\\/reports\\/evidence-export-manifest[^/]*\\.ya?ml$",
       "regex_flags": "",
       "family": "evidence-export-manifest"
+    },
+    {
+      "regex_source": "^examples\\/tasks\\/task-action-catalog[^/]*\\.ya?ml$",
+      "regex_flags": "",
+      "family": "task-action-catalog"
     },
     {
       "regex_source": "^examples\\/tasks\\/task-projection[^/]*\\.ya?ml$",

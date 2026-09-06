@@ -25,6 +25,7 @@ Filesystem reads, materialization, copy, and cleanup additionally inherit the
 - `intent-normalization-report.md`
 - `task-source-item.md`
 - `task-projection.md`
+- `task-action-catalog.md`
 - `task-runner-selection.md`
 - `task-review.md`
 - `wave-ticket.md`

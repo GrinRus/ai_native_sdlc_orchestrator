@@ -1,5 +1,15 @@
 export const TASK_CONTRACT_FAMILIES = Object.freeze([
   {
+    family: "task-action-catalog",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/task-action-catalog.md",
+    exampleGlob: "examples/tasks/task-action-catalog*.yaml",
+    status: "implemented",
+    requiredFields: ["schema_version", "catalog_id", "actions", "readback"],
+    fieldTypes: { schema_version: "number", catalog_id: "string", actions: "array", readback: "object" },
+    enumChecks: [],
+  },
+  {
     family: "task-projection",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/task-projection.md",
@@ -57,6 +67,7 @@ export const TASK_CONTRACT_FAMILIES = Object.freeze([
 ]);
 
 export const TASK_EXAMPLE_RULES = Object.freeze([
+  { regex: /^examples\/tasks\/task-action-catalog[^/]*\.ya?ml$/, family: "task-action-catalog" },
   { regex: /^examples\/tasks\/task-projection[^/]*\.ya?ml$/, family: "task-projection" },
   { regex: /^examples\/tasks\/task-source-item[^/]*\.ya?ml$/, family: "task-source-item" },
   { regex: /^examples\/tasks\/task-runner-selection[^/]*\.ya?ml$/, family: "task-runner-selection" },

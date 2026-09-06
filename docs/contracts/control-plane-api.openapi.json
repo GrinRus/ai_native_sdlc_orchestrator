@@ -2898,14 +2898,18 @@
         "type": "object",
         "required": ["action"],
         "properties": {
-          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "cancel", "retry", "request", "follow-up"] },
+          "action": { "type": "string", "enum": ["confirm", "start", "pause", "resume", "steer", "cancel", "retry", "request", "follow-up", "intent.resume", "discovery-run", "spec-build", "plan-create", "review-run", "delivery-prepare", "release-prepare", "learning-handoff", "mission-create", "handoff-approve", "review-decide", "inspect-active-run", "inspect-quality-repair", "fix-onboarding", "fix-delivery-blockers", "repair-mission-intake", "repair-review-gate", "resolve-review-hold", "hold-exhausted-quality-repair", "run-review-repair", "run-review-quality-repair", "run-qa-quality-repair", "qa-quality-repair", "start-new-flow", "complete-mission-intake", "closure-complete"] },
           "expected_revision": { "type": "integer", "minimum": 0 },
           "command_id": { "type": "string", "minLength": 1 },
           "request_text": { "type": "string", "minLength": 1 },
           "intent_type": { "type": "string", "enum": ["analyze", "explain", "review", "validate", "repair", "plan", "implement"] },
           "approval_ref": { "type": "string", "minLength": 1 },
           "reason": { "type": "string", "minLength": 1 },
-          "allowed_paths": { "type": "array", "items": { "type": "string" } }
+          "allowed_paths": { "type": "array", "items": { "type": "string" } },
+          "decision": { "type": "string", "minLength": 1 },
+          "run_id": { "type": "string", "minLength": 1 },
+          "mode": { "type": "string", "enum": ["no-write", "patch-only", "local-branch", "fork-first"] },
+          "input_packet": { "type": "string", "minLength": 1 }
         },
         "additionalProperties": false
       },

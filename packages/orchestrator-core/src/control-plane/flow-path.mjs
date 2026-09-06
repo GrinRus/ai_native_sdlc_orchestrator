@@ -1,3 +1,5 @@
+import { getTaskActionDefinition } from "./task-action-catalog.mjs";
+
 const READ_ONLY_PATH = Object.freeze([
   { id: "discovery", label: "Discover" },
   { id: "review", label: "Verify" },
@@ -87,6 +89,24 @@ export function buildLifecyclePath(workType, selectedStage, status, evidenceRefs
 
 const text = (value) => typeof value === "string" && value.trim() ? value.trim() : null;
 
+function publicAction(action, status) {
+  const actionId = text(action.action_id);
+  const definition = actionId ? getTaskActionDefinition(actionId) : null;
+  const operatorControl = action.operator_control && typeof action.operator_control === "object" && !Array.isArray(action.operator_control)
+    ? { ...action.operator_control }
+    : text(action.operator_control) ?? text(action.command);
+  return {
+    action_id: actionId,
+    operator_control: operatorControl,
+    reason: text(action.reason),
+    available: status !== "completed" && action.available !== false && Boolean(actionId || text(action.command)),
+    permission: definition?.permission ?? "read",
+    category: definition?.category ?? "unavailable",
+    requires_confirmation: definition?.requires_confirmation === true,
+    payload: definition?.payload ?? {},
+  };
+}
+
 export function buildFlowPresentation({ missionSettings, missionId, selectedStage, status, evidenceRefs, primaryAction, blockers, attentionCount, runtimeLifecyclePath, updatedAt }) {
   const settings = missionSettings && typeof missionSettings === "object" ? missionSettings : {};
   const action = primaryAction && typeof primaryAction === "object" ? primaryAction : {};
@@ -99,7 +119,7 @@ export function buildFlowPresentation({ missionSettings, missionId, selectedStag
     current_step: currentStep?.id ?? null,
     current_step_label: currentStep?.label ?? null,
     next_action_summary: text(action.reason) ?? text(action.command),
-    primary_action: { action_id: text(action.action_id), operator_control: text(action.operator_control) ?? text(action.command), reason: text(action.reason), available: status !== "completed" && Boolean(text(action.action_id) || text(action.command)) },
+    primary_action: publicAction(action, status),
     attention_count: Number.isInteger(attentionCount) && attentionCount >= 0 ? attentionCount : blockerList.length,
     blocker_count: blockerList.length,
     evidence_count: Array.isArray(evidenceRefs) ? evidenceRefs.length : 0,

@@ -13,6 +13,7 @@ import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
 import { readFlowProjection } from "../flow-projections.mjs";
 import { listTaskProjections } from "../read-surface.mjs";
+import { validateTaskActionPayload } from "../task-action-catalog.mjs";
 import {
   approveTaskPlan,
   createTaskPlan,
@@ -371,10 +372,15 @@ export async function handleTaskAction({ request, response, params, registry, ru
   const payload = await readMutationPayload(request, response);
   if (!payload) return;
   const action = asString(payload.action);
-  if (!["confirm", "start", "pause", "resume", "cancel", "retry", "request", "follow-up"].includes(action)) {
-    sendError(response, 400, "task.invalid_action", `Unsupported Task action '${action ?? "missing"}'.`);
+  const actionValidation = validateTaskActionPayload(action, payload);
+  if (!actionValidation.ok) {
+    sendError(response, 400, actionValidation.code === "task.unknown_action" ? "task.invalid_action" : actionValidation.code, actionValidation.message, {
+      action_catalog: true,
+      field_errors: actionValidation.field_errors,
+    });
     return;
   }
+  const definition = actionValidation.definition;
   const task = listTaskProjections({
     ...runtimeOptions,
     registry,
@@ -416,6 +422,30 @@ export async function handleTaskAction({ request, response, params, registry, ru
       });
       return;
     }
+    const durableReadback = (result = null, status = null) => {
+      const tasks = listTaskProjections({
+        ...runtimeOptions,
+        registry,
+        projectId: params.projectId,
+        intentSubmissions: listIntentSubmissions({ registry, projectId: params.projectId }).submissions,
+      });
+      const refreshed = tasks.tasks.find((candidate) => candidate.task_id === task.task_id)
+        ?? (result?.flow_id ? tasks.tasks.find((candidate) => candidate.flow_id === result.flow_id) : null)
+        ?? task;
+      return {
+        durable: true,
+        task: refreshed,
+        task_id: refreshed.task_id,
+        intent_submission_ref: refreshed.intent_submission_ref ?? null,
+        mission_id: refreshed.mission_id ?? null,
+        flow_id: refreshed.flow_id ?? result?.flow_id ?? null,
+        run_ids: refreshed.run_ids ?? [],
+        revision: refreshed.revision ?? null,
+        state: refreshed.status_detail ?? refreshed.status ?? null,
+        evidence_refs: refreshed.evidence_refs ?? [],
+        ...(status ? { result_status: status } : {}),
+      };
+    };
     if (["confirm", "start"].includes(action)) {
       if (action === "start" && task.status === "prepared") {
         const route = task.prepared_contract?.approved_execution_route;
@@ -434,7 +464,22 @@ export async function handleTaskAction({ request, response, params, registry, ru
       const result = action === "confirm"
         ? confirmIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision })
         : confirmAndStartIntent({ registry, projectId: params.projectId, submissionId, expectedRevision: Number.isInteger(payload.expected_revision) ? payload.expected_revision : task.revision });
-      sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: { durable: true, task_id: task.task_id, flow_id: result.flow_id ?? null } });
+      sendJson(response, action === "start" ? 202 : 200, { task_id: task.task_id, action, confirmation: result, readback: durableReadback(result, action === "start" ? "accepted" : "confirmed") });
+      return;
+    }
+    if (definition.dispatch === "intent.prepare") {
+      const submissionId = asString(task.lineage?.intent_submission_id);
+      if (!submissionId) {
+        sendError(response, 409, "task.prepare_unavailable", "This Task has no intent submission that can be resumed.");
+        return;
+      }
+      const result = prepareIntentSubmission({ registry, projectId: params.projectId, submissionId });
+      sendJson(response, 202, {
+        task_id: task.task_id,
+        action,
+        preparation: result,
+        readback: durableReadback(result, "accepted"),
+      });
       return;
     }
     if (action === "request" || action === "retry") {
@@ -463,7 +508,54 @@ export async function handleTaskAction({ request, response, params, registry, ru
           status: result.status,
           document: result.operatorRequest,
         },
-        readback: { durable: true, task_id: task.task_id, flow_id: task.flow_id },
+        readback: durableReadback(result),
+      });
+      return;
+    }
+    if (definition.dispatch === "readback") {
+      sendJson(response, 200, { task_id: task.task_id, action, accepted: true, readback: durableReadback(null, "read-only") });
+      return;
+    }
+    if (definition.dispatch === "lifecycle") {
+      if (task.primary_action?.action_id !== action) {
+        sendError(response, 409, "task.action_not_current", `Task action '${action}' is not the server-published next action.`, {
+          current_action: task.primary_action?.action_id ?? null,
+          recovery_actions: [{ action: "refresh", payload: { resource: `task://${task.task_id}`, current_revision: task.revision ?? null } }],
+        });
+        return;
+      }
+      const flags = {};
+      if (action === "discovery-run" && task.intent_submission_ref) flags["input-packet"] = task.intent_submission_ref;
+      if (["review-run", "learning-handoff"].includes(action) && task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
+      if (["delivery-prepare", "release-prepare"].includes(action)) {
+        if (task.run_ids?.[0]) flags["run-id"] = task.run_ids[0];
+        flags.mode = task.prepared_contract?.delivery_mode ?? "no-write";
+        flags["require-review-decision"] = true;
+      }
+      for (const [key, value] of Object.entries(payload)) {
+        if (["action", "expected_revision", "command_id", "request_text", "allowed_paths", "intent_type"].includes(key)) continue;
+        if (value !== undefined) flags[key] = value;
+      }
+      const lifecycle = runLifecycleCommand({
+        ...runtimeOptions,
+        cwd: runtimeOptions.cwd ?? runtimeOptions.projectRef,
+        projectRef: runtimeOptions.projectRef,
+        command: definition.lifecycle_command,
+        flags,
+      });
+      if (!lifecycle.ok) {
+        sendError(response, lifecycle.statusCode ?? 409, lifecycle.error?.code ?? "task.lifecycle_blocked", lifecycle.error?.detail ?? "Published Task action is blocked.", {
+          action_id: action,
+          evidence_refs: lifecycle.result?.evidence_refs ?? [],
+          recovery_actions: [{ action: "retry", payload: { task_id: task.task_id, action } }],
+        });
+        return;
+      }
+      sendJson(response, lifecycle.statusCode === 202 ? 202 : 200, {
+        task_id: task.task_id,
+        action,
+        lifecycle_command: lifecycle.result,
+        readback: durableReadback(lifecycle.result, "accepted"),
       });
       return;
     }
@@ -489,8 +581,12 @@ export async function handleTaskAction({ request, response, params, registry, ru
       });
       return;
     }
-    sendJson(response, 200, { task_id: task.task_id, action, run_control: result, readback: { durable: true, task_id: task.task_id, run_id: runId } });
+    sendJson(response, 200, { task_id: task.task_id, action, run_control: result, readback: durableReadback({ flow_id: task.flow_id, run_id: runId }, result.blocked ? "blocked" : "accepted") });
   } catch (error) {
+    if (error instanceof IntentServiceError) {
+      sendError(response, error.statusCode ?? 409, error.code, error.message, error.details);
+      return;
+    }
     if (error instanceof OperatorRequestError) {
       sendError(response, error.statusCode, error.code, error.message);
       return;
