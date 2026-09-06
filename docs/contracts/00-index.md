@@ -89,5 +89,7 @@ Compiled-context and external-runner contracts include context-budget evidence f
 - `control-plane-api.md`
 - `control-plane-api.openapi.json`
 
+Foundational and qualification references: [canonical-identifiers-and-paths.md](canonical-identifiers-and-paths.md), [canonical-path-ownership.md](canonical-path-ownership.md), [evidence-reference.md](evidence-reference.md), [state-transaction.md](state-transaction.md), [contract-loader-coverage.md](contract-loader-coverage.md), and [w66-adversarial-proof.md](w66-adversarial-proof.md).
+
 ## Loader coverage
 See `contract-loader-coverage.md` for the contract-to-loader mapping table, current limitation status, and W0-S03 reference-integrity failure shapes.

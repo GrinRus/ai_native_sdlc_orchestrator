@@ -906,7 +906,7 @@ handoff remains `Улучшить UI и UX` at immutable commit `59943bfa`.
 
 ## W71-S13 — Source-of-truth and story-evidence alignment
 
-- **State:** blocked
+- **State:** active
 - **Epic:** EPIC-0, EPIC-1, EPIC-4, EPIC-5, EPIC-6, EPIC-7
 - **Hard dependencies:** W71-S15
 - **Remediation priority:** P1
