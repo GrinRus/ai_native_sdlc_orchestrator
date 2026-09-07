@@ -8,6 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 import { runProductionReadinessGate } from "../production-readiness.mjs";
 import { checkW59ClosureReport } from "../readiness/w59-closure.mjs";
+import { checkW71AuditDisposition } from "../readiness/w71-disposition.mjs";
 import { evaluateAuditReleaseHold } from "../../packages/orchestrator-core/src/audit-release-hold.mjs";
 import { getCommandDefinition } from "../../packages/orchestrator-core/src/operator-cli/command-catalog.mjs";
 import {
@@ -122,6 +123,39 @@ test("W71 disposition enumerates every open blocker and fails closed on drift", 
     const check = result.checks.find((entry) => entry.id === "w71-audit-disposition");
     assert.equal(check?.status, "fail");
     assert.match(check?.findings?.join("\n") ?? "", /W71-AUD-008/u);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("integrated-local W71 disposition requires digest-addressed S14 evidence", () => {
+  const dispositionPath = path.join(root, "docs/research/26-w71-audit-disposition.json");
+  const evidencePath = path.join(root, "docs/research/27-w71-s14-installed-control-plane-evidence.json");
+  const originalDisposition = JSON.parse(fs.readFileSync(dispositionPath, "utf8"));
+  const originalEvidence = JSON.parse(fs.readFileSync(evidencePath, "utf8"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w71-integrated-proof-"));
+  const tempDispositionPath = path.join(tempDir, "disposition.json");
+  const tempEvidencePath = path.join(tempDir, "evidence.json");
+  try {
+    const writeCase = (evidence) => {
+      fs.writeFileSync(tempEvidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+      const disposition = structuredClone(originalDisposition);
+      disposition.evidence_policy.integrated_evidence_ref = path.relative(root, tempEvidencePath);
+      fs.writeFileSync(tempDispositionPath, `${JSON.stringify(disposition, null, 2)}\n`);
+      return checkW71AuditDisposition(root, path.relative(root, tempDispositionPath));
+    };
+
+    assert.equal(writeCase(originalEvidence).status, "pass");
+
+    const invalidStatus = structuredClone(originalEvidence);
+    invalidStatus.status = "fixture-pass";
+    assert.equal(writeCase(invalidStatus).status, "fail");
+
+    const invalidManifest = structuredClone(originalEvidence);
+    invalidManifest.qualification_freeze.manifest_sha256 = "not-a-digest";
+    const invalidResult = writeCase(invalidManifest);
+    assert.equal(invalidResult.status, "fail");
+    assert.match(invalidResult.findings.join("\n"), /digest-addressed qualification manifest/u);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

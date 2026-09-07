@@ -3,13 +3,14 @@
   "disposition_id": "aor-post-w70-audit-disposition-2026-09",
   "audit_source": "docs/research/05-codebase-audit-2026-07.md",
   "baseline_commit": "f6de7e3167e74a2fd975deb5736e464cdcffac2f",
-  "updated_at": "2026-09-06",
+  "updated_at": "2026-09-07",
   "release_disposition": "audit-hold",
   "release_clearance": false,
   "historical_qualification_boundary": "W66 qualification remains a separate release hold until its fresh matrix closes.",
   "evidence_policy": {
     "allowed_tiers": ["baseline", "fixture", "integrated-local", "live-provider"],
-    "current_integrated_tier": "baseline",
+    "current_integrated_tier": "integrated-local",
+    "integrated_evidence_ref": "docs/research/27-w71-s14-installed-control-plane-evidence.json",
     "historical_provider_evidence_is_current": false,
     "mock_or_route_fulfilled_evidence_is_integrated_proof": false
   },
@@ -17,56 +18,56 @@
     {
       "finding_id": "W71-AUD-001",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S02"],
       "release_blocking": true,
       "affected_invariants": ["canonical-filesystem-containment", "durable-cleanup"],
-      "summary": "Repository-derived paths and cleanup need one symlink-safe canonical ownership rule.",
-      "evidence_refs": ["docs/research/05-codebase-audit-2026-07.md", "docs/backlog/wave-71-implementation-slices.md"],
-      "limitations": ["OS-level provider sandboxing remains outside W71-S02."]
+      "summary": "W71-S02 centralizes symlink-safe canonical path ownership, no-follow reads, and durable cleanup transitions.",
+      "evidence_refs": ["docs/backlog/handoffs/w71-s02-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "limitations": ["OS-level provider sandboxing remains outside W71-S02.", "The local full runner reached 102/102 tests before a known worker hang; remote CI remains the slice-gate authority."]
     },
     {
       "finding_id": "W71-AUD-002",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S03"],
       "release_blocking": true,
       "affected_invariants": ["deterministic-repository-gate", "process-failure-authority"],
-      "summary": "The canonical gate still needs fail-hard process supervision, complete coverage, and supported-version determinism.",
-      "evidence_refs": ["docs/research/05-codebase-audit-2026-07.md", "docs/research/06-maintainability-and-backlog-triage-2026-07.md", "docs/backlog/wave-71-implementation-slices.md"],
-      "limitations": ["Performance benchmarking is isolated from correctness acceptance until W71-S03."]
+      "summary": "W71-S03 adds fail-closed process supervision, bounded command execution, supported Node 22 enforcement, and complete gate coverage metadata.",
+      "evidence_refs": ["docs/backlog/handoffs/w71-s03-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "limitations": ["Performance benchmarking is isolated from correctness acceptance until W71-S03.", "The local Node 25 runner remains non-authoritative for the full gate; CI Node 22 is the supported verification environment."]
     },
     {
       "finding_id": "W71-AUD-003",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S04"],
       "release_blocking": true,
       "affected_invariants": ["versioned-task-contract", "execution-route-lineage"],
-      "summary": "Prepared Task data and the route executed by Start are not yet one versioned, durable contract.",
-      "evidence_refs": ["docs/backlog/wave-71-implementation-slices.md", "docs/product/user-story-coverage-matrix.md"],
+      "summary": "W71-S04 makes the prepared Task projection and Start execution route one versioned, durable contract with revision-guarded mutation.",
+      "evidence_refs": ["docs/backlog/handoffs/w71-s04-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md"],
       "limitations": ["Existing W70 presentation evidence remains valid only at its documented fixture scope."]
     },
     {
       "finding_id": "W71-AUD-004",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S05"],
       "release_blocking": true,
       "affected_invariants": ["atomic-state-transitions", "restart-recovery", "concurrent-control"],
-      "summary": "Intent, run, and Task transitions need atomic durable state and restart-safe ownership.",
-      "evidence_refs": ["docs/research/05-codebase-audit-2026-07.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "summary": "W71-S05 moves intent, run, and provider status updates behind lock-scoped, revision-aware transactions with explicit recovery evidence.",
+      "evidence_refs": ["docs/backlog/handoffs/w71-s05-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md"],
       "limitations": ["Distributed hosted coordination remains outside the local W71 runtime boundary."]
     },
     {
       "finding_id": "W71-AUD-005",
       "severity": "S1",
-      "state": "open",
+      "state": "resolved",
       "owner_slices": ["W71-S06"],
       "release_blocking": true,
       "affected_invariants": ["delivery-scope", "route-safety", "evidence-acceptance"],
-      "summary": "Delivery, release, route, and scope validation still require a single fail-closed grammar and evidence boundary.",
-      "evidence_refs": ["docs/research/05-codebase-audit-2026-07.md", "docs/backlog/wave-71-implementation-slices.md"],
+      "summary": "W71-S06 closes delivery, release, integration, route, scope, and evidence validation behind shared fail-closed contracts and immutable lineage checks.",
+      "evidence_refs": ["docs/backlog/handoffs/w71-s06-contracts-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md"],
       "limitations": ["No real upstream write is permitted as part of remediation evidence."]
     },
     {
@@ -77,8 +78,8 @@
       "release_blocking": true,
       "affected_invariants": ["server-owned-task-lifecycle", "public-provisioning"],
       "summary": "W71-S07/S10 expose the server-owned Task and provision/integration boundaries; one installed Prepare-to-Start-to-Work proof remains for W71-S14.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md"],
-      "limitations": ["W70 browser fixtures do not constitute integrated control-plane proof."]
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
+      "limitations": ["The installed evidence proves the real control-plane boundary, but does not yet contain the complete Prepare-to-Start-to-Work two-repository run."]
     },
     {
       "finding_id": "W71-AUD-007",
@@ -88,8 +89,8 @@
       "release_blocking": true,
       "affected_invariants": ["operator-request-durability", "review-completion-recovery"],
       "summary": "W71-S08 now supplies durable Ask AOR, recovery, review, and completion transitions; installed public control-plane qualification remains for W71-S14.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md"],
-      "limitations": ["Historical deterministic lifecycle evidence is retained as historical or fixture evidence only."]
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
+      "limitations": ["Historical deterministic lifecycle evidence is retained as historical or fixture evidence only; the installed evidence does not yet prove full recovery and review completion across two repositories."]
     },
     {
       "finding_id": "W71-AUD-008",
@@ -99,8 +100,8 @@
       "release_blocking": true,
       "affected_invariants": ["public-integration"],
       "summary": "W71-S09 hardens multirepo scope locking and isolated measured integration; W71-S10 now exposes the public provision-to-integration producer path, while installed closure remains for W71-S14.",
-      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md"],
-      "limitations": ["Constructed W62 proof remains useful diagnostic evidence but is not installed public proof."]
+      "evidence_refs": ["docs/product/user-story-coverage-matrix.md", "docs/backlog/wave-71-implementation-slices.md", "docs/backlog/handoffs/w71-s10-public-workspace-provision-integration-execution-plan.md", "docs/research/27-w71-s14-installed-control-plane-evidence.json"],
+      "limitations": ["Constructed W62 proof remains useful diagnostic evidence but is not installed public proof; current installed coverage stops at second-repository connection."]
     },
     {
       "finding_id": "W71-AUD-009",
@@ -142,9 +143,9 @@
       "owner_slices": ["W71-S14"],
       "release_blocking": true,
       "affected_invariants": ["merged-ui-runtime-journey", "installed-black-box-proof", "qualification-freeze"],
-      "summary": "The merged Command Desk UI and runtime now have an installed real-control-plane proof and same-commit qualification-freeze inputs.",
+      "summary": "The merged Command Desk UI and runtime now have installed real-control-plane evidence and same-commit qualification-freeze inputs; the remaining two-repository closure is tracked separately under W71-S14.",
       "evidence_refs": ["docs/research/27-w71-s14-installed-control-plane-evidence.json", "docs/backlog/handoffs/w71-s14-ui-integration-execution-plan.md", "docs/backlog/wave-71-implementation-slices.md", "docs/product/user-story-coverage-matrix.md"],
-      "limitations": ["Fresh W66 provider qualification remains an independent release hold.", "The sibling UI branch remains an immutable handoff; the integrated runtime evidence is recorded on the S14 candidate."]
+      "limitations": ["Fresh W66 provider qualification remains an independent release hold.", "The sibling UI branch remains an immutable handoff; the integrated runtime evidence is recorded on the S14 candidate.", "The S14 evidence record is intentionally partial and does not close W71-AUD-006 through W71-AUD-008."]
     }
   ],
   "story_downgrades": [
